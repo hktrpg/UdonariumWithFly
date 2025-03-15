@@ -61,8 +61,6 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   get text(): string { return <string>this.value; }
   set text(text: string) { this.value = (text == null) ? '' : text; }
 
-  isAnimated = false;
-
   get timestamp(): number {
     let timestamp = this.getAttribute('timestamp');
     let num = timestamp ? +timestamp : 0;

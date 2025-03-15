@@ -14,7 +14,7 @@ import {
   Output,
   ViewChild
 } from '@angular/core';
-
+import { ChatMessageService } from 'service/chat-message.service';
 import { ChatMessage, ChatMessageContext } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -101,7 +101,6 @@ Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れ�
     return (chatMessage && chatMessage.isOperationLog) ? 26 : 61;
   }
 
-
   private preScrollTop = 0;
   private scrollSpeed = 0;
 
@@ -147,6 +146,7 @@ Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れ�
   @Output() onAddMessage: EventEmitter<null> = new EventEmitter();
 
   constructor(
+    private chatMessageService: ChatMessageService,
     private ngZone: NgZone,
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService
@@ -229,6 +229,11 @@ Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れ�
 
   trackByChatMessage(index: number, message: ChatMessage) {
     return message.identifier;
+  }
+
+  checkAnimated(message: ChatMessage): boolean {
+    //console.log(this.chatMessageService.getTime())
+    return !(message.timestamp + 1000 >= this.chatMessageService.getTime());
   }
 
   private adjustIndex() {
