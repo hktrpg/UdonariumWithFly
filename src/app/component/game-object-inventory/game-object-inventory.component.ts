@@ -1,3 +1,4 @@
+import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
@@ -27,7 +28,37 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
   selector: 'game-object-inventory',
   templateUrl: './game-object-inventory.component.html',
   styleUrls: ['./game-object-inventory.component.css'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  animations: [
+    trigger('SlideInOut', [
+      transition('void => *', [
+        animate('200ms ease', keyframes([
+          style({ transform: 'translateX(60px)', opacity: 0, offset: 0 }),
+          style({ transform: 'translateX(0px)', opacity: 1, offset: 1.0 })
+        ]))
+      ]),
+      transition('* => void', [
+        animate('200ms ease', keyframes([
+          style({ transform: 'translateX(0px)', opacity: 1, offset: 0 }),
+          style({ transform: 'translateX(60px)', opacity: 0, offset: 1.0 })
+        ]))
+      ]),
+      /*
+      transition(':increment', [
+        animate('200ms ease', keyframes([
+          style({ transform: 'translateY(-150px)', opacity: 0, offset: 0 }),
+          style({ transform: 'translateY(0px)', opacity: 1, offset: 1.0 })
+        ]))
+      ]),
+      transition(':decrement', [
+        animate('200ms ease', keyframes([
+          style({ transform: 'translateY(150px)', opacity: 0, offset: 0 }),
+          style({ transform: 'translateY(0px)', opacity: 1, offset: 1.0 })
+        ]))
+      ]),
+      */
+    ])
+  ]
 })
 export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   inventoryTypes: string[] = ['table', 'common', 'graveyard'];

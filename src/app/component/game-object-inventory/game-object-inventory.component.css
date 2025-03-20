@@ -4,6 +4,7 @@
 
 .component {
   width: 100%;
+  overflow-x: hidden;
 }
 
 .box {
@@ -505,6 +506,19 @@ button.link {
 
 .object-container {
   position: relative;
+  /* 
+  transition: all 700ms 0s ease;
+  animation: fadeIn 0.7s cubic-bezier(0.33, 1, 0.68, 1) alternate;
+    */
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .owner-tag {
