@@ -299,7 +299,8 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
       window.open(url.trim(), '_blank', 'noopener');
     } else {
       this.modalService.open(OpenUrlComponent, { url: url, title: title, subTitle: subTitle });
-    } 
+    }
+    return false; 
   }
   private getInventoryTags(gameObject: TabletopObject): DataElement[] {
     return this.inventoryService.tableInventory.dataElementMap.get(gameObject.identifier);
