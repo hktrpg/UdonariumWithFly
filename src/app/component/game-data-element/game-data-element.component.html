@@ -82,7 +82,7 @@
             <ng-container *ngIf="!isEdit && currentValue"><span style="font-size: smaller;">{{'(' + (abilityScore >=0 ? '+' : '') + abilityScore + ')'}}</span></ng-container>
           </ng-container>
           <ng-container *ngSwitchCase="'checkProperty'">
-              <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width:30%; max-width:4em" type="checkbox" [(ngModel)]="value" checked="{{value ? 'checked' : ''}}" (change)="value = (value ? name : '')">
+              <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" type="checkbox" [(ngModel)]="value" checked="{{value ? 'checked' : ''}}" (change)="value = (value ? name : '')">
               <input *ngIf="isEdit" style="width:50%; max-width:4em" type="text" size="1" [(ngModel)]="currentValue" placeholder="Option">
               <span *ngIf="!isEdit" style="font-size: 1.0em; font-family: Cambria, Georgia; color: #555">{{checkValue}}</span>
             </ng-container>
