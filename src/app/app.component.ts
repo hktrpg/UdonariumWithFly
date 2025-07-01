@@ -501,6 +501,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
               materialIcon: 'browser_updated',
               action: () => {
                 this.swUpdate.activateUpdate().then(() => {
+                  if (notification) {
+                    notification.close();
+                    notification = null;
+                  }
                   window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
                   document.location.reload();
                 });
