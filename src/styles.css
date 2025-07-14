@@ -270,6 +270,10 @@ s.drop-dice .dropped {
   scrollbar-width: thin;
 }
 
+input {
+  accent-color: #002699;
+}
+
 /*
  * デスクトップWindows版Chrome 119におけるレンダリング改善のための定義.
  * 3D表示している画像にこのCSSクラスを付与すると至近距離で表示した時の解像度が鮮明になる.
