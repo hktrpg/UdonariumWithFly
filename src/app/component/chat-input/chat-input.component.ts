@@ -222,7 +222,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
 
   get diceBotInfos() { return DiceBot.diceBotInfos }
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
-  get otherPeers(): PeerCursor[] { return ObjectStore.instance.getObjects(PeerCursor); }
+  get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /** ObjectStore.instance.getObjects(PeerCursor); **/ }
 
   get diceBotInfosIndexed() { return DiceBot.diceBotInfosIndexed }
 

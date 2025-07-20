@@ -98,7 +98,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   
   private noticeIntervalTimer: NodeJS.Timer = null;
 
-  get otherPeers(): PeerCursor[] { return ObjectStore.instance.getObjects(PeerCursor); }
+  get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -450,6 +450,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   
   private static readonly beforeUnloadProc = (event) => {
+    event.stopImmediatePropagation();
     event.preventDefault();
     event.returnValue = '';
   };
