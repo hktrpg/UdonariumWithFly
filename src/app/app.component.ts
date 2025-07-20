@@ -770,6 +770,24 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
   }
+
+  logout() {
+      this.modalService.open(ConfirmationComponent, {
+      title: 'ログアウト', 
+      text: '接続を終了しログアウトします。',
+      helpHtml: '<b style="color: red">ページを再読み込みします。</b>必要ならばその前に保存してください。',
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'logout',
+      action: () => {
+        window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
+        document.location.reload();
+      },
+      cancelAction: () => {
+        this.isUpdateCanceled = true;
+      }
+    });
+  }
+
   deleteGameObject(gameObject: any) {
     throw new Error('Method not implemented.');
   }
