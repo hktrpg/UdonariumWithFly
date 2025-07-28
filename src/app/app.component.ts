@@ -99,6 +99,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private noticeIntervalTimer: NodeJS.Timer = null;
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
+  get isRoom(): boolean { return Network.peer?.isRoom; }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -377,7 +378,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
-            chatMessageService.sendOperationLog((Network.peer.isRoom ? Network.peer.roomName + ' に': '他者と') + '接続した');
+            chatMessageService.sendOperationLog((this.isRoom ? Network.peer.roomName + ' に': '他者と') + '接続した');
           }
         }
         this.lazyNgZoneUpdate(event.isSendFromSelf);
@@ -773,17 +774,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   logout() {
       this.modalService.open(ConfirmationComponent, {
-      title: 'ログアウト', 
-      text: '接続を終了しログアウトします。',
-      helpHtml: '<b style="color: red">ページを再読み込みします。</b>必要ならばその前に保存してください。',
+      title: '退出／切断', 
+      text: `他の参加者との接続を切断し${ this.isRoom ? '、ルームから退出し' : '' }ます。`,
+      helpHtml: '<b style="color: red">ページを再読み込みします。</b>データの保存が必要ならキャンセルしてください。',
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {
         window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
         document.location.reload();
-      },
-      cancelAction: () => {
-        this.isUpdateCanceled = true;
       }
     });
   }

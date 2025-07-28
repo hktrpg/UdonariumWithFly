@@ -61,3 +61,8 @@
 .is-0-width {
   width: 0;
 }
+
+.material-icons {
+  font-size: 18px;
+  vertical-align: bottom;
+}
