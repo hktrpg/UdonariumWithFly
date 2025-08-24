@@ -19,7 +19,7 @@
     <select #chatPlette class="palette" style="overflow-y: auto;" size="5" (focus)="arrowPalette()" (keydown.arrowUp)="moveToInput($event)" (keyup.arrowUp)="arrowPalette()" (keyup.arrowDown)="arrowPalette()" (keydown.enter)="enterPalette(chatPlette.value, $event)" (click)="clickPalette(chatPlette.value)">
       <ng-container *ngIf="palette">
         <ng-container *ngFor="let palette of filteredPaletteStrings">
-          <option *ngIf="filter(palette)" value="{{palette}}" [style.color]="color">{{palette}}</option>
+          <option *ngIf="filter(palette)" value="{{palette}}" [style.color]="color" title="{{palette}}">{{palette}}</option>
         </ng-container>
       </ng-container>
     </select>
