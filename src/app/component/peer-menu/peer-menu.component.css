@@ -176,5 +176,6 @@
 .material-icons {
   font-size: 18px;
   display: inline-block;
+  vertical-align: middle;
   margin-right: 1px;
 }
