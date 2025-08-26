@@ -47,8 +47,8 @@
     <div>
       パスワード
       <label sytle="white-space: nowrap">
-        <input name="show-hide-password" type="checkbox" value="Show Hides" checked="{{ isPasswordOpen ? 'checked' : '' }}" (click)="onPasswordOpen($event)">
-        <b class="material-icons" [ngClass]="{'red-eye': isPasswordOpen}" style="font-size: smaller">{{ isPasswordOpen ? 'visibility' : 'visibility_off' }}</b>：
+        <input name="show-hide-password" type="checkbox" value="Show Hides" class="show-hides" checked="{{ isPasswordOpen ? 'checked' : '' }}" (click)="onPasswordOpen($event)">
+        <b class="material-icons show-hides" [ngClass]="{'red-eye': isPasswordOpen}" style="font-size: smaller">{{ isPasswordOpen ? 'visibility' : 'visibility_off' }}</b>：
       </label>
       <div style="display: inline">
         <span *ngIf="isPasswordOpen" class="id-input-container">
