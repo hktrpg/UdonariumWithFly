@@ -179,3 +179,7 @@
   vertical-align: middle;
   margin-right: 1px;
 }
+
+.material-icons.health {
+  vertical-align: text-bottom;
+}
