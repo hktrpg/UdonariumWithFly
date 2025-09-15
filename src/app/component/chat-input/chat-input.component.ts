@@ -98,6 +98,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
 
   isUseFaceIcon: boolean = true;
   isUseStandImage: boolean = true;
+  isUseChatBalloon: boolean = true;
   
   static history: string[] = new Array();
   private currentHistoryIndex: number = -1;
@@ -683,7 +684,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       if (matchMostLongText.length < cutInInfo.matchMostLongText.length) matchMostLongText = cutInInfo.matchMostLongText;
       text = text.slice(0, text.length - matchMostLongText.length);
       // 💭
-      if (isUseStandImageOnChatTab && targetCharacter && StringUtil.cr(text).trim()) {
+      if (this.isUseChatBalloon && isUseStandImageOnChatTab && targetCharacter && StringUtil.cr(text).trim()) {
         // CHOICEコマンドの引数は💭としない
         const regArray = /^(([sＳｓ][rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[sＳｓ][rＲｒ][eＥｅ][pＰｐ]|[rＲｒ][eＥｅ][pＰｐ]|[sＳｓ][xＸｘ]|[xＸｘ])?([\d０-９]+)?[ 　]+)?([\s\S]*)?/igm.exec(text);
         let dialogText = (regArray[4] != null) ? regArray[4].trim() : text.trim();

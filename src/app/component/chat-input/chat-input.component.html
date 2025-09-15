@@ -18,10 +18,24 @@
   </div>
   <div class="table-cell">
     <div>
+      <!--
       <label style="margin-right: 3px">
         <input *ngIf="character" type="checkbox" [(ngModel)]="isUseFaceIcon" checked="{{isUseFaceIcon ? 'checked' : ''}}" (change)="isUseFaceIcon = (isUseFaceIcon ? true : false)" />
         <b *ngIf="character" style="font-size: smaller;">顔IC</b>
       </label>
+      -->
+
+      <button *ngIf="character" class="indicate" style="font-size: 0.8em; padding: 1px; width: 1.6em; height: 1.6em; margin-right: 0px" title="チャットに顔ICを使用" [ngClass]="{'is-active': isUseFaceIcon}" (click)="isUseFaceIcon = !isUseFaceIcon">        
+        <i *ngIf="character.faceIcon && 0 < character.faceIcon?.url.length; else altImageIcon" class="mini-face-icon"><img [src]="character.faceIcon.url | safe: 'resourceUrl'" alt=""></i>
+        <ng-template #altImageIcon>
+          <i class="material-icons" style="font-size: 0.8em; padding-top: 2px">emoji_emotions</i>
+        </ng-template>
+      </button>
+
+      <button *ngIf="character" class="indicate" style="font-size: 0.8em; padding: 1px; width: 1.6em; height: 1.6em; margin-left: 1px; margin-right: 2px" [title]="isUseStandImageOnChatTab ? 'チャットの「」内を💭に表示' : '現在のタブでは💭は無効です'" [ngClass]="{'is-active': isUseChatBalloon}" (click)="isUseChatBalloon = !isUseChatBalloon">        
+          <i class="material-icons" style="font-size: 0.8em">{{ isUseChatBalloon && isUseStandImageOnChatTab ? 'textsms' : 'speaker_notes_off'}}</i>
+      </button>
+
       <select [style.max-width]="character ? '9.5em' : '13em'" [(ngModel)]="sendFrom" (change)="standName = ''" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
         <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}（あなた）</option>
         <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal;" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
