@@ -55,7 +55,7 @@
     <div *ngIf="hasStand" [ngClass]="{'disabled-stand': !isUseStandImageOnChatTab}" style="font-size: smaller; margin-top: 1px" [title]="isUseStandImageOnChatTab ? '' : '現在のタブではスタンドは無効です'">
       <span style="font-size: medium">
         <button class="indicate" style="font-size: 0.8em; padding: 1px; height: 1.3rem; width: 1.3rem; margin-left: 2px; margin-right: 2px" [title]="isUseStandImageOnChatTab ? 'スタンドを表示' : '現在のタブではスタンドは無効です'" [ngClass]="{'is-active': isUseStandImage}" (click)="isUseStandImage = !isUseStandImage">        
-          <i class="material-icons" style="font-size: 12px; overflow: hidden; vertical-align: text-bottom">{{ isUseStandImageOnChatTab && isUseStandImage ? 'person' : 'person_off'}}</i>
+          <i class="material-icons" style="font-size: 12px; overflow: hidden; vertical-align: text-bottom">{{ isUseStandImageOnChatTab && isUseStandImage ? 'how_to_reg' : 'person_off'}}</i>
         </button>
       </span>
       <select style="width: 10em; margin-right: 3px" (change)="isUseStandImage = true" [(ngModel)]="standName" [ngModelOptions]="{standalone: true}" [ngClass]="{'not-specified': standName == ''}" [attr.disabled]="!isUseStandImageOnChatTab || !isUseStandImage ? '' : null" >
