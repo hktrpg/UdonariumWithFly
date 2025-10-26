@@ -17,19 +17,22 @@
     </ng-template>
   </div>
   <div class="table-cell">
-    <div styke="display: flex">
+    <div class="ff-flex">
       <label style="margin-right: 2px">
         <input *ngIf="character" type="checkbox" [(ngModel)]="isUseFaceIcon" checked="{{isUseFaceIcon ? 'checked' : ''}}" (change)="isUseFaceIcon = (isUseFaceIcon ? true : false)" />
         <b *ngIf="character" style="font-size: smaller">顔IC</b>
       </label>
-      <select [style.max-width]="character ? '10em' : '13em'" [(ngModel)]="sendFrom" (change)="standName = ''" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
-        <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}（あなた）</option>
-        <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal;" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
-      </select>
-      <button *ngIf="character" class="indicate" style="font-size: 0.8em; padding: 1px; height: 1.3rem; width: 1.3rem; margin-left: 1px; margin-right: 2px" [title]="isUseStandImageOnChatTab ? 'チャットの「」内を💭に表示' : '現在のタブでは💭は無効です'" [ngClass]="{'is-active': isUseChatBalloon}" (click)="isUseChatBalloon = !isUseChatBalloon">        
-          <i class="material-icons" style="font-size: 0.8em">{{ isUseChatBalloon && isUseStandImageOnChatTab ? 'textsms' : 'speaker_notes_off'}}</i>
-      </button>
-      <span style="white-space: nowrap"> ➡
+      <span style="white-space: nowrap">
+        <select [style.max-width]="character ? '10em' : '13em'" [(ngModel)]="sendFrom" (change)="standName = ''" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
+          <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}（あなた）</option>
+          <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal;" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
+        </select>
+        <button *ngIf="character" class="indicate speech-bubble-indicate" [title]="isUseStandImageOnChatTab ? 'チャットの「」内を💭に表示' : '現在のタブでは💭は無効です'" [ngClass]="{'is-active': isUseChatBalloon}" (click)="isUseChatBalloon = !isUseChatBalloon">        
+            <i class="material-icons" style="font-size: 0.8em">{{ isUseChatBalloon && isUseStandImageOnChatTab ? 'textsms' : 'speaker_notes_off'}}</i>
+        </button>
+      </span>
+      <span style="white-space: nowrap">
+        <span style="display: inline-block; margin: auto 2px; text-align: center">➡</span>
         <select style="max-width: 9.5em" [(ngModel)]="sendTo" [ngClass]="{'not-specified': sendTo == ''}" [ngStyle]="{'color': (sendTo == '' ? null : sendToColor), 'font-weight': (sendTo == '' ? 'normal' : 'bolder')}">
           <option value="" class="not-specified">全員</option>
           <option *ngFor="let peer of otherPeers" value="{{peer.identifier}}" [style.color]="peer.color" style="font-weight: bolder;">{{peer.name}}
@@ -49,12 +52,12 @@
           [ngClass]="{'not-specified': gameType == 'DiceBot' || gameType == ''}">
           <option value="DiceBot" class="not-specified">ダイスボット読込中…</option>
         </select>
-        <button style="padding: 2px 6px; vertical-align: baseline; font-size: x-0.8em; ; height: 1.3rem; width: 1.3rem; cursor: help" (click)="showDicebotHelp()">?</button>
+        <button class="dicebot-help" style="cursor: help" (click)="showDicebotHelp()">?</button>
       </span>
     </div>
     <div *ngIf="hasStand" [ngClass]="{'disabled-stand': !isUseStandImageOnChatTab}" style="font-size: smaller; margin-top: 1px" [title]="isUseStandImageOnChatTab ? '' : '現在のタブではスタンドは無効です'">
       <span style="font-size: medium">
-        <button class="indicate" style="font-size: 0.8em; padding: 1px; height: 1.3rem; width: 1.3rem; margin-left: 2px; margin-right: 2px" [title]="isUseStandImageOnChatTab ? 'スタンドを表示' : '現在のタブではスタンドは無効です'" [ngClass]="{'is-active': isUseStandImage}" (click)="isUseStandImage = !isUseStandImage">        
+        <button class="indicate speech-bubble-indicate" style="font-size: 0.8em; padding: 1px; height: 1.3rem; width: 1.3rem; margin-left: 2px; margin-right: 2px" [title]="isUseStandImageOnChatTab ? 'スタンドを表示' : '現在のタブではスタンドは無効です'" [ngClass]="{'is-active': isUseStandImage}" (click)="isUseStandImage = !isUseStandImage">        
           <i class="material-icons" style="font-size: 12px; overflow: hidden; vertical-align: text-bottom">{{ isUseStandImageOnChatTab && isUseStandImage ? 'how_to_reg' : 'person_off'}}</i>
         </button>
       </span>
