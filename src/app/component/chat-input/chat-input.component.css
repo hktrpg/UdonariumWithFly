@@ -18,17 +18,19 @@
   .ff-flex {
     display: flex;
   }
-  .speech-bubble-indicate {
+  .ff-button {
     display: inline-block;
-    padding: 0.35em 0.7em !important;
     width: initial !important;
     height: auto !important;
   }
+  .speech-bubble-indicate {
+    padding: 5px 7px !important;
+  }
   .dicebot-help {
-    display: inline-block;
-    padding: 0.35em 0.7em !important;
-    width: initial !important;
-    height: auto !important;
+    padding: 5px 8px !important;
+  }
+  .stand-indicate {
+    padding: 4px 5px !important;
   }
 }
 
