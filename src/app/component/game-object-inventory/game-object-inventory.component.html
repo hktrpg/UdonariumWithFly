@@ -11,6 +11,9 @@
   <div *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
     <button class="danger" (click)="cleanInventory()" [attr.disabled]="getGameObjects(selectTab).length < 1 ? '' : null">墓場を空にする</button>
   </div>
+  <datalist id="{{panelId}}_suggest">
+    <option *ngFor="let word of suggestWords()" value="{{word}}">{{word}}</option>
+  </datalist>
 </div>
 <ng-template #inventoryTab>
   <form class="is-sticky-top">
@@ -26,7 +29,7 @@
   <ng-container *ngIf="isEdit">
     <div>
       <div style="font-size: 12px;"><b>並び順: </b></div>
-      <input [(ngModel)]="sortTag" placeholder="タグ名" class="order-control" />
+      <input [(ngModel)]="sortTag" placeholder="タグ名" class="order-control" attr.list="{{panelId}}_suggest" />
       <select [(ngModel)]="sortOrder" class="order-control">
         <option value="ASC">昇順</option>
         <option value="DESC">降順</option>

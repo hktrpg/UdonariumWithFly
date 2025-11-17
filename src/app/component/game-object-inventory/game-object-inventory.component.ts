@@ -5,6 +5,7 @@ import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { UUID } from '@udonarium/core/system/util/uuid';
 import { DataElement } from '@udonarium/data-element';
 import { SortOrder } from '@udonarium/data-summary-setting';
 import { GameCharacter } from '@udonarium/game-character';
@@ -71,6 +72,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   };
   selectedIdentifier: string = '';
 
+  panelId;
+
   isEdit: boolean = false;
 
   stringUtil = StringUtil;
@@ -130,6 +133,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         }
       });
     this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
+    this.panelId = UUID.generateUuid();
   }
 
   ngOnDestroy() {
@@ -726,7 +730,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (StringUtil.sameOrigin(url)) {
       window.open(url.trim(), '_blank', 'noopener');
     } else {
-      this.modalService.open(OpenUrlComponent, { url: url, title: title, subTitle: subTitle  });
+      this.modalService.open(OpenUrlComponent, { url: url, title: title, subTitle: subTitle });
     }
     return false;
   }
@@ -737,5 +741,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     this.sortStopTimerId = setTimeout(() => {
       this.inventoryService.sortStop = false;
     }, 666);
+  }
+
+  suggestWords(): string[] {
+    return ['name', 'size'].concat([...new Set(this.inventoryService.dataTags)].filter(dataTag => dataTag != '/' && dataTag != '／').sort());
   }
 }
