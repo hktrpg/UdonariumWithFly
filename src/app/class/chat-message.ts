@@ -221,7 +221,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
         //console.log(this.image)
         const imageIconHtml = (this.image && imageDict[this.image.identifier]) ? `<img class="icon" src="${StringUtil.escapeHtml(imageDict[this.image.identifier])}">` : '<span class="icon-space"></span>';
         return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
-  <div class="msg-header">${ tabNameHtml }<br>${ dateHtml }</div>
+  <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
   <div class="msg-icon">${imageIconHtml}</div>
   <div>
     <div><span class="msg-name">${ nameHtml }</span></div>
