@@ -1,5 +1,6 @@
 import { ChatMessage } from './chat-message';
 import { ChatTab } from './chat-tab';
+import { ImageFile } from './core/file-storage/image-file';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { InnerXml } from './core/synchronize-object/object-serializer';
@@ -48,7 +49,7 @@ export class ChatTabList extends ObjectNode implements InnerXml {
     this.destroy();
   }
 
-  log(logFormat, dateFormat, isWriteOerationLog=true): string {
+  log(logFormat, dateFormat, isWriteOerationLog=true, imageDict?: {}): string {
     if (!this.chatTabs) return '';
     const logBody = this.chatTabs.reduce((ac, chatTab) => {
         if (chatTab) ac.push(...chatTab.chatMessages.filter(chatMessage => chatMessage.isDisplayable && (isWriteOerationLog || !chatMessage.isOperationLog))
@@ -56,7 +57,7 @@ export class ChatTabList extends ObjectNode implements InnerXml {
         return ac;
       }, [])
       .sort((a, b) => a.index - b.index)
-      .map(obj => obj.chatMessage.logFragment(logFormat, obj.tabName, dateFormat))
+      .map(obj => obj.chatMessage.logFragment(logFormat, obj.tabName, dateFormat, imageDict))
       .join("\n");
 
     return logFormat == 0 
@@ -68,7 +69,7 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 <title>Udonarium with Fly：チャットログ：全てのタブ</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
-${ ChatMessage.logCss() }
+${ ChatMessage.logCss(imageDict) }
 </style>
 </head>
 <body>

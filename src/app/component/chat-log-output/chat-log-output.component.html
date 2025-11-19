@@ -1,4 +1,4 @@
-<div class="flex-container">
+<div class="flex-container" style="flex-wrap: nowrap">
     <div class="flex-item no-grow">
       <select #select style="width: 140px" size="10" (change)="onChangeSelectTab(select.value)" [ngModel]="selectedTab?.identifier" [disabled]="isAllTabs">
         <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}">{{chatTab.name}}</option>
@@ -16,7 +16,8 @@
             形式<sup class="self-only">*</sup>：
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 0" [value]="0">テキスト</label>
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 1" [value]="1">HTML</label>
-            <!-- <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">HTML (画像あり)</label> -->
+            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">HTML (画像あり)</label>
+            <div style="font-weight: normal; padding-left: 1em">※<b>HTML（画像あり）</b> はZIPファイルとなります、<br>　フォルダ構造を保って解凍してください。</div>
           </div>
           <div>
             時刻<sup class="self-only">*</sup>：
@@ -33,7 +34,12 @@
             </label>
           </div>
           <div style="flex-grow: 1; text-align: right">
-            <button (click)="saveLog()" style="font-size: smaller" [disabled]="isDiable">ログ出力</button>
+            <button (click)="logFormat < 2 ? saveLog() : saveLogWithImages()" style="font-size: smaller" [disabled]="isDisable">
+              <div style="position: relative;">
+                <div [ngClass]="{'is-hidden': isSaveing}">ログ出力</div>
+                <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
+              </div>
+            </button>
           </div>
         </div>
       </ng-container>

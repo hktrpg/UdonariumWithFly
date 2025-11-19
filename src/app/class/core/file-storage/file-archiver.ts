@@ -138,9 +138,9 @@ export class FileArchiver {
     }
   }
 
-  async saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void>
-  async saveAsync(files: FileList, zipName: string, updateCallback?: UpdateCallback): Promise<void>
-  async saveAsync(files: any, zipName: string, updateCallback?: UpdateCallback): Promise<void> {
+  async saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback, imageFolder?: boolean): Promise<void>
+  async saveAsync(files: FileList, zipName: string, updateCallback?: UpdateCallback, imageFolder?: boolean): Promise<void>
+  async saveAsync(files: any, zipName: string, updateCallback?: UpdateCallback, imageFolder?: boolean): Promise<void> {
     if (!files) return;
     let saveFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
@@ -151,7 +151,7 @@ export class FileArchiver {
     await Promise.all(Array.from(saveFiles).map(async file => {
       let prevProgress = 0;
       sumTotal += file.size;
-      zipWriter.add(file.name, new BlobReader(file), {
+      zipWriter.add((imageFolder && file.type.indexOf('image/') >= 0 ? 'images/' : '') + file.name, new BlobReader(file), {
         async onprogress(progress, total) {
           sumProgress += progress - prevProgress;
           prevProgress = progress;

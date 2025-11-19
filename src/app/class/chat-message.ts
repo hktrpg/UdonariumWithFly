@@ -134,11 +134,11 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     return text;
   }
 
-  logFragment(logForamt: number, tabName: string=null, dateFormat='HH:mm', noImage=true): string {
+  logFragment(logForamt: number, tabName: string=null, dateFormat='HH:mm', imageDict?: {}): string {
     if (logForamt == 0) {
       return this.logFragmentText(tabName, dateFormat);
     } else {
-      return this.logFragmentHtml(tabName, dateFormat, logForamt != 2);
+      return this.logFragmentHtml(tabName, dateFormat, imageDict);
     }
   }
 
@@ -156,7 +156,8 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     return `${ tabName }${ dateStr }${ this.name }${ this.toColor ? (' ➡ ' + this.toName) : '' }：${ (this.isSecret && !this.isSendFromSelf) ? '（シークレットダイス）' : text + lastUpdateStr }`
   }
 
-  logFragmentHtml(tabName: string=null, dateFormat='HH:mm', noImage=true): string {
+  logFragmentHtml(tabName: string=null, dateFormat='HH:mm', imageDict?: {}): string {
+    const isWithImage = !!imageDict;
     const color = StringUtil.escapeHtml(this.color ? this.color : PeerCursor.CHAT_DEFAULT_COLOR);
     const colorStyle = ` style="color: ${ color }"`;
 
@@ -165,9 +166,9 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
     const growClass = (this.isDirect || this.isSecret) ? ' class="grow"' : '';
 
-    const tabNameHtml = (!tabName || tabName.trim() == '') ? '' : `<span class="tab-name">${ StringUtil.escapeHtml(tabName) }</span> `;
+    const tabNameHtml = (tabName == null || tabName.trim() == '') ? '' : `<span class="tab-name">${ StringUtil.escapeHtml(tabName) }</span> `;
     const date = new Date(this.timestamp);
-    const dateHtml = (dateFormat == '') ? '' : `<time datetime="${ date.toISOString() }">${ StringUtil.escapeHtml(formatDate(date, dateFormat, this.locale)) }</time>：`;
+    const dateHtml = (dateFormat == '') ? '' : `<time datetime="${ date.toISOString() }">${ StringUtil.escapeHtml(formatDate(date, dateFormat, this.locale)) }</time>`;
     const nameHtml = `<span${growClass}${colorStyle}>${StringUtil.escapeHtml(this.name)}</span>` 
       + (this.toColor ? ` ➡ <span${growClass}${toColorStyle}>${StringUtil.escapeHtml(this.toName)}</span>` : '');
 
@@ -176,6 +177,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     if (this.isSystem) messageClassNames.push('system-message');
     if (this.isDicebot || this.isCalculate) messageClassNames.push('dicebot-message');
     if (this.isOperationLog) messageClassNames.push('operation-log');
+    if (isWithImage && this.isFaceIcon) messageClassNames.push('face-icon-msessage');
 
     let messageTextClassNames = ['msg-text'];
     if (!this.isSecret || this.isSendFromSelf) {
@@ -215,14 +217,46 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
         // 最終行の調整
         textAutoLinkedHtml += "\n";
       }
-
-    return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
-  <div class="msg-header">${ tabNameHtml }${ dateHtml }<span class="msg-name">${ nameHtml }</span>：</div>
+      if (isWithImage) {
+        //console.log(this.image)
+        const imageIconHtml = this.image ? `<img class="icon" src="./images/${StringUtil.escapeHtml(imageDict[this.image.identifier])}">` : '<span class="icon-space"></span>';
+        return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
+  <div class="msg-header">${ tabNameHtml }<br>${ dateHtml }</div>
+  <div class="msg-icon">${imageIconHtml}</div>
+  <div>
+    <div><span class="msg-name">${ nameHtml }</span></div>
+    <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
+  </div>
+</div>`
+      } else {
+        return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
+  <div class="msg-header">${ tabNameHtml }${ dateHtml }：<span class="msg-name">${ nameHtml }</span>：</div>
   <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
 </div>`;
+      }
   }
 
-  static logCss(noImage=true): string {
+  static logCss(images?): string {
+    const imageCSS = (!images ? '' : `\n
+img.icon {
+  width: 2.8em;
+  height: 2.8em;
+  vertical-align: top;
+  margin: 2px 3px;
+  object-fit: cover;
+  object-position: 50% 0%;
+}
+.face-icon-msessage img.icon {
+  border-radius: 0.5rem;
+}
+span.icon-space {
+  display: inline-block;
+  width: 2.8em;
+  height: 2.8em;
+  vertical-align: top;
+  margin: 2px 3px;
+}
+`);
     return `body {
   color: #444;
   background-color: #FFF;
@@ -335,7 +369,7 @@ s.drop-dice .dropped {
        0px  1px 1px #ffffff,
       -1px  0px 1px #ffffff,
        0px -1px 1px #ffffff; 
-}`;
+}${ imageCSS }`;
   }
 
   static decorationDiceResult(diceBotMessage: string) :string {

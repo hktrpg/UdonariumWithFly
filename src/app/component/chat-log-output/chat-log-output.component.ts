@@ -22,6 +22,9 @@ export class ChatLogOutputComponent implements OnInit {
   selectedTab: ChatTab = null;
   panelId;
 
+  isSaveing: boolean = false;
+  progresPercent: number = 0;
+
   get isAllTabs(): boolean { return ChatLogOutputComponent.isAllTabs; }
   set isAllTabs(isAllTabs: boolean) { ChatLogOutputComponent.isAllTabs = isAllTabs; }
 
@@ -41,7 +44,7 @@ export class ChatLogOutputComponent implements OnInit {
   get isEmpty(): boolean { return this.chatMessageService.chatTabs.length < 1 }
   get isDeleted(): boolean { return this.selectedTab ? ObjectStore.instance.get(this.selectedTab.identifier) == null : false; }
 
-  get isDiable(): boolean { return this.isEmpty || (!this.isAllTabs && (!this.selectedTab || this.isDeleted)) }
+  get isDisable(): boolean { return this.isEmpty || this.isSaveing || (!this.isAllTabs && (!this.selectedTab || this.isDeleted)) }
 
   get roomName():string {
     let roomName = Network.peer && 0 < Network.peer.roomName.length
@@ -76,9 +79,27 @@ export class ChatLogOutputComponent implements OnInit {
   }
 
   saveLog() {
-    if (this.isDiable) return;
+    if (this.isDisable) return;
     const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? '全てのタブ' : this.selectedTab.name);
     const tab = this.isAllTabs ? null : this.selectedTab;
     this.saveDataService.saveChatLog(this.logFormat, fileName, tab, this.dateFormat, this.isWriteOerationLog);
+  }
+
+  async saveLogWithImages() {
+    if (this.isDisable) return;
+    const fileName = this.roomName + '_chatLogWithImages_' + (this.isAllTabs ? '全てのタブ' : this.selectedTab.name);
+    const tab = this.isAllTabs ? null : this.selectedTab;
+
+    this.isSaveing = true;
+    this.progresPercent = 0;
+
+    await this.saveDataService.saveChatLogAsync(this.logFormat, fileName, tab, this.dateFormat, this.isWriteOerationLog, percent => {
+      this.progresPercent = percent;
+    });
+
+    setTimeout(() => {
+      this.isSaveing = false;
+      this.progresPercent = 0;
+    }, 500);
   }
 }

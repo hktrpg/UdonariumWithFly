@@ -94,14 +94,14 @@ export class SaveDataService {
     return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
   }
 
-  private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void> {
+  private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback, imageFolder?: boolean): Promise<void> {
     let progresPercent = -1;
     return FileArchiver.instance.saveAsync(files, zipName, meta => {
       let percent = meta.percent | 0;
       if (percent <= progresPercent) return;
       progresPercent = percent;
       this.ngZone.run(() => updateCallback(progresPercent));
-    });
+    }, imageFolder);
   }
 
   private convertToXml(gameObject: GameObject): string {
@@ -168,6 +168,37 @@ export class SaveDataService {
     const ext = (logFormat == 0 ? '.txt' : '.html');
     const trueFileName = 'fly_' + this.appendTimestamp(fileName) + ext;
     this.chatMessageService.sendOperationLog(`チャットログ ${trueFileName} を保存`);
+    const xml = (chatTab ? chatTab.log(logFormat, dateFormat, isWriteOerationLog) : ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog));
+    
+    const files: File[] = [];
+    files.push(new File([xml], trueFileName, {type: `${mimeType};charset=utf-8`}));
+
     saveAs(new Blob([chatTab ? chatTab.log(logFormat, dateFormat, isWriteOerationLog) : ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog)], {type: `${mimeType};charset=utf-8`}), trueFileName);
+  }
+
+  async saveChatLogAsync(logFormat: number, fileName: string, chatTab: ChatTab=null, dateFormat='HH:mm', isWriteOerationLog=true, updateCallback?: UpdateCallback): Promise<void> {
+    const trueFileName = 'fly_' + this.appendTimestamp(fileName);
+    this.chatMessageService.sendOperationLog(`チャットログ ${trueFileName}.zip を保存`);
+    const target = (chatTab ? chatTab : ChatTabList.instance);
+    const files: File[] = [];
+    const images = this.searchImageFiles(this.convertToXml(target));
+    const imageDict = {};
+    for (const image of images) {
+      if (image.state === ImageState.COMPLETE) {
+        const fileName = image.identifier + '.' + MimeType.extension(image.blob.type);
+        imageDict[image.identifier] = fileName;
+        files.push(new File([image.blob], fileName, { type: image.blob.type }));
+      } else if (image.state === ImageState.URL) {
+        await fetch(image.url)
+          .then(response => response.blob())
+          .then(blob => {
+            const fileName = image.identifier + '.' + MimeType.extension(blob.type);
+            imageDict[image.identifier] = fileName;
+            files.push(new File([blob], fileName, { type: blob.type }))
+          });
+      }
+    }
+    files.push(new File([target.log(logFormat, dateFormat, isWriteOerationLog, imageDict)], 'index.html', {type: 'text/html;charset=utf-8'}));
+    return this.saveAsync(files, trueFileName, updateCallback, true);
   }
 }

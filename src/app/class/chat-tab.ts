@@ -1,4 +1,5 @@
 import { ChatMessage, ChatMessageContext } from './chat-message';
+import { ImageFile } from './core/file-storage/image-file';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { InnerXml, ObjectSerializer } from './core/synchronize-object/object-serializer';
@@ -70,11 +71,11 @@ export class ChatTab extends ObjectNode implements InnerXml {
     return super.parseInnerXml(element);
   };
 
-  log(logFormat, dateFormat,  isWriteOerationLog=true): string {
+  log(logFormat, dateFormat,  isWriteOerationLog=true, imageDict?: {}): string {
     const logBody = this.chatMessages
     .filter(chatMessage => chatMessage.isDisplayable && (isWriteOerationLog || !chatMessage.isOperationLog))
     .sort((a, b) => a.index - b.index)
-    .map(chatMessage => chatMessage.logFragment(logFormat, null, dateFormat))
+    .map(chatMessage => chatMessage.logFragment(logFormat, null, dateFormat, imageDict))
     .join("\n");
 
     return logFormat == 0 
@@ -86,7 +87,7 @@ export class ChatTab extends ObjectNode implements InnerXml {
 <title>Udonarium with Fly：チャットログ：${ StringUtil.escapeHtml(this.name == '' ? '(無名のタブ)' : this.name) }</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
-${ ChatMessage.logCss() }
+${ ChatMessage.logCss(imageDict) }
 </style>
 </head>
 <body>
