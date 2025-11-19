@@ -186,16 +186,20 @@ export class SaveDataService {
     for (const image of images) {
       if (image.state === ImageState.COMPLETE) {
         const fileName = image.identifier + '.' + MimeType.extension(image.blob.type);
-        imageDict[image.identifier] = fileName;
+        imageDict[image.identifier] = './images/' + fileName;
         files.push(new File([image.blob], fileName, { type: image.blob.type }));
       } else if (image.state === ImageState.URL) {
-        await fetch(image.url)
-          .then(response => response.blob())
-          .then(blob => {
-            const fileName = image.identifier + '.' + MimeType.extension(blob.type);
-            imageDict[image.identifier] = fileName;
-            files.push(new File([blob], fileName, { type: blob.type }))
-          });
+        if (image.url.indexOf('http') == 0) {
+          if (StringUtil.validUrl(image.url)) imageDict[image.identifier] = image.url;
+        } else {
+          await fetch(image.url)
+            .then(response => response.blob())
+            .then(blob => {
+              const fileName = image.identifier + '.' + MimeType.extension(blob.type);
+              imageDict[image.identifier] = './images/' + fileName;
+              files.push(new File([blob], fileName, { type: blob.type }))
+            });
+        }
       }
     }
     files.push(new File([target.log(logFormat, dateFormat, isWriteOerationLog, imageDict)], 'index.html', {type: 'text/html;charset=utf-8'}));
