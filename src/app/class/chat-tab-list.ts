@@ -66,7 +66,7 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 <html lang="ja-JP">
 <head>
 <meta charset="UTF-8">
-<title>Udonarium with Fly：チャットログ：全てのタブ</title>
+<title>Udonarium with Fly：チャットログ：全てのタブ${imageDict ? '（画像付き）' : ''}</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 ${ ChatMessage.logCss(imageDict) }

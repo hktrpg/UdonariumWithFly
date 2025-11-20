@@ -218,12 +218,22 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
         textAutoLinkedHtml += "\n";
       }
       if (isWithImage) {
-        //console.log(this.image)
-        const imageIconHtml = (this.image && imageDict[this.image.identifier]) ? `<img class="icon" src="${StringUtil.escapeHtml(imageDict[this.image.identifier])}">` : '<span class="icon-space"></span>';
+        const iconContainerClassList = ['msg-icon'];
+        const auraClassList = ['aura'];
+        if (this.isInverseIcon == 1) iconContainerClassList.push('inverse');
+        if (this.isHollowIcon == 1) iconContainerClassList.push('hollow');
+        if (0 <= this.aura && this.aura <= 7) {
+          auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
+        }
+        const imageIconHtml = (this.image && imageDict[this.image.identifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.image.identifier]) }">` : '<span class="icon-space"></span>';
         return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
-  <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
-  <div class="msg-icon">${imageIconHtml}</div>
-  <div>
+  <div class="msg-header" style="padding-right: 3px">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
+    <div class="${ iconContainerClassList.join(' ') }">
+      <span class="${ auraClassList.join(' ') }">
+        ${imageIconHtml}
+      </span>
+    </div>
+  <div style="padding-left: 3px">
     <div><span class="msg-name">${ nameHtml }</span></div>
     <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
   </div>
@@ -238,11 +248,15 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   static logCss(images?): string {
     const imageCSS = (!images ? '' : `\n
+msg-icon {
+  vertical-align: top;
+  padding-top: 2px;
+  overflow: hidden;
+}
 img.icon {
   width: 2.8em;
   height: 2.8em;
-  vertical-align: top;
-  margin: 2px 3px;
+  vertical-align: bottom;
   object-fit: cover;
   object-position: 50% 0%;
 }
@@ -253,10 +267,42 @@ span.icon-space {
   display: inline-block;
   width: 2.8em;
   height: 2.8em;
-  vertical-align: top;
-  margin: 2px 3px;
+  vertical-align: bottom;
 }
-`);
+.inverse {
+  transform: scaleX(-1);
+}
+.hollow {
+  opacity: 0.6;
+  filter: blur(1px);
+}
+.black-paint {
+  filter: brightness(0);
+}
+.aura.black {
+  filter: drop-shadow(0 -0.2rem 0.2rem black);
+}
+.aura.blue {
+  filter: drop-shadow(0 -0.2rem 0.2rem #00f);
+}
+.aura.green {
+  filter: drop-shadow(0 -0.2rem 0.2rem #3f3);
+}
+.aura.cyan {
+  filter: drop-shadow(0 -0.2rem 0.2rem #3ff);
+}
+.aura.red {
+  filter: drop-shadow(0 -0.2rem 0.2rem #f00);
+}
+.aura.magenta {
+  filter: drop-shadow(0 -0.2rem 0.2rem #f0f);
+}
+.aura.yellow {
+  filter: drop-shadow(0 -0.2rem 0.2rem #ff3);
+}
+.aura.white {
+  filter: drop-shadow(0 -0.2rem 0.3rem #ccc) drop-shadow(0 -0.2rem 0.2rem #fff);
+}`);
     return `body {
   color: #444;
   background-color: #FFF;
