@@ -301,7 +301,7 @@ span.icon-space {
   filter: drop-shadow(0 -0.2rem 0.2rem #ff3);
 }
 .aura.white {
-  filter: drop-shadow(0 -0.2rem 0.3rem #ccc) drop-shadow(0 -0.2rem 0.2rem #fff);
+  filter: drop-shadow(0 -0.2rem 0.3rem #999) drop-shadow(0 -0.2rem 0.2rem #fff);
 }`);
     return `body {
   color: #444;

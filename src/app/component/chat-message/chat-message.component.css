@@ -219,7 +219,7 @@ textarea {
   filter: drop-shadow(0 -4px 4px #ff3);
 }
 .aura.white {
-  filter: drop-shadow(0 -4px 6px #ccc) drop-shadow(0 -4px 4px #fff);
+  filter: drop-shadow(0 -4px 6px #999) drop-shadow(0 -4px 4px #fff);
 }
 
 .msg-timestamp {
