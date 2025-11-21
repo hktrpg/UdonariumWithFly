@@ -227,13 +227,13 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
         }
         const imageIconHtml = (this.image && imageDict[this.image.identifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.image.identifier]) }">` : '<span class="icon-space"></span>';
         return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
-  <div class="msg-header" style="padding-right: 3px">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
-    <div class="${ iconContainerClassList.join(' ') }">
-      <span class="${ auraClassList.join(' ') }">
-        ${imageIconHtml}
-      </span>
-    </div>
-  <div style="padding-left: 3px">
+  <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
+  <div class="${ iconContainerClassList.join(' ') }">
+    <span class="${ auraClassList.join(' ') }">
+      ${imageIconHtml}
+    </span>
+  </div>
+  <div>
     <div><span class="msg-name">${ nameHtml }</span></div>
     <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
   </div>
@@ -248,10 +248,11 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   static logCss(images?): string {
     const imageCSS = (!images ? '' : `\n
-msg-icon {
+.msg-icon {
   vertical-align: top;
-  padding-top: 2px;
+  padding: 2px 3px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 img.icon {
   width: 2.8em;
