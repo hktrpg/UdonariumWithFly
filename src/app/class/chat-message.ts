@@ -169,8 +169,9 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     const tabNameHtml = (tabName == null || tabName.trim() == '') ? '' : `<span class="tab-name">${ StringUtil.escapeHtml(tabName) }</span> `;
     const date = new Date(this.timestamp);
     const dateHtml = (dateFormat == '') ? '' : `<time datetime="${ date.toISOString() }">${ StringUtil.escapeHtml(formatDate(date, dateFormat, this.locale)) }</time>`;
+    const toImageTag = (isWithImage && this.toImageIdentifier && imageDict[this.toImageIdentifier]) ? `<img class="to-icon" src="${ StringUtil.escapeHtml(imageDict[this.toImageIdentifier]) }">` : ''
     const nameHtml = `<span${growClass}${colorStyle}>${StringUtil.escapeHtml(this.name)}</span>` 
-      + (this.toColor ? ` ➡ <span${growClass}${toColorStyle}>${StringUtil.escapeHtml(this.toName)}</span>` : '');
+      + (this.toColor ? ` ➡ ${toImageTag}<span${growClass}${toColorStyle}>${StringUtil.escapeHtml(this.toName)}</span>` : '');
 
     let messageClassNames = ['message'];
     if (this.isDirect || this.isSecret) messageClassNames.push('direct-message');
@@ -225,7 +226,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
         if (0 <= this.aura && this.aura <= 7) {
           auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
         }
-        const imageIconHtml = (this.image && imageDict[this.image.identifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.image.identifier]) }">` : '<span class="icon-space"></span>';
+        const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
         return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
   <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
   <div class="${ iconContainerClassList.join(' ') }">
@@ -263,6 +264,20 @@ img.icon {
 }
 .face-icon-msessage img.icon {
   border-radius: 0.5rem;
+}
+.to-icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: top;
+  margin-right: 2px;
+  margin-top: 2px;
+  object-fit: cover;
+  object-position: 50% 0%;
+  border-radius: 0.25rem;
+  filter: drop-shadow(1px  0px 0px #fff)
+      drop-shadow( 0px  1px 0px #fff)
+      drop-shadow(-1px  0px 0px #fff)
+      drop-shadow( 0px -1px 0px #fff);
 }
 span.icon-space {
   display: inline-block;
@@ -412,10 +427,10 @@ s.drop-dice .dropped {
 }
 .grow {
   text-shadow: 
-       1px  0px 1px #ffffff,
-       0px  1px 1px #ffffff,
-      -1px  0px 1px #ffffff,
-       0px -1px 1px #ffffff; 
+       1px  0px 1px #fff,
+       0px  1px 1px #fff,
+      -1px  0px 1px #fff,
+       0px -1px 1px #fff; 
 }${ imageCSS }`;
   }
 

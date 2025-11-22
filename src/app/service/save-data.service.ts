@@ -184,21 +184,23 @@ export class SaveDataService {
     const images = this.searchImageFiles(this.convertToXml(target));
     const imageDict = {};
     for (const image of images) {
-      if (image.state === ImageState.COMPLETE) {
-        const fileName = image.identifier + '.' + MimeType.extension(image.blob.type);
-        imageDict[image.identifier] = './images/' + fileName;
-        files.push(new File([image.blob], fileName, { type: image.blob.type }));
-      } else if (image.state === ImageState.URL) {
-        if (image.url.indexOf('http') == 0) {
-          if (StringUtil.validUrl(image.url)) imageDict[image.identifier] = image.url;
-        } else {
-          await fetch(image.url)
-            .then(response => response.blob())
-            .then(blob => {
-              const fileName = image.identifier + '.' + MimeType.extension(blob.type);
-              imageDict[image.identifier] = './images/' + fileName;
-              files.push(new File([blob], fileName, { type: blob.type }))
-            });
+      if (!imageDict[image.identifier]) {
+        if (image.state === ImageState.COMPLETE) {
+          const fileName = image.identifier + '.' + MimeType.extension(image.blob.type);
+          imageDict[image.identifier] = './images/' + fileName;
+          files.push(new File([image.blob], fileName, { type: image.blob.type }));
+        } else if (image.state === ImageState.URL) {
+          if (image.url.indexOf('http') == 0) {
+            if (StringUtil.validUrl(image.url)) imageDict[image.identifier] = image.url;
+          } else {
+            await fetch(image.url)
+              .then(response => response.blob())
+              .then(blob => {
+                const fileName = image.identifier + '.' + MimeType.extension(blob.type);
+                imageDict[image.identifier] = './images/' + fileName;
+                files.push(new File([blob], fileName, { type: blob.type }))
+              });
+          }
         }
       }
     }
