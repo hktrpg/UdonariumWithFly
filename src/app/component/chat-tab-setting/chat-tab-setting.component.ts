@@ -135,6 +135,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 540, height: 300 };
     let component = this.panelService.open<ChatLogOutputComponent>(ChatLogOutputComponent, option);
-    component.selectedTab = this.selectedTab;
+    component.selectedTabs = [this.selectedTab];
+    component.selectTabsApplay();
   }
 }

@@ -1,6 +1,6 @@
 <div class="flex-container" style="flex-wrap: nowrap">
     <div class="flex-item no-grow">
-      <select #select style="width: 140px" size="10" (change)="onChangeSelectTab(select.value)" [ngModel]="selectedTab?.identifier" [disabled]="isAllTabs">
+      <select #select style="width: 140px" size="10" multiple (change)="onChangeSelectTabs()" [disabled]="isAllTabs">
         <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}">{{chatTab.name}}</option>
       </select>
     </div>
@@ -8,19 +8,19 @@
       <ng-container *ngIf="!isEmpty">
         <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
           <div>
-            タブ<sup class="self-only">*</sup>：
+            タブ：
             <label><input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [checked]="!isAllTabs" [value]="false">選択したタブ</label>
             <label><input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [checked]="isAllTabs" [value]="true">全てのタブ</label>
           </div>
           <div>
-            形式<sup class="self-only">*</sup>：
+            形式：
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 0" [value]="0">テキスト</label>
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 1" [value]="1">HTML</label>
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">HTML (画像あり)</label>
             <div style="font-weight: normal; padding-left: 1em">※<b>HTML（画像あり）</b> はZIPファイルとなります、<br>　フォルダ構造を保って解凍してください。</div>
           </div>
           <div>
-            時刻<sup class="self-only">*</sup>：
+            時刻：
             <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == ''" [value]="''">なし</label>
             <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == 'HH:mm'" [value]="'HH:mm'">時：分</label>
             <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == 'yyyy/MM/dd HH:mm'" [value]="'yyyy/MM/dd HH:mm'">日付時刻</label>
@@ -30,7 +30,7 @@
         <div style="width: 100%; display: flex">
           <div>
             <label style="font-weight: bolder; font-size: smaller; padding-top: 3px; padding-right: 1em">
-              <input type="checkbox" [(ngModel)]="isWriteOerationLog" checked="{{isWriteOerationLog ? 'checked' : ''}}" />操作ログを含める<sup class="self-only">*</sup>
+              <input type="checkbox" [(ngModel)]="isWriteOerationLog" checked="{{isWriteOerationLog ? 'checked' : ''}}" />操作ログを含める
             </label>
           </div>
           <div style="flex-grow: 1; text-align: right">

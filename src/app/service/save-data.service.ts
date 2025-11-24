@@ -163,25 +163,24 @@ export class SaveDataService {
     return fileName + `_${year}-${month}-${day}_${hours}${minutes}`;
   }
 
-  saveChatLog(logFormat: number, fileName: string, chatTab: ChatTab=null, dateFormat='HH:mm', isWriteOerationLog=true) {
+  saveChatLog(logFormat: number, fileName: string, chatTabs: ChatTab[]=null, dateFormat='HH:mm', isWriteOerationLog=true) {
     const mimeType = (logFormat == 0 ? 'text/plain' : 'text/html');
     const ext = (logFormat == 0 ? '.txt' : '.html');
     const trueFileName = 'fly_' + this.appendTimestamp(fileName) + ext;
     this.chatMessageService.sendOperationLog(`チャットログ ${trueFileName} を保存`);
-    const xml = (chatTab ? chatTab.log(logFormat, dateFormat, isWriteOerationLog) : ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog));
+    //const xml = ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, chatTabs);
     
-    const files: File[] = [];
-    files.push(new File([xml], trueFileName, {type: `${mimeType};charset=utf-8`}));
+    //const files: File[] = [];
+    //files.push(new File([xml], trueFileName, {type: `${mimeType};charset=utf-8`}));
 
-    saveAs(new Blob([chatTab ? chatTab.log(logFormat, dateFormat, isWriteOerationLog) : ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog)], {type: `${mimeType};charset=utf-8`}), trueFileName);
+    saveAs(new Blob([ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, null, chatTabs)], {type: `${mimeType};charset=utf-8`}), trueFileName);
   }
 
-  async saveChatLogAsync(logFormat: number, fileName: string, chatTab: ChatTab=null, dateFormat='HH:mm', isWriteOerationLog=true, updateCallback?: UpdateCallback): Promise<void> {
+  async saveChatLogAsync(logFormat: number, fileName: string, chatTabs: ChatTab[]=null, dateFormat='HH:mm', isWriteOerationLog=true, updateCallback?: UpdateCallback): Promise<void> {
     const trueFileName = 'fly_' + this.appendTimestamp(fileName);
     this.chatMessageService.sendOperationLog(`チャットログ ${trueFileName}.zip を保存`);
-    const target = (chatTab ? chatTab : ChatTabList.instance);
     const files: File[] = [];
-    const images = this.searchImageFiles(this.convertToXml(target));
+    const images: ImageFile[] = (chatTabs ? chatTabs : [ChatTabList.instance]).reduce<ImageFile[]>((acm, obj) => acm.concat(this.searchImageFiles(this.convertToXml(obj))), []);
     const imageDict = {};
     for (const image of images) {
       if (!imageDict[image.identifier]) {
@@ -204,7 +203,7 @@ export class SaveDataService {
         }
       }
     }
-    files.push(new File([target.log(logFormat, dateFormat, isWriteOerationLog, imageDict)], 'index.html', {type: 'text/html;charset=utf-8'}));
+    files.push(new File([ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, imageDict, chatTabs)], 'index.html', {type: 'text/html;charset=utf-8'}));
     return this.saveAsync(files, trueFileName, updateCallback, true);
   }
 }

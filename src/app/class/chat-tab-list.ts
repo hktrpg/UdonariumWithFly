@@ -49,15 +49,16 @@ export class ChatTabList extends ObjectNode implements InnerXml {
     this.destroy();
   }
 
-  log(logFormat, dateFormat, isWriteOerationLog=true, imageDict?: {}): string {
-    if (!this.chatTabs) return '';
-    const logBody = this.chatTabs.reduce((ac, chatTab) => {
+  log(logFormat, dateFormat, isWriteOerationLog=true, imageDict?: {}, target?: ChatTab[]): string {
+    if (!this.chatTabs || (target && target.length == 0)) return '';
+    if (target && target.length > 1 && target.map(tab => tab.identifier).sort().join() == this.chatTabs.map(tab => tab.identifier).sort().join()) target = null;
+    const logBody = (target ? target : this.chatTabs).reduce((ac, chatTab) => {
         if (chatTab) ac.push(...chatTab.chatMessages.filter(chatMessage => chatMessage.isDisplayable && (isWriteOerationLog || !chatMessage.isOperationLog))
           .map(chatMessage => ({ index: chatMessage.index, tabName: chatTab.name, chatMessage: chatMessage }))); 
         return ac;
       }, [])
       .sort((a, b) => a.index - b.index)
-      .map(obj => obj.chatMessage.logFragment(logFormat, obj.tabName, dateFormat, imageDict))
+      .map(obj => obj.chatMessage.logFragment(logFormat, (target && target.length == 1) ? null : obj.tabName, dateFormat, imageDict))
       .join("\n");
 
     return logFormat == 0 
@@ -66,7 +67,7 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 <html lang="ja-JP">
 <head>
 <meta charset="UTF-8">
-<title>Udonarium with Fly：チャットログ：全てのタブ${imageDict ? '（画像付き）' : ''}</title>
+<title>Udonarium with Fly：チャットログ：${ !target ? '全てのタブ' : (target[0].name  == '' ? '（無名のタブ）' : target[0].name) }${ target && target.length > 1 ? '、他' : '' }${imageDict ? '（画像付き）' : ''}</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 ${ ChatMessage.logCss(imageDict) }
