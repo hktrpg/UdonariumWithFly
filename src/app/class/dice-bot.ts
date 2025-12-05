@@ -261,7 +261,7 @@ export class DiceBot extends GameObject {
         const diceRollTableRows = diceRollTable.parseText();
         for (let i = 0; i < repeat && i < 32; i++) {
           let rollResultNumber = null;
-          let rollResult = await DiceBot.diceRollAsync(isFixedRef ? `C(${modStr.substring(1)})` : StringUtil.toHalfWidth(diceRollTable.dice).trim().replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/').replace(/[―ー—‐]/g, '-'), 'DiceBot', 1);
+          let rollResult = await DiceBot.diceRollAsync(isFixedRef ? `C(${modStr.substring(1)})` : StringUtil.toHalfWidth(diceRollTable.dice).trim().replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/').replace(/[―ー—‐]/g, '-'), 'DiceBot', 1);
           finalResult.isEmptyDice = finalResult.isEmptyDice && rollResult.isEmptyDice;
           let match = null;
           if (rollResult.result.length > 0 && (match = rollResult.result.match(/\s＞\s(?:成功数|計算結果)?(\-?\d+)$/))) {
@@ -338,11 +338,11 @@ export class DiceBot extends GameObject {
         }
       }
       if (!isChoice) {
-        rollText = StringUtil.toHalfWidth(rollText).trim().split(/\s+/)[0].replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/').replace(/[―ー—‐]/g, '-');
+        rollText = StringUtil.toHalfWidth(rollText).trim().split(/\s+/)[0].replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/').replace(/[―ー—‐]/g, '-');
       }
       //console.log(rollText);
       if (DiceBot.apiUrl) {
-        //rollText = StringUtil.toHalfWidth(rollText).trim().split(/\s+/)[0].replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/').replace(/[―ー—‐]/g, '-');
+        //rollText = StringUtil.toHalfWidth(rollText).trim().split(/\s+/)[0].replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/').replace(/[―ー—‐]/g, '-');
         // すべてBCDiceに投げずに回数が1回未満かchoice[]が含まれるか英数記号以外は門前払い
         //ToDO APIのバージョン調べて新しければCOMMAND_PATTERN使う？（いつ読み込もう？）
         if (!isChoice && !/^[a-zA-Z0-9!-/:-@¥[-`{-~\}]+$/.test(rollText)) return;

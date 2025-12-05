@@ -467,15 +467,15 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                     value = operateValue;
                   } else {
                     const testHalfWidthText = StringUtil.toHalfWidth(operateValue.replace(/[―ー—‐]/g, '-')).trim();
-                    //const rollText = StringUtil.toHalfWidth(operateValue.replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/').replace(/[―ー—‐]/g, '-')).trim();
+                    //const rollText = StringUtil.toHalfWidth(operateValue.replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/').replace(/[―ー—‐]/g, '-')).trim();
                     if (StringUtil.cr(testHalfWidthText) == '') {
                       value = '';
                     } else {
                       if (/^[\+\-]?\d+$/.test(testHalfWidthText)) {
                         value = parseInt(testHalfWidthText);
-                      } else if (/^[\d\+\-\*\/\(\)]+$/.test(testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/'))) {
-                        rollResult = await DiceBot.rollCommandAsync(`C(${testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/')})`, gameType ? gameType : 'DiceBot');
-                      } else if (/^[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ]/i.test(operateValue) || /^[a-zA-Z0-9!-/:-@¥[-`{-~\}]+$/.test(testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/\×/g, '*').replace(/\÷/g, '/'))
+                      } else if (/^[\d\+\-\*\/\(\)]+$/.test(testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/'))) {
+                        rollResult = await DiceBot.rollCommandAsync(`C(${testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/')})`, gameType ? gameType : 'DiceBot');
+                      } else if (/^[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ]/i.test(operateValue) || /^[a-zA-Z0-9!-/:-@¥[-`{-~\}]+$/.test(testHalfWidthText.replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/'))
                         || DiceRollTableList.instance.diceRollTables.some(diceRollTable => diceRollTable.command != null && (new RegExp('^' + StringUtil.toHalfWidth(diceRollTable.command.replace(/[―ー—‐]/g, '-')).toUpperCase().trim() + '([=+\\-]\\d*)?$')).test(testHalfWidthText.toUpperCase()))) {
                         rollResult = await DiceBot.rollCommandAsync(operateValue, gameType ? gameType : 'DiceBot');
                       } else {
