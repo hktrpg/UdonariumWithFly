@@ -214,9 +214,27 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     return tabletopObject.imageFile;
   }
 
-  get descriptionType():string {
+  get descriptionType(): string {
     if (this.tabletopObject instanceof RangeArea && !this.tabletopObject.isApplyWidth) return 'range-not-width';
     return this.tabletopObject.aliasName;
+  }
+
+  get isAllowsChat(): boolean {
+    if (!(this.tabletopObject instanceof GameCharacter) || !this.tabletopObject.isAllowsChat) return false;
+    switch (this.tabletopObject.location.name) {
+      case 'table':
+      case PeerCursor.myCursor.peerId:
+        return true;
+      case 'graveyard':
+        return false;
+      default:
+        for (const peer of Network.peers) {
+          if (peer.isOpen && this.tabletopObject.location.name === peer.peerId) {
+            return false;
+          }
+        }
+        return true;
+    }
   }
 
   async saveToXML() {

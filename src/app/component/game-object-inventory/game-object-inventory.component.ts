@@ -498,10 +498,26 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     });
     actions.push(ContextMenuSeparator);
     actions.push({ name: '詳細を表示...', action: () => { this.showDetail(gameObject); } });
+    actions.push(gameObject.isAllowsChat
+      ? {
+        name: '☑ チャットを行う', action: () => {
+          gameObject.isAllowsChat = false;
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        },
+        disabled: gameObject.location.name === 'graveyard',
+        checkBox: 'check'
+      } : {
+        name: '☐ チャットを行う', action: () => {
+          gameObject.isAllowsChat = true;
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        },
+        disabled: gameObject.location.name === 'graveyard',
+        checkBox: 'check'
+      });
     //if (gameObject.location.name !== 'graveyard') {
-      actions.push({ name: 'チャットパレットを表示...', action: () => { this.showChatPalette(gameObject) }, disabled: gameObject.location.name === 'graveyard' });
+      actions.push({ name: 'チャットパレットを表示...', action: () => { this.showChatPalette(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
     //}
-    actions.push({ name: 'スタンド設定...', action: () => { this.showStandSetting(gameObject) } });
+    actions.push({ name: 'スタンド設定...', action: () => { this.showStandSetting(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
     actions.push(ContextMenuSeparator);
     actions.push({
       name: '参照URLを開く', action: null,

@@ -21,6 +21,7 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() isDropShadow: boolean = true;
   @SyncVar() isShowChatBubble: boolean = true;
   @SyncVar() owner: string = '';
+  @SyncVar() isAllowsChat: boolean = true;
   
   text = '';
   dialog = null;

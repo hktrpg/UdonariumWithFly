@@ -786,8 +786,22 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       { name: '詳細を表示...', action: () => { this.showDetail(this.gameCharacter); } },
-      { name: 'チャットパレットを表示...', action: () => { this.showChatPalette(this.gameCharacter) } },
-      { name: 'スタンド設定...', action: () => { this.showStandSetting(this.gameCharacter) } },
+      (this.gameCharacter.isAllowsChat
+        ? {
+          name: '☑ チャットを行う', action: () => {
+            this.gameCharacter.isAllowsChat = false;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          checkBox: 'check'
+        } : {
+          name: '☐ チャットを行う', action: () => {
+            this.gameCharacter.isAllowsChat = true;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          checkBox: 'check'
+        }),
+      { name: 'チャットパレットを表示...', action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
+      { name: 'スタンド設定...', action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
       ContextMenuSeparator,
       {
         name: '参照URLを開く', action: null,
@@ -907,6 +921,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   private showChatPalette(gameObject: GameCharacter) {
+    if (!gameObject || !gameObject.isAllowsChat) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);

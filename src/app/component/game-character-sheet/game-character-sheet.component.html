@@ -88,8 +88,8 @@
           [isHideText]="tabletopObject.aliasName === 'card' && !$any(tabletopObject).isFront && !$any(tabletopObject).isHand && !tabletopObject.isGMMode" [isNoLogging]="isNoLogging" [descriptionType]="descriptionType"></div>
       </div>
       <div *ngIf="tabletopObject.aliasName === 'character'" style="margin-top: 3px; text-align: right">
-        <button style="font-size: 11px; color: #444;" (click)="showChatPalette()">チャットパレットを表示</button>
-        <button style="font-size: 11px; color: #444;" (click)="showStandSetting()">スタンド設定</button>
+        <button class="character-setteings" (click)="showChatPalette()" [disabled]="!isAllowsChat">チャットパレットを表示</button>
+        <button class="character-setteings" (click)="showStandSetting()" [disabled]="!isAllowsChat">スタンド設定</button>
       </div>
     </div>
   </ng-container>

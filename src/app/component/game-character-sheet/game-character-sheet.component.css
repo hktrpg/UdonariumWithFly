@@ -285,3 +285,13 @@ input {
   #fff 0px 0px 2px,
   #fff 0px 0px 2px;
 }
+
+.flex-item button.character-setteings {
+  font-size: 11px;
+  color: #444;
+}
+.flex-item button.character-setteings:disabled {
+  background-color: #eee;
+  color: #aaa;
+  cursor: auto;
+}
