@@ -92,7 +92,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   }
 
   selectTabsApplay() {
-    if (!this.select && this.isAllTabs) return;
+    if (!this.select || this.isAllTabs) return;
     const selectedTabsIdentifier = this.selectedTabs.map(tab => tab.identifier);
     Array.from(this.select.nativeElement.options).forEach(elm => {
       elm.selected = selectedTabsIdentifier.includes(elm.value);

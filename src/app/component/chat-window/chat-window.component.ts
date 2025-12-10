@@ -138,7 +138,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 540, height: 300 };
     let component = this.panelService.open<ChatLogOutputComponent>(ChatLogOutputComponent, option);
-    component.selectedTabs = [this.chatTab];
+    component.selectedTabs = this.chatTab ? [this.chatTab] : [];
     component.selectTabsApplay();
   }
 
