@@ -52,15 +52,21 @@ export class ChatTabList extends ObjectNode implements InnerXml {
   log(logFormat, dateFormat, isWriteOerationLog=true, imageDict?: {}, target?: ChatTab[]): string {
     if (!this.chatTabs || (target && target.length == 0)) return '';
     if (target && target.length > 1 && target.map(tab => tab.identifier).sort().join() == this.chatTabs.map(tab => tab.identifier).sort().join()) target = null;
-    const logBody = (target ? target : this.chatTabs).reduce((ac, chatTab) => {
+    const messages = (target ? target : this.chatTabs).reduce((ac, chatTab) => {
         if (chatTab) ac.push(...chatTab.chatMessages.filter(chatMessage => chatMessage.isDisplayable && (isWriteOerationLog || !chatMessage.isOperationLog))
           .map(chatMessage => ({ index: chatMessage.index, tabName: chatTab.name, chatMessage: chatMessage }))); 
         return ac;
-      }, [])
-      .sort((a, b) => a.index - b.index)
-      .map(obj => obj.chatMessage.logFragment(logFormat, (target && target.length == 1) ? null : obj.tabName, dateFormat, imageDict))
-      .join("\n");
-
+      }, []).sort((a, b) => a.index - b.index);
+    const logBodyAry = [];
+    let currentTabIdentifier = (messages.length > 0 ? messages[0].chatMessage.tabIdentifier : null);
+    for (const message of messages) {
+      if (currentTabIdentifier && currentTabIdentifier !== message.chatMessage.tabIdentifier) {
+        currentTabIdentifier =  message.chatMessage.tabIdentifier;
+        logBodyAry.push(logFormat == 0 ? '--------' : '<hr>');
+      }
+      logBodyAry.push(message.chatMessage.logFragment(logFormat, (target && target.length == 1) ? null : message.tabName, dateFormat, imageDict));
+    }
+    const logBody = logBodyAry.join("\n");
     return logFormat == 0 
       ? logBody
       : `<!DOCTYPE html>

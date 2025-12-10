@@ -249,6 +249,12 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   static logCss(images?): string {
     const imageCSS = (!images ? '' : `\n
+.msg-header::first-line, .msg-name {
+  font-size: 116%;
+}
+.msg-header {
+   white-space: nowrap;
+}
 .msg-icon {
   vertical-align: top;
   padding: 2px 3px;
@@ -256,8 +262,8 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   flex-shrink: 0;
 }
 img.icon {
-  width: 2.8em;
-  height: 2.8em;
+  width: 4.2em;
+  height: 4.2em;
   vertical-align: bottom;
   object-fit: cover;
   object-position: 50% 0%;
@@ -266,8 +272,8 @@ img.icon {
   border-radius: 0.5rem;
 }
 .to-icon {
-  width: 1.1em;
-  height: 1.1em;
+  width: 1.2em;
+  height: 1.2em;
   vertical-align: top;
   margin-right: 2px;
   margin-top: 2px;
@@ -281,8 +287,8 @@ img.icon {
 }
 span.icon-space {
   display: inline-block;
-  width: 2.8em;
-  height: 2.8em;
+  width: 4.2em;
+  height: 4.2em;
   vertical-align: bottom;
 }
 .inverse {
@@ -322,6 +328,10 @@ span.icon-space {
     return `body {
   color: #444;
   background-color: #FFF;
+}
+hr {
+  margin: 2px 0px;
+  border: 1px dotted #aaa;
 }
 .message {
   display: flex;
