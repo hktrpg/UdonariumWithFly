@@ -239,3 +239,7 @@ button.is-active .material-icons {
 .not-allow-chat {
   text-decoration: line-through;
 }
+
+.table-cell.imagebox.not-allow-chat {
+  visibility: hidden;
+}

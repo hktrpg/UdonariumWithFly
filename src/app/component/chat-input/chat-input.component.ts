@@ -816,7 +816,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     e.stopPropagation();
     e.preventDefault();
 
-    if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    if (!this.pointerDeviceService.isAllowedToOpenContextMenu || !this.isAllowsChat) return;
 
     let position = this.pointerDeviceService.pointers[0];
     if (!this.character) {
