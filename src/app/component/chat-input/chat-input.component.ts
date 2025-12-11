@@ -208,7 +208,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       this.shouldUpdateCharacterList = false;
       this._gameCharacters = ObjectStore.instance
         .getObjects<GameCharacter>(GameCharacter)
-        .filter(character => this.allowsChat(character));
+        .filter(character => (this.allowsChat(character) || (this.character && this.character.identifier === character.identifier)));
     }
     return this._gameCharacters;
   }
@@ -226,6 +226,10 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /** ObjectStore.instance.getObjects(PeerCursor); **/ }
 
   get diceBotInfosIndexed() { return DiceBot.diceBotInfosIndexed }
+
+  get isAllowsChat(): boolean {
+    return !this.character || this.allowsChat(this.character);
+  }
 
   constructor(
     private ngZone: NgZone,
@@ -251,6 +255,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       })
       .on(`UPDATE_GAME_OBJECT/aliasName/${GameCharacter.aliasName}`, event => {
         this.shouldUpdateCharacterList = true;
+        /*
         if (event.data.identifier !== this.sendFrom) return;
         let gameCharacter = ObjectStore.instance.get<GameCharacter>(event.data.identifier);
         if (gameCharacter && !this.allowsChat(gameCharacter)) {
@@ -260,6 +265,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
             this.sendFrom = this.myPeer.identifier;
           }
         }
+        */
       })
       .on('DISCONNECT_PEER', event => {
         let object = ObjectStore.instance.get(this.sendTo);
@@ -369,10 +375,16 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     this.textAreaElementRef.nativeElement.focus();
   } 
 
+  onChangeSendFromList() {
+    this.standName = '';
+    this.shouldUpdateCharacterList = true;
+  }
+
   sendChat(event: Partial<KeyboardEvent>) {
     if (event) event.preventDefault();
     //if (!this.text.length) return;
     if (event && event.keyCode !== 13) return;
+    if (!this.isAllowsChat) return;
     if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
     
     let text = this.text;

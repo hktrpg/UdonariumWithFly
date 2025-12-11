@@ -23,9 +23,9 @@
         <b *ngIf="character" style="font-size: smaller">顔IC</b>
       </label>
       <span style="white-space: nowrap">
-        <select [style.max-width]="character ? '10em' : '13em'" [(ngModel)]="sendFrom" (change)="standName = ''" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
+        <select [style.max-width]="character ? '10em' : '13em'" [ngClass]="{'not-allow-chat': !isAllowsChat}" [(ngModel)]="sendFrom" (change)="onChangeSendFromList()" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
           <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}（あなた）</option>
-          <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal;" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
+          <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
         </select>
         <button *ngIf="character" class="indicate ff-button speech-bubble-indicate" [title]="isUseStandImageOnChatTab ? 'チャットの「」内を💭に表示' : '現在のタブでは💭は無効です'" [ngClass]="{'is-active': isUseChatBalloon}" (click)="isUseChatBalloon = !isUseChatBalloon">        
             <i class="material-icons" style="font-size: 0.8em">{{ isUseChatBalloon && isUseStandImageOnChatTab ? 'textsms' : 'speaker_notes_off'}}</i>
@@ -76,9 +76,9 @@
         <input *ngIf="onlyCharacters" type="color" style="width:1em; margin-left: 3px" [(ngModel)]="paletteColor" [ngModelOptions]="{standalone: true}">
         <textarea class="chat-input" [placeholder]="!onlyCharacters ? 'Ctrl+⇅:履歴 &#x23CE;:送信 Shift+&#x23CE;:改行　チャットパレットの色を優先' : 'Ctrl+⇅:履歴 &#x23CE;:送信 Shift+&#x23CE;:改行　白(255,255,255):あなたの色'" [(ngModel)]="text"
           [ngModelOptions]="{standalone: true}" (input)="onInput()" (keydown.enter)="sendChat($event)" (focus)="isFilterTextUpdate = true" (blur)="isFilterTextUpdate = false"
-          (keydown.control.arrowup)="moveHistory($event, 1)" (keydown.control.arrowdown)="moveHistory($event, -1)" (keydown.arrowdown)="moveTo($event)"
+          (keydown.control.arrowup)="moveHistory($event, 1)" (keydown.control.arrowdown)="moveHistory($event, -1)" (keydown.arrowdown)="moveTo($event)" [disabled]="!isAllowsChat"
           #textArea></textarea>
-        <button type="submit" (click)="sendChat(null)"><b>SEND</b></button>
+        <button type="submit" (click)="sendChat(null)" [disabled]="!isAllowsChat"><b>SEND</b></button>
       </form>
     </div>
     <div class="writing-info">
