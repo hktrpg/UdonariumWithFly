@@ -340,7 +340,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
             name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
             action: () => {
               gameObject.currntImageIndex = i;
-              SoundEffect.play(PresetSound.surprise);
+              if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
             default: gameObject.currntImageIndex == i,

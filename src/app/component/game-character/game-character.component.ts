@@ -938,7 +938,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   changeImage(index: number) {
     if (this.gameCharacter.currntImageIndex != index) {
       this.gameCharacter.currntImageIndex = index;
-      if (!this.isHideIn) SoundEffect.play(PresetSound.surprise);
+      if (!this.isHideIn && this.gameCharacter.location.name === 'table') SoundEffect.play(PresetSound.surprise);
       EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
       EventSystem.trigger('UPDATE_INVENTORY', null);
     }
