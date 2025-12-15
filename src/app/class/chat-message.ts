@@ -227,14 +227,14 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
           auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
         }
         const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
-        return `<div class="${ messageClassNames.join(' ') }" style="display: flex; border-left-color: ${ color }">
+        return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
   <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
   <div class="${ iconContainerClassList.join(' ') }">
     <span class="${ auraClassList.join(' ') }">
       ${imageIconHtml}
     </span>
   </div>
-  <div>
+  <div class="msg-body">
     <div><span class="msg-name">${ nameHtml }</span></div>
     <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
   </div>
@@ -249,6 +249,9 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   static logCss(images?): string {
     const imageCSS = (!images ? '' : `\n
+.msg-header, msg-icon, .msg-body {
+  display: inline-box;
+}
 .msg-header::first-line, .msg-name {
   font-size: 116%;
 }
@@ -259,7 +262,6 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   vertical-align: top;
   padding: 2px 3px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 img.icon {
   width: 4.2em;
