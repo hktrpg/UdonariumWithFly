@@ -12,7 +12,7 @@
     </ng-container>
     <div class="is-3d texture" style="z-index: 1" [ngClass]="{'upright-transform': (height < 0.5 && altitude == 0), 'fall': (height >= 0.5 && altitude == 0)}" [ngStyle]="{transform: 'translateZ(' + (altitude * gridSize) + 'px)'}">
       <ng-container *ngIf="hasFloor && isVisibleFloor && 0 < floorImageUrl.length">
-        <div class="is-3d texture chrome-smooth-image-trick" [ngClass]="{'blinking-animation': !isLocked}" [ngStyle]="{'backface-visibility': isSlope ? 'visible' : 'hidden', 'transform': 'translateZ(' + ((height / (isSlope ? 2 : 1)) * gridSize) + 'px)' + floorModCss, filter: 'brightness(' + floorBrightness + ')'}"
+        <div class="is-3d texture chrome-smooth-image-trick" [ngClass]="{'blinking-animation': !isLocked}" [ngStyle]="{'backface-visibility': isSlope ? 'visible' : 'hidden', 'transform': 'translateZ(' + ((height / (isSlope ? 2 : 1)) * gridSize) + 'px)' + floorModCss, filter: 'brightness(' + floorBrightness + ') sharpen(1)'}"
           [style.background-image]="'url(' + floorImageUrl + ')' | safe: 'style'">
           <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
         </div>
