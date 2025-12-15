@@ -92,6 +92,7 @@
     </div>
     <div class="object-tags-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
       <div class="table-cell image-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
+        <span *ngIf="!gameObject.isAllowsChat" style="margin-top:-2px; margin-left: -2px; position: absolute; pointer-events: none; font-size: 16px; filter: grayscale(100%); opacity: 0.8">🤐</span>
         <span class="aura" [ngClass]="{black: gameObject.aura == 0, blue: gameObject.aura == 1, green: gameObject.aura == 2, cyan: gameObject.aura == 3, red: gameObject.aura == 4, magenta: gameObject.aura == 5, yellow: gameObject.aura == 6, white: gameObject.aura == 7}">
           <img *ngIf="gameObject.imageFile.url" class="inverser" [src]="gameObject.imageFile.url | safe: 'resourceUrl'" [ngClass]="{inverse: gameObject.isInverse, hollow: gameObject.isHollow, 'is-hide-in': gameObject.isHideIn, 'black-paint': gameObject.isBlackPaint}" draggable="false" />
         </span>
