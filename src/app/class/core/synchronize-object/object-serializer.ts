@@ -133,7 +133,7 @@ export class ObjectSerializer {
       gameObject.complement();
     } catch(e) {
       console.log(e);
-    }   
+    }
     
     return gameObject;
   }

@@ -127,6 +127,16 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   //とりあえず
   private locale = 'en-US';
   
+  complement(): void {
+    const color = this.getAttribute('messColor');
+    if (color) {
+      if (/^\#[a-fA-F0-9]{6}$/.test(color)) {
+        this.setAttribute('color', color);
+      }
+      this.removeAttribute('messColor');
+    }
+  };
+
   plainText(): string {
     if (this.isSecret && !this.isSendFromSelf) return '（シークレットダイス）';
     let text = StringUtil.rubyToText(this.text);
