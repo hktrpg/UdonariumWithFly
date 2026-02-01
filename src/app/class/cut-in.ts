@@ -20,7 +20,7 @@ export class CutIn extends ObjectNode {
   @SyncVar() animationType: number = 0 // 0:フェード 1:バウンス 3:オープン
   @SyncVar() borderStyle: number = 0 // 0:なし 1:あり　いまのところ有無だけ
   @SyncVar() isFrontOfStand: boolean = false;
-  @SyncVar() isPreventOutBounds: boolean = false;
+  @SyncVar() isPreventOutBounds: boolean = true;
   @SyncVar() imageIdentifier: string = ImageFile.Empty.identifier;
 
   @SyncVar() isVideoCutIn: boolean = false;
