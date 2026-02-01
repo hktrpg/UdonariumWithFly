@@ -266,6 +266,12 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           }
         }
         */
+      }).on('DELETE_GAME_OBJECT', event => {
+        // this.onlyCharacters が真の場合はパネルが閉じる前提
+        if (!this.onlyCharacters && this.sendFrom === event.data.identifier) {
+          this.sendFrom = this.myPeer.identifier;
+          this.onChangeSendFromList();
+        }
       })
       .on('DISCONNECT_PEER', event => {
         let object = ObjectStore.instance.get(this.sendTo);
