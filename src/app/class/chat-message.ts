@@ -274,8 +274,8 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   overflow: hidden;
 }
 img.icon {
-  width: 4.2em;
-  height: 4.2em;
+  width: 4.6em;
+  height: 4.6em;
   vertical-align: bottom;
   object-fit: cover;
   object-position: 50% 0%;
@@ -299,8 +299,8 @@ img.icon {
 }
 span.icon-space {
   display: inline-block;
-  width: 4.2em;
-  height: 4.2em;
+  width: 4.6em;
+  height: 4.6em;
   vertical-align: bottom;
 }
 .inverse {

@@ -94,14 +94,14 @@ export class SaveDataService {
     return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
   }
 
-  private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback, imageFolder?: boolean): Promise<void> {
+  private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void> {
     let progresPercent = -1;
     return FileArchiver.instance.saveAsync(files, zipName, meta => {
       let percent = meta.percent | 0;
       if (percent <= progresPercent) return;
       progresPercent = percent;
       this.ngZone.run(() => updateCallback(progresPercent));
-    }, imageFolder);
+    });
   }
 
   private convertToXml(gameObject: GameObject): string {
@@ -182,28 +182,50 @@ export class SaveDataService {
     const files: File[] = [];
     const images: ImageFile[] = (chatTabs ? chatTabs : [ChatTabList.instance]).reduce<ImageFile[]>((acm, obj) => acm.concat(this.searchImageFiles(this.convertToXml(obj))), []);
     const imageDict = {};
+    const basename = path => path.split('/').pop().split('.').shift();
+    let isLicenseIncluded = false;
+    let isCopyrightIncluded = false;
     for (const image of images) {
       if (!imageDict[image.identifier]) {
         if (image.state === ImageState.COMPLETE) {
           const fileName = image.identifier + '.' + MimeType.extension(image.blob.type);
-          imageDict[image.identifier] = './images/' + fileName;
-          files.push(new File([image.blob], fileName, { type: image.blob.type }));
+          imageDict[image.identifier] = 'images/' + fileName;
+          files.push(new File([image.blob], 'images/' + fileName, { type: image.blob.type }));
         } else if (image.state === ImageState.URL) {
-          if (image.url.indexOf('http') == 0) {
+          if (image.url.startsWith('http')) {
             if (StringUtil.validUrl(image.url)) imageDict[image.identifier] = image.url;
           } else {
             await fetch(image.url)
               .then(response => response.blob())
               .then(blob => {
-                const fileName = image.identifier + '.' + MimeType.extension(blob.type);
-                imageDict[image.identifier] = './images/' + fileName;
-                files.push(new File([blob], fileName, { type: blob.type }))
+                const fileName = basename(image.identifier) + '.' + MimeType.extension(blob.type);
+                imageDict[image.identifier] = 'udonarium_assets/' + fileName;
+                files.push(new File([blob], 'udonarium_assets/' + fileName, { type: blob.type }))
               });
+            if (image.url.indexOf('/dice/') >= 0 || image.url.indexOf('/trump/') >= 0) {
+              if (!isLicenseIncluded) {
+                await fetch('./assets/images/dice/license.txt')
+                  .then(response => response.blob())
+                  .then(blob => {
+                    files.push(new File([blob], 'udonarium_assets/license.txt', { type: 'text/plain' }));
+                    isLicenseIncluded = true;
+                  });
+              }
+            } else {
+              if (!isCopyrightIncluded) {
+                await fetch('./assets/images/copyright.txt')
+                  .then(response => response.blob())
+                  .then(blob => {
+                    files.push(new File([blob], 'udonarium_assets/copyright.txt', { type: 'text/plain' }));
+                    isCopyrightIncluded = true;
+                  });
+              }
+            }
           }
         }
       }
     }
     files.push(new File([ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, imageDict, chatTabs)], 'index.html', {type: 'text/html;charset=utf-8'}));
-    return this.saveAsync(files, trueFileName, updateCallback, true);
+    return this.saveAsync(files, trueFileName, updateCallback);
   }
 }
