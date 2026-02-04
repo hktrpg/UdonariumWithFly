@@ -202,7 +202,7 @@ export class SaveDataService {
                 imageDict[image.identifier] = 'udonarium_assets/' + fileName;
                 files.push(new File([blob], 'udonarium_assets/' + fileName, { type: blob.type }))
               });
-            if (image.url.indexOf('/dice/') >= 0 || image.url.indexOf('/trump/') >= 0) {
+            if (image.url.indexOf('/dice/') >= 0) {
               if (!isLicenseIncluded) {
                 await fetch('./assets/images/dice/license.txt')
                   .then(response => response.blob())
