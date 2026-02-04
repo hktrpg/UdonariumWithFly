@@ -342,6 +342,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.gameCharacter.chatBubbleAltitude = ret;
     return ret;
   }
+
+  get elevationUnrerZeroIndicatorY(): number {
+    let ret = Math.max(this.characterImageWidth, this.chatBubbleAltitude) + 4;
+    if (Math.abs(this.altitude * this.gridSize) < ret) {
+      return -this.altitude * this.gridSize - 4;
+    }
+    return ret;
+  }
+
   /*
   // 元の高さからマイナスする値
   get nameplateOffset(): number {
