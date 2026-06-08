@@ -15,6 +15,8 @@
     "module": "ES2022",
     "useDefineForClassFields": false,
     "allowSyntheticDefaultImports": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
     "lib": [
       "ES2022",
       "dom"
