@@ -49,7 +49,8 @@
               "pako",
               "skyway-js",
               "vkbeautify"
-            ]
+            ],
+            "main": "src/main.ts"
           },
           "configurations": {
             "production": {
@@ -71,14 +72,12 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "serviceWorker": true,
-              "ngswConfigPath": "ngsw-config.json",
+              "serviceWorker": false,
+              "ngswConfigPath": "src/ngsw-config.json",
               "outputHashing": "all"
             },
             "development": {
-              "buildOptimizer": false,
               "optimization": false,
-              "vendorChunk": true,
               "extractLicenses": false,
               "sourceMap": true,
               "namedChunks": true

@@ -6,7 +6,7 @@
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "declaration": false,
-    "downlevelIteration": true,
+    "esModuleInterop": true,
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -14,7 +14,6 @@
     "target": "ES2022",
     "module": "ES2022",
     "useDefineForClassFields": false,
-    "allowSyntheticDefaultImports": true,
     "strictPropertyInitialization": false,
     "noImplicitAny": false,
     "lib": [
