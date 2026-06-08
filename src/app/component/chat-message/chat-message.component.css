@@ -18,10 +18,10 @@
   word-break: break-word;
   border-bottom:1px dotted #999;
 }
-.is-mine.message {
+.is-left.message {
   border-left: 4px solid #555;
 }
-.is-others.message {
+.is-right.message {
   border-right: 4px solid #555;
 }
 
@@ -30,10 +30,10 @@
   color: #CCC;
   border-bottom: 1px dotted #CCC;
 }
-.is-mine.direct-message {
+.is-left.direct-message {
   border-left: 4px solid #555;
 }
-.is-others.direct-message {
+.is-right.direct-message {
   border-right: 4px solid #555;
 }
 
@@ -136,14 +136,14 @@
   font-style: oblique;
 }
 
-.is-others .title {
+.is-right .title {
   text-align: right;
 }
 
-.is-others .msg-text {
+.is-right .msg-text {
   text-align: right;
 }
-.is-others .msg-text span {
+.is-right .msg-text span {
   text-align: left;
   max-width: 100%;
 }

@@ -28,6 +28,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.isNoticeOn = isNoticeOn;
   }
 
+  static isLeftOnly = false;
+  get isLeftOnly(): boolean {
+    return ChatWindowComponent.isLeftOnly;
+  }
+  set isLeftOnly(isLeftOnly: boolean) {
+    ChatWindowComponent.isLeftOnly = isLeftOnly;
+  }
+
   private _isCompact = false;
   get isCompact(): boolean {
     return this._isCompact;
@@ -53,7 +61,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get chatTab(): ChatTab { return ObjectStore.instance.get<ChatTab>(this.chatTabidentifier); }
   isAutoScroll: boolean = true;
-  scrollToBottomTimer: NodeJS.Timeout = null;
+  scrollToBottomTimer: NodeJS.Timeout | null = null;
 
   constructor(
     public chatMessageService: ChatMessageService,

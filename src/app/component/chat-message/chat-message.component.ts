@@ -54,6 +54,7 @@ import Autolinker from 'autolinker';
 export class ChatMessageComponent implements OnInit {
   @Input() chatMessage: ChatMessage;
   @Input() compact: boolean = false;
+  @Input() leftOnly: boolean = false; //ToDO あとで切り替え可能に
   @ViewChild('edit', { static: false }) editElm: ElementRef<HTMLTextAreaElement>;
 
   imageFile: ImageFile = ImageFile.Empty;
@@ -101,6 +102,11 @@ export class ChatMessageComponent implements OnInit {
 
   get isCompact(): boolean {
     return this.compact || this.chatMessage.isOperationLog;
+    //return this.compact || this.chatMessage.isOperationLog || this.chatMessage.isDicebot;
+  }
+
+  get isLeft(): boolean {
+    return this.leftOnly || this.isMine;
     //return this.compact || this.chatMessage.isOperationLog || this.chatMessage.isDicebot;
   }
 
@@ -154,8 +160,8 @@ export class ChatMessageComponent implements OnInit {
     });
   }
 
-  editEnd(event: Partial<KeyboardEvent>=null) {
-    if (event) event.preventDefault();
+  editEnd(event?: Partial<KeyboardEvent>) {
+    event?.preventDefault?.();
     if (event && event.keyCode !== 13) return;
 
     if (this.isEditable && this.editingText.trim().length > 0 && this.chatMessage.text != this.editingText) {
