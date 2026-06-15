@@ -110,18 +110,22 @@ export class CutInComponent implements OnInit, OnDestroy {
   videoId = '';
   playListId = '';
 
+  get isVideo(): boolean {
+    return (!!this.videoId || !!this.playListId);
+  }
+
   cutInImageTransformOrigin = 'center';
 
   private _naturalWidth = 0;
   private _naturalHeight = 0;
   private get naturalWidth(): number {
-    if (this.videoId && !this.isSoundOnly) {
+    if (this.isVideo && !this.isSoundOnly) {
       return (this.cutIn.videoUrl.indexOf('/shorts/') >= 0) ? 270 : 480;
     }
     return this._naturalWidth;
   }
   private get naturalHeight(): number {
-    if (this.videoId && !this.isSoundOnly) {
+    if (this.isVideo && !this.isSoundOnly) {
       return (this.cutIn.videoUrl.indexOf('/shorts/') >= 0) ? 480 : 270;
     }
     return this._naturalHeight;
@@ -144,7 +148,7 @@ export class CutInComponent implements OnInit, OnDestroy {
         //if (this.videoPlayer) console.log(this.videoPlayer.getVolume())
       })
       .on('PLAY_VIDEO_CUT_IN', -1000, event => {
-        if (this.cutIn && this.cutIn.identifier != event.data.identifier && !!this.videoId) {
+        if (this.cutIn && this.cutIn.identifier != event.data.identifier && this.isVideo) {
           this.stop();
         }
       });
@@ -206,7 +210,7 @@ export class CutInComponent implements OnInit, OnDestroy {
 
   get pixcelWidth(): number {
     let ret = this.pixcelWidthPreAdjust;
-    if (this.cutIn.isPreventOutBounds || this.videoId) {
+    if (this.cutIn.isPreventOutBounds || this.isVideo) {
       if (this.isAjustAspect) {
         if (this.isAjustAspectWidth) {
           ret = document.documentElement.clientWidth;
@@ -250,7 +254,7 @@ export class CutInComponent implements OnInit, OnDestroy {
 
   get pixcelHeight(): number {
     let ret = this.pixcelHeightPreAdjust;
-    if (this.cutIn.isPreventOutBounds || this.videoId) {
+    if (this.cutIn.isPreventOutBounds || this.isVideo) {
       if (this.isAjustAspect) {
         if (this.isAjustAspectWidth) {
           ret = ret * (document.documentElement.offsetWidth / this.pixcelWidthPreAdjust)
@@ -305,7 +309,7 @@ export class CutInComponent implements OnInit, OnDestroy {
     let ret = 0;
     if (!this.cutIn) return ret;
     ret = (document.documentElement.clientWidth * this.cutIn.posX / 100) - this.pixcelWidth / 2;
-    if (this.cutIn.isPreventOutBounds || this.videoId) {
+    if (this.cutIn.isPreventOutBounds || this.isVideo) {
       const leftOffset = (this.pixcelWidth / 2) - (document.documentElement.clientWidth * this.cutIn.posX / 100);
       if (leftOffset > 0) {
         ret += leftOffset;
@@ -322,7 +326,7 @@ export class CutInComponent implements OnInit, OnDestroy {
     let ret = 0;
     if (!this.cutIn) return ret;
     ret = (document.documentElement.offsetHeight * this.cutIn.posY / 100) - this.pixcelHeight / 2;
-    if (this.cutIn.isPreventOutBounds || this.videoId) {
+    if (this.cutIn.isPreventOutBounds || this.isVideo) {
       const topOffset = (this.pixcelHeight / 2) - (document.documentElement.offsetHeight * this.cutIn.posY / 100)
       if (topOffset > 0) {
         ret += topOffset;
@@ -337,22 +341,16 @@ export class CutInComponent implements OnInit, OnDestroy {
 
   get zIndex(): number {
     if (!this.cutIn || this.isBackyard) return 0;
-    return (this.cutIn.isFrontOfStand || this.videoId ? 1500000 : 500000) + this.cutIn.zIndex + (this.videoId ? 1000 : 0);
+    return (this.cutIn.isFrontOfStand || this.isVideo ? 1500000 : 500000) + this.cutIn.zIndex + (this.isVideo ? 1000 : 0);
   }
 
   get objectFit(): string {
     if (!this.cutIn) return 'none';
     if (this.isMinimize) return 'contain';
-    if ((this.videoId && !this.isSoundOnly) || this.cutIn.objectFitType == 2) return 'contain';
+    if ((this.isVideo && !this.isSoundOnly) || this.cutIn.objectFitType == 2) return 'contain';
     return this.cutIn.objectFitType == 1 ? 'cover' : 'fill';
   }
 
-  /*
-  get videoId(): string {
-    if (!this.cutIn) return '';
-    return this.cutIn.videoId;
-  }
-*/
   get videoVolume(): number {
     if (this.isTest) {
       return AudioPlayer.isAuditionMute ? 0 : AudioPlayer.auditionVolume * 100;

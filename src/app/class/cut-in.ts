@@ -59,17 +59,17 @@ export class CutIn extends ObjectNode {
   }
 
   get videoStart(): string {
-    if (!this.isVideoCutIn || !this.videoUrl || !this.videoId) return null;
+    if (!this.isVideoCutIn || !this.videoUrl || !this.videoId) return '';
     const result = /[\&\?](?:start|t)\=([\dhms]+)/i.exec(this.videoUrl);
     if (result && result[1]) {
       return this._sec(result[1]);
     }
-    return null; 
+    return ''; 
   }
 
   private _sec(str: string): string {
-    if (!str) return null;
-    let tmp = null;
+    if (!str) return '';
+    let tmp;
     if (tmp = /^(\d+)$/.exec(str)) {
       return tmp[1];
     } else if (tmp = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(str)) {
@@ -79,7 +79,7 @@ export class CutIn extends ObjectNode {
       if (tmp[3]) sec += +tmp[3];
       return '' + sec;
     }
-    return null;
+    return '';
   }
 
   get playListId(): string {
