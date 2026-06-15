@@ -378,7 +378,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
 
   helpCutIn() {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 600, height: 680 };
+    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
     let textView = this.panelService.open(TextViewComponent, option);
     textView.title = 'カットインヘルプ';
     textView.text = 
@@ -398,7 +398,9 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
 
 　カットインはドラッグによって移動可能です（動画を再生するカットインは端をドラッグ）。またダブルクリックで閉じる（自分だけ停止）、右クリックでコンテキストメニューから操作が可能です（「閉じる」「ウィンドウの背面に表示」「最小化」が可能、動画を再生するカットインは端で受付）。
 
-　アップロードされた音楽ファイルをカットイン表示時の効果音として設定できます。音量にはジュークボックスの設定（「テスト (自分だけ見る)」の場合は試聴音量）が使用されます。表示時間や手動操作によってカットインが停止した際には、途中であっても音声も停止します。カットインや部屋のセーブデータ（zip）には音楽ファイルは含まれませんので、必要でしたら別途アップロードしてください（カットインと音楽ファイルのリンクはファイルの内容によります、同名の別ファイルをアップロードしても再リンクされません）。
+　アップロードされた音楽ファイルをカットイン表示時の効果音として設定できます。音量にはジュークボックスの設定（「テスト (自分だけ見る)」の場合は試聴音量）が使用されます。カットインや部屋のセーブデータ（zip）には音楽ファイルは含まれませんので、必要でしたら別途アップロードしてください（カットインと音楽ファイルのリンクはファイルの内容によります、同名の別ファイルをアップロードしても再リンクされません）。
+
+　表示時間（Duration）や手動操作によってカットインが停止した際には、途中であっても動画・効果音も終了します。また、効果音・動画の終了時に「カットインを停止」する設定の場合、表示時間に優先して停止します。
 
 　カットインに動画を使用する場合、URLは現在YouTubeのもののみ有効です。動画を利用する際は権利者およびYouTubeの定めた利用規約を参照し、順守してください。`;
   }

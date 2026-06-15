@@ -178,7 +178,7 @@
           <b>効果音・動画の終了時: </b> 
             <select [(ngModel)]="cutInMediaEndedActionType" [disabled]="!isEditable || isPlaying">
               <option [value]="0" [selected]="cutInMediaEndedActionType == 0">何もしない</option>
-              <option [value]="1" [selected]="cutInMediaEndedActionType == 1">カットインを終了</option>
+              <option [value]="1" [selected]="cutInMediaEndedActionType == 1">カットインを停止</option>
               <option [value]="2" [selected]="cutInMediaEndedActionType == 2">効果音・動画をループ</option>
             </select>
           </div>
