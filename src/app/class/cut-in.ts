@@ -30,7 +30,8 @@ export class CutIn extends ObjectNode {
 
   @SyncVar() audioFileName: string = '';
   @SyncVar() audioIdentifier: string = '';
-  @SyncVar() isLoop: boolean = false;
+  //@SyncVar() isLoop: boolean = false;
+  @SyncVar() endedActionType: number = 1 // 0:なにもしない 1:閉じる 2:繰り返す;
 
   get videoId(): string {
     if (!this.isVideoCutIn || !this.videoUrl) return '';
@@ -82,6 +83,7 @@ export class CutIn extends ObjectNode {
     return '';
   }
 
+  // リストから再生機能はとりあえず凍結
   get playListId(): string {
     if (!this.isVideoCutIn || !this.videoId) return '';
     let ret = '';
@@ -91,7 +93,8 @@ export class CutIn extends ObjectNode {
     } else {
       return ret = '';
     }
-    return ret.replace(/[\<\>\/\:\s\r\n]/g, '');
+    return '';
+    //return ret.replace(/[\<\>\/\:\s\r\n]/g, '');
   }
 
   get isValidAudio(): boolean {
@@ -107,5 +110,14 @@ export class CutIn extends ObjectNode {
 
   get isPlayingNow(): boolean {
     return CutInService.nowShowingIdentifiers().includes(this.identifier);
+  }
+
+  complement(): void {
+    const isLoop = this.getAttribute('isLoop');
+    if (isLoop && isLoop != '') {
+      if (isLoop == 'true') this.endedActionType = 2;
+      if (isLoop == 'false') this.endedActionType = 0;
+      this.removeAttribute('isLoop'); 
+    }
   }
 }

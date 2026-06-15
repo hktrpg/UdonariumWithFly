@@ -134,7 +134,7 @@ export class CutInComponent implements OnInit, OnDestroy {
   private _dragging = false;
 
   private readonly audioPlayer = new AudioPlayer();
-
+  
   constructor(
     private pointerDeviceService: PointerDeviceService,
     private contextMenuService: ContextMenuService,
@@ -142,6 +142,7 @@ export class CutInComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
+    this.audioPlayer.endedAction = () => { if (this.cutIn.endedActionType == 1) this.stop(); };
     EventSystem.register(this)
       .on('CHANGE_JUKEBOX_VOLUME', -100, event => {
         if (this.videoPlayer) this.videoPlayer.setVolume(this.videoVolume);
@@ -420,7 +421,7 @@ export class CutInComponent implements OnInit, OnDestroy {
     const audio = AudioStorage.instance.get(this.cutIn.audioIdentifier);
     if (audio && audio.isReady) {
       this.audioPlayer.volumeType = this.isTest ? VolumeType.AUDITION : VolumeType.MASTER;
-      this.audioPlayer.loop = this.cutIn.isLoop;
+      this.audioPlayer.loop = this.cutIn.endedActionType == 2;
       if (!this.cutIn.videoId) this.audioPlayer.play(audio);
     } else {
       EventSystem.register(this)
@@ -464,6 +465,9 @@ export class CutInComponent implements OnInit, OnDestroy {
   onPlayerStateChange($event) {
     const state = $event.data;
     //console.log($event.data)
+    if (state == 0 && this.cutIn.endedActionType == 1) {
+      this.stop();
+    }
     if (state == 1) {
       if (this.videoPlayer) this.videoPlayer.setVolume(this.videoVolume);
       this.videoStateTransition = true;

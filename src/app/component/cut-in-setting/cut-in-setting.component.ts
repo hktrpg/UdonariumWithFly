@@ -38,7 +38,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   panelId: string;
 
   isShowHideImages = false;
-  selectedCutIn: CutIn = null;
+  selectedCutIn: CutIn;
   selectedCutInXml: string = '';
 
   get cutIns(): CutIn[] { return CutInList.instance.cutIns; }
@@ -85,8 +85,11 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   get cutInAudioFileName(): string { return this.selectedCutIn.audioFileName; }
   set cutInAudioFileName(audioFileName: string) { if (this.isEditable) this.selectedCutIn.audioFileName = audioFileName; }
 
-  get cutInSEIsLoop(): boolean { return this.selectedCutIn.isLoop; }
-  set cutInSEIsLoop(isLoop: boolean) { if (this.isEditable) this.selectedCutIn.isLoop = isLoop; }
+  //get cutInSEIsLoop(): boolean { return this.selectedCutIn.endedAction == 2; }
+  //set cutInSEIsLoop(isLoop: boolean) { if (this.isEditable) this.selectedCutIn.endedAction = 2; }
+
+  get cutInMediaEndedActionType(): number { return this.selectedCutIn.endedActionType; }
+  set cutInMediaEndedActionType(cutInMediaEndedActionType: number) { if (this.isEditable) this.selectedCutIn.endedActionType = cutInMediaEndedActionType; }
 
   get cutInType(): number { return this.selectedCutIn.animationType; }
   set cutInType(cutInType: number) { if (this.isEditable) this.selectedCutIn.animationType = cutInType; }

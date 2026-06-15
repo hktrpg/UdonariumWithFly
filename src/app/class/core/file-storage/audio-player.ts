@@ -29,7 +29,7 @@ export class AudioPlayer {
   static readonly SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-sound-effect-is-mute-local-storage';
   static readonly NOTICE_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-notice-is-mute-local-storage';
 
-  private static _audioContext: AudioContext
+  private static _audioContext: AudioContext;
   static get audioContext(): AudioContext {
     if (!AudioPlayer._audioContext) AudioPlayer._audioContext = new (window.AudioContext || window.webkitAudioContext)();
     return AudioPlayer._audioContext;
@@ -157,6 +157,9 @@ export class AudioPlayer {
     return this._mediaElementSource;
   }
 
+  // イベントにする？
+  public endedAction: Function;
+
   audio: AudioFile;
   volumeType: VolumeType = VolumeType.MASTER;
 
@@ -197,6 +200,9 @@ export class AudioPlayer {
 
     this.mediaElementSource.connect(this.getConnectingAudioNode());
     this.audioElm.src = url;
+    this.audioElm.addEventListener('ended', () => {
+      if (this.endedAction) this.endedAction();
+    });
     this.audioElm.load();
     this.audioElm.play().catch(reason => { console.warn(reason); });
   }
