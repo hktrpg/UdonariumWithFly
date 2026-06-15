@@ -72,7 +72,7 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "serviceWorker": false,
+              "serviceWorker": true,
               "ngswConfigPath": "src/ngsw-config.json",
               "outputHashing": "all"
             },
