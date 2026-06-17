@@ -104,7 +104,7 @@
             </div>
           </div>
           <div style="margin-left: 1em">
-            <b>Z-Index (大きいものが前): </b><input [(ngModel)]="cutInZIndex" type="number" min="{{-maxSize}}" max="{{maxSize}}" style="width: 3.5em" [attr.disabled]="!isEditable  || cutInVideoId ? '' : null">
+            <b>Z-Index (大きいものが手前): </b><input [(ngModel)]="cutInZIndex" type="number" min="{{-maxSize}}" max="{{maxSize}}" style="width: 3.5em" [attr.disabled]="!isEditable  || cutInVideoId ? '' : null">
             <label style="margin-left: 0.6em"><input name="cutInIsFrontOfStand" type="checkbox" [(ngModel)]="cutInIsFrontOfStand" [checked]="cutInIsFrontOfStand" [value]="true" [attr.disabled]="!isEditable || cutInVideoId ? '' : null"><b>スタンドの前面に表示</b></label>
           </div>
         </div>
