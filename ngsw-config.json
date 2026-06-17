@@ -47,7 +47,8 @@
     {
       "name": "material-icons",
       "urls": [
-        "https://fonts.googleapis.com/icon?family=Material+Icons"
+        "https://fonts.googleapis.com/icon?family=Material+Icons",
+        "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
       ],
       "cacheConfig": {
         "maxSize": 1,
