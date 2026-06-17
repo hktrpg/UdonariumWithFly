@@ -728,6 +728,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         checkBox: 'check'
       },
+      { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }受信チャット左からのみ表示`, 
+        action: () => {
+          ChatWindowComponent.isLeftOnly = !ChatWindowComponent.isLeftOnly;
+        },
+        checkBox: 'check'
+      },
       ContextMenuSeparator,
       { name: `${ isShowStand ? '☑' : '☐' }スタンド表示`, 
         action: () => {

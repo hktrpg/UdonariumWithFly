@@ -38,6 +38,7 @@ const isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf
 })
 export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges, AfterViewChecked {
   @Input() compact: boolean = false;
+  @Input() leftOnly: boolean = false;
   
   sampleMessages: ChatMessage[] = [
     this.makeSampleMessage('System', null, 'チュートリアル：はじめに', null, 'ユドナリウムはサーバーを使用しないTRPGオンセツールです。参加者同士で接続し、コマや画像ファイルなどを同期します。'),

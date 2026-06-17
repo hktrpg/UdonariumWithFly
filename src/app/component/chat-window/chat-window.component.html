@@ -1,7 +1,7 @@
 <!--<h2>チャットシステム</h2>-->
 <div class="component">
 <div class="log">
-  <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" (onAddMessage)="scrollToBottom()"></chat-tab>
+  <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" [leftOnly]="isLeftOnly" (onAddMessage)="scrollToBottom()"></chat-tab>
   <div *ngIf="!chatTab">※チャットタブの内容が更新されました。チャットタブを選択しなおすか、このチャットウィンドウを開きなおしてください。</div>
 </div>
 <div class="sticky-bottom">
@@ -17,12 +17,16 @@
       <label class="small-font" style="float: right; padding: 1px 4px 1px 2px; margin-left: 2px; height: 24px; box-sizing: border-box"><input name="isCompact" type="checkbox" [(ngModel)]="isCompact" [value]="true" [checked]="isCompact" ><b>簡易表示<sup style="color: red">*</sup></b></label>
       -->
       <div style="float: right; padding: 1px 4px 1px 2px; margin-left: 2px; height: 24px; box-sizing: border-box">
-        <button class="indicate" style="font-size: 0.8em; padding: 2px 5px;" title="受信時に音で通知" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
-          <i class="material-icons" style="font-size: 1em;">{{ isNoticeOn ? 'notifications_active' : 'notifications_off'}}</i>
+        <button class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="受信時に音で通知" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
+          <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_off'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button class="indicate" style="font-size: 0.8em; padding: 2px 5px;" title="簡易表示" [ngClass]="{'is-active': isCompact}" (click)="isCompact = !isCompact">
-          <i class="material-icons" style="font-size: 1em;">{{ isCompact ? 'list' : 'forum'}}</i>
+        <button class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="受信チャットを左からのみ" [ngClass]="{'is-active': isLeftOnly}" (click)="isLeftOnly = !isLeftOnly">
+          <i class="material-symbols-outlined" style="font-size: 1em">{{ isLeftOnly ? 'arrow_forward' : 'conversation'}}</i>
+          <sup style="color: red">*</sup>
+        </button>
+        <button class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="簡易表示" [ngClass]="{'is-active': isCompact}" (click)="isCompact = !isCompact">
+          <i class="material-icons" style="font-size: 1em">{{ isCompact ? 'list' : 'forum'}}</i>
           <sup style="color: red">*</sup>
         </button>
       </div>

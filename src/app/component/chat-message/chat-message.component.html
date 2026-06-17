@@ -3,7 +3,7 @@
     [style.border-left-color]="chatMessage.isSystem && !(chatMessage.isDicebot || chatMessage.isCalculate) ? '#444444' : chatMessage.color"
     [style.border-right-color]="chatMessage.isSystem && !(chatMessage.isDicebot || chatMessage.isCalculate) ? '#444444' : chatMessage.color"
     [ngClass]="{'is-left': isLeft, 'is-right': !isLeft, 'direct-message': (chatMessage.isDirect || chatMessage.isSecret), 'system-message': chatMessage.isSystem, 'dicebot-message': (chatMessage.isDicebot || chatMessage.isCalculate), 'operation-log': chatMessage.isOperationLog}"
-    [@flyInOut]="isLeft ? null : 'active'" [@flyInOutMe]="!isLeft ? null : 'active'">
+    [@flyInOut]="isMine ? null : 'active'" [@flyInOutMe]="!isMine ? null : 'active'">
     <ng-container *ngIf="!isCompact && isLeft">
       <ng-container *ngTemplateOutlet="image"></ng-container>
     </ng-container>
