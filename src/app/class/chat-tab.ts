@@ -86,6 +86,11 @@ export class ChatTab extends ObjectNode implements InnerXml {
 <meta charset="UTF-8">
 <title>Udonarium with Fly：チャットログ：${ StringUtil.escapeHtml(this.name == '' ? '(無名のタブ)' : this.name) + (imageDict ? '（画像付き）' : '') }</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script>
+  if (window.chrome) {
+    document.documentElement.classList.add('is-chrome');
+  }
+</script>
 <style>
 ${ ChatMessage.logCss(imageDict) }
 </style>

@@ -272,6 +272,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   vertical-align: top;
   padding: 2px 3px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 img.icon {
   width: 4.6em;
@@ -353,6 +354,11 @@ hr {
   word-break: break-word;
   border-left: 4px solid transparent;
   margin-top: 1px;
+  contain: layout;
+}
+.is-chrome .message {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 80px;
 }
 .direct-message {
   background-color: #555;
@@ -399,6 +405,7 @@ hr {
   white-space: nowrap;
   border-left: 1px solid #FFF;
   padding-left: 2px;
+  flex-shrink: 0;
 }
 .msg-name {
   font-weight: bolder;
