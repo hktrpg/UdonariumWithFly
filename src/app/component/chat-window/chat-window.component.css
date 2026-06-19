@@ -108,6 +108,9 @@ label.compact {
 
 button.indicate {
   margin: 0px 0px 0px 1px;
+  width: 30px;
+  height: 24px;
+  box-sizing: border-box;
 }
 button.indicate:disabled {
   border-color: transparent;
