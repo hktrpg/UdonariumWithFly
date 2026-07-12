@@ -37,28 +37,39 @@ export class TextViewComponent implements OnInit {
   }
 
   htmlEscapeLinking(str, shorten=false): string {
-    return Autolinker.link(StringUtil.escapeHtml(str), {
-      urls: {schemeMatches: true, wwwMatches: true, tldMatches: false}, 
-      truncate: {length: 96, location: 'end'}, 
-      decodePercentEncoding: shorten, 
-      stripPrefix: shorten, 
-      stripTrailingSlash: shorten, 
-      email: false, 
-      phone: false,
-      replaceFn : function(m) {
-        if (m.getType() == 'url' && StringUtil.validUrl(m.getAnchorHref())) {
-          if (StringUtil.sameOrigin(m.getAnchorHref())) {
-            return true;
-          } else {
-            const tag = m.buildTag();
-            tag.setAttr('rel', 'noreferrer');
-            tag.addClass('outer-link');
-            return tag;
-          }
-        }
-        return false;
+    return StringUtil.escapeHtml(str).split("\n").map(line => {
+      const headerMatch = line.match(/^(#+ )([\s\S]*)$/);
+      let prefix = '';
+      let content = '';
+      if (headerMatch) {
+        prefix = headerMatch[1];
+        content = headerMatch[2];
+      } else {
+        content = line;
       }
-    });
+      return prefix + Autolinker.link(content, {
+        urls: {schemeMatches: true, wwwMatches: true, tldMatches: false}, 
+        truncate: {length: 96, location: 'end'}, 
+        decodePercentEncoding: shorten, 
+        stripPrefix: shorten, 
+        stripTrailingSlash: shorten, 
+        email: false, 
+        phone: false,
+        replaceFn : function(m) {
+          if (m.getType() == 'url' && StringUtil.validUrl(m.getAnchorHref())) {
+            if (StringUtil.sameOrigin(m.getAnchorHref())) {
+              return true;
+            } else {
+              const tag = m.buildTag();
+              tag.setAttr('rel', 'noreferrer');
+              tag.addClass('outer-link');
+              return tag;
+            }
+          }
+          return false;
+        }
+      });
+    }).join("\n")
   }
 
   textShadwing(str) {
