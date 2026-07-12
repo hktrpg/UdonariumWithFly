@@ -124,7 +124,17 @@ export class ChatMessageComponent implements OnInit {
   private _htmlEscapeLinking(str, shorten=false, ruby=false): string {
     str = StringUtil.escapeHtml(str);
     if (ruby) str = StringUtil.rubyToHtml(str);
-    return Autolinker.link(this.lastNewLineAdjust(str), {
+    return this.lastNewLineAdjust(str).split("\n").map(line => {
+      const headerMatch = line.match(/^(#+ )([\s\S]*)$/);
+      let prefix = '';
+      let content = '';
+      if (headerMatch) {
+        prefix = headerMatch[1];
+        content = headerMatch[2];
+      } else {
+        content = line;
+      }
+      return prefix + Autolinker.link(content, {
       urls: {schemeMatches: true, wwwMatches: true, tldMatches: false}, 
       truncate: {length: 48, location: 'end'}, 
       decodePercentEncoding: shorten, 
@@ -132,7 +142,7 @@ export class ChatMessageComponent implements OnInit {
       stripTrailingSlash: shorten, 
       email: false, 
       phone: false,
-      replaceFn : function(m) {
+      replaceFn: function(m) {
         if (m.getType() == 'url' && StringUtil.validUrl(m.getAnchorHref())) {
           if (StringUtil.sameOrigin(m.getAnchorHref())) {
             return true;
@@ -144,8 +154,8 @@ export class ChatMessageComponent implements OnInit {
           }
         }
         return false;
-      }
-    });
+      }});
+    }).join("\n");
   }
 
   discloseMessage() {

@@ -198,46 +198,62 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
       if (this.isFumble) messageTextClassNames.push('is-fumble');
     }
 
-    let textAutoLinkedHtml = (this.isSecret && !this.isSendFromSelf) ? '<s>（シークレットダイス）</s>' 
-      : Autolinker.link(this.isOperationLog ? StringUtil.escapeHtml(this.text) : StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text)), {
-        urls: {schemeMatches: true, wwwMatches: true, tldMatches: false}, 
-        truncate: {length: 96, location: 'end'}, 
-        decodePercentEncoding: false, 
-        stripPrefix: false, 
-        stripTrailingSlash: false, 
-        email: false, 
-        phone: false,
-        className: 'outer-link',
-        replaceFn : function(m) {
-          return m.getType() == 'url' && StringUtil.validUrl(m.getAnchorHref());
-        }
-      });
-      if (this.isDicebot) textAutoLinkedHtml = ChatMessage.decorationDiceResult(textAutoLinkedHtml);
-
-      let lastUpdateHtml = '';
-      if (this.isEdited) {
-        if (dateFormat == '') {
-          lastUpdateHtml = '<span class="is-edited">編集済</span>';
+    let textAutoLinkedHtml: string;
+    if (this.isSecret && !this.isSendFromSelf) {
+      textAutoLinkedHtml = '<s>（シークレットダイス）</s>';
+    } else {
+      let tmpStr = this.isOperationLog ? StringUtil.escapeHtml(this.text) : StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text));
+      textAutoLinkedHtml = tmpStr.split("\n").map(line => {
+        const headerMatch = line.match(/^(#+ )([\s\S]*)$/);
+        let prefix = '';
+        let content = '';
+        if (headerMatch) {
+          prefix = headerMatch[1];
+          content = headerMatch[2];
         } else {
-          const lastUpdate = new Date(this.lastUpdate);
-          lastUpdateHtml = `<span class="is-edited"><b>編集済</b> <time datetime="${ lastUpdate.toISOString() }">${ StringUtil.escapeHtml(formatDate(lastUpdate, dateFormat, this.locale)) }</time></span>`;
+          content = line;
         }
+        return prefix + Autolinker.link(content, {
+          urls: {schemeMatches: true, wwwMatches: true, tldMatches: false}, 
+          truncate: {length: 96, location: 'end'}, 
+          decodePercentEncoding: false, 
+          stripPrefix: false, 
+          stripTrailingSlash: false, 
+          email: false, 
+          phone: false,
+          className: 'outer-link',
+          replaceFn : function(m) {
+            return m.getType() == 'url' && StringUtil.validUrl(m.getAnchorHref());
+          }
+        });
+      }).join("\n");
+      if (this.isDicebot) textAutoLinkedHtml = ChatMessage.decorationDiceResult(textAutoLinkedHtml);
+    }
+
+    let lastUpdateHtml = '';
+    if (this.isEdited) {
+      if (dateFormat == '') {
+        lastUpdateHtml = '<span class="is-edited">編集済</span>';
+      } else {
+        const lastUpdate = new Date(this.lastUpdate);
+        lastUpdateHtml = `<span class="is-edited"><b>編集済</b> <time datetime="${ lastUpdate.toISOString() }">${ StringUtil.escapeHtml(formatDate(lastUpdate, dateFormat, this.locale)) }</time></span>`;
       }
-      
-      if (textAutoLinkedHtml.lastIndexOf('\n') == textAutoLinkedHtml.length - 1 && !lastUpdateHtml) {
-        // 最終行の調整
-        textAutoLinkedHtml += "\n";
+    }
+    
+    if (textAutoLinkedHtml.lastIndexOf('\n') == textAutoLinkedHtml.length - 1 && !lastUpdateHtml) {
+      // 最終行の調整
+      textAutoLinkedHtml += "\n";
+    }
+    if (isWithImage) {
+      const iconContainerClassList = ['msg-icon'];
+      const auraClassList = ['aura'];
+      if (this.isInverseIcon == 1) iconContainerClassList.push('inverse');
+      if (this.isHollowIcon == 1) iconContainerClassList.push('hollow');
+      if (0 <= this.aura && this.aura <= 7) {
+        auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
       }
-      if (isWithImage) {
-        const iconContainerClassList = ['msg-icon'];
-        const auraClassList = ['aura'];
-        if (this.isInverseIcon == 1) iconContainerClassList.push('inverse');
-        if (this.isHollowIcon == 1) iconContainerClassList.push('hollow');
-        if (0 <= this.aura && this.aura <= 7) {
-          auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
-        }
-        const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
-        return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
+      const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
+      return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
   <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
   <div class="${ iconContainerClassList.join(' ') }">
     <span class="${ auraClassList.join(' ') }">
@@ -249,12 +265,12 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
   </div>
 </div>`
-      } else {
-        return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
-  <div class="msg-header">${ tabNameHtml }${ dateHtml }：<span class="msg-name">${ nameHtml }</span>：</div>
-  <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
+    } else {
+      return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
+<div class="msg-header">${ tabNameHtml }${ dateHtml }：<span class="msg-name">${ nameHtml }</span>：</div>
+<div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
 </div>`;
-      }
+    }
   }
 
   static logCss(images?): string {
