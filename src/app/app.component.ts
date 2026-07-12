@@ -209,6 +209,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => ChatWindowComponent.isNoticeOn = !!isNoticeOn);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
     } catch(e) {
       console.log(e);
     }
@@ -724,13 +726,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       ContextMenuSeparator,
       { name: `${ ChatWindowComponent.isNoticeOn ? '☑' : '☐' }チャット受信時に音で通知`, 
         action: () => {
-          ChatWindowComponent.isNoticeOn = !ChatWindowComponent.isNoticeOn;
+          ChatWindowComponent.setChatNotice(!ChatWindowComponent.isNoticeOn);
         },
         checkBox: 'check'
       },
       { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }受信チャット左からのみ表示`, 
         action: () => {
-          ChatWindowComponent.isLeftOnly = !ChatWindowComponent.isLeftOnly;
+          ChatWindowComponent.setChatLeftOnly(!ChatWindowComponent.isLeftOnly);
         },
         checkBox: 'check'
       },

@@ -11,6 +11,8 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
+import * as localForage from 'localforage';
+
 @Component({
     selector: 'chat-window',
     templateUrl: './chat-window.component.html',
@@ -21,20 +23,39 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('chatTabComponemt', { static: false }) chatTabComponemt: ChatTabComponent;
   sendFrom: string = 'Guest';
   
+  static readonly CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-is-notice-on-local-storage';
+  static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
+
   static isNoticeOn = false;
+  static setChatNotice(isNoticeOn: boolean) {
+    if (isNoticeOn) {
+      localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, isNoticeOn).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    }
+    ChatWindowComponent.isNoticeOn = isNoticeOn;
+  }
   get isNoticeOn(): boolean {
     return ChatWindowComponent.isNoticeOn;
   }
   set isNoticeOn(isNoticeOn: boolean) {
-    ChatWindowComponent.isNoticeOn = isNoticeOn;
+    ChatWindowComponent.setChatNotice(isNoticeOn);
   }
 
   static isLeftOnly = false;
+  static setChatLeftOnly(isLeftOnly: boolean) {
+    if (isLeftOnly) {
+      localForage.setItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY, isLeftOnly).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).catch(e => console.log(e));;
+    }
+    ChatWindowComponent.isLeftOnly = isLeftOnly;
+  }
   get isLeftOnly(): boolean {
     return ChatWindowComponent.isLeftOnly;
   }
   set isLeftOnly(isLeftOnly: boolean) {
-    ChatWindowComponent.isLeftOnly = isLeftOnly;
+    ChatWindowComponent.setChatLeftOnly(isLeftOnly);
   }
 
   private _isCompact = false;
