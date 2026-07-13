@@ -464,6 +464,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /^初期/)
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /初期値$/)
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /最大値$/)
+                    || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /\.max$/i)
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /^基本/)
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /^原/)
                     || targetCharacter.detailDataElement.getFirstElementByNameUnsensitive(targetName, /\^$/)

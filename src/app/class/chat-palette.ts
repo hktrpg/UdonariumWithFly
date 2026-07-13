@@ -103,6 +103,7 @@ export class ChatPalette extends ObjectNode {
               || extendVariables.getFirstElementByNameUnsensitive(name, /^初期/)
               || extendVariables.getFirstElementByNameUnsensitive(name, /初期値$/)
               || extendVariables.getFirstElementByNameUnsensitive(name, /最大値$/)
+              || extendVariables.getFirstElementByNameUnsensitive(name, /\.max$/i)  // ココフォリア風
             ) && (element.isNumberResource || element.isAbilityScore)) { // 互換のためにいったん残し、将来リソースのみにするかも？
               ret = element.value;
             } else if ((
