@@ -116,6 +116,11 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     private modalService: ModalService,
     private chatMessageService: ChatMessageService
   ) { }
+
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
   
   ngOnInit() {
     Promise.resolve().then(() => this.panelService.title = 'ファイル一覧');
@@ -195,6 +200,7 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   handleFileSelect(event: Event) {
+    if (this.GuestMode()) return;
     let input = <HTMLInputElement>event.target;
     let files = input.files;
     if (files.length) FileArchiver.instance.load(files);
@@ -224,6 +230,7 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onSelectedFile(file: ImageFile) {
+    if (this.GuestMode()) return;
     if (this.selected(file)) {
       this.selectedImageFiles = this.selectedImageFiles.filter(imageFile => imageFile.identifier !== file.identifier);
     } else {

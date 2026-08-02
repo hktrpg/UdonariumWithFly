@@ -11,7 +11,7 @@ import {
   OnDestroy,
   ViewChild
 } from '@angular/core';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { GameObjectInventoryService } from 'service/game-object-inventory.service';
@@ -199,6 +199,11 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService
   ) { }
+
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
 
   ngOnChanges(): void {
     EventSystem.unregister(this);

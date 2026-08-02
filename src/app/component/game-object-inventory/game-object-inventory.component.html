@@ -1,4 +1,4 @@
-<div class="component" (input)="onInput()">
+<div class="component" (input)="onInput()" *ngIf="!GuestMode()">
   <ng-container *ngTemplateOutlet="inventoryTab"></ng-container>
   <ng-container *ngTemplateOutlet="inventoryViewSetting"></ng-container>
   <div *ngIf="getGameObjects(selectTab).length < 1"><small><b>{{getTabTitle(selectTab)}}</b>インベントリは空です</small></div>

@@ -22,7 +22,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   isReloading: boolean = false;
 
-  help: string = '「一覧を更新」ボタンを押すと接続可能なルーム一覧を表示します。';
+  help: string = '單擊「更新列表」按鈕以顯示可以連接的房間的列表。';
 
   get currentRoom(): string { return Network.peer.roomId };
   get peerId(): string { return Network.peerId; }
@@ -46,7 +46,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   private changeTitle() {
-    this.modalService.title = this.panelService.title = 'ロビー';
+    this.modalService.title = this.panelService.title = '大廳';
     if (Network.peer.roomName.length) {
       this.modalService.title = this.panelService.title = '〈' + Network.peer.roomName + '/' + Network.peer.roomId + '〉'
     }
@@ -58,9 +58,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   async reload() {
     this.isReloading = true;
-    this.help = '検索中...';
+    this.help = '搜索中...';
     this.rooms = await Network.listAllRooms();
-    this.help = '接続可能なルームが見つかりませんでした。「新しいルームを作成する」で新規ルームを作成できます。';
+    this.help = '找不到連接的房間。您可以使用「新增一個新房間」。';
     this.isReloading = false;
   }
 
@@ -100,15 +100,15 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return true;
     }
     let onConnect = (peerId) => {
-      console.log('接続成功！', peerId);
+      console.log('連接成功！', peerId);
       triedPeer.push(peerId);
-      console.log('接続成功 ' + triedPeer.length + '/' + targetPeers.length);
+      console.log('連接成功 ' + triedPeer.length + '/' + targetPeers.length);
       return onTried();
     }
     let onDisconnect = (peerId) => {
-      console.warn('接続失敗', peerId);
+      console.warn('連接失敗', peerId);
       triedPeer.push(peerId);
-      console.warn('接続失敗 ' + triedPeer.length + '/' + targetPeers.length);
+      console.warn('連接失敗 ' + triedPeer.length + '/' + targetPeers.length);
       return onTried();
     }
 
@@ -140,6 +140,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
   async showRoomSetting() {
     let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 400, left: 0, top: 400 });
     if (isCreate) this.modalService.resolve();
-    this.help = '「一覧を更新」ボタンを押すと接続可能なルーム一覧を表示します。';
+    this.help = '單擊「更新列表」按鈕以顯示可以連接的房間的列表。';
   }
 }

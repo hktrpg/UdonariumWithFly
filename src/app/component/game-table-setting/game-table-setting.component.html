@@ -1,4 +1,4 @@
-<div class="flex-container">
+<div class="flex-container" *ngIf="!GuestMode()">
   <div class="flex-item no-grow">
     <div>
       <button style="margin: 0px 0px 2px 0px; font-size: smaller" (click)="createGameTable()">新しいテーブルを作る</button>

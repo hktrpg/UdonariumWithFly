@@ -112,6 +112,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     private selectionService: TabletopSelectionService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     Promise.resolve().then(() => this.panelService.title = 'インベントリ');
     EventSystem.register(this)
@@ -143,6 +148,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   getTabTitle(inventoryType: string) {
+    if (this.GuestMode()) return;
     switch (inventoryType) {
       case 'table':
         return 'テーブル';
@@ -156,6 +162,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   getInventory(inventoryType: string) {
+    if (this.GuestMode()) return;
     switch (inventoryType) {
       case 'table':
         return this.inventoryService.tableInventory;
@@ -177,6 +184,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   onContextMenu(event: Event, gameObject: GameCharacter) {
+
+    if (this.GuestMode()) return;
     if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
     event.stopPropagation();
     event.preventDefault();
@@ -663,6 +672,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   cleanInventory() {
+    if (this.GuestMode()) return;
     let tabTitle = this.getTabTitle(this.selectTab);
     let gameObjects = this.getGameObjects(this.selectTab);
     this.modalService.open(ConfirmationComponent, {
@@ -681,10 +691,12 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   private cloneGameObject(gameObject: TabletopObject) {
+    if (this.GuestMode()) return;
     gameObject.clone();
   }
 
   private showDetail(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = 'キャラクターシート';
@@ -695,6 +707,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   private showChatPalette(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
@@ -702,6 +715,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   selectGameObject(gameObject: GameObject, e: Event=null) {
+    if (this.GuestMode()) return;
     if (!(gameObject instanceof TabletopObject)) return;
     if (e && e instanceof MouseEvent && e.ctrlKey) {
       SoundEffect.playLocal(PresetSound.selectionStart);
@@ -728,11 +742,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   private deleteGameObject(gameObject: GameObject) {
+    if (this.GuestMode()) return;
     gameObject.destroy();
     this.changeDetector.markForCheck();
   }
 
   private showStandSetting(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572 };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);

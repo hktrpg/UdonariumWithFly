@@ -2,7 +2,7 @@ import { AfterViewInit, Component, OnDestroy, OnInit, ViewChild } from '@angular
 import { ChatMessage } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatLogOutputComponent } from 'component/chat-log-output/chat-log-output.component';
 import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-setting.component';
@@ -100,6 +100,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     this.sendFrom = PeerCursor.myCursor.identifier;
     this._chatTabidentifier = 0 < this.chatMessageService.chatTabs.length ? this.chatMessageService.chatTabs[0].identifier : '';
@@ -156,9 +161,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   updatePanelTitle() {
     if (this.chatTab && this.chatTab.name !== '') {
-      this.panelService.title = 'チャットウィンドウ - ' + this.chatTab.name;
+      this.panelService.title = '聊天視窗 - ' + this.chatTab.name;
     } else {
-      this.panelService.title = 'チャットウィンドウ';
+      this.panelService.title = '聊天視窗';
     }
   }
 
@@ -167,6 +172,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   showTabSetting() {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 460, height: 330 };
     let component = this.panelService.open<ChatTabSettingComponent>(ChatTabSettingComponent, option);
@@ -174,6 +180,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   showLogOutput() {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 540, height: 300 };
     let component = this.panelService.open<ChatLogOutputComponent>(ChatLogOutputComponent, option);

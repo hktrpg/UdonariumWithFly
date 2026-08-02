@@ -1,23 +1,39 @@
-<div class="component">
-  <div *ngFor="let gameObject of getNotes(); trackBy: trackByGameObject">
-    <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject }">
-    </ng-container>
+<div class="component" *ngIf="!GuestMode()">
+  <div class="toolbar">
+    <div class="tab">
+      <label *ngFor="let filter of filters">
+        <input name="note-filter" type="radio" [value]="filter.id" [(ngModel)]="selectFilter">
+        <div>{{filter.label}} ({{countByFilter(filter.id)}})</div>
+      </label>
+    </div>
+    <button type="button" class="refresh" title="重新整理" (click)="refresh()">
+      <i class="material-icons" style="font-size: 1rem;">refresh</i>
+    </button>
   </div>
-  <div *ngIf="getNotes().length < 1" style="padding: 8px; color: #666;">尚無筆記</div>
-</div>
 
-<ng-template #gameObjectTags let-gameObject="gameObject">
-  <div class="inventory-object">
-    <div class="object-name">
-      <li>{{showgameObject(gameObject)}}
+  <div *ngFor="let gameObject of filteredNotes(); trackBy: trackByGameObject">
+    <div class="inventory-object" [class.selected]="selectedIdentifier === gameObject.identifier"
+      (click)="selectNote(gameObject)">
+      <div class="object-name">
+        <strong>{{showgameObject(gameObject)}}</strong>
+        <span class="location-badge">{{locationLabel(gameObject)}}</span>
         <span *ngIf="!isittable(gameObject)">
-          <button style="font-size: 0.8em; padding: 2px 5px;" (click)="settotable(gameObject)">移到桌面
-            <i class="material-icons" style="font-size: 1em;">settings</i>
+          <button type="button" class="move-btn" (click)="settotable(gameObject); $event.stopPropagation()">
+            移到桌面
+            <i class="material-icons" style="font-size: 1em;">open_with</i>
           </button>
         </span>
-      </li>
+      </div>
+      <div class="note-text" [class.expanded]="expandedId === gameObject.identifier">
+        {{gameObject.text}}
+      </div>
+      <button *ngIf="gameObject.text && gameObject.text.length > 80" type="button" class="expand-btn"
+        (click)="toggleExpand(gameObject); $event.stopPropagation()">
+        {{expandedId === gameObject.identifier ? '收合' : '展開'}}
+      </button>
     </div>
-    {{gameObject.text}}
   </div>
-  <hr class="style-one" />
-</ng-template>
+
+  <div *ngIf="filteredNotes().length < 1" class="empty">尚無筆記（桌面上的共有筆記會顯示在這裡）</div>
+</div>
+<div *ngIf="GuestMode()" class="empty">訪客模式無法使用筆記倉庫</div>

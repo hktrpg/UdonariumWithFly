@@ -158,6 +158,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   heightWidthRatio = 1.5;
 
   set dialog(dialog) {
+    if (this.GuestMode()) return;
     if (!this.gameCharacter || this.gameCharacter.isHideIn) return;
     clearTimeout(this.dialogTimeOutId);
     clearInterval(this.chatIntervalId);
@@ -403,6 +404,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private modalService: ModalService,
     private selectionService: TabletopSelectionService
   ) { }
+
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
   
   /*
   ngOnInit() {
@@ -533,6 +539,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     e.stopPropagation();
     e.preventDefault();
 
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
     let position = this.pointerDeviceService.pointers[0];
@@ -922,6 +930,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   private showDetail(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = 'キャラクターシート';
     if (gameObject.name.length) title += ' - ' + gameObject.name;
@@ -939,6 +948,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   private showStandSetting(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572 };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
@@ -946,6 +956,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   changeImage(index: number) {
+    if (this.GuestMode()) return;
     if (this.gameCharacter.currntImageIndex != index) {
       this.gameCharacter.currntImageIndex = index;
       if (!this.isHideIn && this.gameCharacter.location.name === 'table') SoundEffect.play(PresetSound.surprise);

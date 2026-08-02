@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { TextViewComponent } from 'component/text-view/text-view.component';
@@ -49,6 +49,11 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
     private saveDataService: SaveDataService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'ダイスボット表設定');
     EventSystem.register(this)
@@ -81,6 +86,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   create(name: string = 'ダイスボット表'): DiceRollTable {
+    if (this.GuestMode()) return;
     return DiceRollTableList.instance.addDiceRollTable(name)
   }
 
@@ -93,6 +99,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
   
   async save() {
+    if (this.GuestMode()) return;
     if (!this.selectedDiceRollTable || this.isSaveing) return;
     this.isSaveing = true;
     this.progresPercent = 0;
@@ -125,6 +132,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   delete() {
+    if (this.GuestMode()) return;
     if (!this.isEmpty && this.selectedDiceRollTable) {
       this.selectedDiceRollTableXml = this.selectedDiceRollTable.toXml();
       this.selectedDiceRollTable.destroy();
@@ -132,6 +140,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   restore() {
+    if (this.GuestMode()) return;
     if (this.selectedDiceRollTable && this.selectedDiceRollTableXml) {
       let restoreTable = <DiceRollTable>ObjectSerializer.instance.parseXml(this.selectedDiceRollTableXml);
       DiceRollTableList.instance.addDiceRollTable(restoreTable);
@@ -145,6 +154,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   upTabIndex() {
+    if (this.GuestMode()) return;
     if (!this.selectedDiceRollTable) return;
     let parentElement = this.selectedDiceRollTable.parent;
     let index: number = parentElement.children.indexOf(this.selectedDiceRollTable);
@@ -155,6 +165,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   downTabIndex() {
+    if (this.GuestMode()) return;
     if (!this.selectedDiceRollTable) return;
     let parentElement = this.selectedDiceRollTable.parent;
     let index: number = parentElement.children.indexOf(this.selectedDiceRollTable);
@@ -165,6 +176,7 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
   }
 
   helpDiceRollTable() {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 600, height: 788 };
     let textView = this.panelService.open(TextViewComponent, option);

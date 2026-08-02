@@ -4,6 +4,7 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { Network } from '@udonarium/core/system';
 
 @Component({
     selector: 'context-menu',
@@ -55,6 +56,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     if (!this.isSubmenu) {
       this.title = this.contextMenuService.title;
@@ -89,6 +95,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   onContextMenu(e: Event) {
     e.stopPropagation();
     e.preventDefault();
+
+    if (this.GuestMode()) return;
   }
 
   private adjustPositionRoot() {
@@ -162,6 +170,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   showSubMenu(action: ContextMenuAction) {
+    if (this.GuestMode()) return;
     this.hideSubMenu();
     clearTimeout(this.showSubMenuTimer);
     if (action.subActions == null || action.subActions.length < 1) return;

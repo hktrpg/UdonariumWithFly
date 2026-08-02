@@ -14,7 +14,7 @@
   <div *ngIf="audios.length < 1" style="padding: 1em 0px; text-align: center"><small><b>アップロードされた音楽ファイルはここに表示されます。</b></small></div>
 </div>
 
-<label>
+<label *ngIf="!GuestMode()">
   <span class="drop-zone">
     <span>
       <i class="material-icons large-font">playlist_add</i>

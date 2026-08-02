@@ -1,4 +1,4 @@
-<div class="flex-container" style="flex-wrap: nowrap">
+<div class="flex-container" style="flex-wrap: nowrap" *ngIf="!GuestMode()">
     <div class="flex-item no-grow">
       <select #select style="width: 140px" size="10" multiple (change)="onChangeSelectTabs()" [disabled]="isAllTabs">
         <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}">{{chatTab.name}}</option>

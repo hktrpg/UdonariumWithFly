@@ -143,6 +143,11 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnChanges(): void {
     EventSystem.unregister(this);
     EventSystem.register(this)
@@ -236,6 +241,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   @HostListener('carddrop', ['$event'])
   onCardDrop(e) {
+    if (this.GuestMode()) return;
     if (this.cardStack === e.detail || (e.detail instanceof Card === false && e.detail instanceof CardStack === false)) {
       return;
     }
@@ -260,6 +266,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   onDoubleClick() {
+    if (this.GuestMode()) return;
     this.ngZone.run(() => {
       //if (this.drawCard() != null) SoundEffect.play(PresetSound.cardDraw);
       const card = this.drawCard();
@@ -283,6 +290,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   onInputStart(e: MouseEvent | TouchEvent) {
+    if (this.GuestMode()) return;
     // TODO:もっと良い方法考える
     if (this.isLocked) {
       this.cardStack.toTopmost();
@@ -302,6 +310,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     e.stopPropagation();
     e.preventDefault();
 
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let position = this.pointerDeviceService.pointers[0];
 
@@ -357,6 +367,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   private splitStack(split: number) {
+    if (this.GuestMode()) return;
     if (split < 2) return;
     let cardStacks: CardStack[] = [];
     for (let i = 0; i < split; i++) {
@@ -386,6 +397,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   private concatStack(topStack: CardStack, bottomStack: CardStack = this.cardStack) {
+    if (this.GuestMode()) return;
     let newCardStack = CardStack.create(bottomStack.name);
     newCardStack.location.name = bottomStack.location.name;
     newCardStack.location.x = bottomStack.location.x;
@@ -688,6 +700,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   private showDetail(gameObject: CardStack) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '山札設定';
@@ -698,6 +711,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   private showStackList(gameObject: CardStack) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
 
     let coordinate = this.pointerDeviceService.pointers[0];

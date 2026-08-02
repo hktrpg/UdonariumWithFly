@@ -176,6 +176,11 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnChanges(): void {
     EventSystem.unregister(this);
     EventSystem.register(this)
@@ -239,6 +244,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   @HostListener('carddrop', ['$event'])
   onCardDrop(e) {
+    if (this.GuestMode()) return;
     if (this.card === e.detail || (e.detail instanceof Card === false && e.detail instanceof CardStack === false)) {
       return;
     }
@@ -260,6 +266,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   onDoubleClick() {
+    if (this.GuestMode()) return;
     if (this.isLocked || (this.ownerIsOnline && !this.isHand)) return;
     this.ngZone.run(() => {
       this.state = this.isVisible && !this.isHand ? CardState.BACK : CardState.FRONT;
@@ -291,6 +298,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   onContextMenu(e: Event) {
     e.stopPropagation();
     e.preventDefault();
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let position = this.pointerDeviceService.pointers[0];
 
@@ -323,6 +332,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   private createStack() {
+    if (this.GuestMode()) return;
     let cardStack = CardStack.create('山札');
     cardStack.location.x = this.card.location.x;
     cardStack.location.y = this.card.location.y;
@@ -594,6 +604,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   private showDetail(gameObject: Card) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = 'カード設定';

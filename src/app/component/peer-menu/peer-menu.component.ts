@@ -105,8 +105,13 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     public appConfigService: AppConfigService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
-    Promise.resolve().then(() => { this.panelService.title = '接続情報'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => { this.panelService.title = '連接情報'; this.panelService.isAbleFullScreenButton = false });
   }
 
   ngAfterViewInit() {

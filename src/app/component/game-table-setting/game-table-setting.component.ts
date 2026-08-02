@@ -101,6 +101,11 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     Promise.resolve().then(() => { this.modalService.title = this.panelService.title = 'テーブル設定' });
     this.selectedTable = this.tableSelecter.viewTable;
@@ -119,6 +124,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   selectGameTable(identifier: string) {
+    if (this.GuestMode()) return;
     EventSystem.call('SELECT_GAME_TABLE', { identifier: identifier }, Network.peerId);
     this.selectedTable = ObjectStore.instance.get<GameTable>(identifier);
     this.selectedTableXml = '';
@@ -129,6 +135,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   createGameTable() {
+    if (this.GuestMode()) return;
     let gameTable = new GameTable();
     gameTable.name = '白紙のテーブル';
     gameTable.imageIdentifier = 'testTableBackgroundImage_image';
@@ -137,6 +144,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   async save() {
+    if (this.GuestMode()) return;
     if (!this.selectedTable || this.isSaveing) return;
     this.isSaveing = true;
     this.progresPercent = 0;
@@ -153,6 +161,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   delete() {
+    if (this.GuestMode()) return;
     if (!this.isEmpty && this.selectedTable) {
       this.selectedTableXml = this.selectedTable.toXml();
       this.selectedTable.destroy();
@@ -160,6 +169,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   restore() {
+    if (this.GuestMode()) return;
     if (this.selectedTable && this.selectedTableXml) {
       let restoreTable = ObjectSerializer.instance.parseXml(this.selectedTableXml);
       this.selectGameTable(restoreTable.identifier);
@@ -173,6 +183,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
   
   openBgImageModal() {
+    if (this.GuestMode()) return;
     if (this.isDeleted) return;
     let currentImageIdentifires: string[] = [];
     if (this.selectedTable && this.selectedTable.imageIdentifier) currentImageIdentifires = [this.selectedTable.imageIdentifier];
@@ -183,6 +194,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   openDistanceViewImageModal() {
+    if (this.GuestMode()) return;
     if (this.isDeleted) return;
     let currentImageIdentifires: string[] = [];
     if (this.selectedTable && this.selectedTable.backgroundImageIdentifier) currentImageIdentifires = [this.selectedTable.backgroundImageIdentifier];
@@ -193,6 +205,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   openDistanceViewImageModal2() {
+    if (this.GuestMode()) return;
     if (this.isDeleted) return;
     let currentImageIdentifires: string[] = [];
     if (this.selectedTable && this.selectedTable.backgroundImageIdentifier2) currentImageIdentifires = [this.selectedTable.backgroundImageIdentifier2];

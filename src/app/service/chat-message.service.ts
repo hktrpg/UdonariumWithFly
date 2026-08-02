@@ -25,6 +25,11 @@ export class ChatMessageService {
 
   constructor() { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   get chatTabs(): ChatTab[] {
     return ChatTabList.instance.chatTabs;
   }
@@ -83,7 +88,7 @@ export class ChatMessageService {
       to: ChatMessageService.findId(sendTo),
       //to: this.findId(sendTo),
       //name: this.makeMessageName(sendFrom, sendTo),
-      name: this.findObjectName(sendFrom),
+      name: this.findObjectName(sendFrom) + (this.GuestMode() ? '(訪客)' : ''),
       toName: sendTo ? this.findObjectName(sendTo) : '',
       imageIdentifier: this.findImageIdentifier(sendFrom, isUseFaceIcon),
       toImageIdentifier: sendTo ? this.findImageIdentifier(sendTo) : '',
@@ -157,6 +162,9 @@ export class ChatMessageService {
 
   private makeMessageName(sendFrom: string, sendTo?: string): string {
     let sendFromName = this.findObjectName(sendFrom);
+    if (this.GuestMode()) {
+      sendFromName += '(訪客)';
+    }
     if (sendTo == null || sendTo.length < 1) return sendFromName;
 
     let sendToName = this.findObjectName(sendTo);

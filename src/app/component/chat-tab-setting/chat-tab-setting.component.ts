@@ -55,6 +55,11 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     private pointerDeviceService: PointerDeviceService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     Promise.resolve().then(() => { this.modalService.title = this.panelService.title = 'チャットタブ設定'; this.panelService.isAbleFullScreenButton = false });
     EventSystem.register(this)
@@ -77,10 +82,12 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   create() {
+    if (this.GuestMode()) return;
     ChatTabList.instance.addChatTab('タブ');
   }
 
   async save() {
+    if (this.GuestMode()) return;
     if (!this.selectedTab || this.isSaveing) return;
     this.isSaveing = true;
     this.progresPercent = 0;
@@ -98,6 +105,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   delete() {
+    if (this.GuestMode()) return;
     if (!this.isEmpty && this.selectedTab) {
       this.selectedTabXml = this.selectedTab.toXml();
       this.selectedTab.destroy();
@@ -105,6 +113,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   restore() {
+    if (this.GuestMode()) return;
     if (this.selectedTab && this.selectedTabXml) {
       let restoreTable = <ChatTab>ObjectSerializer.instance.parseXml(this.selectedTabXml);
       ChatTabList.instance.addChatTab(restoreTable);
@@ -113,6 +122,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   upTabIndex() {
+    if (this.GuestMode()) return;
     if (!this.selectedTab) return;
     let parentElement = this.selectedTab.parent;
     let index: number = parentElement.children.indexOf(this.selectedTab);
@@ -123,6 +133,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   downTabIndex() {
+    if (this.GuestMode()) return;
     if (!this.selectedTab) return;
     let parentElement = this.selectedTab.parent;
     let index: number = parentElement.children.indexOf(this.selectedTab);

@@ -31,6 +31,11 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnChanges() {
     Promise.resolve().then(() => this.panelService.title = this.cardStack.name + ' のカード一覧');
     EventSystem.unregister(this);
@@ -59,6 +64,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   }
 
   drawCard(card: Card) {
+    if (this.GuestMode()) return;
     card.parent.removeChild(card);
     card.location.x = this.cardStack.location.x + 100 + (Math.random() * 50);
     card.location.y = this.cardStack.location.y + 25 + (Math.random() * 50);
@@ -75,6 +81,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   } 
 
   up(card: Card) {
+    if (this.GuestMode()) return;
     let parent = card.parent;
     let index: number = parent.children.indexOf(card);
     if (0 < index) {
@@ -84,6 +91,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   }
 
   down(card: Card) {
+    if (this.GuestMode()) return;
     let parent = card.parent;
     let index: number = parent.children.indexOf(card);
     if (index < parent.children.length - 1) {
@@ -93,6 +101,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   }
 
   close(needShuffle: boolean = false) {
+    if (this.GuestMode()) return;
     if (needShuffle) {
       this.cardStack.shuffle();
       EventSystem.call('SHUFFLE_CARD_STACK', { identifier: this.cardStack.identifier });
@@ -102,6 +111,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   }
 
   showDetail(gameObject: Card) {
+    if (this.GuestMode()) return;
     let coordinate = {
       x: this.panelService.left,
       y: this.panelService.top

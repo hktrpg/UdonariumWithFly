@@ -11,7 +11,7 @@ import {
   OnDestroy
 } from '@angular/core';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
@@ -152,6 +152,11 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     private coordinateService: CoordinateService,
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   viewRotateZ = 10;
 
   ngOnChanges(): void {
@@ -222,6 +227,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     e.stopPropagation();
     e.preventDefault();
 
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
     let menuPosition = this.pointerDeviceService.pointers[0];
@@ -520,6 +527,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   private showDetail(gameObject: Terrain) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '地形設定';

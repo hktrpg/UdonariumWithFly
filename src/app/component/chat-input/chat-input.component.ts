@@ -813,7 +813,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     DiceBot.getHelpMessage(this.gameType).then(help => {
       this.gameHelp = help;
 
-      let gameName: string = 'ダイスボット';
+      let gameName: string = '骰子機械人';
       for (let diceBotInfo of DiceBot.diceBotInfos) {
         if (diceBotInfo.id === this.gameType) {
           gameName = 'ダイスボット〈' + diceBotInfo.game + '〉'
@@ -840,7 +840,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       this.contextMenuService.open(
         position, 
         [
-          { name: '接続情報...', action: () => {
+          { name: '連接情報...', action: () => {
             this.panelService.open(PeerMenuComponent, { width: 520, height: 600, top: position.y - 100, left: position.x - 100 });
           } }
         ],
@@ -872,7 +872,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         if (this.character.imageFiles.length > 1) {
           contextMenuActions.push(ContextMenuSeparator);
           contextMenuActions.push({
-            name: '画像切り替え',
+            name: '圖片切換',
             action: null,
             subActions: this.character.imageFiles.map((image, i) => {
               return { 
@@ -891,16 +891,16 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         }
         contextMenuActions.push(ContextMenuSeparator);
         contextMenuActions.push(
-          { name: '画像効果', action: null, subActions: [
+          { name: '圖片效果', action: null, subActions: [
             (this.character.isInverse
               ? {
-                name: '☑ 反転', action: () => {
+                name: '☑ 反轉', action: () => {
                   this.character.isInverse = false;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               } : {
-                name: '☐ 反転', action: () => {
+                name: '☐ 反轉', action: () => {
                   this.character.isInverse = true;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
@@ -908,13 +908,13 @@ export class ChatInputComponent implements OnInit, OnDestroy {
               }),
             (this.character.isHollow
               ? {
-                name: '☑ ぼかし', action: () => {
+                name: '☑ 模糊', action: () => {
                   this.character.isHollow = false;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               } : {
-                name: '☐ ぼかし', action: () => {
+                name: '☐ 模糊', action: () => {
                   this.character.isHollow = true;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
@@ -922,24 +922,24 @@ export class ChatInputComponent implements OnInit, OnDestroy {
               }),
             (this.character.isBlackPaint
               ? {
-                name: '☑ 黒塗り', action: () => {
+                name: '☑ 塗成黑色', action: () => {
                   this.character.isBlackPaint = false;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               } : {
-                name: '☐ 黒塗り', action: () => {
+                name: '☐ 塗成黑色', action: () => {
                   this.character.isBlackPaint = true;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               }),
-              { name: 'オーラ', action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} なし`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['ブラック', 'ブルー', 'グリーン', 'シアン', 'レッド', 'マゼンタ', 'イエロー', 'ホワイト'].map((color, i) => {  
+              { name: '光環', action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} 無`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['ブラック', 'ブルー', 'グリーン', 'シアン', 'レッド', 'マゼンタ', 'イエロー', 'ホワイト'].map((color, i) => {  
                 return { name: `${this.character.aura == i ? '◉' : '○'} ${color}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
               })) },
             ContextMenuSeparator,
             {
-              name: 'リセット', action: () => {
+              name: '重置', action: () => {
                 this.character.isInverse = false;
                 this.character.isHollow = false;
                 this.character.isBlackPaint = false;
@@ -954,7 +954,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //if (this.character.faceIcons.length > 1) {
           contextMenuActions.push(ContextMenuSeparator);
           contextMenuActions.push({
-            name: '顔アイコンの切り替え',
+            name: '改變大頭貼icon',
             action: null,
             subActions: this.character.faceIcons.map((faceIconImage, i) => {
               return { 
@@ -974,11 +974,11 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //}
       }
       contextMenuActions.push(ContextMenuSeparator);
-      contextMenuActions.push({ name: '詳細を表示...', action: () => { this.showDetail(this.character); } });
+      contextMenuActions.push({ name: '顯示詳情...', action: () => { this.showDetail(this.character); } });
       if (!this.onlyCharacters) {
-        contextMenuActions.push({ name: 'チャットパレットを表示...', action: () => { this.showChatPalette(this.character) } });
+        contextMenuActions.push({ name: '顯示聊天面板...', action: () => { this.showChatPalette(this.character) } });
       }
-      contextMenuActions.push({ name: 'スタンド設定...', action: () => { this.showStandSetting(this.character) } });
+      contextMenuActions.push({ name: '立繪設定...', action: () => { this.showStandSetting(this.character) } });
     }
     this.contextMenuService.open(position, contextMenuActions, this.character.name);
   }
@@ -1003,7 +1003,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
 
   private showDetail(gameObject: GameCharacter) {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = 'キャラクターシート';
+    let title = '角色卡';
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

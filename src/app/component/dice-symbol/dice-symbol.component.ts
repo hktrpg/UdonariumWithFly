@@ -196,6 +196,11 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnChanges(): void {
     EventSystem.register(this)
       .on('ROLL_DICE_SYMBOL', event => {
@@ -298,6 +303,8 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     e.stopPropagation();
     e.preventDefault();
 
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let position = this.pointerDeviceService.pointers[0];
 
@@ -533,6 +540,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   diceRoll(): string {
+    if (this.GuestMode()) return;
     EventSystem.call('ROLL_DICE_SYMBOL', { identifier: this.diceSymbol.identifier });
     //if (this.owner === '') {
       if (this.isCoin) {
@@ -549,6 +557,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   showDetail(gameObject: DiceSymbol) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = 'ダイスシンボル設定';

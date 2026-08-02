@@ -62,6 +62,11 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
     private saveDataService: SaveDataService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnInit() {
     Promise.resolve().then(() => { this.modalService.title = this.panelService.title = 'チャットログ出力'; this.panelService.isAbleFullScreenButton = false });
     EventSystem.register(this)
@@ -101,6 +106,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   }
 
   saveLog() {
+    if (this.GuestMode()) return;
     if (this.isDisable) return;
     const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? '全てのタブ' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、他' : ''));
     const tabs = this.isAllTabs ? null : this.selectedTabs;

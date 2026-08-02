@@ -11,7 +11,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
@@ -125,6 +125,11 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     private selectionService: TabletopSelectionService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   viewRotateZ = 10;
   private input: InputHandler = null;
   
@@ -196,6 +201,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
+
+    if (this.GuestMode()) return;
     if (this.isActive || this.isLocked) return;
     e.preventDefault();
     this.textNote.toTopmost();
@@ -227,6 +234,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
     this.removeMouseEventListeners();
+
+    if (this.GuestMode()) return;
     if (this.isActive) return;
     e.stopPropagation();
     e.preventDefault();
@@ -414,6 +423,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
   }
 
   private showDetail(gameObject: TextNote) {
+    if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '共有メモ設定';

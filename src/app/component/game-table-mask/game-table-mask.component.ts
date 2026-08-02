@@ -252,6 +252,11 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     private chatMessageService: ChatMessageService
   ) { }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
+
   ngOnChanges(): void {
     EventSystem.unregister(this);
     EventSystem.register(this)
@@ -405,6 +410,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     e.stopPropagation();
     e.preventDefault();
 
+
+    if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let menuPosition = this.pointerDeviceService.pointers[0];
 
@@ -794,6 +801,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   private showDetail(gameObject: GameTableMask) {
+    if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = 'マップマスク設定';
     if (gameObject.name.length) title += ' - ' + gameObject.name;
