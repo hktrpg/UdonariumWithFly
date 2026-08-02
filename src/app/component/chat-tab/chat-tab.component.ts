@@ -48,7 +48,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 完整說明：https://bothelp.hktrpg.com/guide`, 'mine', 0),
 
     this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞Shift＋左鍵拖曳＝平移　右鍵拖曳＝旋轉　滾輪＝縮放
-＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝顯示詳情
+＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝顯示詳情（角色／牌／地形／筆記等）
 ＜選取＞左鍵點物件＝選取（會高亮）　左鍵空白拖曳＝框選　Esc＝取消
 　　　　Ctrl＋點＝加減選
 ＜鍵盤＞選取後：WASD／方向鍵移動（可對角）

@@ -293,9 +293,9 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     this.ngZone.run(() => this.startIconHiddenTimer());
   }
 
-  onDoubleClick() {
-    if (!this.isVisible) return;
-    this.ngZone.run(() => this.diceRoll());
+  onDoubleClick(e?: Event) {
+    e?.stopPropagation();
+    this.showDetail(this.diceSymbol);
   }
 
   @HostListener('contextmenu', ['$event'])

@@ -422,6 +422,11 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     document.body.removeEventListener('mouseup', this.callbackOnMouseUp, false);
   }
 
+  onDoubleClick(e: Event) {
+    e.stopPropagation();
+    this.showDetail(this.textNote);
+  }
+
   private showDetail(gameObject: TextNote) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });

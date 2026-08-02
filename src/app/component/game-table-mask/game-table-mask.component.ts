@@ -800,6 +800,11 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     return actions;
   }
 
+  onDoubleClick(e: Event) {
+    e.stopPropagation();
+    this.showDetail(this.gameTableMask);
+  }
+
   private showDetail(gameObject: GameTableMask) {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];

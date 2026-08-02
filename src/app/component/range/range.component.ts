@@ -760,6 +760,11 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     return value < min ? min : value;
   }
 
+  onDoubleClick(e: Event) {
+    e.stopPropagation();
+    this.showDetail(this.range);
+  }
+
   private showDetail(gameObject: RangeArea) {
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '射程／範圍設定';

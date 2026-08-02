@@ -395,7 +395,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onTablePickStart() {
     this.isTableTransformMode = false;
-    SoundEffect.playLocal(PresetSound.selectionStart);
+    // Only cue audio when picking an object / magnetic gather — not bare empty clicks.
+    if (this.pickGesture.isMagneticMode || this.pickGesture.isPickObjectMode) {
+      SoundEffect.playLocal(PresetSound.selectionStart);
+    }
 
     if (!this.pickGesture.isMagneticMode) {
       let opacity: number = this.tableSelecter.gridShow ? 1.0 : 0.0;
@@ -404,7 +407,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTablePickEnd() {
-    if (this.pickGesture.isKeepSelection) return;
+    if (this.pickGesture.isKeepSelection) {
+      // Region select finished: play only if something was actually selected.
+      if (this.pickGesture.isPickRegionMode && this.selectionService.size > 0) {
+        SoundEffect.playLocal(PresetSound.selectionStart);
+      }
+      return;
+    }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!this.contextMenuService.isShow) this.selectionService.clear();

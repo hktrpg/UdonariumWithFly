@@ -8,6 +8,7 @@
     </div>
     <div class="is-fit-full is-3d">
       <div class="is-fit-full is-3d chrome-smooth-image-trick" style="pointer-events: auto; position: absolute; backface-visibility: hidden"
+        (dblclick)="onDoubleClick($event)"
         [ngStyle]="{'opacity': operateOpacity, 'background-color': imageFileUrl.length < 1 || blendType > 0 ? bgcolor : null, '-webkit-mask': masksCss, mask: masksCss}"
         [ngClass]="{image: imageFileUrl.length >= 1}">
         <img *ngIf="imageFileUrl.length >= 1" class="is-fit-full is-3d chrome-smooth-image-trick" style="pointer-events: none; position: absolute;" [style.mix-blend-mode]="blendType == 1 ? null : 'hard-light'" [src]="imageFileUrl | safe: 'resourceUrl'">

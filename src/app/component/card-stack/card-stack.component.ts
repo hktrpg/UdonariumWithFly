@@ -265,22 +265,9 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     }
   }
 
-  onDoubleClick() {
-    if (this.GuestMode()) return;
-    this.ngZone.run(() => {
-      //if (this.drawCard() != null) SoundEffect.play(PresetSound.cardDraw);
-      const card = this.drawCard();
-      if (card) {
-        SoundEffect.play(PresetSound.cardDraw);
-        let text: string;
-        if (card.isFront) {
-          text = `${this.cardStack.name == '' ? '(無名的牌堆)' : this.cardStack.name} 抽出了 ${card.name == '' ? '(無名的卡牌)' : card.name}`
-        } else {
-          text = `${this.cardStack.name == '' ? '(無名的牌堆)' : this.cardStack.name} 抽出 1 張並蓋起`
-        }
-        this.chatMessageService.sendOperationLog(text);
-      }
-    });
+  onDoubleClick(e?: Event) {
+    e?.stopPropagation();
+    this.showDetail(this.cardStack);
   }
 
   @HostListener('dragstart', ['$event'])

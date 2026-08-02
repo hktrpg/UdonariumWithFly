@@ -9,6 +9,7 @@ https://opensource.org/licenses/mit-license.php
   <div class="is-3d" [style.transform]="'translateZ(' + (altitude * gridSize) + 'px)'" [ngClass]="{fall: altitude == 0}">
     <div class="is-3d" [style.clip-path]="gripPathText" style="position: absolute">
       <div class="is-fill" style="position: absolute; pointer-events: auto; top: -100%" 
+        (dblclick)="onDoubleClick($event)"
         [style.left.px]="-gripLength * 1.5 * gridSize" 
         [style.width.px]="gripLength * 3 * gridSize"
         [style.height.px]="gripWidth * 3 * gridSize">
@@ -30,7 +31,7 @@ https://opensource.org/licenses/mit-license.php
           <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">{{ isLocked ? 'lock' : 'open_with' }}</i>
         </div>
         <ng-container *ngIf="(range.type != 'CIRCLE') && (range.type != 'SQUARE') && (range.type != 'DIAMOND')"> 
-          <div class="is-3d" style="position: absolute; width: 28px; pointer-events: auto">
+          <div class="is-3d" style="position: absolute; width: 28px; pointer-events: auto" (dblclick)="onDoubleClick($event)">
             <ng-container *ngFor="let pos of rotateHandlesLeftPos">
               <div class="rotate-grab of-corn-tip rotate-grab-icon is-3d will-change" style="position:absolute"
                 [style.left.px]="math.ceil((pos - 0.3) * gridSize)">

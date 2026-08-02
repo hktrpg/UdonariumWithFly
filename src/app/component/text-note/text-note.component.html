@@ -1,7 +1,7 @@
 <div class="component is-3d is-pointer-events-none" [ngClass]="{'is-grab': !isLocked}"
   appMovable [movable.option]="movableOption" [movable.disable]="isEditorSelected || isLocked" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="is-3d" appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
-    <div class="component-content is-3d is-pointer-events-auto"
+    <div class="component-content is-3d is-pointer-events-auto" (dblclick)="onDoubleClick($event)"
       [style.width.px]="width * gridSize">
       <div class="is-3d" [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}" [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">

@@ -2,7 +2,7 @@
   appMovable [movable.option]="movableOption" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="component-content is-3d" [@bounceInOut]="'in'">
     <div appRotable [rotable.option]="rotableOption" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()"
-      class="component-content is-3d is-pointer-events-auto">
+      class="component-content is-3d is-pointer-events-auto" (dblclick)="onDoubleClick($event)">
       <ng-container *ngIf="!isIconHidden">
         <div class="pedestal-grab rotate-grab is-3d">
           <div class="pedestal-grab-border">

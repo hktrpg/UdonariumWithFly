@@ -3,7 +3,7 @@
   (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()"
   (keyup.t)="horizontal()" (keyup.r)="turnRight()" (keyup.u)="vertical()" (keyup.shift.r)="turnLeft()" [attr.tabindex]="isLocked ? null : -1">
   <div @slidInOut class="is-3d">
-    <div class="component-content is-pointer-events-auto is-3d"
+    <div class="component-content is-pointer-events-auto is-3d" (dblclick)="onDoubleClick($event)"
       appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
       <img #cardImage [@inverse]="state" *ngIf="imageFile" (load)="onImageLoad()" class="card-image is-3d chrome-smooth-image-trick" [src]="(isFront ? frontImage.url : backImage.url) | safe: 'resourceUrl'">
       <div [style.opacity]="!isFront ? 0.8 : 1.0" [style.transform]="!isFront ? 'scale(0.9)' : ''" class="is-3d is-pointer-events-none" style="position: absolute"

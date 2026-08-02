@@ -265,15 +265,9 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
   }
 
-  onDoubleClick() {
-    if (this.GuestMode()) return;
-    if (this.isLocked || (this.ownerIsOnline && !this.isHand)) return;
-    this.ngZone.run(() => {
-      this.state = this.isVisible && !this.isHand ? CardState.BACK : CardState.FRONT;
-      this.owner = '';
-      if (this.state === CardState.FRONT) this.chatMessageService.sendOperationLog((this.card.name == '' ? '(無名的卡牌)' : this.card.name)  + ' 公開了');
-      SoundEffect.play(PresetSound.cardDraw);
-    });
+  onDoubleClick(e?: Event) {
+    e?.stopPropagation();
+    this.showDetail(this.card);
   }
 
   @HostListener('dragstart', ['$event'])

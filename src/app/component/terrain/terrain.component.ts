@@ -526,6 +526,11 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     return actions;
   }
 
+  onDoubleClick(e: Event) {
+    e.stopPropagation();
+    this.showDetail(this.terrain);
+  }
+
   private showDetail(gameObject: Terrain) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
