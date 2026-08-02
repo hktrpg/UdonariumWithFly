@@ -9,7 +9,7 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | ClarifyMode | Toggle simplified chat presentation | `chat-window.component.*`, `chat-input.component.*` | Toggle changes chat UI as in old build |
 | Guest mode | Room option「允許訪客」; guests join with restricted UI (no save, limited menus) | `guest-session.ts`, lobby/room-setting, `Network.GuestMode()`, menu/movable/rotable/tabletop-action gates | Host enables allow-guest; lobby shows 訪客; guest UI restricted; password rooms still need password (skyway2023) |
 | HKTRPG / CHT | HKTRPG favicon/OG/title; landing page; high-traffic UI Traditional Chinese | root `index.html` (landing), `src/index.html`, selected UI strings | First paint + main flows show HKTRPG + zh-Hant |
-| Keyboard token controls | Click object to select (highlight); WASD/arrows move; Shift+WASD face; Delete; Ctrl/Cmd+C/X/V; Esc/empty click clears | `tabletop-keyboard.service.ts`, `movable.directive.ts`, `game-table.component.ts` | Click token → highlight → keys work; empty click or Esc clears |
+| Keyboard token controls | Click to select; WASD move; Shift+WASD face; Delete; C/X/V (paste at cursor); [ ] layer; Ctrl(+Shift)+wheel rotate; Shift on drop skips snap; Esc/empty clears | `tabletop-keyboard.service.ts`, `movable.directive.ts`, rotable synchronizer | Select → keys/wheel; text selection still copies text; paste follows pointer |
 
 ## Port decisions
 

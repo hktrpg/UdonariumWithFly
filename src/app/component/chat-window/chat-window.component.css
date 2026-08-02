@@ -24,42 +24,42 @@
   margin-bottom: 0;
 }
 
-.clarify-restore-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 2px 6px 0;
-  min-height: 0;
+.sticky-bottom.is-clarify {
+  border-top-style: solid;
+  border-top-color: rgba(102, 102, 102, 0.35);
+  /* Reserve space so the floating restore control sits under the input, not over SEND. */
+  padding-bottom: 26px;
 }
 
+/* Bottom of sticky input area (not above the toolbar). */
 .clarify-restore {
-  width: 26px;
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  z-index: 3;
+  width: 22px;
   height: 22px;
   padding: 0;
   margin: 0;
-  border: solid 1px #888;
-  border-radius: 11px;
-  background-color: transparent;
-  color: #444;
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.55);
+  color: #555;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.45;
   line-height: 1;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
 .clarify-restore:hover {
   opacity: 1;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: #fff;
 }
 
 .clarify-restore .material-icons {
   font-size: 14px;
-  line-height: 20px;
+  line-height: 22px;
   opacity: 1;
-}
-
-.sticky-bottom.is-clarify {
-  border-top-style: solid;
-  border-top-color: rgba(102, 102, 102, 0.35);
 }
 
 .chat-toolbar {

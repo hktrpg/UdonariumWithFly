@@ -178,16 +178,17 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.callSelectedEvent();
     if (this.collidableElements.length < 1) this.findCollidableElements(); // 偶爾會取得 collidableElements 失敗
 
+    const isPrimaryClick = !(e instanceof MouseEvent) || (e.button === 0 && !e.ctrlKey && !e.shiftKey);
+
+    // Click-to-select before disable/guest drag cancel, so a single click still selects.
+    if (isPrimaryClick && !Network.GuestMode() && this.tabletopObject && this.state === SelectionState.NONE) {
+      this.selectionService.clear();
+      this.state = SelectionState.SELECTED;
+    }
+
     if (Network.GuestMode() || this.isDisable || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
       this.cancel();
       return;
-    }
-
-    // Click-to-select so keyboard controls (WASD etc.) have a target without Shift/Ctrl pick.
-    // Keep existing multi-selection when dragging an already-selected object.
-    if (this.state === SelectionState.NONE && this.tabletopObject) {
-      this.selectionService.clear();
-      this.state = SelectionState.SELECTED;
     }
 
     this.onstart.emit(e as PointerEvent);
@@ -300,7 +301,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       z: this.posZ,
     };
 
-    if (this.isGridSnap && this.input.isDragging) this.snapToGrid();
+    if (this.shouldSnapToGrid(e)) this.snapToGrid();
 
     let delta = {
       x: this.posX - prev.x,
@@ -318,7 +319,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     if (this.isDisable) return this.cancel();
     if (e.cancelable) e.preventDefault();
 
-    if (this.isGridSnap && this.input.isDragging) this.snapToGrid();
+    if (this.shouldSnapToGrid(e)) this.snapToGrid();
 
     let needsDispatch = this.input.isGrabbing && e.isTrusted;
     this.cancel();
@@ -339,6 +340,13 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   snapToGrid(gridSize: number = 25) {
     this.posX = this.calcSnapNum(this.posX, gridSize);
     this.posY = this.calcSnapNum(this.posY, gridSize);
+  }
+
+  /** Shift held on drop bypasses grid snap (Foundry-style). */
+  private shouldSnapToGrid(e: MouseEvent | TouchEvent): boolean {
+    if (!this.isGridSnap || !this.input.isDragging) return false;
+    if (e instanceof MouseEvent && e.shiftKey) return false;
+    return true;
   }
 
   private calcSnapNum(num: number, interval: number): number {

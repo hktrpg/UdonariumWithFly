@@ -10,11 +10,13 @@ import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
+import { moveToBackmost, moveToTopmost, Stackable } from '@udonarium/tabletop-object-util';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchronizer';
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
+import { CoordinateService } from './coordinate.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
 
 const MOVE_CODES = new Set([
@@ -29,19 +31,26 @@ export class TabletopKeyboardService {
   private readonly pressed = new Set<string>();
   private clipboardXml: string[] = [];
   private listening = false;
+  private wheelAcc = 0;
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
-  private readonly onBlur = () => this.pressed.clear();
+  private readonly onWheel = (e: WheelEvent) => this.handleWheel(e);
+  private readonly onBlur = () => {
+    this.pressed.clear();
+    this.wheelAcc = 0;
+  };
 
   constructor(
     private selectionService: TabletopSelectionService,
+    private coordinateService: CoordinateService,
   ) { }
 
   initialize() {
     if (this.listening) return;
     document.addEventListener('keydown', this.onKeyDown, true);
     document.addEventListener('keyup', this.onKeyUp, true);
+    document.addEventListener('wheel', this.onWheel, { capture: true, passive: false });
     window.addEventListener('blur', this.onBlur);
     this.listening = true;
   }
@@ -50,6 +59,7 @@ export class TabletopKeyboardService {
     if (!this.listening) return;
     document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('keyup', this.onKeyUp, true);
+    document.removeEventListener('wheel', this.onWheel, true);
     window.removeEventListener('blur', this.onBlur);
     this.pressed.clear();
     this.listening = false;
@@ -65,7 +75,6 @@ export class TabletopKeyboardService {
 
     if (mod && !e.altKey && !e.shiftKey) {
       if (code === 'KeyC') {
-        // Prefer native text copy when the user has highlighted text.
         if (this.hasTextSelection()) return;
         if (this.copySelection()) this.consume(e);
         return;
@@ -96,6 +105,11 @@ export class TabletopKeyboardService {
       return;
     }
 
+    if ((code === 'BracketLeft' || code === 'BracketRight') && !mod && !e.altKey && !e.shiftKey) {
+      if (this.changeLayerOrder(code === 'BracketRight')) this.consume(e);
+      return;
+    }
+
     if (!MOVE_CODES.has(code) || mod || e.altKey) return;
     if (this.selectionService.size < 1) return;
 
@@ -121,7 +135,42 @@ export class TabletopKeyboardService {
     this.pressed.delete(e.code);
   }
 
-  private shouldIgnore(e: KeyboardEvent): boolean {
+  private handleWheel(e: WheelEvent) {
+    if (this.shouldIgnore(e)) return;
+    if (Network.GuestMode()) return;
+    if (this.selectionService.size < 1) return;
+    // Require Ctrl/Cmd. Bare Shift+wheel is remapped to horizontal scroll on many OSes
+    // (deltaX / noisy deltaY), which feels like rotation reversing around 180°.
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    // Prefer the dominant axis (Shift may still contribute deltaX while Ctrl is held).
+    const scroll = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (scroll === 0) return;
+
+    let amount = scroll;
+    if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) amount *= 16;
+    else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) amount *= 800;
+
+    const stepDeg = e.shiftKey ? 45 : 15;
+    const notch = 100;
+    this.wheelAcc += amount;
+
+    let applied = false;
+    while (Math.abs(this.wheelAcc) >= notch) {
+      const dir = this.wheelAcc > 0 ? 1 : -1;
+      if (RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, dir * stepDeg)) {
+        applied = true;
+      }
+      this.wheelAcc -= dir * notch;
+    }
+
+    if (applied) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+
+  private shouldIgnore(e: Event): boolean {
     const target = e.target;
     if (!(target instanceof HTMLElement)) return false;
     const tag = target.tagName;
@@ -155,10 +204,51 @@ export class TabletopKeyboardService {
   private facingAngleFromPressed(): number | null {
     const delta = this.moveDeltaFromPressed();
     if (!delta) return null;
-    // Up = 0°, Right = 90°, Down = 180°, Left = 270° (and diagonals).
     let angle = Math.atan2(delta.dx, -delta.dy) * 180 / Math.PI;
     if (angle < 0) angle += 360;
     return angle;
+  }
+
+  private changeLayerOrder(toFront: boolean): boolean {
+    if (this.selectionService.size < 1) return false;
+    let changed = false;
+    for (const object of this.selectionService.objects) {
+      if (this.isLocked(object)) continue;
+      if (toFront ? this.bringToFront(object) : this.sendToBack(object)) changed = true;
+    }
+    return changed;
+  }
+
+  private bringToFront(object: TabletopObject): boolean {
+    if (typeof (object as any).toTopmost === 'function') {
+      (object as any).toTopmost();
+      return true;
+    }
+    if ((object instanceof Terrain || object instanceof GameTableMask) && object.parent) {
+      object.parent.appendChild(object);
+      return true;
+    }
+    if ('zindex' in object) {
+      moveToTopmost(object as Stackable);
+      return true;
+    }
+    return false;
+  }
+
+  private sendToBack(object: TabletopObject): boolean {
+    if (typeof (object as any).toBackmost === 'function') {
+      (object as any).toBackmost();
+      return true;
+    }
+    if ((object instanceof Terrain || object instanceof GameTableMask) && object.parent) {
+      object.parent.prependChild(object);
+      return true;
+    }
+    if ('zindex' in object) {
+      moveToBackmost(object as Stackable);
+      return true;
+    }
+    return false;
   }
 
   private copySelection(): boolean {
@@ -177,16 +267,32 @@ export class TabletopKeyboardService {
     if (Network.GuestMode()) return false;
     if (this.clipboardXml.length < 1) return false;
 
-    const gridSize = TableSelecter.instance.viewTable?.gridSize ?? 50;
     const table = TableSelecter.instance.viewTable;
     const pasted: TabletopObject[] = [];
 
     for (const xml of this.clipboardXml) {
       const object = ObjectSerializer.instance.parseXml(xml);
       if (!(object instanceof TabletopObject)) continue;
+      pasted.push(object);
+    }
+    if (pasted.length < 1) return false;
 
-      object.location.x += gridSize;
-      object.location.y += gridSize;
+    let cx = 0;
+    let cy = 0;
+    for (const object of pasted) {
+      cx += object.location.x;
+      cy += object.location.y;
+    }
+    cx /= pasted.length;
+    cy /= pasted.length;
+
+    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
+    const dx = pointer.x - cx;
+    const dy = pointer.y - cy;
+
+    for (const object of pasted) {
+      object.location.x += dx;
+      object.location.y += dy;
 
       if (object instanceof GameCharacter) {
         object.update();
@@ -215,11 +321,7 @@ export class TabletopKeyboardService {
       } else {
         object.update();
       }
-
-      pasted.push(object);
     }
-
-    if (pasted.length < 1) return false;
 
     this.selectionService.clear();
     for (const object of pasted) {

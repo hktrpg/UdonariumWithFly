@@ -177,7 +177,8 @@ export class MovableSelectionSynchronizer {
 
   finishMove(delta: PointerCoordinate) {
     if (!this.shouldSynchronize()) {
-      this.selection.clear();
+      // Do not clear here: a plain click may end with no sync window while
+      // click-to-select already registered the object on input start.
       return;
     }
 

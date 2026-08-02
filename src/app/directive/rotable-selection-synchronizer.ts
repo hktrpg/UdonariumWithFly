@@ -82,20 +82,33 @@ export class RotableSelectionSynchronizer {
   }
 
   static face(targets: TabletopObject[], angle: number): boolean {
+    return RotableSelectionSynchronizer.applyRotate(targets, () => angle);
+  }
+
+  static rotateBy(targets: TabletopObject[], delta: number): boolean {
+    if (delta === 0) return false;
+    return RotableSelectionSynchronizer.applyRotate(targets, current => {
+      let next = (current + delta) % 360;
+      if (next < 0) next += 360;
+      return next;
+    });
+  }
+
+  private static applyRotate(targets: TabletopObject[], nextAngle: (current: number) => number): boolean {
     let rotated = false;
     for (let object of targets) {
       let rotables = RotableSelectionSynchronizer.rotablesMap.get(object);
       if (rotables == null || rotables.size < 1) {
         if (!('rotate' in object)) continue;
         if ((object as any).isLocked || (object as any).isLock) continue;
-        (object as any).rotate = angle;
+        (object as any).rotate = nextAngle(+(object as any).rotate || 0);
         rotated = true;
         continue;
       }
       for (let rotable of rotables) {
         if (rotable.isDisable) continue;
         if (rotable.targetPropertyName !== 'rotate') continue;
-        rotable.rotate = angle;
+        rotable.rotate = nextAngle(rotable.rotate);
         rotated = true;
       }
     }

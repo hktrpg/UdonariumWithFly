@@ -39,11 +39,9 @@
       </div>
     </div>
   </form>
-  <div *ngIf="ClarifyModeActive()" class="clarify-restore-bar">
-    <button type="button" class="clarify-restore" title="結束精簡：顯示標籤列與工具列" (click)="toggleClarifyMode()">
-      <i class="material-icons">view_agenda</i>
-    </button>
-  </div>
   <chat-input [chatTabidentifier]="chatTabidentifier" [(gameType)]="gameType" [(sendFrom)]="sendFrom" (chat)="sendChat($event)"></chat-input>
+  <button *ngIf="ClarifyModeActive()" type="button" class="clarify-restore" title="結束精簡：顯示標籤列與工具列" (click)="toggleClarifyMode()">
+    <i class="material-icons">view_agenda</i>
+  </button>
 </div>
 <!--<div style="white-space:pre-wrap; font-size: 8px;"><span>{{gameHelp}}</span></div>-->

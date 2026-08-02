@@ -103,7 +103,10 @@ export class TablePickGesture {
     if (!isMainButton) return this.cancel();
 
     this.isStrokeMode = (e instanceof MouseEvent && e.button === 0 && e.ctrlKey);
-    let isQuickActivate = (e instanceof MouseEvent && e.button === 0 && e.shiftKey);
+    // Swapped from former Shift+left: bare left on empty table = region select.
+    // Shift+left is reserved for panning the map (see game-table onTableMouseStart).
+    const isBackground = (e.target instanceof HTMLElement) && e.target.contains(this.gameObjectsElement);
+    const isQuickActivate = (e instanceof MouseEvent && e.button === 0 && !e.shiftKey && !e.ctrlKey && isBackground);
 
     if (this.isStrokeMode || isQuickActivate) {
       this.startQuickCursor(e);
@@ -144,7 +147,12 @@ export class TablePickGesture {
 
     this.isObjectDragging = this.pointerDevice.isDragging;
     this.isPointerMoved = this.isPointerMoved || threshold < this.input.magnitude;
-    this.isKeepSelection = this.isKeepSelection || this.isPointerMoved || this.isObjectDragging;
+    // Keep selection after a click on an object. Mouse-up may clear isDragging before
+    // this runs (handler order), which previously wiped click-to-select.
+    this.isKeepSelection = this.isKeepSelection
+      || this.isPointerMoved
+      || this.isObjectDragging
+      || this.target != null;
 
     if (this.onend) this.onend();
     this.cancel();
@@ -159,8 +167,6 @@ export class TablePickGesture {
     if (this.isActive && (!this.input.isGrabbing)) return;
     switch (e.key) {
       case 'Control':
-        this.isStrokeMode = true;
-      case 'Shift':
         this.clearActivateTimer();
         this.clearKeyDownTimer();
 
@@ -168,6 +174,7 @@ export class TablePickGesture {
         this.isPointerMoved = false;
         this.isObjectDragging = false;
         this.isKeepSelection = false;
+        this.isStrokeMode = true;
 
         this.isActive = true;
         this.pickCursor.update(this.input.pointer);
@@ -178,6 +185,10 @@ export class TablePickGesture {
 
         this.pointerDevice.isDragging = false;
         this.pickStart();
+        break;
+      case 'Shift':
+        // Shift = pan map; abort in-progress pick so transform can take over next gesture.
+        this.cancel();
         break;
     }
   }

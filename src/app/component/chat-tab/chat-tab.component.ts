@@ -47,13 +47,15 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
 完整說明：https://bothelp.hktrpg.com/guide`, 'mine', 0),
 
-    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞空白處拖曳＝平移　右鍵拖曳＝旋轉　滾輪＝縮放
-＜物件＞拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝預設動作
-＜選取＞左鍵點物件＝選取（會高亮）　點空白／Esc＝取消
-　　　　Shift＋拖曳＝框選　Ctrl＋點＝加減選
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞Shift＋左鍵拖曳＝平移　右鍵拖曳＝旋轉　滾輪＝縮放
+＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝預設動作
+＜選取＞左鍵點物件＝選取（會高亮）　左鍵空白拖曳＝框選　Esc＝取消
+　　　　Ctrl＋點＝加減選
 ＜鍵盤＞選取後：WASD／方向鍵移動（可對角）
 　　　　Shift＋WASD＝面向　Delete＝刪除（角色進回收區）
-　　　　Ctrl＋C／X／V＝複製／剪下／貼上
+　　　　Ctrl＋C／X／V＝複製／剪下／貼上（貼在游標處）
+　　　　[ / ]＝送後／送前　Ctrl＋滾輪旋轉／Ctrl＋Shift＋滾輪快轉
+　　　　拖曳放開時按住 Shift＝暫時不吸附格線
 圖片、音樂可直接拖進瀏覽器匯入。`, 'mine', 0),
 
     this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜聊天＞上方可切頻道；工具列（本機）：提示音／靠左／列表／靜音／精簡

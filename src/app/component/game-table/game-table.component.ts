@@ -350,10 +350,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableMouseStart(e: any) {
-    if (e.target.contains(this.gameObjects.nativeElement) || e.button === 1 || e.button === 2) {
+    // Shift+left = pan map (swapped with former bare-left pan).
+    // Bare left on empty table = region select (handled by TablePickGesture).
+    if (e.button === 0 && e.shiftKey) {
       this.isTableTransformMode = true;
-      // Empty-table click clears selection (Foundry-style).
-      if (e.button === 0) this.selectionService.clear();
+      this.pointerDeviceService.isDragging = false;
+    } else if (e.button === 1 || e.button === 2) {
+      this.isTableTransformMode = true;
+    } else if (e.target.contains(this.gameObjects.nativeElement)) {
+      this.isTableTransformMode = false;
     } else {
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = true;
