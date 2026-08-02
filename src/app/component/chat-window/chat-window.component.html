@@ -4,10 +4,10 @@
   <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" [leftOnly]="isLeftOnly" (onAddMessage)="scrollToBottom()"></chat-tab>
   <div *ngIf="!chatTab">※聊天標籤的內容已更新。請重新選擇聊天標籤，或重新開啟此聊天視窗。</div>
 </div>
-<div class="sticky-bottom">
-  <form>
+<div class="sticky-bottom" [ngClass]="{'is-clarify': ClarifyModeActive()}">
+  <form *ngIf="!ClarifyModeActive()">
     <div class="chat-toolbar">
-      <div class="chat-tab" *ngIf="!ClarifyModeActive()">
+      <div class="chat-tab">
         <label *ngFor="let chatTab of chatMessageService.chatTabs; trackBy: trackByChatTab" class="tab">
           <input name="chat-tab" type="radio" value="{{chatTab.identifier}}" ng-control="options" [(ngModel)]="chatTabidentifier">
           <div><span [style.cursor]="chatTabidentifier != chatTab.identifier ? 'pointer' : ''" [style.color]="chatTab.name == '' && chatTabidentifier != chatTab.identifier ? 'gray' : ''">{{chatTab.name == '' ? '(未命名標籤)' : chatTab.name}}</span><i *ngIf="chatTab.isUseStandImage" class="material-icons small-font">how_to_reg</i><i *ngIf="chatTab.recieveOperationLogLevel > 0" class="material-icons small-font">history_edu</i><badge *ngIf="chatTab.hasUnread" class="badge" [count]="chatTab.unreadLength"></badge></div>
@@ -32,13 +32,18 @@
           <i class="material-icons" style="font-size: 1em">{{ isFullMute ? 'volume_off' : 'volume_up'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="隱藏標籤列：收起上方聊天頻道列，介面更乾淨（本機設定）" [ngClass]="{'is-active': ClarifyModeActive()}" (click)="toggleClarifyMode()">
-          <i class="material-icons" style="font-size: 1em">{{ ClarifyModeActive() ? 'view_agenda' : 'view_day'}}</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="精簡：收起標籤列與工具列，只保留輸入區（本機設定）" (click)="toggleClarifyMode()">
+          <i class="material-icons" style="font-size: 1em">view_day</i>
           <sup style="color: red">*</sup>
         </button>
       </div>
     </div>
   </form>
+  <div *ngIf="ClarifyModeActive()" class="clarify-restore-bar">
+    <button type="button" class="clarify-restore" title="結束精簡：顯示標籤列與工具列" (click)="toggleClarifyMode()">
+      <i class="material-icons">view_agenda</i>
+    </button>
+  </div>
   <chat-input [chatTabidentifier]="chatTabidentifier" [(gameType)]="gameType" [(sendFrom)]="sendFrom" (chat)="sendChat($event)"></chat-input>
 </div>
 <!--<div style="white-space:pre-wrap; font-size: 8px;"><span>{{gameHelp}}</span></div>-->

@@ -183,6 +183,13 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
+    // Click-to-select so keyboard controls (WASD etc.) have a target without Shift/Ctrl pick.
+    // Keep existing multi-selection when dragging an already-selected object.
+    if (this.state === SelectionState.NONE && this.tabletopObject) {
+      this.selectionService.clear();
+      this.state = SelectionState.SELECTED;
+    }
+
     this.onstart.emit(e as PointerEvent);
 
     this.setPointerEvents(false);

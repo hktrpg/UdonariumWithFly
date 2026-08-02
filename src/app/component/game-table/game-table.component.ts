@@ -23,6 +23,7 @@ import { ImageService } from 'service/image.service';
 import { ModalService } from 'service/modal.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { TabletopKeyboardService } from 'service/tabletop-keyboard.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
 
@@ -172,6 +173,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private tabletopService: TabletopService,
     private tabletopActionService: TabletopActionService,
     private selectionService: TabletopSelectionService,
+    private tabletopKeyboardService: TabletopKeyboardService,
     private modalService: ModalService,
   ) { }
 
@@ -263,6 +265,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.initializeTableTouchGesture();
       this.initializeTableMouseGesture();
       this.initializeTablePickGesture();
+      this.tabletopKeyboardService.initialize();
     });
     this.cancelInput();
 
@@ -276,6 +279,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mouseGesture.destroy();
     this.touchGesture.destroy();
     this.pickGesture.destroy();
+    this.tabletopKeyboardService.destroy();
     if (this._currentTableImageUrl) URL.revokeObjectURL(this._currentTableImageUrl);
     if (this._currentBackgroundImageUrl) URL.revokeObjectURL(this._currentBackgroundImageUrl);
     if (this._currentBackgroundImageUrl2) URL.revokeObjectURL(this._currentBackgroundImageUrl2);
@@ -348,6 +352,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onTableMouseStart(e: any) {
     if (e.target.contains(this.gameObjects.nativeElement) || e.button === 1 || e.button === 2) {
       this.isTableTransformMode = true;
+      // Empty-table click clears selection (Foundry-style).
+      if (e.button === 0) this.selectionService.clear();
     } else {
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = true;

@@ -41,43 +41,36 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   @Input() leftOnly: boolean = false;
   
   sampleMessages: ChatMessage[] = [
-    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `烏冬說明: 這是由日本作者 TK11235 所開發的開源 TRPG 跑團平台，使用 MIT 授權。
-特點是地圖以 2.5D 顯示，架構簡單、容易擴充。原版網址見下方連結。
-在這個平台中，主要資料由使用者之間彼此傳送與處理；HKTRPG 提供中文化平台與額外功能，棋子、圖片等仍儲存在各位的電腦中。
-所以離開前，請先按「保存ZIP」產生 ZIP 檔；下次使用時按「讀取ZIP」上傳，否則房間資料會像煙火一樣燒光。
-輸入第一則聊天後，此教學會自動隱藏。`, 'mine', 0),
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `歡迎使用 HKTRPG 烏冬桌（基於 Udonarium with Fly）。
+地圖是 2.5D；資料在玩家之間互傳，伺服器不幫你長期保管棋子與圖片。
+★ 離開前請「保存 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
+建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
+完整說明：https://bothelp.hktrpg.com/guide`, 'mine', 0),
 
-    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞拖曳空白處移動視角／右鍵拖曳旋轉／右鍵開啟選單
-＜物件＞拖曳移動或旋轉／右鍵開啟選單／雙擊執行預設動作
-＜選取＞空白處長按拖曳範圍選取；Ctrl+左鍵增減選取
-圖片與音樂可直接拖放到瀏覽器畫面匯入。建議使用桌面版 Google Chrome。`, 'mine', 0),
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞空白處拖曳＝平移　右鍵拖曳＝旋轉　滾輪＝縮放
+＜物件＞拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝預設動作
+＜選取＞左鍵點物件＝選取（會高亮）　點空白／Esc＝取消
+　　　　Shift＋拖曳＝框選　Ctrl＋點＝加減選
+＜鍵盤＞選取後：WASD／方向鍵移動（可對角）
+　　　　Shift＋WASD＝面向　Delete＝刪除（角色進回收區）
+　　　　Ctrl＋C／X／V＝複製／剪下／貼上
+圖片、音樂可直接拖進瀏覽器匯入。`, 'mine', 0),
 
-    this.makeSampleMessage('System', '???', '教學Zzzzzz', '玩家', '密語並不會儲存到 ZIP 中。當你的 ID 更新之後，將無法再看見之前傳給你的密語，還請多加注意。', 'mine', 0),
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜聊天＞上方可切頻道；工具列（本機）：提示音／靠左／列表／靜音／精簡
+　　　　精簡＝收起標籤與工具列，右上小鈕可還原
+＜骰子＞輸入區選規則後直接打指令（BCDice）；角色卡欄位可快速擲骰
+＜訪客＞開房可「允許訪客」；訪客功能受限。有密碼仍要密碼
+＜筆記＞選單可開「筆記倉庫」整理桌面／公用／私人筆記
+＜密語＞不會進 ZIP；換了連線 ID 後舊密語也看不到，請留意。`, 'mine', 0),
 
-    this.makeSampleMessage('System', null, '連結:', null, `根據 https://nanasunana.github.io/ 私家改造版重新中文化，並加入各種功能。
-升級 1.13.2 版本`, 'mine', 1615253220000),
-
-    this.makeSampleMessage('System', null, '連結:', null, `升級成 1.13.3b 版本
-2021/05/11 改良 HTML 及 TXT 匯出功能，增加 COIN 功能
-2021/05/13 更新 TOKEN 底部框大小
-2021/05/27 更新 CutIn 功能（可使用 YouTube）；陰影會依高度改變`, 'mine', 1615253220000),
-
-    this.makeSampleMessage('System', null, '連結:', null, `2021/08/17 更新成 F 版，更新組件版本。修正角色卡不能擲骰的 BUG，感謝吐司兔的回報。`, 'mine', 1635253220000),
-
-    this.makeSampleMessage('System', null, '連結:', null, `2026 重大更新（hktrpg-main）
-・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
-・介面全面繁體中文化；品牌與說明對齊 HKTRPG
-・訪客模式、隱藏標籤列、筆記倉庫、角色卡快速擲骰
-・聊天工具列：新訊息提示音／訊息靠左／列表模式／完全靜音
-・BCDice 4.9.0（內建 3.16.1）
-
-https://z01.hktrpg.com 本網頁永久連結
-https://udonarium.app/ 原版連結
-https://nanasunana.github.io/ 改版連結
-https://support.hktrpg.com 支援用 Discord 群
-https://www.facebook.com/groups/HKTRPG 香港 TRPG 研究社
-https://www.hktrpg.com/ TRPG 百科
-https://www.patreon.com/HKTRPG HKTRPG 開發支援`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
+    this.makeSampleMessage('System', null, '連結:', null, `本站：https://z01.hktrpg.com
+教學：https://bothelp.hktrpg.com/guide
+Discord：https://support.hktrpg.com
+Facebook：https://www.facebook.com/groups/HKTRPG
+百科：https://www.hktrpg.com/
+原版烏冬：https://udonarium.app/
+with Fly：https://nanasunana.github.io/
+支援開發：https://www.patreon.com/HKTRPG`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
   ];
 
   private topTimestamp = 0;

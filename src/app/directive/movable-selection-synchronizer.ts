@@ -300,6 +300,33 @@ export class MovableSelectionSynchronizer {
       }
     }
   }
+
+  static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
+    if (dx === 0 && dy === 0) return false;
+    let moved = false;
+    for (let object of targets) {
+      let movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (movables == null || movables.size < 1) {
+        if (MovableSelectionSynchronizer.isLocked(object)) continue;
+        object.location.x += dx;
+        object.location.y += dy;
+        object.update();
+        moved = true;
+        continue;
+      }
+      for (let movable of movables) {
+        if (movable.isDisable) continue;
+        movable.posX += dx;
+        movable.posY += dy;
+        moved = true;
+      }
+    }
+    return moved;
+  }
+
+  private static isLocked(object: TabletopObject): boolean {
+    return !!(object as any).isLocked || !!(object as any).isLock;
+  }
 }
 
 function checkOverlapSAT(rectA: IPoint2D[], rectB: IPoint2D[]) {

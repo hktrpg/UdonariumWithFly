@@ -80,4 +80,25 @@ export class RotableSelectionSynchronizer {
     objectSet.delete(this.rotable);
     if (objectSet.size < 1) RotableSelectionSynchronizer.rotablesMap.delete(this.rotable.tabletopObject);
   }
+
+  static face(targets: TabletopObject[], angle: number): boolean {
+    let rotated = false;
+    for (let object of targets) {
+      let rotables = RotableSelectionSynchronizer.rotablesMap.get(object);
+      if (rotables == null || rotables.size < 1) {
+        if (!('rotate' in object)) continue;
+        if ((object as any).isLocked || (object as any).isLock) continue;
+        (object as any).rotate = angle;
+        rotated = true;
+        continue;
+      }
+      for (let rotable of rotables) {
+        if (rotable.isDisable) continue;
+        if (rotable.targetPropertyName !== 'rotate') continue;
+        rotable.rotate = angle;
+        rotated = true;
+      }
+    }
+    return rotated;
+  }
 }

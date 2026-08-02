@@ -8,12 +8,13 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | Note inventory | Panel「筆記倉庫」lists notes by table / common / private / graveyard | `src/app/component/note-inventory/*`, wiring in `app.module.ts`, `app.component.{ts,html}` | Open panel; create/move notes; sync to other peers |
 | ClarifyMode | Toggle simplified chat presentation | `chat-window.component.*`, `chat-input.component.*` | Toggle changes chat UI as in old build |
 | Guest mode | Room option「允許訪客」; guests join with restricted UI (no save, limited menus) | `guest-session.ts`, lobby/room-setting, `Network.GuestMode()`, menu/movable/rotable/tabletop-action gates | Host enables allow-guest; lobby shows 訪客; guest UI restricted; password rooms still need password (skyway2023) |
-| Brand / CHT | HKTRPG favicon/OG/title; landing page; high-traffic UI Traditional Chinese | root `index.html` (landing), `src/index.html`, selected UI strings | First paint + main flows show HKTRPG + zh-Hant |
+| HKTRPG / CHT | HKTRPG favicon/OG/title; landing page; high-traffic UI Traditional Chinese | root `index.html` (landing), `src/index.html`, selected UI strings | First paint + main flows show HKTRPG + zh-Hant |
+| Keyboard token controls | Click object to select (highlight); WASD/arrows move; Shift+WASD face; Delete; Ctrl/Cmd+C/X/V; Esc/empty click clears | `tabletop-keyboard.service.ts`, `movable.directive.ts`, `game-table.component.ts` | Click token → highlight → keys work; empty click or Esc clears |
 
 ## Port decisions
 
 - **Guest**: do **not** encode `isAllowGuest` / `isGuest` into peerId. Use sync room state + local guest flag.
-- **CHT**: brand shell + high-frequency UI first; not full i18n of every WithFly string.
+- **CHT**: title/favicon/landing + high-frequency UI first; not full i18n of every WithFly string.
 - **Quick roll**: old `sendLogMessage` passed broken `value.gameType` etc.; reimplement against current `ChatMessageService.sendMessage` using active chat tab + current speaker.
 
 ## Sync after port
