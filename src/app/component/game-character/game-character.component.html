@@ -13,20 +13,20 @@
       <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-inner" [ngClass]="{'selected': selected, 'not-inventory': !gameCharacter.isInventoryIndicate, 'is-hide-in-pedestal': isHideIn}"></div>
       <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
       <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-outer"></div>
-      <div class="is-pointer-events-none is-3d" style="transform-origin: center bottom" [style.transform]="'translateX(' + ((size * gridSize - characterShadowImageWidth) / 2) + 'px) translateY(' + characterShadowOffset +'px) scale(1.0, 0.66)'">
+      <div class="is-pointer-events-none is-3d" style="transform-origin: center bottom" [style.transform]="'translateX(' + shadowTranslateX + 'px) translateY(' + characterShadowOffset + 'px) scale(1.0, 0.66)'">
         <div class="image-box is-3d" [style.width.px]="characterShadowImageWidth" [style.height.px]="characterShadowImageHeight" style="pointer-events: none"
           style="transform-origin: center 66%" [style.transform]="'rotateZ(' + roll + 'deg)'">
           <div class="aura is-3d" style="pointer-events: none;" [ngClass]="{black: aura == 0, blue: aura == 1, green: aura == 2, cyan: aura == 3, red: aura == 4, magenta: aura == 5, yellow: aura == 6, white: aura == 7}">
             <div class="is-3d" style="pointer-events: none; transition: transform 132ms 0s ease;"
               [ngStyle]="{'transform': 'scaleX(' + (isInverse ? '-1' : '1') + ')'}">
                 <img *ngIf="isDropShadow && (0 < imageFile.url.length || 0 < shadowImageFile.url.length)" [style.height.px]="characterShadowImageHeight" class="image drop-shadow is-3d chrome-smooth-image-trick" style="pointer-events: none" [src]="((0 < shadowImageFile.url.length) ? shadowImageFile.url : imageFile.url) | safe: 'resourceUrl'"
-                  [style.filter]="'brightness(0) blur(1px)' + (isHideIn ? ' invert(85%)' : '')"
-                  [ngStyle]="{'opacity': (isHollow ? 0.5 : 0.7) * (isHideIn ? 0.85 : 1)}" [@switchImageShadow]="gameCharacter.currntImageIndex">
+                  [style.filter]="'brightness(0) blur(' + shadowBlurPx + 'px)' + (isHideIn ? ' invert(85%)' : '')"
+                  [ngStyle]="{'opacity': shadowOpacity}" [@switchImageShadow]="gameCharacter.currntImageIndex">
             </div>
           </div>
         </div>
       </div>
-      <div class="upright-transform is-fit-width is-3d" [ngClass]="{fall: altitude == 0}" (dblclick)="nextImage()"
+      <div class="upright-transform is-fit-width is-3d" [ngClass]="{fall: altitude == 0}" (dblclick)="onDoubleClick($event)"
         [ngStyle]="{'transform': 'rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(' + (-altitude) * gridSize +'px)'}">
         <div class="rotate-frame is-3d" style="position: absolute" [style.transform-origin]="'center ' + (-characterImageHeight * 0.333) + 'px'"
           appRotable [rotable.option]="rollOption" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">

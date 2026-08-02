@@ -146,12 +146,12 @@ export class GameCharacter extends TabletopObject {
     //TEST
     testElement = DataElement.create('戰鬥特技', '', {}, '戰鬥特技' + this.identifier);
     this.detailDataElement.appendChild(testElement);
-    testElement.appendChild(DataElement.create('Lv1', '全力攻擊', {}, 'Lv1' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv3', '武器專精/劍', {}, 'Lv3' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv5', '武器專精/劍Ⅱ', {}, 'Lv5' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv7', '頑強', {}, 'Lv7' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv9', '橫掃', {}, 'Lv9' + this.identifier));
-    testElement.appendChild(DataElement.create('自動', '治癒適性', {}, '自動' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv1', '1d100 全力攻擊', {}, 'Lv1' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv3', '1d100 武器專精/劍', {}, 'Lv3' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv5', '1d100 武器專精/劍Ⅱ', {}, 'Lv5' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv7', '1d100 頑強', {}, 'Lv7' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv9', '1d100 橫掃', {}, 'Lv9' + this.identifier));
+    testElement.appendChild(DataElement.create('自動', '1d100 治癒適性', {}, '自動' + this.identifier));
 
     let domParser: DOMParser = new DOMParser();
     let gameCharacterXMLDocument: Document = domParser.parseFromString(this.rootDataElement.toXml(), 'application/xml');

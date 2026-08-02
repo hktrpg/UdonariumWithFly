@@ -87,11 +87,9 @@ export class RotableSelectionSynchronizer {
 
   static rotateBy(targets: TabletopObject[], delta: number): boolean {
     if (delta === 0) return false;
-    return RotableSelectionSynchronizer.applyRotate(targets, current => {
-      let next = (current + delta) % 360;
-      if (next < 0) next += 360;
-      return next;
-    });
+    // Keep unbounded angles (no % 360). Wrapping while CSS transition is on
+    // interpolates the long way and looks like a sudden ~180°+ spin.
+    return RotableSelectionSynchronizer.applyRotate(targets, current => current + delta);
   }
 
   private static applyRotate(targets: TabletopObject[], nextAngle: (current: number) => number): boolean {
@@ -108,6 +106,9 @@ export class RotableSelectionSynchronizer {
       for (let rotable of rotables) {
         if (rotable.isDisable) continue;
         if (rotable.targetPropertyName !== 'rotate') continue;
+        // Instant update — animated rotateZ(350→5) spins almost a full turn.
+        rotable.setAnimatedTransition(false);
+        rotable.stopTransition(rotable.rotate);
         rotable.rotate = nextAngle(rotable.rotate);
         rotated = true;
       }

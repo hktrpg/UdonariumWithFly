@@ -299,38 +299,39 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return this.gridSize * this.height / ratio;
   }
 
+  /** Ground-shadow shrink/fade factor from altitude (1 on ground, smaller when flying). */
+  get shadowAltitudeFactor(): number {
+    return Math.max(0.35, 1 / (1 + Math.max(0, this.altitude) * 0.45));
+  }
+
   get characterShadowImageHeight(): number {
-    return this.characterImageHeight;
-    /* Pending
-    if (!this.characterShadowImage) return 0;
-    if (this.height > 0) return this.gridSize * this.height;
-    let ratio = this.characterShadowImage.nativeElement.naturalHeight / this.characterShadowImage.nativeElement.naturalWidth;
-    if (ratio > this.heightWidthRatio) ratio = this.heightWidthRatio;
-    return ratio * this.gridSize * this.size;
-    */
+    // Follow token image height (size / height), then shrink with altitude.
+    return this.characterImageHeight * this.shadowAltitudeFactor;
   }
 
   get characterShadowImageWidth(): number {
-    return this.characterImageWidth;
-    /* Pending
-    if (!this.characterShadowImage) return 0;
-    if (this.height <= 0) return this.gridSize * this.size;
-    let ratio = this.characterShadowImage.nativeElement.naturalHeight / this.characterShadowImage.nativeElement.naturalWidth;
-    if (ratio > this.heightWidthRatio) ratio = this.heightWidthRatio;
-    return this.gridSize * this.height / ratio;
-    */
+    // Follow token image width (size / height), then shrink with altitude.
+    return this.characterImageWidth * this.shadowAltitudeFactor;
   }
 
-  get characterShadowOffset(): number  {
-    let offset = 0; 
-    if (0.2 < this.height && this.height <= 0.3) {
-      offset = 0.09;
-    } else if (0.1 < this.height && this.height <= 0.2) {
-      offset = 0.19;
-    } else if (0 < this.height && this.height <= 0.1) {
-      offset = 0.29;
-    } 
-    return (this.gridSize * this.size / 2) - (this.characterShadowImageHeight * 0.99) - (this.gridSize * offset);
+  get characterShadowOffset(): number {
+    // Place flattened shadow on the pedestal, centered by size.
+    const flatY = 0.66;
+    const pedestalCenter = this.gridSize * this.size / 2;
+    return pedestalCenter - this.characterShadowImageHeight * flatY;
+  }
+
+  get shadowOpacity(): number {
+    const base = (this.isHollow ? 0.5 : 0.7) * (this.isHideIn ? 0.85 : 1);
+    return base * Math.max(0.3, 1 / (1 + Math.max(0, this.altitude) * 0.35));
+  }
+
+  get shadowBlurPx(): number {
+    return 1 + Math.max(0, this.altitude) * 0.6;
+  }
+
+  get shadowTranslateX(): number {
+    return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
   }
 
   get chatBubbleAltitude(): number {
@@ -804,6 +805,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       { name: '顯示詳情...', action: () => { this.showDetail(this.gameCharacter); } },
+      {
+        name: '切換下一張圖像', action: () => { this.nextImage(); },
+        disabled: this.gameCharacter.imageFiles.length <= 1
+      },
       (this.gameCharacter.isAllowsChat
         ? {
           name: '☑ 可進行聊天', action: () => {
@@ -927,6 +932,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     ];
 
     return actions;
+  }
+
+  onDoubleClick(e: Event) {
+    e.stopPropagation();
+    this.showDetail(this.gameCharacter);
   }
 
   private showDetail(gameObject: GameCharacter) {
