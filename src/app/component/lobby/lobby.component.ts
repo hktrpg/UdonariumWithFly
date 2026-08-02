@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
@@ -63,17 +64,28 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.isReloading = false;
   }
 
-  async connect(room: IRoomInfo) {
-    let password = '';
+  displayRoomName(room: IRoomInfo): string {
+    return GuestSession.displayRoomName(room.name);
+  }
 
+  isAllowGuest(room: IRoomInfo): boolean {
+    return GuestSession.isAllowGuestRoomName(room.name);
+  }
+
+  async connect(room: IRoomInfo, asGuest: boolean = false) {
+    let password = '';
+    const allowGuest = this.isAllowGuest(room);
+
+    // skyway2023 requires the same password digest as room peers; guests are UI-restricted only.
     if (room.hasPassword) {
-      password = await this.modalService.open<string>(PasswordCheckComponent, { peers: room.peers, title: `${room.name}/${room.id}` });
+      password = await this.modalService.open<string>(PasswordCheckComponent, { peers: room.peers, title: `${this.displayRoomName(room)}/${room.id}` });
       if (password == null) password = '';
     }
 
     let targetPeers = room.filterByPassword(password);
     if (targetPeers.length < 1) return;
 
+    GuestSession.isGuest = !!(allowGuest && asGuest);
     let userId = Network.peer.userId;
     Network.open(userId, room.id, room.name, password);
     PeerCursor.myCursor.peerId = Network.peerId;

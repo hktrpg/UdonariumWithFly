@@ -18,7 +18,7 @@
   </div>
   <div class="table-cell">
     <div class="ff-flex">
-      <label style="margin-right: 2px">
+      <label style="margin-right: 2px" *ngIf="!ClarifyMode()">
         <input *ngIf="character" type="checkbox" [(ngModel)]="isUseFaceIcon" checked="{{isUseFaceIcon ? 'checked' : ''}}" (change)="isUseFaceIcon = (isUseFaceIcon ? true : false)" />
         <b *ngIf="character" style="font-size: smaller">顔IC</b>
       </label>
@@ -54,6 +54,11 @@
         </select>
         <button class="ff-button dicebot-help" style="cursor: help" (click)="showDicebotHelp()">?</button>
       </span>
+      <button type="button" class="tab-setting small-font" style="padding: 1px 4px; margin-left: 2px; height: 24px; box-sizing: border-box" title="Clarify / simplify chat" (click)="ClarifyModeChanged()">
+        <i *ngIf="!ClarifyMode()" class="material-icons icon-size">highlight_off</i>
+        <i *ngIf="ClarifyMode()" class="material-icons icon-size">radio_button_checked</i>
+        精簡
+      </button>
     </div>
     <div *ngIf="hasStand" [ngClass]="{'disabled-stand': !isUseStandImageOnChatTab}" style="font-size: smaller; margin-top: 1px" [title]="isUseStandImageOnChatTab ? '' : '現在のタブではスタンドは無効です'">
       <span style="font-size: medium">

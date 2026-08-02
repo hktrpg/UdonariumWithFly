@@ -1,0 +1,23 @@
+<div class="component">
+  <div *ngFor="let gameObject of getNotes(); trackBy: trackByGameObject">
+    <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject }">
+    </ng-container>
+  </div>
+  <div *ngIf="getNotes().length < 1" style="padding: 8px; color: #666;">尚無筆記</div>
+</div>
+
+<ng-template #gameObjectTags let-gameObject="gameObject">
+  <div class="inventory-object">
+    <div class="object-name">
+      <li>{{showgameObject(gameObject)}}
+        <span *ngIf="!isittable(gameObject)">
+          <button style="font-size: 0.8em; padding: 2px 5px;" (click)="settotable(gameObject)">移到桌面
+            <i class="material-icons" style="font-size: 1em;">settings</i>
+          </button>
+        </span>
+      </li>
+    </div>
+    {{gameObject.text}}
+  </div>
+  <hr class="style-one" />
+</ng-template>

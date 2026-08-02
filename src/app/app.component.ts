@@ -27,6 +27,7 @@ import { GameCharacterSheetComponent } from 'component/game-character-sheet/game
 import { GameObjectInventoryComponent } from 'component/game-object-inventory/game-object-inventory.component';
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
 import { JukeboxComponent } from 'component/jukebox/jukebox.component';
+import { NoteInventoryComponent } from 'component/note-inventory/note-inventory.component';
 import { ModalComponent } from 'component/modal/modal.component';
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
 import { TextViewComponent } from 'component/text-view/text-view.component';
@@ -562,6 +563,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
         break;
+      case 'NoteInventoryComponent':
+        component = NoteInventoryComponent;
+        break;
       case 'DiceRollTableSettingComponent':
         component = DiceRollTableSettingComponent;
         option = { width: 645, height: 475 };
@@ -579,13 +583,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
   async save() {
-    if (this.isSaveing) return;
+    if (this.isSaveing || this.GuestMode()) return;
     this.isSaveing = true;
     this.progresPercent = 0;
     let roomName = 0 < Network.peer.roomName.length
       ? Network.peer.roomName
-      : 'fly_ルームデータ';
+      : 'HKTRPG';
     await this.saveDataService.saveRoomAsync(roomName, percent => {
       this.progresPercent = percent;
     });

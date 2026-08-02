@@ -14,10 +14,16 @@
     </div>
     <div class="table-cell table-cell_solid">
       <ng-container *ngIf="isTagLocked">
+        <button *ngIf="!isCommonValue" type="button" title="Send to chat" style="vertical-align: middle; padding: 0 2px;" (click)="sendLogMessage()">
+          <i class="material-icons" style="font-size: 1rem;">send</i>
+        </button>
         <span style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</span>
         <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">0=画像依存</span></ng-container>
       </ng-container>
       <ng-container *ngIf="!isTagLocked">
+        <button type="button" title="Send to chat" (click)="sendLogMessage()">
+          <i class="material-icons icon-size">send</i>
+        </button>
         <div class="hidden-spacer" style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</div>
         <input style="width:100%; min-width:10px; font-family: Cambria, Georgia; font-size: 0.9rem;" size="1"
           [(ngModel)]="name" placeholder="Value" />

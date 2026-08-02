@@ -23,6 +23,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
 
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
+import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ChatTab } from '@udonarium/chat-tab';
 import { CutInList } from '@udonarium/cut-in-list';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
@@ -47,6 +48,14 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   get isUseStandImageOnChatTab(): boolean {
     const chatTab = <ChatTab>ObjectStore.instance.get(this.chatTabidentifier);
     return chatTab && chatTab.isUseStandImage;
+  }
+
+  ClarifyMode(): boolean {
+    return ChatWindowComponent.ClarifyMode;
+  }
+
+  ClarifyModeChanged() {
+    ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
   }
 
   @Input('gameType') _gameType: string = '';

@@ -67,6 +67,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     this.chatTabComponemt.onScroll();
   }
 
+  /** HKTRPG ClarifyMode: hide chat tab bar for a simpler chat UI. */
+  public static ClarifyMode: boolean = false;
+  ClarifyModeActive(): boolean {
+    return ChatWindowComponent.ClarifyMode;
+  }
+  toggleClarifyMode() {
+    ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
+  }
+
   get gameType(): string { return !this.chatMessageService.gameType ? 'DiceBot' : this.chatMessageService.gameType; }
   set gameType(gameType: string) { this.chatMessageService.gameType = gameType; }
 

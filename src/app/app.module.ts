@@ -14,6 +14,7 @@ import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-set
 import { ChatTabComponent } from 'component/chat-tab/chat-tab.component';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuComponent } from 'component/context-menu/context-menu.component';
+import { NoteInventoryComponent } from 'component/note-inventory/note-inventory.component';
 import { DiceSymbolComponent } from 'component/dice-symbol/dice-symbol.component';
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { FileStorageComponent } from 'component/file-storage/file-storage.component';
@@ -88,6 +89,7 @@ import { RangeComponent } from './component/range/range.component';
     ChatTabSettingComponent,
     ChatWindowComponent,
     ContextMenuComponent,
+    NoteInventoryComponent,
     FileSelecterComponent,
     FileStorageComponent,
     GameCharacterSheetComponent,

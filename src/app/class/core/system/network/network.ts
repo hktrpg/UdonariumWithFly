@@ -1,3 +1,4 @@
+import { GuestSession } from '@udonarium/guest-session';
 import { setZeroTimeout } from '../util/zero-timeout';
 import { Connection, ConnectionCallback } from './connection';
 import { IPeerContext, PeerContext } from './peer-context';
@@ -143,6 +144,10 @@ export class Network {
 
   listAllRooms(): Promise<IRoomInfo[]> {
     return this.connection ? this.connection.listAllRooms() : Promise.resolve([]);
+  }
+
+  GuestMode(): boolean {
+    return GuestSession.GuestMode();
   }
 
   private initializeConnection(): Connection {

@@ -16,34 +16,40 @@
           <div>チャット画面</div>
         </a>
       </li>
-      <li (click)="open('GameTableSettingComponent')">
+      <li (click)="open('GameTableSettingComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">layers</i></div>
           <div>テーブル設定</div>
         </a>
       </li>
-      <li (click)="open('FileStorageComponent')">
+      <li (click)="open('FileStorageComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">photo_library</i></div>
           <div>画像</div>
         </a>
       </li>
-      <li (click)="open('JukeboxComponent')">
+      <li (click)="open('JukeboxComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons">queue_music</i></div>
           <div>音楽</div>
         </a>
       </li>
-      <li (click)="toolBox($event)">
+      <li (click)="toolBox($event)" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
           <div><i class="material-icons">build</i></div>
           <div>ツールボックス</div>
         </a>
       </li>
-      <li (click)="open('GameObjectInventoryComponent')">
+      <li (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">folder_shared</i></div>
           <div>インベントリ</div>
+        </a>
+      </li>
+      <li (click)="open('NoteInventoryComponent')" *ngIf="!GuestMode()">
+        <a routerLink="/" routerLinkActive="active">
+          <div><i class="material-icons icon-size">note</i></div>
+          <div>筆記倉庫</div>
         </a>
       </li>
       <li (click)="diceAllOpne()">
@@ -64,7 +70,7 @@
           <div>視点リセット<sup class="self-only">*</sup></div>
         </a>
       </li>
-      <li>
+      <li *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <label>
             <div><i class="material-icons">open_in_browser</i></div>
@@ -74,7 +80,7 @@
           </label>
         </a>
       </li>
-      <li *ngIf="!isSaveing" (click)="save()">
+      <li *ngIf="!isSaveing && !GuestMode()" (click)="save()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons">sd_storage</i></div>
           <div>保存</div>

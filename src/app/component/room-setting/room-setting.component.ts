@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { ModalService } from 'service/modal.service';
@@ -20,6 +21,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   roomName: string = 'ふつうの部屋';
   password: string = '';
   isPrivate: boolean = false;
+  allowGuest: boolean = false;
 
   get peerId(): string { return Network.peerId; }
   get isConnected(): boolean { return 0 < Network.peerIds.length; }
@@ -48,7 +50,9 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
 
   createRoom() {
     let userId = Network.peer.userId;
-    Network.open(userId, PeerContext.generateId('***'), this.roomName, this.password);
+    GuestSession.isGuest = false;
+    const roomName = this.allowGuest ? GuestSession.markAllowGuest(this.roomName) : this.roomName;
+    Network.open(userId, PeerContext.generateId('***'), roomName, this.password);
     PeerCursor.myCursor.peerId = Network.peerId;
 
     this.modalService.resolve(true);

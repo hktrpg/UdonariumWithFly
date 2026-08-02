@@ -9,7 +9,7 @@ import {
   OnDestroy,
   Output
 } from '@angular/core';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { BatchService } from 'service/batch.service';
@@ -178,7 +178,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.callSelectedEvent();
     if (this.collidableElements.length < 1) this.findCollidableElements(); // 稀にcollidableElementsの取得に失敗している
 
-    if (this.isDisable || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
+    if (Network.GuestMode() || this.isDisable || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
       this.cancel();
       return;
     }

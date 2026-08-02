@@ -4,7 +4,7 @@ import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { FilterType, GameTable, GridType } from '@udonarium/game-table';
@@ -419,12 +419,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.gridCanvas.nativeElement.style.opacity = opacity + '';
   }
 
+  GuestMode() {
+    return Network.GuestMode();
+  }
+
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
     if (!document.activeElement.contains(this.gameObjects.nativeElement)) return;
     e.preventDefault();
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    if (this.GuestMode()) return;
 
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();

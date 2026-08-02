@@ -1,10 +1,13 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { ChatTab } from '@udonarium/chat-tab';
 import { EventSystem } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
+import { PeerCursor } from '@udonarium/peer-cursor';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
+import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
 
 @Component({
@@ -99,6 +102,7 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
 
   constructor(
     private changeDetector: ChangeDetectorRef,
+    private chatMessageService: ChatMessageService,
     private modalService: ModalService
   ) { }
 
@@ -174,6 +178,27 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
     } else {
       this.modalService.open(OpenUrlComponent, { url: url, title: this.tabletopObjectName, subTitle: this.name });
     } 
+  }
+
+  /** Send field value (or current/max) + name to the first chat tab for quick dice/commands. */
+  sendLogMessage() {
+    const chatTabs = this.chatMessageService.chatTabs;
+    if (!chatTabs || chatTabs.length < 1) return;
+
+    const chatTab: ChatTab = chatTabs[0];
+    let payload = `${this.value ?? ''}`;
+    if (this.currentValue !== '' && this.currentValue != null) {
+      payload = `${this.currentValue}/${this.value}`;
+    }
+    const text = `${payload} ${this.name}`.trim();
+    if (!text) return;
+
+    const sendFrom = (this.tabletopObject instanceof GameCharacter)
+      ? this.tabletopObject.identifier
+      : PeerCursor.myCursor.identifier;
+    const gameType = this.chatMessageService.gameType || 'DiceBot';
+
+    this.chatMessageService.sendMessage(chatTab, text, gameType, sendFrom);
   }
 
   private setValues(object: DataElement) {

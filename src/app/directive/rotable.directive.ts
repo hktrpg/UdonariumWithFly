@@ -1,5 +1,5 @@
 import { AfterViewInit, Directive, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output } from '@angular/core';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { BatchService } from 'service/batch.service';
@@ -148,7 +148,7 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   onInputStart(e: MouseEvent | TouchEvent) {
     this.grabbingElement = e.target as HTMLElement;
-    if (this.isDisable || !this.isAllowedToRotate || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
+    if (Network.GuestMode() || this.isDisable || !this.isAllowedToRotate || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
       this.cancel();
       return;
     }
