@@ -77,7 +77,7 @@ export class SkyWayDataStreamList implements Iterable<SkyWayDataStream> {
   remove(stream: SkyWayDataStream): SkyWayDataStream {
     let index = this.streams.indexOf(stream);
     if (0 <= index) {
-      console.log(stream.peer.peerId + ' is えんいー' + 'index:' + index + ' length:' + this.streams.length);
+      console.log(stream.peer.peerId + ' is gone ' + 'index:' + index + ' length:' + this.streams.length);
       this.streams.splice(index, 1);
       this.refresh();
       console.log('<close()> Peer:' + stream.peer.peerId + ' length:' + this.streams.length);

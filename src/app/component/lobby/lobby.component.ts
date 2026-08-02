@@ -22,7 +22,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   isReloading: boolean = false;
 
-  help: string = '單擊「更新列表」按鈕以顯示可以連接的房間的列表。';
+  help: string = '按「更新列表」以顯示可連線的房間。';
 
   get currentRoom(): string { return Network.peer.roomId };
   get peerId(): string { return Network.peerId; }
@@ -60,7 +60,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.isReloading = true;
     this.help = '搜索中...';
     this.rooms = await Network.listAllRooms();
-    this.help = '找不到連接的房間。您可以使用「新增一個新房間」。';
+    this.help = '找不到連線的房間。您可以使用「建立新房間」。';
     this.isReloading = false;
   }
 
@@ -100,15 +100,15 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return true;
     }
     let onConnect = (peerId) => {
-      console.log('連接成功！', peerId);
+      console.log('連線成功！', peerId);
       triedPeer.push(peerId);
-      console.log('連接成功 ' + triedPeer.length + '/' + targetPeers.length);
+      console.log('連線成功 ' + triedPeer.length + '/' + targetPeers.length);
       return onTried();
     }
     let onDisconnect = (peerId) => {
-      console.warn('連接失敗', peerId);
+      console.warn('連線失敗', peerId);
       triedPeer.push(peerId);
-      console.warn('連接失敗 ' + triedPeer.length + '/' + targetPeers.length);
+      console.warn('連線失敗 ' + triedPeer.length + '/' + targetPeers.length);
       return onTried();
     }
 
@@ -140,6 +140,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
   async showRoomSetting() {
     let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 400, left: 0, top: 400 });
     if (isCreate) this.modalService.resolve();
-    this.help = '單擊「更新列表」按鈕以顯示可以連接的房間的列表。';
+    this.help = '按「更新列表」以顯示可連線的房間。';
   }
 }

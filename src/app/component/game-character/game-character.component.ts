@@ -171,7 +171,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     let rubyLength = 0;
 
     if (!isEmote) {
-      text = text.replace(/[。、]{3}/g, '…').replace(/[。、]{2}/g, '‥').replace(/(。|[\r\n]{2,})/g, "$1                            ").trimEnd(); //改行や。のあと時間を置くためのダーティハック
+      text = text.replace(/[。、]{3}/g, '…').replace(/[。、]{2}/g, '‥').replace(/(。|[\r\n]{2,})/g, "$1                            ").trimEnd(); // 在換行或句號後留時間的 dirty hack
       while ((ary = re.exec(text)) !== null) {
         let offset = ary.index - (count * 3);
         rubys.push({base: ary[1], ruby: ary[2], start: offset - rubyLength, end: offset + ary[1].length - rubyLength - 1});
@@ -301,7 +301,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   get characterShadowImageHeight(): number {
     return this.characterImageHeight;
-    /* ペンディング
+    /* Pending
     if (!this.characterShadowImage) return 0;
     if (this.height > 0) return this.gridSize * this.height;
     let ratio = this.characterShadowImage.nativeElement.naturalHeight / this.characterShadowImage.nativeElement.naturalWidth;
@@ -312,7 +312,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   get characterShadowImageWidth(): number {
     return this.characterImageWidth;
-    /* ペンディング
+    /* Pending
     if (!this.characterShadowImage) return 0;
     if (this.height <= 0) return this.gridSize * this.size;
     let ratio = this.characterShadowImage.nativeElement.naturalHeight / this.characterShadowImage.nativeElement.naturalWidth;
@@ -354,7 +354,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   /*
-  // 元の高さからマイナスする値
+  // 自原始高度扣除的值
   get nameplateOffset(): number {
     return 0;
     if (!this.characterImage) return this.gridSize * this.size * this.heightWidthRatio;
@@ -461,7 +461,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         });
       })
       .on<object>('SELECT_TABLETOP_OBJECT', -1000, event => {
-        // とりあえず
+        // 暫且如此
         this.ngZone.run(() => {
           if (event.data['highlighting'] && event.data['identifier'] === this.gameCharacter.identifier) {
             this.selected = true;
@@ -556,7 +556,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   onMoved() {
-    // とりあえず移動したら💭消す
+    // 暫且：移動後清除 💭
     if (this.gameCharacter && this.gameCharacter.text) {
       EventSystem.call('FAREWELL_CHAT_BALLOON', { characterIdentifier: this.gameCharacter.identifier });
     }
@@ -581,15 +581,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
       z: this.gameCharacter.posZ
     };
-    actions.push({ name: 'ここに集める', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedCharacter = () => this.selectionService.objects.filter(object => object.aliasName === this.gameCharacter.aliasName) as GameCharacter[];
       actions.push(
         {
-          name: '選択したキャラクター', action: null, subActions: [
+          name: '已選擇的角色', action: null, subActions: [
             {
-              name: 'すべて共有イベントリに移動', action: () => {
+              name: '全部移至公用倉庫', action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('common')
                   this.selectionService.remove(gameCharacter);
@@ -598,7 +598,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: 'すべて個人イベントリに移動', action: () => {
+              name: '全部移至個人倉庫', action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation(Network.peerId);
                   this.selectionService.remove(gameCharacter);
@@ -607,7 +607,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: 'すべて墓場に移動', action: () => {
+              name: '全部移至回收區', action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('graveyard');
                   this.selectionService.remove(gameCharacter);
@@ -626,7 +626,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [
       { 
-        name: this.isHideIn ? '位置を公開する' : '位置を自分だけ見る（ステルス）',
+        name: this.isHideIn ? '公開位置' : '僅自己可見（隱身）',
         action: () => {
           if (this.isHideIn) {
             this.gameCharacter.owner = '';
@@ -634,9 +634,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           } else {
             if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
               this.modalService.open(ConfirmationComponent, {
-                title: 'ステルスモード', 
-                text: 'ステルスモードになります。',
-                help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+                title: '隱身模式', 
+                text: '已開啟隱身：其他人看不到你的游標位置。',
+                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
                 type: ConfirmationType.OK,
                 materialIcon: 'disabled_visible'
               });
@@ -650,7 +650,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       (this.gameCharacter.imageFiles.length <= 1 ? null : {
-        name: '画像切り替え',
+        name: '圖片切換',
         action: null,
         subActions: this.gameCharacter.imageFiles.map((image, i) => {
           return { 
@@ -665,13 +665,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       (this.gameCharacter.imageFiles.length <= 1 ? null : ContextMenuSeparator),
       (this.isUseIconToOverviewImage
         ? {
-          name: '☑ オーバービューに顔ICを使用', action: () => {
+          name: '☑ 總覽顯示大頭貼', action: () => {
             this.isUseIconToOverviewImage = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ オーバービューに顔ICを使用', action: () => {
+          name: '☐ 總覽顯示大頭貼', action: () => {
             this.isUseIconToOverviewImage = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -679,13 +679,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }),
       (this.gameCharacter.isShowChatBubble
         ? {
-          name: '☑ 💭の表示', action: () => {
+          name: '☑ 顯示💭', action: () => {
             this.gameCharacter.isShowChatBubble = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 💭の表示', action: () => {
+          name: '☐ 顯示💭', action: () => {
             this.gameCharacter.isShowChatBubble = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -693,28 +693,28 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }),
       (this.isDropShadow
         ? {
-          name: '☑ 影の表示', action: () => {
+          name: '☑ 顯示陰影', action: () => {
             this.isDropShadow = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 影の表示', action: () => {
+          name: '☐ 顯示陰影', action: () => {
             this.isDropShadow = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-      { name: '画像効果', action: null, subActions: [
+      { name: '圖片效果', action: null, subActions: [
         (this.isInverse
           ? {
-            name: '☑ 反転', action: () => {
+            name: '☑ 反轉', action: () => {
               this.isInverse = false;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
             checkBox: 'check'
           } : {
-            name: '☐ 反転', action: () => {
+            name: '☐ 反轉', action: () => {
               this.isInverse = true;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
@@ -722,13 +722,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }),
         (this.isHollow
           ? {
-            name: '☑ ぼかし', action: () => {
+            name: '☑ 模糊', action: () => {
               this.isHollow = false;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
             checkBox: 'check'
           } : {
-            name: '☐ ぼかし', action: () => {
+            name: '☐ 模糊', action: () => {
               this.isHollow = true;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
@@ -736,24 +736,24 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }),
         (this.isBlackPaint
           ? {
-            name: '☑ 黒塗り', action: () => {
+            name: '☑ 設為黑色剪影', action: () => {
               this.isBlackPaint = false;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
             checkBox: 'check'
           } : {
-            name: '☐ 黒塗り', action: () => {
+            name: '☐ 設為黑色剪影', action: () => {
               this.isBlackPaint = true;
               EventSystem.trigger('UPDATE_INVENTORY', null);
             },
             checkBox: 'check'
           }),
-          { name: 'オーラ', action: null, subActions: [{ name: `${this.aura == -1 ? '◉' : '○'} なし`, action: () => { this.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['ブラック', 'ブルー', 'グリーン', 'シアン', 'レッド', 'マゼンタ', 'イエロー', 'ホワイト'].map((color, i) => {  
+          { name: '光環', action: null, subActions: [{ name: `${this.aura == -1 ? '◉' : '○'} 無`, action: () => { this.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {  
             return { name: `${this.aura == i ? '◉' : '○'} ${color}`, colorSample: true, action: () => { this.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' };
           })) },
           ContextMenuSeparator,
           {
-            name: 'リセット', action: () => {
+            name: '重置', action: () => {
               this.isInverse = false;
               this.isHollow = false;
               this.isBlackPaint = false;
@@ -767,13 +767,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ContextMenuSeparator,
       (!this.isNotRide
         ? {
-          name: '☑ 他のキャラクターに乗る', action: () => {
+          name: '☑ 可疊在其他角色上', action: () => {
             this.isNotRide = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 他のキャラクターに乗る', action: () => {
+          name: '☐ 可疊在其他角色上', action: () => {
             this.isNotRide = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -781,20 +781,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }),
       (this.isAltitudeIndicate
         ? {
-          name: '☑ 高度の表示', action: () => {
+          name: '☑ 顯示高度', action: () => {
             this.isAltitudeIndicate = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 高度の表示', action: () => {
+          name: '☐ 顯示高度', action: () => {
             this.isAltitudeIndicate = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
       {
-        name: '高度を0にする', action: () => {
+        name: '將高度設為0', action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
@@ -803,26 +803,26 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         altitudeHande: this.gameCharacter
       },
       ContextMenuSeparator,
-      { name: '詳細を表示...', action: () => { this.showDetail(this.gameCharacter); } },
+      { name: '顯示詳情...', action: () => { this.showDetail(this.gameCharacter); } },
       (this.gameCharacter.isAllowsChat
         ? {
-          name: '☑ チャットを行う', action: () => {
+          name: '☑ 可進行聊天', action: () => {
             this.gameCharacter.isAllowsChat = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ チャットを行う', action: () => {
+          name: '☐ 可進行聊天', action: () => {
             this.gameCharacter.isAllowsChat = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-      { name: 'チャットパレットを表示...', action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      { name: 'スタンド設定...', action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
+      { name: '顯示聊天面板...', action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
+      { name: '立繪設定...', action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
       ContextMenuSeparator,
       {
-        name: '参照URLを開く', action: null,
+        name: '開啟參考網址', action: null,
         subActions: this.gameCharacter.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -835,7 +835,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? 'URLが不正です' : null,
+            error: !StringUtil.validUrl(url) ? '網址無效' : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
@@ -844,21 +844,21 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ContextMenuSeparator,
       (this.gameCharacter.isInventoryIndicate
         ? {
-          name: '☑ テーブルインベントリに表示', action: () => {
+          name: '☑ 在桌面倉庫中顯示', action: () => {
             this.gameCharacter.isInventoryIndicate = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ テーブルインベントリに表示', action: () => {
+          name: '☐ 在桌面倉庫中顯示', action: () => {
             this.gameCharacter.isInventoryIndicate = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-      { name: 'テーブルから移動', action: null, subActions: [
+      { name: '移動位置', action: null, subActions: [
         {
-          name: '共有インベントリ', action: () => {
+          name: '公用倉庫', action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('common');
             this.selectionService.remove(this.gameCharacter);
@@ -866,7 +866,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: '個人インベントリ', action: () => {
+          name: '個人倉庫', action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation(Network.peerId);
             this.selectionService.remove(this.gameCharacter);
@@ -874,7 +874,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: '墓場', action: () => {
+          name: '回收區', action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
@@ -884,7 +884,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ]},
       ContextMenuSeparator,
       {
-        name: 'コピーを作る', action: () => {
+        name: '建立副本', action: () => {
           let cloneObject = this.gameCharacter.clone();
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
@@ -893,7 +893,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }
       },
       {
-        name: 'コピーを作る（自動採番）', action: () => {
+        name: '建立副本（自動編號）', action: () => {
           const cloneObject = this.gameCharacter.clone();
           const tmp = cloneObject.name.split('_');
           let baseName;
@@ -917,7 +917,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       {
-        name: '削除する（墓場へ移動）', action: () => {
+        name: '刪除（移至回收區）', action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
           this.gameCharacter.setLocation('graveyard');
           this.selectionService.remove(this.gameCharacter);
@@ -932,7 +932,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = 'キャラクターシート';
+    let title = '角色卡';
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

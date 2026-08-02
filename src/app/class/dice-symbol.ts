@@ -40,7 +40,7 @@ export class DiceSymbol extends TabletopObject {
   get backFaceImageFile(): ImageFile {
     if (!this.isCoin) return this.imageFile;
     return this.isVisible ?
-    this.getImageFile(this.face == '表' ? '裏' : '表')
+    this.getImageFile(this.face == '正面' ? '背面' : '正面')
     : this.getImageFile(this.faces[1])
   }
   get nothingFaces(): string[] { return this.imageDataElement.children.filter(element => (element as DataElement).currentValue == 'nothing').map(element => (element as DataElement).name); }
@@ -59,7 +59,7 @@ export class DiceSymbol extends TabletopObject {
   get ownerIsOnline(): boolean { return this.hasOwner && Network.peers.some(peer => peer.userId === this.owner && peer.isOpen); }
   get isMine(): boolean { return Network.peer.userId === this.owner; }
   get isVisible(): boolean { return !this.hasOwner || this.isMine || this.isGMMode; }
-  get isCoin(): boolean { return this.faces.length === 2; }S
+  get isCoin(): boolean { return this.faces.length === 2; }
 
   diceRoll(): string {
     let faces = this.faces;
@@ -79,7 +79,7 @@ export class DiceSymbol extends TabletopObject {
     switch (type) {
       case DiceType.D2:
         sided = 2;
-        faceGeneratorFunc = index => (index === 0) ? '表' : '裏';
+        faceGeneratorFunc = index => (index === 0) ? '正面' : '背面';
         break;
       case DiceType.D4:
         sided = 4;
@@ -87,7 +87,7 @@ export class DiceSymbol extends TabletopObject {
       case DiceType.D6:
         sided = 6;
         let identifier = identifierSuffix != null ? 'nothing_' + identifierSuffix : null;
-        faces.push(DataElement.create('なし', '', { type: 'image', currentValue: 'nothing' }, identifier));
+        faces.push(DataElement.create('無', '', { type: 'image', currentValue: 'nothing' }, identifier));
         break;
       case DiceType.D8:
         sided = 8;

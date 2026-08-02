@@ -87,7 +87,7 @@
 .emote.emote-secret.is-ghostly {
   z-index: 900005;
 }
-/* なぜかz-indexの上書きがいる */
+/* 不知為何需要覆寫 z-index */
 .emote {
   z-index: 1000005;
 }
@@ -131,14 +131,14 @@
   right: 17px;
   margin-right: -12px;
 }
-/* 不要になった？
+/* 已不需要？
 @supports (-moz-user-select: -moz-none) {
   .dialog.is-position-right:after, .dialog.is-position-left:before {
     bottom: -39px !important;
   }
 }
 */
-/* 吹き出しの横向きベロがカッコよくならないのでとりあえずコメントアウト
+/* 對話泡泡橫向尖端不好看，暫先註解掉
 .dialog:after {
   box-sizing: border-box;
   content: '';

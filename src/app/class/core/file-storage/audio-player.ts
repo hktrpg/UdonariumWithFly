@@ -157,7 +157,7 @@ export class AudioPlayer {
     return this._mediaElementSource;
   }
 
-  // イベントにする？
+  // Make this an event?
   public endedAction: Function;
 
   audio: AudioFile;
@@ -310,7 +310,7 @@ export class AudioPlayer {
 
   private static async getBlobAsync(audio: AudioFile): Promise<Blob> {
     if (audio.blob) return audio.blob;
-    if (audio.url.length < 1) throw new Error('えっ なにそれ怖い');
+    if (audio.url.length < 1) throw new Error('Invalid audio URL');
 
     try {
       let response = await fetch(audio.url);

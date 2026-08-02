@@ -1,6 +1,6 @@
 <div *ngIf="!isConnected;else other_content">
   <button (click)="reload()" [disabled]="isReloading"><i class="material-icons" style="display: inline-block; margin-right: 2px">refresh</i>更新列表</button>
-  <button (click)="showRoomSetting()"><i class="material-icons" style="display: inline-block; margin-right: 2px">room_preferences</i>新增一個新房間</button>
+  <button (click)="showRoomSetting()"><i class="material-icons" style="display: inline-block; margin-right: 2px">room_preferences</i>建立新房間</button>
   <hr/>
   <ng-container *ngIf="rooms.length">
     <table class="room-list">
@@ -21,7 +21,7 @@
           <td *ngIf="!room.hasPassword">-</td>
           <td>{{room.peers.length}}人</td>
           <td>
-            <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">連接</button>
+            <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">連線</button>
             <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" type="submit" (click)="connect(room, true)">訪客</button>
           </td>
         </tr>
@@ -30,4 +30,4 @@
   </ng-container>
   <span *ngIf="rooms.length < 1" style="font-size: 12px;">{{help}}</span>
 </div>
-<ng-template #other_content><span style="font-size: 12px;">如果要連接到另一個房間，請與其他參與者斷開連接。<br>（※您可以從功能表退出／切斷。）</span></ng-template>
+<ng-template #other_content><span style="font-size: 12px;">如果要連線到另一個房間，請與其他參與者斷開連線。<br>（※您可以從選單斷開連線。）</span></ng-template>

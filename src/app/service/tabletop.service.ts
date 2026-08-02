@@ -99,7 +99,7 @@ export class TabletopService {
       })
       .on('XML_LOADED', event => {
         let xmlElement: Element = event.data.xmlElement;
-        // todo:立体地形の上にドロップした時の挙動
+        // todo: 拖放到立體地形上時的行為
         let gameObject = ObjectSerializer.instance.parseXml(xmlElement);
         if (gameObject instanceof TabletopObject) {
           let pointer = this.coordinateService.calcTabletopLocalCoordinate();
@@ -108,7 +108,7 @@ export class TabletopService {
           gameObject.posZ = pointer.z;
           this.placeToTabletop(gameObject);
           SoundEffect.play(PresetSound.piecePut);
-          /* TODO ダイスボット読むか検討
+          /* TODO 是否讀取骰子機器人待評估
           if (gameObject instanceof GameCharacter && gameObject.chatPalette) {
             DiceBot.getHelpMessage(gameObject.chatPalette.dicebot).then(help => {
               console.log('onChangeGameType done\n' + help);
@@ -190,7 +190,7 @@ export class TabletopService {
           gameObject.isLock = false;
           gameObject.isPreview = false;
         }
-        // フォールスルー
+        // fallthrough
       case Terrain.aliasName:
         if (gameObject instanceof Terrain) gameObject.isLocked = false;
         if (!this.tableSelecter || !this.tableSelecter.viewTable) return;

@@ -13,7 +13,7 @@ import { UUID } from '@udonarium/core/system/util/uuid';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ModalService } from 'service/modal.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
-import { AppComponent } from 'src/app/app.component';
+import { AppComponent } from '../../app.component';
 import { ChatMessageService } from 'service/chat-message.service';
 
 @Component({
@@ -123,11 +123,11 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   
   ngOnInit() {
-    Promise.resolve().then(() => this.panelService.title = 'ファイル一覧');
+    Promise.resolve().then(() => this.panelService.title = '圖片庫');
     this.searchWords = this.allImagesOwnWords;
     //FileStorageComponent.sortOrder = [null].concat(this.searchWords);
     this.panelId = UUID.generateUuid();
-    // 非表示も含めた数
+    // 含隱藏項目的數量
     //FileStorageComponent.imageCount = ImageStorage.instance.images.length;
   }
 
@@ -135,7 +135,7 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.register(this)
     .on('SYNCHRONIZE_FILE_LIST', event => {
       if (event.isSendFromSelf) {
-        /* 自分だけできないかな
+        /* 能否只對自己？
         console.log(event.data)
         if (this.serchCondIsOr) {
           let isNotagAdd = false;
@@ -269,13 +269,13 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '非表示設定の画像を表示', 
-        text: '非表示設定の画像を表示しますか？',
-        help: 'ネタバレなどにご注意ください。',
+        title: '顯示已設為隱藏的圖片', 
+        text: '要顯示已設為隱藏的圖片嗎？',
+        help: '請注意劇透等內容。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('ファイル一覧 から非表示設定の画像を表示した');
+          this.chatMessageService.sendOperationLog('從圖片庫顯示了已設為隱藏的圖片');
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -286,9 +286,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   setectedImagesToHidden(toHidden: boolean) {
     this.modalService.open(ConfirmationComponent, {
-      title: toHidden ? '非表示に設定' : '非表示設定を解除', 
-      text: `画像${ toHidden ? 'を非表示に設定' : 'の非表示設定を解除'}しますか？`,
-      help: toHidden ? '選択した画像を非表示に設定します。\nこれは「意図せずにネタバレを見てしまう」ことなどを防ぐものであり、他者から完全に隠すものではありません。' : '選択した画像の非表示設定を解除します。',
+      title: toHidden ? '設為隱藏' : '解除隱藏設定', 
+      text: `要${ toHidden ? '將圖片設為隱藏' : '解除圖片的隱藏設定'}嗎？`,
+      help: toHidden ? '將選擇的圖片設為隱藏。\n這是為了避免「無意中看到劇透」等情況，並非對其他人完全隱藏。' : '解除選擇圖片的隱藏設定。',
       type: ConfirmationType.OK_CANCEL,
       materialIcon: toHidden ? 'visibility_off' : 'visibility',
       action: () => {
@@ -305,9 +305,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.addingTagWord == null || this.addingTagWord.trim() == '') return;
     const words = this.addingTagWord.trim().split(/\s+/);
     this.modalService.open(ConfirmationComponent, {
-      title: '画像にタグを追加', 
-      text: `画像にタグを追加しますか？`,
-      helpHtml: '選択した画像に ' + words.map(word => `<b class="word-tag">${ StringUtil.escapeHtml(word) }</b>`).join(' ') + ' を追加します。',
+      title: '為圖片新增標籤', 
+      text: `要為圖片新增標籤嗎？`,
+      helpHtml: '將為選擇的圖片新增 ' + words.map(word => `<b class="word-tag">${ StringUtil.escapeHtml(word) }</b>`).join(' ') + ' 。',
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sell',
       action: () => {
@@ -315,7 +315,7 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
         for (const image of this.selectedImageFiles) {
           const imageTag = ImageTag.get(image.identifier) || ImageTag.create(image.identifier);
           //imageTag.addWords(words);
-          //TODO いまのところ全部帰ってくるが実際に追加したタグだけを返して追加したい
+          // TODO: 目前會回傳全部；希望只回傳實際新增的標籤
           addedWords = imageTag.addWords(words);
         }
         if (addedWords) {
@@ -332,9 +332,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   removeTagWord(word: string) {
     this.modalService.open(ConfirmationComponent, {
-      title: '画像からタグを削除', 
-      text: `画像からタグを削除しますか？`,
-      helpHtml: `選択した画像から <b class="word-tag">${ StringUtil.escapeHtml(word) }</b> を削除します。`,
+      title: '從圖片刪除標籤', 
+      text: `要從圖片刪除標籤嗎？`,
+      helpHtml: `將從選擇的圖片刪除 <b class="word-tag">${ StringUtil.escapeHtml(word) }</b> 。`,
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sell',
       action: () => {

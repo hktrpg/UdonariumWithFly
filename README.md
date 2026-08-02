@@ -1,207 +1,132 @@
+# Udonarium 烏冬 @ HKTRPG
 
-[ユドナリウム（Udonarium）](https://github.com/TK11235/udonarium)の私家改造版、高度とかチャットテキストの色とか立ち絵（ユドナリウムだとキャラクターの画像と紛らわしいのでスタンドと呼称）とか。
+以 [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) 為基底的 [HKTRPG](https://www.hktrpg.com/) 改造版：線上桌面團務工具，介面為繁體中文，並整合 HKTRPG 生態常用功能。
 
-配布用ファイルは用意していないので、自分で配置したい場合はcloneしてbuildする必要があります。
+- **線上桌面**：https://z01.hktrpg.com/
+- **HKTRPG 官方使用教學**：https://bothelp.hktrpg.com/guide
+- **HKTRPG 主站**：https://www.hktrpg.com/
 
-本家ユドナリウムはバージョン1.16.0より推奨ブラウザにデスクトップ版Mozilla Firefoxが追加されましたが、Udonarium with Flyの推奨ブラウザは現状デスクトップ版Google Chromeのみです。
+推薦瀏覽器：桌面版 Google Chrome（需 HTTPS）。
 
-[お試しページ](https://nanasunana.github.io/)
+---
 
-## ToDo的なもの（優先順位ではない）
+## 關於 HKTRPG
 
-* ソースをきれいにする(特に高度、💭周り)
-* ~~ランダムチャート作成機能~~ ダイスボット表実装済
-* 管理パネル作ってキャラクター画像切り替えと顔ICの上限増やす
-* ~~カットイン的なもの~~ 実装済。ユドナリウム リリィと同様に音楽ファイルを別にアップすると再リンクする
-* 投票、効果音
-* ~~キャラクターコマの身長指定？~~ 実装済
-* ~~スタンドがダイスボット結果末尾に反応~~ 反応するように
-* サイコロ・フィクションの判定ヘルパ
-* 地形の4面に別の画像を設定
+[HKTRPG](https://bothelp.hktrpg.com/guide) 是用於 TRPG 的網上工具，可在網站、Discord、Line、Telegram、Plurk、WhatsApp 等平台以統一指令擲骰，也可用於日常娛樂與群組管理。原生正體中文，最初為 CoC 開發，現已獨立支援十數種 TRPG 系統。
 
-## 実験的機能（ほとんどテストされていない、一部環境から利用できない不具合あり）
+本專案是 HKTRPG 生態中的 **線上桌面（烏冬）**，適合需要地圖、棋子、立繪、共用備忘的視覺團務；聊天平台擲骰與角色卡等仍請搭配 HKTRPG Bot／網頁版使用。
 
-### BCDice-API対応
+### 5 分鐘上手（HKTRPG Bot）
 
-下記のようにconfig.yamlにBCDice-APIのエンドポイントURLを記述するとBCDice-API経由でダイスボットが反応します。
+詳見官方教學：[歡迎來到 HKTRPG](https://bothelp.hktrpg.com/guide)
 
-デフォルトの対応APIバージョンは2です、バージョン1が必要の場合は下記のdice配下のapiキーの値に1と記述してください（APIバージョン1はBCDice-API 3.0.0で削除されました）。
+1. [邀請 HKTRPG](https://bothelp.hktrpg.com/guide/kai-shi-shi-yong/yao-qing-hktrpg) 到你的平台
+2. （可選）語言：`.lang zh-tw`／`.lang zh-hans`／`.lang en` — [語言設定](https://bothelp.hktrpg.com/guide/kai-shi-shi-yong/yu-yan-she-ding-duo-yu-xi)
+3. 輸入 `1d100` 試試基本擲骰
+4. 輸入 `bothelp` 查看指令分類，或看 [指令速查表](https://bothelp.hktrpg.com/guide/kai-shi-shi-yong/zhi-ling-su-cha-biao)
+5. 建立 [角色卡](https://bothelp.hktrpg.com/guide/trpg-gong-neng/kai-shi-jin-hang-trpg/jiao-se-ka)：`.char add …`／`.char use 名字`
+6. 需要隱藏結果時用 [暗骰](https://bothelp.hktrpg.com/guide/trpg-gong-neng/kai-shi-jin-hang-trpg/an-tou)：`dr`／`ddr`／`dddr`
 
-なお、判定結果の成功、失敗での色分けに対応するためにはAPIバージョンが2である必要があります。
+### 依 bothelp 四大區塊
 
-```
-backend:
-  mode: skyway2023 #'skyway2023' or 'skyway'
-  url: https://{your-backend-hostname} #Your Backend API URL
-webrtc: #非推奨（旧SkyWay）
-  key: aaaaaaaa-bbbb-ccccc-dddd-eeeeeeeeeeee #[deprecated] Your (old) SkyWay API key
-app: #未使用
-dice:
-  url: BCDice-APIのエンドポイントURL
-  api: APIバージョン
-```
+| bothelp | 說明 | 文件 |
+|---------|------|------|
+| `bothelp Base` | 基本擲骰、暗骰、角色卡等 | [開始進行 TRPG](https://bothelp.hktrpg.com/guide/trpg-gong-neng/kai-shi-jin-hang-trpg) |
+| `bothelp Dice` | 各 TRPG 系統骰組 | [指定 TRPG 系統](https://bothelp.hktrpg.com/guide/trpg-gong-neng/zhi-ding-trpg-xi-tong) |
+| `bothelp Tool`／`admin` | 系統工具與管理 | [功能開關](https://bothelp.hktrpg.com/guide/xi-tong-gong-ju/gong-neng-kai-guan) |
+| `bothelp funny` | 娛樂與日常功能 | [趣味擲骰](https://bothelp.hktrpg.com/guide/yu-le-gong-neng/qu-wei-zhi-tou) |
 
-**↓↓↓↓　以下、ユドナリウム本家より　↓↓↓↓**
+其他常用連結：
 
+- [網頁版聊天室](https://bothelp.hktrpg.com/guide/kai-shi-shi-yong/yao-qing-hktrpg/wang-ye-ban)
+- [平台差異表](https://bothelp.hktrpg.com/guide/qi-ta-qing-bao/ping-tai-cha-yi-biao)
+- [開發支援／Patreon](https://www.patreon.com/HKTRPG)
+- [私人／公開角色卡](https://www.hktrpg.com:20721/card/)
 
-# ユドナリウム
+完整索引：[llms.txt](https://bothelp.hktrpg.com/guide/llms.txt)
 
-[ユドナリウム（Udonarium）][udonarium-url]はWebブラウザで動作するボードゲームオンラインセッション支援ツールです。
+---
 
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
+## 本專案特色（烏冬 @ HKTRPG）
 
-[![Udonarium](docs/images/ss.jpg "スクリーンショット")][udonarium-url]
+繼承 With Fly 功能（高度、聊天文字顏色、立繪、Cut-in、骰子機器人表等），並加上：
 
-## クイックスタート
+| 功能 | 說明 |
+|------|------|
+| 繁體中文介面 | 主要 UI／說明已本地化為 zh-Hant |
+| 訪客模式 | 開房可「允許訪客」；訪客 UI 受限（無法存檔等）；有密碼的房間仍需密碼 |
+| 精簡模式（ClarifyMode） | 聊天視窗可切換精簡顯示 |
+| 筆記倉庫 | 依桌面／共用／私人／墳場整理備忘 |
+| 快速擲骰 | 角色卡欄位可一鍵送到聊天給 BCDice 結算 |
+| SkyWay 2023 | 使用最新 `@skyway-sdk` 與自架 backend |
 
-今すぐ試して利用できる公開サーバを用意しています。  
-推奨ブラウザはデスクトップ版Google Chrome、またはデスクトップ版Mozilla Firefoxです。
+功能驗收清單：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
-[**ユドナリウムをはじめる**][udonarium-url]
+---
 
-## 目次
+## 本機開發
 
-- [機能](#機能)
-- [サーバ設置](#サーバ設置)
-- [開発者クイックスタート](#開発者クイックスタート)
-- [開発に寄与する](#開発に寄与する)
-- [今後の開発](#今後の開発)
-- [License](#license)
+需要 Node.js、npm，以及自架的 [udonarium-backend](https://github.com/TK11235/udonarium-backend)（SkyWay Auth Token）。  
+**請勿**把本機／HKTRPG 站點指向 WithFly 公開 Workers（僅允許 `nanasunana.github.io` Origin）。
 
-## 機能
+詳見：
 
-- **オンラインセッション**
-  - ルーム機能
-  - 複数テーブル管理
-  - テーブルマスク、立体地形
-  - コマ、カード、共有メモ
-  - チャット送受信、チャットパレット
-  - ダイスボット（[BCDice](https://github.com/bcdice/bcdice-js)）
-  - 画像ファイル共有
-  - BGM再生
-  - セーブデータ生成（ZIP形式）
-
-- **ブラウザ間通信**
-  - WebRTCを利用したブラウザ間通信を実現しています。  
-    ユーザ間で通信接続した後の全ての処理をWebブラウザ上で完結させることを目指しています。
-
-- **軽量&リアルタイム**
-  - 軽量で快適に動作し、ユーザの操作は別のユーザにリアルタイムに反映されます。
-
-## サーバ設置
-
-ユーザ自身でWebサーバを用意してユドナリウムを利用することができます。
-
-#### 1. Webサーバにコンテンツを配置
-
-ユドナリウムの[リリース版（**udonarium.zip**）](../../releases/latest)をダウンロードして展開し、`index.html`などコンテンツ一式をWebサーバに配置します。  
-必ず**HTTPS環境のWebサーバ**に配置してください。
-
-#### 2. ユドナリウムバックエンドの配置
-
-[ユドナリウムバックエンド][udonarium-backend-repo]のサーバを準備します。  
-詳細はユドナリウムバックエンドのリポジトリの`README.md`を参照してください。
-
-#### 3. ユドナリウムの設定ファイル変更
-
-Webサーバに配置したユドナリウムの`assets/config.yaml`を編集して、`backend.url`にユドナリウムバックエンドのURLを記述します。
-
-```yaml
-backend:
-  mode: skyway2023
-  url: https://your-udonarium-backend-url/ #Your Backend API URL
-...
-```
-
-Webブラウザからユドナリウムの`index.html`にアクセスしてエラーが発生していなければ完了です。  
-上手く動作しない時は付属の`上手くサーバで動かない時Q&A.txt`を参照してください。
-
-## 開発者クイックスタート
-
-開発環境を用意するとソースコードの修正や機能追加を行うことができます。
-
-### 開発環境
-
-[Node.js](https://nodejs.org/)と[npm](https://www.npmjs.com/)が必要です。
-
-開発言語はTypeScriptを使用し、[Angular](https://angular.jp/)のフレームワークを使用して実装されています。  
-環境構築の手順は[Angular公式ページのチュートリアル](https://angular.jp/tutorials/first-app)を参考にしてください。
-
-#### Angular CLI
-
-開発を効率化するCLIツールとして[Angular CLI](https://github.com/angular/angular-cli)を利用しています。  
-`ng`コマンドを使用するのに必要です。
-
-#### SkyWay
-
-ユドナリウムはWebRTCを使用しており、WebRTC向けのサービスとして[SkyWay][SkyWay-url]を利用しています。  
-SkyWayのアカウントとアプリケーション情報が必要です。
-
-#### ユドナリウムバックエンド
-
- [SkyWay][SkyWay-url]を利用するには認証トークン（SkyWay Auth Token）を都度作成する必要がありますが、Webブラウザ側で認証トークンを作成するのはセキュリティ上の観点から望ましくありません。  
-そこで、Webブラウザ側で実行できない処理は[ユドナリウムバックエンド][udonarium-backend-repo]のWeb APIとして実行します。
-
-ローカル環境で開発を行う際には、ユドナリウムバックエンドの開発用ローカルサーバを使用することをおすすめします。
-
-### ユドナリウムの実行
-
-リポジトリをダウンロードした後、初回はリポジトリのディレクトリで以下のコマンドを実行してください。
+- [`docs/hktrpg-backend.md`](docs/hktrpg-backend.md) — 本機 backend、CORS、proxy
+- [`docs/hktrpg-deploy.md`](docs/hktrpg-deploy.md) — 正式環境 Workers＋前端
+- [`docs/hktrpg-sync.md`](docs/hktrpg-sync.md) — 同步 upstream WithFly
 
 ```bash
 npm i
+# 編輯 src/assets/config.yaml（gitignored），設定 backend.url
+# 建議：Angular proxy → 本機 :8787，見 proxy.conf.js
+npx ng serve --ssl --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.js
 ```
 
-#### 開発用ローカルサーバ
-
-開発作業を行う際には、`src/assets/config.yaml`を編集して`backend.url`にユドナリウムバックエンドのURLを記述してください。
-
-以下のコマンドを実行すると`https://localhost:4200/`でユドナリウムの開発用ローカルサーバが起動します。  
-必ず`--ssl`オプションを使用してHTTPSのサーバを起動してください。SkyWayの一部の機能はHTTPS環境でしか実行できません。
-
-```bash
-ng serve --ssl
-```
-
-開発用ローカルサーバが起動している状態でソースコードを変更すると、アプリケーション全体が自動的にホットリロードされます。
-
-#### 本番環境向けビルド
-
-以下のコマンドでソースコード全体のビルドを実行します。ビルド成果物は`dist`ディレクトリ配下に格納されます。
+正式建置：
 
 ```bash
 ng build
 ```
 
-## 開発に寄与する
+產物在 `dist/`。部署前請將 `backend.url` 設為你的 Workers URL，並讓 `ACCESS_CONTROL_ALLOW_ORIGIN` 等於站點 Origin（例如 `https://z01.hktrpg.com`）。
 
-バグを報告したり、ドキュメントを改善したり、開発の手助けをしたりしたいですか？
+### BCDice-API（可選）
 
-報告や要望の窓口として[GitHubのIssue](https://github.com/TK11235/udonarium/issues)、または[X（Twitter）](https://x.com/TK11235)を利用できます。  
-コードの[Pull Request](https://github.com/TK11235/udonarium/pulls)も歓迎です。
+在 `config.yaml` 設定 `dice.url` 後可改走 BCDice-API；預設 API 版本為 2（成功／失敗著色需要 v2）。
 
-ただ、難易度や優先度の都合によりそっとしたままになる可能性があります。
+```yaml
+backend:
+  mode: skyway2023
+  url: https://{your-backend-hostname}/
+dice:
+  url: # BCDice-API 端點
+  api: 2
+```
 
-### 報告
+---
 
-バグ報告では、バグを再現できる必要十分な条件について、分かっている範囲で詳しく書いてください。  
-基本的には「報告を受けて改修 → 次回更新時に反映」の流れで対応する予定です。
+## 上游專案
 
-### 要望
+本專案基於：
 
-機能要望では「何故それが必要なのか」について説明があると良いです。
+1. [TK11235/udonarium](https://github.com/TK11235/udonarium) — Udonarium 本家  
+2. [NanasuNANA/UdonariumWithFly](https://github.com/NanasuNANA/UdonariumWithFly) — With Fly 改造（高度、立繪、Cut-in 等）
 
-### Pull Request
+本家試用：https://udonarium.app/  
+With Fly 試用：https://nanasunana.github.io/
 
-作成したコードやドキュメントをこのリポジトリに反映させたい時はPull Request（PR）を送ってください。
+### Udonarium 本家功能摘要
 
-PRのコードが完全ではない場合でも作業中PRとして送ることができます。  
-その場合、作業中である旨をPRタイトルか説明文に付け加えてください。
+- **線上團務**：房間、多桌面、遮罩／地形、棋子／卡片／備忘、聊天與指令板、BCDice、圖片共用、BGM、ZIP 存檔  
+- **瀏覽器間通訊**：WebRTC（SkyWay）；連線後處理盡量在瀏覽器完成  
+- **輕量即時**：操作即時同步給其他參加者  
+
+本家開發與貢獻說明請見上游 README；Issue／PR 請開到對應上游或本 fork（HKTRPG 相關）。
+
+---
 
 ## License
 
 [MIT License](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
-[udonarium-url]: https://udonarium.app/
-[udonarium-backend-repo]: https://github.com/TK11235/udonarium-backend
-[SkyWay-url]: https://skyway.ntt.com/
+Udonarium、Udonarium with Fly 與第三方素材（圖片／音效）之授權與署名，請一併遵守各原始專案與 `src/assets/**/copyright.txt`、`license.txt`。

@@ -27,7 +27,7 @@ export class PeerCursor extends GameObject {
   static readonly CHAT_MY_ICON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-my-icon-local-storage';
 
   static readonly CHAT_DEFAULT_COLOR = '#444444';
-  static readonly CHAT_DEFAULT_NAME = 'プレイヤー';
+  static readonly CHAT_DEFAULT_NAME = '玩家';
   static readonly CHAT_TRANSPARENT_COLOR = '#ffffff';
 
   static myCursor: PeerCursor = null;
@@ -93,7 +93,7 @@ export class PeerCursor extends GameObject {
     PeerCursor.myCursor.peerId = Network.peerId;
     PeerCursor.myCursor.initialize();
     try {
-      // 互換のためしばらく残す ---
+      // 為相容暫時保留 ---
       try {
         if (window.localStorage && localStorage.getItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY)) {
           PeerCursor.myCursor.name = localStorage.getItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY);
@@ -129,7 +129,7 @@ export class PeerCursor extends GameObject {
           if (color !== undefined) localForage.removeItem(PeerCursor.CHAT_MY_COLOR_LOCAL_STORAGE_KEY);
         }
       });
-      // アイコン
+      // 圖示
       try { 
         await localForage.getItem(PeerCursor.CHAT_MY_ICON_LOCAL_STORAGE_KEY).then(identifierOrImageData => {
           let blob: Blob = null;

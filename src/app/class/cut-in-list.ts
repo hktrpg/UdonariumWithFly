@@ -40,7 +40,7 @@ export class CutInList extends ObjectNode implements InnerXml {
   }
 
   parseInnerXml(element: Element) {
-    // XMLからの新規作成を許可せず、既存のオブジェクトを更新する
+    // 不允許從 XML 新建，改為更新既有物件
     for (let child of CutInList.instance.children) {
       child.destroy();
     }
@@ -54,7 +54,7 @@ export class CutInList extends ObjectNode implements InnerXml {
     this.destroy();
   }
 
-  // マッチしたものから、タグが空のものすべて、同じタグのものはランダムに1個づつを返す
+  // 從符合條件者中：回傳所有標籤為空者，以及相同標籤各隨機取 1 個
   matchCutInInfo(text: string): CutInInfo {
     //text = StringUtil.toHalfWidth(text).toUpperCase().trimRight();
     let textTagMatch = '';
@@ -62,7 +62,7 @@ export class CutInList extends ObjectNode implements InnerXml {
     const matchCutIn: CutIn[] = [];
 
     let videoFound = false;
-    // ランダムに並べ替えておく
+    // 先隨機排序
     for (const cutIn of this.cutIns.map<[number, CutIn]>(cutIn => [Math.random(), cutIn]).sort((a, b) => { return a[0] - b[0]; }).map(pair => pair[1])) {
       if (!cutIn) continue;
       let isMatch = false;
@@ -82,7 +82,7 @@ export class CutInList extends ObjectNode implements InnerXml {
       }
     }
     matchCutIn.push(...tagMatch.values());
-    // 動画を一個だけ残す、その際にタグがあるものを優先する
+    // 影片只保留一個，並優先保留有標籤者
     /*
     matchCutIn.reverse();
     let foundVideo = false;
@@ -96,7 +96,7 @@ export class CutInList extends ObjectNode implements InnerXml {
       }
     }
     */
-    // 再度シャッフルして出現順をランダムに
+    // 再次洗牌，使出現順序隨機
     const matchCutIns = matchCutIn.map<[number, CutIn]>(cutIn => [Math.random(), cutIn]).sort((a, b) => { return a[0] - b[0]; });
     return {
       names: matchCutIns.map(pair => pair[1].name),

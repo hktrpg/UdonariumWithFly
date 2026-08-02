@@ -1,5 +1,5 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -91,7 +91,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   get indicateAll(): boolean { return this.inventoryService.indicateAll; }
   set indicateAll(indicateAll: boolean) { this.inventoryService.indicateAll = indicateAll; }
 
-  get sortOrderName(): string { return this.sortOrder === SortOrder.ASC ? '昇順' : '降順'; }
+  get sortOrderName(): string { return this.sortOrder === SortOrder.ASC ? '由小到大' : '由大到小'; }
 
   //get newLineStrings(): string { return this.inventoryService.newLineStrings; }
 
@@ -118,7 +118,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => this.panelService.title = 'インベントリ');
+    Promise.resolve().then(() => this.panelService.title = '倉庫');
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', event => {
         if (ObjectStore.instance.get(event.data.identifier) instanceof TabletopObject) {
@@ -151,13 +151,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (this.GuestMode()) return;
     switch (inventoryType) {
       case 'table':
-        return 'テーブル';
+        return '桌面';
       case Network.peerId:
         return '個人';
       case 'graveyard':
-        return '墓場';
+        return '回收區';
       default:
-        return '共有';
+        return '公用';
     }
   }
 
@@ -183,13 +183,18 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     return this.getInventory(gameObject.location.name).dataElementMap.get(gameObject.identifier);
   }
 
-  onContextMenu(event: Event, gameObject: GameCharacter) {
+  /** Blank area: block browser menu (item menus call stopPropagation). */
+  @HostListener('contextmenu', ['$event'])
+  onHostContextMenu(e: Event) {
+    e.preventDefault();
+  }
 
-    if (this.GuestMode()) return;
-    if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
+  onContextMenu(event: Event, gameObject: GameCharacter) {
     event.stopPropagation();
     event.preventDefault();
 
+    if (this.GuestMode()) return;
+    if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
     this.selectGameObject(gameObject);
@@ -212,7 +217,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       let subActions: ContextMenuAction[] = [];
       if (this.selectTab != 'table') {
         subActions.push({
-          name: 'すべてテーブルに移動', action: () => {
+          name: '全部移至桌面', action: () => {
             selectedCharacter().forEach(gameCharacter => {
               EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
               let isStealthMode = GameCharacter.isStealthMode;
@@ -220,9 +225,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               this.selectionService.remove(gameCharacter);
               if (gameCharacter.isHideIn && gameCharacter.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
                 this.modalService.open(ConfirmationComponent, {
-                  title: 'ステルスモード',
-                  text: 'ステルスモードになります。',
-                  help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+                  title: '隱身模式',
+                  text: '已開啟隱身：其他人看不到你的游標位置。',
+                  help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
                   type: ConfirmationType.OK,
                   materialIcon: 'disabled_visible'
                 });
@@ -235,7 +240,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab != 'common') {
         subActions.push({
-          name: 'すべて共有イベントリに移動', action: () => {
+          name: '全部移至公用倉庫', action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation('common');
               this.selectionService.remove(gameCharacter);
@@ -247,7 +252,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab === 'table' || this.selectTab === 'common' || this.selectTab === 'graveyard') {
         subActions.push({
-          name: 'すべて個人イベントリに移動', action: () => {
+          name: '全部移至個人倉庫', action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation(Network.peerId);
               this.selectionService.remove(gameCharacter);
@@ -259,7 +264,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab != 'graveyard') {
         subActions.push({
-          name: 'すべて墓場に移動', action: () => {
+          name: '全部移至回收區', action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation('graveyard');
               this.selectionService.remove(gameCharacter);
@@ -270,7 +275,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         });
       }
       actions.push({
-        name: '選択したキャラクター',
+        name: '已選擇的角色',
         action: null,
         subActions: subActions
       });
@@ -279,7 +284,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
     if (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) {
       actions.push({
-        name: 'テーブル上から探す',
+        name: '在桌面上尋找',
         action: () => {
           if (gameObject.location.name === 'table') EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
         },
@@ -290,7 +295,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
     if (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) {
       actions.push({
-        name: 'テーブルへ移動',
+        name: '移至桌面',
         action: () => {
           let isStealthMode = GameCharacter.isStealthMode;
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
@@ -298,9 +303,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           this.selectionService.remove(gameObject);
           if (gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
-              title: 'ステルスモード',
-              text: 'ステルスモードになります。',
-              help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+              title: '隱身模式',
+              text: '已開啟隱身：其他人看不到你的游標位置。',
+              help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
               type: ConfirmationType.OK,
               materialIcon: 'disabled_visible'
             });
@@ -313,7 +318,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
     if (gameObject.isHideIn) {
       actions.push({
-        name: '位置を公開する',
+        name: '公開位置',
         action: () => {
           gameObject.owner = '';
           SoundEffect.play(PresetSound.piecePut);
@@ -323,13 +328,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
     if (!gameObject.isHideIn || !gameObject.isVisible) {
       actions.push({
-        name: '位置を自分だけ見る（ステルス）',
+        name: '僅自己可見（隱身）',
         action: () => {
           if (gameObject.location.name === 'table' && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
-              title: 'ステルスモード',
-              text: 'ステルスモードになります。',
-              help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+              title: '隱身模式',
+              text: '已開啟隱身：其他人看不到你的游標位置。',
+              help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
               type: ConfirmationType.OK,
               materialIcon: 'disabled_visible'
             });
@@ -343,7 +348,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     actions.push(ContextMenuSeparator);
     if (gameObject.imageFiles.length > 1) {
       actions.push({
-        name: '画像切り替え',
+        name: '圖片切換',
         action: null,
         subActions: gameObject.imageFiles.map((image, i) => {
           return {
@@ -363,13 +368,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
     actions.push((gameObject.isUseIconToOverviewImage
       ? {
-        name: '☑ オーバービューに顔ICを使用', action: () => {
+        name: '☑ 總覽顯示大頭貼', action: () => {
           gameObject.isUseIconToOverviewImage = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ オーバービューに顔ICを使用', action: () => {
+        name: '☐ 總覽顯示大頭貼', action: () => {
           gameObject.isUseIconToOverviewImage = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
@@ -377,13 +382,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }));
     actions.push((gameObject.isShowChatBubble
       ? {
-        name: '☑ 💭の表示', action: () => {
+        name: '☑ 顯示💭', action: () => {
           gameObject.isShowChatBubble = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ 💭の表示', action: () => {
+        name: '☐ 顯示💭', action: () => {
           gameObject.isShowChatBubble = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
@@ -392,30 +397,30 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     actions.push(
       (gameObject.isDropShadow
       ? {
-        name: '☑ 影の表示', action: () => {
+        name: '☑ 顯示陰影', action: () => {
           gameObject.isDropShadow = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ 影の表示', action: () => {
+        name: '☐ 顯示陰影', action: () => {
           gameObject.isDropShadow = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       })
     );
-    actions.push({ name: '画像効果', action: null,
+    actions.push({ name: '圖片效果', action: null,
       subActions: [
       (gameObject.isInverse
         ? {
-          name: '☑ 反転', action: () => {
+          name: '☑ 反轉', action: () => {
             gameObject.isInverse = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 反転', action: () => {
+          name: '☐ 反轉', action: () => {
             gameObject.isInverse = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -423,13 +428,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         }),
       (gameObject.isHollow
         ? {
-          name: '☑ ぼかし', action: () => {
+          name: '☑ 模糊', action: () => {
             gameObject.isHollow = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ ぼかし', action: () => {
+          name: '☐ 模糊', action: () => {
             gameObject.isHollow = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -437,24 +442,24 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         }),
       (gameObject.isBlackPaint
         ? {
-          name: '☑ 黒塗り', action: () => {
+          name: '☑ 設為黑色剪影', action: () => {
             gameObject.isBlackPaint = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 黒塗り', action: () => {
+          name: '☐ 設為黑色剪影', action: () => {
             gameObject.isBlackPaint = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-        { name: 'オーラ', action: null, subActions: [ { name: `${gameObject.aura == -1 ? '◉' : '○'} なし`, action: () => { gameObject.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['ブラック', 'ブルー', 'グリーン', 'シアン', 'レッド', 'マゼンタ', 'イエロー', 'ホワイト'].map((color, i) => {
+        { name: '光環', action: null, subActions: [ { name: `${gameObject.aura == -1 ? '◉' : '○'} 無`, action: () => { gameObject.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {
           return { name: `${gameObject.aura == i ? '◉' : '○'} ${color}`, action: () => { gameObject.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
         })) },
         ContextMenuSeparator,
         {
-          name: 'リセット', action: () => {
+          name: '重置', action: () => {
             gameObject.isInverse = false;
             gameObject.isHollow = false;
             gameObject.isBlackPaint = false;
@@ -468,13 +473,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     actions.push(ContextMenuSeparator);
     actions.push((!gameObject.isNotRide
       ? {
-        name: '☑ 他のキャラクターに乗る', action: () => {
+        name: '☑ 可疊在其他角色上', action: () => {
           gameObject.isNotRide = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ 他のキャラクターに乗る', action: () => {
+        name: '☐ 可疊在其他角色上', action: () => {
           gameObject.isNotRide = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
@@ -483,13 +488,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     actions.push(
       (gameObject.isAltitudeIndicate
       ? {
-        name: '☑ 高度の表示', action: () => {
+        name: '☑ 顯示高度', action: () => {
           gameObject.isAltitudeIndicate = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ 高度の表示', action: () => {
+        name: '☐ 顯示高度', action: () => {
           gameObject.isAltitudeIndicate = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
@@ -498,7 +503,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     );
     actions.push(
     {
-      name: '高度を0にする', action: () => {
+      name: '將高度設為0', action: () => {
         if (gameObject.altitude != 0) {
           gameObject.altitude = 0;
           if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
@@ -507,17 +512,17 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       altitudeHande: gameObject
     });
     actions.push(ContextMenuSeparator);
-    actions.push({ name: '詳細を表示...', action: () => { this.showDetail(gameObject); } });
+    actions.push({ name: '顯示詳情...', action: () => { this.showDetail(gameObject); } });
     actions.push(gameObject.isAllowsChat
       ? {
-        name: '☑ チャットを行う', action: () => {
+        name: '☑ 可進行聊天', action: () => {
           gameObject.isAllowsChat = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         disabled: gameObject.location.name === 'graveyard',
         checkBox: 'check'
       } : {
-        name: '☐ チャットを行う', action: () => {
+        name: '☐ 可進行聊天', action: () => {
           gameObject.isAllowsChat = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
@@ -525,12 +530,12 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         checkBox: 'check'
       });
     //if (gameObject.location.name !== 'graveyard') {
-      actions.push({ name: 'チャットパレットを表示...', action: () => { this.showChatPalette(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
+      actions.push({ name: '顯示聊天面板...', action: () => { this.showChatPalette(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
     //}
-    actions.push({ name: 'スタンド設定...', action: () => { this.showStandSetting(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
+    actions.push({ name: '立繪設定...', action: () => { this.showStandSetting(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
     actions.push(ContextMenuSeparator);
     actions.push({
-      name: '参照URLを開く', action: null,
+      name: '開啟參考網址', action: null,
       subActions: gameObject.getUrls().map((urlElement) => {
         const url = urlElement.value.toString();
         return {
@@ -543,7 +548,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
             }
           },
           disabled: !StringUtil.validUrl(url),
-          error: !StringUtil.validUrl(url) ? 'URLが不正です' : null,
+          error: !StringUtil.validUrl(url) ? '網址無效' : null,
           isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
         };
       }),
@@ -552,26 +557,26 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     actions.push(ContextMenuSeparator);
     actions.push(gameObject.isInventoryIndicate
       ? {
-        name: '☑ テーブルインベントリに表示', action: () => {
+        name: '☑ 在桌面倉庫中顯示', action: () => {
           gameObject.isInventoryIndicate = false;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       } : {
-        name: '☐ テーブルインベントリに表示', action: () => {
+        name: '☐ 在桌面倉庫中顯示', action: () => {
           gameObject.isInventoryIndicate = true;
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         checkBox: 'check'
       });
     let locations = [
-      { name: 'table', alias: 'テーブル' },
-      { name: 'common', alias: '共有インベントリ' },
-      { name: Network.peerId, alias: '個人インベントリ' },
-      { name: 'graveyard', alias: '墓場' }
+      { name: 'table', alias: '桌面' },
+      { name: 'common', alias: '公用倉庫' },
+      { name: Network.peerId, alias: '個人倉庫' },
+      { name: 'graveyard', alias: '回收區' }
     ];
     actions.push({
-      name: `${ (locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).alias }から移動`,
+      name: `從${ (locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).alias }移動`,
       action: null,
       subActions: locations
         .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
@@ -585,9 +590,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               this.selectionService.remove(gameObject);
               if (location.name === 'table' && gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
                 this.modalService.open(ConfirmationComponent, {
-                  title: 'ステルスモード',
-                  text: 'ステルスモードになります。',
-                  help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+                  title: '隱身模式',
+                  text: '已開啟隱身：其他人看不到你的游標位置。',
+                  help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
                   type: ConfirmationType.OK,
                   materialIcon: 'disabled_visible'
                 });
@@ -616,14 +621,14 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     */
     actions.push(ContextMenuSeparator);
     actions.push({
-      name: 'コピーを作る', action: () => {
+      name: '建立副本', action: () => {
         this.cloneGameObject(gameObject);
         SoundEffect.play(PresetSound.piecePut);
       },
       disabled: !gameObject.isVisible && !this.isGMMode
     });
     actions.push({
-      name: 'コピーを作る（自動採番）', action: () => {
+      name: '建立副本（自動編號）', action: () => {
         const cloneObject = gameObject.clone();
         const tmp = cloneObject.name.split('_');
         let baseName;
@@ -647,7 +652,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (gameObject.location.name === 'graveyard') {
       actions.push(ContextMenuSeparator);
       actions.push({
-        name: '削除する（完全に削除）', action: () => {
+        name: '刪除（完全刪除）', action: () => {
           this.selectionService.remove(gameObject);
           this.deleteGameObject(gameObject);
           SoundEffect.play(PresetSound.sweep);
@@ -656,7 +661,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     } else {
       actions.push(ContextMenuSeparator);
       actions.push({
-        name: '削除する（墓場へ移動）', action: () => {
+        name: '刪除（移至回收區）', action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
           this.selectionService.remove(gameObject);
           gameObject.setLocation('graveyard');
@@ -676,9 +681,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     let tabTitle = this.getTabTitle(this.selectTab);
     let gameObjects = this.getGameObjects(this.selectTab);
     this.modalService.open(ConfirmationComponent, {
-      title: '墓場を空にする',
-      text: 'キャラクターを完全に削除しますか？',
-      helpHtml: `<b>${ StringUtil.escapeHtml(tabTitle) }</b>に存在する <b>${ gameObjects.length }</b> 体のキャラクターを完全に削除します。`,
+      title: '清空回收區',
+      text: '要完全刪除角色嗎？',
+      helpHtml: `<b>${ StringUtil.escapeHtml(tabTitle) }</b>中存在的 <b>${ gameObjects.length }</b> 個角色將被完全刪除。`,
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'delete_forever',
       action: () => {
@@ -699,7 +704,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = 'キャラクターシート';
+    let title = '角色卡';
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 800, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

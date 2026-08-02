@@ -41,43 +41,43 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   @Input() leftOnly: boolean = false;
   
   sampleMessages: ChatMessage[] = [
-    this.makeSampleMessage('System', null, 'チュートリアル：はじめに', null, 'ユドナリウムはサーバーを使用しないTRPGオンセツールです。参加者同士で接続し、コマや画像ファイルなどを同期します。'),
-    this.makeSampleMessage('System', null, 'テーブルとコマの基本操作', null, `＜テーブルの操作＞
-テーブルを左ドラッグ : 視点変更
-テーブルを右ドラッグ : 視点回転
-テーブルを右クリック : コンテキストメニューを表示
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `烏冬說明: 這是由日本作者 TK11235 所開發的開源 TRPG 跑團平台，使用 MIT 授權。
+特點是地圖以 2.5D 顯示，架構簡單、容易擴充。原版網址見下方連結。
+在這個平台中，主要資料由使用者之間彼此傳送與處理；HKTRPG 提供中文化平台與額外功能，棋子、圖片等仍儲存在各位的電腦中。
+所以離開前，請先按「保存ZIP」產生 ZIP 檔；下次使用時按「讀取ZIP」上傳，否則房間資料會像煙火一樣燒光。
+輸入第一則聊天後，此教學會自動隱藏。`, 'mine', 0),
 
-＜オブジェクトの操作＞
-オブジェクトをドラッグ操作 : オブジェクトの移動や回転
-オブジェクトを右クリック : 個別のコンテキストメニューを表示
-オブジェクトを左ダブルクリック : オブジェクト固有の動作`),
-    this.makeSampleMessage('System', null, '範囲選択', null, `<用語>
-範囲選択モード : 選択領域の内側に見えているオブジェクトを選択状態にする
-磁石モード : 同じ種類のオブジェクトを巻き込みながら移動させる
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞拖曳空白處移動視角／右鍵拖曳旋轉／右鍵開啟選單
+＜物件＞拖曳移動或旋轉／右鍵開啟選單／雙擊執行預設動作
+＜選取＞空白處長按拖曳範圍選取；Ctrl+左鍵增減選取
+圖片與音樂可直接拖放到瀏覽器畫面匯入。建議使用桌面版 Google Chrome。`, 'mine', 0),
 
-<オブジェクトの選択>
-テーブルをマウス左ボタン長押し+ドラッグ操作 : 長押しで範囲選択モードを開始し、ドラッグで範囲領域を指定
-オブジェクトを左ダブルクリック長押し+ドラッグ操作 : 長押しで磁石モードを開始し、ドラッグでオブジェクトを移動
-Shift+マウス左ボタン+ドラッグ操作 : 即時に範囲選択モードを開始し、ドラッグで範囲領域を指定
-Ctrl+マウス左ボタン : クリックしたオブジェクトの選択状態を切り替える
-Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れた対象を選択状態にする
+    this.makeSampleMessage('System', '???', '教學Zzzzzz', '玩家', '密語並不會儲存到 ZIP 中。當你的 ID 更新之後，將無法再看見之前傳給你的密語，還請多加注意。', 'mine', 0),
 
-<選択オブジェクトの操作>
-選択オブジェクトを移動 : 選択状態の全てのオブジェクトが同期して移動
-選択オブジェクトを回転 : 選択状態の同じ種類のオブジェクトが同期して回転
+    this.makeSampleMessage('System', null, '連結:', null, `根據 https://nanasunana.github.io/ 私家改造版重新中文化，並加入各種功能。
+升級 1.13.2 版本`, 'mine', 1615253220000),
 
-<選択解除>
-任意の場所をクリック : 全ての選択状態を解除`),
-    this.makeSampleMessage('System', null, '画像と音楽', null, 'ファイルをブラウザ画面にドラッグ&ドロップすることでユドナリウムに取り込めます。'),
-    this.makeSampleMessage('System', null, 'データの保存', null, '全てのデータが各参加者のブラウザ内にのみ存在するため、全員がルームから離脱するとデータが消失します。ルームの状態を次回セッションに持ち越したい場合は、必ず「保存」を実行してセーブデータ（zip）を生成してください。保存したzipの読み込みはブラウザ画面へのファイルドロップで行えます。'),
-    this.makeSampleMessage('System', '???', 'プレイヤー', 'ダイレクトメッセージ', 'ダイレクトメッセージ（秘密会話）はセーブデータに記録されません。'),
-    this.makeSampleMessage('System', '???', 'プレイヤー', 'ダイレクトメッセージ', 'また、過去のダイレクトメッセージはあなたのIDが更新されると同じルーム内であっても見えなくなります。注意してください。'),
-    this.makeSampleMessage('System', null, '動作環境', null, '動作推奨環境はデスクトップ版 Google Chrome です。今のところ、スマホからだと操作性に難があります。'),
-    this.makeSampleMessage('System', null, '動作が不安定な時は', null, `利用環境の設定変更で改善できるかもしれません。次の事を試してみて下さい。
-・ハードウェア アクセラレーションをオンにする
-・ブラウザ拡張機能（アドオン／プラグイン）を全てオフにする
-・Chrome ⇔ Firefoxなど違うブラウザを使用する`),
-    this.makeSampleMessage('System', null, 'チュートリアル：おわりに', null, 'チュートリアルは以上です。このチュートリアルは最初のチャットを入力すると非表示になります。'),
+    this.makeSampleMessage('System', null, '連結:', null, `升級成 1.13.3b 版本
+2021/05/11 改良 HTML 及 TXT 匯出功能，增加 COIN 功能
+2021/05/13 更新 TOKEN 底部框大小
+2021/05/27 更新 CutIn 功能（可使用 YouTube）；陰影會依高度改變`, 'mine', 1615253220000),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2021/08/17 更新成 F 版，更新組件版本。修正角色卡不能擲骰的 BUG，感謝吐司兔的回報。`, 'mine', 1635253220000),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2026 重大更新（hktrpg-main）
+・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
+・介面全面繁體中文化；品牌與說明對齊 HKTRPG
+・訪客模式、隱藏標籤列、筆記倉庫、角色卡快速擲骰
+・聊天工具列：新訊息提示音／訊息靠左／列表模式／完全靜音
+・BCDice 4.9.0（內建 3.16.1）
+
+https://z01.hktrpg.com 本網頁永久連結
+https://udonarium.app/ 原版連結
+https://nanasunana.github.io/ 改版連結
+https://support.hktrpg.com 支援用 Discord 群
+https://www.facebook.com/groups/HKTRPG 香港 TRPG 研究社
+https://www.hktrpg.com/ TRPG 百科
+https://www.patreon.com/HKTRPG HKTRPG 開發支援`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
   ];
 
   private topTimestamp = 0;
@@ -426,7 +426,7 @@ Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れ�
     this.adjustIndex();
   }
 
-  private makeSampleMessage(from: string, to: string, name: string, toName: string, text: string, tag='mine'): ChatMessage {
+  private makeSampleMessage(from: string, to: string, name: string, toName: string, text: string, tag = 'mine', timestamp = 0): ChatMessage {
     let message = new ChatMessage();
     message.from = from;
     message.to = to;
@@ -436,6 +436,7 @@ Ctrl+マウス左ボタン+ドラッグ操作 : マウスカーソルの触れ�
     message.toColor = toName ? '#444444' : null;
     message.tag = tag;
     message.value = text;
+    message.setAttribute('timestamp', timestamp);
     return message;
   }
 }

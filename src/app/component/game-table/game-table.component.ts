@@ -222,17 +222,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           MIT License
           https://opensource.org/licenses/mit-license.php
           */
-          // 座標変換
+          // 座標轉換
           let centerX = this.gridCanvas.nativeElement.clientWidth / 2;
           let centerY = this.gridCanvas.nativeElement.clientHeight / 2;
           let movedX = event.data.x - centerX;
           let movedY = event.data.y - centerY;
           let movedZ = event.data.z;
-          // z軸回転
+          // z 軸旋轉
           let rotateZRad = this.viewRotateZ / 180 * Math.PI;
           let rotatedMovedX = movedX * Math.cos(rotateZRad) - movedY * Math.sin(rotateZRad);
           let zRotatedMovedY = movedX * Math.sin(rotateZRad) + movedY * Math.cos(rotateZRad);
-          // x軸回転
+          // x 軸旋轉
           let rotateXRad = this.viewRotateX / 180 * Math.PI;
           let rotatedMovedY = zRotatedMovedY * Math.cos(rotateXRad);
           let rotatedMovedZ = zRotatedMovedY * Math.sin(rotateXRad) + movedZ;
@@ -437,7 +437,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (0 < this.selectionService.size) {
       menuActions.push({
-        name: 'ここに集める', action: () => {
+        name: '集中到這裡', action: () => {
           this.selectionService.congregate(objectPosition);
         },
         //enabled: 0 < this.selectionService.size
@@ -448,7 +448,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     Array.prototype.push.apply(menuActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
     menuActions.push(ContextMenuSeparator);
     menuActions.push({
-      name: 'テーブル設定...', action: () => {
+      name: '地圖設定...', action: () => {
         this.modalService.open(GameTableSettingComponent);
       }
     });

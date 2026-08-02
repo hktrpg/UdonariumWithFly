@@ -288,19 +288,19 @@ export class CutInComponent implements OnInit, OnDestroy {
       && (this.pixcelWidthPreAdjust > document.documentElement.clientWidth || this.pixcelHeightPreAdjust > document.documentElement.offsetHeight);
   }
 
-  // アス比合わせて画面に納める際にどちらの幅を画面いっぱいに合わせるか
+  // 依長寬比放入畫面時，要以寬或高對齊畫面
   private get isAjustAspectWidth(): boolean {
     const pixcelWidthPreAdjust = this.pixcelWidthPreAdjust;
     const pixcelHeightPreAdjust = this.pixcelHeightPreAdjust;
     if (pixcelWidthPreAdjust > document.documentElement.clientWidth) {
-      //幅が超えるのでとりあえず幅を合わせて高さが超えないか見る
+      // 寬度超出時先對齊寬度，再檢查高度是否超出
       if (document.documentElement.offsetHeight < pixcelHeightPreAdjust * (document.documentElement.clientWidth / pixcelWidthPreAdjust)) {
-        // 高さが超える場合は高さを画面いっぱいに
+        // 若高度超出則改以高度對齊畫面
         return false;
       }
       return true;
     } else if (pixcelHeightPreAdjust > document.documentElement.offsetHeight) {
-      // 幅は超えずに高さのみ超えるので高さを画面いっぱい
+      // 寬度未超、僅高度超出時，以高度對齊畫面
       return false
     }
     return false;
@@ -399,7 +399,7 @@ export class CutInComponent implements OnInit, OnDestroy {
   play() {
     if (this.isEnd) return;
     if (this._isVisible) {
-      //TODO pauseからの再開
+      // TODO: 從 pause 恢復播放
       if (!this.cutIn.videoId) this.audioPlayer.play();
     } else {
       this.ngZone.run(() => {
@@ -477,7 +477,7 @@ export class CutInComponent implements OnInit, OnDestroy {
           this._timeoutIdVideo = null;
         });
       }, 200);
-      //Timeoutの変更
+      // 變更 Timeout
       if (this.cutIn.duration > 0) {
         clearTimeout(this._timeoutId);
         const timeLimit = this.cutIn.duration - this.videoPlayer.getCurrentTime() + (this.cutIn.videoStart ? parseInt(this.cutIn.videoStart) : 0);
@@ -530,20 +530,20 @@ export class CutInComponent implements OnInit, OnDestroy {
     let position = this.pointerDeviceService.pointers[0];
     this.contextMenuService.open(position, [
       {
-        name: '閉じる（自分のみ停止）',
+        name: '關閉（僅自己停止）',
         action: () => { this.stop(); },
         default: true,
         selfOnly: true
       },
       ContextMenuSeparator,
       {
-        name: `${this.isIndicateSender ? '☑' : '☐'}送信者を表示`,
+        name: `${this.isIndicateSender ? '☑' : '☐'}顯示傳送者`,
         action: () => { this.isIndicateSender = !this.isIndicateSender; },
         selfOnly: true,
         checkBox: 'check'
       },
       {
-        name: `${this.isBackyard ? '☑' : '☐'}ウィンドウの背後に表示`,
+        name: `${this.isBackyard ? '☑' : '☐'}顯示在視窗後方`,
         action: () => { this.isBackyard = !this.isBackyard; },
         selfOnly: true,
         checkBox: 'check'
@@ -558,25 +558,25 @@ export class CutInComponent implements OnInit, OnDestroy {
       (!this.videoId ? null : ContextMenuSeparator),
       (!this.videoId ? null :
         {
-          name: 'YouTubeで開く',
+          name: '在 YouTube 開啟',
           action: () => { 
             this.modalService.open(OpenUrlComponent, { url: `https://www.youtube.com/watch?v=${this.cutIn.videoId}`, title: this.cutIn.name });
           },
           //disabled: !StringUtil.validUrl(url),
-          //error: !StringUtil.validUrl(url) ? 'URLが不正です' : null,
+          //error: !StringUtil.validUrl(url) ? '網址無效' : null,
           isOuterLink: true
         }
       )
       ContextMenuSeparator,
       {
-        name: '効果音の開始／最初から',
+        name: '開始／從頭播放音效',
         action: () => { this.audioPlayer.play() },
         disabled: !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio), 
         selfOnly: true,
         materialIcon: 'play_arrow'
       },
       {
-        name: '効果音の停止',
+        name: '停止音效',
         action: () => { this.audioPlayer.stop() },
         disabled: !this.audioPlayer.paused && !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio), 
         selfOnly: true,

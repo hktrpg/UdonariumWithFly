@@ -176,7 +176,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   onInputStart(e: MouseEvent | TouchEvent) {
     this.callSelectedEvent();
-    if (this.collidableElements.length < 1) this.findCollidableElements(); // 稀にcollidableElementsの取得に失敗している
+    if (this.collidableElements.length < 1) this.findCollidableElements(); // 偶爾會取得 collidableElements 失敗
 
     if (Network.GuestMode() || this.isDisable || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {
       this.cancel();
@@ -317,7 +317,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.cancel();
 
     if (needsDispatch) {
-      // ロングプレスによるタッチ操作でコンテキストメニューを開く場合、イベントを適切なDOMに伝搬させる
+      // 以長按觸控開啟右鍵選單時，將事件傳播到適當的 DOM
       e.stopPropagation();
       let ev = new MouseEvent(e.type, e);
       this.ngZone.run(() => this.nativeElement.dispatchEvent(ev));

@@ -56,8 +56,8 @@ export class StandList extends DataElement {
     let farewell = false;
     let useStands = [];
 
-    // 退去コマンド
-    ['＠退去', '@farewell'].forEach((command) => {
+    // 退場指令
+    ['＠退場', '@farewell', '@退場'].forEach((command) => {
       if (StringUtil.toHalfWidth(text).trimRight().toUpperCase().endsWith(StringUtil.toHalfWidth(command).toUpperCase())) {
         if ((command.slice(0, 1) == '@' || command.slice(0, 1) == '＠') && textTagMatch.length < command.length) textTagMatch = command;
         farewell = true;
@@ -76,7 +76,7 @@ export class StandList extends DataElement {
     let isUseDfault = true;  
     let defautStands: DataElement[] = [];
     let matchStands: DataElement[] = [];
-    // 優先順位を「それ以外→デフォルト」から変更する過程の効率悪い処理
+    // 將優先順序從「其他→預設」變更過程中的低效率處理
     
     for (const standElement of this.standElements) {
       if (!standElement.getFirstElementByName('imageIdentifier') || !standElement.getFirstElementByName('conditionType')) continue;

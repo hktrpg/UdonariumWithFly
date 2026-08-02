@@ -161,7 +161,7 @@ export class ObjectSynchronizer {
     }
 
     task.ontimeout = (task, remainedRequests) => {
-      console.log('GameObject synchronize タイムアウト');
+      console.log('GameObject synchronize timeout');
       remainedRequests.forEach(request => this.requestMap.set(request.identifier, request));
     }
 

@@ -50,7 +50,7 @@ export class ImageSharingSystem {
           }
         }
 
-        // Peer切断時などのエッジケースに対応する
+        // Handle edge cases such as Peer disconnect
         if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
           ImageStorage.instance.synchronize(event.sendFrom);
         }
@@ -88,7 +88,7 @@ export class ImageSharingSystem {
             EventSystem.call(event, peerId);
             return;
           }
-          console.log('REQUEST_FILE_RESOURE ImageStorageService あぶれた...' + event.data.receiver, randomRequest.length);
+          console.log('REQUEST_FILE_RESOURE ImageStorageService overflow...' + event.data.receiver, randomRequest.length);
         }
       })
       .on('UPDATE_FILE_RESOURE', 1000, event => {

@@ -70,7 +70,7 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // iOS で contextmenu が発火しない問題へのworkaround.
+    // Workaround：iOS 上 contextmenu 不會觸發。
     let ua = window.navigator.userAgent.toLowerCase();
     let isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf('macintosh') > -1 && 'ontouchend' in document;
     if (!isiOS) return;

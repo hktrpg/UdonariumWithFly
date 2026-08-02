@@ -216,7 +216,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   onInputStart(e: any) {
     this.input.cancel();
 
-    // TODO:もっと良い方法考える
+    // TODO: 想更好的做法
     if (this.isLocked) {
       EventSystem.trigger('DRAG_LOCKED_OBJECT', { srcEvent: e });
     }
@@ -298,21 +298,21 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: 'ここに集める', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedGameTableMasks = () => this.selectionService.objects.filter(object => object.aliasName === this.terrain.aliasName) as Terrain[];
       actions.push(
         {
-          name: '選択した地形', action: null, subActions: [
+          name: '選擇的地形', action: null, subActions: [
             {
-              name: 'すべて固定する', action: () => {
+              name: '全部固定', action: () => {
                 selectedGameTableMasks().forEach(terrain => terrain.isLocked = true);
                 SoundEffect.play(PresetSound.lock);
               }
             },
             {
-              name: 'すべてのコピーを作る', action: () => {
+              name: '全部建立副本', action: () => {
                 selectedGameTableMasks().forEach(terrain => {
                   let cloneObject = terrain.clone();
                   cloneObject.location.x += this.gridSize;
@@ -349,9 +349,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           checkBox: 'check'
         }
       ),
-      (this.isLocked ? null : { name: `重なり順 ${this.height === 0 ? '' : ' (平面地形のみ)' }`, action: null, subActions: [
+      (this.isLocked ? null : { name: `重疊順序 ${this.height === 0 ? '' : ' （僅平面地形）' }`, action: null, subActions: [
         {
-          name: '平面地形の一番上に', action: () => {
+          name: '移到平面地形最上層', action: () => {
             if (!this.isLocked) {
               const parent = this.terrain.parent;
               if (parent) parent.appendChild(this.terrain);
@@ -360,7 +360,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           disabled: this.isLocked
         },
         {
-          name: '平面地形の一番下に', action: () => {
+          name: '移到平面地形最下層', action: () => {
             if (!this.isLocked) {
               const parent = this.terrain.parent;
               if (parent) parent.prependChild(this.terrain);
@@ -373,7 +373,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       ContextMenuSeparator,
       { name: '傾斜', action: null, subActions: [
         {
-          name: `${ this.slopeDirection == SlopeDirection.NONE ? '◉' : '○' } なし`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.NONE ? '◉' : '○' } 無`, action: () => {
             this.slopeDirection = SlopeDirection.NONE;
           },
           checkBox: 'radio'
@@ -404,7 +404,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           checkBox: 'radio'
         }
       ]},
-      { name: '壁の表示', action: null, subActions: [
+      { name: '牆壁顯示', action: null, subActions: [
         {
           name: `${ this.hasWall && this.isSurfaceShading ? '◉' : '○' } 通常`, action: () => {
             this.mode = TerrainViewState.ALL;
@@ -413,14 +413,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           checkBox: 'radio'
         },
         {
-          name: `${ this.hasWall && !this.isSurfaceShading ? '◉' : '○' } 陰影なし`, action: () => {
+          name: `${ this.hasWall && !this.isSurfaceShading ? '◉' : '○' } 沒有陰影`, action: () => {
             this.mode = TerrainViewState.ALL;
             this.isSurfaceShading = false;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ !this.hasWall ? '◉' : '○' } 非表示`, action: () => {
+          name: `${ !this.hasWall ? '◉' : '○' } 不顯示`, action: () => {
             this.mode = TerrainViewState.FLOOR;
             if (this.depth * this.width === 0) {
               this.terrain.width = this.width <= 0 ? 1 : this.width;
@@ -434,13 +434,13 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       /*
       (this.isInteract
         ? {
-          name: '☑ 他の地形に乗る', action: () => {
+          name: '☑ 疊在其他地形上', action: () => {
             this.isInteract = false;
             SoundEffect.play(PresetSound.unlock);
           },
                 checkBox: 'check'
         } : {
-          name: '☐ 他の地形に乗る', action: () => {
+          name: '☐ 疊在其他地形上', action: () => {
             this.isInteract = true;
             SoundEffect.play(PresetSound.lock);
           },
@@ -450,30 +450,30 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       */
       (this.isDropShadow
         ? {
-          name: '☑ 影を落とす', action: () => {
+          name: '☑ 加上陰影', action: () => {
             this.isDropShadow = false;
           },
           checkBox: 'check'
         } : {
-          name: '☐ 影を落とす', action: () => {
+          name: '☐ 加上陰影', action: () => {
             this.isDropShadow = true;
           },
           checkBox: 'check'
         }),
       (this.isAltitudeIndicate
         ? {
-          name: '☑ 高度の表示', action: () => {
+          name: '☑ 顯示高度', action: () => {
             this.isAltitudeIndicate = false;
           },
           checkBox: 'check'
         } : {
-          name: '☐ 高度の表示', action: () => {
+          name: '☐ 顯示高度', action: () => {
             this.isAltitudeIndicate = true;
           },
           checkBox: 'check'
         }),
       {
-        name: '高度を0にする', action: () => {
+        name: '將高度設為0', action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             SoundEffect.play(PresetSound.sweep);
@@ -482,9 +482,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         altitudeHande: this.terrain
       },
       ContextMenuSeparator,
-      { name: '地形設定を編集...', action: () => { this.showDetail(this.terrain); } },
+      { name: '編輯地形設定...', action: () => { this.showDetail(this.terrain); } },
       (this.terrain.getUrls().length <= 0 ? null : {
-        name: '参照URLを開く', action: null,
+        name: '打開參考網址', action: null,
         subActions: this.terrain.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -497,14 +497,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? 'URLが不正です' : null,
+            error: !StringUtil.validUrl(url) ? '網址無效' : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         })
       }),
       (this.terrain.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: 'コピーを作る', action: () => {
+        name: '建立副本', action: () => {
           let cloneObject = this.terrain.clone();
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
@@ -514,13 +514,13 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         }
       },
       {
-        name: '削除する', action: () => {
+        name: '刪除', action: () => {
           this.terrain.destroy();
           SoundEffect.play(PresetSound.sweep);
         }
       },
       ContextMenuSeparator,
-      { name: 'オブジェクト作成', action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
+      { name: '新增物件', action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
     ];
 
     return actions;

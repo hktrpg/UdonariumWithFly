@@ -81,7 +81,7 @@ export class ChatMessageService {
   }
 
   sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean): ChatMessage {
-    // もうちょとなんとかする
+    // TODO: 再整理一下
     let effective = !(isUseFaceIcon && this.findFaceIconIdentifier(sendFrom));
     let chatMessage: ChatMessageContext = {
       from: Network.peer.userId,
@@ -143,9 +143,9 @@ export class ChatMessageService {
   private findObjectName(identifier: string): string {
     let object = ObjectStore.instance.get(identifier);
     if (object instanceof GameCharacter) {
-      return object.name && object.name.length ? object.name : '（無名のキャラクター）';
+      return object.name && object.name.length ? object.name : '（無名角色）';
     } else if (object instanceof PeerCursor) {
-      return object.name && object.name.length ? object.name : '（無名のプレイヤー）';
+      return object.name && object.name.length ? object.name : '（無名玩家）';
     }
     return identifier;
   }

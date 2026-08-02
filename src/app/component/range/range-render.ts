@@ -65,7 +65,7 @@ export interface ClipAreaDiamond {
 }
 
 export interface ClipAreaCorn {
-  clip01x: number; // 根本始点
+  clip01x: number; // 根本始點
   clip01y: number;
   clip02x: number;
   clip02y: number;
@@ -75,7 +75,7 @@ export interface ClipAreaCorn {
   clip04y: number;
   clip05x: number; // 先端部
   clip05y: number;
-  clip06x: number; // 折り返し
+  clip06x: number; // 折返
   clip06y: number;
   clip07x: number;
   clip07y: number;
@@ -93,7 +93,7 @@ export class RangeRender {
   ) { }
 
   private makeBrush(context: CanvasRenderingContext2D, gridSize: number, gridColor: string): CanvasRenderingContext2D {
-    // 座標描画用brush設定
+    // 座標繪製用 brush 設定
     context.strokeStyle = gridColor;
     context.fillStyle = context.strokeStyle;
     context.lineWidth = 1;
@@ -105,8 +105,8 @@ export class RangeRender {
     return context
   }
 
-  //多角形の構成ベクトルをを盤面見下ろしで右回転にとる
-  //ベクトルP1P2 x Px1Pchk の外積が+ならば図形の内側にある
+  // 多邊形構成向量：俯視盤面採右旋轉
+  // 向量 P1P2 × Px1Pchk 外積為正則在圖形內側
   chkOuterProduct(p1x: number,p1y: number, p2x: number,p2y: number, pchkx: number,pchky: number ): boolean{
     let ax = p2x - p1x;
     let ay = p2y - p1y;
@@ -116,7 +116,7 @@ export class RangeRender {
     // console.log('p1:' + p1x + ',' + p1y +' p2:' + p2x + ',' + p2y + ' pchk:' + pchkx + ',' + pchky);
     // console.log('a:' + ax + ',' + ay +' b:' + bx + ',' + by + ' calc:' + calc);
     //return calc >= -100000;
-    return calc >= -0.01 // 丸め誤差対策で少し許容範囲を広くする
+    return calc >= -0.01 // 為因應捨入誤差，稍微放寬容許範圍
   }
 
   chkInCircle(radius: number, pchkx: number,pchky: number ): boolean{
@@ -171,12 +171,12 @@ export class RangeRender {
           if (setting.fillType == 1) {
             gcx = gx + gridOffX + (gridSize / 2) - offSetX_px;
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
-            // trueで内側にある
+            // true 表示在內側
             if (this.chkInCircle(setting.range * gridSize, gcx, gcy)) {
               this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
             }
           } else {
-            /* 富豪的プログラミング */
+            /* 暴力／富豪式程式設計 */
             let hit = 0;
             for (let i = 0; i < gridSize; i++) {
               for (let j = 0; j < gridSize; j++) {
@@ -263,7 +263,7 @@ export class RangeRender {
     this.canvasElement.height = setting.areaHeight * gridSize;
     let context: CanvasRenderingContext2D = this.canvasElement.getContext('2d');
 
-    // 範囲座標
+    // 範圍座標
     let p1x_ = 0;
     let p1y_ = 0.5 * setting.width * gridSize;
     let p2x_ = 0;
@@ -273,8 +273,8 @@ export class RangeRender {
     let p4x_ = setting.range * gridSize;
     let p4y_ = 0.5 * setting.width * gridSize;
 
-    // クリッピング座標
-    // コーンの根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自錐形根部起順時針定義裁切範圍
     let clip01x_ = p1x_ - gridSize * Math.sqrt(2);
     let clip01y_ = p1y_ + gridSize * Math.sqrt(2);
     let clip02x_ = p2x_ - gridSize * Math.sqrt(2);
@@ -284,7 +284,7 @@ export class RangeRender {
     let clip04x_ = p4x_ + gridSize * Math.sqrt(2);
     let clip04y_ = p4y_ + gridSize * Math.sqrt(2);
 
-    // 座標変換回転
+    // 座標轉換旋轉
     let p1x = p1x_ * Math.cos(rad) - p1y_ * Math.sin(rad);
     let p1y = p1x_ * Math.sin(rad) + p1y_ * Math.cos(rad);
     let p2x = p2x_ * Math.cos(rad) - p2y_ * Math.sin(rad);
@@ -295,7 +295,7 @@ export class RangeRender {
     let p4y = p4x_ * Math.sin(rad) + p4y_ * Math.cos(rad);
 
     let clip: ClipAreaLine = {
-      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始点
+      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始點
       clip01y: clip01x_ * Math.sin(rad) + clip01y_ * Math.cos(rad),
       clip02x: clip02x_ * Math.cos(rad) - clip02y_ * Math.sin(rad),
       clip02y: clip02x_ * Math.sin(rad) + clip02y_ * Math.cos(rad),
@@ -331,7 +331,7 @@ export class RangeRender {
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
             // console.log('hw' + h + ',' + w);
 
-            // 全部trueで内側にある
+            // 全部為 true 表示在內側
             if(this.chkOuterProduct(p1x, p1y, p2x, p2y, gcx, gcy)
               && this.chkOuterProduct(p2x, p2y, p3x, p3y, gcx, gcy)
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
@@ -340,7 +340,7 @@ export class RangeRender {
               this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
             }
           } else {
-            /* 富豪的プログラミング */
+            /* 暴力／富豪式程式設計 */
             let hit = 0;
             for (let i = 0; i < gridSize; i++) {
               for (let j = 0; j < gridSize; j++) {
@@ -398,7 +398,7 @@ export class RangeRender {
     let gridSize = setting.gridSize;
     let rad = Math.PI / 180 * setting.degree;
 
-    // 範囲座標
+    // 範圍座標
     let p1x_ = 0;
     let p1y_ = 0.5 * setting.width * gridSize;
     let p2x_ = 0;
@@ -408,8 +408,8 @@ export class RangeRender {
     let p4x_ = setting.range * gridSize;
     let p4y_ = 0.5 * setting.width * gridSize;
 
-    // クリッピング座標
-    // コーンの根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自錐形根部起順時針定義裁切範圍
     let clip01x_ = p1x_;
     let clip01y_ = p1y_;
     let clip02x_ = p2x_;
@@ -420,7 +420,7 @@ export class RangeRender {
     let clip04y_ = p4y_;
 
     let clip: ClipAreaLine = {
-      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始点
+      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始點
       clip01y: clip01x_ * Math.sin(rad) + clip01y_ * Math.cos(rad),
       clip02x: clip02x_ * Math.cos(rad) - clip02y_ * Math.sin(rad),
       clip02y: clip02x_ * Math.sin(rad) + clip02y_ * Math.cos(rad),
@@ -464,7 +464,7 @@ export class RangeRender {
     this.canvasElement.height = setting.areaHeight * gridSize;
     let context: CanvasRenderingContext2D = this.canvasElement.getContext('2d');
 
-    // 範囲座標
+    // 範圍座標
     let p1x = -setting.range * gridSize; // 左下
     let p1y = setting.range * gridSize;
     let p2x = -setting.range * gridSize; // 左上
@@ -474,8 +474,8 @@ export class RangeRender {
     let p4x = setting.range * gridSize; // 右下
     let p4y = setting.range * gridSize;
 
-    // クリッピング座標
-    // 根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自根部起順時針定義裁切範圍
     let clip01x = p1x - (gridSize * 1.0);
     let clip01y = p1y + (gridSize * 1.0);
     let clip02x = p2x - (gridSize * 1.0);
@@ -486,7 +486,7 @@ export class RangeRender {
     let clip04y = p4y + (gridSize * 1.0);
 
     let clip: ClipAreaSquare = {
-      clip01x: clip01x, // 根本始点
+      clip01x: clip01x, // 根本始點
       clip01y: clip01y,
       clip02x: clip02x,
       clip02y: clip02y,
@@ -521,7 +521,7 @@ export class RangeRender {
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
             // console.log('hw' + h + ',' + w);
 
-            // 全部trueで内側にある
+            // 全部為 true 表示在內側
             if(this.chkOuterProduct(p1x, p1y, p2x, p2y, gcx, gcy)
               && this.chkOuterProduct(p2x, p2y, p3x, p3y, gcx, gcy)
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
@@ -530,7 +530,7 @@ export class RangeRender {
               this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
             }
           } else {
-            /* 富豪的プログラミング */
+            /* 暴力／富豪式程式設計 */
             let hit = 0;
             for (let i = 0; i < gridSize; i++) {
               for (let j = 0; j < gridSize; j++) {
@@ -600,7 +600,7 @@ export class RangeRender {
     let gridSize = setting.gridSize;
     let rad = Math.PI / 180 * setting.degree;
 
-    // 範囲座標
+    // 範圍座標
     let p1x = -setting.range * gridSize; // 左下
     let p1y = setting.range * gridSize;
     let p2x = -setting.range * gridSize; // 左上
@@ -610,8 +610,8 @@ export class RangeRender {
     let p4x = setting.range * gridSize; // 右下
     let p4y = setting.range * gridSize;
 
-    // クリッピング座標
-    // 根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自根部起順時針定義裁切範圍
     let clip01x = p1x;
     let clip01y = p1y;
     let clip02x = p2x;
@@ -622,7 +622,7 @@ export class RangeRender {
     let clip04y = p4y;
 
     let clip: ClipAreaSquare = {
-      clip01x: clip01x, // 根本始点
+      clip01x: clip01x, // 根本始點
       clip01y: clip01y,
       clip02x: clip02x,
       clip02y: clip02y,
@@ -667,7 +667,7 @@ export class RangeRender {
     this.canvasElement.height = setting.areaHeight * gridSize;
     let context: CanvasRenderingContext2D = this.canvasElement.getContext('2d');
 
-    // 範囲座標
+    // 範圍座標
     let p1x = -setting.range * gridSize; // 左
     let p1y = 0;
     let p2x = 0; // 上
@@ -677,8 +677,8 @@ export class RangeRender {
     let p4x = 0; // 下
     let p4y = setting.range * gridSize;
 
-    // クリッピング座標
-    // 根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自根部起順時針定義裁切範圍
     let clip01x = p1x - (gridSize * 2);
     let clip01y = 0;
     let clip02x = 0;
@@ -689,7 +689,7 @@ export class RangeRender {
     let clip04y = p4y + (gridSize * 2);
 
     let clip: ClipAreaSquare = {
-      clip01x: clip01x, // 根本始点
+      clip01x: clip01x, // 根本始點
       clip01y: clip01y,
       clip02x: clip02x,
       clip02y: clip02y,
@@ -726,7 +726,7 @@ export class RangeRender {
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
             // console.log('hw' + h + ',' + w);
 
-            // 全部trueで内側にある
+            // 全部為 true 表示在內側
             if(  this.chkOuterProduct(p1x, p1y, p2x, p2y, gcx, gcy)
               && this.chkOuterProduct(p2x, p2y, p3x, p3y, gcx, gcy)
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
@@ -735,7 +735,7 @@ export class RangeRender {
               this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
             }
           } else {
-            /* 富豪的プログラミング */
+            /* 暴力／富豪式程式設計 */
             let hit = 0;
             for (let i = 0; i < gridSize; i++) {
               for (let j = 0; j < gridSize; j++) {
@@ -804,14 +804,14 @@ export class RangeRender {
   static gripAreaPathDiamond(setting: RangeRenderSetting): ClipAreaSquare {
     let gridSize = setting.gridSize;
 
-    // 範囲座標
+    // 範圍座標
     let p1x = -setting.range * gridSize; // 左
     let p2y = -setting.range * gridSize;
     let p3x = setting.range * gridSize; // 右
     let p4y = setting.range * gridSize;
 
-    // クリッピング座標
-    // 根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自根部起順時針定義裁切範圍
     let clip01x = p1x;
     let clip01y = 0;
     let clip02x = 0;
@@ -822,7 +822,7 @@ export class RangeRender {
     let clip04y = p4y;
 
     let clip: ClipAreaSquare = {
-      clip01x: clip01x, // 根本始点
+      clip01x: clip01x, // 根本始點
       clip01y: clip01y,
       clip02x: clip02x,
       clip02y: clip02y,
@@ -866,7 +866,7 @@ export class RangeRender {
     this.canvasElement.height = setting.areaHeight * gridSize;
     let context: CanvasRenderingContext2D = this.canvasElement.getContext('2d');
 
-    // 範囲座標
+    // 範圍座標
     let cx_ = 0.0;
     let cy_ = 0.0;
     let p1x_ = setting.range * gridSize;
@@ -874,10 +874,10 @@ export class RangeRender {
     let p2x_ = setting.range * gridSize;
     let p2y_ = 0.5 * setting.width * gridSize;
 
-    // クリッピング座標
-    // コーンの根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自錐形根部起順時針定義裁切範圍
     
-    let clip01x_ = cx_ - gridSize * Math.sqrt(2); // コーン根本
+    let clip01x_ = cx_ - gridSize * Math.sqrt(2); // 錐形根部
     let clip01y_ = cy_;
     let clip02x_ = cx_ - gridSize * Math.sqrt(2); // 領部根本
     let clip02y_ = cy_ - gridSize *  Math.sqrt(2);
@@ -897,7 +897,7 @@ export class RangeRender {
     let clip09x_ = clip02x_;
     let clip09y_ = - clip02y_;
 
-    // 座標変換回転
+    // 座標轉換旋轉
     let cx = cx_;
     let cy = cy_;
     let p1x = p1x_ * Math.cos(rad) - p1y_ * Math.sin(rad);
@@ -906,7 +906,7 @@ export class RangeRender {
     let p2y = p2x_ * Math.sin(rad) + p2y_ * Math.cos(rad);
 
     let clip: ClipAreaCorn = {
-      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本支店
+      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始點
       clip01y: clip01x_ * Math.sin(rad) + clip01y_ * Math.cos(rad),
       clip02x: clip02x_ * Math.cos(rad) - clip02y_ * Math.sin(rad),
       clip02y: clip02x_ * Math.sin(rad) + clip02y_ * Math.cos(rad),
@@ -916,7 +916,7 @@ export class RangeRender {
       clip04y: clip04x_ * Math.sin(rad) + clip04y_ * Math.cos(rad),
       clip05x: clip05x_ * Math.cos(rad) - clip05y_ * Math.sin(rad), // 先端部
       clip05y: clip05x_ * Math.sin(rad) + clip05y_ * Math.cos(rad),
-      clip06x: clip06x_ * Math.cos(rad) - clip06y_ * Math.sin(rad), // 折り返し
+      clip06x: clip06x_ * Math.cos(rad) - clip06y_ * Math.sin(rad), // 折返
       clip06y: clip06x_ * Math.sin(rad) + clip06y_ * Math.cos(rad),
       clip07x: clip07x_ * Math.cos(rad) - clip07y_ * Math.sin(rad),
       clip07y: clip07x_ * Math.sin(rad) + clip07y_ * Math.cos(rad),
@@ -949,14 +949,14 @@ export class RangeRender {
             gcx = gx + gridOffX + (gridSize / 2) - offSetX_px;
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
             // console.log('hw' + h + ',' + w);
-            // 全部trueで内側にある
+            // 全部為 true 表示在內側
             if(this.chkOuterProduct(cx, cy, p1x, p1y, gcx, gcy)
               && this.chkOuterProduct(p1x, p1y, p2x, p2y, gcx, gcy)
               && this.chkOuterProduct(p2x, p2y, cx,cy , gcx, gcy)) {
               this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
             }
           } else {
-            /* 富豪的プログラミング */
+            /* 暴力／富豪式程式設計 */
             let hit = 0;
             for (let i = 0; i < gridSize; i++) {
               for (let j = 0; j < gridSize; j++) {
@@ -1013,16 +1013,16 @@ export class RangeRender {
     let gridSize = setting.gridSize;
     let rad = Math.PI / 180 * setting.degree;
 
-    // 範囲座標
+    // 範圍座標
     let cx_ = 0.0;
     let cy_ = 0.0;
     let p1x_ = setting.range * gridSize;
     let p1y_ = -0.5 * setting.width * gridSize;
 
-    // クリッピング座標
-    // コーンの根本から時計回りにクリップ範囲を定義
+    // 裁切座標
+    // 自錐形根部起順時針定義裁切範圍
     
-    let clip01x_ = cx_; // コーン根本
+    let clip01x_ = cx_; // 錐形根部
     let clip01y_ = cy_;
     let clip02x_ = cx_; // 領部根本
     let clip02y_ = cy_;
@@ -1043,7 +1043,7 @@ export class RangeRender {
     let clip09y_ = - clip02y_;
 
     let clip: ClipAreaCorn = {
-      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本支店
+      clip01x: clip01x_ * Math.cos(rad) - clip01y_ * Math.sin(rad), // 根本始點
       clip01y: clip01x_ * Math.sin(rad) + clip01y_ * Math.cos(rad),
       clip02x: clip02x_ * Math.cos(rad) - clip02y_ * Math.sin(rad),
       clip02y: clip02x_ * Math.sin(rad) + clip02y_ * Math.cos(rad),
@@ -1053,7 +1053,7 @@ export class RangeRender {
       clip04y: clip04x_ * Math.sin(rad) + clip04y_ * Math.cos(rad),
       clip05x: clip05x_ * Math.cos(rad) - clip05y_ * Math.sin(rad), // 先端部
       clip05y: clip05x_ * Math.sin(rad) + clip05y_ * Math.cos(rad),
-      clip06x: clip06x_ * Math.cos(rad) - clip06y_ * Math.sin(rad), // 折り返し
+      clip06x: clip06x_ * Math.cos(rad) - clip06y_ * Math.sin(rad), // 折返
       clip06y: clip06x_ * Math.sin(rad) + clip06y_ * Math.cos(rad),
       clip07x: clip07x_ * Math.cos(rad) - clip07y_ * Math.sin(rad),
       clip07y: clip07x_ * Math.sin(rad) + clip07y_ * Math.cos(rad),
@@ -1069,7 +1069,7 @@ export class RangeRender {
   private generateCalcGridPositionFunc(gridType: GridType,centerX: number,centerY: number,areaWidth: number,areaHeight: number): StrokeGridFunc {
 //  console.log('areaWidth:'+areaWidth + ' areaHeight:'+areaHeight);
     switch (gridType) {
-      case GridType.HEX_VERTICAL: // ヘクス縦揃え
+      case GridType.HEX_VERTICAL: // 六角格縱向對齊
         return (w, h, gridSize) => {
           let isHalfSlideXLine = centerX % (gridSize * 2) < gridSize ? 1:0;
           let idAreaWidthMulti4 = areaWidth % 4 == 0 ? 1:0;
@@ -1079,7 +1079,7 @@ export class RangeRender {
             return { gx: w * gridSize, gy: h * gridSize + (gridSize / 2) };
           }
         }
-      case GridType.HEX_HORIZONTAL: // ヘクス横揃え(どどんとふ互換)
+      case GridType.HEX_HORIZONTAL: // 六角格橫向對齊（相容 DodontoF）
         return (w, h, gridSize) => {
           let isHalfSlideYLine = centerY % (gridSize * 2) < gridSize ? 1:0;
           let idAreaHeightMulti4 = areaHeight % 4 == 0 ? 1:0;
@@ -1089,7 +1089,7 @@ export class RangeRender {
             return { gx: w * gridSize + (gridSize / 2), gy: h * gridSize };
           }
         }
-      default: // スクエア(default)
+      default: // 方格（default）
         return (w, h, gridSize) => {
           return { gx: w * gridSize, gy: h * gridSize };
         }

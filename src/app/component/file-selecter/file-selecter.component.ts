@@ -17,7 +17,7 @@ import { ImageTagList } from '@udonarium/image-tag-list';
 import { trigger, transition, animate, keyframes, style } from '@angular/animations';
 import { FileStorageComponent } from 'component/file-storage/file-storage.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
-import { AppComponent } from 'src/app/app.component';
+import { AppComponent } from '../../app.component';
 import { ChatMessageService } from 'service/chat-message.service';
 
 @Component({
@@ -114,10 +114,10 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnInit() {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'ファイル一覧');
+    Promise.resolve().then(() => this.modalService.title = this.panelService.title = '圖片庫');
     this.searchWords = this.allImagesOwnWords;
     //FileStorageComponent.sortOrder = [null].concat(this.searchWords);
-    // 非表示も含めた数
+    // 含隱藏項目的數量
     //FileStorageComponent.imageCount = ImageStorage.instance.images.length;
   }
 
@@ -210,13 +210,13 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '非表示設定の画像を表示', 
-        text: '非表示設定の画像を表示しますか？',
-        help: 'ネタバレなどにご注意ください。',
+        title: '顯示已設為隱藏的圖片', 
+        text: '要顯示已設為隱藏的圖片嗎？',
+        help: '請注意劇透等內容。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('ファイル一覧 から非表示設定の画像を表示した');
+          this.chatMessageService.sendOperationLog('從圖片庫顯示了已設為隱藏的圖片');
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -226,7 +226,7 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onSelectedFile(file: ImageFile) {
-    // 今のところGameCharacterGeneratorComponentでしか使ってない？
+    // 目前似乎只在 GameCharacterGeneratorComponent 使用？
     //EventSystem.call('SELECT_FILE', { fileIdentifier: file.identifier }, Network.peerId);
     this.modalService.resolve(file.identifier);
   }

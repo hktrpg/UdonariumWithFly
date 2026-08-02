@@ -33,7 +33,7 @@ export class DiceRollTableList extends ObjectNode implements InnerXml {
   }
 
   parseInnerXml(element: Element) {
-    // XMLからの新規作成を許可せず、既存のオブジェクトを更新する
+    // 不允許從 XML 新建，改為更新既有物件
     for (let child of DiceRollTableList.instance.children) {
       child.destroy();
     }

@@ -4,7 +4,7 @@ backend:
   # ACCESS_CONTROL_ALLOW_ORIGIN must match this site's Origin (e.g. https://localhost:4200).
   # Do NOT use nanasunana public workers URL from localhost — it returns 403.
   url: https://{your-backend-hostname}/ #Your Backend API URL
-webrtc: #非推奨（旧SkyWay）
+webrtc: #不建議使用（舊 SkyWay）
   key: aaaaaaaa-bbbb-ccccc-dddd-eeeeeeeeeeee #[deprecated] Your (old) SkyWay API key
 app: #未使用
 dice:

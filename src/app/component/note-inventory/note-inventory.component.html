@@ -13,10 +13,14 @@
 
   <div *ngFor="let gameObject of filteredNotes(); trackBy: trackByGameObject">
     <div class="inventory-object" [class.selected]="selectedIdentifier === gameObject.identifier"
-      (click)="selectNote(gameObject)">
+      (click)="selectNote(gameObject)" (contextmenu)="onContextMenu($event, gameObject)">
       <div class="object-name">
         <strong>{{showgameObject(gameObject)}}</strong>
         <span class="location-badge">{{locationLabel(gameObject)}}</span>
+        <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="menu-btn" title="選單"
+          (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
+          <i class="material-icons" style="font-size: 1em;">settings</i>
+        </button>
         <span *ngIf="!isittable(gameObject)">
           <button type="button" class="move-btn" (click)="settotable(gameObject); $event.stopPropagation()">
             移到桌面
@@ -34,6 +38,6 @@
     </div>
   </div>
 
-  <div *ngIf="filteredNotes().length < 1" class="empty">尚無筆記（桌面上的共有筆記會顯示在這裡）</div>
+  <div *ngIf="filteredNotes().length < 1" class="empty">尚無筆記（桌面上的共用筆記會顯示在這裡）</div>
 </div>
 <div *ngIf="GuestMode()" class="empty">訪客模式無法使用筆記倉庫</div>

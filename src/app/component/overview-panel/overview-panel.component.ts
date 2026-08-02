@@ -337,7 +337,7 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
 
     const viewWidth = areaWidth - offset * 2;
     const viewHeight = areaHeight - offset * 2;
-    // scale使わなかった頃の名残
+    // 尚未使用 scale 時期的殘留
     if ((this.naturalHeight * viewWidth / this.naturalWidth) > viewHeight) {
       rect.width = this.naturalWidth * viewHeight / this.naturalHeight;
       rect.height = viewHeight;

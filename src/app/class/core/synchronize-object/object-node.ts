@@ -6,7 +6,7 @@ import { markForChildrenChanged } from './object-event-extension';
 import { InnerXml, ObjectSerializer, XmlAttributes } from './object-serializer';
 import { ObjectStore } from './object-store';
 
-// 親Nodeの存在が未知の子Node
+// Child Node whose parent is not yet known
 const orphanNodes: { [parentIdentifier: string]: ObjectNode[] } = {};
 
 @SyncObject('node')
@@ -213,7 +213,7 @@ export class ObjectNode extends GameObject implements XmlAttributes, InnerXml {
     let parent = child.parent;
     while (parent) {
       if (identifiers.has(parent.identifier)) {
-        console.error('あ やっべ、循環参照', child);
+        console.error('circular reference detected', child);
         return false;
       }
       if (parent === this) return true;

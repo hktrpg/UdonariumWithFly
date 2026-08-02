@@ -73,7 +73,7 @@ export class SkyWayDataConnectionList implements Iterable<SkyWayDataConnection> 
     conn.close();
     let index = this.connections.indexOf(conn);
     if (0 <= index) {
-      console.log(conn.remoteId + ' is えんいー' + 'index:' + index + ' length:' + this.connections.length);
+      console.log(conn.remoteId + ' is gone ' + 'index:' + index + ' length:' + this.connections.length);
       this.connections.splice(index, 1);
       this.refresh();
     }

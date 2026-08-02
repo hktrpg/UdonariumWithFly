@@ -109,7 +109,7 @@ export class DataElement extends ObjectNode {
       return +this.value;
     } else if (match = this.currentValue.toString().match(/^div(\d+)$/)) {
       return Math.floor(+this.value / +match[1]);
-    // 現状3.0以降のみ
+    // currently 3.0+ only
     } else if (match = this.currentValue.toString().match(/^DnD/)) {
       return Math.floor((+this.value - 10) / 2);
     } else {

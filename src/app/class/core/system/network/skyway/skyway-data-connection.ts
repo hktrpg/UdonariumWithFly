@@ -233,8 +233,8 @@ export class SkyWayDataConnection extends EventEmitter implements WebRTCConnecti
 }
 
 /* 
-SkyWay の DataConnection._startSendLoop() を取り替える.
-setInterval() に由来する遅延を解消するが skyway-js-sdk の更新次第で動作しなくなるので注意.
+Replace SkyWay DataConnection._startSendLoop().
+Removes delay from setInterval(), but may break after skyway-js-sdk updates.
 
 https://github.com/skyway/skyway-js-sdk/blob/master/src/peer/dataConnection.js
 */

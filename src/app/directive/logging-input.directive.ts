@@ -29,34 +29,34 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
   @Input('logging.loggingValue') showValue: boolean = true;
 
   private static LoggingValueMap = new Map<string, LoggingValue>(); 
-  type = 'オブジェクト';
+  type = '物件';
 
   ngAfterViewInit() {
     let elm = <ObjectNode>this.dataElement;
     while (elm = elm.parent) {
       if (elm instanceof Card) {
-        this.type = 'カード';
+        this.type = '卡牌';
       }
       if (elm instanceof CardStack) {
-        this.type = '山札';
+        this.type = '牌堆';
       }
       if (elm instanceof DiceSymbol) {
-        this.type = (elm.isCoin ? 'コイン' : 'ダイス');
+        this.type = (elm.isCoin ? '硬幣' : '骰子');
       }
       if (elm instanceof GameCharacter) {
-        this.type = 'キャラクター';
+        this.type = '角色';
       }
       if (elm instanceof GameTableMask) {
-        this.type = 'マップマスク';
+        this.type = '地圖遮罩';
       }
       if (elm instanceof Terrain) {
         this.type = '地形';
       }
       if (elm instanceof TextNote) {
-        this.type = '共有メモ';
+        this.type = '共用備忘';
       }
       if (elm instanceof RangeArea) {
-        this.type = '射程・範囲';
+        this.type = '射程範圍';
       }
       if (!elm.parentIsAssigned || elm.parentIsUnknown) break;
     }
@@ -64,7 +64,7 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
     const identifier = this.dataElement.identifier;
     const loggingNativeElement = this.elementRef.nativeElement;
     LoggingValueMap.set(identifier, { oldValue: this.dataElement.loggingValue });
-    // input 試してダメだったらイベントで制御考える
+    // 若用 input 不行再改以事件控制
     /*
     LoggingValueMap.set(identifier, { oldValue: this.loggingValue, isEditing: false });
     const startFunc = () => { LoggingValueMap.get(identifier).isEditing = true; };
@@ -84,7 +84,7 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
       }, this.timeout);
     });
 
-    // 汚い、本来初期化要るだろうけどとりあえずコマンドへの対処なのでこのまま
+    // 寫法粗糙；本應初始化，但目前只為對應指令，暫維持現狀
     this.dataElement.changeObserver = () => {
       if (LoggingValueMap.get(identifier).timerId) clearTimeout(LoggingValueMap.get(identifier).timerId);
       LoggingValueMap.get(identifier).timerId = setTimeout(() => {
@@ -122,7 +122,7 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
     const value = this.dataElement.loggingValue;
     const dataElement = this.dataElement;
     if (sendMsssage && !this.isDisable && value != oldValue) {
-      let text = `${this.name == '' ? `(無名の${this.type})` : this.name} の ${dataElement.name == '' ? '(無名の変数)' : dataElement.name} を変更`;
+      let text = `${this.name == '' ? `(無名的${this.type})` : this.name} 的 ${dataElement.name == '' ? '(無名變數)' : dataElement.name} 已變更`;
       if (this.showValue && (dataElement.isSimpleNumber || dataElement.isNumberResource || dataElement.isAbilityScore)) {
         text += ` ${oldValue} → ${value}`;
       } else if (dataElement.isCheckProperty) {

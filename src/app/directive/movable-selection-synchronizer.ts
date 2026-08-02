@@ -306,7 +306,7 @@ function checkOverlapSAT(rectA: IPoint2D[], rectB: IPoint2D[]) {
   let edges = [...getEdges(rectA), ...getEdges(rectB)];
 
   for (let edge of edges) {
-    let axis = { x: -edge.y, y: edge.x }; // 法線ベクトル
+    let axis = { x: -edge.y, y: edge.x }; // 法線向量
     let projA = projectOntoAxis(rectA, axis);
     let projB = projectOntoAxis(rectB, axis);
 
@@ -314,7 +314,7 @@ function checkOverlapSAT(rectA: IPoint2D[], rectB: IPoint2D[]) {
     if (!isProjectionsOverlap) return false;
   }
 
-  return true; // すべての軸で投影が重なるなら接触している
+  return true; // 若各軸投影皆重疊則判定為接觸
 }
 
 function getEdges(points: IPoint2D[]): IPoint2D[] {

@@ -110,7 +110,7 @@ export class ObjectSerializer {
       xmlElement = xml;
     }
     if (!xmlElement) {
-      console.error('xmlElementが空です');
+      console.error('xmlElement is empty');
       return null;
     }
 
@@ -169,8 +169,8 @@ export class ObjectSerializer {
   }
 
   private static attributes2object(split: string[], obj: Object | any[], key: string | number) {
-    // 階層構造の解析 foo.bar.0="abc" 等
-    // 処理として実装こそしているが、xmlの仕様としては良くないので使用するべきではない.
+    // Parse hierarchy like foo.bar.0="abc"
+    // Implemented, but not good XML practice; should not be used.
     let parentObj: Object | Array<any> = null;
     let length = split.length;
     for (let i = 0; i < length; i++) {
@@ -182,7 +182,7 @@ export class ObjectSerializer {
       key = Number.isNaN(index) ? split[i] : index;
 
       if (Array.isArray(obj) && typeof key !== 'number') {
-        console.warn('Arrayにはindexの挿入しか許可しない');
+        console.warn('Array only allows inserting by index');
         return { obj, key: null };
       }
       if (i + 1 < length) {

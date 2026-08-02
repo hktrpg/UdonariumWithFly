@@ -18,13 +18,13 @@ export class RangeArea extends TabletopObject {
   @SyncVar() rotate: number = 0;
   @SyncVar() zindex: number = 0;
   @SyncVar() followingCharctorIdentifier: string = null;
-  @SyncVar() followingCounterDummy: number = 0; // 追従時再描画用ダミー
+  @SyncVar() followingCounterDummy: number = 0; // 追隨時重新繪製用的虛擬值
 
   @SyncVar() offSetX: boolean = false;
   @SyncVar() offSetY: boolean = false;
   @SyncVar() type: string = 'CORN';
   @SyncVar() subDivisionSnapPolygonal: boolean = true;
-  @SyncVar() fillType: number = 1; // 0: 輪郭に合わせて塗る　1: 中心を通る　2:一部を覆う　3:半分を覆う　4:全体を覆う
+  @SyncVar() fillType: number = 1; // 0: 依輪廓填色　1: 通過中心　2: 覆蓋一部分　3: 覆蓋一半　4: 覆蓋全部
   @SyncVar() isExpandByFollowing: boolean = false;
   @SyncVar() isFollowAltitude: boolean = false;
 
@@ -93,7 +93,7 @@ export class RangeArea extends TabletopObject {
 
   following(){
     if(!this.followingCharactor || this.followingCharactor.isHideIn) {
-      //console.log('追従対象見失い');
+      //console.log('lost follow target');
       this.followingCharactor = null;
       return;
     }

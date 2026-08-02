@@ -146,7 +146,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'ジュークボックス');
+    Promise.resolve().then(() => this.modalService.title = this.panelService.title = '音樂播放器');
     this.auditionPlayer.volumeType = VolumeType.AUDITION;
     EventSystem.register(this)
       .on('*', event => {
@@ -199,32 +199,32 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const clientRect = button.getBoundingClientRect();
     const position = { x: window.pageXOffset + clientRect.left + button.clientWidth, y: window.pageYOffset + clientRect.top };
     const menu: ContextMenuAction[] = [
-      { name: 'キャラクター・地形', subActions: [
-        { name: 'キャラクターの移動開始', action: () => { this.playSETest(PresetSound.piecePick); }},
-        { name: 'キャラクターを置く', action: () => { this.playSETest(PresetSound.piecePut); }},
-        { name: '地形の移動開始／終了', action: () => { this.playSETest(PresetSound.blockPick); }},
+      { name: '角色／地形', subActions: [
+        { name: '角色開始移動', action: () => { this.playSETest(PresetSound.piecePick); }},
+        { name: '放置角色', action: () => { this.playSETest(PresetSound.piecePut); }},
+        { name: '地形開始／結束移動', action: () => { this.playSETest(PresetSound.blockPick); }},
       ]},
-      { name: 'ダイス・コイン', subActions: [
-        { name: 'ダイスシンボルを取る', action: () => { this.playSETest(PresetSound.dicePick); }},
-        { name: 'ダイスシンボルを置く', action: () => { this.playSETest(PresetSound.dicePut); }},
-        { name: 'ダイスを振る１', action: () => { this.playSETest(PresetSound.diceRoll1); }},
-        { name: 'ダイスを振る２', action: () => { this.playSETest(PresetSound.diceRoll2); }},
-        { name: 'コイントス', action: () => { this.playSETest(PresetSound.coinToss); }},
+      { name: '骰子／硬幣', subActions: [
+        { name: '拿起骰子符號', action: () => { this.playSETest(PresetSound.dicePick); }},
+        { name: '放置骰子符號', action: () => { this.playSETest(PresetSound.dicePut); }},
+        { name: '擲骰１', action: () => { this.playSETest(PresetSound.diceRoll1); }},
+        { name: '擲骰２', action: () => { this.playSETest(PresetSound.diceRoll2); }},
+        { name: '擲硬幣', action: () => { this.playSETest(PresetSound.coinToss); }},
       ]},
-      { name: 'カード・山札', subActions: [
-        { name: 'カードを引く／裏返す', action: () => { this.playSETest(PresetSound.cardDraw); }},
-        { name: 'カード・山札を取る', action: () => { this.playSETest(PresetSound.cardPick); }},
-        { name: 'カード・山札を置く', action: () => { this.playSETest(PresetSound.cardPut); }},
-        { name: '山札をシャッフル', action: () => { this.playSETest(PresetSound.cardShuffle); }},
+      { name: '卡牌／牌堆', subActions: [
+        { name: '抽牌／翻面', action: () => { this.playSETest(PresetSound.cardDraw); }},
+        { name: '拿起卡牌／牌堆', action: () => { this.playSETest(PresetSound.cardPick); }},
+        { name: '放置卡牌／牌堆', action: () => { this.playSETest(PresetSound.cardPut); }},
+        { name: '洗牌', action: () => { this.playSETest(PresetSound.cardShuffle); }},
       ]},
-      { name: 'その他', subActions: [
-        { name: '固定・ロック／解除', action: () => { this.playSETest(PresetSound.lock); }},
-        { name: '落下／取り除く／削除', action: () => { this.playSETest(PresetSound.sweep); }},
-        { name: 'オブジェクト選択', action: () => { this.playSETest(PresetSound.selectionStart); }},
-        { name: '変身！', action: () => { this.playSETest(PresetSound.surprise); }}
+      { name: '其他', subActions: [
+        { name: '固定／鎖定／解除', action: () => { this.playSETest(PresetSound.lock); }},
+        { name: '落下／移除／刪除', action: () => { this.playSETest(PresetSound.sweep); }},
+        { name: '選擇物件', action: () => { this.playSETest(PresetSound.selectionStart); }},
+        { name: '變身！', action: () => { this.playSETest(PresetSound.surprise); }}
       ]}
     ];
-    this.contextMenuService.open(position, menu, 'SEテスト');
+    this.contextMenuService.open(position, menu, 'SE測試');
   }
 
   private playSETest(audioIdentifier) {

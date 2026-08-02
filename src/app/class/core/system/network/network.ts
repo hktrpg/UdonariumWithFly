@@ -60,7 +60,7 @@ export class Network {
     this.connectionClassPromise = promise;
     this.connectionClass = await promise;
     if (this.connectionClassPromise != promise) {
-      // Promiseがresolveするまでに違うPromiseオブジェクトに置き換わっているならclose()済み
+      // 若在 Promise resolve 前已被換成其他 Promise，表示已 close()
       return;
     }
 
@@ -119,13 +119,13 @@ export class Network {
       }
     }
 
-    // できるだけ一纏めにして送る
+    // 盡量合併後再送出
     if (this.connection) {
       if (broadcast.length) this.connection.send(broadcast);
       for (let sendTo in unicast) this.connection.send(unicast[sendTo], sendTo);
     }
 
-    // 自分自身への送信
+    // 傳送給自己
     if (this.callback.onData) {
       this.callback.onData(null, broadcast);
       this.callback.onData(this.peer, echocast);

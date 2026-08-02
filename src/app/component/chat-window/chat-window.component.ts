@@ -1,6 +1,7 @@
-import { AfterViewInit, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
+import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -76,6 +77,36 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
   }
 
+  /** Mute BGM, sound effects, notice, and audition together. */
+  get isFullMute(): boolean {
+    return AudioPlayer.isMute
+      && AudioPlayer.isSoundEffectMute
+      && AudioPlayer.isNoticeMute
+      && AudioPlayer.isAuditionMute;
+  }
+
+  toggleFullMute() {
+    const next = !this.isFullMute;
+    AudioPlayer.isMute = next;
+    AudioPlayer.isSoundEffectMute = next;
+    AudioPlayer.isNoticeMute = next;
+    AudioPlayer.isAuditionMute = next;
+
+    const persistMute = (key: string, muted: boolean) => {
+      if (muted) {
+        localForage.setItem(key, true).catch(e => console.log(e));
+      } else {
+        localForage.removeItem(key).catch(e => console.log(e));
+      }
+    };
+    persistMute(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY, next);
+    persistMute(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY, next);
+    persistMute(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY, next);
+    persistMute(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY, next);
+
+    EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
+  }
+
   get gameType(): string { return !this.chatMessageService.gameType ? 'DiceBot' : this.chatMessageService.gameType; }
   set gameType(gameType: string) { this.chatMessageService.gameType = gameType; }
 
@@ -97,7 +128,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     public chatMessageService: ChatMessageService,
     private panelService: PanelService,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private changeDetector: ChangeDetectorRef,
   ) { }
 
   GuestMode() {
@@ -119,6 +151,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
           this.checkAutoScroll();
         }
         if (this.isAutoScroll && this.chatTab) this.chatTab.markForRead();
+      })
+      .on('CHANGE_JUKEBOX_VOLUME', event => {
+        this.changeDetector.markForCheck();
       });
     Promise.resolve().then(() => this.updatePanelTitle());
   }
@@ -131,7 +166,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.unregister(this);
   }
 
-  // @TODO やり方はもう少し考えた方がいいい
+  // @TODO 做法應再斟酌
   scrollToBottom(isForce: boolean = false) {
     if (isForce) this.isAutoScroll = true;
     if (!this.isAutoScroll) return;

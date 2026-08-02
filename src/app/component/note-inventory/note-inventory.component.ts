@@ -1,13 +1,17 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
-import { PanelService } from 'service/panel.service';
+import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
+import { PanelOption, PanelService } from 'service/panel.service';
+import { PointerDeviceService } from 'service/pointer-device.service';
 
 type NoteFilterId = 'all' | 'table' | 'other';
 
@@ -35,6 +39,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   constructor(
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
+    private contextMenuService: ContextMenuService,
+    private pointerDeviceService: PointerDeviceService,
   ) { }
 
   GuestMode() {
@@ -64,6 +70,12 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  /** Blank area: block browser menu (item menus call stopPropagation). */
+  @HostListener('contextmenu', ['$event'])
+  onHostContextMenu(e: Event) {
+    e.preventDefault();
   }
 
   refresh() {
@@ -98,8 +110,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   locationLabel(note: TextNote): string {
     const name = note.location?.name || '';
     if (name === 'table') return '桌面';
-    if (name === 'graveyard') return '墓場';
-    if (name === 'common' || !name) return '共有';
+    if (name === 'graveyard') return '回收區';
+    if (name === 'common' || !name) return '公用';
     return '個人';
   }
 
@@ -119,11 +131,95 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   selectNote(note: TextNote) {
     this.selectedIdentifier = note.identifier;
-    EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: note.identifier, className: 'GameCharacter' });
+    EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: note.identifier, className: note.aliasName });
   }
 
   toggleExpand(note: TextNote) {
     this.expandedId = this.expandedId === note.identifier ? '' : note.identifier;
+  }
+
+  onContextMenu(event: Event, gameObject: TextNote) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (this.GuestMode()) return;
+    if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
+    if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+
+    this.selectNote(gameObject);
+
+    const target = event.target as HTMLElement;
+    let position;
+    if (target && target.tagName === 'BUTTON') {
+      const clientRect = target.getBoundingClientRect();
+      position = {
+        x: window.pageXOffset + clientRect.left + target.clientWidth,
+        y: window.pageYOffset + clientRect.top
+      };
+    } else {
+      position = this.pointerDeviceService.pointers[0];
+    }
+
+    const location = gameObject.location?.name || '';
+    const actions: ContextMenuAction[] = [
+      {
+        name: '移到桌面',
+        action: () => {
+          gameObject.setLocation('table');
+          this.refresh();
+        },
+        disabled: location === 'table'
+      },
+      {
+        name: '移至公用區',
+        action: () => {
+          gameObject.setLocation('common');
+          this.refresh();
+        },
+        disabled: location === 'common' || !location
+      },
+      {
+        name: '移至回收區',
+        action: () => {
+          gameObject.setLocation('graveyard');
+          this.refresh();
+        },
+        disabled: location === 'graveyard'
+      },
+      ContextMenuSeparator,
+      { name: '編輯筆記...', action: () => { this.showDetail(gameObject); } },
+      {
+        name: '建立副本',
+        action: () => {
+          const cloneObject = gameObject.clone();
+          cloneObject.isLocked = false;
+          SoundEffect.play(PresetSound.cardPut);
+          this.refresh();
+        }
+      },
+      ContextMenuSeparator,
+      {
+        name: '刪除',
+        action: () => {
+          gameObject.destroy();
+          SoundEffect.play(PresetSound.sweep);
+          this.refresh();
+        }
+      },
+    ];
+
+    this.contextMenuService.open(position, actions, this.showgameObject(gameObject));
+  }
+
+  private showDetail(gameObject: TextNote) {
+    if (this.GuestMode()) return;
+    EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
+    const coordinate = this.pointerDeviceService.pointers[0];
+    let title = '共用筆記設定';
+    if (gameObject.title.length) title += ' - ' + gameObject.title;
+    const option: PanelOption = { title: title, left: coordinate.x - 350, top: coordinate.y - 200, width: 560, height: 470 };
+    const component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
+    component.tabletopObject = gameObject;
   }
 
   trackByGameObject(index: number, gameObject: TextNote) {

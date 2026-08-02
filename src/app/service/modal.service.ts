@@ -22,7 +22,7 @@ export class ModalService {
   private modalContext: ModalContext = null;
   private count = 0;
 
-  title: string = '無名のモーダル';
+  title: string = '無名對話框';
 
   /* Todo */
   static defaultParentViewContainerRef: ViewContainerRef;
@@ -41,7 +41,7 @@ export class ModalService {
       parentViewContainerRef = ModalService.defaultParentViewContainerRef;
     }
     return new Promise<T>((resolve, reject) => {
-      // Injector 作成
+      // 建立 Injector
       const _resolve = (val: T) => {
         if (panelComponentRef) {
           panelComponentRef.destroy();

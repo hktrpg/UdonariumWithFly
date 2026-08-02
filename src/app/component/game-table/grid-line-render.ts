@@ -9,7 +9,7 @@ export class GridLineRender {
   }
 
   private makeBrush(context: CanvasRenderingContext2D, gridSize: number, gridColor: string): CanvasRenderingContext2D {
-    // 座標描画用brush設定
+    // 座標繪製用 brush 設定
     context.strokeStyle = gridColor;
     context.fillStyle = context.strokeStyle;
     context.lineWidth = 1;
@@ -41,7 +41,7 @@ export class GridLineRender {
 
   private generateCalcGridPositionFunc(gridType: GridType): StrokeGridFunc {
     switch (gridType) {
-      case GridType.HEX_VERTICAL: // ヘクス縦揃え
+      case GridType.HEX_VERTICAL: // 六角格縱向對齊
         return (w, h, gridSize) => {
           if ((w % 2) === 1) {
             return { gx: w * gridSize, gy: h * gridSize };
@@ -50,7 +50,7 @@ export class GridLineRender {
           }
         }
 
-      case GridType.HEX_HORIZONTAL: // ヘクス横揃え(どどんとふ互換)
+      case GridType.HEX_HORIZONTAL: // 六角格橫向對齊（相容 DodontoF）
         return (w, h, gridSize) => {
           if ((h % 2) === 1) {
             return { gx: w * gridSize, gy: h * gridSize };
@@ -59,7 +59,7 @@ export class GridLineRender {
           }
         }
 
-      default: // スクエア(default)
+      default: // 方格(default)
         return (w, h, gridSize) => {
           return { gx: w * gridSize, gy: h * gridSize };
         }

@@ -1,5 +1,5 @@
 import { animate, keyframes, state, style, transition, trigger } from '@angular/animations';
-import { Component, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, HostListener, ViewChild, ViewContainerRef } from '@angular/core';
 import { ModalService } from 'service/modal.service';
 
 @Component({
@@ -35,6 +35,20 @@ export class ModalComponent {
 
   constructor(
     public modalService: ModalService) { }
+
+  /** Suppress browser context menu on modals (same as ui-panel / map). */
+  @HostListener('contextmenu', ['$event'])
+  onHostContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('textarea, [contenteditable="true"]')) return;
+    if (target instanceof HTMLInputElement) {
+      const type = (target.type || 'text').toLowerCase();
+      if (type !== 'range' && type !== 'checkbox' && type !== 'radio' && type !== 'button' && type !== 'submit' && type !== 'color' && type !== 'file') {
+        return;
+      }
+    }
+    e.preventDefault();
+  }
 
   clickBackground(event: MouseEvent) {
     if (event.target === event.currentTarget) this.resolve();

@@ -55,7 +55,7 @@ import Autolinker from 'autolinker';
 export class ChatMessageComponent implements OnInit {
   @Input() chatMessage: ChatMessage;
   @Input() compact: boolean = false;
-  @Input() leftOnly: boolean = false; //ToDO あとで切り替え可能に
+  @Input() leftOnly: boolean = false; // TODO: 之後改為可切換
   @ViewChild('edit', { static: false }) editElm: ElementRef<HTMLTextAreaElement>;
 
   imageFile: ImageFile = ImageFile.Empty;
@@ -188,7 +188,7 @@ export class ChatMessageComponent implements OnInit {
     this.isEditing = false;
   }
 
-  // 表示の調整
+  // 顯示調整
   lastNewLineAdjust(str: string): string {
     if (str == null) return '';
     return ((this.isEditing || !(this.chatMessage.isEdited || this.chatMessage.isSecret)) && str.lastIndexOf("\n") == str.length - 1) ? str + "\n" : str;

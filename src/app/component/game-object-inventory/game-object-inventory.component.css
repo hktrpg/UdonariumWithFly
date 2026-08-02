@@ -370,7 +370,7 @@ input[type='range']::-ms-tooltip {
   filter: invert(100%);
 }
 .inverser.black-paint.is-hide-in {
-  filter: brightness(0); /* 汚いけどとりあえず */
+  filter: brightness(0); /* 粗糙但暫且如此 */
 }
 
 .aura {

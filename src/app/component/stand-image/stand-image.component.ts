@@ -90,7 +90,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
   ) { }
 
   onSpeaking(event: any) {
-    //キャラクターの吹き出し表示に合わせる
+    // 配合角色對話泡泡顯示
     if (this.gameCharacter && this.gameCharacter.text && (this.isApplyDialog || this.isSpeakable || this.gameCharacter.isShowChatBubble)) {
       clearTimeout(this._timeoutId);
       this._timeoutId = setTimeout(() => {
@@ -99,7 +99,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
         });
       }, 12000);
     }
-    //ToDO エモート時画像
+    // TODO: 表情（emote）時的圖片
     if (this.isSpeakable && !this.gameCharacter.isEmote) {
       clearTimeout(this._dialogTimeoutId);
       if (this.gameCharacter && this.gameCharacter.text) {
@@ -129,7 +129,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
     return StandImageComponent.isCanBeGone;
   }
 
-  //ToDO 共通化、とりあえず2回まではコピペOKのルール
+  // TODO: 應共用化；暫定複製貼上兩次以內可接受
   set dialog(dialog) {
     if (!this.gameCharacter || (this.gameCharacter.location.name === 'table' && !this.gameCharacter.isHideIn) || this.gameCharacter.location.name === 'graveyard') return;
     clearTimeout(this._dialogTimeoutId);
@@ -142,7 +142,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
     let rubyLength = 0;
 
     if (!isEmote) {
-      text = text.replace(/[。、]{3}/g, '…').replace(/[。、]{2}/g, '‥').replace(/(。|[\r\n]{2,})/g, "$1                            ").trimEnd(); //改行や。のあと時間を置くためのダーティハック
+      text = text.replace(/[。、]{3}/g, '…').replace(/[。、]{2}/g, '‥').replace(/(。|[\r\n]{2,})/g, "$1                            ").trimEnd(); // 在換行或句號後留時間的 dirty hack
       while ((ary = re.exec(text)) !== null) {
         let offset = ary.index - (count * 3);
         rubys.push({base: ary[1], ruby: ary[2], start: offset - rubyLength, end: offset + ary[1].length - rubyLength - 1});
@@ -343,7 +343,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
   }
 
   get groupValue(): number {
-    // セキュリティ目的のハッシュではないのでとりあえず
+    // 非安全用途雜湊，暫且如此
     let hash = 0;
     const str = this.group;
     for (let i = 0; i < str.length; i++) {
@@ -427,7 +427,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
   get isApplyImageEffect(): boolean {
     if (!this.standElement || !this.gameCharacter) return false;
     let elm = this.standElement.getFirstElementByName('applyImageEffect');
-    // 真偽判定のもっといい方法ない？
+    // 真偽判定有沒有更好的做法？
     if (elm && elm.value) {
       return true;
     }

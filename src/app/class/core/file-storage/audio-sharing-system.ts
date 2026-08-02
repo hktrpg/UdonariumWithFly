@@ -46,7 +46,7 @@ export class AudioSharingSystem {
           }
         }
 
-        // Peer切断時などのエッジケースに対応する
+        // Handle edge cases such as Peer disconnect
         if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < AudioStorage.instance.getCatalog().length) {
           AudioStorage.instance.synchronize(event.sendFrom);
         }
@@ -86,7 +86,7 @@ export class AudioSharingSystem {
             EventSystem.call(event, peerId);
             return;
           }
-          console.log('REQUEST_FILE_RESOURE AudioStorageService あぶれた...' + event.data.receiver, randomRequest.length);
+          console.log('REQUEST_FILE_RESOURE AudioStorageService overflow...' + event.data.receiver, randomRequest.length);
         }
       })
       .on('UPDATE_AUDIO_RESOURE', 1000, event => {

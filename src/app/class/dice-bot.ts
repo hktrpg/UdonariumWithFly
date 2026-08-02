@@ -211,8 +211,8 @@ export class DiceBot extends GameObject {
   }
 
   static async rollCommandAsync(diceCommand: string, gameType='DiceBot', isTableFormat=false): Promise<DiceRollResult> {
-    //const text: string = StringUtil.toHalfWidth(diceCommand).replace("\u200b", ''); //ゼロ幅スペース削除
-    const text: string = diceCommand.replace("\u200b", ''); //ゼロ幅スペース削除
+    //const text: string = StringUtil.toHalfWidth(diceCommand).replace("\u200b", ''); // remove zero-width space
+    const text: string = diceCommand.replace("\u200b", ''); // remove zero-width space
     const regArray = /^(([sＳｓ][rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[sＳｓ][rＲｒ][eＥｅ][pＰｐ]|[rＲｒ][eＥｅ][pＰｐ]|[sＳｓ][xＸｘ]|[xＸｘ])?([\d０-９]+)?[ 　]+)?([^\n]*)?/ig.exec(text);
     const repCommand =  StringUtil.toHalfWidth(regArray[2]);
     const isRepSecret = repCommand && StringUtil.toHalfWidth(repCommand).toUpperCase().indexOf('S') === 0;
@@ -223,7 +223,7 @@ export class DiceBot extends GameObject {
 
     if (!rollText || repeat <= 0) return finalResult;
 
-    //ダイスボット表
+    // 骰子機器人表
     let isDiceRollTableMatch = false;
     for (const diceRollTable of DiceRollTableList.instance.diceRollTables) {
       if (diceRollTable.command == null) continue;
@@ -245,7 +245,7 @@ export class DiceBot extends GameObject {
         modStr = modStr.split(' ')[0];
         if (/^[\+\-]\d+$/.test(modStr)) {
           modifier = +modStr;
-          modStr = ` (修正${modStr})`;
+          modStr = ` (修正值${modStr})`;
         } else if (/^\=\-?\d+$/.test(modStr)) {
           isFixedRef = true;
         } else {
@@ -256,7 +256,7 @@ export class DiceBot extends GameObject {
       if (isDiceRollTableMatch) {
         finalResult.isFailure = false;
         finalResult.isDiceRollTable = true;
-        finalResult.tableName = (diceRollTable.name && diceRollTable.name.length > 0) ? diceRollTable.name : '(無名のダイスボット表)';
+        finalResult.tableName = (diceRollTable.name && diceRollTable.name.length > 0) ? diceRollTable.name : '(無名骰子機器人表)';
         finalResult.isSecret = isSecret || isRepSecret;
         const diceRollTableRows = diceRollTable.parseText();
         for (let i = 0; i < repeat && i < 32; i++) {
@@ -290,11 +290,11 @@ export class DiceBot extends GameObject {
           if (!isRowMatch) {
             if (rollResultNumber == null) {
               finalResult.isFailure = true;
-              finalResult.result += ('（エラー：ダイスロールから数字が取得できません）' + "\n" + '(結果なし)');
+              finalResult.result += ('（錯誤：無法從擲骰結果取得數字）' + "\n" + '(無結果)');
             } else if (!isFixedRef) {
-              finalResult.result += (rollResult.result + modStr + (modStr ? ` → ${rollResultNumber + modifier}`: '') + "\n" + '(結果なし)');
+              finalResult.result += (rollResult.result + modStr + (modStr ? ` → ${rollResultNumber + modifier}`: '') + "\n" + '(無結果)');
             } else {
-              finalResult.result += ('指定=' + rollResultNumber + "\n" + '(結果なし)');
+              finalResult.result += ('指定=' + rollResultNumber + "\n" + '(無結果)');
             }
           }
           if (1 < repeat) finalResult.result += ` #${i + 1}`;
@@ -304,9 +304,9 @@ export class DiceBot extends GameObject {
       }
     }
     if (!isDiceRollTableMatch) {
-      // スペース区切りのChoiceコマンドへの対応
+      // Support space-separated Choice commands
       let isChoice = false;
-      //ToDO バージョン調べる
+      // TODO: check version
       let choiceMatch;
       if (choiceMatch = /^([sＳｓ]?[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ][\d０-９]*)([ 　]+|[\\￥][sｓ])([^\n]*)/ig.exec(rollText.trim())) {
         //if (choiceMatch[2] && choiceMatch[2] !== '' && !DiceRollTableList.instance.diceRollTables.map(diceRollTable => diceRollTable.command).some(command => command != null && command.trim().toUpperCase() === choiceMatch[1].toUpperCase())) {
@@ -343,15 +343,15 @@ export class DiceBot extends GameObject {
       //console.log(rollText);
       if (DiceBot.apiUrl) {
         //rollText = StringUtil.toHalfWidth(rollText).trim().split(/\s+/)[0].replace(/[ⅮÐ]/g, 'D').replace(/×/g, '*').replace(/÷/g, '/').replace(/[―ー—‐]/g, '-');
-        // すべてBCDiceに投げずに回数が1回未満かchoice[]が含まれるか英数記号以外は門前払い
-        //ToDO APIのバージョン調べて新しければCOMMAND_PATTERN使う？（いつ読み込もう？）
+        // Reject early if count < 1, contains choice[], or non-alnum/symbols without sending all to BCDice
+        // TODO: check API version and use COMMAND_PATTERN if new?
         if (!isChoice && !/^[a-zA-Z0-9!-/:-@¥[-`{-~\}]+$/.test(rollText)) return;
-        //BCDice-API の繰り返し機能を利用する、結果の形式が縦に長いのと、更新していないBCDice-APIサーバーもありそうなのでまだ実装しない
+        // BCDice-API repeat feature not used yet (tall result format / outdated servers)
         //finalResult = await DiceBot.diceRollAsync(repCommand ? (repCommand + repeat + ' ' + rollText) : rollText, gameType, repCommand ? 1 : repeat);
         finalResult = await DiceBot.diceRollAsync(rollText, gameType, repeat);
         finalResult.isSecret = finalResult.isSecret || isRepSecret;
       } else {
-        // 読み込まれていないダイスボットのロード、COMMAND_PATTERN使用
+        // Load unloaded dicebot and use COMMAND_PATTERN
         const gameSystem = await DiceBot.loadGameSystemAsync(gameType);
         if (!gameSystem.COMMAND_PATTERN.test(rollText)) return;
         for (let i = 0; i < repeat && i < 32; i++) {
@@ -439,7 +439,7 @@ export class DiceBot extends GameObject {
     };
 
     let matchMostLongText = '';
-    // ダイスボットへのスタンドの反応
+    // Stand reaction to dicebot
     const gameCharacter = ObjectStore.instance.get(originalMessage.characterIdentifier);
     if (gameCharacter instanceof GameCharacter) {
       const standInfo = gameCharacter.standList.matchStandInfo(result, originalMessage.imageIdentifier);
@@ -485,7 +485,7 @@ export class DiceBot extends GameObject {
     }
 
     const chatTab = ObjectStore.instance.get<ChatTab>(originalMessage.tabIdentifier);
-    // ダイスによるカットイン発生
+    // Cut-in triggered by dice
     const cutInInfo = CutInList.instance.matchCutInInfo(result);
     if (!isSecret && chatTab.isUseStandImage && cutInInfo) {
       for (const identifier of cutInInfo.identifiers) {
@@ -509,19 +509,19 @@ export class DiceBot extends GameObject {
         for (const name of cutInInfo.names) {
           let count = counter.get(name) || 0;
           count += 1;
-          counter.set(name == '' ? '(無名のカットイン)' : name, count);
+          counter.set(name == '' ? '(無名過場)' : name, count);
         }
         const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
-        this.chatMessageService.sendOperationLog(text + ' が起動した');
+        this.chatMessageService.sendOperationLog(text + ' 已啟動');
       }
     }
 
-    // 切り取り
+    // trim
     if (matchMostLongText.length < cutInInfo.matchMostLongText.length) matchMostLongText = cutInInfo.matchMostLongText;
     if (matchMostLongText && diceBotMessage.text) {
       diceBotMessage.text = diceBotMessage.text.slice(0, diceBotMessage.text.length - matchMostLongText.length);
     }
-    // フォーマット
+    // format
     if (!rollResult.isDiceRollTable) diceBotMessage.text = DiceBot.formatRollResult(diceBotMessage.text, id);
 
     if (originalMessage.to != null && 0 < originalMessage.to.length) {
@@ -607,11 +607,11 @@ export class DiceBot extends GameObject {
         .then(jsons => {
           return jsons.map(json => {
             if (DiceBot.apiVersion == 1 && json.systeminfo && json.systeminfo.info) {
-              return json.systeminfo.info.replace('部屋のシステム名', 'チャットパレットなどのシステム名');
+              return json.systeminfo.info.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱');
             } else if (json.help_message) {
-              return json.help_message.replace('部屋のシステム名', 'チャットパレットなどのシステム名');
+              return json.help_message.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱');
             } else {
-              return 'ダイスボット情報がありません。';
+              return '沒有骰子機器人資訊。';
             }
           })
         });
@@ -622,9 +622,9 @@ export class DiceBot extends GameObject {
         if (gameType && gameType != '' && gameType != 'DiceBot') {
           let gameSystem = await DiceBot.loadGameSystemAsync(gameType);
           if (gameSystem && gameSystem.ID != 'DiceBot' && gameSystem.HELP_MESSAGE) {
-            help.push(gameSystem.HELP_MESSAGE.replace('部屋のシステム名', 'チャットパレットなどのシステム名'));
+            help.push(gameSystem.HELP_MESSAGE.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱'));
           } else {
-            help.push('ダイスボット情報がありません。');
+            help.push('沒有骰子機器人資訊。');
           }
         }
       } catch (e) {
@@ -647,8 +647,8 @@ export class DiceBot extends GameObject {
 
   private static formatRollResult(result: string, id='DiceBot'): string {
     if (result == null) return '';
-    let coc7thFARCount = 0; //ToDo CoC他ゲームごとの処理メソッド分離
-    let coc7thBonusDiceCount = 0; //ToDo CoC他ゲームごとの処理メソッド分離
+    let coc7thFARCount = 0; // TODO: split CoC and other game-specific handlers
+    let coc7thBonusDiceCount = 0; // TODO: split CoC and other game-specific handlers
     return result.split("\n").map(resultLine => {
       let addDiceInfos = [];
       let barabaraDiceInfos = [];

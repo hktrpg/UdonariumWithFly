@@ -136,7 +136,7 @@ export class InputHandler {
       if (touch == null) {
         let isTouchContinues = Array.from(e.touches).find(touch => touch.identifier === this.primaryPointer.identifier) != null;
         if (!isTouchContinues) {
-          // タッチを追跡できなくなったら終了
+          // 無法再追蹤觸控時結束
           if (this.onEnd) this.onEnd(e);
           this.cancel();
         }

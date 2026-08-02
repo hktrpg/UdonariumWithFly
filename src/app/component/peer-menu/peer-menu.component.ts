@@ -111,7 +111,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.panelService.title = '連接情報'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => { this.panelService.title = '連線資訊'; this.panelService.isAbleFullScreenButton = false });
   }
 
   ngAfterViewInit() {
@@ -163,7 +163,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
       if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('GMモードを解除');
+        this.chatMessageService.sendOperationLog('解除 GM 模式');
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
@@ -174,7 +174,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
       if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('GMモードを解除');
+        this.chatMessageService.sendOperationLog('解除 GM 模式');
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
@@ -235,9 +235,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyPassword() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: 'パスワードのコピー', 
-        text: 'パスワードをクリップボードにコピーしますか？',
-        helpHtml: 'パスワードを共有する際には、SNSの公開アカウントなどで<b>不特定多数に公開することは避けて</b>ください。',
+        title: '複製密碼', 
+        text: '要將密碼複製到剪貼簿嗎？',
+        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
@@ -256,13 +256,13 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyRoomInfo() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: 'ルーム情報のコピー', 
-        text: 'ルーム情報（ルーム名/ルームID、パスワード）をクリップボードにコピーしますか？',
-        helpHtml: 'パスワードを共有する際には、SNSの公開アカウントなどで<b>不特定多数に公開することは避けて</b>ください。',
+        title: '複製房間資訊', 
+        text: '要將房間資訊（房間名稱/房間 ID、密碼）複製到剪貼簿嗎？',
+        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
-          navigator.clipboard.writeText('ルーム名：' + this.networkService.peer.roomName + '/' + this.networkService.peer.roomId + '  パスワード：' + this.networkService.peer.password);
+          navigator.clipboard.writeText('房間名稱：' + this.networkService.peer.roomName + '/' + this.networkService.peer.roomId + '  密碼：' + this.networkService.peer.password);
           this.isRoomInfoCopied = true;
           clearTimeout(this._timeOutId4);
           this._timeOutId4 = setTimeout(() => {
@@ -284,9 +284,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: 'パスワードの表示', 
-        text: 'パスワードを表示しますか？',
-        helpHtml: 'プレイ配信中などに誤ってパスワードを表示しないように注意してください。<br>またパスワードを共有する際には、SNSの公開アカウントなどで<b>不特定多数に公開することは避けて</b>ください。',
+        title: '顯示密碼', 
+        text: '要顯示密碼嗎？',
+        helpHtml: '直播時請注意不要讓密碼出現在畫面上。<br>分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
@@ -303,22 +303,22 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       if (this.isGMMode) {
         $event.preventDefault();
         this.modalService.open(ConfirmationComponent, {
-          title: 'GMモード解除', 
-          text: 'GMモードを解除しますか？',
+          title: '解除 GM 模式', 
+          text: '要解除 GM 模式嗎？',
           type: ConfirmationType.OK_CANCEL,
           materialIcon: 'person_remove',
           action: () => {
             PeerCursor.isGMHold = false;
             this.isGMMode = false;
             (<HTMLInputElement>$event.target).checked = false;
-            this.chatMessageService.sendOperationLog('GMモードを解除');
+            this.chatMessageService.sendOperationLog('解除 GM 模式');
             EventSystem.trigger('CHANGE_GM_MODE', null);
             //this.changeDetector.markForCheck();
             if (GameCharacter.isStealthMode) {
               this.modalService.open(ConfirmationComponent, {
-                title: 'ステルスモード', 
-                text: 'ステルスモードになります。',
-                help: '位置を自分だけ見ているキャラクターが1つ以上テーブル上にある間、あなたのカーソル位置は他の参加者に伝わりません。',
+                title: '隱身模式', 
+                text: '已開啟隱身：其他人看不到你的游標位置。',
+                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
                 type: ConfirmationType.OK,
                 materialIcon: 'disabled_visible'
               });
@@ -332,9 +332,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: 'GMモードになる', 
-        text: 'GMモードになりますか？\nGMモード中（保留中含む）はあなたからプライベート接続、ルームへの接続は行えません。',
-        helpHtml: 'GMモードでは、<b>秘話</b>、裏向きの<b>カード</b>、公開されていない<b>ダイスシンボル</b>、<b>キャラクター</b>位置、<b>カーソル</b>位置をすべて見ることができ、あなたのカーソル位置は他の参加者に伝わらなくなります。\n\n<b><big>—With great power comes great responsibility.</big></b>',
+        title: '進入 GM 模式', 
+        text: '要進入 GM 模式嗎？\nGM 模式中（含保留中）無法由你發起私人連線或房間連線。',
+        helpHtml: 'GM 模式下可查看全部<b>密語</b>、背面的<b>卡片</b>、未公開的<b>骰子符號</b>、<b>角色</b>位置與<b>游標</b>位置，且你的游標位置不會傳送給其他參加者。\n\n<b><big>—With great power comes great responsibility.</big></b>',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'person_add',
         action: () => {
@@ -343,9 +343,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
           (<HTMLInputElement>$event.target).checked = true;
           //this.changeDetector.markForCheck();
           this.modalService.open(ConfirmationComponent, {
-            title: 'GMモードになる', 
-            text: 'まだGMモードではありません。',
-            helpHtml: 'GMモードになるには、チャットから <b>GMになる</b> または <b>GMになります</b> を含む文を送信します。',
+            title: '進入 GM 模式', 
+            text: '目前尚未進入 GM 模式。',
+            helpHtml: '要進入 GM 模式，請在聊天傳送含 <b>GMになる</b> 或 <b>GMになります</b> 的訊息（此為系統觸發關鍵字，請原樣輸入）。',
             type: ConfirmationType.OK,
             materialIcon: 'person_add'
           });

@@ -1,13 +1,13 @@
 <div id="app-table-layer" style="position: absolute; width: 100%; height: 100%; overflow: hidden;">
   <game-table></game-table>
 </div>
-<ui-panel (rotateEvent)="rotateChange($event)" [top]="0" [left]="0" [width]="100" [height]="765" [title]="'功能表'" [isAbleFullScreenButton]="false" [isAbleCloseButton]="false"  [isAbleRotateButton]="true">
+<ui-panel (rotateEvent)="rotateChange($event)" [top]="0" [left]="0" [width]="100" [height]="765" [title]="'選單'" [isAbleFullScreenButton]="false" [isAbleCloseButton]="false"  [isAbleRotateButton]="true">
   <nav [ngClass]="{'horizontal': isHorizontal, 'vertical': !isHorizontal}">
     <ul>
       <li (click)="open('PeerMenuComponent')">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">people</i></div>
-          <div>連接</div>
+          <div>連線</div>
         </a>
       </li>
       <li (click)="open('ChatWindowComponent')">
@@ -55,7 +55,7 @@
       <li (click)="diceAllOpne()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">all_out</i></div>
-          <div>骰子一齊公開</div>
+          <div>一次公開桌面骰子</div>
         </a>
       </li>
       <li (click)="standSetteings($event)">
@@ -96,7 +96,7 @@
         <a routerLink="/" routerLinkActive="active">
           <label>
             <div><i class="material-icons">logout</i></div>
-            <div>退出／切斷</div>
+            <div>斷開連線</div>
           </label>
         </a>
       </li>

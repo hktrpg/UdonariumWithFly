@@ -7,23 +7,23 @@ export enum PeerSessionGrade {
 
 export interface PeerSessionState {
   /**
-   * 接続方法の評価. `PeerSessionGrade.LOW`よりも`PeerSessionGrade.HIGH`の方がより望ましい方法で通信している事を示す.
+   * Connection method grade. Higher than `PeerSessionGrade.LOW` means a more desirable method.
    */
   readonly grade: PeerSessionGrade;
   /**
-   * データ送信に対する宛先からの応答時間(Round-Trip Time). 単位はms.
+   * Round-trip time to the destination in ms.
    */
   readonly ping: number;
   /**
-   * 接続の健康度を`[0.0, 1.0]`の区間で表現した値. 値が1.0より低い場合、通信が切断している可能性がある.
+   * Connection health in `[0.0, 1.0]`. Below 1.0 may mean the connection is dropping.
    */
   readonly health: number;
   /**
-   * 通信速度の評価を`[0.0, 1.0]`の区間で表現した値. 値が高いほど通信速度が速い.
+   * Speed score in `[0.0, 1.0]`. Higher is faster.
    */
   readonly speed: number;
   /**
-   * 接続についての任意の説明.
+   * Optional description of the connection.
    */
   readonly description: string;
 }

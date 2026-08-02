@@ -14,7 +14,7 @@ export class ImageTagList extends ObjectNode implements InnerXml {
   static searchImages(searchWords: string[], noTag: boolean, isOr: boolean, isShowHideImages: boolean): ImageFile[]
   static searchImages(searchWords: any, noTag, isOr, isShowHideImages: boolean): ImageFile[] {
     if (typeof searchWords === 'string') searchWords = searchWords.trim().split(/\s+/);
-    // 検索単語は画像タグのすべての単語に含まれるもののみ(noTagの処理は呼び出し側でやってて実装がひどい、要修正)
+    // Search terms must be included in all image-tag words (noTag handled by caller; messy, needs fix)
     const allWords = ImageTagList.allImagesOwnWords(isShowHideImages);
     searchWords = searchWords.filter(searchWord => allWords.includes(searchWord));
     const images = this.allImages(isShowHideImages);
@@ -126,7 +126,7 @@ export class ImageTagList extends ObjectNode implements InnerXml {
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
-    ObjectStore.instance.remove(this); // ObjectStoreには登録しない
+    ObjectStore.instance.remove(this); // 不登錄到 ObjectStore
   }
 
   innerXml(): string {

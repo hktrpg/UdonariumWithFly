@@ -55,7 +55,7 @@ export class AppConfigService {
 
   private async initAppConfig() {
     try {
-      console.log('YAML読み込み...');
+      console.log('Loading YAML...');
       let config = await this.loadYaml();
       let obj = yaml.load(config);
       AppConfigService.applyConfig(obj);

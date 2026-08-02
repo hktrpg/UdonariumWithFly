@@ -1,5 +1,5 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
-import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -63,7 +63,7 @@ export class UIPanelComponent implements OnInit {
   private preWidth: number = 100;
   private preHeight: number = 100;
 
-  // 今はメニューだけなのでとりあえず
+  // 目前只有選單，暫且如此
   private horizontalWidth: number = 1092;
   private horizontalHeight: number = 100;
   private verticalWidth: number = 0;
@@ -82,6 +82,20 @@ export class UIPanelComponent implements OnInit {
 
   ngOnInit() {
     this.panelService.scrollablePanel = this.scrollablePanel.nativeElement;
+  }
+
+  /** Suppress browser context menu on panels (custom menus handle right-click). */
+  @HostListener('contextmenu', ['$event'])
+  onHostContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('textarea, [contenteditable="true"]')) return;
+    if (target instanceof HTMLInputElement) {
+      const type = (target.type || 'text').toLowerCase();
+      if (type !== 'range' && type !== 'checkbox' && type !== 'radio' && type !== 'button' && type !== 'submit' && type !== 'color' && type !== 'file') {
+        return;
+      }
+    }
+    e.preventDefault();
   }
 
   toggleMinimize(e: Event = null) {

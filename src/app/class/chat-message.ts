@@ -124,7 +124,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
 
-  //とりあえず
+  // for now
   private locale = 'en-US';
   
   complement(): void {
@@ -138,7 +138,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   };
 
   plainText(): string {
-    if (this.isSecret && !this.isSendFromSelf) return '（シークレットダイス）';
+    if (this.isSecret && !this.isSendFromSelf) return '（暗骰）';
     let text = StringUtil.rubyToText(this.text);
     if (this.isDicebot) text = text.replace(/###(.+?)###/g, '*$1').replace(/\~\~\~(.+?)\~\~\~/g, '~$1');
     return text;
@@ -156,14 +156,14 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     tabName = (!tabName || tabName.trim() == '') ? '' : `[${ tabName }] `;
     const dateStr = (dateFormat == '') ? '' : formatDate(new Date(this.timestamp), dateFormat, this.locale) + '：';
     const lastUpdateStr = !this.isEdited ? '' : 
-      (dateFormat == '') ? ' (編集済)' : ` (編集済 ${ formatDate(new Date(this.lastUpdate), dateFormat, this.locale) })`;
+      (dateFormat == '') ? ' (已編輯)' : ` (已編輯 ${ formatDate(new Date(this.lastUpdate), dateFormat, this.locale) })`;
     let text = StringUtil.rubyToText(this.text);
     if (this.isDicebot) text = text.replace(/###(.+?)###/g, '*$1').replace(/\~\~\~(.+?)\~\~\~/g, '~$1');
     if (text.lastIndexOf('\n') == text.length - 1 && !lastUpdateStr) {
-      // 最終行の調整
+      // Adjust the last line
       text += "\n";
     }
-    return `${ tabName }${ dateStr }${ this.name }${ this.toColor ? (' ➡ ' + this.toName) : '' }：${ (this.isSecret && !this.isSendFromSelf) ? '（シークレットダイス）' : text + lastUpdateStr }`
+    return `${ tabName }${ dateStr }${ this.name }${ this.toColor ? (' ➡ ' + this.toName) : '' }：${ (this.isSecret && !this.isSendFromSelf) ? '（暗骰）' : text + lastUpdateStr }`
   }
 
   logFragmentHtml(tabName: string=null, dateFormat='HH:mm', imageDict?: {}): string {
@@ -200,7 +200,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
     let textAutoLinkedHtml: string;
     if (this.isSecret && !this.isSendFromSelf) {
-      textAutoLinkedHtml = '<s>（シークレットダイス）</s>';
+      textAutoLinkedHtml = '<s>（暗骰）</s>';
     } else {
       let tmpStr = this.isOperationLog ? StringUtil.escapeHtml(this.text) : StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text));
       textAutoLinkedHtml = tmpStr.split("\n").map(line => {
@@ -233,15 +233,15 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
     let lastUpdateHtml = '';
     if (this.isEdited) {
       if (dateFormat == '') {
-        lastUpdateHtml = '<span class="is-edited">編集済</span>';
+        lastUpdateHtml = '<span class="is-edited">已編輯</span>';
       } else {
         const lastUpdate = new Date(this.lastUpdate);
-        lastUpdateHtml = `<span class="is-edited"><b>編集済</b> <time datetime="${ lastUpdate.toISOString() }">${ StringUtil.escapeHtml(formatDate(lastUpdate, dateFormat, this.locale)) }</time></span>`;
+        lastUpdateHtml = `<span class="is-edited"><b>已編輯</b> <time datetime="${ lastUpdate.toISOString() }">${ StringUtil.escapeHtml(formatDate(lastUpdate, dateFormat, this.locale)) }</time></span>`;
       }
     }
     
     if (textAutoLinkedHtml.lastIndexOf('\n') == textAutoLinkedHtml.length - 1 && !lastUpdateHtml) {
-      // 最終行の調整
+      // Adjust the last line
       textAutoLinkedHtml += "\n";
     }
     if (isWithImage) {

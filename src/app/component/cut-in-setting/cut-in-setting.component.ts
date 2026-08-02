@@ -177,7 +177,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   ) { }
 
   ngOnInit(): void {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'カットイン設定');
+    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'CutIn 設定');
     EventSystem.register(this)
       .on('SYNCHRONIZE_AUDIO_LIST', -1000, event => {
         this.onAudioFileChange();
@@ -203,7 +203,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     this.selectedCutInXml = '';
   }
 
-  create(name: string = 'カットイン'): CutIn {
+  create(name: string = 'CutIn'): CutIn {
     return CutInList.instance.addCutIn(name)
   }
 
@@ -298,13 +298,13 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '非表示設定の画像を表示', 
-        text: '非表示設定の画像を表示しますか？',
-        help: 'ネタバレなどにご注意ください。',
+        title: '顯示隱藏設定的圖片', 
+        text: '要顯示隱藏設定的圖片嗎？',
+        help: '請注意劇透等內容。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('カットイン設定 から非表示設定の画像を表示した');
+          this.chatMessageService.sendOperationLog('從 CutIn 設定顯示了隱藏設定的圖片');
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -329,7 +329,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     } else {
       EventSystem.call('PLAY_CUT_IN', sendObj);
-      this.chatMessageService.sendOperationLog((cutIn.name == '' ? '(無名のカットイン)' : cutIn.name) + ' を再生した');
+      this.chatMessageService.sendOperationLog('播放了 ' + (cutIn.name == '' ? '(無名的 CutIn)' : cutIn.name));
     }
   }
 
@@ -372,7 +372,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openYouTubeTerms() {
-    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: 'YouTube 利用規約' });
+    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: 'YouTube 服務條款' });
     return false;
   }
 
@@ -380,28 +380,26 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
     let textView = this.panelService.open(TextViewComponent, option);
-    textView.title = 'カットインヘルプ';
+    textView.title = 'CutIn 說明';
     textView.text = 
-`　カットインの名前、表示時間、位置と幅と高さ（それぞれ画面サイズに対する相対指定）、チャット送信時にカットインが表示される条件を設定できます。また、動画を再生する場合および「見切れ防止」にチェックを入れた場合、画面内に収まるように位置とサイズが調整されます。
+`　可設定 CutIn 的名稱、顯示時間、位置與寬高（皆為相對畫面尺寸）、以及發送聊天時顯示 CutIn 的條件。另外，播放影片時以及勾選「防止超出畫面」時，會調整位置與尺寸以收進畫面內。
 
-　チャット末尾一致を判定する際、全角半角、アルファべットの大文字小文字は区別されません。また、他のBCDiceを利用するオンラインセッションツールとの互換性のため、チャット末尾一致を判定する際、両側にスペースが入った “ ＞ ” と “ → ” を同値とみなします。
+　判定聊天末尾是否符合時，不區分全形半形、英文字母大小寫。另外為了與其他使用 BCDice 的線上團工具相容，判定時會將兩側有空白的「 ＞ 」與「 → 」視為相同。
 　
-　横位置（PosX）と縦位置（PosY）は、画面の左上隅からカットインの中心位置までの距離となります。サイズの幅（Width）と高さ（Height）のどちらかを0とした場合、元画像の縦横比を保って拡大縮小します（ただし、カットインの最小幅、高さは${CutInComponent.MIN_SIZE}ピクセルとなります）。
+　橫位置（PosX）與縱位置（PosY）是從畫面左上角到 CutIn 中心的距離。尺寸的寬（Width）與高（Height）任一為 0 時，會維持原圖片長寬比縮放（不過 CutIn 的最小寬高為 ${CutInComponent.MIN_SIZE} 像素）。
 　
-　動画を再生するカットインは必ず前面、その他は後から表示されるカットイン画像がより前面になりますが、重なり順（Z-Index）を指定することで制御可能です。同じカットイン、動画を再生するカットイン、同じタグが指定されたカットインを再生する場合は、以前のものは停止します。また、チャット末尾条件を満たすカットインが複数ある場合、
+　播放影片的 CutIn 一定在最前面，其他則是後顯示的 CutIn 圖片會更前面，但可透過重疊順序（Z-Index）控制。播放相同 CutIn、播放影片的 CutIn、或相同標籤的 CutIn 時，先前的會停止。另外，若符合聊天末尾條件的 CutIn 有多個：
 
-　　・タグが設定されていないものはすべて
-　　・タグが設定されたものは、同じタグのものの中からランダムに1つ
-　　・動画を再生するカットインは上記の中からランダムに1つを選択
+　　- 未設定標籤的全部播放
+　　- 有設定標籤的，從相同標籤之中隨機選 1 個
+　　- 播放影片的 CutIn 從上述之中再隨機選 1 個
 
-となります。
+　CutIn 可用拖曳移動（播放影片的 CutIn 請拖邊緣）。另可雙擊關閉（僅自己停止）、右鍵從選單操作（可「關閉」「顯示在視窗後方」「最小化」；播放影片的 CutIn 請在邊緣操作）。
 
-　カットインはドラッグによって移動可能です（動画を再生するカットインは端をドラッグ）。またダブルクリックで閉じる（自分だけ停止）、右クリックでコンテキストメニューから操作が可能です（「閉じる」「ウィンドウの背面に表示」「最小化」が可能、動画を再生するカットインは端で受付）。
+　可將上傳的音樂檔案設為 CutIn 顯示時的音效。音量依「音樂播放器」設定（「測試（僅本人看見）」時使用試聽音量）。CutIn 與房間存檔（zip）不含音樂檔，需要時請另外上傳（連結依檔案內容判定，即使檔名相同也不會自動重新連結）。
 
-　アップロードされた音楽ファイルをカットイン表示時の効果音として設定できます。音量にはジュークボックスの設定（「テスト (自分だけ見る)」の場合は試聴音量）が使用されます。カットインや部屋のセーブデータ（zip）には音楽ファイルは含まれませんので、必要でしたら別途アップロードしてください（カットインと音楽ファイルのリンクはファイルの内容によります、同名の別ファイルをアップロードしても再リンクされません）。
+　因顯示時間（Duration）或手動操作而停止 CutIn 時，即使尚未播完，影片／音效也會結束。另外，若音效／影片結束時設為「停止 CutIn」，會優先於顯示時間而停止。
 
-　表示時間（Duration）や手動操作によってカットインが停止した際には、途中であっても動画・効果音も終了します。また、効果音・動画の終了時に「カットインを停止」する設定の場合、表示時間に優先して停止します。
-
-　カットインに動画を使用する場合、URLは現在YouTubeのもののみ有効です。動画を利用する際は権利者およびYouTubeの定めた利用規約を参照し、順守してください。`;
+　CutIn 使用影片時，目前僅支援 YouTube 網址。使用影片時請參照並遵守權利人與 YouTube 訂定的服務條款。`;
   }
 }

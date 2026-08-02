@@ -70,9 +70,9 @@ export class SkyWayConnection implements Connection {
 
   connect(peer: IPeerContext): boolean {
     if (!this.peer.isRoom) {
-      console.warn('connect() is Fail. ルーム接続のみ可能');
+      console.warn('connect() is Fail. Room connection only');
       let errorType = 'udonarium-unsupported';
-      let errorMessage = '現在のユドナリウムでSkyWay(2023)を使用する場合、プライベート接続は利用できません。ルーム接続機能を利用してください。';
+      let errorMessage = '在目前的 Udonarium 使用 SkyWay(2023) 時，無法使用私人連線。請改用房間連線功能。';
       if (this.callback.onError) this.callback.onError(this.peer, errorType, errorMessage, {});
       return false;
     }
@@ -86,7 +86,7 @@ export class SkyWayConnection implements Connection {
 
   private shouldConnect(peerId: string): boolean {
     if (!this.skyWay.isOpen) {
-      console.log('connect() is Fail. IDが割り振られるまで待てや');
+      console.log('connect() is Fail. Wait until ID is assigned');
       return false;
     }
 
@@ -309,7 +309,7 @@ export class SkyWayConnection implements Connection {
     for (let peerId of relayingPeerIds) {
       let conn = this.streams.find(peerId);
       if (conn && conn.open) {
-        console.log('<' + peerId + '> 転送しなきゃ・・・');
+        console.log('<' + peerId + '> need to forward...');
         conn.send(container);
       }
     }

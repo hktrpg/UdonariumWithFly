@@ -75,7 +75,7 @@ export class ImageTag extends ObjectNode {
   }
 
   parseInnerXml(element: Element) {
-    // 既存のオブジェクトを更新する
+    // 更新既有物件
     let imageTag = ImageTag.get(this.imageIdentifier);
     if (!imageTag) imageTag = ImageTag.create(this.imageIdentifier);
     const context = imageTag.toContext();

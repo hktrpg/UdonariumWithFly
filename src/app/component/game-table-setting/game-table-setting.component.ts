@@ -55,7 +55,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableGridShow(tableGridShow: boolean) {
     this.tableSelecter.gridShow = tableGridShow;
     if (tableGridShow) this.tableSelecter.viewTable.gridClipRect = null;
-    EventSystem.trigger('UPDATE_GAME_OBJECT', this.tableSelecter.toContext()); // 自分にだけイベントを発行してグリッド更新を誘発
+    EventSystem.trigger('UPDATE_GAME_OBJECT', this.tableSelecter.toContext()); // 僅對自己發送事件以觸發格線更新
   }
 
   get tableGridSnap(): boolean { return this.tableSelecter.gridSnap; }
@@ -69,7 +69,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   get tableGridNumberShow(): boolean { return this.selectedTable.isShowNumber; }
   set tableGridNumberShow(isShowNumber: boolean) {
     this.selectedTable.isShowNumber = isShowNumber;
-    EventSystem.trigger('UPDATE_GAME_OBJECT', this.tableSelecter.toContext()); // 自分にだけイベントを発行してグリッド更新を誘発
+    EventSystem.trigger('UPDATE_GAME_OBJECT', this.tableSelecter.toContext()); // 僅對自己發送事件以觸發格線更新
   }
 
   get tableDistanceviewFilter(): FilterType { return this.selectedTable.backgroundFilterType; }
@@ -107,7 +107,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = 'テーブル設定' });
+    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '地圖設定' });
     this.selectedTable = this.tableSelecter.viewTable;
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 2000, event => {
@@ -137,7 +137,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   createGameTable() {
     if (this.GuestMode()) return;
     let gameTable = new GameTable();
-    gameTable.name = '白紙のテーブル';
+    gameTable.name = '空白地圖';
     gameTable.imageIdentifier = 'testTableBackgroundImage_image';
     gameTable.initialize();
     this.selectGameTable(gameTable.identifier);
@@ -221,13 +221,13 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '非表示設定の画像を表示', 
-        text: '非表示設定の画像を表示しますか？',
-        help: 'ネタバレなどにご注意ください。',
+        title: '顯示隱藏設定的圖片', 
+        text: '要顯示設為隱藏的圖片嗎？',
+        help: '請注意劇透等內容。',
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('テーブル設定 から非表示設定の画像を表示した');
+          this.chatMessageService.sendOperationLog('從地圖設定顯示了隱藏設定的圖片');
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();

@@ -1,4 +1,4 @@
-// 試験実装中
+// 試驗實作中
 export class Database<T> {
   readonly version: number = 1;
   readonly databaseName: string;
@@ -19,9 +19,8 @@ export class Database<T> {
       let request = indexedDB.open(this.databaseName, this.version);
       request.onblocked = event => {
         console.warn('request.onblocked');
-        // 他のタブがデータベースを読み込んでいる場合は、処理を進める前に
-        // それらを閉じなければなりません。
-        //alert('このサイトを開いている他のタブをすべて閉じてください!');
+        // If other tabs have the database open, close them before continuing.
+        //alert('Please close all other tabs that have this site open!');
       };
       request.onupgradeneeded = event => {
         console.log('request.onupgradeneeded');
@@ -68,14 +67,14 @@ export class Database<T> {
   }
 
   private initializeDB(database: IDBDatabase): IDBDatabase {
-    // 別のページがバージョン変更を求めた場合に、通知されるようにするためのハンドラを追加するようにしてください。
-    // データベースを閉じなければなりません。データベースを閉じると、別のページがデータベースをアップグレードできます。
-    // これを行わなければ、ユーザがタブを閉じるまでデータベースはアップグレードされません。
+    // Add a handler so we are notified when another page requests a version change.
+    // The database must be closed so the other page can upgrade it.
+    // Otherwise upgrade waits until the user closes the tab.
     database.onversionchange = event => {
       console.warn('database.onversionchange.');
       database.close();
       this.openDBPromise = null;
-      //alert('新しいバージョンのページが使用可能になりました。再読み込みしてください!');
+      //alert('A new version of the page is available. Please reload!');
     };
     database.onabort = database.onerror = event => console.error(event);
     return database;

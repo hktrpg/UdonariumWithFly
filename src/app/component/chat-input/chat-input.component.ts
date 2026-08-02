@@ -54,10 +54,6 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     return ChatWindowComponent.ClarifyMode;
   }
 
-  ClarifyModeChanged() {
-    ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
-  }
-
   @Input('gameType') _gameType: string = '';
   @Output() gameTypeChange = new EventEmitter<string>();
   get gameType(): string { return this._gameType };
@@ -277,7 +273,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         }
         */
       }).on('DELETE_GAME_OBJECT', event => {
-        // this.onlyCharacters が真の場合はパネルが閉じる前提
+        // this.onlyCharacters 為真時，前提是面板會關閉
         if (!this.onlyCharacters && this.sendFrom === event.data.identifier) {
           this.sendFrom = this.myPeer.identifier;
           this.onChangeSendFromList();
@@ -435,26 +431,26 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       let matchMostLongText = '';
       let standIdentifier = null;
       const delayRefs: string[] = [];
-      // ステータス操作
+      // 狀態操作
       if (text != '' && /^[\\￥]+[:：]/.test(text)) {
-        // コマンド全体のエスケープ
+        // 對整個指令跳脫
         text = text.replace(/[\\￥]([:：])/, '$1');
       } else if (text != '' && StringUtil.toHalfWidth(text).startsWith(':')) {
         if (!targetCharacter) {
-          this.chatMessageService.sendOperationLog('コマンドエラー：対象がキャラクターではない');
+          this.chatMessageService.sendOperationLog('指令錯誤：對象不是角色');
         } else {
           const commandsInfo = StringUtil.parseCommands(targetCharacter.chatPalette.evaluate(text.substring(1), targetCharacter.rootDataElement));
           text = commandsInfo.endString;
           if (commandsInfo.commands.length) {
             //await (async () => {
-              const loggingTexts: string[] = [`${targetCharacter.name == '' ? '(無名のキャラクター)' : targetCharacter.name} へのコマンド：${commandsInfo.commandString}`];
+              const loggingTexts: string[] = [`${targetCharacter.name == '' ? '(未命名角色)' : targetCharacter.name} 的指令：${commandsInfo.commandString}`];
               let isDiceRoll = false;
               for (let i = 0; i < commandsInfo.commands.length; i++) {
                 let rollResult = null;
-                // ステータス操作のみ
+                // 僅狀態操作
                   try {
                   const command = commandsInfo.commands[i];
-                  if (command.isIncomplete) throw '→ コマンドエラー：コマンド不完全：' + command.targetName;
+                  if (command.isIncomplete) throw '→ 指令錯誤：指令不完整：' + command.targetName;
 
                   const targetName = targetCharacter.chatPalette.evaluate(command.targetName, targetCharacter.rootDataElement, delayRefs);
                   const operator = StringUtil.toHalfWidth(command.operator);
@@ -488,7 +484,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                     }
                   }
                   
-                  if (!target) throw `→ コマンドエラー：${(StringUtil.cr(targetName).trim() == '') ? '(無名の変数)' : StringUtil.cr(targetName).trim()} は見つからなかった`;
+                  if (!target) throw `→ 指令錯誤：${(StringUtil.cr(targetName).trim() == '') ? '(未命名變數)' : StringUtil.cr(targetName).trim()} 找不到`;
 
                   oldValue = target.loggingValue;
                   let value = null;
@@ -529,9 +525,9 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                   if (value == null 
                     || (rollResult && rollResult.isDiceRollTable && rollResult.isFailure) 
                     || (isOperateNumber && value !== '' && isNaN(value))) {
-                    throw `→ ${target.name == '' ? '(無名の変数)' : target.name} を操作 → コマンドエラー：` + command.operator + command.value;
+                    throw `→ ${target.name == '' ? '(未命名變數)' : target.name} 操作 → 指令錯誤：` + command.operator + command.value;
                   } else if (target.isUrl && !StringUtil.validUrl(StringUtil.cr(value))) {
-                    throw `→ ${target.name == '' ? '(無名の変数)' : target.name} を操作 → URL不正：` + command.value;
+                    throw `→ ${target.name == '' ? '(未命名變數)' : target.name} 操作 → URL 不正確：` + command.value;
                   }
                   //console.log(value)
                   if (operator === '>') {
@@ -596,16 +592,16 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                       target.value = (isNaN(value) || value === '') ? StringUtil.cr(value).replace(/(:?\r\n|\r|\n)/g, ' ') : parseInt(value);
                     }
                   } else {
-                    throw `→ ${target.name === '' ? '(無名の変数)' : target.name} を操作 → コマンドエラー：` + command.operator + command.value;
+                    throw `→ ${target.name === '' ? '(未命名變數)' : target.name} 操作 → 指令錯誤：` + command.operator + command.value;
                   }
                   const newValue = target.loggingValue;
-                  let loggingText = `→ ${target.name === '' ? '(無名の変数)' : target.name} を操作`;
+                  let loggingText = `→ ${target.name === '' ? '(未命名變數)' : target.name} 操作`;
                   if (isOperateNumber) {
-                    loggingText += ` ${oldValue} → ${oldValue === newValue ? '変更なし' : newValue}`;
+                    loggingText += ` ${oldValue} → ${oldValue === newValue ? '無變更' : newValue}`;
                   } else if (target.isCheckProperty) {
-                    loggingText += `${oldValue === newValue ? ' 変更なし' : newValue}`
+                    loggingText += `${oldValue === newValue ? ' 無變更' : newValue}`
                   } else {
-                    loggingText += ` "${oldValue}" → ${oldValue === newValue ? '変更なし' : '"' + newValue + '"'}`;
+                    loggingText += ` "${oldValue}" → ${oldValue === newValue ? '無變更' : '"' + newValue + '"'}`;
                   }
                   if (rollResult) {
                     if (rollResult.isDiceRollTable) {
@@ -620,7 +616,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                   delayRefs.push(delayRef != null ? delayRef : '');
                   //console.log(delayRefs)
                 } catch (error) {
-                  // 横着、例外設計すべき
+                  // 偷懶寫法，應改為例外設計
                   if (error instanceof Error) throw error;
                   loggingTexts.push(error);
                   delayRefs.push('');
@@ -641,10 +637,10 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       }
       if (targetCharacter) {
         text = targetCharacter.chatPalette.evaluate(text, targetCharacter.rootDataElement, delayRefs);
-        // スタンド
-        // 空文字でもスタンド反応するのは便利かと思ったがメッセージ送信後にもう一度エンター押すだけで誤爆するので指定時のみ
+        // 立繪（stand）
+        // 曾考慮空字串也觸發立繪較方便，但送出訊息後再按 Enter 易誤觸，故僅在有指定時觸發
         if (StringUtil.cr(text).trim() || standName) {
-          // 立ち絵
+          // 立繪
           if (targetCharacter.standList) {
             let imageIdentifier = null;
             if (isUseFaceIcon && targetCharacter.faceIcon) {
@@ -679,7 +675,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           }
         }
       }
-      // カットイン
+      // 過場動畫（cut-in）
       const cutInInfo = CutInList.instance.matchCutInInfo(text);
       if (isUseStandImageOnChatTab && cutInInfo) {
         for (const identifier of cutInInfo.identifiers) {
@@ -703,18 +699,18 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           for (const name of cutInInfo.names) {
             let count = counter.get(name) || 0;
             count += 1;
-            counter.set(name == '' ? '(無名のカットイン)' : name, count);
+            counter.set(name == '' ? '(未命名過場)' : name, count);
           }
           const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
-          this.chatMessageService.sendOperationLog(text + ' が起動した');
+          this.chatMessageService.sendOperationLog(text + ' 已啟動');
         }
       }
-      // 切り取り
+      // 裁切
       if (matchMostLongText.length < cutInInfo.matchMostLongText.length) matchMostLongText = cutInInfo.matchMostLongText;
       text = text.slice(0, text.length - matchMostLongText.length);
       // 💭
       if (this.isUseChatBalloon && isUseStandImageOnChatTab && targetCharacter && StringUtil.cr(text).trim()) {
-        // CHOICEコマンドの引数は💭としない
+        // CHOICE 指令的引數不當作 💭
         const regArray = /^(([sＳｓ][rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[sＳｓ][rＲｒ][eＥｅ][pＰｐ]|[rＲｒ][eＥｅ][pＰｐ]|[sＳｓ][xＸｘ]|[xＸｘ])?([\d０-９]+)?[ 　]+)?([\s\S]*)?/igm.exec(text);
         let dialogText = (regArray[4] != null) ? regArray[4].trim() : text.trim();
         let choiceMatch;
@@ -725,10 +721,10 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           dialogText = dialogText.slice(choiceMatch[1].length)
         }
         //console.log(dialogText)
-        //💭はEvant機能使うようにする
+        //💭 改為使用 Event 功能
         const dialogRegExp = /「+([\s\S]+?)」/gm;
         // const dialogRegExp = /(?:^|[^\￥])「([\s\S]+?[^\￥])」/gm; 
-        //ToDO ちゃんとパースする
+        // TODO: 應正確解析
         let match;
         let dialog = [];
         if ((match = dialogRegExp.exec(dialogText)) !== null) {
@@ -741,7 +737,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           }
         }
         if (dialog.length > 0) {
-          //連続💭とりあえずやめる（複数表示できないかな）
+          // 連續 💭 暫時停用（能否同時顯示多個？）
           //const dialogs = [...dialog, null];
           //const gameCharacter = this.character;
           //const color = this.color;
@@ -769,7 +765,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
 
       if (PeerCursor.isGMHold && !sendTo && !PeerCursor.myCursor.isGMMode && /GM(?:モード)?にな(?:ります|る)/i.test(StringUtil.toHalfWidth(text))) {
         PeerCursor.myCursor.isGMMode = true;
-        this.chatMessageService.sendOperationLog('GMモードになった');
+        this.chatMessageService.sendOperationLog('已進入 GM 模式');
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
 
@@ -816,7 +812,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       let gameName: string = '骰子機械人';
       for (let diceBotInfo of DiceBot.diceBotInfos) {
         if (diceBotInfo.id === this.gameType) {
-          gameName = 'ダイスボット〈' + diceBotInfo.game + '〉'
+          gameName = '骰子機器人〈' + diceBotInfo.game + '〉'
         }
       }
       gameName += '使用法';
@@ -840,7 +836,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       this.contextMenuService.open(
         position, 
         [
-          { name: '連接情報...', action: () => {
+          { name: '連線資訊...', action: () => {
             this.panelService.open(PeerMenuComponent, { width: 520, height: 600, top: position.y - 100, left: position.x - 100 });
           } }
         ],
@@ -853,7 +849,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     }
     
     let contextMenuActions: ContextMenuAction[] = [
-      { name: '「」を入力', 
+      { name: '輸入「」', 
         action: () => {
           let textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
           let text = this.text.trim();
@@ -922,19 +918,19 @@ export class ChatInputComponent implements OnInit, OnDestroy {
               }),
             (this.character.isBlackPaint
               ? {
-                name: '☑ 塗成黑色', action: () => {
+                name: '☑ 設為黑色剪影', action: () => {
                   this.character.isBlackPaint = false;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               } : {
-                name: '☐ 塗成黑色', action: () => {
+                name: '☐ 設為黑色剪影', action: () => {
                   this.character.isBlackPaint = true;
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 },
                 checkBox: 'check'
               }),
-              { name: '光環', action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} 無`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['ブラック', 'ブルー', 'グリーン', 'シアン', 'レッド', 'マゼンタ', 'イエロー', 'ホワイト'].map((color, i) => {  
+              { name: '光環', action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} 無`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑', '藍', '綠', '青', '紅', '洋紅', '黃', '白'].map((color, i) => {  
                 return { name: `${this.character.aura == i ? '◉' : '○'} ${color}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
               })) },
             ContextMenuSeparator,
@@ -954,7 +950,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //if (this.character.faceIcons.length > 1) {
           contextMenuActions.push(ContextMenuSeparator);
           contextMenuActions.push({
-            name: '改變大頭貼icon',
+            name: '改變大頭貼',
             action: null,
             subActions: this.character.faceIcons.map((faceIconImage, i) => {
               return { 

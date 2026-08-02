@@ -17,7 +17,7 @@ export class Room extends GameObject implements InnerXml {
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
-    ObjectStore.instance.remove(this); // ObjectStoreには登録しない
+    ObjectStore.instance.remove(this); // 不登錄到 ObjectStore
   }
 
   innerXml(): string {

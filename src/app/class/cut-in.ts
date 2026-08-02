@@ -17,21 +17,21 @@ export class CutIn extends ObjectNode {
   @SyncVar() posY: number = 50;
   @SyncVar() zIndex: number = 0;
   @SyncVar() objectFitType: number = 0; //0:fill 1:cover
-  @SyncVar() animationType: number = 0 // 0:フェード 1:バウンス 3:オープン
-  @SyncVar() borderStyle: number = 0 // 0:なし 1:あり　いまのところ有無だけ
+  @SyncVar() animationType: number = 0 // 0:淡入淡出 1:彈跳 3:開啟
+  @SyncVar() borderStyle: number = 0 // 0:無 1:有　目前僅有無
   @SyncVar() isFrontOfStand: boolean = false;
   @SyncVar() isPreventOutBounds: boolean = true;
   @SyncVar() imageIdentifier: string = ImageFile.Empty.identifier;
 
   @SyncVar() isVideoCutIn: boolean = false;
   @SyncVar() videoUrl: string = '';
-  // 規約準拠のため常時falseに変更 ToDO 取り除く
+  // 為符合條款一律改為 false TODO: 移除
   isSoundOnly: boolean = false;
 
   @SyncVar() audioFileName: string = '';
   @SyncVar() audioIdentifier: string = '';
   //@SyncVar() isLoop: boolean = false;
-  @SyncVar() endedActionType: number = 1 // 0:なにもしない 1:閉じる 2:繰り返す;
+  @SyncVar() endedActionType: number = 1 // 0:什麼都不做 1:關閉 2:重複;
 
   get videoId(): string {
     if (!this.isVideoCutIn || !this.videoUrl) return '';
@@ -53,7 +53,7 @@ export class CutIn extends ObjectNode {
         return '';
       }
     } else {
-      // IDだけを許可すべきか？
+      // 是否只應允許 ID？
       return ret = '';
     }
     return ret.replace(/[\<\>\/\:\s\r\n]/g, '');
@@ -83,7 +83,7 @@ export class CutIn extends ObjectNode {
     return '';
   }
 
-  // リストから再生機能はとりあえず凍結
+  // 從列表播放的功能暫時凍結
   get playListId(): string {
     if (!this.isVideoCutIn || !this.videoId) return '';
     let ret = '';

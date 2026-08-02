@@ -18,7 +18,7 @@ export class StandImageService {
   show(gameCharacter: GameCharacter, standElement: DataElement, color: string=null, isSecret=false) {
     let isNewbee = true;
     for (const pair of StandImageService.currentStandImageShowing) {
-      // 型を厳密にやりつつkey, valueをもう少し楽にイテレートできないか？
+      // 能否在保持型別嚴格的同時更輕鬆地迭代 key, value？
       const identifier = pair[0];
       const standImageComponentRef = pair[1];
       if (!standImageComponentRef) continue;
@@ -73,7 +73,7 @@ export class StandImageService {
 
   destroyAll() {
     for (const pair of StandImageService.currentStandImageShowing) {
-      // 型を厳密にやりつつkey, valueをもう少し楽にイテレートできないか？
+      // 能否在保持型別嚴格的同時更輕鬆地迭代 key, value？
       const identifier = pair[0];
       const standImageComponentRef = pair[1];
       if (!standImageComponentRef) continue;

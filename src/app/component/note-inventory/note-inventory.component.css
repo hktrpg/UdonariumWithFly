@@ -51,8 +51,15 @@
   border-color: #444;
 }
 
-.refresh, .move-btn, .expand-btn {
+.refresh, .move-btn, .expand-btn, .menu-btn {
   cursor: pointer;
+}
+
+.menu-btn {
+  font-size: 0.8em;
+  padding: 2px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .move-btn {

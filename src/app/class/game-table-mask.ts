@@ -16,7 +16,7 @@ export class GameTableMask extends TabletopObject {
   @SyncVar() isScratchPreviewOnGMMode = false;
   @SyncVar() isPreview = false;
 
-  @SyncVar() borderType = 1; // 0:非表示 1:非ロック時のみ表示 2:常に表示
+  @SyncVar() borderType = 1; // 0:不顯示 1:僅未鎖定時顯示 2:一律顯示
 
   get name(): string { return this.getCommonValue('name', ''); }
   get width(): number { return this.getCommonValue('width', 1); }

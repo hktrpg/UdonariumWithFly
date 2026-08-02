@@ -7,7 +7,7 @@
   "scope": "./",
   "id": "/",
   "start_url": "./",
-  "lang": "ja",
+  "lang": "zh-Hant",
   "icons": [
     {
       "src": "assets/icons/icon-72x72m.jpg",
@@ -120,5 +120,5 @@
        "form_factor": "narrow"
      }
   ],
-  "description": "改造版ユドナリウム（Udonarium）。高度、チャットテキストの個人カラー、立ち絵（ユドナリウムだとキャラクターの画像と紛らわしいのでスタンドと呼称）など。"
+  "description": "改造版 Udonarium（Udonarium with Fly）。高度、聊天文字個人顏色、立繪（原版易與角色圖片混淆，故稱作立繪）等功能。"
 }

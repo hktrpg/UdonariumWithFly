@@ -2,7 +2,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "declaration": false,
@@ -23,19 +22,19 @@
     ],
     "paths": {
       "@udonarium/*": [
-        "src/app/class/*"
+        "./src/app/class/*"
       ],
       "directive/*": [
-        "src/app/directive/*"
+        "./src/app/directive/*"
       ],
       "component/*": [
-        "src/app/component/*"
+        "./src/app/component/*"
       ],
       "pipe/*": [
-        "src/app/pipe/*"
+        "./src/app/pipe/*"
       ],
       "service/*": [
-        "src/app/service/*"
+        "./src/app/service/*"
       ]
     }
   },

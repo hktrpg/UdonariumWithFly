@@ -48,20 +48,20 @@ async function fetchSkyWayAuthToken(url: string, channelName: string, peerId: st
 }
 
 /**
- * SkyWayAuthTokenを生成するモック実装.
- * 
- * **シークレットキーはフロントエンドでは秘匿されている必要があります. この実装を本番環境で運用しないでください.**
- * 
- * サーバを構築せずにフロントエンドでSkyWayAuthTokenを生成した場合、
- * シークレットキーをエンドユーザが取得できるため、誰でも任意のChannelやRoomを生成して参加できる等のセキュリティ上の問題が発生します.
- * 
- * @param channelName 接続するチャンネルの名称
+ * Mock implementation that generates SkyWayAuthToken.
+ *
+ * **The secret key must stay hidden from the frontend. Do not use this in production.**
+ *
+ * If you generate SkyWayAuthToken on the frontend without a server,
+ * end users can obtain the secret key and create/join arbitrary Channels/Rooms.
+ *
+ * @param channelName Channel name to connect
  * @param peerId PeerId
  * @returns JWT
  */
 async function createSkyWayAuthTokenMock(channelName: string, peerId: string): Promise<string> {
-  // モック実装のため、アプリケーションIDとシークレットキーは固定値
-  // 本番環境ではシークレットキーをサーバなどに置いて秘匿する
+  // Mock: application ID and secret key are fixed values
+  // In production, keep the secret key on a server
   const _appId = '<SkyWay2023 Application ID>';
   const _secret = '<SkyWay2023 Secret key>';
 

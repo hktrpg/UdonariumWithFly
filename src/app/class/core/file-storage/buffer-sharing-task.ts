@@ -55,7 +55,7 @@ export class BufferSharingTask<T> {
 
   start(data?: T) {
     if (!this.onstart) {
-      console.warn('再起動する仕様など無い。');
+      console.warn('No restart behavior is defined.');
       return;
     }
     this.data = data;
@@ -110,7 +110,7 @@ export class BufferSharingTask<T> {
     let total = Math.ceil(this.uint8Array.byteLength / this.chankSize);
     this.chanks = new Array(total);
 
-    console.log('チャンク分割 ' + this.identifier, this.chanks.length);
+    console.log('chunk split ' + this.identifier, this.chanks.length);
 
     EventSystem.register(this)
       .on<number>('FILE_MORE_CHANK_' + this.identifier, event => {
@@ -123,11 +123,11 @@ export class BufferSharingTask<T> {
       })
       .on('DISCONNECT_PEER', event => {
         if (event.data.peerId !== this.sendTo) return;
-        console.warn('送信キャンセル（Peer切断）', this, event.data.peerId);
+        console.warn('send canceled (peer disconnected)', this, event.data.peerId);
         this._cancel();
       })
       .on('CANCEL_TASK_' + this.identifier, event => {
-        console.warn('送信キャンセル', this, event.sendFrom);
+        console.warn('send canceled', this, event.sendFrom);
         this._cancel();
       });
     this.sentChankIndex = this.completedChankIndex = 0;
@@ -142,7 +142,7 @@ export class BufferSharingTask<T> {
     this.sentChankIndex = index;
     this.sendChankTimer = null;
     if (this.chanks.length <= index + 1) {
-      console.log('バッファ送信完了', this.identifier);
+      console.log('buffer send complete', this.identifier);
       this.outputTransferRate(this.uint8Array.byteLength);
       setZeroTimeout(() => this.finish());
     } else if (this.completedChankIndex + this.bufferingChankRange <= index) {
@@ -176,17 +176,17 @@ export class BufferSharingTask<T> {
       })
       .on('DISCONNECT_PEER', event => {
         if (event.data.peerId !== this.sendTo) return;
-        console.warn('受信キャンセル（Peer切断）', this, event.data.peerId);
+        console.warn('receive canceled (peer disconnected)', this, event.data.peerId);
         this._cancel();
       })
       .on('CANCEL_TASK_' + this.identifier, event => {
-        console.warn('受信キャンセル', this, event.sendFrom);
+        console.warn('receive canceled', this, event.sendFrom);
         this._cancel();
       });
   }
 
   private finishReceive() {
-    console.log('バッファ受信完了', this.identifier);
+    console.log('buffer receive complete', this.identifier);
 
     let sumLength = 0;
     for (let chank of this.chanks) { sumLength += chank.byteLength; }

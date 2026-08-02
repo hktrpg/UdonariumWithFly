@@ -51,7 +51,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   get roomName():string {
     let roomName = Network.peer && 0 < Network.peer.roomName.length
       ? Network.peer.roomName
-      : 'ルームデータ';
+      : '房間資料';
     return roomName;
   }
 
@@ -68,7 +68,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = 'チャットログ出力'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '聊天日誌輸出'; this.panelService.isAbleFullScreenButton = false });
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 1000, event => {
         if (this.selectedTabs.length == 0 || !event.data.identifier) return;
@@ -108,14 +108,14 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   saveLog() {
     if (this.GuestMode()) return;
     if (this.isDisable) return;
-    const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? '全てのタブ' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、他' : ''));
+    const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? '全部標籤' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、其他' : ''));
     const tabs = this.isAllTabs ? null : this.selectedTabs;
     this.saveDataService.saveChatLog(this.logFormat, fileName, tabs, this.dateFormat, this.isWriteOerationLog);
   }
 
   async saveLogWithImages() {
     if (this.isDisable) return;
-    const fileName = this.roomName + '_chatLogWithImages_' + (this.isAllTabs ? '全てのタブ' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、他' : ''));
+    const fileName = this.roomName + '_chatLogWithImages_' + (this.isAllTabs ? '全部標籤' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、其他' : ''));
     const tabs = this.isAllTabs ? null : this.selectedTabs;
 
     this.isSaveing = true;

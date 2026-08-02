@@ -13,7 +13,7 @@
   height: 1.3rem;
   width: 1.3rem; 
 }
-/* ブラウザハック */
+/* 瀏覽器 hack */
 @-moz-document url-prefix() {
   .ff-flex {
     display: flex;

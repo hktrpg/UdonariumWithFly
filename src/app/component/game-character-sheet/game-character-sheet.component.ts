@@ -121,26 +121,26 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
             case 'card':
               const card = this.tabletopObject;
               if (card instanceof Card) { 
-                this.panelService.title = `カード設定 - ${card.isFront ? this.tabletopObjectName : 'カード（裏面）'}`;
+                this.panelService.title = `卡片設定 - ${card.isFront ? this.tabletopObjectName : '卡片（背面）'}`;
               } 
               break;
             case 'card-stack':
-              this.panelService.title = `山札設定 - ${this.tabletopObjectName}`;
+              this.panelService.title = `牌堆設定 - ${this.tabletopObjectName}`;
               break;
             case 'table-mask':
-              this.panelService.title = `マップマスク設定 - ${this.tabletopObjectName}`;
+              this.panelService.title = `地圖遮罩設定 - ${this.tabletopObjectName}`;
               break;
             case 'text-note':
-              this.panelService.title = `共有メモ設定 - ${this.tabletopObjectName}`;
+              this.panelService.title = `共用筆記設定 - ${this.tabletopObjectName}`;
               break;
             case 'dice-symbol':
-              this.panelService.title = `ダイスシンボル設定 - ${this.tabletopObjectName}`;
+              this.panelService.title = `骰子符號設定 - ${this.tabletopObjectName}`;
               break;
             case 'character':
-              this.panelService.title = `キャラクターシート - ${this.tabletopObjectName}`;
+              this.panelService.title = `角色卡 - ${this.tabletopObjectName}`;
               break;
             case 'range':
-              this.panelService.title = `射程・範囲設定 - ${this.tabletopObjectName}`;
+              this.panelService.title = `射程／範圍設定 - ${this.tabletopObjectName}`;
               break;
           }
         }
@@ -149,8 +149,8 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   ngAfterViewInit() {
     queueMicrotask(() => {
-      const title = (this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? 'カード設定 - カード（裏面）' : this.panelService.title;
-      this.chatMessageService.sendOperationLog(`${title} を開いた`);
+      const title = (this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? '卡片設定 - 卡片（背面）' : this.panelService.title;
+      this.chatMessageService.sendOperationLog(`${title} 已開啟`);
     });
   }
 
@@ -164,8 +164,8 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   addDataElement() {
     if (this.tabletopObject.detailDataElement) {
-      let title = DataElement.create('見出し', '', {});
-      let tag = DataElement.create('タグ', '', {});
+      let title = DataElement.create('標題', '', {});
+      let tag = DataElement.create('標籤', '', {});
       title.appendChild(tag);
       this.tabletopObject.detailDataElement.appendChild(title);
     }
@@ -245,7 +245,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
     //let element = this.tabletopObject.commonDataElement.getFirstElementByName('name') || this.tabletopObject.commonDataElement.getFirstElementByName('title');
     //let objectName: string = element ? <string>element.value : '';
-    const objectName = ((this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? 'カード' : this.tabletopObjectName);
+    const objectName = ((this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? '卡片' : this.tabletopObjectName);
 
     await this.saveDataService.saveGameObjectAsync(this.tabletopObject, 'fly_xml_' + objectName, percent => {
       this.progresPercent = percent;
@@ -279,18 +279,18 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty, currentImageIdentifires: currentImageIdentifires }).then(value => {
       if (!this.tabletopObject || !this.tabletopObject.imageDataElement || !value) return;
       if (name == 'shadowImageIdentifier') {
-        // 影はメイン画像のcurrentValueとする
+        // 陰影以主圖的 currentValue 為準
         const element = this.tabletopObject.imageElement;
         if (element) {
           if (element.value != 'null') element.currentValue = value;
-          // 過去の処理で作ったゴミを消す
+          // 清除過去處理留下的垃圾資料
           const garbages = this.tabletopObject.imageDataElement.getElementsByName('shadowImageIdentifier');
           for (const garbage of garbages) {
             this.tabletopObject.imageDataElement.removeChild(garbage);
           }
         }
       } else if (name === 'faceIcon') {
-        // faceIcon特殊処理（ToDo：分ける）
+        // faceIcon 特殊處理（TODO：分離）
         let elements = this.tabletopObject.imageDataElement.getElementsByName(name);
         if (elements.length >= this.MAX_IMAGE_ICON_COUNT) {
           for (let i = this.MAX_IMAGE_ICON_COUNT; i < elements.length; i++) {
@@ -343,9 +343,9 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty, currentImageIdentifires: currentImageIdentifires }).then(value => {
       if (!this.tabletopObject || !this.tabletopObject.imageDataElement || !value) return;
       if (value == 'null') {
-        //削除
+        // 刪除
         if (this.tabletopObject.imageElement && this.tabletopObject.imageFiles.length == 1) {
-          // 互換のため一個残す
+          // 為相容性保留一個
           this.tabletopObject.imageElement.value = value;
           this.tabletopObject.imageElement.currentValue = value;
         } else {
@@ -371,7 +371,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     });
   }
 
-  //ToDO インデックスも抽象化して汎用にする
+  // TODO: 索引也應抽象化以通用化
   selectImage(index: number, name='imageIdentifier') {
     if (this.tabletopObject.currntImageIndex == index) return;
     this.tabletopObject.currntImageIndex = index;
@@ -387,7 +387,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   deleteImage(index: number=0, name='imageIdentifier') {
     if (!this.tabletopObject || !this.tabletopObject.imageDataElement) return;
     let elements = this.tabletopObject.imageDataElement.getElementsByName(name);
-    //ToDO インデックスも抽象化して汎用にする
+    // TODO: 索引也應抽象化以通用化
     if (elements && 0 < elements.length && index < elements.length) {
       if (this.tabletopObject.currntImageIndex > index) this.tabletopObject.currntImageIndex -= 1;
       this.tabletopObject.imageDataElement.removeChild(elements[index]);
@@ -462,7 +462,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
     const viewWidth = areaWidth - offset * 2;
     const viewHeight = areaHeight - offset * 2;
-    // scale使わなかった頃の名残
+    // 尚未使用 scale 時期的殘留
     if ((this.naturalHeight * viewWidth / this.naturalWidth) > viewHeight) {
       rect.width = this.naturalWidth * viewHeight / this.naturalHeight;
       rect.height = viewHeight;

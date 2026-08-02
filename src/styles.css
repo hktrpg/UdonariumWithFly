@@ -275,9 +275,9 @@ input {
 }
 
 /*
- * デスクトップWindows版Chrome 119におけるレンダリング改善のための定義.
- * 3D表示している画像にこのCSSクラスを付与すると至近距離で表示した時の解像度が鮮明になる.
- * 将来的なChromeのアップデートでレンダリングが改善された場合は削除を検討.
+ * Desktop Windows Chrome 119 rendering improvement.
+ * Apply this CSS class to 3D-displayed images to sharpen resolution at close range.
+ * Consider removing after a future Chrome update improves rendering.
  */
  .chrome-smooth-image-trick {
   transform-style: inherit;
@@ -285,9 +285,9 @@ input {
 }
 
 /*
- * Windows版デスクトップChrome 138におけるレンダリング改善の定義.
- * rotateZ(180deg)された3D要素の高さ軸（z軸）を正しく表示するトリック.
- * 将来的なChromeのアップデートでレンダリングが改善された場合は削除を検討.
+ * Desktop Windows Chrome 138 rendering improvement.
+ * Trick to correctly display the height (z) axis of 3D elements with rotateZ(180deg).
+ * Consider removing after a future Chrome update improves rendering.
  */
 .is-3d:has(> .chrome-smooth-image-trick)::before {
   content: ".";
