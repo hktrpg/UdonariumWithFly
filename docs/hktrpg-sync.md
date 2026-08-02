@@ -27,6 +27,7 @@ git push origin hktrpg-main
 - Prefer keeping HKTRPG code in dedicated files (`guest-session.ts`, `note-inventory/`) to reduce conflict surface.
 - Do **not** re-encode guest flags into peerId; use `GuestSession` + room-name marker.
 - Keep `src/assets/config.yaml` gitignored; do not commit backend secrets.
+- Local/HKTRPG must use a self-hosted `udonarium-backend` (see `docs/hktrpg-backend.md`). The WithFly public workers URL rejects non-`nanasunana.github.io` Origins.
 
 ## Smoke checklist after sync
 

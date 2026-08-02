@@ -364,12 +364,23 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         let errorMessage: string = event.data.errorMessage;
 
         this.ngZone.run(async () => {
-          //SKyWayエラーハンドリング
+          // SkyWay error handling
           let quietErrorTypes = ['peer-unavailable'];
-          let reconnectErrorTypes = ['disconnected', 'socket-error', 'unavailable-id', 'authentication', 'server-error'];
+          // Only auto-retry transient network drops. Backend/auth failures need config fixes.
+          let reconnectErrorTypes = ['disconnected', 'socket-error', 'unavailable-id'];
+          let configErrorTypes = ['server-error', 'authentication', 'token-expired'];
 
           if (quietErrorTypes.includes(errorType)) return;
           await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: errorMessage });
+
+          if (configErrorTypes.includes(errorType)) {
+            await this.modalService.open(TextViewComponent, {
+              title: 'ネットワークエラー',
+              text: 'バックエンド（SkyWay認証トークンサーバ）に接続できません。\n\nsrc/assets/config.yaml の backend.url を確認し、ACCESS_CONTROL_ALLOW_ORIGIN にこのサイトの Origin（例: https://localhost:4200）を許可した自前の udonarium-backend を設定してください。\n\n公開デモ用 backend は nanasunana.github.io 以外から利用できません。\nページを再読み込みすると再試行します。'
+            });
+            this.isLoggedin = false;
+            return;
+          }
 
           if (!reconnectErrorTypes.includes(errorType)) return;
           await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: 'このウィンドウを閉じると再接続を試みます。' });
