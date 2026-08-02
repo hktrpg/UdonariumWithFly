@@ -14,36 +14,51 @@ skyway2023 needs a token API ([udonarium-backend](https://github.com/TK11235/udo
 
 That is expected. Do **not** point local/HKTRPG builds at that URL.
 
-## Minimal fix for local develop
+## Local develop (recommended on this machine)
 
-1. Create a SkyWay app: https://skyway.ntt.com/
-2. Clone and deploy backend (Cloudflare Workers is the usual path):
+Backend lives beside the frontend: `E:\github\udonarium-backend`  
+Secrets go only in `packages/backend/cloudflare-workers/.dev.vars` (**gitignored**).
+
+Terminal A — token API:
 
 ```text
-git clone https://github.com/TK11235/udonarium-backend.git
-cd udonarium-backend
+cd E:\github\udonarium-backend
+npm run cloudflare-workers:dev
+# Ready on http://127.0.0.1:8787
 ```
 
-3. Set Worker env (or `wrangler.toml` / `.dev.vars` — **never commit secrets**):
+Terminal B — frontend (HTTPS + proxy `/v1` → 8787):
+
+```text
+cd E:\github\UdonariumWithFly
+npx ng serve --ssl --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.js
+```
+
+`src/assets/config.yaml` (gitignored):
+
+```yaml
+backend:
+  mode: skyway2023
+  url: https://localhost:4200/
+```
+
+Open `https://localhost:4200/` (accept the self-signed cert) and hard-reload.
+
+## Cloudflare Workers deploy (production)
+
+1. Create a SkyWay app: https://skyway.ntt.com/
+2. Clone backend if needed: `git clone https://github.com/TK11235/udonarium-backend.git`
+3. Set Worker env / `.dev.vars` (**never commit secrets**):
 
 | Variable | Value |
 |----------|--------|
 | `SKYWAY_APP_ID` | your app id |
 | `SKYWAY_SECRET` | your secret |
 | `SKYWAY_UDONARIUM_LOBBY_SIZE` | `4` |
-| `ACCESS_CONTROL_ALLOW_ORIGIN` | `https://localhost:4200` for local; production site Origin for deploy |
+| `ACCESS_CONTROL_ALLOW_ORIGIN` | production Origin, e.g. `https://z01.hktrpg.com` |
 
-For multiple Origins, deploy separate Workers or check backend docs; Cosr is typically one Origin per Worker config.
-
-4. Put the Worker URL into **gitignored** `src/assets/config.yaml`:
-
-```yaml
-backend:
-  mode: skyway2023
-  url: https://YOUR-WORKER.workers.dev/
-```
-
-5. Restart `ng serve --ssl` and reload the page.
+4. `npm run cloudflare-workers:deploy`
+5. Put the Worker URL into deployed `assets/config.yaml` `backend.url`
 
 ## Production (HKTRPG)
 
