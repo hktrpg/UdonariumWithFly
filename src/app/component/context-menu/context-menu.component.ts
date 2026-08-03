@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, HostListener, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ContextMenuAction, ContextMenuService } from 'service/context-menu.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopObject } from '@udonarium/tabletop-object';
@@ -53,7 +53,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     public contextMenuService: ContextMenuService,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private changeDetector: ChangeDetectorRef,
   ) { }
 
   GuestMode() {
@@ -163,9 +164,41 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   doAction(action: ContextMenuAction) {
     this.showSubMenu(action);
-    if (action.action != null) {
-      action.action();
+    if (action.action == null) return;
+
+    action.action();
+    this.refreshActionVisual(action);
+
+    // Keep menu open after checkbox / radio / button clicks; close only on outside blank click.
+    // Explicit keepOpen === false still closes (for rare one-shot items).
+    if (action.keepOpen === false) {
       this.close();
+      return;
+    }
+    this.changeDetector.detectChanges();
+  }
+
+  private refreshActionVisual(action: ContextMenuAction) {
+    let updatedByNameUpdate = false;
+    for (const a of this.actions) {
+      if (a && typeof a.nameUpdate === 'function') {
+        a.name = a.nameUpdate() ?? a.name;
+        updatedByNameUpdate = true;
+      }
+    }
+    if (updatedByNameUpdate) return;
+
+    if (action.checkBox === 'check' && action.name) {
+      if (action.name.startsWith('☑')) action.name = '☐' + action.name.substring(1);
+      else if (action.name.startsWith('☐')) action.name = '☑' + action.name.substring(1);
+      return;
+    }
+    if (action.checkBox === 'radio' && action.name) {
+      for (const a of this.actions) {
+        if (!a || a.checkBox !== 'radio' || !a.name) continue;
+        if (a === action) a.name = a.name.replace(/^[◉○]/, '◉');
+        else a.name = a.name.replace(/^[◉○]/, '○');
+      }
     }
   }
 

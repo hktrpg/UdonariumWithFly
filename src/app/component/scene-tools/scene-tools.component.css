@@ -1,0 +1,53 @@
+.scene-tools {
+  position: fixed;
+  left: 8px;
+  top: 72px;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+.scene-tools > * { pointer-events: auto; }
+.toggle, .palette button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #555;
+  background: rgba(30, 30, 30, 0.88);
+  color: #eee;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid #666;
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 110px;
+}
+.palette .title, .palette .sub {
+  font-size: 11px;
+  color: #aaa;
+  margin: 2px 0;
+}
+.palette button.active {
+  background: #2563eb;
+  border-color: #60a5fa;
+}
+.palette button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.palette .material-icons { font-size: 16px; }
+.hint {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #9ca3af;
+  line-height: 1.35;
+}

@@ -4,9 +4,10 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { FilterType, GameTable, GridType } from '@udonarium/game-table';
+import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -74,6 +75,45 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   get tableDistanceviewFilter(): FilterType { return this.selectedTable.backgroundFilterType; }
   set tableDistanceviewFilter(filterType: FilterType) { if (this.isEditable) this.selectedTable.backgroundFilterType = filterType; }
+
+  get tableDarkness(): number { return this.selectedTable?.darkness ?? 0; }
+  set tableDarkness(v: number) { if (this.isEditable) this.selectedTable.darkness = Number(v); }
+  get tableGlobalIllumination(): number { return this.selectedTable?.globalIllumination ?? 1; }
+  set tableGlobalIllumination(v: number) { if (this.isEditable) this.selectedTable.globalIllumination = Number(v); }
+  get tableWeatherType(): WeatherType { return this.selectedTable?.weatherType || 'none'; }
+  set tableWeatherType(v: WeatherType) { if (this.isEditable) this.selectedTable.weatherType = v; }
+  get tableWeatherIntensity(): number { return this.selectedTable?.weatherIntensity ?? 0.5; }
+  set tableWeatherIntensity(v: number) { if (this.isEditable) this.selectedTable.weatherIntensity = Number(v); }
+  get tableVisionEnabled(): boolean { return !!this.selectedTable?.visionEnabled; }
+  set tableVisionEnabled(v: boolean) { if (this.isEditable) this.selectedTable.visionEnabled = !!v; }
+
+  get auraNames(): string[] { return AuraNameConfig.instance.names; }
+  setAuraName(index: number, name: string) {
+    if (!this.isEditable) return;
+    AuraNameConfig.instance.setName(index, name);
+  }
+
+  transitionDay() {
+    if (!this.isEditable) return;
+    this.animateDarkness(0);
+  }
+  transitionNight() {
+    if (!this.isEditable) return;
+    this.animateDarkness(0.85);
+  }
+  private animateDarkness(target: number) {
+    const table = this.selectedTable;
+    if (!table) return;
+    const start = table.darkness;
+    const t0 = performance.now();
+    const dur = 800;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur);
+      table.darkness = start + (target - start) * p;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
 
   get tableSelecter(): TableSelecter { return TableSelecter.instance; }
 

@@ -10,9 +10,18 @@
           <div class="material-icons of-back">autorenew</div>
         </div>
       </div>
+      <div class="floor-ring is-pointer-events-none" *ngIf="floorRingUrl"
+        [style.background-image]="'url(' + floorRingUrl + ')'"
+        [style.animation-duration.s]="(8 / floorRingSpeed)"
+        [style.filter]="floorRingColor ? 'drop-shadow(0 0 4px ' + floorRingColor + ')' : ''"></div>
       <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-inner" [ngClass]="{'selected': selected, 'not-inventory': !gameCharacter.isInventoryIndicate, 'is-hide-in-pedestal': isHideIn}"></div>
       <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
       <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-outer"></div>
+      <div class="status-icons is-pointer-events-none" *ngIf="statusEntries.length">
+        <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + '：' + statusTooltip(s.id)">
+          <i class="material-icons">{{ statusIcon(s.id) }}</i>
+        </span>
+      </div>
       <div class="is-pointer-events-none is-3d" style="transform-origin: center bottom" [style.transform]="'translateX(' + shadowTranslateX + 'px) translateY(' + characterShadowOffset + 'px) scale(1.0, 0.66)'">
         <div class="image-box is-3d" [style.width.px]="characterShadowImageWidth" [style.height.px]="characterShadowImageHeight" style="pointer-events: none"
           style="transform-origin: center 66%" [style.transform]="'rotateZ(' + roll + 'deg)'">
@@ -46,7 +55,7 @@
               <div class="inverser is-3d" [ngClass]="{inverse: isInverse, 'black-paint': isBlackPaint, 'hollow': isHollow}">
                 <span class="image-box is-3d" [style.width.px]="characterImageWidth" [style.height.px]="characterImageHeight" [style.transform]="'translateX(' + ((size * gridSize - characterImageWidth) / 2) + 'px)'">
                   <img #characterImage *ngIf="0 < imageFile.url.length" class="image is-3d chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" [ngClass]="{'is-hide-in': isHideIn}"
-                    [style.height.px]="characterImageHeight" (load)="onImageLoad()">
+                    [style.height.px]="characterImageHeight" [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
                 </span>
               </div>
             </div>

@@ -75,6 +75,15 @@ import { CardListImageComponent } from './component/card-list-image/card-list-im
 import { LoggingInputDirective } from './directive/logging-input.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
 import { RangeComponent } from './component/range/range.component';
+import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
+import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
+
+// Ensure SyncObject registration for table FX
+import '@udonarium/table-fx/table-wall';
+import '@udonarium/table-fx/table-light';
+import '@udonarium/table-fx/table-drawing';
+import '@udonarium/table-fx/aura-name-config';
+import '@udonarium/table-fx/combat-tracker';
 
 @NgModule({
   declarations: [
@@ -132,7 +141,9 @@ import { RangeComponent } from './component/range/range.component';
     CardListImageComponent,
     LoggingInputDirective,
     ConfirmationComponent,
-    RangeComponent
+    RangeComponent,
+    SceneToolsComponent,
+    CombatTrackerComponent
   ],
   imports: [
     BrowserModule,

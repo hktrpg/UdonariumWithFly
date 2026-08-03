@@ -1,0 +1,62 @@
+<div class="combat-tracker" *ngIf="encounter">
+  <div class="row">
+    <button type="button" (click)="tracker.prevEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">◀</button>
+    <select [ngModel]="tracker.activeEncounterId" (ngModelChange)="tracker.selectEncounter($event)" [disabled]="isGuest">
+      <option *ngFor="let e of tracker.encounters; trackBy: trackEncounter" [value]="e.id">{{ e.name }}</option>
+    </select>
+    <button type="button" (click)="tracker.nextEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">▶</button>
+    <button type="button" (click)="createEncounter()" [disabled]="isGuest">＋</button>
+    <button type="button" class="danger" (click)="deleteEncounter()" [disabled]="isGuest">刪</button>
+  </div>
+  <div class="row">
+    <label>先攻骰
+      <select [ngModel]="encounter.initiativeDice" (ngModelChange)="setDice($event)" [disabled]="isGuest">
+        <option value="d20">d20</option>
+        <option value="d100">d100</option>
+      </select>
+    </label>
+    <label>追蹤資源
+      <select [ngModel]="encounter.trackedResourceName || ''" (ngModelChange)="setTrackedResource($event)" [disabled]="isGuest">
+        <option value="">（無）</option>
+        <option *ngFor="let n of resourceNameOptions()" [value]="n">{{ n }}</option>
+      </select>
+    </label>
+    <label>
+      <input type="checkbox" [ngModel]="encounter.skipDefeated" (ngModelChange)="setSkipDefeated($event)" [disabled]="isGuest">
+      跳過敗北
+    </label>
+  </div>
+  <div class="row">
+    <button type="button" (click)="addSelected()" [disabled]="isGuest">加入選取棋子</button>
+    <button type="button" (click)="rollAll(false)" [disabled]="isGuest">全部擲先攻</button>
+    <button type="button" (click)="rollAll(true)" [disabled]="isGuest">NPC 擲先攻</button>
+    <button type="button" (click)="resetInitiative()" [disabled]="isGuest">重置先攻</button>
+  </div>
+  <div class="status" *ngIf="encounter.isStarted">
+    第 {{ encounter.round }} 輪　回合 {{ encounter.turnIndex + 1 }}／{{ encounter.combatants.length }}
+  </div>
+  <ul class="list">
+    <li *ngFor="let c of visibleCombatants(); trackBy: trackCombatant" [class.current]="isCurrent(c)" [class.defeated]="c.isDefeated" [class.hidden-row]="c.isHidden">
+      <span class="name">{{ c.name }}</span>
+      <input class="init" type="number" [ngModel]="c.initiative" (ngModelChange)="setInitiative(c, $event)" [ngModelOptions]="{updateOn: 'blur'}" [disabled]="isGuest" placeholder="-">
+      <span class="resource" *ngIf="encounter.trackedResourceName" [title]="encounter.trackedResourceName">{{ resourceDisplay(c) }}</span>
+      <button type="button" (click)="rollOne(c)" [disabled]="isGuest" title="擲先攻">🎲</button>
+      <button *ngIf="isGM" type="button" (click)="toggleHidden(c)" [title]="c.isHidden ? '顯示' : '隱藏'">{{ c.isHidden ? '隱' : '見' }}</button>
+      <button type="button" (click)="toggleDefeated(c)" [disabled]="isGuest" [title]="c.isDefeated ? '取消敗北' : '標記敗北'">{{ c.isDefeated ? '敗' : '活' }}</button>
+      <button type="button" (click)="remove(c)" [disabled]="isGuest">×</button>
+    </li>
+  </ul>
+  <div class="row controls">
+    <ng-container *ngIf="!encounter.isStarted">
+      <button type="button" (click)="begin()" [disabled]="isGuest || !encounter.combatants.length">開始戰鬥</button>
+    </ng-container>
+    <ng-container *ngIf="encounter.isStarted">
+      <button type="button" (click)="prevRound()" [disabled]="isGuest">⟸輪</button>
+      <button type="button" (click)="prevTurn()" [disabled]="isGuest">⟵回合</button>
+      <button type="button" (click)="nextTurn()" [disabled]="isGuest">回合⟶</button>
+      <button type="button" (click)="nextRound()" [disabled]="isGuest">輪⟹</button>
+      <button type="button" (click)="endMyTurn()">結束我的回合</button>
+      <button type="button" class="danger" (click)="end()" [disabled]="isGuest">結束戰鬥</button>
+    </ng-container>
+  </div>
+</div>

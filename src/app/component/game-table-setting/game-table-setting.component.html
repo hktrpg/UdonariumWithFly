@@ -117,6 +117,36 @@
         </div>
       </div>
       <hr/>
+      <div><b>氣氛／光影</b></div>
+      <div class="self-setting">黑暗度：
+        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable" style="width: 8em">
+        {{ tableDarkness | number:'1.0-2' }}
+        <button type="button" (click)="transitionDay()" [disabled]="!isEditable">日</button>
+        <button type="button" (click)="transitionNight()" [disabled]="!isEditable">夜</button>
+      </div>
+      <div class="self-setting">全域亮度：
+        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable" style="width: 8em">
+        {{ tableGlobalIllumination | number:'1.0-2' }}
+      </div>
+      <div class="self-setting">天氣：
+        <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable">
+          <option value="none">無</option>
+          <option value="rain">雨</option>
+          <option value="snow">雪</option>
+          <option value="fog">霧</option>
+        </select>
+        強度
+        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableWeatherIntensity" [disabled]="!isEditable || tableWeatherType === 'none'" style="width: 6em">
+      </div>
+      <div class="self-setting">
+        <label><input type="checkbox" [(ngModel)]="tableVisionEnabled" [disabled]="!isEditable"> 啟用視野（擁有角色）</label>
+      </div>
+      <div><b>光環名稱（全局）</b></div>
+      <div *ngFor="let name of auraNames; let i = index" class="self-setting">
+        {{ i + 1 }}.
+        <input [ngModel]="auraNames[i]" (ngModelChange)="setAuraName(i, $event)" [disabled]="!isEditable" style="width: 8em">
+      </div>
+      <hr/>
       <div>
         <label class="self-setting">
           <input type="checkbox" [(ngModel)]="tableGridShow" name="tableGridShow" />

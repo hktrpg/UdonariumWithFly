@@ -1,0 +1,14 @@
+Table FX assets (Udonarium @ HKTRPG)
+
+Primary approach: procedural SVG / canvas particles generated for this project (public domain / project-owned).
+
+Additional CC0 / free sources intended for reinforcement (download and place selected files here when packaging):
+- Kenney Particle Pack (CC0): https://opengameart.org/content/particle-pack-80-sprites — credit Kenney.nl appreciated
+- Kenney Light Masks (CC0): https://opengameart.org/content/light-masks
+- Magic Summoning Circle (CC0): https://opengameart.org/content/magic-summoning-circle — CityBuildingKit.com
+- Fog Animation (CC0): https://opengameart.org/content/fog-animation
+- 300+ Gradient Textures (CC0): https://opengameart.org/content/300-gradient-textures — Screaming Brain Studios
+- game-icons.net (CC-BY 3.0): https://game-icons.net/ — attribution required per icon author
+- Mixkit Free Sound Effects: https://mixkit.co/free-sound-effects/ — Mixkit Free License (not Restricted); do not redistribute as standalone SFX library
+
+Bundled SVG rings / status placeholders in fx/** are project-authored for MVP.

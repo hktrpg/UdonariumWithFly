@@ -22,6 +22,11 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() isShowChatBubble: boolean = true;
   @SyncVar() owner: string = '';
   @SyncVar() isAllowsChat: boolean = true;
+  @SyncVar() visionRange: number = 6;
+  @SyncVar() statusesJson: string = '[]';
+  @SyncVar() floorRing: string = 'none';
+  @SyncVar() floorRingColor: string = '';
+  @SyncVar() floorRingSpeed: number = 1;
   
   text = '';
   dialog = null;

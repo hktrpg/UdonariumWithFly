@@ -9,9 +9,13 @@ import { DiceSymbol } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { FilterType, GameTable, GridType } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TableDrawing } from '@udonarium/table-fx/table-drawing';
+import { TableLight } from '@udonarium/table-fx/table-light';
+import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
@@ -22,15 +26,27 @@ import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
 import { ModalService } from 'service/modal.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { SceneToolService } from 'service/scene-tool.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopKeyboardService } from 'service/tabletop-keyboard.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
 
 import { GridLineRender } from './grid-line-render';
+import { LightingRender } from './lighting-render';
 import { TableMouseGesture } from './table-mouse-gesture';
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
+import { WeatherRender } from './weather-render';
+
+interface TablePingView {
+  id: string;
+  x: number;
+  y: number;
+  type: 'basic' | 'warning';
+  color: string;
+  expire: number;
+}
 
 @Component({
     selector: 'game-table',
@@ -43,12 +59,33 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('gameTable', { static: true }) gameTable: ElementRef<HTMLElement>;
   @ViewChild('gameObjects', { static: true }) gameObjects: ElementRef<HTMLElement>;
   @ViewChild('gridCanvas', { static: true }) gridCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('fxCanvas', { static: true }) fxCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvas', { static: true }) weatherCanvas: ElementRef<HTMLCanvasElement>;
   @ViewChild('pickArea', { static: true }) pickArea: ElementRef<HTMLElement>;
   @ViewChild('pickCursor', { static: true }) pickCursor: ElementRef<HTMLElement>;
+
+  readonly Math = Math;
+  pings: TablePingView[] = [];
+  offscreenArrows: { x: number; y: number; deg: number; color: string }[] = [];
+
+  private lightingRender: LightingRender = null;
+  private weatherRender: WeatherRender = null;
+  private fxTimer: any = null;
+  private pingHoldTimer: any = null;
+  private pingHoldOrigin: { x: number; y: number } = null;
+  private pingHoldLast: { x: number; y: number } = null;
+  private pingHoldShift = false;
+  private static readonly PING_MOVE_THRESHOLD_SQ = 8 * 8;
+  private drawDragStart: { x: number; y: number } = null;
+  private freehandPoints: { x: number; y: number }[] = [];
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
+  get tablePixelWidth(): number { return this.currentTable.width * this.currentTable.gridSize; }
+  get tablePixelHeight(): number { return this.currentTable.height * this.currentTable.gridSize; }
+  get drawings(): TableDrawing[] { return this.currentTable?.drawings || []; }
+  get lights(): TableLight[] { return this.currentTable?.lights || []; }
 
   get tableImage(): ImageFile { return this.imageService.getSkeletonOr(this.currentTable.imageIdentifier); }
   get backgroundImage(): ImageFile { return this.imageService.getEmptyOr(this.currentTable.backgroundImageIdentifier); }
@@ -175,6 +212,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private selectionService: TabletopSelectionService,
     private tabletopKeyboardService: TabletopKeyboardService,
     private modalService: ModalService,
+    private sceneTools: SceneToolService,
   ) { }
 
   ngOnInit() {
@@ -184,6 +222,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         console.log('UPDATE_GAME_OBJECT GameTableComponent ' + this.currentTable.identifier);
 
         this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor, this.currentTable.isShowNumber);
+        this.refreshFx();
+      })
+      .on('TABLE_PING', event => {
+        this.ngZone.run(() => this.spawnPing(event.data));
       })
       .on('DRAG_LOCKED_OBJECT', event => {
         this.isTableTransformMode = true;
@@ -272,6 +314,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor);
     this.setTransform(0, 0, 0, 0, 0, 0);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
+    this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
+    this.weatherRender = new WeatherRender(this.weatherCanvas.nativeElement);
+    this.refreshFx();
+    this.fxTimer = setInterval(() => this.refreshFx(), 200);
   }
 
   ngOnDestroy() {
@@ -280,6 +326,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchGesture.destroy();
     this.pickGesture.destroy();
     this.tabletopKeyboardService.destroy();
+    if (this.fxTimer) clearInterval(this.fxTimer);
+    if (this.weatherRender) this.weatherRender.destroy();
+    this.clearPingHold();
     if (this._currentTableImageUrl) URL.revokeObjectURL(this._currentTableImageUrl);
     if (this._currentBackgroundImageUrl) URL.revokeObjectURL(this._currentBackgroundImageUrl);
     if (this._currentBackgroundImageUrl2) URL.revokeObjectURL(this._currentBackgroundImageUrl2);
@@ -445,6 +494,22 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
+    if (this.sceneTools.mode === 'wall' && this.sceneTools.wallDraftPoints.length >= 2) {
+      e.preventDefault();
+      if (!GuestSession.isGuest) {
+        const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
+        this.currentTable.appendChild(wall);
+        this.sceneTools.resetDrafts();
+        this.refreshFx();
+      }
+      return;
+    }
+    if (this.sceneTools.mode === 'draw-polygon' && this.sceneTools.polygonDraftPoints.length) {
+      e.preventDefault();
+      this.sceneTools.polygonDraftPoints.pop();
+      return;
+    }
+
     if (!document.activeElement.contains(this.gameObjects.nativeElement)) return;
     e.preventDefault();
 
@@ -457,11 +522,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (0 < this.selectionService.size) {
       menuActions.push({
-        name: '集中到這裡', action: () => {
+        name: '集中到這裡',
+        action: () => {
           this.selectionService.congregate(objectPosition);
         },
-        //enabled: 0 < this.selectionService.size
-        disabled: 0 < this.selectionService.size
       });
       menuActions.push(ContextMenuSeparator);
     }
@@ -554,5 +618,189 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (character.isHideIn && character.location.name === 'table' && character.owner === cursor.userId) return true;
     }
     return false;
+  }
+
+  polylinePoints(d: TableDrawing): string {
+    const pts = d.geom?.points || [];
+    return pts.map((p: any) => `${p.x},${p.y}`).join(' ');
+  }
+
+  private refreshFx() {
+    if (!this.lightingRender || !this.currentTable) return;
+    const owned = this.characters.filter(c => c.owner === Network.peer?.userId && c.location.name === 'table');
+    this.lightingRender.render(this.currentTable, owned, this.isGMMode);
+    this.weatherRender?.sync(this.currentTable);
+    this.updateOffscreenArrows();
+  }
+
+  @HostListener('pointerdown', ['$event'])
+  onPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    // clearPingHold must run before setting origin (it nulls origin/timer).
+    this.clearPingHold();
+    this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
+    this.pingHoldLast = { x: e.clientX, y: e.clientY };
+    this.pingHoldShift = e.shiftKey;
+    this.pingHoldTimer = setTimeout(() => {
+      if (!this.pingHoldOrigin || !this.pingHoldLast) return;
+      const dx = this.pingHoldLast.x - this.pingHoldOrigin.x;
+      const dy = this.pingHoldLast.y - this.pingHoldOrigin.y;
+      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) return;
+      // Token/object drag — never ping after a drag.
+      if (this.pointerDeviceService.isDragging) return;
+      this.broadcastPing(pos.x, pos.y, this.pingHoldShift ? 'warning' : 'basic');
+      this.clearPingHold();
+    }, 1000);
+
+    if (GuestSession.isGuest) return;
+    if (this.sceneTools.mode === 'light') {
+      const light = TableLight.create(pos.x, pos.y, this.currentTable.gridSize * 3);
+      this.currentTable.appendChild(light);
+      this.sceneTools.setMode('select');
+      this.refreshFx();
+      return;
+    }
+    if (this.sceneTools.mode === 'wall') {
+      this.sceneTools.wallDraftPoints.push({ x: pos.x, y: pos.y });
+      if (this.sceneTools.wallDraftPoints.length >= 2 && e.detail >= 2) {
+        const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
+        this.currentTable.appendChild(wall);
+        this.sceneTools.resetDrafts();
+        this.refreshFx();
+      }
+      return;
+    }
+    if (this.sceneTools.isDrawMode) {
+      this.drawDragStart = { x: pos.x, y: pos.y };
+      if (this.sceneTools.mode === 'draw-freehand') this.freehandPoints = [{ x: pos.x, y: pos.y }];
+      if (this.sceneTools.mode === 'draw-polygon') {
+        this.sceneTools.polygonDraftPoints.push({ x: pos.x, y: pos.y });
+        if (e.detail >= 2 && this.sceneTools.polygonDraftPoints.length >= 3) {
+          this.commitPolygon();
+        }
+      }
+      if (this.sceneTools.mode === 'draw-text') {
+        const text = window.prompt('文字內容', '註記');
+        if (text) {
+          const d = TableDrawing.create('text', Network.peer?.userId || '');
+          d.x = pos.x; d.y = pos.y; d.text = text;
+          d.strokeColor = this.sceneTools.drawStrokeColor;
+          this.currentTable.appendChild(d);
+        }
+        this.sceneTools.setMode('select');
+      }
+    }
+  }
+
+  @HostListener('pointermove', ['$event'])
+  onPointerMove(e: PointerEvent) {
+    if (this.pingHoldOrigin) {
+      this.pingHoldLast = { x: e.clientX, y: e.clientY };
+      const dx = e.clientX - this.pingHoldOrigin.x;
+      const dy = e.clientY - this.pingHoldOrigin.y;
+      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
+    }
+    if (this.sceneTools.mode === 'draw-freehand' && this.drawDragStart) {
+      const pos = this.coordinateService.calcTabletopLocalCoordinate();
+      this.freehandPoints.push({ x: pos.x, y: pos.y });
+      if (this.freehandPoints.length > 200) this.freehandPoints = this.freehandPoints.filter((_, i) => i % 2 === 0);
+    }
+  }
+
+  @HostListener('pointerup', ['$event'])
+  onPointerUp(e: PointerEvent) {
+    this.clearPingHold();
+    if (GuestSession.isGuest || !this.drawDragStart) {
+      this.drawDragStart = null;
+      return;
+    }
+    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    if (this.sceneTools.mode === 'draw-rect' || this.sceneTools.mode === 'draw-ellipse') {
+      const d = TableDrawing.create(this.sceneTools.mode === 'draw-rect' ? 'rect' : 'ellipse', Network.peer?.userId || '');
+      d.x = Math.min(this.drawDragStart.x, pos.x);
+      d.y = Math.min(this.drawDragStart.y, pos.y);
+      d.width = Math.max(8, Math.abs(pos.x - this.drawDragStart.x));
+      d.height = Math.max(8, Math.abs(pos.y - this.drawDragStart.y));
+      d.strokeColor = this.sceneTools.drawStrokeColor;
+      d.fillOpacity = this.sceneTools.drawFillOpacity;
+      this.currentTable.appendChild(d);
+      this.sceneTools.setMode('select');
+    } else if (this.sceneTools.mode === 'draw-freehand' && this.freehandPoints.length > 1) {
+      const d = TableDrawing.create('freehand', Network.peer?.userId || '');
+      d.geom = { points: this.freehandPoints.slice(0, 200) };
+      d.strokeColor = this.sceneTools.drawStrokeColor;
+      d.fillOpacity = 0;
+      this.currentTable.appendChild(d);
+      this.sceneTools.setMode('select');
+    }
+    this.drawDragStart = null;
+    this.freehandPoints = [];
+  }
+
+  private commitPolygon() {
+    const d = TableDrawing.create('polygon', Network.peer?.userId || '');
+    d.geom = { points: this.sceneTools.polygonDraftPoints.slice() };
+    d.strokeColor = this.sceneTools.drawStrokeColor;
+    d.fillOpacity = this.sceneTools.drawFillOpacity;
+    this.currentTable.appendChild(d);
+    this.sceneTools.resetDrafts();
+    this.sceneTools.setMode('select');
+  }
+
+  private clearPingHold() {
+    if (this.pingHoldTimer) clearTimeout(this.pingHoldTimer);
+    this.pingHoldTimer = null;
+    this.pingHoldOrigin = null;
+    this.pingHoldLast = null;
+    this.pingHoldShift = false;
+  }
+
+  private broadcastPing(x: number, y: number, type: 'basic' | 'warning') {
+    const data = {
+      x, y, type,
+      color: '#e11d48',
+      peerId: Network.peerId,
+      name: PeerCursor.myCursor?.name || ''
+    };
+    EventSystem.call('TABLE_PING', data);
+    this.spawnPing(data);
+    if (PresetSound.ping) SoundEffect.play(PresetSound.ping);
+  }
+
+  private spawnPing(data: any) {
+    const rawType = data.type === 'warning' || data.type === 'drag' ? 'warning' : 'basic';
+    const ping: TablePingView = {
+      id: `${Date.now()}_${Math.random()}`,
+      x: data.x,
+      y: data.y,
+      type: rawType,
+      color: '#e11d48',
+      expire: Date.now() + 2800,
+    };
+    this.pings = [...this.pings, ping];
+    setTimeout(() => {
+      this.pings = this.pings.filter(p => p.id !== ping.id);
+      this.updateOffscreenArrows();
+    }, 2800);
+    this.updateOffscreenArrows();
+  }
+
+  private updateOffscreenArrows() {
+    const root = this.rootElementRef?.nativeElement;
+    if (!root) { this.offscreenArrows = []; return; }
+    const rect = root.getBoundingClientRect();
+    const arrows = [];
+    for (const ping of this.pings) {
+      // Approximate: if ping table coords far from view center, show edge arrow
+      const sx = rect.left + rect.width / 2 + (ping.x - this.tablePixelWidth / 2) * 0.2 + this.viewPotisonX * 0.1;
+      const sy = rect.top + rect.height / 2 + (ping.y - this.tablePixelHeight / 2) * 0.15 + this.viewPotisonY * 0.1;
+      if (sx > rect.left + 20 && sx < rect.right - 20 && sy > rect.top + 20 && sy < rect.bottom - 20) continue;
+      const cx = Math.min(rect.right - 24, Math.max(rect.left + 24, sx));
+      const cy = Math.min(rect.bottom - 24, Math.max(rect.top + 24, sy));
+      const deg = Math.atan2(sy - (rect.top + rect.height / 2), sx - (rect.left + rect.width / 2)) * 180 / Math.PI + 90;
+      arrows.push({ x: cx - rect.left, y: cy - rect.top, deg, color: ping.color });
+    }
+    this.offscreenArrows = arrows;
   }
 }

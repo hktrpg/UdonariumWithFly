@@ -17,6 +17,8 @@ import Beautify from 'vkbeautify';
 import { ImageTagList } from '@udonarium/image-tag-list';
 import { ChatTab } from '@udonarium/chat-tab';
 import { CutInList } from '@udonarium/cut-in-list';
+import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
+import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import saveAs from 'file-saver';
@@ -46,11 +48,15 @@ export class SaveDataService {
     let diceRollTableXml = this.convertToXml(DiceRollTableList.instance);
     let cutInXml = this.convertToXml(CutInList.instance);
     let summarySetting = this.convertToXml(DataSummarySetting.instance);
+    let auraNameXml = this.convertToXml(AuraNameConfig.instance);
+    let combatXml = this.convertToXml(CombatTracker.instance);
     files.push(new File([roomXml], 'fly_data.xml', { type: 'text/plain' }));
     files.push(new File([chatXml], 'fly_chat.xml', { type: 'text/plain' }));
     files.push(new File([diceRollTableXml], 'fly_rollTable.xml', { type: 'text/plain' }));
     files.push(new File([cutInXml], 'fly_cutIn.xml', { type: 'text/plain' }));
     files.push(new File([summarySetting], 'summary.xml', { type: 'text/plain' }));
+    files.push(new File([auraNameXml], 'fly_auraNames.xml', { type: 'text/plain' }));
+    files.push(new File([combatXml], 'fly_combat.xml', { type: 'text/plain' }));
 
     //files = files.concat(this.searchImageFiles(roomXml));
     //files = files.concat(this.searchImageFiles(chatXml));

@@ -24,6 +24,7 @@ import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 
 @Component({
     selector: 'game-object-inventory',
@@ -109,7 +110,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    private characterFxMenu: CharacterFxMenuService,
   ) { }
 
   GuestMode() {
@@ -410,66 +412,20 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         checkBox: 'check'
       })
     );
-    actions.push({ name: '圖片效果', action: null,
-      subActions: [
-      (gameObject.isInverse
-        ? {
-          name: '☑ 反轉', action: () => {
-            gameObject.isInverse = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 反轉', action: () => {
-            gameObject.isInverse = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (gameObject.isHollow
-        ? {
-          name: '☑ 模糊', action: () => {
-            gameObject.isHollow = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 模糊', action: () => {
-            gameObject.isHollow = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (gameObject.isBlackPaint
-        ? {
-          name: '☑ 設為黑色剪影', action: () => {
-            gameObject.isBlackPaint = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 設為黑色剪影', action: () => {
-            gameObject.isBlackPaint = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-        { name: '光環', action: null, subActions: [ { name: `${gameObject.aura == -1 ? '◉' : '○'} 無`, action: () => { gameObject.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {
-          return { name: `${gameObject.aura == i ? '◉' : '○'} ${color}`, action: () => { gameObject.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
-        })) },
-        ContextMenuSeparator,
-        {
-          name: '重置', action: () => {
-            gameObject.isInverse = false;
-            gameObject.isHollow = false;
-            gameObject.isBlackPaint = false;
-            gameObject.aura = -1;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          disabled: !gameObject.isInverse && !gameObject.isHollow && !gameObject.isBlackPaint && gameObject.aura == -1
-        }
-      ]
-    });
+    if (gameObject instanceof GameCharacter) {
+      actions.push(this.characterFxMenu.makeAuraMenu(gameObject));
+      actions.push(this.characterFxMenu.makeRingMenu(gameObject));
+      actions.push(this.characterFxMenu.makeStatusMenu(gameObject));
+      actions.push(this.characterFxMenu.makeCombatMenu(gameObject));
+      actions.push(this.characterFxMenu.makeImageEffectMenu(gameObject, {
+        isInverse: gameObject.isInverse,
+        isHollow: gameObject.isHollow,
+        isBlackPaint: gameObject.isBlackPaint,
+        setInverse: v => gameObject.isInverse = v,
+        setHollow: v => gameObject.isHollow = v,
+        setBlackPaint: v => gameObject.isBlackPaint = v,
+      }));
+    }
     actions.push(ContextMenuSeparator);
     actions.push((!gameObject.isNotRide
       ? {

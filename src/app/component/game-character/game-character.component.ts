@@ -31,6 +31,8 @@ import { StandSettingComponent } from 'component/stand-setting/stand-setting.com
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
+import { CHARACTER_STATUS_DEFS, getStatusDef } from '@udonarium/table-fx/character-status';
 
 @Component({
     selector: 'game-character',
@@ -121,6 +123,21 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   set isBlackPaint(isBlackPaint: boolean) { this.gameCharacter.isBlackPaint = isBlackPaint; }
   get aura(): number { return this.gameCharacter.aura; }
   set aura(aura: number) { this.gameCharacter.aura = aura; }
+  get floorRing(): string { return this.gameCharacter.floorRing || 'none'; }
+  get floorRingUrl(): string { return this.characterFxMenu.ringAsset(this.floorRing); }
+  get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
+  get floorRingColor(): string { return this.gameCharacter.floorRingColor || ''; }
+  get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
+  get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
+  get statusDefs() { return CHARACTER_STATUS_DEFS; }
+  statusTooltip(id: string): string { return getStatusDef(id as any)?.tooltip || ''; }
+  statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }
+  statusName(id: string): string {
+    const def = getStatusDef(id as any);
+    const entry = this.statusEntries.find(s => s.id === id);
+    if (!def) return id;
+    return entry?.level ? `${def.name} ${entry.level}` : def.name;
+  }
 
   get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
   set isNotRide(isNotRide: boolean) { this.gameCharacter.isNotRide = isNotRide; }
@@ -403,7 +420,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private pointerDeviceService: PointerDeviceService,
     private ngZone: NgZone,
     private modalService: ModalService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    private characterFxMenu: CharacterFxMenuService,
   ) { }
 
   GuestMode() {
@@ -706,65 +724,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           },
           checkBox: 'check'
         }),
-      { name: '圖片效果', action: null, subActions: [
-        (this.isInverse
-          ? {
-            name: '☑ 反轉', action: () => {
-              this.isInverse = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 反轉', action: () => {
-              this.isInverse = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-        (this.isHollow
-          ? {
-            name: '☑ 模糊', action: () => {
-              this.isHollow = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 模糊', action: () => {
-              this.isHollow = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-        (this.isBlackPaint
-          ? {
-            name: '☑ 設為黑色剪影', action: () => {
-              this.isBlackPaint = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 設為黑色剪影', action: () => {
-              this.isBlackPaint = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-          { name: '光環', action: null, subActions: [{ name: `${this.aura == -1 ? '◉' : '○'} 無`, action: () => { this.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {  
-            return { name: `${this.aura == i ? '◉' : '○'} ${color}`, colorSample: true, action: () => { this.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' };
-          })) },
-          ContextMenuSeparator,
-          {
-            name: '重置', action: () => {
-              this.isInverse = false;
-              this.isHollow = false;
-              this.isBlackPaint = false;
-              this.aura = -1;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            disabled: !this.isInverse && !this.isHollow && !this.isBlackPaint && this.aura == -1
-          }
-        ]
-      },
+      this.characterFxMenu.makeAuraMenu(this.gameCharacter),
+      this.characterFxMenu.makeRingMenu(this.gameCharacter),
+      this.characterFxMenu.makeStatusMenu(this.gameCharacter),
+      this.characterFxMenu.makeCombatMenu(this.gameCharacter),
+      this.characterFxMenu.makeImageEffectMenu(this.gameCharacter, {
+        isInverse: this.isInverse,
+        isHollow: this.isHollow,
+        isBlackPaint: this.isBlackPaint,
+        setInverse: v => this.isInverse = v,
+        setHollow: v => this.isHollow = v,
+        setBlackPaint: v => this.isBlackPaint = v,
+      }),
       ContextMenuSeparator,
       (!this.isNotRide
         ? {

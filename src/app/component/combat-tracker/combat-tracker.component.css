@@ -1,0 +1,21 @@
+.combat-tracker { font-size: 12px; padding: 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; align-items: center; }
+.row button, .row select, .row input { font-size: 12px; }
+.list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow: auto; }
+.list li {
+  display: flex; gap: 4px; align-items: center;
+  padding: 3px 4px; border-bottom: 1px solid #ddd;
+}
+.list li.current { background: #dbeafe; font-weight: bold; }
+.list li.defeated { opacity: 0.5; text-decoration: line-through; }
+.list li.hidden-row { opacity: 0.65; font-style: italic; }
+.name { flex: 1; min-width: 4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.init { width: 3.5em; }
+.resource {
+  min-width: 3.2em; max-width: 5.5em;
+  text-align: right; font-variant-numeric: tabular-nums;
+  color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.status { margin-bottom: 6px; color: #1d4ed8; }
+.danger { color: #b91c1c; }
+.controls button { margin-right: 2px; }

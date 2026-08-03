@@ -6,6 +6,24 @@
   <div class="component-content is-fill is-3d" #gameTable>
     <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'" #gameObjects>
       <canvas class="grid-canvas is-fill is-pointer-events-none" #gridCanvas [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.1) + 'px)', 'clip': clipCss}"></canvas>
+      <svg class="drawings-layer is-fill is-pointer-events-none" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.2) + 'px)'}">
+        <g *ngFor="let d of drawings; trackBy: trackByGameObject">
+          <rect *ngIf="d.type === 'rect'" [attr.x]="d.x" [attr.y]="d.y" [attr.width]="d.width" [attr.height]="d.height"
+            [attr.stroke]="d.strokeColor" [attr.stroke-width]="d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.fillColor" [attr.fill-opacity]="d.fillOpacity" />
+          <ellipse *ngIf="d.type === 'ellipse'" [attr.cx]="d.x + d.width/2" [attr.cy]="d.y + d.height/2"
+            [attr.rx]="Math.abs(d.width/2)" [attr.ry]="Math.abs(d.height/2)"
+            [attr.stroke]="d.strokeColor" [attr.stroke-width]="d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.fillColor" [attr.fill-opacity]="d.fillOpacity" />
+          <polyline *ngIf="d.type === 'polygon' || d.type === 'freehand'"
+            [attr.points]="polylinePoints(d)"
+            [attr.stroke]="d.strokeColor" [attr.stroke-width]="d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.type === 'polygon' ? d.fillColor : 'none'" [attr.fill-opacity]="d.fillOpacity" />
+          <text *ngIf="d.type === 'text'" [attr.x]="d.x" [attr.y]="d.y + d.fontSize"
+            [attr.fill]="d.strokeColor" [attr.font-size]="d.fontSize" [attr.opacity]="d.strokeOpacity">{{ d.text }}</text>
+        </g>
+      </svg>
       <div class="is-fill is-3d is-pointer-events-none">
         <ng-container *ngFor="let terrain of terrains; trackBy: trackByGameObject; index as z">
           <ng-container *ngIf="terrain.detailDataElement && 0 < terrain.detailDataElement.children.length"><terrain class="is-3d" [style.z-index]="z + (terrain.height > 0 ? 0 : 10000)" [terrain]="terrain" [appTooltip]="terrain"></terrain></ng-container>
@@ -28,6 +46,34 @@
       <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
       <ng-container *ngFor="let character of characters; trackBy: trackByGameObject"><ng-container *ngIf="character && (character.isVisible || isGMMode)"><game-character class="is-3d" [style.display]="character.isLoaded ? '' : 'none'" [gameCharacter]="character" [appTooltip]="character"></game-character></ng-container></ng-container>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
+      <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
+      <canvas class="weather-canvas is-fill is-pointer-events-none" #weatherCanvas
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.1) + 'px)', 'clip': clipCss}"></canvas>
+      <div class="pings-layer is-fill is-pointer-events-none is-3d" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.2) + 'px)'}">
+        <div *ngFor="let ping of pings" class="table-ping is-3d" [ngClass]="ping.type"
+          [style.left.px]="ping.x" [style.top.px]="ping.y">
+          <!-- basic: flat red rings on table -->
+          <div class="ping-flat" *ngIf="ping.type === 'basic'">
+            <div class="ping-ring ring-a"></div>
+            <div class="ping-ring ring-b"></div>
+            <div class="ping-ring ring-c"></div>
+            <div class="ping-flat-core"></div>
+          </div>
+          <!-- Shift: upright 3D warning ! (token-like, bobbing) -->
+          <div class="ping-upright is-3d" *ngIf="ping.type === 'warning'">
+            <div class="ping-ground-ring ring-a"></div>
+            <div class="ping-ground-ring ring-b"></div>
+            <div class="ping-token is-3d">
+              <div class="ping-warning-plate">!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="edit-markers is-pointer-events-none" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.5) + 'px)'}">
+        <div *ngFor="let light of lights" class="light-marker" [style.left.px]="light.x - 8" [style.top.px]="light.y - 8"
+          [class.interactive]="isGMMode" title="{{ light.name }}"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -36,4 +82,8 @@
   <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
     <circle cx="50" cy="50" r="15" />
   </svg>
+</div>
+<div class="offscreen-pings">
+  <div *ngFor="let arrow of offscreenArrows" class="offscreen-arrow" [style.transform]="'translate(' + arrow.x + 'px,' + arrow.y + 'px) rotate(' + arrow.deg + 'deg)'"
+    [style.border-bottom-color]="arrow.color"></div>
 </div>

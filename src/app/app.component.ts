@@ -47,6 +47,9 @@ import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting/dice-roll-table-setting.component';
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
+import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
+import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
+import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { CutInService } from 'service/cut-in.service';
@@ -174,6 +177,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     subTab.recieveOperationLogLevel = 1;
 
     CutInList.instance.initialize();
+    AuraNameConfig.instance;
+    CombatTracker.instance;
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
     sampleDiceRollTable.initialize();
@@ -236,6 +241,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     PresetSound.surprise = AudioStorage.instance.add('./assets/sounds/otologic/Onmtp-Surprise02-1.mp3').identifier;
     PresetSound.coinToss = AudioStorage.instance.add('./assets/sounds/niconicomons/nc146227.mp3').identifier;
     PresetSound.selectionStart = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/decision50.mp3').identifier;
+    PresetSound.ping = AudioStorage.instance.add('./assets/sounds/otologic/Onmtp-Surprise02-1.mp3').identifier;
 
     AudioStorage.instance.get(PresetSound.dicePick).isHidden = true;
     AudioStorage.instance.get(PresetSound.dicePut).isHidden = true;
@@ -257,6 +263,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     AudioStorage.instance.get(PresetSound.coinToss).isHidden = true;
     AudioStorage.instance.get(PresetSound.sweep).isHidden = true;
     AudioStorage.instance.get(PresetSound.selectionStart).isHidden = true;
+    AudioStorage.instance.get(PresetSound.ping).isHidden = true;
 
     PeerCursor.createMyCursor().then(() => {
       if (PeerCursor.myCursor.name == null || PeerCursor.myCursor.name === '') PeerCursor.myCursor.name = PeerCursor.CHAT_DEFAULT_NAME;
@@ -584,6 +591,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
         option = { width: 700, height: 600 };
+        break;
+      case 'CombatTrackerComponent':
+        component = CombatTrackerComponent;
+        option = { width: 420, height: 520, left: 100 };
         break;
     }
     if (component) {

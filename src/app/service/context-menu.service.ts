@@ -38,7 +38,11 @@ export interface ContextMenuAction {
   center?: boolean,
   colorSample?: boolean,
   hotkey?: string,
-  checkBox?: string
+  checkBox?: string,
+  /** When set, menu stays open after this action (default: stay open for all actionable items). */
+  keepOpen?: boolean,
+  /** Optional: refresh displayed name after action while menu stays open. */
+  nameUpdate?: () => string,
 }
 
 @Injectable()

@@ -550,3 +550,44 @@ p.is-wisper .face-icon {
 .is-hide-in {
   filter: invert(85%) opacity(85%);
 }
+
+.floor-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 110%;
+  height: 110%;
+  margin-left: -55%;
+  margin-top: -55%;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  animation: floor-ring-spin 8s linear infinite;
+  transform: translateZ(0.05px);
+  opacity: 0.9;
+  z-index: 0;
+}
+@keyframes floor-ring-spin {
+  from { transform: translateZ(0.05px) rotate(0deg); }
+  to { transform: translateZ(0.05px) rotate(360deg); }
+}
+.status-icons {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  z-index: 5;
+  transform: translateZ(1px);
+}
+.status-badge {
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px;
+  line-height: 1;
+}
+.status-badge .material-icons {
+  font-size: 12px;
+}
