@@ -650,7 +650,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   selectGameObject(gameObject: GameObject, e: Event=null) {
     if (this.GuestMode()) return;
     if (!(gameObject instanceof TabletopObject)) return;
-    if (e && e instanceof MouseEvent && e.ctrlKey) {
+    if (e && e instanceof MouseEvent && e.shiftKey) {
       SoundEffect.playLocal(PresetSound.selectionStart);
       if (this.checkSelected(gameObject)) {
         this.selectionService.remove(gameObject);
@@ -669,7 +669,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   focusGameObject(gameObject: GameCharacter, e: Event) {
     if (!(e.target instanceof HTMLElement)) return;
     if (new Set(['input', 'button']).has(e.target.tagName.toLowerCase())) return;
-    if (e instanceof MouseEvent && e.ctrlKey) return;
+    if (e instanceof MouseEvent && e.shiftKey) return;
     if (gameObject.location.name !== 'table' || (!gameObject.isVisible && !this.isGMMode)) return;
     EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x + gameObject.size * 50 / 2, y: gameObject.location.y + gameObject.size * 50 / 2, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
   }

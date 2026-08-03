@@ -10,12 +10,18 @@ import { TabletopSelectionService } from './tabletop-selection.service';
 export type PathWaypoint = { x: number; y: number };
 
 /**
- * Shift+left-click waypoints while a token is selected, then Shift+right-click
- * to animate along the path. Releasing Shift cancels an unfinished draft.
+ * Ctrl+left-click adds waypoints (draft persists after releasing Ctrl).
+ * Plain left-click starts movement along the path.
+ * Right-click removes the last waypoint.
  */
 @Injectable({ providedIn: 'root' })
 export class TokenPathMoveService {
+  private static readonly PATH_STEP_MS = 640;
+  private static readonly PATH_PAUSE_MS = 300;
+
   waypoints: PathWaypoint[] = [];
+  /** Token center when the draft started — used to draw origin→1. */
+  origin: PathWaypoint = null;
   isAnimating = false;
 
   private targets: TabletopObject[] = [];
@@ -46,6 +52,10 @@ export class TokenPathMoveService {
 
   canDraft(): boolean {
     if (this.isAnimating) return false;
+    if (GuestSession.isGuest) return false;
+    if (this.sceneTools.isBlockingPick) return false;
+    // Keep accepting waypoints after the first even if selection was cleared.
+    if (this.targets.length > 0) return true;
     return this.pathableTargets().length > 0;
   }
 
@@ -54,18 +64,33 @@ export class TokenPathMoveService {
     if (!this.targets.length) {
       this.targets = this.pathableTargets();
       if (!this.targets.length) return false;
+      this.origin = MovableSelectionSynchronizer.centerOf(this.targets[0]);
     }
     this.waypoints = [...this.waypoints, { x, y }];
     SoundEffect.playLocal(PresetSound.selectionStart);
     return true;
   }
 
-  /** Cancel unfinished draft (e.g. Shift released). */
+  /** Remove the last waypoint; clears draft when none remain. */
+  undoLastWaypoint(): boolean {
+    if (this.isAnimating) return false;
+    if (!this.waypoints.length) return false;
+    this.waypoints = this.waypoints.slice(0, -1);
+    if (!this.waypoints.length) {
+      this.targets = [];
+      this.origin = null;
+    }
+    SoundEffect.playLocal(PresetSound.selectionStart);
+    return true;
+  }
+
+  /** Cancel unfinished draft. */
   cancelDraft() {
     if (this.isAnimating) return;
     if (!this.waypoints.length && !this.targets.length) return;
     this.waypoints = [];
     this.targets = [];
+    this.origin = null;
   }
 
   async commit(): Promise<boolean> {
@@ -78,10 +103,16 @@ export class TokenPathMoveService {
     const movers = this.targets.slice();
     this.waypoints = [];
     this.targets = [];
+    this.origin = null;
     this.isAnimating = true;
     const token = ++this.animToken;
     try {
-      const ok = await MovableSelectionSynchronizer.animatePath(movers, path, 320);
+      const ok = await MovableSelectionSynchronizer.animatePath(
+        movers,
+        path,
+        TokenPathMoveService.PATH_STEP_MS,
+        TokenPathMoveService.PATH_PAUSE_MS,
+      );
       if (token === this.animToken && ok) {
         SoundEffect.play(PresetSound.piecePut);
       }

@@ -46,9 +46,10 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Clarify mode | Compact chat toolbar toggle |
 | Note inventory | Notes by tabletop / shared / private / trash |
 | Quick roll | Send character-sheet fields to chat for BCDice in one click |
-| Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; `[`/`]` layer; Ctrl(+Shift)+wheel rotate; Shift drop skips snap |
-| Path move | Shift+left waypoints → Shift+right animate along path |
-| Selection UX | Click / box select, double-click details, selection highlight |
+| Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; Ctrl+Z undo / Ctrl+Y (or Ctrl+Shift+Z) redo; `[`/`]` layer; Ctrl(+Shift)+wheel rotate; Shift drop skips snap |
+| Undo / redo | Local stack: move / rotate / delete / cut-paste / layer; scene create / delete / nudge. Guests blocked; ignored in text fields (browser handles text undo) |
+| Path move | Ctrl+left waypoints (draft stays after release) → left-click destination to go; right-click undoes last waypoint |
+| Selection UX | Click / box select; Shift+click/drag multi-select; double-click details; selection highlight |
 | Ping | Long-press map for a marker; Shift+long-press for a warning |
 | Table lighting & vision | Darkness / FoW, lights, walls, vision ranges; claim vision character |
 | Scene tools | GM light / wall / draw / text tools; optional per-tool player permissions |

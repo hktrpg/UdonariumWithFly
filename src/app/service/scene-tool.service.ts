@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { GuestSession } from '@udonarium/guest-session';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
@@ -9,6 +11,17 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { translate } from 'i18n';
 import { I18nService } from './i18n.service';
+import { DeleteEntry, UndoCommand, UndoService } from './undo.service';
+
+type SceneNudgeSnap =
+  | { kind: 'drawing'; x: number; y: number; points: { x: number; y: number }[] }
+  | { kind: 'light'; x: number; y: number }
+  | { kind: 'wall'; points: { x: number; y: number }[] };
+
+interface SceneNudgeCommand extends UndoCommand {
+  __before: Map<string, SceneNudgeSnap>;
+  __after: Map<string, SceneNudgeSnap>;
+}
 
 /** `none` = idle (no tool lit). `select` = scene-object pick only. */
 export type SceneToolMode = 'none' | 'select' | 'light' | 'wall' | 'draw-rect' | 'draw-ellipse' | 'draw-polygon' | 'draw-freehand' | 'draw-text';
@@ -46,10 +59,18 @@ export class SceneToolService {
   selectedLight: TableLight = null;
   selectedWall: TableWall = null;
 
-  constructor(private i18n: I18nService) {
+  constructor(
+    private i18n: I18nService,
+    private undoService: UndoService,
+  ) {
     this.refreshLocalizedDefaults();
     EventSystem.register(this)
       .on('LOCALE_CHANGED', () => this.refreshLocalizedDefaults());
+  }
+
+  /** Record a newly created scene object for Ctrl+Z. Call after appendChild. */
+  trackCreated(object: ObjectNode | ObjectNode[]) {
+    this.undoService.recordCreated(object, 'scene-create');
   }
 
   private refreshLocalizedDefaults() {
@@ -199,10 +220,22 @@ export class SceneToolService {
     if (this.selectedLights.length && !perm.canModifyKind('light')) return false;
     if (this.selectedWalls.length && !perm.canModifyKind('wall')) return false;
 
+    const parentId = TableSelecter.instance.viewTable?.identifier || '';
+    const entries: DeleteEntry[] = [];
+    for (const obj of [...this.selectedDrawings, ...this.selectedLights, ...this.selectedWalls]) {
+      entries.push({
+        kind: 'destroy',
+        xml: obj.toXml(),
+        parentId: (obj as ObjectNode).parentId || parentId,
+        liveId: obj.identifier,
+      });
+    }
+
     for (const d of this.selectedDrawings.slice()) d.destroy();
     for (const l of this.selectedLights.slice()) l.destroy();
     for (const w of this.selectedWalls.slice()) w.destroy();
     this.clearSelection();
+    this.undoService.recordDeleted(entries, 'scene-delete');
     SoundEffect.play(PresetSound.sweep);
     this.notifyTableUpdate();
     return true;
@@ -213,6 +246,7 @@ export class SceneToolService {
     if (GuestSession.isGuest || Network.GuestMode()) return false;
     if (this.selectionCount < 1 || (dx === 0 && dy === 0)) return false;
     const perm = SceneToolPermission.instance;
+    const before = this.captureSceneNudgeState(perm);
     let moved = false;
 
     if (perm.canModifyKind('drawing')) {
@@ -237,8 +271,82 @@ export class SceneToolService {
       }
     }
 
-    if (moved) this.notifyTableUpdate();
+    if (moved) {
+      const after = this.captureSceneNudgeState(perm);
+      this.recordSceneNudge(before, after);
+      this.notifyTableUpdate();
+    }
     return moved;
+  }
+
+  private captureSceneNudgeState(perm: SceneToolPermission): Map<string, SceneNudgeSnap> {
+    const map = new Map<string, SceneNudgeSnap>();
+    if (perm.canModifyKind('drawing')) {
+      for (const d of this.selectedDrawings) {
+        map.set(d.identifier, {
+          kind: 'drawing',
+          x: d.x,
+          y: d.y,
+          points: (d.geom?.points || []).map(p => ({ x: p.x, y: p.y })),
+        });
+      }
+    }
+    if (perm.canModifyKind('light')) {
+      for (const l of this.selectedLights) {
+        map.set(l.identifier, { kind: 'light', x: l.x, y: l.y });
+      }
+    }
+    if (perm.canModifyKind('wall')) {
+      for (const w of this.selectedWalls) {
+        map.set(w.identifier, {
+          kind: 'wall',
+          points: (w.points || []).map(p => ({ x: p.x, y: p.y })),
+        });
+      }
+    }
+    return map;
+  }
+
+  private recordSceneNudge(before: Map<string, SceneNudgeSnap>, after: Map<string, SceneNudgeSnap>) {
+    const apply = (snap: Map<string, SceneNudgeSnap>) => {
+      for (const [id, state] of snap) {
+        if (state.kind === 'drawing') {
+          const d = ObjectStore.instance.get<TableDrawing>(id);
+          if (!d) continue;
+          d.x = state.x;
+          d.y = state.y;
+          if (state.points?.length) {
+            const geom = d.geom || {};
+            geom.points = state.points.map(p => ({ x: p.x, y: p.y }));
+            d.geom = geom;
+          }
+        } else if (state.kind === 'light') {
+          const l = ObjectStore.instance.get<TableLight>(id);
+          if (!l) continue;
+          l.x = state.x;
+          l.y = state.y;
+        } else if (state.kind === 'wall') {
+          const w = ObjectStore.instance.get<TableWall>(id);
+          if (!w || !state.points) continue;
+          w.points = state.points.map(p => ({ x: p.x, y: p.y }));
+        }
+      }
+      this.notifyTableUpdate();
+    };
+
+    const makeCmd = (b: Map<string, SceneNudgeSnap>, a: Map<string, SceneNudgeSnap>): SceneNudgeCommand => ({
+      label: 'scene-nudge',
+      __before: b,
+      __after: a,
+      undo: () => apply(b),
+      redo: () => apply(a),
+    });
+
+    this.undoService.pushMerged('scene-nudge', makeCmd(before, after), (prev, next) => {
+      const p = prev as SceneNudgeCommand;
+      const n = next as SceneNudgeCommand;
+      return makeCmd(p.__before ?? before, n.__after ?? after);
+    });
   }
 
   private nudgeDrawing(d: TableDrawing, dx: number, dy: number) {

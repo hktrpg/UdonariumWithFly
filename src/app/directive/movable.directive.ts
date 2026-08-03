@@ -19,6 +19,7 @@ import { CoordinateService } from 'service/coordinate.service';
 import { TabletopService } from 'service/tabletop.service';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { UndoService } from 'service/undo.service';
 
 import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
@@ -113,7 +114,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private coordinateService: CoordinateService,
     private tabletopService: TabletopService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    _undoService: UndoService,
   ) { }
 
   ngAfterViewInit() {
@@ -128,6 +130,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
         if ((event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) || !this.shouldTransition(this.tabletopObject)) return;
         this.batchService.add(() => {
           if (this.input.isGrabbing) {
+            UndoService.instance?.discardTransformGesture();
             this.cancel();
           } else {
             this.setAnimatedTransition(true);
@@ -371,6 +374,28 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this._posY = object.location.y;
     this._posZ = object.posZ;
     this.updateTransformCss();
+  }
+
+  /**
+   * Sync visual pose from undo/redo without going through UPDATE_GAME_OBJECT.
+   * Self-updates are ignored while selected, so undo must write directives directly.
+   */
+  applyExternalPose(x: number, y: number, posZ: number) {
+    this._posX = x;
+    this._posY = y;
+    this._posZ = posZ;
+    this.updateTransformCss();
+  }
+
+  static syncPoseFromUndo(object: TabletopObject, x: number, y: number, posZ: number) {
+    if (!object) return;
+    const layer = MovableDirective.layerMap.get(object.aliasName);
+    if (!layer) return;
+    for (const movable of layer) {
+      if (movable.tabletopObject === object) {
+        movable.applyExternalPose(x, y, posZ);
+      }
+    }
   }
 
   private setUpdateBatching() {
