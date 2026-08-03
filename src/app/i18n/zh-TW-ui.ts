@@ -430,6 +430,7 @@ export const zhTW_ui: I18nDictionary = {
   'toolbox.diceTableSettings': '骰子機器人表設定...',
   'toolbox.played': '{{name}} 已播放',
   'toolbox.unnamedCutIn': '(無名過場)',
+  'toolbox.closeAllPanels': '清空桌面視窗',
   'net.errorTitle': '網路錯誤',
   'net.backendHelp': '無法連線到後端（SkyWay 認證權杖伺服器）。\n\n請確認 src/assets/config.yaml 的 backend.url，並在 ACCESS_CONTROL_ALLOW_ORIGIN 中允許本站 Origin（例如: https://localhost:4200），設定自架的 udonarium-backend。\n\n公開示範用 backend 僅能從 nanasunana.github.io 使用。\n重新載入頁面後會再試一次。',
   'net.reconnectHint': '關閉此視窗後將嘗試重新連線。',

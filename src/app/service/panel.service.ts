@@ -20,6 +20,9 @@ export class PanelService {
   static defaultParentViewContainerRef: ViewContainerRef;
   static UIPanelComponentClass: { new(...args: any[]): any } = null;
 
+  /** Dynamically opened panels (not the fixed left-nav panel). */
+  private static readonly openPanels = new Set<PanelService>();
+
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
   left: number = 0;
@@ -41,6 +44,13 @@ export class PanelService {
     return this.panelComponentRef ? true : false;
   }
 
+  /** Close all closable desktop UI panels opened via PanelService.open(). */
+  static closeAllPanels() {
+    for (const panel of Array.from(PanelService.openPanels)) {
+      if (panel.isAbleCloseButton) panel.close();
+    }
+  }
+
   open<T>(childComponent: Type<T>, option?: PanelOption, parentViewContainerRef?: ViewContainerRef): T {
     if (!parentViewContainerRef) {
       parentViewContainerRef = PanelService.defaultParentViewContainerRef;
@@ -54,6 +64,7 @@ export class PanelService {
     const childPanelService: PanelService = panelComponentRef.injector.get(PanelService);
 
     childPanelService.panelComponentRef = panelComponentRef;
+    PanelService.openPanels.add(childPanelService);
     if (option) {
       if (option.title) childPanelService.title = option.title;
       if (option.top) childPanelService.top = option.top;
@@ -62,6 +73,7 @@ export class PanelService {
       if (option.height) childPanelService.height = option.height;
     }
     panelComponentRef.onDestroy(() => {
+      PanelService.openPanels.delete(childPanelService);
       childPanelService.panelComponentRef = null;
       panelComponentRef = null;
     });

@@ -422,6 +422,7 @@ export const en_ui: I18nDictionary = {
   'toolbox.diceTableSettings': 'Dice table settings...',
   'toolbox.played': '{{name}} played',
   'toolbox.unnamedCutIn': '(unnamed CutIn)',
+  'toolbox.closeAllPanels': 'Close all panels',
   'net.errorTitle': 'Network error',
   'net.backendHelp': 'Could not connect to the backend (SkyWay auth token server).\n\nCheck backend.url in src/assets/config.yaml and allow this Origin in ACCESS_CONTROL_ALLOW_ORIGIN (e.g. https://localhost:4200) for a self-hosted udonarium-backend.\n\nThe public demo backend only works from nanasunana.github.io.\nReload the page to retry.',
   'net.reconnectHint': 'Closing this window will try to reconnect.',

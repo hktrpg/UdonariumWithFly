@@ -5,10 +5,14 @@ export type TourRequire =
   | 'ack'
   | 'panel-open'
   | 'gesture-pan'
+  | 'gesture-wheel-pan'
   | 'gesture-zoom'
   | 'context-menu'
   | 'click'
-  | 'key-move';
+  | 'key-move'
+  | 'select-object'
+  | 'path-draft'
+  | 'table-ping';
 
 export interface GuidedTourStep {
   id: string;
@@ -114,7 +118,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       titleKey: 'tour.step.mapWheel.title',
       bodyKey: 'tour.step.mapWheel.body',
       target: '[data-tour-id="table.layer"]',
-      require: 'ack',
+      require: 'gesture-wheel-pan',
       chapter: 'table',
     },
     {
@@ -139,7 +143,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'controlsChapter',
       titleKey: 'tour.step.controlsChapter.title',
       bodyKey: 'tour.step.controlsChapter.body',
-      require: 'ack',
+      target: '[data-tour-id="table.layer"]',
+      require: 'select-object',
       chapter: 'controls',
     },
     {
@@ -175,14 +180,17 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'controlsPath',
       titleKey: 'tour.step.controlsPath.title',
       bodyKey: 'tour.step.controlsPath.body',
-      require: 'ack',
+      target: '[data-tour-id="table.layer"]',
+      require: 'path-draft',
       chapter: 'controls',
+      skipIfGuest: true,
     },
     {
       id: 'controlsPing',
       titleKey: 'tour.step.controlsPing.title',
       bodyKey: 'tour.step.controlsPing.body',
-      require: 'ack',
+      target: '[data-tour-id="table.layer"]',
+      require: 'table-ping',
       chapter: 'controls',
     },
     {

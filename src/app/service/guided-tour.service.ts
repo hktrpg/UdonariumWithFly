@@ -1,7 +1,11 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { EventSystem } from '@udonarium/core/system';
 import { buildGuidedTourSteps, GuidedTourStep, shouldSkipStep, TourRequire } from '@udonarium/guided-tour-steps';
+import { PanelService } from 'service/panel.service';
+import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
+import { TokenPathMoveService } from 'service/token-path-move.service';
 
 const TOUR_DONE_KEY = 'udonarium.ui.tourDone';
 
@@ -25,15 +29,17 @@ export class GuidedTourService {
   private phase: GuidedTourPhase = 'idle';
   private actionDone = false;
   private listenersBound = false;
+  private eventBound = false;
 
   private readonly stateSubject = new BehaviorSubject<GuidedTourUiState>(this.snapshot());
   readonly state$ = this.stateSubject.asObservable();
 
   private readonly onPointerMove = (e: PointerEvent) => this.handlePan(e);
-  private readonly onWheel = (e: WheelEvent) => this.handleZoom(e);
+  private readonly onWheel = (e: WheelEvent) => this.handleWheel(e);
   private readonly onContextMenu = () => this.handleContextMenu();
   private readonly onClickCapture = (e: Event) => this.handleClickCapture(e);
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyMove(e);
+  private readonly onPointerUp = () => this.handlePathDraft();
   private readonly onResize = () => this.refreshHole();
 
   private panLast: { x: number; y: number } | null = null;
@@ -41,6 +47,8 @@ export class GuidedTourService {
   constructor(
     private tips: TeachingTipService,
     private ngZone: NgZone,
+    private tokenPath: TokenPathMoveService,
+    private selection: TabletopSelectionService,
   ) { }
 
   get isActive(): boolean {
@@ -158,6 +166,17 @@ export class GuidedTourService {
     const step = this.steps[this.stepIndex];
     this.actionDone = !step || step.require === 'ack';
     this.panLast = null;
+    if (step?.id === 'tableChapter') {
+      PanelService.closeAllPanels();
+    }
+    if (step?.require !== 'path-draft' && this.tokenPath.hasDraft) {
+      this.tokenPath.cancelDraft();
+    }
+    if (step?.require === 'select-object') {
+      // Force a fresh select so this step is practiced, not skipped from prior selection.
+      this.selection.clear();
+      this.actionDone = false;
+    }
     this.refreshHole();
     this.emit();
   }
@@ -196,8 +215,15 @@ export class GuidedTourService {
       window.addEventListener('contextmenu', this.onContextMenu, true);
       window.addEventListener('click', this.onClickCapture, true);
       window.addEventListener('keydown', this.onKeyDown, true);
+      window.addEventListener('pointerup', this.onPointerUp, true);
       window.addEventListener('resize', this.onResize);
     });
+    if (!this.eventBound) {
+      this.eventBound = true;
+      EventSystem.register(this)
+        .on('TABLE_PING_SPAWNED', () => this.handleTablePing())
+        .on('UPDATE_SELECTION', () => this.handleSelectObject());
+    }
   }
 
   private unbindListeners() {
@@ -208,7 +234,12 @@ export class GuidedTourService {
     window.removeEventListener('contextmenu', this.onContextMenu, true);
     window.removeEventListener('click', this.onClickCapture, true);
     window.removeEventListener('keydown', this.onKeyDown, true);
+    window.removeEventListener('pointerup', this.onPointerUp, true);
     window.removeEventListener('resize', this.onResize);
+    if (this.eventBound) {
+      this.eventBound = false;
+      EventSystem.unregister(this);
+    }
   }
 
   private handlePan(e: PointerEvent) {
@@ -233,9 +264,20 @@ export class GuidedTourService {
     }
   }
 
-  private handleZoom(e: WheelEvent) {
-    if (this.currentRequire() !== 'gesture-zoom') return;
-    if (Math.abs(e.deltaY) < 1) return;
+  private handleWheel(e: WheelEvent) {
+    const req = this.currentRequire();
+    if (req !== 'gesture-wheel-pan' && req !== 'gesture-zoom') return;
+    if (Math.abs(e.deltaY) < 1 && Math.abs(e.deltaX) < 1) return;
+
+    if (req === 'gesture-wheel-pan') {
+      if (!(e.shiftKey || e.ctrlKey || e.metaKey) || e.altKey) return;
+      // Ctrl+Shift+wheel is object rotate, not view pan
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey) return;
+    } else {
+      // Plain wheel zoom — ignore modifier pans / rotates
+      if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    }
+
     this.ngZone.run(() => {
       this.actionDone = true;
       this.emit();
@@ -257,6 +299,36 @@ export class GuidedTourService {
       key === 'w' || key === 'a' || key === 's' || key === 'd' ||
       key === 'W' || key === 'A' || key === 'S' || key === 'D';
     if (!isMove) return;
+    this.ngZone.run(() => {
+      this.actionDone = true;
+      this.emit();
+    });
+  }
+
+  private handlePathDraft() {
+    if (this.currentRequire() !== 'path-draft' || this.actionDone) return;
+    // Defer so game-table finishPathClick can add the waypoint first.
+    setTimeout(() => {
+      if (this.currentRequire() !== 'path-draft' || this.actionDone) return;
+      if (!this.tokenPath.hasDraft) return;
+      this.ngZone.run(() => {
+        this.actionDone = true;
+        this.emit();
+      });
+    }, 0);
+  }
+
+  private handleTablePing() {
+    if (this.phase !== 'running' || this.currentRequire() !== 'table-ping' || this.actionDone) return;
+    this.ngZone.run(() => {
+      this.actionDone = true;
+      this.emit();
+    });
+  }
+
+  private handleSelectObject() {
+    if (this.phase !== 'running' || this.currentRequire() !== 'select-object' || this.actionDone) return;
+    if (this.selection.size < 1) return;
     this.ngZone.run(() => {
       this.actionDone = true;
       this.emit();

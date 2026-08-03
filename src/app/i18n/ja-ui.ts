@@ -422,6 +422,7 @@ export const ja_ui: I18nDictionary = {
   'toolbox.diceTableSettings': 'ダイス表設定...',
   'toolbox.played': '{{name}} を再生',
   'toolbox.unnamedCutIn': '(無名のカットイン)',
+  'toolbox.closeAllPanels': 'パネルをすべて閉じる',
   'net.errorTitle': 'ネットワークエラー',
   'net.backendHelp': 'バックエンド（SkyWay 認証トークンサーバー）に接続できません。\n\nsrc/assets/config.yaml の backend.url を確認し、ACCESS_CONTROL_ALLOW_ORIGIN にこの Origin（例: https://localhost:4200）を許可して自前の udonarium-backend を設定してください。\n\n公開デモ用 backend は nanasunana.github.io からのみ利用できます。\nページを再読み込みすると再試行します。',
   'net.reconnectHint': 'このウィンドウを閉じると再接続を試みます。',

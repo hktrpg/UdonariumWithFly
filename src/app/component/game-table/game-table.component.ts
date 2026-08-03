@@ -1690,6 +1690,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       expire: Date.now() + 2800,
     };
     this.pings = [...this.pings, ping];
+    EventSystem.trigger('TABLE_PING_SPAWNED', { type: rawType, x: data.x, y: data.y });
     setTimeout(() => {
       this.pings = this.pings.filter(p => p.id !== ping.id);
       this.updateOffscreenArrows();

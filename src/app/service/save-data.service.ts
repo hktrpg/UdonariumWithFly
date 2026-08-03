@@ -2,7 +2,7 @@ import { Injectable, NgZone } from '@angular/core';
 
 import { ChatTabList } from '@udonarium/chat-tab-list';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
-import { AudioFile, AudioState } from '@udonarium/core/file-storage/audio-file';
+import { AudioState } from '@udonarium/core/file-storage/audio-file';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';

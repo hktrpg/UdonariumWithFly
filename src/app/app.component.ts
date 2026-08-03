@@ -945,6 +945,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
       ]
     });
+    menu.push({
+      name: this.i18n.t('toolbox.closeAllPanels'),
+      materialIcon: 'close_fullscreen',
+      selfOnly: true,
+      action: () => PanelService.closeAllPanels()
+    });
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);

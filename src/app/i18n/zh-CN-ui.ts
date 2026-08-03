@@ -422,6 +422,7 @@ export const zhCN_ui: I18nDictionary = {
   'toolbox.diceTableSettings': '骰子机器人表设置...',
   'toolbox.played': '{{name}} 已播放',
   'toolbox.unnamedCutIn': '(无名过场)',
+  'toolbox.closeAllPanels': '清空桌面窗口',
   'net.errorTitle': '网络错误',
   'net.backendHelp': '无法连接到后端（SkyWay 认证权杖服务器）。\n\n请确认 src/assets/config.yaml 的 backend.url，并在 ACCESS_CONTROL_ALLOW_ORIGIN 中允许本站 Origin（例如: https://localhost:4200），设置自架的 udonarium-backend。\n\n公开示范用 backend 仅能从 nanasunana.github.io 使用。\n重新加载页面后会再试一次。',
   'net.reconnectHint': '关闭此窗口后将尝试重新连接。',
