@@ -35,6 +35,7 @@ export const zhTW_tip: I18nDictionary = {
 
   'tour.welcome.title': '歡迎 — 引導教學',
   'tour.welcome.body': '請依序閱讀說明並打開／嘗試各主要功能。\n可隨時略過。之後滑過按鈕仍會立刻顯示教學 BOX。\n建議桌面版 Chrome。離開前請存檔（ZIP 或資料夾備份）。',
+  'tour.welcome.language': '語言 / Language',
   'tour.welcome.start': '開始',
   'tour.welcome.skip': '略過',
   'tour.prev': '上一步',

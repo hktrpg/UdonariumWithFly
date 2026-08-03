@@ -25,6 +25,12 @@
     [style.top.px]="state.phase === 'welcome' ? null : state.bubbleTop"
   >
     <ng-container *ngIf="state.phase === 'welcome'">
+      <div class="gt-lang">
+        <label class="gt-lang-label">{{ 'tour.welcome.language' | i18n }}</label>
+        <select class="gt-lang-select" [ngModel]="i18n.locale" (ngModelChange)="onLocaleChange($event)">
+          <option *ngFor="let loc of i18n.locales" [value]="loc.id">{{ loc.nativeLabel }}</option>
+        </select>
+      </div>
       <div class="gt-title">{{ 'tour.welcome.title' | i18n }}</div>
       <div class="gt-body">{{ 'tour.welcome.body' | i18n }}</div>
       <div class="gt-actions">

@@ -35,6 +35,7 @@ export const en_tip: I18nDictionary = {
 
   'tour.welcome.title': 'Welcome — guided tour',
   'tour.welcome.body': 'Read each intro, then open / try the main features once.\nYou can skip anytime. Hover tips stay available afterward.\nDesktop Chrome recommended. Save (ZIP or folder backup) before leaving.',
+  'tour.welcome.language': 'Language / 語言',
   'tour.welcome.start': 'Start',
   'tour.welcome.skip': 'Skip',
   'tour.prev': 'Back',

@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { AppLocale } from 'i18n';
 import { GuidedTourService, GuidedTourUiState } from 'service/guided-tour.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
   selector: 'guided-tour',
@@ -26,6 +28,7 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   constructor(
     private tour: GuidedTourService,
     private cd: ChangeDetectorRef,
+    public i18n: I18nService,
   ) { }
 
   ngOnInit() {
@@ -33,6 +36,7 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
       this.state = s;
       this.cd.markForCheck();
     });
+    this.sub.add(this.i18n.locale$.subscribe(() => this.cd.markForCheck()));
   }
 
   ngOnDestroy() {
@@ -47,6 +51,10 @@ export class GuidedTourComponent implements OnInit, OnDestroy {
   get canNext(): boolean {
     if (this.state.phase === 'welcome') return true;
     return this.state.actionDone || this.state.current?.require === 'ack';
+  }
+
+  onLocaleChange(locale: AppLocale) {
+    this.i18n.setLocale(locale);
   }
 
   start() { this.tour.start(); }
