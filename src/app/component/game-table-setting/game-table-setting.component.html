@@ -1,11 +1,11 @@
-<div class="table-setting" *ngIf="!GuestMode()">
-  <aside class="table-setting-aside">
+<div class="settings-ui settings-layout" *ngIf="!GuestMode()">
+  <aside class="settings-aside">
     <button type="button" class="btn btn-primary btn-block" (click)="createGameTable()">
       <i class="material-icons">add</i>{{ 'table.create' | i18n }}
     </button>
     <select
       #select
-      class="table-list"
+      class="settings-list"
       size="16"
       (change)="selectGameTable(select.value)"
       [ngModel]="selectedTable?.identifier"
@@ -21,7 +21,7 @@
     </select>
   </aside>
 
-  <main class="table-setting-main" *ngIf="!isEmpty || selectedTable">
+  <main class="settings-main" *ngIf="!isEmpty || selectedTable">
     <section class="card">
       <header class="card-head">
         <h3>{{ 'table.images' | i18n }}</h3>
@@ -294,7 +294,7 @@
   </main>
 </div>
 
-<div class="empty-hint" *ngIf="isEmpty">
+<div class="settings-ui empty-hint" *ngIf="isEmpty">
   {{ 'table.emptyHint' | i18n }}
   <div class="actions" style="margin-top:8px">
     <button type="button" class="btn btn-primary" (click)="confirm()">{{ 'table.confirm' | i18n }}</button>

@@ -1,216 +1,325 @@
-<div class="flex-container">
-  <div class="flex-item no-grow">
-    <div>
-      <button style="margin: 0px 0px 2px 0px; font-size: smaller" (click)="add()">{{ 'cutin.add' | i18n }}</button>
-    </div>
-    <select #cutInSelecter style="width: 12em;" size="15" (change)="onChangeCutIn(cutInSelecter.value)">
-      <option *ngFor="let cutIn of cutIns" value="{{ cutIn.identifier }}" title="{{ cutIn.name }}" [style.color]="cutIn.isValidAudio ? cutIn.name == '' ? 'gray' : '' : 'red'">{{ (cutIn.isPlayingNow ? '▶ ' : '■ ') + (cutIn.isValidAudio ? '' : '⚠️') + (cutIn.name == '' ? ('cutin.unnamed' | i18n) : cutIn.name) }}</option>
+<div class="settings-ui settings-layout">
+  <aside class="settings-aside">
+    <button type="button" class="btn btn-primary btn-block" (click)="add()">
+      <i class="material-icons">add</i>{{ 'cutin.add' | i18n }}
+    </button>
+    <select #cutInSelecter class="settings-list" size="15" (change)="onChangeCutIn(cutInSelecter.value)">
+      <option
+        *ngFor="let cutIn of cutIns"
+        [value]="cutIn.identifier"
+        [title]="cutIn.name"
+        [class.is-unnamed]="cutIn.isValidAudio && cutIn.name == ''"
+        [class.is-invalid-audio]="!cutIn.isValidAudio"
+      >
+        {{ (cutIn.isPlayingNow ? '▶ ' : '■ ') + (cutIn.isValidAudio ? '' : '⚠️') + (cutIn.name == '' ? ('cutin.unnamed' | i18n) : cutIn.name) }}
+      </option>
     </select>
-  </div>
-  <div class="flex-item">
-    <div style="float: right; margin-top: 3px; margin-right: 3px">
-      <button style="cursor: help" (click)="helpCutIn()">?</button>
-    </div>
-    <ng-container *ngIf="!isEmpty && selectedCutIn">
-      <div style="display: flex">
-        <div>
-          <div (dblclick)="isEditable && (!cutInVideoId || cutInisSoundOnly) ? openModal() : false" style="position: relative; overflow: hidden">
-            <div *ngIf="(!cutInVideoId || cutInisSoundOnly) && getHidden(cutInImage)" style="position: absolute; text-align: right; top: 0px; right: 0px; pointer-events: none; z-index: 5">
-              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'" style="margin-right: 2px; font-size: 16px; display: block">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
-            </div>
-            <div *ngIf="isEditable" style="position: absolute; top: 1px; left: -1px; z-index: 5">
-              <button *ngIf="!cutInVideoId || cutInisSoundOnly" (click)="openModal()"><b>{{ 'cutin.changeImage' | i18n }}</b></button>
-            </div>
-            <div *ngIf="cutInVideoId && !cutInisSoundOnly" class="grow" style="opacity: 0.8; position: absolute; bottom: 1px; right: -1px; z-index: 5"><i style="font-size: 32px" class="material-icons">{{ cutInPlayListId ? 'featured_play_list' : 'movie' }}</i></div>
-            <img style="width: 160px; height: 160px; object-fit: contain" [ngClass]="{ blackout: (!cutInVideoId || cutInisSoundOnly) && !isShowHideImages && getHidden(cutInImage) }" [src]="cutInImageUrl | safe: 'resourceUrl'" draggable="false">
-          </div>
-        </div>
-        <div style="display: flex; flex-direction: column; width: 100%">
-          <div style="padding-bottom: 2px">
-            <div style="float: right">
-              <label sytle="white-space: nowrap">
-                <input name="show-hide-images" type="checkbox" value="Show Hides" [attr.title]="'table.showHiddenImages' | i18n" checked="{{isShowHideImages ? 'checked' : ''}}" (click)="onShowHiddenImages($event)">
-                <i class="material-icons" style="font-size: smaller" [ngClass]="{'red-eye': isShowHideImages}">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
-              </label>
-            </div>
-          </div>
-          <div style="padding-left: 2px">
-            <b style="font-size: smaller">{{ 'cutin.name' | i18n }}: </b><input type="text" style="width: 8em" [placeholder]="'cutin.name' | i18n" [(ngModel)]="cutInName" [attr.disabled]="!isEditable ? '' : null">
-            <b style="font-size: smaller; margin-left: 1em">{{ 'cutin.tag' | i18n }}: </b><input type="text" style="width: 3em" [placeholder]="'cutin.tag' | i18n" [(ngModel)]="cutInTag" [attr.disabled]="!isEditable ? '' : null">
-          </div>
-          <div style="padding-left: 2px; padding-top: 2px">
-            <b style="font-size: smaller">{{ 'cutin.duration' | i18n }}: </b><input type="number" min="0" max="1000" [(ngModel)]="cutInDuration" style="width: 3.5em" [attr.disabled]="!isEditable || isPlaying ? '' : null"><b style="font-size: smaller; padding-left: 2px">{{ 'cutin.seconds' | i18n }}</b>
-          </div>
-          <div style="padding-left: 2px">
-            <b style="font-size: smaller">{{ 'cutin.animation' | i18n }}: </b>
-            <select [(ngModel)]="cutInType" style="min-width: 8em" [attr.disabled]="!isEditable ? '' : null">
-              <option [value]="-1" [selected]="cutInType == -1">{{ 'cutin.instant' | i18n }}</option>
-              <option [value]="0" [selected]="cutInType == 0">{{ 'cutin.fade' | i18n }}</option>
-              <option [value]="1" [selected]="cutInType == 1">{{ 'cutin.pop' | i18n }}</option>
-              <option [value]="2" [selected]="cutInType == 2">{{ 'cutin.openHorizontal' | i18n }}</option>
-              <option [value]="3" [selected]="cutInType == 3">{{ 'cutin.openVertical' | i18n }}</option>
-            </select>
-            <label style="margin-left: 1em; font-size: smaller" [style.cursor]="isEditable ? 'pointer' : 'default'"><input name="borderStyle" type="checkbox" (click)="borderStyle = borderStyle == 0 ? 1 : 0" [checked]="borderStyle == 1" [attr.disabled]="!isEditable ? '' : null"><b>{{ 'cutin.border' | i18n }}</b></label>
-          </div>
-          <div style="padding-left: 2px">
-            <b style="font-size: smaller">{{ 'cutin.condition' | i18n }}: </b><br>
-            <textarea style="width: 100%; height: 3em" [placeholder]="('cutin.conditionPlaceholder' | i18n) + '\n' + ('cutin.conditionExample' | i18n)" [(ngModel)]="cutInCond" [attr.disabled]="!isEditable ? '' : null"></textarea>
-          </div>
-        </div>
-      </div>
-      <div style="font-size: smaller; display: flex; flex-direction: column; width: 100%">
-        <div>
-          <button [attr.disabled]="!isEditable ? '' : null" (click)="testCutIn()"><b>{{ 'cutin.test' | i18n }}<sup class="self-only">*</sup></b></button>
-          <span style="margin-left: 2em">
-            <button style="margin-right: 0px" [attr.disabled]="!isEditable ? '' : null" (click)="playCutIn()"><b><i class="material-icons" style="font-size: smaller">play_arrow</i>{{ 'cutin.play' | i18n }}</b></button>
-            <button style="margin-left: 0px" [attr.disabled]="!isEditable ? '' : null" (click)="stopCutIn()"><b><i class="material-icons" style="font-size: smaller">stop</i>{{ 'cutin.stop' | i18n }}</b></button>
-            <span style="white-space: nowrap"> ➡
-              <select style="max-width: 10em" [(ngModel)]="sendTo" [ngClass]="{'not-specified': sendTo == ''}" [ngStyle]="{'color': (sendTo == '' ? null : sendToColor), 'font-weight': (sendTo == '' ? 'normal' : 'bolder')}">
-                <option value="" class="not-specified">{{ 'cutin.all' | i18n }}</option>
-                <option *ngFor="let peer of otherPeers" value="{{peer.identifier}}" [style.color]="peer.color" style="font-weight: bolder;">{{peer.name}}
-                  <ng-container *ngIf="peer === myPeer">{{ 'cutin.you' | i18n }}</ng-container>
-                </option>
-              </select>
+  </aside>
+
+  <main class="settings-main" *ngIf="!isEmpty && selectedCutIn">
+    <section class="card">
+      <header class="card-head">
+        <h3>{{ 'cutin.title' | i18n }}</h3>
+        <span class="btn-group">
+          <label class="icon-toggle" [title]="'table.showHiddenImages' | i18n">
+            <input
+              name="show-hide-images"
+              type="checkbox"
+              [checked]="isShowHideImages"
+              (click)="onShowHiddenImages($event)"
+            >
+            <i class="material-icons" [ngClass]="{'red-eye': isShowHideImages}">
+              {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+            </i>
+          </label>
+          <button type="button" class="btn btn-sm" (click)="helpCutIn()">?</button>
+        </span>
+      </header>
+
+      <div class="cutin-basic">
+        <div class="image-slot cutin-preview">
+          <button
+            type="button"
+            class="image-frame cutin-image-frame"
+            (click)="openModal()"
+            (dblclick)="openModal()"
+            [disabled]="!isEditable || (!!cutInVideoId && !cutInisSoundOnly)"
+          >
+            <span *ngIf="(!cutInVideoId || cutInisSoundOnly) && getHidden(cutInImage)" class="image-badge">
+              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
+                {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+              </i>
             </span>
-          </span>
+            <span *ngIf="isEditable && (!cutInVideoId || cutInisSoundOnly)" class="cutin-change-badge">
+              {{ 'cutin.changeImage' | i18n }}
+            </span>
+            <span *ngIf="cutInVideoId && !cutInisSoundOnly" class="cutin-video-badge grow">
+              <i class="material-icons">{{ cutInPlayListId ? 'featured_play_list' : 'movie' }}</i>
+            </span>
+            <img
+              [ngClass]="{ blackout: (!cutInVideoId || cutInisSoundOnly) && !isShowHideImages && getHidden(cutInImage) }"
+              [src]="cutInImageUrl | safe: 'resourceUrl'"
+              draggable="false"
+              alt=""
+            >
+          </button>
         </div>
-        <div class="section">
-          <div>
-            <b class="header">{{ 'cutin.position' | i18n }}</b>
-            <label style="margin-left: 0.6em" [style.cursor]="isEditable ? 'pointer' : 'default'"><input name="cutInIsPreventOutBounds" type="checkbox" [(ngModel)]="cutInIsPreventOutBounds" [checked]="cutInIsPreventOutBounds" [value]="true" [attr.disabled]="!isEditable || cutInVideoId ? '' : null"><b>{{ 'cutin.preventOutOfBounds' | i18n }}</b></label>
+
+        <div class="cutin-basic-fields">
+          <div class="field-row wrap">
+            <label class="field grow" [class.disabled]="!isEditable">
+              <span>{{ 'cutin.name' | i18n }}</span>
+              <input type="text" [placeholder]="'cutin.name' | i18n" [(ngModel)]="cutInName" [disabled]="!isEditable">
+            </label>
+            <label class="field" [class.disabled]="!isEditable">
+              <span>{{ 'cutin.tag' | i18n }}</span>
+              <input type="text" class="tag-input" [placeholder]="'cutin.tag' | i18n" [(ngModel)]="cutInTag" [disabled]="!isEditable">
+            </label>
           </div>
-          <div style="margin-left: 1em; display: table; width: 65%">
-            <div style="display: table-row">
-              <div style="display: table-cell; width: 3.5em">
-                <b>{{ 'cutin.posX' | i18n }}</b>
-              </div>
-              <div style="display: table-cell; width: calc(100% - 9.5em)">
-                <input [(ngModel)]="cutInPosX" type="range" style="width: 100%" [title]="cutInPosX + '%'" min="{{minSize}}" max="{{maxSize}}" name="cutInPosX" [attr.disabled]="!isEditable ? '' : null" />
-              </div>
-              <div style="display: table-cell; width: 6em; text-align: right">
-                <input [(ngModel)]="cutInPosX" type="number" min="{{minSize}}" max="{{maxSize}}" style="width: 3.5em" [attr.disabled]="!isEditable ? '' : null"><b style="padding-left: 2px">%</b>
-              </div>
-            </div>
-            <div style="display: table-row">
-              <div style="display: table-cell; width: 3.5em">
-                <b>{{ 'cutin.posY' | i18n }}</b>
-              </div>
-              <div style="display: table-cell; width: calc(100% - 9.5em)">
-                <input [(ngModel)]="cutInPosY" type="range" style="width: 100%" [title]="cutInPosY + '%'" min="{{minSize}}" max="{{maxSize}}" name="cutInPosY" [attr.disabled]="!isEditable ? '' : null" />
-              </div>
-              <div style="display: table-cell; width: 6em; text-align: right">
-                <input [(ngModel)]="cutInPosY" type="number" min="{{minSize}}" max="{{maxSize}}" style="width: 3.5em" [attr.disabled]="!isEditable ? '' : null"><b style="padding-left: 2px">%</b>
-              </div>
-            </div>
+          <div class="field-row wrap">
+            <label class="field" [class.disabled]="!isEditable || isPlaying">
+              <span>{{ 'cutin.duration' | i18n }}</span>
+              <span class="duration-wrap">
+                <input type="number" min="0" max="1000" [(ngModel)]="cutInDuration" [disabled]="!isEditable || isPlaying">
+                <span class="unit">{{ 'cutin.seconds' | i18n }}</span>
+              </span>
+            </label>
+            <label class="field" [class.disabled]="!isEditable">
+              <span>{{ 'cutin.animation' | i18n }}</span>
+              <select [(ngModel)]="cutInType" [disabled]="!isEditable">
+                <option [value]="-1">{{ 'cutin.instant' | i18n }}</option>
+                <option [value]="0">{{ 'cutin.fade' | i18n }}</option>
+                <option [value]="1">{{ 'cutin.pop' | i18n }}</option>
+                <option [value]="2">{{ 'cutin.openHorizontal' | i18n }}</option>
+                <option [value]="3">{{ 'cutin.openVertical' | i18n }}</option>
+              </select>
+            </label>
           </div>
-          <div style="margin-left: 1em">
-            <b>{{ 'cutin.zIndex' | i18n }}: </b><input [(ngModel)]="cutInZIndex" type="number" min="{{-maxSize}}" max="{{maxSize}}" style="width: 3.5em" [attr.disabled]="!isEditable  || cutInVideoId ? '' : null">
-            <label style="margin-left: 0.6em"><input name="cutInIsFrontOfStand" type="checkbox" [(ngModel)]="cutInIsFrontOfStand" [checked]="cutInIsFrontOfStand" [value]="true" [attr.disabled]="!isEditable || cutInVideoId ? '' : null"><b>{{ 'cutin.frontOfStand' | i18n }}</b></label>
+          <div class="check-row">
+            <label [class.disabled]="!isEditable" [style.cursor]="isEditable ? 'pointer' : 'default'">
+              <input
+                name="borderStyle"
+                type="checkbox"
+                (click)="borderStyle = borderStyle == 0 ? 1 : 0"
+                [checked]="borderStyle == 1"
+                [disabled]="!isEditable"
+              >
+              {{ 'cutin.border' | i18n }}
+            </label>
           </div>
-        </div>
-        <div class="section">
-          <div>
-            <b class="header">{{ 'cutin.size' | i18n }}</b>
-          </div>
-          <div style="margin-left: 1em; display: table; width: 90%">
-            <div style="display: table-row">
-              <div style="display: table-cell; width: 11.5em">
-                <b>{{ 'cutin.width' | i18n }}: </b>
-              </div>
-              <div style="display: table-cell; width: calc(100% - 15.5em)">
-                <input [(ngModel)]="cutInWidth" type="range" [title]="cutInWidth ? cutInWidth + '%' : ('cutin.unspecified' | i18n)" min="{{minSize}}" max="{{maxSize}}" style="width: 100%" name="cutInWidth" [disabled]="!isEditable" />
-              </div>
-              <div style="display: table-cell; width: 6em; text-align: right">
-                <input [(ngModel)]="cutInWidth" type="number" min="{{minSize}}" max="{{maxSize * 2}}" style="width: 3.5em" [disabled]="!isEditable"><b style="padding-left: 2px">%</b>
-              </div>
-            </div>
-            <div style="display: table-row">
-              <div style="display: table-cell; width: 11.5em">
-                <b>{{ 'cutin.height' | i18n }}: </b>
-              </div>
-              <div style="display: table-cell; width: calc(100% - 15.5em)">
-                <input [(ngModel)]="cutInHeight" type="range" [title]="cutInHeight ? cutInHeight + '%' : ('cutin.unspecified' | i18n)" min="{{minSize}}" max="{{maxSize}}" style="width: 100%" name="cutIHeight" [disabled]="!isEditable" />
-              </div>
-              <div style="display: table-cell; width: 6em; text-align: right">
-                <input [(ngModel)]="cutInHeight" type="number" min="{{minSize}}" max="{{maxSize * 2}}" style="width: 3.5em" [disabled]="!isEditable"><b style="padding-left: 2px">%</b>
-              </div>
-            </div>
-          </div>
-          <div style="margin-left: 1em">
-            <b>{{ 'cutin.fit' | i18n }}: </b>
-            <select [(ngModel)]="objectFitType" [disabled]="(cutInVideoId && !cutInisSoundOnly) || !isEditable">
-              <option [value]="0" [selected]="objectFitType == 0">{{ 'cutin.stretch' | i18n }}</option>
-              <option [value]="1" [selected]="objectFitType == 1">{{ 'cutin.crop' | i18n }}</option>
-              <!-- <option [value]="2" [selected]="objectFitType == 2">收進範圍</option> -->
-            </select>
-          </div>
-        </div>
-        <div class="section">
-          <div>
-            <b class="header">{{ 'cutin.media' | i18n }}</b>　
-          </div>
-          <div style="padding-left: 1em">
-            <input type="radio" name="{{panelId}}-media" id="{{panelId}}-media-sound" [(ngModel)]="cutInIsVideo" [checked]="!cutInIsVideo" [value]="false" [disabled]="!isEditable || isPlaying">
-            <label for="{{panelId}}-media-sound" [style.cursor]="isEditable ? 'pointer' : 'default'"><b>{{ 'cutin.audio' | i18n }}: </b></label>
-            <select #audioSelect 
-              [style.min-width.em]="isValidAudio ? 10 : 5"
-              [style.max-width.em]="isValidAudio ? 20 : 5"
-              [(ngModel)]="cutInAudioIdentifier" 
-              [ngClass]="{'not-specified': cutInAudioIdentifier == ''}" 
-              [attr.disabled]="cutInIsVideo || !isEditable || isPlaying ? '' : null"
-              (change)="onAudioFileChange(audioSelect.value)">
-              <option value="" class="not-specified">{{ 'cutin.noAudio' | i18n }}</option>
-              <option style="color: black" *ngFor="let audio of audios" value="{{audio.identifier}}">{{ audio.name }}</option>
-            </select>
-            <ng-container *ngIf="isEditable && this.cutInAudioFileName.length > 0">
-              <span *ngIf="isValidAudio" style="margin-left: 0.6em"><i class="material-icons" style="font-size: 14px">check</i> <span style="color: blue">{{ 'cutin.linkOk' | i18n }}</span></span>
-              <span *ngIf="!isValidAudio" style="margin-left: 0.6em; color: red; display:inline-block; white-space: nowrap; max-width: 20em; overflow: hidden; text-overflow: ellipsis"><i class="material-icons"></i><span style="font-weight: bolder">⚠️{{ 'cutin.linkNg' | i18n }}</span> {{ this.cutInAudioFileName }}</span>
-            </ng-container>
-          </div>
-          <div style="padding-left: 1em">
-            <input type="radio" name="{{panelId}}-media" id="{{panelId}}-media-video" [(ngModel)]="cutInIsVideo" [checked]="cutInIsVideo" [value]="true" [disabled]="!isEditable || isPlaying">
-            <label for="{{panelId}}-media-video" [style.cursor]="isEditable ? 'pointer' : 'default'"><b>{{ 'cutin.videoUrl' | i18n }}: </b></label><input type="text" style="width: 24em" [(ngModel)]="cutInVideoURL" [disabled]="!cutInIsVideo || !isEditable || isPlaying">
-          </div>
-          <div style="padding-left: 2.5em">
-            <a href="https://www.youtube.com/terms" target="_blank" class="outer-link" (click)="openYouTubeTerms()">{{ 'cutin.youtubeTerms' | i18n }}</a>
-          </div>
-          <div style="padding-left: 1.5em">
-          <b>{{ 'cutin.endedAction' | i18n }}: </b> 
-            <select [(ngModel)]="cutInMediaEndedActionType" [disabled]="!isEditable || isPlaying">
-              <option [value]="0" [selected]="cutInMediaEndedActionType == 0">{{ 'cutin.nothing' | i18n }}</option>
-              <option [value]="1" [selected]="cutInMediaEndedActionType == 1">{{ 'cutin.stopWhenEnded' | i18n }}</option>
-              <option [value]="2" [selected]="cutInMediaEndedActionType == 2">{{ 'cutin.loop' | i18n }}</option>
-            </select>
+          <div class="field-row">
+            <label class="field grow" [class.disabled]="!isEditable">
+              <span>{{ 'cutin.condition' | i18n }}</span>
+              <textarea
+                class="cond-text"
+                [placeholder]="('cutin.conditionPlaceholder' | i18n) + '\n' + ('cutin.conditionExample' | i18n)"
+                [(ngModel)]="cutInCond"
+                [disabled]="!isEditable"
+              ></textarea>
+            </label>
           </div>
         </div>
       </div>
-      <hr/>
-      <div>
-        <ng-container *ngIf="!isDeleted">
-          <button (click)="upTabIndex()">↑</button>
-          <button (click)="downTabIndex()">↓</button>
-          <div style="float: right">
-            <button [disabled]="isSaveing" (click)="save()">
-              <div style="position: relative;">
-                <div [ngClass]="{'is-hidden': isSaveing}">{{ 'cutin.save' | i18n }}</div>
-                <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
-              </div>
-            </button>
-            <button class="danger" (click)="delete()">{{ 'cutin.delete' | i18n }}</button>
-          </div>
-        </ng-container>
-        <ng-container *ngIf="isDeleted && selectedCutInXml">
-          <button (click)="restore()">{{ 'cutin.restore' | i18n }}</button>
-        </ng-container>
+
+      <div class="actions cutin-play-actions">
+        <button type="button" class="btn" [disabled]="!isEditable" (click)="testCutIn()">
+          {{ 'cutin.test' | i18n }}<sup class="self-only">*</sup>
+        </button>
+        <span class="btn-group">
+          <button type="button" class="btn" [disabled]="!isEditable" (click)="playCutIn()">
+            <i class="material-icons">play_arrow</i>{{ 'cutin.play' | i18n }}
+          </button>
+          <button type="button" class="btn" [disabled]="!isEditable" (click)="stopCutIn()">
+            <i class="material-icons">stop</i>{{ 'cutin.stop' | i18n }}
+          </button>
+        </span>
+        <label class="field send-to-field">
+          <span>➡</span>
+          <select
+            [(ngModel)]="sendTo"
+            [ngClass]="{'not-specified': sendTo == ''}"
+            [ngStyle]="{'color': (sendTo == '' ? null : sendToColor), 'font-weight': (sendTo == '' ? 'normal' : 'bolder')}"
+          >
+            <option value="" class="not-specified">{{ 'cutin.all' | i18n }}</option>
+            <option *ngFor="let peer of otherPeers" [value]="peer.identifier" [style.color]="peer.color" style="font-weight: bolder;">
+              {{peer.name}}<ng-container *ngIf="peer === myPeer">{{ 'cutin.you' | i18n }}</ng-container>
+            </option>
+          </select>
+        </label>
       </div>
-    </ng-container>
-  </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>{{ 'cutin.position' | i18n }}</h3></header>
+      <div class="check-row">
+        <label [class.disabled]="!isEditable || !!cutInVideoId" [style.cursor]="isEditable && !cutInVideoId ? 'pointer' : 'default'">
+          <input
+            name="cutInIsPreventOutBounds"
+            type="checkbox"
+            [(ngModel)]="cutInIsPreventOutBounds"
+            [disabled]="!isEditable || !!cutInVideoId"
+          >
+          {{ 'cutin.preventOutOfBounds' | i18n }}
+        </label>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">{{ 'cutin.posX' | i18n }}</span>
+        <input [(ngModel)]="cutInPosX" type="range" [title]="cutInPosX + '%'" [min]="minSize" [max]="maxSize" name="cutInPosX" [disabled]="!isEditable">
+        <input [(ngModel)]="cutInPosX" type="number" class="num" [min]="minSize" [max]="maxSize" [disabled]="!isEditable">
+        <span class="val">%</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">{{ 'cutin.posY' | i18n }}</span>
+        <input [(ngModel)]="cutInPosY" type="range" [title]="cutInPosY + '%'" [min]="minSize" [max]="maxSize" name="cutInPosY" [disabled]="!isEditable">
+        <input [(ngModel)]="cutInPosY" type="number" class="num" [min]="minSize" [max]="maxSize" [disabled]="!isEditable">
+        <span class="val">%</span>
+      </div>
+      <div class="field-row wrap">
+        <label class="field" [class.disabled]="!isEditable || !!cutInVideoId">
+          <span>{{ 'cutin.zIndex' | i18n }}</span>
+          <input [(ngModel)]="cutInZIndex" type="number" [min]="-maxSize" [max]="maxSize" [disabled]="!isEditable || !!cutInVideoId">
+        </label>
+      </div>
+      <div class="check-row">
+        <label [class.disabled]="!isEditable || !!cutInVideoId">
+          <input
+            name="cutInIsFrontOfStand"
+            type="checkbox"
+            [(ngModel)]="cutInIsFrontOfStand"
+            [disabled]="!isEditable || !!cutInVideoId"
+          >
+          {{ 'cutin.frontOfStand' | i18n }}
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>{{ 'cutin.size' | i18n }}</h3></header>
+      <div class="slider-row">
+        <span class="slider-label">{{ 'cutin.width' | i18n }}</span>
+        <input
+          [(ngModel)]="cutInWidth"
+          type="range"
+          [title]="cutInWidth ? cutInWidth + '%' : ('cutin.unspecified' | i18n)"
+          [min]="minSize"
+          [max]="maxSize"
+          name="cutInWidth"
+          [disabled]="!isEditable"
+        >
+        <input [(ngModel)]="cutInWidth" type="number" class="num" [min]="minSize" [max]="maxSize * 2" [disabled]="!isEditable">
+        <span class="val">%</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">{{ 'cutin.height' | i18n }}</span>
+        <input
+          [(ngModel)]="cutInHeight"
+          type="range"
+          [title]="cutInHeight ? cutInHeight + '%' : ('cutin.unspecified' | i18n)"
+          [min]="minSize"
+          [max]="maxSize"
+          name="cutInHeight"
+          [disabled]="!isEditable"
+        >
+        <input [(ngModel)]="cutInHeight" type="number" class="num" [min]="minSize" [max]="maxSize * 2" [disabled]="!isEditable">
+        <span class="val">%</span>
+      </div>
+      <div class="field-row">
+        <label class="field" [class.disabled]="(cutInVideoId && !cutInisSoundOnly) || !isEditable">
+          <span>{{ 'cutin.fit' | i18n }}</span>
+          <select [(ngModel)]="objectFitType" [disabled]="(cutInVideoId && !cutInisSoundOnly) || !isEditable">
+            <option [value]="0">{{ 'cutin.stretch' | i18n }}</option>
+            <option [value]="1">{{ 'cutin.crop' | i18n }}</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>{{ 'cutin.media' | i18n }}</h3></header>
+      <div class="media-row">
+        <input
+          type="radio"
+          name="{{panelId}}-media"
+          id="{{panelId}}-media-sound"
+          [(ngModel)]="cutInIsVideo"
+          [value]="false"
+          [disabled]="!isEditable || isPlaying"
+        >
+        <label class="field grow" for="{{panelId}}-media-sound" [class.disabled]="!isEditable || isPlaying">
+          <span>{{ 'cutin.audio' | i18n }}</span>
+          <select
+            #audioSelect
+            [(ngModel)]="cutInAudioIdentifier"
+            [ngClass]="{'not-specified': cutInAudioIdentifier == ''}"
+            [disabled]="cutInIsVideo || !isEditable || isPlaying"
+            (change)="onAudioFileChange(audioSelect.value)"
+          >
+            <option value="" class="not-specified">{{ 'cutin.noAudio' | i18n }}</option>
+            <option *ngFor="let audio of audios" [value]="audio.identifier">{{ audio.name }}</option>
+          </select>
+        </label>
+      </div>
+      <ng-container *ngIf="isEditable && cutInAudioFileName.length > 0">
+        <p class="hint link-ok" *ngIf="isValidAudio">
+          <i class="material-icons">check</i> {{ 'cutin.linkOk' | i18n }}
+        </p>
+        <p class="hint link-ng" *ngIf="!isValidAudio">
+          ⚠️{{ 'cutin.linkNg' | i18n }} {{ cutInAudioFileName }}
+        </p>
+      </ng-container>
+      <div class="media-row">
+        <input
+          type="radio"
+          name="{{panelId}}-media"
+          id="{{panelId}}-media-video"
+          [(ngModel)]="cutInIsVideo"
+          [value]="true"
+          [disabled]="!isEditable || isPlaying"
+        >
+        <label class="field grow" for="{{panelId}}-media-video" [class.disabled]="!cutInIsVideo || !isEditable || isPlaying">
+          <span>{{ 'cutin.videoUrl' | i18n }}</span>
+          <input type="text" [(ngModel)]="cutInVideoURL" [disabled]="!cutInIsVideo || !isEditable || isPlaying">
+        </label>
+      </div>
+      <p class="hint">
+        <a href="https://www.youtube.com/terms" target="_blank" class="outer-link" (click)="openYouTubeTerms()">{{ 'cutin.youtubeTerms' | i18n }}</a>
+      </p>
+      <div class="field-row">
+        <label class="field" [class.disabled]="!isEditable || isPlaying">
+          <span>{{ 'cutin.endedAction' | i18n }}</span>
+          <select [(ngModel)]="cutInMediaEndedActionType" [disabled]="!isEditable || isPlaying">
+            <option [value]="0">{{ 'cutin.nothing' | i18n }}</option>
+            <option [value]="1">{{ 'cutin.stopWhenEnded' | i18n }}</option>
+            <option [value]="2">{{ 'cutin.loop' | i18n }}</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <footer class="actions">
+      <ng-container *ngIf="!isDeleted">
+        <button type="button" class="btn btn-sm" (click)="upTabIndex()">↑</button>
+        <button type="button" class="btn btn-sm" (click)="downTabIndex()">↓</button>
+        <span class="actions-spacer">
+          <button type="button" class="btn" [disabled]="isSaveing" (click)="save()">
+            <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'cutin.save' | i18n }}</span>
+            <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
+          </button>
+          <button type="button" class="btn btn-danger" (click)="delete()">{{ 'cutin.delete' | i18n }}</button>
+        </span>
+      </ng-container>
+      <ng-container *ngIf="isDeleted && selectedCutInXml">
+        <button type="button" class="btn" (click)="restore()">{{ 'cutin.restore' | i18n }}</button>
+      </ng-container>
+    </footer>
+  </main>
 </div>
-<ng-container *ngIf="isEmpty">
-  <div style="font-size: 12px;">
-    {{ 'cutin.empty' | i18n }}
-    <ng-container *ngIf="isDeleted && selectedCutInXml">
-      <button (click)="restore()">{{ 'cutin.restore' | i18n }}</button>
-    </ng-container>
-  </div>
-</ng-container>
+
+<div class="settings-ui empty-hint" *ngIf="isEmpty">
+  {{ 'cutin.empty' | i18n }}
+  <ng-container *ngIf="isDeleted && selectedCutInXml">
+    <div class="actions" style="margin-top:8px">
+      <button type="button" class="btn" (click)="restore()">{{ 'cutin.restore' | i18n }}</button>
+    </div>
+  </ng-container>
+</div>

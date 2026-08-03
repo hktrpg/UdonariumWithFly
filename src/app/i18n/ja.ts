@@ -18,7 +18,7 @@ export const ja: I18nDictionary = {
   'menu.sceneTools': 'シーンツール',
   'menu.inventory': 'キャラ倉庫',
   'menu.notes': 'メモ倉庫',
-  'menu.diceOpen': '卓上ダイスを一斉公開',
+  'menu.diceOpen': 'ダイス公開',
   'menu.settings': '個人設定',
   'menu.viewReset': '視点リセット',
 

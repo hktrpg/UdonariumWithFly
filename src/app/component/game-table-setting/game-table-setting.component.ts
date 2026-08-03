@@ -20,7 +20,7 @@ import { SaveDataService } from 'service/save-data.service';
 @Component({
     selector: 'game-table-setting',
     templateUrl: './game-table-setting.component.html',
-    styleUrls: ['./game-table-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './game-table-setting.component.css'],
     standalone: false
 })
 export class GameTableSettingComponent implements OnInit, OnDestroy {

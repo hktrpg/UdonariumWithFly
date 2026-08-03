@@ -1,7 +1,9 @@
-<div class="component" (input)="onInput()" *ngIf="!GuestMode()">
+<div class="settings-ui component" (input)="onInput()" *ngIf="!GuestMode()">
   <ng-container *ngTemplateOutlet="inventoryTab"></ng-container>
-  <ng-container *ngTemplateOutlet="inventoryViewSetting"></ng-container>
-  <div *ngIf="getGameObjects(selectTab).length < 1"><small><b>{{getTabTitle(selectTab)}}</b>{{ 'inv.emptySuffix' | i18n }}</small></div>
+  <section class="card settings-card">
+    <ng-container *ngTemplateOutlet="inventoryViewSetting"></ng-container>
+  </section>
+  <p class="empty-hint" *ngIf="getGameObjects(selectTab).length < 1"><b>{{getTabTitle(selectTab)}}</b>{{ 'inv.emptySuffix' | i18n }}</p>
   <div (contextmenu)="onContextMenu($event, $any(gameObject))" *ngFor="let gameObject of getGameObjects(selectTab); let i = index; trackBy: trackByGameObject" class="object-container"
     (click)="selectGameObject(gameObject, $event)" (dblclick)="focusGameObject($any(gameObject), $event)"
     [attr.draggable]="canDragInventory($any(gameObject)) ? 'true' : null"
@@ -17,58 +19,69 @@
     </div>
     <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject}"></ng-container>
   </div>
-  <div *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
-    <button class="danger" (click)="cleanInventory()" [attr.disabled]="getGameObjects(selectTab).length < 1 ? '' : null">{{ 'inv.emptyGraveyard' | i18n }}</button>
+  <div class="actions" *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
+    <button type="button" class="btn btn-danger" (click)="cleanInventory()" [disabled]="getGameObjects(selectTab).length < 1">{{ 'inv.emptyGraveyard' | i18n }}</button>
   </div>
   <datalist id="{{panelId}}_suggest">
-    <option *ngFor="let word of suggestWords()" value="{{word}}">{{word}}</option>
+    <option *ngFor="let word of suggestWords()" [value]="word">{{word}}</option>
   </datalist>
 </div>
 <ng-template #inventoryTab>
-  <form class="is-sticky-top">
-    <div class="tab">
-      <label *ngFor="let inventoryType of inventoryTypes"
+  <form class="is-sticky-top card tab-card">
+    <div class="inv-tabs">
+      <label *ngFor="let inventoryType of inventoryTypes" class="inv-tab" [class.is-active]="selectTab === inventoryType"
         (dragover)="onInventoryTabDragOver($event, inventoryType)"
         (dragleave)="onInventoryTabDragLeave($event, inventoryType)"
         (drop)="onInventoryTabDrop($event, inventoryType)"
         [class.is-drop-target]="dropTargetTab === inventoryType">
-        <input name="tab" type="radio" value="{{inventoryType}}" ng-control="options" [(ngModel)]="selectTab">
-        <div>{{getTabTitle(inventoryType)}} ({{ getGameObjects(inventoryType).length }})</div>
+        <input name="tab" type="radio" [value]="inventoryType" ng-control="options" [(ngModel)]="selectTab">
+        <span>{{getTabTitle(inventoryType)}} ({{ getGameObjects(inventoryType).length }})</span>
       </label>
     </div>
   </form>
 </ng-template>
 <ng-template #inventoryViewSetting>
   <ng-container *ngIf="isEdit">
-    <div>
-      <div style="font-size: 12px;"><b>{{ 'inv.sort' | i18n }}</b></div>
-      <input [(ngModel)]="sortTag" [placeholder]="'inv.tagName' | i18n" class="order-control" attr.list="{{panelId}}_suggest" />
-      <select [(ngModel)]="sortOrder" class="order-control">
-        <option value="ASC">{{ 'inv.sortAsc' | i18n }}</option>
-        <option value="DESC">{{ 'inv.sortDesc' | i18n }}</option>
-      </select>
+    <header class="card-head"><h3>{{ 'inv.settings' | i18n }}</h3></header>
+    <div class="field-row wrap">
+      <label class="field grow">
+        <span>{{ 'inv.sort' | i18n }}</span>
+        <input [(ngModel)]="sortTag" [placeholder]="'inv.tagName' | i18n" class="order-control" attr.list="{{panelId}}_suggest" />
+      </label>
+      <label class="field">
+        <span>&nbsp;</span>
+        <select [(ngModel)]="sortOrder" class="order-control">
+          <option value="ASC">{{ 'inv.sortAsc' | i18n }}</option>
+          <option value="DESC">{{ 'inv.sortDesc' | i18n }}</option>
+        </select>
+      </label>
     </div>
-    <div style="font-size: 12px; padding-top: 6px;"><b>{{ 'inv.displayItems' | i18n }}</b></div>
-    <input style="width: 100%; box-sizing: border-box;" [(ngModel)]="dataTag" [placeholder]="'inv.displayItemsPlaceholder' | i18n" />
-    <div style="padding-top: 6px;">
-      <button class="tab-setting small-font" (click)="toggleEdit()"><i class="material-icons small-font">settings</i>{{ 'inv.done' | i18n }}</button>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'inv.displayItems' | i18n }}</span>
+        <input [(ngModel)]="dataTag" [placeholder]="'inv.displayItemsPlaceholder' | i18n" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-sm btn-primary" (click)="toggleEdit()"><i class="material-icons">settings</i>{{ 'inv.done' | i18n }}</button>
     </div>
   </ng-container>
   <ng-container *ngIf="!isEdit">
-    <table style="font-size: 0.8em;">
-      <tr>
-        <th style="vertical-align:middle" nowrap>{{ 'inv.sort' | i18n }}</th>
-        <td style="vertical-align:middle" nowrap>
-          <ng-container *ngIf="0 < sortTag.length"><span>{{sortTag}} ({{sortOrderName}})</span></ng-container>
-          <ng-container *ngIf="sortTag.length < 1">-</ng-container>
-        </td>
-        <td style="vertical-align:middle" width="100%" nowrap>
-          <button class="tab-setting small-font" (click)="toggleEdit()"><i class="material-icons small-font">settings</i>{{ 'inv.settings' | i18n }}</button>
-          <label *ngIf="selectTab === 'table'" style="float: right; font-size: smaller"><input type="checkbox" [(ngModel)]="indicateAll" /><b>{{ 'inv.showAll' | i18n }}<sup class="self_only">*</sup></b></label>
-          <span style="float: right; margin: 2px"><small><kbd style="border-radius: 3px; border: 1px outset #ccc; padding: 1px; background-color: #eee">{{ 'common.keyCtrl' | i18n }}</kbd>{{ 'inv.multiSelectHint' | i18n }}</small></span>
-        </td>
-      </tr>
-    </table>
+    <div class="view-summary">
+      <span class="summary-label">{{ 'inv.sort' | i18n }}</span>
+      <span class="summary-value">
+        <ng-container *ngIf="0 < sortTag.length">{{sortTag}} ({{sortOrderName}})</ng-container>
+        <ng-container *ngIf="sortTag.length < 1">-</ng-container>
+      </span>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm" (click)="toggleEdit()"><i class="material-icons">settings</i>{{ 'inv.settings' | i18n }}</button>
+        <label *ngIf="selectTab === 'table'" class="check-inline">
+          <input type="checkbox" [(ngModel)]="indicateAll" />
+          {{ 'inv.showAll' | i18n }}<sup class="self_only">*</sup>
+        </label>
+        <span class="multi-hint"><kbd>{{ 'common.keyCtrl' | i18n }}</kbd>{{ 'inv.multiSelectHint' | i18n }}</span>
+      </span>
+    </div>
   </ng-container>
 </ng-template>
 <ng-template #gameObjectTags let-gameObject="gameObject">

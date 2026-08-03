@@ -18,7 +18,7 @@ export const zhTW: I18nDictionary = {
   'menu.sceneTools': '場景工具',
   'menu.inventory': '角色倉庫',
   'menu.notes': '筆記倉庫',
-  'menu.diceOpen': '一次公開桌面骰子',
+  'menu.diceOpen': '公開骰子',
   'menu.settings': '個人設定',
   'menu.viewReset': '視點重置',
 

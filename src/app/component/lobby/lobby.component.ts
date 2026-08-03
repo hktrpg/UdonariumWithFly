@@ -17,7 +17,7 @@ import { PanelService } from 'service/panel.service';
 @Component({
     selector: 'lobby',
     templateUrl: './lobby.component.html',
-    styleUrls: ['./lobby.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './lobby.component.css'],
     standalone: false
 })
 export class LobbyComponent implements OnInit, OnDestroy {

@@ -1,46 +1,97 @@
-<div *ngIf="!isConnected;else other_content">
-  <div>{{ 'room.name' | i18n }}
-    <input class="input" [(ngModel)]="roomName" (ngModelChange)="recalcPeerId()" required minlength="1" maxlength="128"
-      #roomNameValidation="ngModel" name="roomName" [placeholder]="'room.namePlaceholder' | i18n" />
-  </div>
-  <hr/>
-  <div class="pw-row">
-    <label>{{ 'room.gmPassword' | i18n }}</label>
-    <input class="input" type="password" [(ngModel)]="gmPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
-      name="gmPassword" #gmPw="ngModel" [placeholder]="'room.passwordPlaceholder' | i18n" autocomplete="new-password" />
-  </div>
-  <div class="pw-row">
-    <label>{{ 'room.userPassword' | i18n }}</label>
-    <input class="input" type="password" [(ngModel)]="userPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
-      name="userPassword" #userPw="ngModel" [placeholder]="'room.passwordPlaceholder' | i18n" autocomplete="new-password" />
-  </div>
-  <div class="pw-row">
-    <label>{{ 'room.guestPassword' | i18n }}</label>
-    <input class="input" type="password" [(ngModel)]="guestPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
-      name="guestPassword" #guestPw="ngModel" [placeholder]="'room.passwordPlaceholder' | i18n" autocomplete="new-password" />
-  </div>
-  <div class="hint">{{ 'room.passwordHint' | i18n }}</div>
-  <hr/>
-  <div *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
-    <div [hidden]="!roomNameValidation.errors.required && !roomNameValidation.errors.minlength">
-      {{ 'room.errorNameRequired' | i18n }}
+<div class="settings-ui" *ngIf="!isConnected; else other_content">
+  <section class="card">
+    <header class="card-head"><h3>{{ 'room.title' | i18n }}</h3></header>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.name' | i18n }}</span>
+        <input
+          type="text"
+          [(ngModel)]="roomName"
+          (ngModelChange)="recalcPeerId()"
+          required
+          minlength="1"
+          maxlength="128"
+          #roomNameValidation="ngModel"
+          name="roomName"
+          [placeholder]="'room.namePlaceholder' | i18n"
+        />
+      </label>
     </div>
-    <div [hidden]="!roomNameValidation.errors.maxlength">
-      {{ 'room.errorNameMaxLength' | i18n }}
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.gmPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="gmPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="gmPassword"
+          #gmPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
     </div>
-  </div>
-  <div *ngIf="gmPw.errors?.maxlength || userPw.errors?.maxlength || guestPw.errors?.maxlength">
-    {{ 'room.errorPasswordMaxLength' | i18n }}
-  </div>
-  <div *ngIf="!validateLength">
-    {{ 'room.errorPeerIdLength' | i18n }}
-  </div>
-  <div>
-    <button [disabled]="!roomNameValidation.valid || !gmPw.valid || !userPw.valid || !guestPw.valid || !validateLength"
-      (click)="createRoom()">{{ 'room.create' | i18n }}</button>
-  </div>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.userPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="userPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="userPassword"
+          #userPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
+    </div>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.guestPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="guestPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="guestPassword"
+          #guestPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
+    </div>
+    <p class="hint">{{ 'room.passwordHint' | i18n }}</p>
+
+    <div class="error-text" *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
+      <div [hidden]="!roomNameValidation.errors.required && !roomNameValidation.errors.minlength">
+        {{ 'room.errorNameRequired' | i18n }}
+      </div>
+      <div [hidden]="!roomNameValidation.errors.maxlength">
+        {{ 'room.errorNameMaxLength' | i18n }}
+      </div>
+    </div>
+    <div class="error-text" *ngIf="gmPw.errors?.maxlength || userPw.errors?.maxlength || guestPw.errors?.maxlength">
+      {{ 'room.errorPasswordMaxLength' | i18n }}
+    </div>
+    <div class="error-text" *ngIf="!validateLength">
+      {{ 'room.errorPeerIdLength' | i18n }}
+    </div>
+
+    <footer class="actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!roomNameValidation.valid || !gmPw.valid || !userPw.valid || !guestPw.valid || !validateLength"
+        (click)="createRoom()"
+      >
+        {{ 'room.create' | i18n }}
+      </button>
+    </footer>
+  </section>
+  <p class="empty-hint">{{ 'room.emptyRoomHint' | i18n }}</p>
 </div>
-<div><span style="font-size: 12px;">{{ 'room.emptyRoomHint' | i18n }}</span></div>
 <ng-template #other_content>
-  <span style="font-size: 12px;" [innerHTML]="'room.connectedHint' | i18n"></span>
+  <div class="settings-ui empty-hint" [innerHTML]="'room.connectedHint' | i18n"></div>
 </ng-template>

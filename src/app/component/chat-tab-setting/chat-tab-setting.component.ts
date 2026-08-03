@@ -17,7 +17,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'app-chat-tab-setting',
     templateUrl: './chat-tab-setting.component.html',
-    styleUrls: ['./chat-tab-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './chat-tab-setting.component.css'],
     standalone: false
 })
 export class ChatTabSettingComponent implements OnInit, OnDestroy {

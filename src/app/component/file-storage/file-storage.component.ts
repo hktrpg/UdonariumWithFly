@@ -20,7 +20,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'file-storage',
     templateUrl: './file-storage.component.html',
-    styleUrls: ['./file-storage.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './file-storage.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('scaleInOut', [

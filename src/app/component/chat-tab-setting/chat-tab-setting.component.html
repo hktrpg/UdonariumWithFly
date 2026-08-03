@@ -1,52 +1,90 @@
-<div class="flex-container">
-  <div class="flex-item no-grow">
-    <div>
-      <button (click)="create()" style="margin: 0px 0px 2px 0px; font-size: smaller">{{ 'chatTab.create' | i18n }}</button>
-    </div>
-    <select #select style="width: 100%; max-width: 140px" size="10" (change)="onChangeSelectTab(select.value)" [ngModel]="selectedTab?.identifier">
-      <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}" title="{{chatTab.name}}" [style.color]="chatTab.name == '' ? 'gray' : ''">{{chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name}}</option>
+<div class="settings-ui settings-layout">
+  <aside class="settings-aside">
+    <button type="button" class="btn btn-primary btn-block" (click)="create()">
+      <i class="material-icons">add</i>{{ 'chatTab.create' | i18n }}
+    </button>
+    <select
+      #select
+      class="settings-list"
+      size="10"
+      (change)="onChangeSelectTab(select.value)"
+      [ngModel]="selectedTab?.identifier"
+    >
+      <option
+        *ngFor="let chatTab of chatTabs"
+        [value]="chatTab.identifier"
+        [title]="chatTab.name"
+        [class.is-unnamed]="chatTab.name == ''"
+      >
+        {{ chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name }}
+      </option>
     </select>
-  </div>
-  <div class="flex-item">
-    <ng-container *ngIf="!isEmpty && selectedTab">
-      <div><b style="font-size: smaller">{{ 'chatTab.name' | i18n }}</b>
-        <input style="width: 200px" [(ngModel)]="tabName" [placeholder]="'chatTab.namePlaceholder' | i18n" [attr.disabled]="!isEditable ? '' : null" />
-      </div>
-      <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
-        <label [style.cursor]="isEditable ? 'pointer' : 'default'">
-          <input type="checkbox" [(ngModel)]="isUseStandImage" checked="{{isUseStandImage ? 'checked' : ''}}" (change)="isUseStandImage = (isUseStandImage ? true : false)" [attr.disabled]="!isEditable ? '' : null" />
-          <span style="text-shadow: #111 0 0 1px">💭</span>{{ 'chatTab.enableStand' | i18n }}
+  </aside>
+
+  <main class="settings-main" *ngIf="!isEmpty && selectedTab">
+    <section class="card">
+      <header class="card-head"><h3>{{ 'chatTab.name' | i18n }}</h3></header>
+      <div class="field-row">
+        <label class="field grow" [class.disabled]="!isEditable">
+          <span>{{ 'chatTab.name' | i18n }}</span>
+          <input
+            type="text"
+            [(ngModel)]="tabName"
+            [placeholder]="'chatTab.namePlaceholder' | i18n"
+            [disabled]="!isEditable"
+          />
         </label>
       </div>
-      <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
-        <label [style.cursor]="isEditable ? 'pointer' : 'default'">
-          <input type="checkbox" [(ngModel)]="recieveOperationLogLevel" checked="{{recieveOperationLogLevel > 0 ? 'checked' : ''}}" (change)="recieveOperationLogLevel = (recieveOperationLogLevel > 0 ? 1 : 0)" [attr.disabled]="!isEditable ? '' : null" />
+      <div class="check-row">
+        <label [class.disabled]="!isEditable" [style.cursor]="isEditable ? 'pointer' : 'default'">
+          <input
+            type="checkbox"
+            [(ngModel)]="isUseStandImage"
+            [disabled]="!isEditable"
+          />
+          {{ 'chatTab.enableStand' | i18n }}
+        </label>
+        <label [class.disabled]="!isEditable" [style.cursor]="isEditable ? 'pointer' : 'default'">
+          <input
+            type="checkbox"
+            [ngModel]="recieveOperationLogLevel > 0"
+            (ngModelChange)="recieveOperationLogLevel = $event ? 1 : 0"
+            [disabled]="!isEditable"
+          />
           {{ 'chatTab.showOperationLog' | i18n }}
         </label>
       </div>
-      <hr/>
-      <div>
-        <ng-container *ngIf="!isDeleted">
-          <button (click)="upTabIndex()">↑</button>
-          <button (click)="downTabIndex()">↓</button>
-          <div style="float: right">
-          <button (click)="showLogOutput()"><i class="material-icons small-font">history_edu</i>{{ 'chatTab.log' | i18n }}</button>
-          <button [disabled]="isSaveing" (click)="save()">
-            <div style="position: relative;">
-              <div [ngClass]="{'is-hidden': isSaveing}">{{ 'chatTab.download' | i18n }}</div>
-              <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
-            </div>
+    </section>
+
+    <footer class="actions">
+      <ng-container *ngIf="!isDeleted">
+        <button type="button" class="btn btn-sm" (click)="upTabIndex()">↑</button>
+        <button type="button" class="btn btn-sm" (click)="downTabIndex()">↓</button>
+        <span class="actions-spacer">
+          <button type="button" class="btn" (click)="showLogOutput()">
+            <i class="material-icons">history_edu</i>{{ 'chatTab.log' | i18n }}
           </button>
-          <button class="danger" (click)="delete()" [attr.disabled]="chatTabs.length <= 1 ? '' : null">{{ 'chatTab.delete' | i18n }}</button>
-          </div>
-        </ng-container>
-        <ng-container *ngIf="isDeleted">
-          <button (click)="restore()">{{ 'chatTab.restore' | i18n }}</button>
-        </ng-container>
-      </div>
-    </ng-container>
-  </div>
+          <button type="button" class="btn" [disabled]="isSaveing" (click)="save()">
+            <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'chatTab.download' | i18n }}</span>
+            <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger"
+            (click)="delete()"
+            [disabled]="chatTabs.length <= 1"
+          >
+            {{ 'chatTab.delete' | i18n }}
+          </button>
+        </span>
+      </ng-container>
+      <ng-container *ngIf="isDeleted">
+        <button type="button" class="btn" (click)="restore()">{{ 'chatTab.restore' | i18n }}</button>
+      </ng-container>
+    </footer>
+  </main>
 </div>
-<ng-container *ngIf="isEmpty">
-  <div style="font-size: 12px;">{{ 'chatTab.empty' | i18n }}</div>
-</ng-container>
+
+<div class="settings-ui empty-hint" *ngIf="isEmpty">
+  {{ 'chatTab.empty' | i18n }}
+</div>

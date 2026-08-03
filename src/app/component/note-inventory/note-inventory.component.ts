@@ -19,7 +19,7 @@ type NoteFilterId = 'all' | 'table' | 'other';
 @Component({
   selector: 'note-inventory',
   templateUrl: './note-inventory.component.html',
-  styleUrls: ['./note-inventory.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './note-inventory.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: false
 })
@@ -183,6 +183,14 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
           this.refresh();
         },
         disabled: location === 'common' || !location
+      },
+      {
+        name: this.i18n.t('note.moveToPersonal'),
+        action: () => {
+          gameObject.setLocation(Network.peerId);
+          this.refresh();
+        },
+        disabled: location === Network.peerId
       },
       {
         name: this.i18n.t('note.moveToGraveyard'),

@@ -1,21 +1,25 @@
-<div class="room-join">
-  <div class="roles">
-    <label *ngFor="let r of roles" class="role" [class.disabled]="!isRoleAvailable(r.id)" [class.active]="role === r.id">
-      <input type="radio" name="roomRole" [value]="r.id" [(ngModel)]="role" [disabled]="!isRoleAvailable(r.id)" (ngModelChange)="onRoleChange()">
-      <span class="label">{{ r.label }}</span>
-      <span class="hint">{{ r.hint }}</span>
-      <span class="lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)">🔒</span>
-      <span class="open" *ngIf="isRoleAvailable(r.id) && !needsPasswordFor(r.id)">{{ 'roomJoin.noPassword' | i18n }}</span>
-    </label>
-  </div>
-  <div class="pw" *ngIf="needsPassword()">
-    <label>{{ 'roomJoin.passwordLabel' | i18n:{ role: roleLabel } }}
-      <input type="password" [(ngModel)]="password" (keydown.enter)="submit()" [placeholder]="'roomJoin.passwordPlaceholder' | i18n" autocomplete="current-password" />
-    </label>
-  </div>
-  <div class="actions">
-    <button type="button" (click)="submit()"><b>{{ submitLabel }}</b></button>
-    <button type="button" class="cancel" (click)="cancel()">{{ 'roomJoin.cancel' | i18n }}</button>
-  </div>
-  <div class="help">{{ help }}</div>
+<div class="settings-ui room-join">
+  <section class="card">
+    <header class="card-head"><h3>{{ 'roomJoin.selectRole' | i18n }}</h3></header>
+    <div class="roles">
+      <label *ngFor="let r of roles; trackBy: trackByRoleId" class="role" [class.disabled]="!isRoleAvailable(r.id)" [class.active]="role === r.id">
+        <input type="radio" name="roomRole" [value]="r.id" [(ngModel)]="role" [disabled]="!isRoleAvailable(r.id)" (ngModelChange)="onRoleChange()">
+        <span class="label">{{ r.label }}</span>
+        <span class="role-hint">{{ r.hint }}</span>
+        <span class="lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)">🔒</span>
+        <span class="open" *ngIf="isRoleAvailable(r.id) && !needsPasswordFor(r.id)">{{ 'roomJoin.noPassword' | i18n }}</span>
+      </label>
+    </div>
+    <div class="field-row" *ngIf="needsPassword()">
+      <label class="field grow">
+        <span>{{ 'roomJoin.passwordLabel' | i18n:{ role: roleLabel } }}</span>
+        <input type="password" [(ngModel)]="password" (keydown.enter)="submit()" [placeholder]="'roomJoin.passwordPlaceholder' | i18n" autocomplete="current-password" />
+      </label>
+    </div>
+    <footer class="actions">
+      <button type="button" class="btn btn-primary" (click)="submit()">{{ submitLabel }}</button>
+      <button type="button" class="btn" (click)="cancel()">{{ 'roomJoin.cancel' | i18n }}</button>
+    </footer>
+    <p class="error-text" *ngIf="help">{{ help }}</p>
+  </section>
 </div>

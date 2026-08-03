@@ -164,6 +164,7 @@ export const zhTW_obj: I18nDictionary = {
   'textNote.menu.14': '打開參考網址',
   'textNote.menu.15': '建立副本',
   'textNote.menu.16': '刪除',
+  'textNote.menu.17': '新增物件',
   'mask.dynamic.1': '僅操作時顯示',
   'mask.dynamic.2': '操作時、未固定時',
   'mask.dynamic.3': '始終顯示',

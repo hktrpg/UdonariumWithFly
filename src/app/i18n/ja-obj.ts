@@ -165,6 +165,7 @@ export const ja_obj: I18nDictionary = {
   'textNote.menu.14': '参照URLを開く',
   'textNote.menu.15': '複製を作る',
   'textNote.menu.16': '削除',
+  'textNote.menu.17': 'オブジェクト作成',
   'mask.dynamic.1': '操作中のみ表示',
   'mask.dynamic.2': '操作中・未固定時',
   'mask.dynamic.3': '常に表示',

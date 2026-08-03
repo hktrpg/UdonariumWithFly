@@ -1,43 +1,51 @@
-<div class="component" *ngIf="!GuestMode()">
-  <div class="toolbar">
-    <div class="tab">
-      <label *ngFor="let filter of filters">
-        <input name="note-filter" type="radio" [value]="filter.id" [(ngModel)]="selectFilter">
-        <div>{{filter.label}} ({{countByFilter(filter.id)}})</div>
-      </label>
-    </div>
-    <button type="button" class="refresh" [title]="'note.refresh' | i18n" (click)="refresh()">
-      <i class="material-icons" style="font-size: 1rem;">refresh</i>
-    </button>
-  </div>
-
-  <div *ngFor="let gameObject of filteredNotes(); trackBy: trackByGameObject">
-    <div class="inventory-object" [class.selected]="selectedIdentifier === gameObject.identifier"
-      (click)="selectNote(gameObject)" (contextmenu)="onContextMenu($event, gameObject)">
-      <div class="object-name">
-        <strong>{{showgameObject(gameObject)}}</strong>
-        <span class="location-badge">{{locationLabel(gameObject)}}</span>
-        <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="menu-btn" [title]="'note.menu' | i18n"
-          (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
-          <i class="material-icons" style="font-size: 1em;">settings</i>
-        </button>
-        <span *ngIf="!isittable(gameObject)">
-          <button type="button" class="move-btn" (click)="settotable(gameObject); $event.stopPropagation()">
-            {{ 'note.moveToTable' | i18n }}
-            <i class="material-icons" style="font-size: 1em;">open_with</i>
-          </button>
-        </span>
+<div class="settings-ui note-inventory" *ngIf="!GuestMode(); else guestBlock">
+  <section class="card sticky-toolbar">
+    <div class="toolbar">
+      <div class="inv-tabs">
+        <label *ngFor="let filter of filters" class="inv-tab" [class.is-active]="selectFilter === filter.id">
+          <input name="note-filter" type="radio" [value]="filter.id" [(ngModel)]="selectFilter">
+          <span>{{filter.label}} ({{countByFilter(filter.id)}})</span>
+        </label>
       </div>
-      <div class="note-text" [class.expanded]="expandedId === gameObject.identifier">
-        {{gameObject.text}}
-      </div>
-      <button *ngIf="gameObject.text && gameObject.text.length > 80" type="button" class="expand-btn"
-        (click)="toggleExpand(gameObject); $event.stopPropagation()">
-        {{expandedId === gameObject.identifier ? ('note.collapse' | i18n) : ('note.expand' | i18n)}}
+      <button type="button" class="btn btn-sm" [title]="'note.refresh' | i18n" (click)="refresh()">
+        <i class="material-icons">refresh</i>
       </button>
     </div>
-  </div>
+  </section>
 
-  <div *ngIf="filteredNotes().length < 1" class="empty">{{ 'note.empty' | i18n }}</div>
+  <section
+    class="card note-card"
+    *ngFor="let gameObject of filteredNotes(); trackBy: trackByGameObject"
+    [class.is-selected]="selectedIdentifier === gameObject.identifier"
+    (click)="selectNote(gameObject)"
+    (contextmenu)="onContextMenu($event, gameObject)"
+  >
+    <div class="note-head">
+      <strong class="note-title">{{showgameObject(gameObject)}}</strong>
+      <span class="location-badge">{{locationLabel(gameObject)}}</span>
+      <span class="actions-spacer">
+        <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="btn btn-sm" [title]="'note.menu' | i18n"
+          (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
+          <i class="material-icons">settings</i>
+        </button>
+        <button *ngIf="!isittable(gameObject)" type="button" class="btn btn-sm btn-primary"
+          (click)="settotable(gameObject); $event.stopPropagation()">
+          {{ 'note.moveToTable' | i18n }}
+          <i class="material-icons">open_with</i>
+        </button>
+      </span>
+    </div>
+    <div class="note-text" [class.expanded]="expandedId === gameObject.identifier">
+      {{gameObject.text}}
+    </div>
+    <button *ngIf="gameObject.text && gameObject.text.length > 80" type="button" class="btn btn-sm expand-btn"
+      (click)="toggleExpand(gameObject); $event.stopPropagation()">
+      {{expandedId === gameObject.identifier ? ('note.collapse' | i18n) : ('note.expand' | i18n)}}
+    </button>
+  </section>
+
+  <p class="empty-hint" *ngIf="filteredNotes().length < 1">{{ 'note.empty' | i18n }}</p>
 </div>
-<div *ngIf="GuestMode()" class="empty">{{ 'note.guestUnavailable' | i18n }}</div>
+<ng-template #guestBlock>
+  <div class="settings-ui empty-hint">{{ 'note.guestUnavailable' | i18n }}</div>
+</ng-template>

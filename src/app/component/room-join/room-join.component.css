@@ -1,16 +1,47 @@
-.room-join { font-size: 13px; }
-.roles { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.role {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+/* Room-join-specific; shared UI lives in ../shared/settings-ui.css */
+
+.roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.role.active { border-color: #2563eb; background: #eff6ff; }
-.role.disabled { opacity: 0.45; cursor: not-allowed; }
-.role .label { font-weight: bold; min-width: 2.5em; }
-.role .hint { color: #64748b; flex: 1; }
-.role .lock, .role .open { font-size: 11px; color: #64748b; }
-.pw { margin-bottom: 10px; }
-.pw input { width: 100%; margin-top: 2px; }
-.actions { display: flex; gap: 8px; }
-.help { margin-top: 6px; font-size: 12px; color: #b91c1c; min-height: 1.2em; }
-.cancel { opacity: 0.85; }
+
+.role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d2c2ab;
+  border-radius: 6px;
+  background: #fffdf8;
+  cursor: pointer;
+  color: #3a2f24;
+}
+
+.role.active {
+  border-color: #5c4630;
+  background: linear-gradient(180deg, #fffaf2 0%, #efe0c8 100%);
+}
+
+.role.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.role .label {
+  font-weight: 700;
+  min-width: 2.5em;
+  color: #5c4630;
+}
+
+.role .role-hint {
+  color: #7a6a58;
+  flex: 1;
+  font-size: 12px;
+}
+
+.role .lock,
+.role .open {
+  font-size: 11px;
+  color: #7a6a58;
+}

@@ -14,7 +14,7 @@ import { TabletopService } from 'service/tabletop.service';
 @Component({
   selector: 'scene-tools',
   templateUrl: './scene-tools.component.html',
-  styleUrls: ['./scene-tools.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './scene-tools.component.css'],
   standalone: false
 })
 export class SceneToolsComponent implements OnInit, OnDestroy {

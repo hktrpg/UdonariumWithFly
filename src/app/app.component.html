@@ -64,44 +64,10 @@
           <div>{{ 'menu.notes' | i18n }}</div>
         </a>
       </li>
-      <li (click)="diceAllOpne()">
-        <a routerLink="/" routerLinkActive="active">
-          <div><i class="material-icons icon-size">all_out</i></div>
-          <div>{{ 'menu.diceOpen' | i18n }}</div>
-        </a>
-      </li>
       <li (click)="standSetteings($event)">
         <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
           <div><i class="material-icons icon-size">how_to_reg</i></div>
           <div>{{ 'menu.settings' | i18n }}<sup class="self-only">*</sup></div>
-        </a>
-      </li>
-      <li (click)="resetPointOfView($event)">
-        <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-          <div><i class="material-icons icon-size">remove_red_eye</i></div>
-          <div>{{ 'menu.viewReset' | i18n }}<sup class="self-only">*</sup></div>
-        </a>
-      </li>
-      <li *ngIf="!GuestMode()">
-        <a routerLink="/" routerLinkActive="active">
-          <label>
-            <div><i class="material-icons">open_in_browser</i></div>
-            <div>{{ 'menu.loadZip' | i18n }}</div>
-            <input type="file" style="display: none;" (change)="handleFileSelect($event)" multiple
-              accept="application/xml,text/xml,application/zip" />
-          </label>
-        </a>
-      </li>
-      <li *ngIf="!isSaveing && !GuestMode()" (click)="save()">
-        <a routerLink="/" routerLinkActive="active">
-          <div><i class="material-icons">sd_storage</i></div>
-          <div>{{ 'menu.downloadZip' | i18n }}</div>
-        </a>
-      </li>
-      <li *ngIf="isSaveing" style="pointer-events: none;">
-        <a>
-          <div><i class="material-icons vibration-amine">sd_storage</i></div>
-          <div>{{progresPercent}}%</div>
         </a>
       </li>
       <li (click)="logout()">

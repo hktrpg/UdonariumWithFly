@@ -17,7 +17,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'app-stand-setting',
     templateUrl: './stand-setting.component.html',
-    styleUrls: ['./stand-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './stand-setting.component.css'],
     standalone: false
 })
 export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {

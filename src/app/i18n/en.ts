@@ -18,7 +18,7 @@ export const en: I18nDictionary = {
   'menu.sceneTools': 'Scene Tools',
   'menu.inventory': 'Characters',
   'menu.notes': 'Notes',
-  'menu.diceOpen': 'Reveal All Dice',
+  'menu.diceOpen': 'Reveal Dice',
   'menu.settings': 'Settings',
   'menu.viewReset': 'Reset View',
 

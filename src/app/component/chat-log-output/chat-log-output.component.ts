@@ -12,7 +12,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'app-chat-log-output',
     templateUrl: './chat-log-output.component.html',
-    styleUrls: ['./chat-log-output.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './chat-log-output.component.css'],
     standalone: false
 })
 export class ChatLogOutputComponent implements OnInit, AfterViewInit {

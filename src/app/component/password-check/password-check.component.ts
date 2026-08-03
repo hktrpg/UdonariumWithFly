@@ -10,7 +10,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'password-check',
     templateUrl: './password-check.component.html',
-    styleUrls: ['./password-check.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './password-check.component.css'],
     standalone: false
 })
 export class PasswordCheckComponent implements OnInit, AfterViewInit, OnDestroy {

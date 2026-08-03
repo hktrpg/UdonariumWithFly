@@ -1,50 +1,90 @@
-<div class="flex-container" style="flex-wrap: nowrap" *ngIf="!GuestMode()">
-    <div class="flex-item no-grow">
-      <select #select style="width: 140px" size="10" multiple (change)="onChangeSelectTabs()" [disabled]="isAllTabs">
-        <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}">{{chatTab.name}}</option>
-      </select>
-    </div>
-    <div class="flex-item">
-      <ng-container *ngIf="!isEmpty">
-        <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
-          <div>
-            {{ 'chatLog.tab' | i18n }}
-            <label><input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [checked]="!isAllTabs" [value]="false">{{ 'chatLog.selectedTabs' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [checked]="isAllTabs" [value]="true">{{ 'chatLog.allTabs' | i18n }}</label>
-          </div>
-          <div>
-            {{ 'chatLog.format' | i18n }}
-            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 0" [value]="0">{{ 'chatLog.text' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 1" [value]="1">{{ 'chatLog.html' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">{{ 'chatLog.htmlWithImages' | i18n }}</label>
-            <div style="font-weight: normal; padding-left: 1em" [innerHTML]="'chatLog.htmlWithImagesHelp' | i18n"></div>
-          </div>
-          <div>
-            {{ 'chatLog.time' | i18n }}
-            <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == ''" [value]="''">{{ 'chatLog.none' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == 'HH:mm'" [value]="'HH:mm'">{{ 'chatLog.hoursMinutes' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [checked]="dateFormat == 'yyyy/MM/dd HH:mm'" [value]="'yyyy/MM/dd HH:mm'">{{ 'chatLog.dateTime' | i18n }}</label>
-          </div>
-        </div>
-        <hr/>
-        <div style="width: 100%; display: flex">
-          <div>
-            <label style="font-weight: bolder; font-size: smaller; padding-top: 3px; padding-right: 1em">
-              <input type="checkbox" [(ngModel)]="isWriteOerationLog" checked="{{isWriteOerationLog ? 'checked' : ''}}" />{{ 'chatLog.includeOperationLog' | i18n }}
-            </label>
-          </div>
-          <div style="flex-grow: 1; text-align: right">
-            <button (click)="logFormat < 2 ? saveLog() : saveLogWithImages()" style="font-size: smaller" [disabled]="isDisable">
-              <div style="position: relative;">
-                <div [ngClass]="{'is-hidden': isSaveing}">{{ 'chatLog.export' | i18n }}</div>
-                <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </ng-container>
-    </div>
-  </div>
-  <ng-container *ngIf="isEmpty">
-    <div style="font-size: 12px;">{{ 'chatLog.empty' | i18n }}</div>
-  </ng-container>
+<div class="settings-ui settings-layout" *ngIf="!GuestMode()">
+  <aside class="settings-aside">
+    <select
+      #select
+      class="settings-list"
+      size="10"
+      multiple
+      (change)="onChangeSelectTabs()"
+      [disabled]="isAllTabs"
+    >
+      <option *ngFor="let chatTab of chatTabs" [value]="chatTab.identifier">{{ chatTab.name }}</option>
+    </select>
+  </aside>
+
+  <main class="settings-main" *ngIf="!isEmpty">
+    <section class="card">
+      <header class="card-head"><h3>{{ 'chatLog.title' | i18n }}</h3></header>
+
+      <div class="radio-row">
+        <span>{{ 'chatLog.tab' | i18n }}</span>
+        <label>
+          <input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [value]="false" />
+          {{ 'chatLog.selectedTabs' | i18n }}
+        </label>
+        <label>
+          <input name="{{panelId}}-log-output-tab" type="radio" [(ngModel)]="isAllTabs" [value]="true" />
+          {{ 'chatLog.allTabs' | i18n }}
+        </label>
+      </div>
+
+      <div class="radio-row">
+        <span>{{ 'chatLog.format' | i18n }}</span>
+        <label>
+          <input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [value]="0" />
+          {{ 'chatLog.text' | i18n }}
+        </label>
+        <label>
+          <input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [value]="1" />
+          {{ 'chatLog.html' | i18n }}
+        </label>
+        <label>
+          <input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [value]="2" />
+          {{ 'chatLog.htmlWithImages' | i18n }}
+        </label>
+      </div>
+      <p class="hint" [innerHTML]="'chatLog.htmlWithImagesHelp' | i18n"></p>
+
+      <div class="radio-row">
+        <span>{{ 'chatLog.time' | i18n }}</span>
+        <label>
+          <input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [value]="''" />
+          {{ 'chatLog.none' | i18n }}
+        </label>
+        <label>
+          <input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [value]="'HH:mm'" />
+          {{ 'chatLog.hoursMinutes' | i18n }}
+        </label>
+        <label>
+          <input name="{{panelId}}-log-output-timestamp-type" type="radio" [(ngModel)]="dateFormat" [value]="'yyyy/MM/dd HH:mm'" />
+          {{ 'chatLog.dateTime' | i18n }}
+        </label>
+      </div>
+
+      <div class="check-row">
+        <label>
+          <input type="checkbox" [(ngModel)]="isWriteOerationLog" />
+          {{ 'chatLog.includeOperationLog' | i18n }}
+        </label>
+      </div>
+    </section>
+
+    <footer class="actions">
+      <span class="actions-spacer">
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="logFormat < 2 ? saveLog() : saveLogWithImages()"
+          [disabled]="isDisable"
+        >
+          <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'chatLog.export' | i18n }}</span>
+          <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
+        </button>
+      </span>
+    </footer>
+  </main>
+</div>
+
+<div class="settings-ui empty-hint" *ngIf="isEmpty">
+  {{ 'chatLog.empty' | i18n }}
+</div>

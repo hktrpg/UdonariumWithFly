@@ -163,6 +163,7 @@ export const en_obj: I18nDictionary = {
   'textNote.menu.14': 'Open reference URL',
   'textNote.menu.15': 'Duplicate',
   'textNote.menu.16': 'Delete',
+  'textNote.menu.17': 'Create object',
   'mask.dynamic.1': 'Show only while operating',
   'mask.dynamic.2': 'While operating / unlocked',
   'mask.dynamic.3': 'Always show',

@@ -28,7 +28,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'app-cut-in-setting',
     templateUrl: './cut-in-setting.component.html',
-    styleUrls: ['./cut-in-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './cut-in-setting.component.css'],
     standalone: false
 })
 export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {

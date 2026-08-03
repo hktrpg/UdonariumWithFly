@@ -11,7 +11,7 @@ import { PanelService } from 'service/panel.service';
 @Component({
   selector: 'room-join',
   templateUrl: './room-join.component.html',
-  styleUrls: ['./room-join.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './room-join.component.css'],
   standalone: false
 })
 export class RoomJoinComponent implements OnInit, OnDestroy {
@@ -22,6 +22,7 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
   /** When true, used from peer-menu「轉換身份」instead of lobby join. */
   switchMode = false;
   currentRole: RoomRole = null;
+  roles: { id: RoomRole; label: string; hint: string }[] = [];
 
   constructor(
     private panelService: PanelService,
@@ -38,14 +39,6 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     return `${RoomAuth.displayRoomName(this.room.name)}/${this.room.id}`;
   }
 
-  get roles(): { id: RoomRole; label: string; hint: string }[] {
-    return ['gm', 'user', 'guest'].map(id => ({
-      id: id as RoomRole,
-      label: this.i18n.t(`roomJoin.role.${id}.label`),
-      hint: this.i18n.t(`roomJoin.role.${id}.hint`),
-    }));
-  }
-
   get roleLabel(): string {
     return this.i18n.t(`roomJoin.role.${this.role}.label`);
   }
@@ -55,14 +48,13 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    Promise.resolve().then(() => {
-      const head = this.i18n.t(this.switchMode ? 'roomJoin.switchRole' : 'roomJoin.selectRole');
-      this.modalService.title = this.panelService.title = this.room
-        ? this.i18n.t('roomJoin.titleWithRoom', { head, room: this.title })
-        : head;
-    });
+    this.refreshRoles();
+    Promise.resolve().then(() => this.refreshTitle());
     EventSystem.register(this)
-      .on('LOCALE_CHANGED', () => this.refreshTitle());
+      .on('LOCALE_CHANGED', () => {
+        this.refreshRoles();
+        this.refreshTitle();
+      });
     if (this.currentRole && this.isRoleAvailable(this.currentRole)) {
       this.role = this.currentRole;
       return;
@@ -74,6 +66,18 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  trackByRoleId(_: number, role: { id: RoomRole }): RoomRole {
+    return role.id;
+  }
+
+  private refreshRoles() {
+    this.roles = (['gm', 'user', 'guest'] as RoomRole[]).map(id => ({
+      id,
+      label: this.i18n.t(`roomJoin.role.${id}.label`),
+      hint: this.i18n.t(`roomJoin.role.${id}.hint`),
+    }));
   }
 
   private refreshTitle() {

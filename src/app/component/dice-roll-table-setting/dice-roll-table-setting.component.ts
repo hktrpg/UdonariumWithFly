@@ -14,7 +14,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'dice-roll-table-setting',
     templateUrl: './dice-roll-table-setting.component.html',
-    styleUrls: ['./dice-roll-table-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './dice-roll-table-setting.component.css'],
     standalone: false
 })
 export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterViewInit {

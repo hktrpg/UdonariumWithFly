@@ -30,7 +30,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'game-object-inventory',
     templateUrl: './game-object-inventory.component.html',
-    styleUrls: ['./game-object-inventory.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './game-object-inventory.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('SlideInOut', [

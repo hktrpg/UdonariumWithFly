@@ -21,7 +21,7 @@ import { TabletopService } from 'service/tabletop.service';
 @Component({
   selector: 'combat-tracker',
   templateUrl: './combat-tracker.component.html',
-  styleUrls: ['./combat-tracker.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './combat-tracker.component.css'],
   standalone: false
 })
 export class CombatTrackerComponent implements OnInit, OnDestroy {

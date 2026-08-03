@@ -1,56 +1,84 @@
+/* File-storage-specific; shared UI lives in ../shared/settings-ui.css */
+
 :host {
   display: block;
 }
 
-.component {
-  position: absolute;
-  max-height: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: visible;
-  color: #444;
-  z-index: 9000;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  cursor: grab;
+.file-storage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.drop-zone {
-  display: block;
-  user-select: none;
-  border: 2px dashed #555;
-  -moz-border-radius: 5px;
-  -webkit-border-radius: 5px;
-  border-radius: 5px;
-  padding: 25px;
-  text-align: center;
-  font: 24px bold 'Vollkorn';
-  color: #444;
-  cursor: pointer;
-}
-.drop-zone span {
+.drop-zone-wrap {
   display: block;
   cursor: pointer;
 }
 
-.large-font {
-  font-size: 64px;
+.filter-card.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.small-font {
+.sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 200;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.cond-select {
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid #c4b29a;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
+  font-weight: 700;
+  color: #5c4630;
+  cursor: pointer;
+}
+
+.file-list {
+  padding-top: 2px;
 }
 
 .image {
+  position: relative;
   font-size: 0;
   display: inline-block;
+  min-width: 100px;
+  height: 120px;
+  text-align: center;
   border: 2px solid transparent;
   margin-right: -2px;
   cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .image:hover {
-  border: 2px dotted red;
+  border: 2px dotted #a33;
   transform: scale(1.08);
   z-index: 150;
   transition-duration: 60ms;
@@ -61,7 +89,7 @@
 }
 
 .image.selected {
-  border: 2px solid red;
+  border: 2px solid #a33;
 }
 
 .selecter .image:not(.selected) img {
@@ -73,41 +101,135 @@
   filter: none !important;
 }
 
+.image-meta {
+  position: absolute;
+  font-size: xx-small;
+  text-align: left;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tag-stack {
+  position: absolute;
+  bottom: 0;
+  z-index: 5;
+}
+
+.word-tag {
+  display: block;
+  width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 3px;
+  color: #3a2f24;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.word-tag.removable {
+  display: inline-block;
+  width: auto;
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: smaller;
+}
+
+.word-tag.removable:hover,
+.word-tag.removable sup {
+  color: #a33;
+}
+
+.more-tags,
+.no-tag-label {
+  display: block;
+  width: 88px;
+  overflow: hidden;
+  padding-left: 2px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.no-tag-label {
+  color: #999;
+}
+
+.zoom-in {
+  z-index: 10;
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+}
+
+.zoom-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 1px;
+  border-radius: 100px;
+  pointer-events: auto;
+  cursor: zoom-in;
+}
+
+.zoom-button .material-icons {
+  font-size: 16px;
+}
+
+.hidden-badge {
+  position: absolute;
+  text-align: right;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.hidden-badge .material-icons {
+  margin-right: 2px;
+  font-size: 16px;
+  display: block;
+}
+
+.image-click {
+  cursor: pointer;
+}
+
 .badge {
   position: absolute;
   top: -4px;
   right: 0;
 }
 
-.sticky-top {
-  position: sticky;
-  top: 0;
-  background-color: rgba(240, 218, 189, 0.9);
-  border-bottom: 1px dotted #666;
-  z-index: 100;
+.selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.sticky-bottom {
-  position: sticky;
-  bottom: 0;
-  background-color: rgba(240, 218, 189, 0.9);
-  border-top: 1px dotted #666;
-  z-index: 200;
+.tag-input {
+  width: 14em;
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid #c4b29a;
+  border-radius: 4px;
+  background: #fff;
 }
 
-.word-tag {
-  margin-right: 3px;
-  display: inline-block;
-  color: black;
-  font-weight: bolder;
-}
-.word-tag:hover {
-  color: red;
+.selected-tags {
+  user-select: none;
 }
 
 .word-selecter {
-  padding : 5px;
+  padding: 0;
   user-select: none;
+  flex: 1 1 auto;
 }
 
 .word-selecter label {
@@ -115,72 +237,52 @@
   position: relative;
 }
 
-.word-selecter input[type="checkbox"] {
+.word-selecter input[type='checkbox'] {
   display: none;
 }
 
-.word-selecter input[type="checkbox"] + div {
+.word-selecter input[type='checkbox'] + div {
   display: inline-block;
   vertical-align: middle;
   outline: 0;
   font-size: 12px;
-  background-color: transparent;
-  color: #444; 
-  border: solid 1px #555;
+  background-color: #fffdf8;
+  color: #5c4630;
+  border: solid 1px #c4b29a;
   padding: 2px 8px;
   margin: 2px;
-  border-radius: 100px;
+  border-radius: 4px;
   cursor: pointer;
-
   height: 1.6em;
 }
 
-.word-selecter input[type="checkbox"] + div:hover {
-  background-color: #888;
-  color: #eee;
-  border: solid 1px #555;
+.word-selecter input[type='checkbox'] + div:hover {
+  background-color: #efe0c8;
+  color: #3a2f24;
 }
 
-.word-selecter input[type="checkbox"]:checked + div {
-  background: #555;
-  color: #CCC;
+.word-selecter input[type='checkbox']:checked + div {
+  background: #5c4630;
+  color: #fffaf2;
+  border-color: #4a3826;
 }
 
-.word-selecter input[type="checkbox"]:checked + div.all-tags {
-  background-color: #eee;
-  color: darkcyan;
+.word-selecter input[type='checkbox']:checked + div.all-tags {
+  background-color: #efe0c8;
+  color: #5c4630;
+  border-color: #b89b78;
 }
 
 .grow {
-  text-shadow    : 
-       1px  1px 0px #ffffff,
-      -1px  1px 0px #ffffff,
-       1px -1px 0px #ffffff,
-      -1px -1px 0px #ffffff,
-       1px  0px 0px #ffffff,
-       0px  1px 0px #ffffff,
-      -1px  0px 0px #ffffff,
-       0px -1px 0px #ffffff; 
+  text-shadow:
+    1px 1px 0 #fff,
+    -1px 1px 0 #fff,
+    1px -1px 0 #fff,
+    -1px -1px 0 #fff;
 }
 
 .red-eye {
   color: darkred;
-  text-shadow: 0px 0px 2px crimson,
-  0px 0px 4px white;
+  text-shadow: 0 0 2px crimson, 0 0 4px white;
   font-weight: bolder;
-}
-
-.zoom-button {
-  width: 24px;
-  height: 24px; 
-  border-radius: 100px; 
-  padding: 1px;
-  pointer-events: auto;
-  cursor: zoom-in;
-}
-
-.zoom-button > .material-icons {
-  display:inline-block;
-  font-size: 16px;
-  vertical-align: bottom;
 }

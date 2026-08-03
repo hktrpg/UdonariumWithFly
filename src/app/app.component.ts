@@ -733,21 +733,36 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     menu.push(ContextMenuSeparator);
     menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
-    menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') })
+    menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
+    menu.push(ContextMenuSeparator);
+    menu.push({
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+      ]
+    });
+    menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
+    menu.push(ContextMenuSeparator);
+    menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
+    menu.push({
+      name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+      materialIcon: 'sd_storage',
+      disabled: this.isSaveing,
+      action: () => this.save()
+    });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
   }
 
-  resetPointOfView(event: Event) {
-    const button = <HTMLElement>event.target;
-    const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
-    };
-    this.contextMenuService.open(position, [
-      { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-      { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-    ], this.i18n.t('menu.viewReset'));
+  openZipFileSelect() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/xml,text/xml,application/zip';
+    input.onchange = (event: Event) => this.handleFileSelect(event);
+    input.click();
   }
 
   standSetteings(event: Event) {
