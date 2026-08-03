@@ -19,6 +19,8 @@ import { Jukebox } from '@udonarium/Jukebox';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { FilterType, WeatherType } from '@udonarium/game-table';
+import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuComponent } from 'component/context-menu/context-menu.component';
@@ -732,6 +734,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
     });
     menu.push(ContextMenuSeparator);
+    menu.push(this.makeWeatherToolboxMenu());
+    menu.push(this.makeDayNightToolboxMenu());
+    menu.push(ContextMenuSeparator);
     menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
     menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
     menu.push(ContextMenuSeparator);
@@ -754,6 +759,102 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       action: () => this.save()
     });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+  }
+
+  private makeWeatherToolboxMenu() {
+    const markType = (type: WeatherType) => {
+      const cur = TableSelecter.instance.viewTable?.weatherType || 'none';
+      return `${cur === type ? '◉' : '○'}`;
+    };
+    const setType = (type: WeatherType) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.weatherType = type;
+      if (type !== 'none' && !(table.weatherIntensity > 0)) table.weatherIntensity = 0.5;
+    };
+    const markIntensity = (value: number) => {
+      const cur = TableSelecter.instance.viewTable?.weatherIntensity ?? 0.5;
+      const on = Math.abs(cur - value) < 0.06;
+      return `${on ? '◉' : '○'}`;
+    };
+    const setIntensity = (value: number) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.weatherIntensity = value;
+      if (table.weatherType === 'none') table.weatherType = 'rain';
+    };
+    const typeItem = (type: WeatherType, labelKey: string) => {
+      const label = this.i18n.t(labelKey);
+      return {
+        name: `${markType(type)} ${label}`,
+        nameUpdate: () => `${markType(type)} ${label}`,
+        action: () => setType(type),
+        checkBox: 'radio' as const,
+      };
+    };
+    const intensityItem = (value: number, labelKey: string) => {
+      const label = this.i18n.t(labelKey);
+      return {
+        name: `${markIntensity(value)} ${label}`,
+        nameUpdate: () => `${markIntensity(value)} ${label}`,
+        action: () => setIntensity(value),
+        checkBox: 'radio' as const,
+      };
+    };
+    return {
+      name: this.i18n.t('table.weather'),
+      materialIcon: 'wb_cloudy',
+      subActions: [
+        ...WEATHER_MENU_ORDER.map(type => typeItem(type, WEATHER_LABEL_KEY[type])),
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('table.intensity'),
+          subActions: [
+            intensityItem(0.25, 'table.intensityLow'),
+            intensityItem(0.5, 'table.intensityMid'),
+            intensityItem(0.75, 'table.intensityHigh'),
+            intensityItem(1, 'table.intensityMax'),
+          ],
+        },
+      ],
+    };
+  }
+
+  private makeDayNightToolboxMenu() {
+    const animateDarkness = (target: number) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
+      const start = table.darkness ?? 0;
+      const t0 = performance.now();
+      const dur = 800;
+      const step = (now: number) => {
+        const p = Math.min(1, (now - t0) / dur);
+        table.darkness = start + (target - start) * p;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const isDay = () => (TableSelecter.instance.viewTable?.darkness ?? 0) < 0.35;
+    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.55;
+    return {
+      name: this.i18n.t('table.dayNight'),
+      materialIcon: 'brightness_6',
+      subActions: [
+        {
+          name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
+          nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
+          action: () => animateDarkness(0),
+          checkBox: 'radio' as const,
+        },
+        {
+          name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
+          nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
+          action: () => animateDarkness(0.85),
+          checkBox: 'radio' as const,
+        },
+      ],
+    };
   }
 
   openZipFileSelect() {

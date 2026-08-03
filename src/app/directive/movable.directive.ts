@@ -10,6 +10,8 @@ import {
   Output
 } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { GridType } from '@udonarium/game-table';
+import { isHexGrid, snapToHexCell } from '@udonarium/hex-grid';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { BatchService } from 'service/batch.service';
@@ -337,9 +339,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: this.tabletopObject.identifier, className: this.tabletopObject.aliasName });
   }
 
-  snapToGrid(gridSize: number = 25) {
-    this.posX = this.calcSnapNum(this.posX, gridSize);
-    this.posY = this.calcSnapNum(this.posY, gridSize);
+  snapToGrid(gridSize?: number) {
+    const table = TableSelecter.instance.viewTable;
+    const type = table?.gridType ?? GridType.SQUARE;
+    if (isHexGrid(type)) {
+      const snapped = snapToHexCell(this.posX, this.posY, table?.gridSize || 50, type);
+      this.posX = snapped.x;
+      this.posY = snapped.y;
+      return;
+    }
+    const interval = gridSize ?? (table?.gridSize ? table.gridSize / 2 : 25);
+    this.posX = this.calcSnapNum(this.posX, interval);
+    this.posY = this.calcSnapNum(this.posY, interval);
   }
 
   /** Shift held on drop bypasses grid snap (Foundry-style). */

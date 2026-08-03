@@ -98,6 +98,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   private animateDarkness(target: number) {
     const table = this.selectedTable;
     if (!table) return;
+    table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
     const start = table.darkness;
     const t0 = performance.now();
     const dur = 800;

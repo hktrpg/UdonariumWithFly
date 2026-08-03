@@ -6,6 +6,7 @@ MIT License
 https://opensource.org/licenses/mit-license.php
 */
 import { GridType } from '@udonarium/game-table';
+import { fillHexCell, isHexGrid } from '@udonarium/hex-grid';
 
 type StrokeGridFunc = (w: number, h: number, gridSize: number) => GridPosition;
 type GridPosition = { gx: number, gy: number };
@@ -173,7 +174,7 @@ export class RangeRender {
             gcy = gy + gridOffY + (gridSize / 2) - offSetY_px;
             // true 表示在內側
             if (this.chkInCircle(setting.range * gridSize, gcx, gcy)) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           } else {
             /* 暴力／富豪式程式設計 */
@@ -190,7 +191,7 @@ export class RangeRender {
             if ((setting.fillType == 2 && hit >= 1)
               || (setting.fillType == 3 && hit >= (gridSize * gridSize / 2))
               || (setting.fillType == 4 && hit >= (gridSize * gridSize))) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           }
         }
@@ -337,7 +338,7 @@ export class RangeRender {
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
               && this.chkOuterProduct(p4x, p4y, p1x, p1y, gcx, gcy)
               ){
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           } else {
             /* 暴力／富豪式程式設計 */
@@ -357,7 +358,7 @@ export class RangeRender {
             if ((setting.fillType == 2 && hit >= 1)
               || (setting.fillType == 3 && hit >= (gridSize * gridSize / 2))
               || (setting.fillType == 4 && hit >= (gridSize * gridSize))) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           }
         }
@@ -527,7 +528,7 @@ export class RangeRender {
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
               && this.chkOuterProduct(p4x, p4y, p1x, p1y, gcx, gcy)
               ) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           } else {
             /* 暴力／富豪式程式設計 */
@@ -547,7 +548,7 @@ export class RangeRender {
             if ((setting.fillType == 2 && hit >= 1)
               || (setting.fillType == 3 && hit >= (gridSize * gridSize / 2))
               || (setting.fillType == 4 && hit >= (gridSize * gridSize))) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           }
         }
@@ -732,7 +733,7 @@ export class RangeRender {
               && this.chkOuterProduct(p3x, p3y, p4x, p4y, gcx, gcy)
               && this.chkOuterProduct(p4x, p4y, p1x, p1y, gcx, gcy)
               ){
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           } else {
             /* 暴力／富豪式程式設計 */
@@ -752,7 +753,7 @@ export class RangeRender {
             if ((setting.fillType == 2 && hit >= 1)
               || (setting.fillType == 3 && hit >= (gridSize * gridSize / 2))
               || (setting.fillType == 4 && hit >= (gridSize * gridSize))) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           }
         }
@@ -953,7 +954,7 @@ export class RangeRender {
             if(this.chkOuterProduct(cx, cy, p1x, p1y, gcx, gcy)
               && this.chkOuterProduct(p1x, p1y, p2x, p2y, gcx, gcy)
               && this.chkOuterProduct(p2x, p2y, cx,cy , gcx, gcy)) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           } else {
             /* 暴力／富豪式程式設計 */
@@ -972,7 +973,7 @@ export class RangeRender {
             if ((setting.fillType == 2 && hit >= 1)
             || (setting.fillType == 3 && hit >= (gridSize * gridSize / 2))
             || (setting.fillType == 4 && hit >= (gridSize * gridSize))) {
-              this.fillSquare(context, gx + gridOffX, gy + gridOffY, gridSize);
+              this.fillCell(context, gx + gridOffX, gy + gridOffY, gridSize, setting.gridType);
             }
           }
         }
@@ -1096,34 +1097,22 @@ export class RangeRender {
     }
   }
 
-  private fillSquare(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number) {
+  private fillCell(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number, gridType: GridType) {
+    if (isHexGrid(gridType)) {
+      fillHexCell(context, gx, gy, gridSize, gridType);
+      return;
+    }
     context.beginPath();
     context.fillRect(gx, gy, gridSize, gridSize);
+  }
 
-    //this.strokeSquare(context, gx, gy, gridSize);
+  private fillSquare(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number) {
+    this.fillCell(context, gx, gy, gridSize, GridType.SQUARE);
   }
 
   private strokeSquare(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number) {
     context.beginPath();
     context.strokeStyle = '#55555533'
     context.strokeRect(gx, gy, gridSize, gridSize);
-  }
-
-  private strokeHex(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number, gridType: GridType) {
-    let deg = gridType === GridType.HEX_HORIZONTAL ? -30 : 0;
-    let radius = gridSize / Math.sqrt(3);
-    let cx = gx + gridSize / 2;
-    let cy = gy + gridSize / 2;
-
-    context.beginPath();
-    for (let i = 0; i < 6; i++) {
-      deg += 60;
-      let radian = Math.PI / 180 * deg;
-      let x = Math.cos(radian) * radius + cx;
-      let y = Math.sin(radian) * radius + cy;
-      context.lineTo(x, y);
-    }
-    context.closePath();
-    context.stroke();
   }
 }

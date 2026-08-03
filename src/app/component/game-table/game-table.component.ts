@@ -113,6 +113,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const lifts = [g * 0.12, g * 1.6, g * 3.6];
     return gh + (lifts[Math.max(0, Math.min(2, layer | 0))] || lifts[0]);
   }
+
+  /** Weather canvas extends past the map so rain/snow/fog spill outside. */
+  get weatherPad(): number {
+    return WeatherRender.marginFor(this.tablePixelWidth, this.tablePixelHeight);
+  }
+  get weatherPixelWidth(): number { return this.tablePixelWidth + this.weatherPad * 2; }
+  get weatherPixelHeight(): number { return this.tablePixelHeight + this.weatherPad * 2; }
   get tablePixelWidth(): number { return this.currentTable.width * this.currentTable.gridSize; }
   get tablePixelHeight(): number { return this.currentTable.height * this.currentTable.gridSize; }
   get drawings(): TableDrawing[] { return this.currentTable?.drawings || []; }

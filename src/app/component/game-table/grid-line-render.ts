@@ -1,5 +1,5 @@
-import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GridType } from '@udonarium/game-table';
+import { fillHexCell, isHexGrid, strokeHexCell } from '@udonarium/hex-grid';
 
 type StrokeGridFunc = (w: number, h: number, gridSize: number) => GridPosition;
 type GridPosition = { gx: number, gy: number };
@@ -9,14 +9,13 @@ export class GridLineRender {
   }
 
   private makeBrush(context: CanvasRenderingContext2D, gridSize: number, gridColor: string): CanvasRenderingContext2D {
-    // 座標繪製用 brush 設定
     context.strokeStyle = gridColor;
     context.fillStyle = context.strokeStyle;
     context.lineWidth = 1;
 
     let fontSize: number = Math.floor(gridSize / 5);
     context.font = `bold ${fontSize}px sans-serif`;
-    context.textBaseline = 'top';
+    context.textBaseline = 'middle';
     context.textAlign = 'center';
     return context
   }
@@ -28,20 +27,34 @@ export class GridLineRender {
 
     if (gridType < 0) return;
 
+    const hex = isHexGrid(gridType);
     let calcGridPosition: StrokeGridFunc = this.generateCalcGridPositionFunc(gridType);
     this.makeBrush(context, gridSize, gridColor);
-    for (let h = 0; h <= height; h++) {
-      for (let w = 0; w <= width; w++) {
+    // Square draws an extra rim cell so outer edges appear; hex only needs real cells.
+    const wMax = hex ? width : width + 1;
+    const hMax = hex ? height : height + 1;
+    for (let h = 0; h < hMax; h++) {
+      for (let w = 0; w < wMax; w++) {
         let { gx, gy } = calcGridPosition(w, h, gridSize);
-        this.strokeSquare(context, gx, gy, gridSize);
-        if (isShowNumber) context.fillText((w + 1).toString() + '-' + (h + 1).toString(), gx + (gridSize / 2), gy + (gridSize / 2));
+        if (hex) {
+          strokeHexCell(context, gx, gy, gridSize, gridType);
+        } else {
+          this.strokeSquare(context, gx, gy, gridSize);
+        }
+        if (isShowNumber && w < width && h < height) {
+          context.fillText(
+            (w + 1).toString() + '-' + (h + 1).toString(),
+            gx + (gridSize / 2),
+            gy + (gridSize / 2),
+          );
+        }
       }
     }
   }
 
   private generateCalcGridPositionFunc(gridType: GridType): StrokeGridFunc {
     switch (gridType) {
-      case GridType.HEX_VERTICAL: // 六角格縱向對齊
+      case GridType.HEX_VERTICAL: // pointy-top, odd-q style (even columns shifted down)
         return (w, h, gridSize) => {
           if ((w % 2) === 1) {
             return { gx: w * gridSize, gy: h * gridSize };
@@ -50,7 +63,7 @@ export class GridLineRender {
           }
         }
 
-      case GridType.HEX_HORIZONTAL: // 六角格橫向對齊（相容 DodontoF）
+      case GridType.HEX_HORIZONTAL: // flat-top (DodontoF compatible)
         return (w, h, gridSize) => {
           if ((h % 2) === 1) {
             return { gx: w * gridSize, gy: h * gridSize };
@@ -59,7 +72,7 @@ export class GridLineRender {
           }
         }
 
-      default: // 方格(default)
+      default:
         return (w, h, gridSize) => {
           return { gx: w * gridSize, gy: h * gridSize };
         }
@@ -69,23 +82,5 @@ export class GridLineRender {
   private strokeSquare(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number) {
     context.beginPath();
     context.strokeRect(gx, gy, gridSize, gridSize);
-  }
-
-  private strokeHex(context: CanvasRenderingContext2D, gx: number, gy: number, gridSize: number, gridType: GridType) {
-    let deg = gridType === GridType.HEX_HORIZONTAL ? -30 : 0;
-    let radius = gridSize / Math.sqrt(3);
-    let cx = gx + gridSize / 2;
-    let cy = gy + gridSize / 2;
-
-    context.beginPath();
-    for (let i = 0; i < 6; i++) {
-      deg += 60;
-      let radian = MathUtil.radians(deg);
-      let x = Math.cos(radian) * radius + cx;
-      let y = Math.sin(radian) * radius + cy;
-      context.lineTo(x, y);
-    }
-    context.closePath();
-    context.stroke();
   }
 }

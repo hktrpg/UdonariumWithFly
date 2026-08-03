@@ -97,12 +97,16 @@
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
       <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
-      <div class="weather-stack is-fill is-pointer-events-none is-3d" [style.clip]="clipCss" aria-hidden="true">
-        <canvas class="weather-canvas is-fill" #weatherCanvasLow
+      <div class="weather-stack is-pointer-events-none is-3d" aria-hidden="true"
+        [style.width.px]="weatherPixelWidth"
+        [style.height.px]="weatherPixelHeight"
+        [style.left.px]="-weatherPad"
+        [style.top.px]="-weatherPad">
+        <canvas class="weather-canvas" #weatherCanvasLow
           [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(0) + 'px)'}"></canvas>
-        <canvas class="weather-canvas is-fill" #weatherCanvasMid
+        <canvas class="weather-canvas" #weatherCanvasMid
           [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(1) + 'px)'}"></canvas>
-        <canvas class="weather-canvas is-fill" #weatherCanvasHigh
+        <canvas class="weather-canvas" #weatherCanvasHigh
           [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(2) + 'px)'}"></canvas>
       </div>
       <div class="pings-layer is-fill is-pointer-events-none is-3d" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.2) + 'px)'}">
