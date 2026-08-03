@@ -339,6 +339,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
   }
 
+  editRoomPasswords() {
+    if (!this.isGMMode || !this.isRoleAuthRoom || !this.networkService.peer.isRoom) return;
+    this.modalService.open(RoomSettingComponent, {
+      editMode: true,
+      width: 700,
+      height: 460,
+      left: 0,
+      top: 400,
+    });
+  }
+
   loadZip() {
     if (this.GuestMode() || !this.networkService.peer.isRoom) return;
     const input = document.createElement('input');
@@ -510,7 +521,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       materialIcon: 'swap_horiz',
       action: () => {
         const prev = this.currentRole;
-        RoomAuth.applyIdentity(result.role);
+        RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
         // Clear legacy hold state.
         PeerCursor.isGMHold = false;
         this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {

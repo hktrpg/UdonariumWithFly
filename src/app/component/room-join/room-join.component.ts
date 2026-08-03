@@ -55,6 +55,10 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
         this.refreshRoles();
         this.refreshTitle();
       });
+    // Record current role as unlocked so GM→player/guest (and back) can skip passwords.
+    if (this.switchMode && this.currentRole && this.room?.id) {
+      RoomAuth.noteAttained(this.currentRole, this.room.id);
+    }
     if (this.currentRole && this.isRoleAvailable(this.currentRole)) {
       this.role = this.currentRole;
       return;
@@ -102,7 +106,29 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     if (!this.room) return false;
     // Legacy / non-role-auth: no per-role password gate.
     if (!RoomAuth.isRoleAuthRoom(this.room.name)) return false;
+    // Downgrade (or same rank) from current identity never needs a password.
+    if (this.switchMode && this.currentRole
+      && RoomAuth.roleRank(this.currentRole) >= RoomAuth.roleRank(role)) {
+      return false;
+    }
+    if (RoomAuth.canBypassPassword(role, this.room.id)) return false;
     return RoomAuth.roleNeedsPassword(this.room.name, role);
+  }
+
+  /** Role has a password gate, but current/unlocked rank skips it. */
+  isPasswordBypassed(role: RoomRole): boolean {
+    if (!this.room || !this.isRoleAvailable(role)) return false;
+    if (!RoomAuth.isRoleAuthRoom(this.room.name)) return false;
+    if (!RoomAuth.roleNeedsPassword(this.room.name, role)) return false;
+    return !this.needsPasswordFor(role);
+  }
+
+  /** Open gate (no password configured) — not the same as bypass. */
+  isRoleOpen(role: RoomRole): boolean {
+    if (!this.room || !this.isRoleAvailable(role)) return false;
+    if (this.needsPasswordFor(role) || this.isPasswordBypassed(role)) return false;
+    if (!RoomAuth.isRoleAuthRoom(this.room.name)) return true;
+    return !RoomAuth.roleNeedsPassword(this.room.name, role);
   }
 
   onRoleChange() {
@@ -120,12 +146,20 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.room && RoomAuth.isRoleAuthRoom(this.room.name)) {
+      const roomId = this.room.id;
+      // Ensure current identity is recorded before evaluating bypass.
+      if (this.switchMode && this.currentRole) {
+        RoomAuth.noteAttained(this.currentRole, roomId);
+      }
+      const bypass = RoomAuth.canBypassPassword(this.role, roomId)
+        || (this.switchMode && !!this.currentRole
+          && RoomAuth.roleRank(this.currentRole) >= RoomAuth.roleRank(this.role));
       if (this.needsPassword()) {
-        if (!RoomAuth.verify(this.room.id, this.room.name, this.role, this.password)) {
+        if (!RoomAuth.verify(roomId, this.room.name, this.role, this.password)) {
           this.help = this.i18n.t('roomJoin.errorWrongPassword');
           return;
         }
-      } else if (!RoomAuth.verify(this.room.id, this.room.name, this.role, '')) {
+      } else if (!bypass && !RoomAuth.verify(roomId, this.room.name, this.role, '')) {
         this.help = this.i18n.t('roomJoin.errorSwitchFailed');
         return;
       }

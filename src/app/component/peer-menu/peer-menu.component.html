@@ -146,6 +146,12 @@
   <div style="font-size: 12px; color: #64748b; margin-bottom: 6px">
     {{ 'peer.scenePermHelp' | i18n }}
   </div>
+  <div *ngIf="isRoleAuthRoom" class="room-pw-edit-row">
+    <button type="button" (click)="editRoomPasswords()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">password</i>
+      {{ 'peer.editRoomPasswords' | i18n }}
+    </button>
+  </div>
   <hr/>
 </ng-container>
 <div *ngFor="let peer of networkService.peers; index as i">

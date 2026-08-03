@@ -1,5 +1,5 @@
 import { CryptoUtil } from './core/system/util/crypto-util';
-import { EventSystem } from './core/system';
+import { EventSystem, Network } from './core/system';
 import { GuestSession } from './guest-session';
 import { PeerCursor } from './peer-cursor';
 import { translate } from 'i18n';
@@ -130,8 +130,56 @@ export class RoomAuth {
     return [info.gm, info.user, info.guest].some(g => g.mode === 'password');
   }
 
-  static applyIdentity(role: RoomRole) {
+  /** Highest role unlocked in the current room this session (gm > user > guest). */
+  private static attainedRoomId = '';
+  private static attainedRank = 0;
+  private static readonly ATTAINED_STORAGE_PREFIX = 'udonarium.roomAuth.attained.';
+
+  static roleRank(role: RoomRole): number {
+    switch (role) {
+      case 'gm': return 3;
+      case 'user': return 2;
+      case 'guest': return 1;
+      default: return 0;
+    }
+  }
+
+  /**
+   * Roles at or below the highest unlocked rank need no password
+   * (e.g. was player → guest free, then guest → player free; GM still needs unlock to go GM).
+   */
+  static canBypassPassword(target: RoomRole, roomId?: string): boolean {
+    const id = RoomAuth.resolveRoomId(roomId);
+    if (!id) return false;
+    RoomAuth.ensureAttainedLoaded(id);
+    if (RoomAuth.attainedRoomId !== id) return false;
+    return RoomAuth.attainedRank >= RoomAuth.roleRank(target);
+  }
+
+  static noteAttained(role: RoomRole, roomId?: string) {
+    const id = RoomAuth.resolveRoomId(roomId);
+    if (!id) return;
+    RoomAuth.ensureAttainedLoaded(id);
+    const rank = RoomAuth.roleRank(role);
+    if (rank > RoomAuth.attainedRank) {
+      RoomAuth.attainedRank = rank;
+      RoomAuth.persistAttained(id, rank);
+    }
+  }
+
+  static clearAttained() {
+    if (RoomAuth.attainedRoomId) {
+      try {
+        sessionStorage.removeItem(RoomAuth.ATTAINED_STORAGE_PREFIX + RoomAuth.attainedRoomId);
+      } catch { /* ignore */ }
+    }
+    RoomAuth.attainedRoomId = '';
+    RoomAuth.attainedRank = 0;
+  }
+
+  static applyIdentity(role: RoomRole, roomId?: string) {
     GuestSession.isGuest = role === 'guest';
+    RoomAuth.noteAttained(role, roomId);
     if (!PeerCursor.myCursor) return;
     const wasGM = PeerCursor.myCursor.isGMMode;
     PeerCursor.isGMHold = false;
@@ -139,6 +187,29 @@ export class RoomAuth {
     if (wasGM !== PeerCursor.myCursor.isGMMode) {
       EventSystem.trigger('CHANGE_GM_MODE', null);
     }
+  }
+
+  private static resolveRoomId(roomId?: string): string {
+    return (roomId || Network.peer?.roomId || '').trim();
+  }
+
+  /** Load persisted unlock for this room; switch context when roomId changes. */
+  private static ensureAttainedLoaded(roomId: string) {
+    if (RoomAuth.attainedRoomId === roomId) return;
+    let rank = 0;
+    try {
+      const raw = sessionStorage.getItem(RoomAuth.ATTAINED_STORAGE_PREFIX + roomId);
+      const parsed = raw ? parseInt(raw, 10) : 0;
+      if (Number.isFinite(parsed) && parsed > 0) rank = parsed;
+    } catch { /* ignore */ }
+    RoomAuth.attainedRoomId = roomId;
+    RoomAuth.attainedRank = rank;
+  }
+
+  private static persistAttained(roomId: string, rank: number) {
+    try {
+      sessionStorage.setItem(RoomAuth.ATTAINED_STORAGE_PREFIX + roomId, String(rank));
+    } catch { /* ignore */ }
   }
 
   private static detectMarker(roomName: string): { marker: string; digestLen: number; index: number } | null {

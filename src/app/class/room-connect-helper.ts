@@ -4,6 +4,7 @@ import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAuth, RoomRole } from '@udonarium/room-auth';
 
 /**
  * Shared room join: reopen as a room peer and mesh-connect to targets.
@@ -66,9 +67,48 @@ export class RoomConnectHelper {
     });
   }
 
+  /**
+   * Re-open into the same roomId with a new encoded roomName (auth re-key),
+   * then remesh with peers advertising that name.
+   */
+  static async rekeyRoom(roomId: string, roomName: string): Promise<void> {
+    const userId = Network.peer.userId;
+    const wasGuest = GuestSession.isGuest;
+    const wasGM = !!PeerCursor.myCursor?.isGMMode;
+    let role: RoomRole = 'user';
+    if (wasGM) role = 'gm';
+    else if (wasGuest) role = 'guest';
+
+    await new Promise<void>(resolve => {
+      const key = { rekey: true };
+      EventSystem.register(key)
+        .on('OPEN_NETWORK', () => {
+          EventSystem.unregister(key);
+          resolve();
+        });
+      Network.open(userId, roomId, roomName, '');
+      PeerCursor.myCursor.peerId = Network.peerId;
+    });
+
+    RoomAuth.applyIdentity(role, roomId);
+
+    for (let i = 0; i < 12; i++) {
+      const rooms = await Network.listAllRooms();
+      const room = rooms.find(r => r.id === roomId && r.name === roomName);
+      if (room) {
+        for (const peer of room.filterByPassword('')) {
+          if (peer.peerId !== Network.peerId) Network.connect(peer);
+        }
+        if (room.peers.length <= 1 || Network.peers.length > 0) break;
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+
   static resetIfAlone() {
     if (Network.peers.length < 1) {
       GuestSession.isGuest = false;
+      RoomAuth.clearAttained();
       if (PeerCursor.myCursor) {
         PeerCursor.isGMHold = false;
         PeerCursor.myCursor.isGMMode = false;

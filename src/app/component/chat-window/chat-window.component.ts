@@ -165,6 +165,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
         }
         if (this.isAutoScroll && this.chatTab) this.chatTab.markForRead();
       })
+      .on('DELETE_GAME_OBJECT', event => {
+        if (this.chatTabidentifier === event.data.identifier || !this.chatTab) {
+          this.selectMainChatTab();
+        }
+      })
+      .on('UPDATE_GAME_OBJECT', event => {
+        // After room sync / ZIP load replaces ChatTabList, reselect main if current tab is gone.
+        if (!this.chatTab) this.selectMainChatTab();
+      })
       .on('CHANGE_JUKEBOX_VOLUME', event => {
         this.changeDetector.markForCheck();
       })
@@ -216,6 +225,17 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       this.panelService.title = this.i18n.t('chat.title');
     }
+  }
+
+  /** Jump to the first (main) chat tab when the current selection is gone. */
+  private selectMainChatTab() {
+    const tabs = this.chatMessageService.chatTabs;
+    const nextId = tabs.length > 0 ? tabs[0].identifier : '';
+    if (this._chatTabidentifier === nextId) {
+      this.updatePanelTitle();
+      return;
+    }
+    this.chatTabidentifier = nextId;
   }
 
   onSelectedTab(identifier: string) {

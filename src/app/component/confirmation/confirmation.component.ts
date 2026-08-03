@@ -17,6 +17,8 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   help: string = '';
   helpHtml: string = '';
   materialIcon: string = '';
+  okLabel: string = '';
+  cancelLabel: string = '';
   type: ConfirmationType = ConfirmationType.OK;
   action: Function = null;
   cancelAction: Function = null;
@@ -32,6 +34,8 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.help = modalService.option.help ? modalService.option.help : '';
     this.helpHtml = modalService.option.helpHtml ? modalService.option.helpHtml : '';
     this.materialIcon = modalService.option.materialIcon ? modalService.option.materialIcon : '';
+    this.okLabel = modalService.option.okLabel ? modalService.option.okLabel : '';
+    this.cancelLabel = modalService.option.cancelLabel ? modalService.option.cancelLabel : '';
     this.type = modalService.option.type ? modalService.option.type : ConfirmationType.OK;
     this.action = modalService.option.action ? modalService.option.action : null;
     this.cancelAction = modalService.option.cancelAction ? modalService.option.cancelAction : null;

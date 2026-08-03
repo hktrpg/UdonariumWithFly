@@ -268,3 +268,10 @@
 .room-zip-row button {
   font-size: 12px;
 }
+
+.room-pw-edit-row {
+  margin: 6px 0 4px;
+}
+.room-pw-edit-row button {
+  font-size: 12px;
+}

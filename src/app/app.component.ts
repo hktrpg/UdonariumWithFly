@@ -67,6 +67,7 @@ import { SwUpdate } from '@angular/service-worker';
 
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { RoomInviteService } from 'service/room-invite.service';
 
 @Component({
@@ -385,6 +386,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.inviteHandled = true;
           this.ngZone.run(() => this.tryConsumeInvite());
         }
+      })
+      .on('ROOM_REKEY', event => {
+        // GM changed room auth; reopen into the new encoded roomName.
+        if (event.isSendFromSelf) return;
+        const roomId = event.data?.roomId;
+        const roomName = event.data?.roomName;
+        if (!roomId || !roomName) return;
+        if (!Network.peer?.isRoom || Network.peer.roomId !== roomId) return;
+        if (Network.peer.roomName === roomName) return;
+        this.ngZone.run(() => {
+          RoomConnectHelper.rekeyRoom(roomId, roomName).catch(e => console.warn('ROOM_REKEY failed', e));
+        });
       })
       .on('NETWORK_ERROR', event => {
         console.log('NETWORK_ERROR', event.data.peerId);

@@ -115,7 +115,7 @@ export class RoomInviteService {
     const targetPeers = room.filterByPassword(skywayPassword);
     if (targetPeers.length < 1) return 'notFound';
 
-    RoomAuth.applyIdentity(payload.r);
+    RoomAuth.applyIdentity(payload.r, payload.id);
     const ok = await RoomConnectHelper.openAndConnect(room, skywayPassword, targetPeers);
     return ok ? 'ok' : 'notFound';
   }

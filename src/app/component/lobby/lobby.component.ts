@@ -114,7 +114,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     const targetPeers = room.filterByPassword('');
     if (targetPeers.length < 1) return;
 
-    RoomAuth.applyIdentity(result.role);
+    RoomAuth.applyIdentity(result.role, room.id);
     await this.openAndConnect(room, '', targetPeers);
   }
 
