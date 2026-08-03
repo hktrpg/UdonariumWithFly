@@ -7,7 +7,7 @@ export const en_tutorial: I18nDictionary = {
 The map is 2.5D. Data is shared peer-to-peer; the server does not keep your tokens or images long-term.
 ★ Before leaving, Download ZIP; next time Load ZIP. Without saving, everything vanishes.
 Desktop Chrome recommended. This tutorial hides after your first chat message.
-Full guide: https://bothelp.hktrpg.com/guide`,
+Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `<View> Ctrl+left-drag = pan  Right-drag = rotate  Wheel = zoom
 　　　　Shift+wheel = pan left/right  Ctrl+wheel = pan up/down
 <Objects> Left-drag to move  Drag the rotate handle  Right-click = menu
@@ -89,7 +89,7 @@ Upgraded to 1.13.2`,
 ・Double-click token art opens details; combat “Add all on table” for everyone except guests
 ・Removed character “Interact with light” (tokens always occlude); masks / terrain still toggleable`,
   'changelog.links': `Site: https://z01.hktrpg.com
-Guide: https://bothelp.hktrpg.com/guide
+Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com
 Facebook: https://www.facebook.com/groups/HKTRPG
 Wiki: https://www.hktrpg.com/

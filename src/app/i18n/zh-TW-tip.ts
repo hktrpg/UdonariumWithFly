@@ -109,7 +109,7 @@ export const zhTW_tip: I18nDictionary = {
   'tour.step.controlsPing.body': '地圖空白處長按約 1 秒＝標記。\nShift＋長按＝警告標記。\n請試一次長按。',
 
   'tour.step.saveGuide.title': '完整指南',
-  'tour.step.saveGuide.body': '更多說明：https://bothelp.hktrpg.com/guide\n可隨時在「設定*」重播本教學，或滑過按鈕查看教學 BOX。\n記得：離開前請 ZIP 或資料夾備份。',
+  'tour.step.saveGuide.body': '更多說明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\n可隨時在「設定*」重播本教學，或滑過按鈕查看教學 BOX。\n記得：離開前請 ZIP 或資料夾備份。',
 
   'tip.pathMove.hud': '路徑移動：Ctrl＋點路點 → 左鍵點終點或 Space 開始　右鍵撤銷最後路點　Esc 取消（僅單一 Token）',
   'tip.vision.noCharacter': '已啟用視野，但尚未設定「我的視野角色」。請右鍵角色 → 作為我的視野角色。',

@@ -7,7 +7,7 @@ export const ja_tutorial: I18nDictionary = {
 マップは 2.5D。データはプレイヤー間で共有され、サーバは駒や画像を長期保管しません。
 ★ 退出前に「ZIP保存」、次回は「ZIP読込」。保存しないと消えます。
 デスクトップ版 Chrome 推奨。最初のチャット送信後、この案内は自動で隠れます。
-詳細：https://bothelp.hktrpg.com/guide`,
+詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜視点＞Ctrl＋左ドラッグ＝パン　右ドラッグ＝回転　ホイール＝ズーム
 　　　　Shift＋ホイール＝左右パン　Ctrl＋ホイール＝上下パン
 ＜オブジェクト＞左ドラッグで移動　回転ハンドル　右クリック＝メニュー
@@ -89,7 +89,7 @@ export const ja_tutorial: I18nDictionary = {
 ・Token 立絵ダブルクリックで詳細；戦闘「卓上全員追加」はゲスト以外利用可
 ・キャラの「ライト連動」削除（Token は常に遮光）；マスク／地形は従来どおり切替可`,
   'changelog.links': `サイト：https://z01.hktrpg.com
-ガイド：https://bothelp.hktrpg.com/guide
+ガイド：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
 Facebook：https://www.facebook.com/groups/HKTRPG
 Wiki：https://www.hktrpg.com/

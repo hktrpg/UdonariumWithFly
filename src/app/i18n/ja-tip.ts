@@ -110,7 +110,7 @@ export const ja_tip: I18nDictionary = {
   'tour.step.controlsPing.body': '空白を約1秒長押し＝Ping。\nShift＋長押し＝警告 Ping。\n長押しを一度試してください。',
 
   'tour.step.saveGuide.title': 'ガイド',
-  'tour.step.saveGuide.body': '詳細：https://bothelp.hktrpg.com/guide\n設定* からいつでもツアー再開、またはボタンをホバーして教學 BOX。\n退出前に ZIP またはフォルダバックアップを忘れずに。',
+  'tour.step.saveGuide.body': '詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\n設定* からいつでもツアー再開、またはボタンをホバーして教學 BOX。\n退出前に ZIP またはフォルダバックアップを忘れずに。',
 
   'tip.pathMove.hud': 'パス移動：Ctrl+クリックで経由点 → 左クリック終点または Space で開始　右クリックで末点取消　Esc で取消（1体のみ）',
   'tip.vision.noCharacter': '視界オンですが「自分の視界キャラ」未設定です。駒を右クリック→自分の視界に設定。',

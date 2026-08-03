@@ -7,7 +7,7 @@ export const zhTW_tutorial: I18nDictionary = {
 地圖是 2.5D；資料在玩家之間互傳，伺服器不幫你長期保管棋子與圖片。
 ★ 離開前請「下載 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
-完整說明：https://bothelp.hktrpg.com/guide`,
+完整說明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜視角＞Ctrl＋左鍵拖曳＝平移地圖　右鍵拖曳＝旋轉視角　滾輪＝縮放
 　　　　Shift＋滾輪＝左右移動畫面　Ctrl＋滾輪＝上下移動畫面
 ＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單
@@ -89,7 +89,7 @@ export const zhTW_tutorial: I18nDictionary = {
 ・雙擊 Token 立繪區可開詳情；戰鬥「加入桌面全部」訪客以外皆可用
 ・移除角色「與燈光互動」（Token 恆擋光）；遮罩／地形仍可開關`,
   'changelog.links': `本站：https://z01.hktrpg.com
-教學：https://bothelp.hktrpg.com/guide
+教學：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
 Facebook：https://www.facebook.com/groups/HKTRPG
 百科：https://www.hktrpg.com/

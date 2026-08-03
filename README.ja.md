@@ -26,7 +26,7 @@
   - コマ、カード、共有メモ
   - チャット送受信、チャットパレット
   - ダイスボット（[BCDice](https://github.com/bcdice/bcdice-js)）
-  - 画像共有、BGM、ZIP セーブ、ローカルフォルダバックアップ（File System Access API）
+  - 画像共有、BGM（ZIP にアップロードした音声を含む）、ZIP セーブ、ローカルフォルダバックアップ（File System Access API）
 
 - **ブラウザ間通信**
   - WebRTC（[SkyWay](https://skyway.ntt.com/)）で接続；接続後の処理はできるだけブラウザ側で完結
@@ -39,6 +39,8 @@
 | 機能 | 説明 |
 |------|------|
 | 多言語 UI | 実行時に 繁中／简中／English／日本語 を切替（メニュー；保存される） |
+| ガイドツアー | 初回のオーバーレイ案内（部屋と保存、メニュー、卓操作、ショートカット）；開始時に言語選択；いつでもスキップ可；設定から再開 |
+| ホバー教學 | メニュー／チャット操作をホバーすると教學 BOX；設定で ON/OFF；ツアー中は抑制 |
 | HKTRPG ブランディング | タイトル、favicon、OG、ランディング |
 | ロール別ルーム | GM／User／Guest ごとに開放／パスワード／無効 |
 | ロール招待リンク | 各ロールのディープリンクをコピー；必要ならパスワード入力 |
@@ -47,8 +49,8 @@
 | ノート倉庫 | 卓／共有／プライベート／ゴミ箱でメモ整理 |
 | クイックロール | キャラクターシート欄をワンクリックでチャットへ送り BCDice で解決 |
 | キーボードでコマ操作 | 選択後 WASD／矢印移動；Shift+WASD 向き；Delete；Ctrl+C/X/V；Ctrl+Z 元に戻す／Ctrl+Y（または Ctrl+Shift+Z）やり直し；`[`/`]` レイヤ；Ctrl(+Shift)+ホイール回転；Shift ドロップで吸着なし |
-| 元に戻す／やり直し | 端末ローカル履歴：移動／回転／削除／切取貼付／レイヤ；シーン作成／削除／微移動。ゲスト不可；入力欄ではブラウザの文字 Undo を優先 |
-| パス移動 | Ctrl+左で経由点（Ctrl 離しても残る）→ 左クリック終点で移動；右クリックで最後の点を取消 |
+| 元に戻す／やり直し | 端末ローカル履歴：移動／回転／削除／切取貼付／レイヤ／パス移動；シーン作成／削除／微移動。ゲスト不可；入力欄ではブラウザの文字 Undo を優先 |
+| パス移動 | Token を1つ選択 → Ctrl+左で経由点（Ctrl 離しても残る）→ 左クリック終点または Space で移動；右クリックで最後の点を取消；Esc で経路取消 |
 | 選択 UX | クリック／範囲選択；Shift+クリック／ドラッグで複数選択；ダブルクリック詳細；選択ハイライト |
 | Ping | マップ長押しでマーカー；Shift+長押しで警告 |
 | 卓の照明と視界 | 暗闇／FoW、ライト、壁、視界距離；視界キャラを申告可能 |
@@ -63,7 +65,8 @@
 
 With Fly から継承：高度、チャット文字色、立ち絵（スタンド）、Cut-in、ダイスボット表、SkyWay 2023（`@skyway-sdk`）など。本 fork は自前 backend を使用（公開 WithFly Workers には向けないこと）。
 
-機能チェックリスト：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
+- 詳細ユーザーガイド（繁体字中国語）：[Udonarium 烏冬教學（Wiki）](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學)（repo：[`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md)）
+- 機能チェックリスト：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
 ### ローカルフォルダバックアップ
 

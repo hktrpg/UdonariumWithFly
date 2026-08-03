@@ -26,7 +26,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
   - Tokens, cards, shared notes
   - Chat and Chat Palette
   - Dice bot ([BCDice](https://github.com/bcdice/bcdice-js))
-  - Shared images, BGM, ZIP save data, local folder backup (File System Access API)
+  - Shared images, BGM (ZIP saves include uploaded audio), ZIP save data, local folder backup (File System Access API)
 
 - **Browser-to-browser networking**
   - WebRTC via [SkyWay](https://skyway.ntt.com/); work after connect stays mostly in the browser
@@ -39,6 +39,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Feature | Description |
 |---------|-------------|
 | Multi-language UI | Switch 繁中 / 简中 / English / 日本語 at runtime (menu; persisted) |
+| Guided tour | First-run overlay walkthrough (rooms & save, menus, table gestures, shortcuts); welcome language picker; skip anytime; replay from Settings |
+| Hover teaching tips | Hover menu / chat controls for tip boxes; toggle in Settings; suppressed during the tour |
 | HKTRPG branding | Title, favicon, OG tags, landing page |
 | Role-based rooms | Per-role GM / User / Guest gates (open / password / disabled) |
 | Role invite links | Copy deep links for each role; join with password prompt when needed |
@@ -47,8 +49,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Note inventory | Notes by tabletop / shared / private / trash |
 | Quick roll | Send character-sheet fields to chat for BCDice in one click |
 | Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; Ctrl+Z undo / Ctrl+Y (or Ctrl+Shift+Z) redo; `[`/`]` layer; Ctrl(+Shift)+wheel rotate; Shift drop skips snap |
-| Undo / redo | Local stack: move / rotate / delete / cut-paste / layer; scene create / delete / nudge. Guests blocked; ignored in text fields (browser handles text undo) |
-| Path move | Ctrl+left waypoints (draft stays after release) → left-click destination to go; right-click undoes last waypoint |
+| Undo / redo | Local stack: move / rotate / delete / cut-paste / layer / path move; scene create / delete / nudge. Guests blocked; ignored in text fields (browser handles text undo) |
+| Path move | Select one token → Ctrl+left waypoints (draft stays after release) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels |
 | Selection UX | Click / box select; Shift+click/drag multi-select; double-click details; selection highlight |
 | Ping | Long-press map for a marker; Shift+long-press for a warning |
 | Table lighting & vision | Darkness / FoW, lights, walls, vision ranges; claim vision character |
@@ -63,7 +65,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 
-Feature checklist: [`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
+- Full user guide (Traditional Chinese): [Udonarium guide (wiki)](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學) (repo: [`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md))
+- Feature checklist: [`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
 ### Local folder backup
 

@@ -7,7 +7,7 @@ export const zhCN_tutorial: I18nDictionary = {
 地图是 2.5D；数据在玩家之间互传，服务器不帮你长期保管棋子与图片。
 ★ 离开前请「下载 ZIP」；下次「读取 ZIP」。不存就会像烟火一样没了。
 建议桌面版 Chrome。输入第一则聊天后，此教学会自动隐藏。
-完整说明：https://bothelp.hktrpg.com/guide`,
+完整说明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜视角＞Ctrl＋左键拖曳＝平移地图　右键拖曳＝旋转视角　滚轮＝缩放
 　　　　Shift＋滚轮＝左右移动画面　Ctrl＋滚轮＝上下移动画面
 ＜物件＞左键拖曳移动　拖旋转把手转向　右键＝菜单
@@ -89,7 +89,7 @@ export const zhCN_tutorial: I18nDictionary = {
 ・双击 Token 立绘区可开详情；战斗「加入桌面全部」访客以外皆可用
 ・移除角色「与灯光互动」（Token 恒挡光）；遮罩／地形仍可开关`,
   'changelog.links': `本站：https://z01.hktrpg.com
-教学：https://bothelp.hktrpg.com/guide
+教学：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
 Facebook：https://www.facebook.com/groups/HKTRPG
 百科：https://www.hktrpg.com/

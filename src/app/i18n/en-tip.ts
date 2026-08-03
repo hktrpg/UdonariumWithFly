@@ -110,7 +110,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.controlsPing.body': 'Long-press empty map (~1s) = ping.\nShift + long-press = warning ping.\nTry a long-press once.',
 
   'tour.step.saveGuide.title': 'Full guide',
-  'tour.step.saveGuide.body': 'More help: https://bothelp.hktrpg.com/guide\nReplay this tour from Settings *, or hover buttons for tip boxes.\nRemember: ZIP or folder backup before you leave.',
+  'tour.step.saveGuide.body': 'More help: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nReplay this tour from Settings *, or hover buttons for tip boxes.\nRemember: ZIP or folder backup before you leave.',
 
   'tip.pathMove.hud': 'Path move: Ctrl+click waypoints → left-click destination or Space to go · right-click undoes last point · Esc cancels (one token only)',
   'tip.vision.noCharacter': 'Vision is on, but you have no “My vision character”. Right-click a token → set as my vision character.',

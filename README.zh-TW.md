@@ -26,7 +26,7 @@
   - 棋子、卡片、共用備忘
   - 聊天與指令板（Chat Palette）
   - 骰子機器人（[BCDice](https://github.com/bcdice/bcdice-js)）
-  - 圖片共用、BGM、ZIP 存檔、本機資料夾備份（File System Access API）
+  - 圖片共用、BGM（ZIP 含已上傳的音訊）、ZIP 存檔、本機資料夾備份（File System Access API）
 
 - **瀏覽器間通訊**
   - 以 WebRTC（[SkyWay](https://skyway.ntt.com/)）連接；連線後處理盡量在瀏覽器完成
@@ -39,6 +39,8 @@
 | 功能 | 說明 |
 |------|------|
 | 多語介面 | 執行時切換 繁中／简中／English／日本語（選單；會記住） |
+| 引導教學 | 首次進入的分步遮罩導覽（房間與存檔、選單、桌面手勢、快捷鍵）；歡迎頁可選語言；可隨時略過；可在設定中重播 |
+| 滑過教學提示 | 滑過選單／聊天控件顯示教學 BOX；設定中可開關；引導進行中會暫時關閉 |
 | HKTRPG 品牌 | 標題、favicon、OG、落地頁 |
 | 角色權限房間 | GM／User／Guest 各自開放／密碼／停用 |
 | 角色邀請連結 | 可複製各角色深連結；需要時再輸入密碼 |
@@ -47,8 +49,8 @@
 | 筆記倉庫 | 依桌面／共用／私人／墳場整理備忘 |
 | 快速擲骰 | 角色卡欄位一鍵送到聊天給 BCDice 結算 |
 | 鍵盤操控棋子 | 選取後 WASD／方向鍵移動；Shift+WASD 面向；Delete；Ctrl+C/X/V；Ctrl+Z 復原／Ctrl+Y（或 Ctrl+Shift+Z）重做；`[`/`]` 圖層；Ctrl(+Shift)+滾輪旋轉；Shift 放下不吸附 |
-| 復原／重做 | 本機堆疊：移動／旋轉／刪除／剪下貼上／圖層；場景工具建立／刪除／微移。訪客不可用；輸入框內不攔截（由瀏覽器處理文字復原） |
-| 路徑移動 | Ctrl+左鍵設路點（放開 Ctrl 仍保留）→ 左鍵點終點開始移動；右鍵取消最後路點 |
+| 復原／重做 | 本機堆疊：移動／旋轉／刪除／剪下貼上／圖層／路徑移動；場景工具建立／刪除／微移。訪客不可用；輸入框內不攔截（由瀏覽器處理文字復原） |
+| 路徑移動 | 選取單一 Token → Ctrl+左鍵設路點（放開 Ctrl 仍保留）→ 左鍵點終點或 Space 開始移動；右鍵取消最後路點；Esc 取消路徑 |
 | 選取體驗 | 點選／框選；Shift+點／拖曳多選；雙擊詳情；選取高亮 |
 | Ping | 長按地圖標記；Shift+長按警告 |
 | 桌面光照與視野 | 黑暗／FoW、燈光、牆、視野距離；可宣告視野角色 |
@@ -63,7 +65,8 @@
 
 繼承自 With Fly：高度、聊天文字顏色、立繪（Stand）、Cut-in、骰子機器人表、SkyWay 2023（`@skyway-sdk`）等。本 fork 使用自架 backend（請勿指向 WithFly 公開 Workers）。
 
-功能驗收清單：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
+- 完整使用教學：[Udonarium 烏冬教學（百科）](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學)（repo：[`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md)）
+- 功能驗收清單：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
 ### 本機資料夾備份（Folder Backup）
 
