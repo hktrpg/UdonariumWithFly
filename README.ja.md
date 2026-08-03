@@ -6,7 +6,7 @@
 
 [ユドナリウム（Udonarium）](https://github.com/TK11235/udonarium) は、Web ブラウザで動作するボードゲーム／TRPG オンラインセッション支援ツールです。
 
-本プロジェクトは [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) をベースにした [HKTRPG](https://www.hktrpg.com/) 改造版です。UI は繁体字中国語で、With Fly の高度・立ち絵（スタンド）・Cut-in・チャット文字色などの拡張を引き継いでいます。
+本プロジェクトは [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) をベースにした [HKTRPG](https://www.hktrpg.com/) 改造版です。多言語 UI（既定は繁体字中国語）に加え、照明・戦闘トラッカー・キーボード操作などの VTT 向け機能を追加。With Fly の高度・立ち絵（スタンド）・Cut-in・チャット文字色なども引き継いでいます。
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
@@ -38,14 +38,28 @@
 
 | 機能 | 説明 |
 |------|------|
-| 繁体字中国語 UI | 主要 UI／説明を zh-Hant にローカライズ |
-| ゲストモード | 部屋作成時に「ゲスト許可」可；ゲスト UI は制限（保存不可など）；パスワード部屋はパスワード必須 |
-| 簡易モード（ClarifyMode） | チャットを簡易表示に切替可能 |
-| ノート倉庫 | 卓／共有／プライベート／ゴミ箱でメモを整理 |
+| 多言語 UI | 実行時に 繁中／简中／English／日本語 を切替（メニュー；保存される） |
+| HKTRPG ブランディング | タイトル、favicon、OG、ランディング |
+| ロール別ルーム | GM／User／Guest ごとに開放／パスワード／無効 |
+| ロール招待リンク | 各ロールのディープリンクをコピー；必要ならパスワード入力 |
+| ゲストモード | ゲスト UI 制限（保存不可・メニュー制限）；旧「ゲスト許可」も対応 |
+| 簡易モード（ClarifyMode） | チャットツールバーの簡易表示切替 |
+| ノート倉庫 | 卓／共有／プライベート／ゴミ箱でメモ整理 |
 | クイックロール | キャラクターシート欄をワンクリックでチャットへ送り BCDice で解決 |
-| SkyWay 2023 | 最新 `@skyway-sdk` と自前 backend |
+| キーボードでコマ操作 | 選択後 WASD／矢印移動；Shift+WASD 向き；Delete；Ctrl+C/X/V；`[`/`]` レイヤ；Ctrl(+Shift)+ホイール回転；Shift ドロップで吸着なし |
+| パス移動 | Shift+左クリックでウェイポイント → Shift+右クリックで沿って移動 |
+| 選択 UX | クリック／範囲選択、ダブルクリック詳細、選択ハイライト |
+| Ping | マップ長押しでマーカー；Shift+長押しで警告 |
+| 卓の照明と視界 | 暗闇／FoW、ライト、壁、視界距離；視界キャラを申告可能 |
+| シーンツール | GM のライト／壁／描画／文字；プレイヤーへのツール権限も設定可 |
+| 戦闘トラッカー | イニシアチブ、ラウンド／ターン、告知、ターン終了、撃破スキップ |
+| プレイヤートークン申告 | 「自分のキャラ」：既定の発言者・視界、他者は移動不可 |
+| 天候 | 雨／雪／桜／紅葉／オーロラなど（テーブル設定） |
+| 画像 FX | グレースケール、セピア、コントラスト、反転、シルエット、Matrix…（コマ／スタンド／チャットアイコン／シート） |
+| ステータス／オーラ／リング／死亡 | 状態アイコン、オーラ、リング FX；死亡は戦闘の撃破と同期 |
+| 再読込時の保存確認 | F5／Ctrl+R で ZIP ダウンロードを提案（ゲストはスキップ） |
 
-With Fly から継承：高度、チャット文字色、立ち絵（スタンド）、Cut-in、ダイスボット表など。
+With Fly から継承：高度、チャット文字色、立ち絵（スタンド）、Cut-in、ダイスボット表、SkyWay 2023（`@skyway-sdk`）など。本 fork は自前 backend を使用（公開 WithFly Workers には向けないこと）。
 
 機能チェックリスト：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 

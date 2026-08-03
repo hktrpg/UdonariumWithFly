@@ -6,7 +6,7 @@
 
 [Udonarium](https://github.com/TK11235/udonarium) is a browser-based tool that supports online board-game / TRPG sessions.
 
-This project is an [HKTRPG](https://www.hktrpg.com/) fork of [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly): Traditional Chinese UI, keeping With Fly extensions such as altitude, standees (Stand), Cut-in, and chat text colors.
+This project is an [HKTRPG](https://www.hktrpg.com/) fork of [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly): multi-language UI (default Traditional Chinese), plus VTT-oriented tools (lighting, combat, keyboard controls, etc.), while keeping With Fly extensions such as altitude, standees (Stand), Cut-in, and chat text colors.
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
@@ -38,14 +38,28 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 
 | Feature | Description |
 |---------|-------------|
-| Traditional Chinese UI | Main UI / help localized to zh-Hant |
-| Guest mode | Rooms can “allow guests”; guest UI is restricted (no save, etc.); password rooms still require a password |
-| Clarify mode | Compact chat display toggle |
-| Note storage | Organize notes by tabletop / shared / private / trash |
+| Multi-language UI | Switch 繁中 / 简中 / English / 日本語 at runtime (menu; persisted) |
+| HKTRPG branding | Title, favicon, OG tags, landing page |
+| Role-based rooms | Per-role GM / User / Guest gates (open / password / disabled) |
+| Role invite links | Copy deep links for each role; join with password prompt when needed |
+| Guest mode | Restricted guest UI (no save, limited menus); legacy “allow guest” still supported |
+| Clarify mode | Compact chat toolbar toggle |
+| Note inventory | Notes by tabletop / shared / private / trash |
 | Quick roll | Send character-sheet fields to chat for BCDice in one click |
-| SkyWay 2023 | Latest `@skyway-sdk` with a self-hosted backend |
+| Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; `[`/`]` layer; Ctrl(+Shift)+wheel rotate; Shift drop skips snap |
+| Path move | Shift+left waypoints → Shift+right animate along path |
+| Selection UX | Click / box select, double-click details, selection highlight |
+| Ping | Long-press map for a marker; Shift+long-press for a warning |
+| Table lighting & vision | Darkness / FoW, lights, walls, vision ranges; claim vision character |
+| Scene tools | GM light / wall / draw / text tools; optional per-tool player permissions |
+| Combat tracker | Initiative, rounds/turns, announce, end turn, defeated skip |
+| Player token claim | “My character”: default chat speaker, vision, others can’t move it |
+| Weather | Rain / snow / sakura / maple / aurora / etc. on table settings |
+| Image FX | Grayscale, sepia, contrast, flip, silhouette, Matrix, … on tokens / stands / chat icons / sheets |
+| Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
+| Reload save prompt | F5 / Ctrl+R offers ZIP download before reload (skipped for guests) |
 
-Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, etc.
+Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 
 Feature checklist: [`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 

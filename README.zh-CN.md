@@ -6,7 +6,7 @@
 
 [Udonarium（ユドナリウム）](https://github.com/TK11235/udonarium) 是在 Web 浏览器中运行的桌游／TRPG 在线跑团支援工具。
 
-本项目是以 [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) 为基底的 [HKTRPG](https://www.hktrpg.com/) 改造版：界面为繁体中文，并保留 With Fly 的高度、立绘（Stand）、Cut-in、聊天文字颜色等扩展。
+本项目是以 [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) 为基底的 [HKTRPG](https://www.hktrpg.com/) 改造版：多语言界面（默认繁体中文），并加入光照、战斗追踪、键盘操控等 VTT 向工具；同时保留 With Fly 的高度、立绘（Stand）、Cut-in、聊天文字颜色等扩展。
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
@@ -38,14 +38,28 @@
 
 | 功能 | 说明 |
 |------|------|
-| 繁体中文界面 | 主要 UI／说明已本地化为 zh-Hant |
-| 访客模式 | 开房可「允许访客」；访客 UI 受限（无法存档等）；有密码的房间仍需密码 |
-| 精简模式（ClarifyMode） | 聊天窗口可切换精简显示 |
+| 多语言界面 | 运行时切换 繁中／简中／English／日本語（菜单；会记住） |
+| HKTRPG 品牌 | 标题、favicon、OG、落地页 |
+| 角色权限房间 | GM／User／Guest 各自开放／密码／停用 |
+| 角色邀请链接 | 可复制各角色深链接；需要时再输入密码 |
+| 访客模式 | 访客 UI 受限（无法存档、菜单受限）；仍支持旧版「允许访客」 |
+| 精简模式（ClarifyMode） | 聊天工具栏精简显示切换 |
 | 笔记仓库 | 按桌面／共用／私人／坟场整理备忘 |
-| 快速掷骰 | 角色卡字段可一键送到聊天给 BCDice 结算 |
-| SkyWay 2023 | 使用最新 `@skyway-sdk` 与自建 backend |
+| 快速掷骰 | 角色卡字段一键送到聊天给 BCDice 结算 |
+| 键盘操控棋子 | 选取后 WASD／方向键移动；Shift+WASD 面向；Delete；Ctrl+C/X/V；`[`/`]` 图层；Ctrl(+Shift)+滚轮旋转；Shift 放下不吸附 |
+| 路径移动 | Shift+左键设路点 → Shift+右键沿路径移动 |
+| 选取体验 | 点选／框选、双击详情、选取高亮 |
+| Ping | 长按地图标记；Shift+长按警告 |
+| 桌面光照与视野 | 黑暗／FoW、灯光、墙、视野距离；可宣告视野角色 |
+| 场景工具 | GM 灯光／墙／绘图／文字；可选开放玩家工具权限 |
+| 战斗追踪 | 先攻、回合、宣告、结束回合、击败跳过 |
+| 玩家认领角色 | 「作为我的角色」：默认发言、视野、他人不可移动 |
+| 天气 | 雨／雪／樱花／枫叶／极光等（桌面设定） |
+| 图片特效 | 灰度、怀旧、对比、翻转、剪影、Matrix…（棋子／立绘／聊天图标／角色卡） |
+| 状态／光环／环／死亡 | 状态图标、光环、环特效；死亡与战斗击败同步 |
+| 重新加载存档提示 | F5／Ctrl+R 可先下载 ZIP（访客跳过） |
 
-继承自 With Fly：高度、聊天文字颜色、立绘（Stand）、Cut-in、骰子机器人表等。
+继承自 With Fly：高度、聊天文字颜色、立绘（Stand）、Cut-in、骰子机器人表、SkyWay 2023（`@skyway-sdk`）等。本 fork 使用自建 backend（请勿指向 WithFly 公开 Workers）。
 
 功能验收清单：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
