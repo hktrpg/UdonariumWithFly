@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { EventSystem } from '@udonarium/core/system';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
-import { FolderBackupService, RoomBackupInfo } from 'service/folder-backup.service';
+import { FolderBackupService, RoomBackupAuthStatus, RoomBackupInfo } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
@@ -76,6 +76,15 @@ export class FolderBackupListComponent implements OnInit, OnDestroy {
     const date = new Date(savedAt);
     if (Number.isNaN(date.getTime())) return savedAt;
     return date.toLocaleString();
+  }
+
+  authStatusLabel(status: RoomBackupAuthStatus): string {
+    switch (status) {
+      case 'ready': return this.i18n.t('folderBackup.authStatus.ready');
+      case 'legacy': return this.i18n.t('folderBackup.authStatus.legacy');
+      case 'undecryptable': return this.i18n.t('folderBackup.authStatus.undecryptable');
+      default: return this.i18n.t('folderBackup.authStatus.missing');
+    }
   }
 
   private async reloadList() {

@@ -78,7 +78,7 @@ export const ja: I18nDictionary = {
   'scene.hint.text': 'マップをクリックしてテキストを配置（ダイアログなし）。',
   'scene.hint.select': 'シーン選択中：ドラッグで図形／ライト／壁を一括選択、短いクリックで単選択（駒は選びません）。WASD／矢印で移動、Delete で削除。「選択」をもう一度で終了。',
   'scene.hint.idle': 'ツール未使用時は駒を通常操作できます。シーン編集時は「選択」を押してください。',
-  'scene.hint.noAccess': 'シーンツールの権限がありません。GM に「接続」画面でプレイヤーの追加／編集を許可してもらってください。',
+  'scene.hint.noAccess': 'シーンツールの権限がありません。GM に「権限管理」でプレイヤーの追加／編集を許可してもらってください。',
   'scene.ctx.addLight': 'ライトを追加',
   'scene.ctx.addWall': '壁を追加',
   'scene.ctx.addFreehand': 'フリーハンドを追加',

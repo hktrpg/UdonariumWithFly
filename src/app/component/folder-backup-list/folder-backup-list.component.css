@@ -66,6 +66,36 @@
   opacity: 0.85;
 }
 
+.auth-badge {
+  margin-top: 4px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.auth-ready {
+  color: #166534;
+  background: rgba(22, 101, 52, 0.12);
+}
+
+.auth-legacy {
+  color: #92400e;
+  background: rgba(180, 83, 9, 0.12);
+}
+
+.auth-missing,
+.auth-undecryptable {
+  color: #9a3412;
+  background: rgba(154, 52, 18, 0.12);
+}
+
+.help-auth {
+  margin-top: -4px;
+  margin-bottom: 10px;
+  color: #64748b;
+}
+
 .delete-btn {
   flex: 0 0 auto;
   align-self: center;

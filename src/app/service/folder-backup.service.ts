@@ -9,9 +9,21 @@ import { RoomSettingComponent } from 'component/room-setting/room-setting.compon
 import * as localForage from 'localforage';
 import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
+import { FolderBackupCrypto, FolderBackupSecretsBlob } from './folder-backup-crypto';
+import { RoomInviteService } from './room-invite.service';
 import { SaveDataService } from './save-data.service';
 
 export type FolderBackupStatus = 'unsupported' | 'unbound' | 'needAuth' | 'ready' | 'writing' | 'error';
+
+export interface RoomBackupAuthSettings {
+  allowUser: boolean;
+  allowGuest: boolean;
+  gmPassword: string;
+  userPassword: string;
+  guestPassword: string;
+}
+
+export type RoomBackupAuthStatus = 'ready' | 'legacy' | 'missing' | 'undecryptable';
 
 export interface RoomBackupInfo {
   roomId: string;
@@ -19,6 +31,9 @@ export interface RoomBackupInfo {
   savedAt: string;
   zipFile: string;
   fileHandle: FileSystemFileHandle;
+  auth?: RoomBackupAuthSettings;
+  /** Whether role passwords can be restored on this browser. */
+  authStatus: RoomBackupAuthStatus;
 }
 
 export interface RoomBackupMeta {
@@ -26,6 +41,30 @@ export interface RoomBackupMeta {
   displayName: string;
   savedAt: string;
   zipFile: string;
+  allowUser?: boolean;
+  allowGuest?: boolean;
+  /** Encrypted role passwords (AES-GCM + PBKDF2 salt). */
+  secrets?: FolderBackupSecretsBlob;
+  /** @deprecated Legacy plaintext — read once for migration, never written again. */
+  gmPassword?: string;
+  /** @deprecated Legacy plaintext — read once for migration, never written again. */
+  userPassword?: string;
+  /** @deprecated Legacy plaintext — read once for migration, never written again. */
+  guestPassword?: string;
+}
+
+export interface FolderFlushOptions {
+  timeoutMs?: number;
+  /** Write even if current identity is Guest (use after role already switched). */
+  bypassGuest?: boolean;
+  /** Write using last room snapshot even if peer left the room. */
+  allowLeave?: boolean;
+}
+
+interface RoomSnapshot {
+  roomId: string;
+  displayName: string;
+  auth?: RoomBackupAuthSettings;
 }
 
 @Injectable({
@@ -42,10 +81,13 @@ export class FolderBackupService implements OnDestroy {
   private dirty = false;
   private writing = false;
   private writeAgain = false;
+  private writePromise: Promise<void> | null = null;
+  private leaveFlushPromise: Promise<void> | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private minIntervalTimer: ReturnType<typeof setTimeout> | null = null;
   private lastWriteAt = 0;
   private activeRoomId = '';
+  private lastRoomSnapshot: RoomSnapshot | null = null;
   private initialized = false;
 
   status: FolderBackupStatus = 'unsupported';
@@ -55,6 +97,7 @@ export class FolderBackupService implements OnDestroy {
 
   constructor(
     private saveDataService: SaveDataService,
+    private roomInvite: RoomInviteService,
     private ngZone: NgZone,
     private modalService: ModalService,
     private i18n: I18nService
@@ -80,6 +123,10 @@ export class FolderBackupService implements OnDestroy {
 
   get hasFolder(): boolean {
     return !!this.dirHandle;
+  }
+
+  get hasError(): boolean {
+    return this.status === 'error';
   }
 
   get canAutoWrite(): boolean {
@@ -114,12 +161,12 @@ export class FolderBackupService implements OnDestroy {
     }
 
     EventSystem.register(this)
-      .on('OPEN_NETWORK', () => this.onNetworkOpen())
+      .on('OPEN_NETWORK', () => { void this.onNetworkOpen(); })
       .on('CHANGE_GM_MODE', () => { void this.onGuestModePossiblyChanged(); })
       .on('UPDATE_GAME_OBJECT', event => this.onGameObjectDirty(event.data?.aliasName))
       .on('DELETE_GAME_OBJECT', event => this.onGameObjectDirty(event.data?.aliasName));
 
-    this.onNetworkOpen();
+    void this.onNetworkOpen();
   }
 
   ngOnDestroy() {
@@ -146,7 +193,7 @@ export class FolderBackupService implements OnDestroy {
       await localForage.setItem(FolderBackupService.STORAGE_KEY, handle);
       this.lastError = '';
       this.setStatus('ready');
-      this.onNetworkOpen();
+      void this.onNetworkOpen();
       return true;
     } catch (e) {
       if ((e as DOMException)?.name === 'AbortError') return false;
@@ -167,7 +214,7 @@ export class FolderBackupService implements OnDestroy {
       }
       this.lastError = '';
       this.setStatus('ready');
-      this.onNetworkOpen();
+      void this.onNetworkOpen();
       return true;
     } catch (e) {
       console.warn('FolderBackup requestAccess failed', e);
@@ -186,6 +233,7 @@ export class FolderBackupService implements OnDestroy {
     this.lastSavedAt = null;
     this.lastError = '';
     this.listening = false;
+    this.lastRoomSnapshot = null;
     try {
       await localForage.removeItem(FolderBackupService.STORAGE_KEY);
     } catch (e) {
@@ -200,15 +248,29 @@ export class FolderBackupService implements OnDestroy {
     this.scheduleWrite();
   }
 
-  async flush(options?: { timeoutMs?: number }): Promise<boolean> {
-    if (!this.dirHandle || !Network.peer?.isRoom || Network.GuestMode()) {
+  async flush(options?: FolderFlushOptions): Promise<boolean> {
+    if (!this.dirHandle) {
+      return false;
+    }
+    if (Network.GuestMode() && !options?.bypassGuest) {
+      return false;
+    }
+    const inRoom = !!Network.peer?.isRoom;
+    if (!inRoom && !options?.allowLeave) {
+      return false;
+    }
+    if (!inRoom && options?.allowLeave && !this.lastRoomSnapshot) {
       this.dirty = false;
       this.clearTimers();
       return false;
     }
-    if (!this.isReady && this.status !== 'writing') {
+
+    if (this.status === 'needAuth' || this.status === 'error' || this.status === 'unbound') {
       const perm = await this.queryPermission(this.dirHandle);
-      if (perm !== 'granted') return false;
+      if (perm !== 'granted') {
+        this.setStatus('needAuth');
+        return false;
+      }
       this.setStatus(this.writing ? 'writing' : 'ready');
     }
 
@@ -216,21 +278,12 @@ export class FolderBackupService implements OnDestroy {
     this.dirty = true;
     const timeoutMs = options?.timeoutMs ?? FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS;
     try {
-      await this.withTimeout(this.flushWrites(), timeoutMs);
-      return true;
+      await this.withTimeout(this.flushWrites(options), timeoutMs);
+      return !this.dirty && !this.lastError;
     } catch (e) {
       console.warn('FolderBackup flush failed', e);
       this.lastError = String((e as Error)?.message || e);
       return false;
-    }
-  }
-
-  private async flushWrites(): Promise<void> {
-    await this.writeNow(true);
-    if (this.dirty || this.writeAgain) {
-      this.writeAgain = false;
-      this.dirty = true;
-      await this.writeNow(true);
     }
   }
 
@@ -251,13 +304,17 @@ export class FolderBackupService implements OnDestroy {
         const file = await fileHandle.getFile();
         const meta = JSON.parse(await file.text()) as RoomBackupMeta;
         if (!meta?.roomId || !meta?.zipFile) continue;
+        if (!this.isSafeRoomFileName(meta.roomId) || !this.isSafeZipFileName(meta.zipFile)) continue;
         const zipHandle = await this.dirHandle.getFileHandle(meta.zipFile);
+        const resolved = await this.authFromMeta(meta);
         results.push({
           roomId: meta.roomId,
           displayName: meta.displayName || meta.roomId,
           savedAt: meta.savedAt || '',
           zipFile: meta.zipFile,
           fileHandle: zipHandle,
+          auth: resolved.auth,
+          authStatus: resolved.status,
         });
       } catch (e) {
         console.warn('Skip backup meta', name, e);
@@ -281,27 +338,34 @@ export class FolderBackupService implements OnDestroy {
     }
     const zipFile = backup.zipFile || `${backup.roomId}.zip`;
     const metaFile = `${backup.roomId}.meta.json`;
+    if (!this.isSafeZipFileName(zipFile) || !this.isSafeRoomFileName(backup.roomId)) return false;
+
+    let zipRemoved = false;
+    let metaRemoved = false;
     try {
       await this.dirHandle.removeEntry(zipFile);
+      zipRemoved = true;
     } catch (e) {
       console.warn('Failed to remove backup zip', zipFile, e);
     }
     try {
       await this.dirHandle.removeEntry(metaFile);
+      metaRemoved = true;
     } catch (e) {
       console.warn('Failed to remove backup meta', metaFile, e);
     }
     try {
       await this.dirHandle.removeEntry(`${zipFile}.tmp`);
     } catch { /* ignore missing temp */ }
-    return true;
+    return zipRemoved || metaRemoved;
   }
 
   async ensureBound(): Promise<boolean> {
     if (!this.isSupported || Network.GuestMode()) return false;
     if (this.status === 'needAuth') return this.requestAccess();
     if (!this.hasFolder || this.status === 'unbound') return this.bindFolder();
-    return this.isReady || this.status === 'error';
+    if (this.status === 'error') return this.requestAccess();
+    return this.isReady;
   }
 
   async openLoadUi(): Promise<void> {
@@ -321,11 +385,14 @@ export class FolderBackupService implements OnDestroy {
       let loadDirect = false;
       const choice = await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.confirm.loadFolder.title'),
-        text: this.i18n.t('menu.confirm.loadFolder.text'),
-        help: this.i18n.t('menu.confirm.loadFolder.help'),
+        text: this.i18n.t('menu.confirm.loadFolder.text', {
+          name: selected.displayName || selected.roomId,
+          id: selected.roomId,
+        }),
+        help: this.resumeConfirmHelp(selected.authStatus),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'folder',
-        okLabel: this.i18n.t('menu.confirm.loadZip.createRoom'),
+        okLabel: this.i18n.t('menu.confirm.loadFolder.resumeRoom'),
         cancelLabel: this.i18n.t('menu.confirm.loadZip.loadDirect'),
         cancelAction: () => {
           loadDirect = true;
@@ -335,9 +402,13 @@ export class FolderBackupService implements OnDestroy {
       if (choice === true) {
         await this.modalService.open(RoomSettingComponent, {
           width: 700,
-          height: 420,
+          height: 480,
           left: 0,
           top: 400,
+          preferredRoomId: selected.roomId,
+          preferredRoomName: selected.displayName,
+          preferredAuth: selected.auth,
+          preferredAuthStatus: selected.authStatus,
           afterCreate: () => { void this.loadRoomBackup(selected); },
         });
       }
@@ -345,10 +416,17 @@ export class FolderBackupService implements OnDestroy {
       return;
     }
 
+    // Already in a room: same roomId keeps one backup; different id forks a new zip.
+    const sameRoom = Network.peer.roomId === selected.roomId;
     const overwrite = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('menu.confirm.loadFolder.overwrite.title'),
       text: this.i18n.t('menu.confirm.loadFolder.overwrite.text'),
-      help: this.i18n.t('menu.confirm.loadFolder.overwrite.help'),
+      help: sameRoom
+        ? this.i18n.t('menu.confirm.loadFolder.overwrite.help')
+        : this.i18n.t('menu.confirm.loadFolder.overwrite.helpFork', {
+          currentId: Network.peer.roomId,
+          backupId: selected.roomId,
+        }),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'folder',
     });
@@ -357,47 +435,69 @@ export class FolderBackupService implements OnDestroy {
     }
   }
 
-  private onNetworkOpen() {
+  private async onNetworkOpen() {
     const peer = Network.peer;
     if (!peer?.isRoom) {
-      this.activeRoomId = '';
-      this.listening = false;
-      this.clearTimers();
-      this.dirty = false;
+      if (!this.leaveFlushPromise) {
+        this.leaveFlushPromise = this.handleLeaveRoom().finally(() => {
+          this.leaveFlushPromise = null;
+        });
+      }
+      await this.leaveFlushPromise;
       return;
     }
 
     const roomId = peer.roomId || '';
-    if (this.activeRoomId && this.activeRoomId !== roomId) {
-      this.clearTimers();
-      this.dirty = false;
-      this.writeAgain = false;
+    const prevSnapshot = this.lastRoomSnapshot;
+    if (prevSnapshot && prevSnapshot.roomId !== roomId && (this.dirty || this.writing || this.writePromise)) {
+      await this.flush({
+        timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS,
+        bypassGuest: true,
+        allowLeave: true,
+      });
     }
-    this.activeRoomId = roomId;
-    this.listening = true;
 
-    if (Network.GuestMode()) {
-      this.listening = false;
-      this.clearTimers();
+    this.captureRoomSnapshot();
+    this.activeRoomId = roomId;
+    this.listening = !Network.GuestMode();
+    if (!this.listening) this.clearTimers();
+  }
+
+  private async handleLeaveRoom() {
+    if ((this.dirty || this.writing || this.writePromise) && this.dirHandle && this.lastRoomSnapshot) {
+      await this.flush({
+        timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS,
+        bypassGuest: true,
+        allowLeave: true,
+      });
     }
+    this.activeRoomId = '';
+    this.listening = false;
+    this.clearTimers();
+    this.dirty = false;
+    this.writeAgain = false;
+    this.lastRoomSnapshot = null;
   }
 
   private async onGuestModePossiblyChanged() {
     if (Network.GuestMode()) {
-      if (this.dirty || this.writing) {
-        await this.flush({ timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS });
+      if (this.dirty || this.writing || this.writePromise) {
+        await this.flush({
+          timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS,
+          bypassGuest: true,
+        });
       }
       this.listening = false;
       this.clearTimers();
-      this.dirty = false;
       return;
     }
-    this.onNetworkOpen();
+    await this.onNetworkOpen();
   }
 
   private onGameObjectDirty(aliasName?: string) {
     if (!this.listening || !this.canAutoWrite) return;
     if (aliasName === PeerCursor.aliasName) return;
+    this.captureRoomSnapshot();
     this.markDirty();
   }
 
@@ -421,49 +521,210 @@ export class FolderBackupService implements OnDestroy {
       }, FolderBackupService.MIN_INTERVAL_MS - elapsed);
       return;
     }
-    await this.writeNow(false);
+    await this.performWrite({});
   }
 
-  private async writeNow(force: boolean): Promise<void> {
-    if (!this.dirHandle) return;
-    if (!force && !this.canAutoWrite) return;
-    if (!Network.peer?.isRoom || Network.GuestMode()) return;
-    if (this.writing) {
+  private async flushWrites(options?: FolderFlushOptions): Promise<void> {
+    if (this.writePromise) {
+      try {
+        await this.writePromise;
+      } catch {
+        // Retry below.
+      }
+    }
+    this.dirty = true;
+    await this.performWrite(options || {});
+    if (this.dirty || this.writeAgain) {
+      this.writeAgain = false;
+      this.dirty = true;
+      await this.performWrite(options || {});
+    }
+  }
+
+  private async performWrite(options: FolderFlushOptions): Promise<void> {
+    if (this.writePromise) {
       this.writeAgain = true;
-      return;
+      this.dirty = true;
+      await this.writePromise;
+      if (!this.dirty && !this.writeAgain) return;
     }
 
-    const roomId = Network.peer.roomId;
-    if (!roomId) return;
+    if (!this.dirHandle) return;
+    if (Network.GuestMode() && !options.bypassGuest) return;
+
+    const snapshot = this.resolveSnapshot(options.allowLeave);
+    if (!snapshot || !this.isSafeRoomFileName(snapshot.roomId)) return;
 
     this.writing = true;
     this.dirty = false;
+    this.writeAgain = false;
     this.setStatus('writing');
-    try {
-      const displayName = RoomAuth.displayRoomName(Network.peer.roomName || roomId) || roomId;
-      await this.saveDataService.saveRoomToDirectoryAsync(this.dirHandle, roomId, displayName);
-      this.lastWriteAt = Date.now();
-      this.lastSavedAt = new Date().toISOString();
-      this.lastError = '';
-      this.activeRoomId = roomId;
-      this.setStatus('ready');
-    } catch (e) {
-      console.warn('FolderBackup write failed', e);
-      this.lastError = String((e as Error)?.message || e);
-      this.dirty = true;
-      const perm = this.dirHandle ? await this.queryPermission(this.dirHandle) : 'denied';
-      this.setStatus(perm === 'granted' ? 'error' : 'needAuth');
-      throw e;
-    } finally {
-      this.writing = false;
-      if (this.writeAgain || this.dirty) {
-        this.writeAgain = false;
-        this.dirty = true;
-        if (!force) this.scheduleWrite();
-      } else if (this.status === 'writing') {
+
+    const run = async () => {
+      try {
+        let metaAuth: {
+          allowUser: boolean;
+          allowGuest: boolean;
+          secrets?: FolderBackupSecretsBlob;
+        } | undefined;
+        if (snapshot.auth) {
+          const secrets = await FolderBackupCrypto.encrypt({
+            gmPassword: snapshot.auth.gmPassword,
+            userPassword: snapshot.auth.userPassword,
+            guestPassword: snapshot.auth.guestPassword,
+          });
+          metaAuth = {
+            allowUser: snapshot.auth.allowUser,
+            allowGuest: snapshot.auth.allowGuest,
+            secrets,
+          };
+        }
+        await this.saveDataService.saveRoomToDirectoryAsync(
+          this.dirHandle,
+          snapshot.roomId,
+          snapshot.displayName,
+          undefined,
+          metaAuth
+        );
+        this.lastWriteAt = Date.now();
+        this.lastSavedAt = new Date().toISOString();
+        this.lastError = '';
+        this.activeRoomId = snapshot.roomId;
         this.setStatus('ready');
+      } catch (e) {
+        console.warn('FolderBackup write failed', e);
+        this.lastError = String((e as Error)?.message || e);
+        this.dirty = true;
+        const perm = this.dirHandle ? await this.queryPermission(this.dirHandle) : 'denied';
+        this.setStatus(perm === 'granted' ? 'error' : 'needAuth');
+        throw e;
+      } finally {
+        this.writing = false;
+        if (this.writeAgain) {
+          this.writeAgain = false;
+          this.dirty = true;
+        }
+        if (this.dirty && !options.bypassGuest && !options.allowLeave) {
+          this.scheduleWrite();
+        } else if (this.status === 'writing') {
+          this.setStatus('ready');
+        }
       }
+    };
+
+    this.writePromise = run().finally(() => {
+      this.writePromise = null;
+    });
+    await this.writePromise;
+  }
+
+  private resolveSnapshot(allowLeave?: boolean): RoomSnapshot | null {
+    if (Network.peer?.isRoom && Network.peer.roomId) {
+      this.captureRoomSnapshot();
+      return this.lastRoomSnapshot;
     }
+    if (allowLeave) return this.lastRoomSnapshot;
+    return null;
+  }
+
+  private captureRoomSnapshot() {
+    const peer = Network.peer;
+    if (!peer?.isRoom || !peer.roomId) return;
+    this.lastRoomSnapshot = {
+      roomId: peer.roomId,
+      displayName: RoomAuth.displayRoomName(peer.roomName || peer.roomId) || peer.roomId,
+      auth: this.captureAuthSettings(peer.roomName || ''),
+    };
+  }
+
+  private captureAuthSettings(roomName: string): RoomBackupAuthSettings {
+    const info = RoomAuth.parse(roomName);
+    const allowUser = info.user.mode !== 'disabled';
+    const allowGuest = info.guest.mode !== 'disabled';
+    return {
+      allowUser,
+      allowGuest,
+      gmPassword: this.roomInvite.getRolePassword('gm'),
+      userPassword: allowUser ? this.roomInvite.getRolePassword('user') : '',
+      guestPassword: allowGuest ? this.roomInvite.getRolePassword('guest') : '',
+    };
+  }
+
+  private resumeConfirmHelp(status: RoomBackupAuthStatus): string {
+    const base = this.i18n.t('menu.confirm.loadFolder.help');
+    let extra = this.i18n.t('menu.confirm.loadFolder.helpAuthMissing');
+    switch (status) {
+      case 'ready':
+        extra = this.i18n.t('menu.confirm.loadFolder.helpAuthReady');
+        break;
+      case 'legacy':
+        extra = this.i18n.t('menu.confirm.loadFolder.helpAuthLegacy');
+        break;
+      case 'undecryptable':
+        extra = this.i18n.t('menu.confirm.loadFolder.helpAuthUndecryptable');
+        break;
+      default:
+        break;
+    }
+    return `${base}\n\n${extra}`;
+  }
+
+  private async authFromMeta(meta: RoomBackupMeta): Promise<{
+    auth?: RoomBackupAuthSettings;
+    status: RoomBackupAuthStatus;
+  }> {
+    const hasAllow = meta.allowUser != null || meta.allowGuest != null;
+    const hasLegacyPlain =
+      meta.gmPassword != null || meta.userPassword != null || meta.guestPassword != null;
+    const hasSecrets = !!meta.secrets;
+
+    if (!hasAllow && !hasLegacyPlain && !hasSecrets) {
+      return { status: 'missing' };
+    }
+
+    let gmPassword = '';
+    let userPassword = '';
+    let guestPassword = '';
+    let status: RoomBackupAuthStatus = 'missing';
+
+    if (meta.secrets) {
+      const decrypted = await FolderBackupCrypto.decrypt(meta.secrets);
+      if (decrypted) {
+        gmPassword = decrypted.gmPassword;
+        userPassword = decrypted.userPassword;
+        guestPassword = decrypted.guestPassword;
+        status = 'ready';
+      } else {
+        status = 'undecryptable';
+      }
+    } else if (hasLegacyPlain) {
+      gmPassword = String(meta.gmPassword || '');
+      userPassword = String(meta.userPassword || '');
+      guestPassword = String(meta.guestPassword || '');
+      status = 'legacy';
+    } else if (hasAllow) {
+      // Allow flags only — passwords never saved (or empty).
+      status = 'missing';
+    }
+
+    return {
+      status,
+      auth: {
+        allowUser: meta.allowUser !== false,
+        allowGuest: meta.allowGuest !== false,
+        gmPassword,
+        userPassword,
+        guestPassword,
+      },
+    };
+  }
+
+  private isSafeRoomFileName(roomId: string): boolean {
+    return !!roomId && /^[A-Za-z0-9_-]{1,32}$/.test(roomId);
+  }
+
+  private isSafeZipFileName(name: string): boolean {
+    return !!name && /^[A-Za-z0-9_-]{1,32}\.zip$/.test(name);
   }
 
   private async queryPermission(handle: FileSystemDirectoryHandle): Promise<PermissionState> {

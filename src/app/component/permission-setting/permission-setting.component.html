@@ -1,0 +1,37 @@
+<div class="permission-setting" *ngIf="isGMMode; else notGm">
+  <div class="section-title">{{ 'peer.scenePermTitle' | i18n }}</div>
+  <div class="scene-perm-group">
+    <div class="scene-perm-row scene-perm-head">
+      <label>
+        <input type="checkbox" [ngModel]="sceneAllCreate" (ngModelChange)="setAllSceneCreate($event)">
+        <b>{{ 'peer.sceneCanCreate' | i18n }}</b>
+      </label>
+    </div>
+    <div class="scene-perm-sub">
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateLight"> {{ 'scene.light' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateWall"> {{ 'scene.wall' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateRect"> {{ 'scene.rect' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateEllipse"> {{ 'scene.ellipse' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreatePolygon"> {{ 'scene.polygon' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateFreehand"> {{ 'scene.freehand' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateText"> {{ 'scene.text' | i18n }}</label>
+    </div>
+  </div>
+  <div class="scene-perm-group">
+    <div class="scene-perm-row scene-perm-head">
+      <label>
+        <input type="checkbox" [ngModel]="sceneAllModify" (ngModelChange)="setAllSceneModify($event)">
+        <b>{{ 'peer.sceneCanModify' | i18n }}</b>
+      </label>
+    </div>
+    <div class="scene-perm-sub">
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyLight"> {{ 'scene.light' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyWall"> {{ 'scene.wall' | i18n }}</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyDrawing"> {{ 'scene.drawing' | i18n }}</label>
+    </div>
+  </div>
+  <p class="hint">{{ 'peer.scenePermHelp' | i18n }}</p>
+</div>
+<ng-template #notGm>
+  <p class="hint">{{ 'peer.permissionManage.gmOnly' | i18n }}</p>
+</ng-template>

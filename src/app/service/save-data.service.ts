@@ -49,10 +49,20 @@ export class SaveDataService {
     dirHandle: FileSystemDirectoryHandle,
     roomId: string,
     displayName: string,
-    updateCallback?: UpdateCallback
+    updateCallback?: UpdateCallback,
+    auth?: {
+      allowUser: boolean;
+      allowGuest: boolean;
+      secrets?: {
+        v: 1;
+        salt: string;
+        iv: string;
+        data: string;
+      };
+    }
   ): Promise<void> {
     return SaveDataService.queue.add((resolve, reject) =>
-      resolve(this._saveRoomToDirectoryAsync(dirHandle, roomId, displayName, updateCallback))
+      resolve(this._saveRoomToDirectoryAsync(dirHandle, roomId, displayName, updateCallback, auth))
     );
   }
 
@@ -98,7 +108,17 @@ export class SaveDataService {
     dirHandle: FileSystemDirectoryHandle,
     roomId: string,
     displayName: string,
-    updateCallback?: UpdateCallback
+    updateCallback?: UpdateCallback,
+    auth?: {
+      allowUser: boolean;
+      allowGuest: boolean;
+      secrets?: {
+        v: 1;
+        salt: string;
+        iv: string;
+        data: string;
+      };
+    }
   ): Promise<void> {
     const files = this.buildRoomFiles();
     let progresPercent = -1;
@@ -111,12 +131,18 @@ export class SaveDataService {
     });
     const zipFile = `${roomId}.zip`;
     await FileArchiver.instance.writeBlobToDirectory(dirHandle, zipFile, zipBlob);
-    const meta = {
+    const meta: Record<string, unknown> = {
       roomId,
       displayName,
       savedAt: new Date().toISOString(),
       zipFile,
     };
+    if (auth) {
+      meta.allowUser = !!auth.allowUser;
+      meta.allowGuest = !!auth.allowGuest;
+      if (auth.secrets) meta.secrets = auth.secrets;
+      // Never write plaintext passwords into the backup folder.
+    }
     await FileArchiver.instance.writeBlobToDirectory(
       dirHandle,
       `${roomId}.meta.json`,

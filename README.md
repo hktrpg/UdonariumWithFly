@@ -26,7 +26,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
   - Tokens, cards, shared notes
   - Chat and Chat Palette
   - Dice bot ([BCDice](https://github.com/bcdice/bcdice-js))
-  - Shared images, BGM, ZIP save data
+  - Shared images, BGM, ZIP save data, local folder backup (File System Access API)
 
 - **Browser-to-browser networking**
   - WebRTC via [SkyWay](https://skyway.ntt.com/); work after connect stays mostly in the browser
@@ -58,11 +58,40 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Weather | Rain / snow / sakura / maple / aurora / etc. on table settings |
 | Image FX | Grayscale, sepia, contrast, flip, silhouette, Matrix, … on tokens / stands / chat icons / sheets |
 | Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
-| Reload save prompt | F5 / Ctrl+R offers ZIP download before reload (skipped for guests) |
+| Reload save prompt | F5 / Ctrl+R offers ZIP download; with a bound folder, flushes backup before reload (skipped for guests) |
+| Local folder backup | File System Access API: bind a folder and auto-overwrite per-room ZIPs; Connection panel can bind / save / load / delete (see below) |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 
 Feature checklist: [`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
+
+### Local folder backup
+
+Room state is still live P2P sync; empty rooms disappear from the lobby, so continuity needs a local ZIP or folder backup. On Chrome / Edge (HTTPS), the **File System Access API** can bind a local folder and write multi-room saves automatically.
+
+**Entry points (Connection panel, non-guest)**
+
+- **Bind / re-authorize** a folder (when unbound or permission expired)
+- **Save room**: write the current room immediately
+- **Load room**: list backups in the folder; delete supported; if not in a room, create a room first then load
+- Status text notes that room changes are saved to the folder automatically
+
+The toolbox menu also has a full “Folder backup” submenu; the empty-table right-click compact menu omits ZIP / backup items. Classic Download / Load ZIP remain available.
+
+**Auto-store rules**
+
+| Rule | Behavior |
+|------|----------|
+| Debounce 5s | After a change, wait 5 seconds before writing |
+| Min interval 30s | While playing, at least 30 seconds between successful writes |
+| One file per room | `{roomId}.zip` + `{roomId}.meta.json` (display name, savedAt, join toggles); same `roomId` overwrites |
+| Role passwords | Never stored plaintext in the folder; encrypted with a browser-local key + per-write salt/IV (PBKDF2→AES-GCM) into meta `secrets`. Other browsers/devices require re-entering passwords (next save encrypts them) |
+| Immediate flush | “Save room”, leave / switch room, switch to Guest, logout, F5 / Ctrl+R, and SW update reload flush first |
+| Guests | Cannot bind, auto-write, manual save, or load from folder |
+| Browser | Needs `showDirectoryPicker` in a secure context (desktop Chrome / Edge recommended); may need re-authorization after reload |
+| No auto-load on join | A local backup with the same `roomId` never overwrites a live peer tabletop on join; load is always manual |
+
+**Restore semantics**: “Resume room” from the folder reuses the backup `roomId` (plus name/toggles/decryptable passwords) so auto-backup overwrites the same files. Loading into a live room with a different `roomId` forks under the current ID. Loading into a connected room replaces the tabletop and syncs to other participants.
 
 ## Local development
 

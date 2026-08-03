@@ -571,13 +571,36 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveThenReload() {
     await this.save();
-    await this.folderBackup.flush({ timeoutMs: 15000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 15000 });
+    if (!ok && this.folderBackup.hasFolder) {
+      const proceed = await this.confirmFlushFailedReload();
+      if (!proceed) return;
+    }
     this.reloadWithoutPrompt();
   }
 
   private async flushFolderThenReload() {
-    await this.folderBackup.flush({ timeoutMs: 15000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 15000 });
+    if (!ok && this.folderBackup.hasFolder && this.isRoom && !this.GuestMode()) {
+      const proceed = await this.confirmFlushFailedReload();
+      if (!proceed) return;
+    }
     this.reloadWithoutPrompt();
+  }
+
+  private async confirmFlushFailedReload(): Promise<boolean> {
+    const choice = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('menu.folderBackup.flushFailed.title'),
+      text: this.i18n.t('menu.folderBackup.flushFailed.text'),
+      help: this.folderBackup.lastError
+        ? this.i18n.t('menu.folderBackup.flushFailed.helpError', { error: this.folderBackup.lastError })
+        : this.i18n.t('menu.folderBackup.flushFailed.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'warning',
+      okLabel: this.i18n.t('menu.folderBackup.flushFailed.reload'),
+      cancelLabel: this.i18n.t('confirm.cancel'),
+    });
+    return choice === true;
   }
 
   private reloadWithoutPrompt() {
@@ -654,11 +677,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
               type: ConfirmationType.OK_CANCEL,
               materialIcon: 'browser_updated',
               action: () => {
-                this.swUpdate.activateUpdate().then(() => {
+                void this.swUpdate.activateUpdate().then(async () => {
                   if (notification) {
                     notification.close();
                     notification = null;
                   }
+                  await this.folderBackup.flush({ timeoutMs: 15000 });
                   window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
                   document.location.reload();
                 });
@@ -924,7 +948,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       {
         name: this.i18n.t('menu.folderBackup.load'),
-        disabled: unsupported || (status !== 'ready' && status !== 'writing' && status !== 'error'),
+        disabled: unsupported || status === 'unbound',
         action: () => { void this.openFolderBackupLoad(); }
       },
       {

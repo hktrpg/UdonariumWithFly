@@ -6,12 +6,12 @@ import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
-import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
+import { PermissionSettingComponent } from 'component/permission-setting/permission-setting.component';
 import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -24,6 +24,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { FolderBackupService } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
 import { RoomInviteService } from 'service/room-invite.service';
+import { SaveDataService } from 'service/save-data.service';
 import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
@@ -58,6 +59,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   isPasswordOpen = false;
   isRoomInfoCopied = false;
   inviteCopiedRole: RoomRole = null;
+  isDownloadingZip = false;
+  downloadZipPercent = 0;
 
   help: string = '';
 
@@ -105,46 +108,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
   set isGMMode(isGMMode: boolean) { if (PeerCursor.myCursor) PeerCursor.myCursor.isGMMode = isGMMode; }
 
-  get scenePerm() { return SceneToolPermission.instance; }
-
-  get sceneCanCreateLight(): boolean { return this.scenePerm.playerCanCreateLight; }
-  set sceneCanCreateLight(v: boolean) { this.scenePerm.playerCanCreateLight = !!v; }
-  get sceneCanCreateWall(): boolean { return this.scenePerm.playerCanCreateWall; }
-  set sceneCanCreateWall(v: boolean) { this.scenePerm.playerCanCreateWall = !!v; }
-  get sceneCanCreateRect(): boolean { return this.scenePerm.playerCanCreateRect; }
-  set sceneCanCreateRect(v: boolean) { this.scenePerm.playerCanCreateRect = !!v; }
-  get sceneCanCreateEllipse(): boolean { return this.scenePerm.playerCanCreateEllipse; }
-  set sceneCanCreateEllipse(v: boolean) { this.scenePerm.playerCanCreateEllipse = !!v; }
-  get sceneCanCreatePolygon(): boolean { return this.scenePerm.playerCanCreatePolygon; }
-  set sceneCanCreatePolygon(v: boolean) { this.scenePerm.playerCanCreatePolygon = !!v; }
-  get sceneCanCreateFreehand(): boolean { return this.scenePerm.playerCanCreateFreehand; }
-  set sceneCanCreateFreehand(v: boolean) { this.scenePerm.playerCanCreateFreehand = !!v; }
-  get sceneCanCreateText(): boolean { return this.scenePerm.playerCanCreateText; }
-  set sceneCanCreateText(v: boolean) { this.scenePerm.playerCanCreateText = !!v; }
-
-  get sceneCanModifyLight(): boolean { return this.scenePerm.playerCanModifyLight; }
-  set sceneCanModifyLight(v: boolean) { this.scenePerm.playerCanModifyLight = !!v; }
-  get sceneCanModifyWall(): boolean { return this.scenePerm.playerCanModifyWall; }
-  set sceneCanModifyWall(v: boolean) { this.scenePerm.playerCanModifyWall = !!v; }
-  get sceneCanModifyDrawing(): boolean { return this.scenePerm.playerCanModifyDrawing; }
-  set sceneCanModifyDrawing(v: boolean) { this.scenePerm.playerCanModifyDrawing = !!v; }
-
-  get sceneAllCreate(): boolean {
-    const p = this.scenePerm;
-    return p.playerCanCreateLight && p.playerCanCreateWall
-      && p.playerCanCreateRect && p.playerCanCreateEllipse
-      && p.playerCanCreatePolygon && p.playerCanCreateFreehand
-      && p.playerCanCreateText;
-  }
-  get sceneAllModify(): boolean {
-    const p = this.scenePerm;
-    return p.playerCanModifyLight && p.playerCanModifyWall && p.playerCanModifyDrawing;
-  }
-  setAllSceneCreate(v: boolean) { this.scenePerm.setAllCreate(v); }
-  setAllSceneModify(v: boolean) { this.scenePerm.setAllModify(v); }
-
   get isGMHold(): boolean { return PeerCursor.isGMHold; }
-  get isDisableConnect(): boolean { return this.isGMHold || this.isGMMode; }
 
   get displayRoomName(): string {
     return RoomAuth.displayRoomName(this.networkService.peer.roomName || '');
@@ -184,6 +148,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     public appConfigService: AppConfigService,
     public i18n: I18nService,
     public folderBackup: FolderBackupService,
+    private saveDataService: SaveDataService,
   ) { }
 
   GuestMode() {
@@ -316,28 +281,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   showLobby() {
-    if (PeerCursor.isGMHold || this.isGMMode) {
-      const wasGM = this.isGMMode;
-      PeerCursor.isGMHold = false;
-      this.isGMMode = false;
-      if (wasGM) {
-        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
-        EventSystem.trigger('CHANGE_GM_MODE', null);
-      }
-    }
     this.modalService.open(LobbyComponent, { width: 700, height: 400, left: 0, top: 400 });
   }
 
   showCreateRoom() {
-    if (PeerCursor.isGMHold || this.isGMMode) {
-      const wasGM = this.isGMMode;
-      PeerCursor.isGMHold = false;
-      this.isGMMode = false;
-      if (wasGM) {
-        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
-        EventSystem.trigger('CHANGE_GM_MODE', null);
-      }
-    }
     this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
   }
 
@@ -350,6 +297,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       left: 0,
       top: 400,
     });
+  }
+
+  openPermissionManage() {
+    if (!this.isGMMode) return;
+    this.panelService.open(PermissionSettingComponent, { width: 480, height: 420, left: 120, top: 80 });
   }
 
   loadZip() {
@@ -380,6 +332,25 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   loadFolderBackup() {
     if (this.GuestMode()) return;
     void this.folderBackup.openLoadUi();
+  }
+
+  async downloadZip() {
+    if (this.GuestMode() || !this.networkService.peer?.isRoom || this.isDownloadingZip) return;
+    this.isDownloadingZip = true;
+    this.downloadZipPercent = 0;
+    const roomName = 0 < this.networkService.peer.roomName.length
+      ? this.networkService.peer.roomName
+      : 'HKTRPG';
+    try {
+      await this.saveDataService.saveRoomAsync(roomName, percent => {
+        this.downloadZipPercent = percent;
+      });
+    } finally {
+      setTimeout(() => {
+        this.isDownloadingZip = false;
+        this.downloadZipPercent = 0;
+      }, 500);
+    }
   }
 
   stringFromSessionGrade(grade: PeerSessionGrade): string {
@@ -538,24 +509,29 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'swap_horiz',
       action: () => {
-        const prev = this.currentRole;
-        RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
-        // Clear legacy hold state.
-        PeerCursor.isGMHold = false;
-        this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {
-          from: this.roleLabel(prev),
-          to: label
-        }));
-        EventSystem.trigger('CHANGE_GM_MODE', null);
-        if (prev === 'gm' && result.role !== 'gm' && GameCharacter.isStealthMode) {
-          this.modalService.open(ConfirmationComponent, {
-            title: this.i18n.t('peer.confirm.stealth.title'),
-            text: this.i18n.t('peer.confirm.stealth.text'),
-            help: this.i18n.t('peer.confirm.stealth.help'),
-            type: ConfirmationType.OK,
-            materialIcon: 'disabled_visible'
-          });
-        }
+        void (async () => {
+          const prev = this.currentRole;
+          if (result.role === 'guest' && prev !== 'guest') {
+            await this.folderBackup.flush({ timeoutMs: 15000 });
+          }
+          RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
+          // Clear legacy hold state.
+          PeerCursor.isGMHold = false;
+          this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {
+            from: this.roleLabel(prev),
+            to: label
+          }));
+          EventSystem.trigger('CHANGE_GM_MODE', null);
+          if (prev === 'gm' && result.role !== 'gm' && GameCharacter.isStealthMode) {
+            this.modalService.open(ConfirmationComponent, {
+              title: this.i18n.t('peer.confirm.stealth.title'),
+              text: this.i18n.t('peer.confirm.stealth.text'),
+              help: this.i18n.t('peer.confirm.stealth.help'),
+              type: ConfirmationType.OK,
+              materialIcon: 'disabled_visible'
+            });
+          }
+        })();
       }
     });
   }

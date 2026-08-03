@@ -1,10 +1,12 @@
 <div class="help">{{ 'folderBackup.loadHelp' | i18n }}</div>
+<div class="help help-auth">{{ 'folderBackup.loadHelpAuth' | i18n }}</div>
 <div class="rules">
   <div class="rules-title">{{ 'folderBackup.storeRulesTitle' | i18n }}</div>
   <ul class="rules-list">
     <li>{{ 'folderBackup.storeRules.debounce' | i18n }}</li>
     <li>{{ 'folderBackup.storeRules.minInterval' | i18n }}</li>
     <li>{{ 'folderBackup.storeRules.overwrite' | i18n }}</li>
+    <li>{{ 'folderBackup.storeRules.auth' | i18n }}</li>
     <li>{{ 'folderBackup.storeRules.flush' | i18n }}</li>
     <li>{{ 'folderBackup.storeRules.guest' | i18n }}</li>
   </ul>
@@ -15,6 +17,7 @@
     <button type="button" class="backup-item" (click)="select(backup)">
       <span class="name">{{ backup.displayName }}</span>
       <span class="meta">{{ backup.roomId }} · {{ formatSavedAt(backup.savedAt) }}</span>
+      <span class="auth-badge" [ngClass]="'auth-' + (backup.authStatus || 'missing')">{{ authStatusLabel(backup.authStatus || 'missing') }}</span>
     </button>
     <button type="button" class="delete-btn" (click)="deleteBackup(backup)"
       [title]="'folderBackup.delete' | i18n"
