@@ -84,12 +84,6 @@
       </span>
     </div>
   </div>
-  <div class="room-zip-row" *ngIf="!GuestMode()">
-    <button type="button" (click)="loadZip()">
-      <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
-      {{ 'menu.loadZip' | i18n }}
-    </button>
-  </div>
   <ng-container *ngIf="networkService.peer.password">
     <div>
       {{ 'peer.password' | i18n }}
@@ -110,50 +104,72 @@
     </div>
   </ng-container>
 </ng-container>
-<hr/>
-<ng-container *ngIf="isGMMode">
-  <div style="font-weight: bold; margin-bottom: 4px">{{ 'peer.scenePermTitle' | i18n }}</div>
-  <div class="scene-perm-group">
-    <div class="scene-perm-row scene-perm-head">
-      <label>
-        <input type="checkbox" [ngModel]="sceneAllCreate" (ngModelChange)="setAllSceneCreate($event)">
-        <b>{{ 'peer.sceneCanCreate' | i18n }}</b>
-      </label>
-    </div>
-    <div class="scene-perm-sub">
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateLight"> {{ 'scene.light' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateWall"> {{ 'scene.wall' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateRect"> {{ 'scene.rect' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateEllipse"> {{ 'scene.ellipse' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreatePolygon"> {{ 'scene.polygon' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateFreehand"> {{ 'scene.freehand' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanCreateText"> {{ 'scene.text' | i18n }}</label>
+<div class="room-actions">
+  <div class="room-zip-row" *ngIf="!GuestMode() && folderBackup.isSupported">
+    <button type="button" *ngIf="folderBackup.needsBind || folderBackup.hasError" (click)="bindFolderBackup()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder</i>
+      {{ (folderBackup.status === 'needAuth' || folderBackup.hasError ? 'menu.folderBackup.reauth' : 'menu.folderBackup.bind') | i18n }}
+    </button>
+    <button type="button" *ngIf="networkService.peer.isRoom" (click)="saveFolderBackup()"
+      [disabled]="folderBackup.status === 'writing'">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
+      {{ 'menu.folderBackup.saveRoom' | i18n }}
+    </button>
+    <button type="button" (click)="loadFolderBackup()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
+      {{ 'menu.folderBackup.loadRoom' | i18n }}
+    </button>
+    <button type="button" *ngIf="networkService.peer.isRoom" (click)="loadZip()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
+      {{ 'menu.loadZip' | i18n }}
+    </button>
+    <button type="button" *ngIf="networkService.peer.isRoom" (click)="downloadZip()"
+      [disabled]="isDownloadingZip">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">sd_storage</i>
+      {{ isDownloadingZip ? (downloadZipPercent + '%') : ('menu.downloadZip' | i18n) }}
+    </button>
+    <span class="folder-status" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
+      {{ folderBackup.status === 'writing'
+        ? ('menu.folderBackup.status.writing' | i18n)
+        : ('menu.folderBackup.status.ready' | i18n:{ name: folderBackup.folderName || '-' }) }}
+    </span>
+    <span class="folder-status folder-error" *ngIf="folderBackup.hasError || folderBackup.status === 'needAuth'">
+      {{ folderBackup.hasError
+        ? ('menu.folderBackup.status.error' | i18n)
+        : ('menu.folderBackup.status.needAuth' | i18n) }}
+      <ng-container *ngIf="folderBackup.lastError"> — {{ folderBackup.lastError }}</ng-container>
+    </span>
+    <div class="folder-auto-hint" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
+      {{ 'menu.folderBackup.autoStoreHint' | i18n }}
     </div>
   </div>
-  <div class="scene-perm-group">
-    <div class="scene-perm-row scene-perm-head">
-      <label>
-        <input type="checkbox" [ngModel]="sceneAllModify" (ngModelChange)="setAllSceneModify($event)">
-        <b>{{ 'peer.sceneCanModify' | i18n }}</b>
-      </label>
-    </div>
-    <div class="scene-perm-sub">
-      <label><input type="checkbox" [(ngModel)]="sceneCanModifyLight"> {{ 'scene.light' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanModifyWall"> {{ 'scene.wall' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="sceneCanModifyDrawing"> {{ 'scene.drawing' | i18n }}</label>
-    </div>
-  </div>
-  <div style="font-size: 12px; color: #64748b; margin-bottom: 6px">
-    {{ 'peer.scenePermHelp' | i18n }}
-  </div>
-  <div *ngIf="isRoleAuthRoom" class="room-pw-edit-row">
-    <button type="button" (click)="editRoomPasswords()">
-      <i class="material-icons" style="font-size: 1em; vertical-align: middle">password</i>
+  <div class="connect-actions">
+    <ng-container *ngIf="!networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">
+      <input [(ngModel)]="targetUserId" [placeholder]="'peer.targetIdPlaceholder' | i18n" name="targetUserId" />
+      <button (click)="connectPeer()" [disabled]="!networkService.isOpen || targetUserId == null || targetUserId == ''">{{ 'peer.privateConnect' | i18n }}</button>
+    </ng-container>
+    <button *ngIf="networkService.peers.length < 1" (click)="showLobby()" [disabled]="!networkService.isOpen"><i class="material-icons" style="vertical-align: bottom">meeting_room</i>{{ 'peer.lobby' | i18n }}</button>
+    <button *ngIf="networkService.peers.length < 1" (click)="showCreateRoom()" [disabled]="!networkService.isOpen"><i class="material-icons" style="vertical-align: bottom">room_preferences</i>{{ 'lobby.createRoom' | i18n }}</button>
+    <button *ngIf="isGMMode && networkService.peer.isRoom && isRoleAuthRoom" type="button" (click)="editRoomPasswords()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">edit</i>
       {{ 'peer.editRoomPasswords' | i18n }}
     </button>
+    <button *ngIf="isGMMode" type="button" (click)="openPermissionManage()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">admin_panel_settings</i>
+      {{ 'peer.permissionManage' | i18n }}
+    </button>
   </div>
-  <hr/>
-</ng-container>
+  <div><span style="font-size: 12px;">{{help}}</span></div>
+  <ng-container *ngIf="!networkService.peer.isRoom">
+    <div style="font-size: 12px" *ngIf="networkService.peers.length < 1 && canUsePrivateSession && !isGMMode && !isGMHold">{{ 'peer.helpPrivateShare' | i18n }}</div>
+    <div style="font-size: 12px" *ngIf="networkService.peers.length < 1">{{ 'peer.helpSoloTest' | i18n }}</div>
+    <div style="font-size: 12px" *ngIf="(isGMMode || isGMHold) && canUsePrivateSession">{{ 'peer.helpGmNoConnect' | i18n }}</div>
+  </ng-container>
+  <ng-container *ngIf="networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">
+    <div style="font-size: 12px">{{ 'peer.helpNoPrivateInRoom' | i18n }}</div>
+  </ng-container>
+</div>
+<hr/>
 <div *ngFor="let peer of networkService.peers; index as i">
   <div *ngIf="i == 0" style="font-weight: bold">{{ 'peer.connectionStatusTitle' | i18n }}<span class="health">（{{ 'peer.healthGood' | i18n }} </span><i class="material-icons health health-blue">sentiment_very_satisfied</i><span class="health"> ＞ </span><i class="material-icons health health-green">sentiment_dissatisfied</i><span class="health"> ＞ </span><i class="material-icons health health-yellow">mood_bad</i><span class="health"> ＞ </span><i class="material-icons health health-red">sentiment_very_dissatisfied</i><span class="health"> {{ 'peer.healthBad' | i18n }}）</span>：</div>
   <div class="peer-info">
@@ -174,22 +190,3 @@
     </div>
   </div>
 </div>
-<div *ngIf="!isGMMode && !isGMHold" style="margin-top: 1px">
-  <ng-container *ngIf="!networkService.peer.isRoom && canUsePrivateSession">
-    <input [(ngModel)]="targetUserId" [placeholder]="'peer.targetIdPlaceholder' | i18n" name="targetUserId" [disabled]="isDisableConnect" />
-    <button (click)="connectPeer()" [disabled]="!networkService.isOpen || targetUserId == null || targetUserId == '' || isDisableConnect">{{ 'peer.privateConnect' | i18n }}</button><br>
-  </ng-container>
-  <button *ngIf="networkService.peers.length < 1" style="margin-left: 0px" (click)="showLobby()" [disabled]="!networkService.isOpen || isDisableConnect"><i class="material-icons" style="vertical-align: bottom">meeting_room</i>{{ 'peer.lobby' | i18n }}</button>
-  <button *ngIf="networkService.peers.length < 1" (click)="showCreateRoom()" [disabled]="!networkService.isOpen || isDisableConnect"><i class="material-icons" style="vertical-align: bottom">room_preferences</i>{{ 'lobby.createRoom' | i18n }}</button>
-</div>
-<div><span style="font-size: 12px;">{{help}}</span></div>
-<ng-container *ngIf="!isGMMode && !isGMHold">
-  <ng-container *ngIf="!networkService.peer.isRoom">
-    <div style="font-size: 12px" *ngIf="networkService.peers.length < 1 && canUsePrivateSession">{{ 'peer.helpPrivateShare' | i18n }}</div>
-    <div style="font-size: 12px" *ngIf="networkService.peers.length < 1">{{ 'peer.helpSoloTest' | i18n }}</div>
-  </ng-container>
-  <ng-container *ngIf="networkService.peer.isRoom && canUsePrivateSession">
-    <div style="font-size: 12px">{{ 'peer.helpNoPrivateInRoom' | i18n }}</div>
-  </ng-container>
-</ng-container>
-<ng-container *ngIf="(isGMMode || isGMHold) && canUsePrivateSession"><div style="font-size: 12px">{{ 'peer.helpGmNoConnect' | i18n }}</div></ng-container>

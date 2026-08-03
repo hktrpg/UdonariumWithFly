@@ -33,6 +33,7 @@ import { OverviewPanelComponent } from 'component/overview-panel/overview-panel.
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
 import { PeerCursorComponent } from 'component/peer-cursor/peer-cursor.component';
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
+import { PermissionSettingComponent } from 'component/permission-setting/permission-setting.component';
 import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -77,6 +78,7 @@ import { YouTubePlayerModule } from "@angular/youtube-player";
 import { CardListImageComponent } from './component/card-list-image/card-list-image.component';
 import { LoggingInputDirective } from './directive/logging-input.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
+import { FolderBackupListComponent } from './component/folder-backup-list/folder-backup-list.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
@@ -118,6 +120,7 @@ import '@udonarium/table-fx/combat-tracker';
     OverviewPanelComponent,
     PasswordCheckComponent,
     PeerMenuComponent,
+    PermissionSettingComponent,
     RolePasswordPromptComponent,
     RoomJoinComponent,
     RoomSettingComponent,
@@ -148,6 +151,7 @@ import '@udonarium/table-fx/combat-tracker';
     CardListImageComponent,
     LoggingInputDirective,
     ConfirmationComponent,
+    FolderBackupListComponent,
     RangeComponent,
     SceneToolsComponent,
     CombatTrackerComponent,

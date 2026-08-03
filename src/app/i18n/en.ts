@@ -78,7 +78,7 @@ export const en: I18nDictionary = {
   'scene.hint.text': 'Click the map to place text (no dialog).',
   'scene.hint.select': 'Scene select: drag a box to multi-select drawings / lights / walls; short click selects one (not tokens). WASD / arrows move, Delete removes. Click Select again to exit.',
   'scene.hint.idle': 'With no tool active you can move tokens normally. Press Select to edit scene objects.',
-  'scene.hint.noAccess': 'No scene-tool permission. Ask the GM to allow player create / edit in Connection.',
+  'scene.hint.noAccess': 'No scene-tool permission. Ask the GM to allow player create / edit in Permissions.',
   'scene.ctx.addLight': 'Add Light',
   'scene.ctx.addWall': 'Add Wall',
   'scene.ctx.addFreehand': 'Add Freehand',

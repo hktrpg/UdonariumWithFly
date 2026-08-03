@@ -27,6 +27,12 @@ export interface RoomJoinResult {
   password: string;
 }
 
+/** Input for encoding a role gate (string = password; empty string = open). */
+export type RoleAuthInput = string | {
+  mode: RoleGateMode;
+  password?: string;
+};
+
 /**
  * Role passwords are advertised as digests in the room name (like guest marker).
  * Network/skyway password stays empty for role-auth rooms so each role can have
@@ -35,6 +41,11 @@ export interface RoomJoinResult {
  * Markers:
  * - \u2060A — legacy (7-hex digests)
  * - \u2060B — compact (4-hex digests) — used for new rooms to keep peerId short
+ *
+ * Gate flags in the blob:
+ * - `*` — open (no password)
+ * - `0` — disabled (role cannot join)
+ * - `1` + digest — password required
  */
 export class RoomAuth {
   static readonly AUTH_MARKER = '\u2060A';
@@ -45,7 +56,7 @@ export class RoomAuth {
   static encode(
     displayName: string,
     roomId: string,
-    passwords: { gm?: string; user?: string; guest?: string },
+    passwords: { gm?: RoleAuthInput; user?: RoleAuthInput; guest?: RoleAuthInput },
   ): string {
     const clean = RoomAuth.sanitizeDisplayName(displayName || translate('room.defaultName'));
     const blob =
@@ -233,10 +244,22 @@ export class RoomAuth {
       .trim() || translate('room.defaultName');
   }
 
-  private static encodeGate(roomId: string, display: string, role: RoomRole, password: string): string {
-    // Empty string = open (no password). All three roles are always available on new rooms.
-    if (!password) return '*';
-    return '1' + RoomAuth.calcDigest(roomId, display, role, password, RoomAuth.DIGEST_LEN_V2);
+  private static encodeGate(roomId: string, display: string, role: RoomRole, input?: RoleAuthInput): string {
+    const gate = RoomAuth.normalizeAuthInput(input);
+    if (gate.mode === 'disabled') return '0';
+    if (gate.mode === 'open' || !gate.password) return '*';
+    return '1' + RoomAuth.calcDigest(roomId, display, role, gate.password, RoomAuth.DIGEST_LEN_V2);
+  }
+
+  private static normalizeAuthInput(input?: RoleAuthInput): { mode: RoleGateMode; password: string } {
+    if (input == null || typeof input === 'string') {
+      const password = typeof input === 'string' ? input : '';
+      return { mode: password ? 'password' : 'open', password };
+    }
+    if (input.mode === 'disabled') return { mode: 'disabled', password: '' };
+    const password = input.password || '';
+    if (!password || input.mode === 'open') return { mode: 'open', password: '' };
+    return { mode: 'password', password };
   }
 
   private static readGate(blob: string, start: number, digestLen: number): { gate: RoleGate; next: number } {

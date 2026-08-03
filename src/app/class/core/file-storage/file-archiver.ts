@@ -138,10 +138,10 @@ export class FileArchiver {
     }
   }
 
-  async saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void>
-  async saveAsync(files: FileList, zipName: string, updateCallback?: UpdateCallback): Promise<void>
-  async saveAsync(files: any, zipName: string, updateCallback?: UpdateCallback): Promise<void> {
-    if (!files) return;
+  async createZipBlobAsync(files: File[], updateCallback?: UpdateCallback): Promise<Blob>
+  async createZipBlobAsync(files: FileList, updateCallback?: UpdateCallback): Promise<Blob>
+  async createZipBlobAsync(files: any, updateCallback?: UpdateCallback): Promise<Blob> {
+    if (!files) return new Blob();
     let saveFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
     let zipWriter = new ZipWriter(new BlobWriter('application/zip'), { bufferedWrite: true });
@@ -156,12 +156,46 @@ export class FileArchiver {
           sumProgress += progress - prevProgress;
           prevProgress = progress;
           let percent = sumProgress * 100 / sumTotal;
-          updateCallback({ percent: percent, currentFile: file.name });
+          if (updateCallback) updateCallback({ percent: percent, currentFile: file.name });
         }
       });
     }));
 
-    saveAs(await zipWriter.close(), zipName + '.zip');
+    return await zipWriter.close();
+  }
+
+  async saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void>
+  async saveAsync(files: FileList, zipName: string, updateCallback?: UpdateCallback): Promise<void>
+  async saveAsync(files: any, zipName: string, updateCallback?: UpdateCallback): Promise<void> {
+    if (!files) return;
+    saveAs(await this.createZipBlobAsync(files, updateCallback), zipName + '.zip');
+  }
+
+  async writeBlobToDirectory(dirHandle: FileSystemDirectoryHandle, fileName: string, blob: Blob): Promise<void> {
+    const tmpName = fileName + '.tmp';
+    const tmpHandle = await dirHandle.getFileHandle(tmpName, { create: true });
+    const writable = await tmpHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+
+    if (typeof tmpHandle.move === 'function') {
+      try {
+        await tmpHandle.move(fileName);
+        return;
+      } catch (e) {
+        console.warn('FileSystemFileHandle.move failed, falling back', e);
+      }
+    }
+
+    const finalHandle = await dirHandle.getFileHandle(fileName, { create: true });
+    const finalWritable = await finalHandle.createWritable();
+    await finalWritable.write(blob);
+    await finalWritable.close();
+    try {
+      await dirHandle.removeEntry(tmpName);
+    } catch (e) {
+      console.warn('Failed to remove temp backup file', e);
+    }
   }
 }
 
