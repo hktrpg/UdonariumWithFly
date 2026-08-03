@@ -196,6 +196,10 @@ export const en_ui: I18nDictionary = {
   'menu.confirm.loadZip.help': 'Create a room first so other participants can join and sync. For local testing, you can load directly.',
   'menu.confirm.loadZip.createRoom': 'Create room',
   'menu.confirm.loadZip.loadDirect': 'Load directly',
+  'menu.confirm.refresh.title': 'Reload',
+  'menu.confirm.refresh.text': 'Download a room ZIP before reloading?',
+  'menu.confirm.refresh.help': 'Unsaved local room state is lost after reload. Close this dialog to cancel.',
+  'menu.confirm.refresh.reload': 'Reload without download',
 
   'table.title': 'Map settings',
   'table.create': 'Create new map',

@@ -36,7 +36,7 @@ import { TextViewComponent } from 'component/text-view/text-view.component';
 import { UIPanelComponent } from 'component/ui-panel/ui-panel.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
-import { ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -105,6 +105,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isLoggedin = false;
   isUpdateCanceled = false;
   private inviteHandled = false;
+  private isRefreshPromptOpen = false;
 
   static imageUrl = '';
   get imageUrl(): string {
@@ -506,6 +507,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ngZone.run(() => {
           if (!CombatTrackerComponent.isOpen) this.open('CombatTrackerComponent');
         });
+      })
+      .on('OPEN_TOOLBOX', -1000, event => {
+        this.ngZone.run(() => {
+          const data = event.data || {};
+          this.openToolboxAt(
+            { x: data.x ?? 0, y: data.y ?? 0 },
+            Array.isArray(data.extraActions) ? data.extraActions : []
+          );
+        });
       });
 
     workaroundForMobileSafari();
@@ -516,6 +526,53 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     event.preventDefault();
     event.returnValue = '';
   };
+
+  private readonly onWindowKeydown = (event: KeyboardEvent) => {
+    const isReload =
+      event.key === 'F5' ||
+      ((event.ctrlKey || event.metaKey) && (event.key === 'r' || event.key === 'R'));
+    if (!isReload) return;
+    if (this.GuestMode()) return;
+    if (this.isRefreshPromptOpen || this.isSaveing) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.ngZone.run(() => this.promptRefreshDownload());
+  };
+
+  private promptRefreshDownload() {
+    if (this.isRefreshPromptOpen || this.GuestMode()) return;
+    this.isRefreshPromptOpen = true;
+    this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('menu.confirm.refresh.title'),
+      text: this.i18n.t('menu.confirm.refresh.text'),
+      help: this.i18n.t('menu.confirm.refresh.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'sd_storage',
+      okLabel: this.i18n.t('menu.downloadZip'),
+      cancelLabel: this.i18n.t('menu.confirm.refresh.reload'),
+      action: () => {
+        void this.saveThenReload();
+      },
+      cancelAction: () => {
+        this.reloadWithoutPrompt();
+      },
+    }).finally(() => {
+      this.isRefreshPromptOpen = false;
+    });
+  }
+
+  private async saveThenReload() {
+    await this.save();
+    this.reloadWithoutPrompt();
+  }
+
+  private reloadWithoutPrompt() {
+    window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
+    document.location.reload();
+  }
 
   private async tryConsumeInvite() {
     const payload = this.roomInvite.parseInviteFromLocation();
@@ -541,6 +598,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
+    window.addEventListener('keydown', this.onWindowKeydown, true);
   }
 
   ngAfterViewInit() {
@@ -610,6 +668,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
+    window.removeEventListener('keydown', this.onWindowKeydown, true);
   }
 
   open(componentName: string) {
@@ -726,11 +785,24 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   toolBox(event: Event) {
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
+    const position = {
+      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
       y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
     };
-    const menu = [];
+    this.openToolboxAt(position);
+  }
+
+  private openToolboxAt(position: { x: number, y: number }, extraActions: ContextMenuAction[] = []) {
+    const menu = this.buildToolboxMenuActions();
+    if (extraActions.length) {
+      menu.push(ContextMenuSeparator);
+      Array.prototype.push.apply(menu, extraActions);
+    }
+    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+  }
+
+  private buildToolboxMenuActions(): ContextMenuAction[] {
+    const menu: ContextMenuAction[] = [];
     const cunIns = CutInList.instance.cutIns;
     menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
       action: null, subActions: cunIns.length === 0 ? [
@@ -740,8 +812,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           center: true
         }
       ] : cunIns.map(cutIn => {
-        return { 
-          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`, 
+        return {
+          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
           subActions: [{
               name: this.i18n.t('cutin.all'),
               action: () => {
@@ -801,7 +873,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       disabled: this.isSaveing,
       action: () => this.save()
     });
-    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+    return menu;
   }
 
   private makeWeatherToolboxMenu() {
@@ -1045,8 +1117,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {
-        window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
-        document.location.reload();
+        this.reloadWithoutPrompt();
       }
     });
   }

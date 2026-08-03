@@ -197,6 +197,10 @@ export const zhTW_ui: I18nDictionary = {
   'menu.confirm.loadZip.help': '先建房後再讀取，其他參加者才能同步進房。若只是本機測試，也可直接讀取。',
   'menu.confirm.loadZip.createRoom': '建立房間',
   'menu.confirm.loadZip.loadDirect': '直接讀取',
+  'menu.confirm.refresh.title': '重新整理',
+  'menu.confirm.refresh.text': '重新整理前要下載房間 ZIP 嗎？',
+  'menu.confirm.refresh.help': '頁面重新載入後，本機未存檔的房間狀態會消失。關閉此視窗可取消重新整理。',
+  'menu.confirm.refresh.reload': '不需下載，重新整理',
 
   'table.title': '地圖設定',
   'table.create': '建立新地圖',

@@ -196,6 +196,10 @@ export const zhCN_ui: I18nDictionary = {
   'menu.confirm.loadZip.help': '先建房再读取，其他参加者才能同步进房。若只是本机测试，也可直接读取。',
   'menu.confirm.loadZip.createRoom': '创建房间',
   'menu.confirm.loadZip.loadDirect': '直接读取',
+  'menu.confirm.refresh.title': '重新加载',
+  'menu.confirm.refresh.text': '重新加载前要下载房间 ZIP 吗？',
+  'menu.confirm.refresh.help': '页面重新加载后，本机未存档的房间状态会消失。关闭此窗口可取消重新加载。',
+  'menu.confirm.refresh.reload': '无需下载，重新加载',
 
   'table.title': '地图设置',
   'table.create': '创建新地图',

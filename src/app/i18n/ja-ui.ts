@@ -196,6 +196,10 @@ export const ja_ui: I18nDictionary = {
   'menu.confirm.loadZip.help': '先に部屋を作ると他の参加者と同期できます。ローカル確認だけなら直接読込でも構いません。',
   'menu.confirm.loadZip.createRoom': '部屋を作成',
   'menu.confirm.loadZip.loadDirect': '直接読込',
+  'menu.confirm.refresh.title': '再読込',
+  'menu.confirm.refresh.text': '再読込の前にルーム ZIP を保存しますか？',
+  'menu.confirm.refresh.help': 'ページ再読込後、未保存のルーム状態は失われます。このダイアログを閉じると再読込をキャンセルできます。',
+  'menu.confirm.refresh.reload': '保存せず再読込',
 
   'table.title': 'マップ設定',
   'table.create': '新規マップ作成',

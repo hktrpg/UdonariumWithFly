@@ -658,30 +658,34 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    let menuActions: ContextMenuAction[] = [];
+    let extraActions: ContextMenuAction[] = [];
 
     if (0 < this.selectionService.size) {
-      menuActions.push({
+      extraActions.push({
         name: this.i18n.t('gt.congregate'),
         action: () => {
           this.selectionService.congregate(objectPosition);
         },
       });
-      menuActions.push(ContextMenuSeparator);
+      extraActions.push(ContextMenuSeparator);
     }
-    Array.prototype.push.apply(menuActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
+    Array.prototype.push.apply(extraActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
     const sceneCreates = this.makeSceneCreateMenuActions(objectPosition);
     if (sceneCreates.length) {
-      menuActions.push(ContextMenuSeparator);
-      Array.prototype.push.apply(menuActions, sceneCreates);
+      extraActions.push(ContextMenuSeparator);
+      Array.prototype.push.apply(extraActions, sceneCreates);
     }
-    menuActions.push(ContextMenuSeparator);
-    menuActions.push({
+    extraActions.push(ContextMenuSeparator);
+    extraActions.push({
       name: this.i18n.t('gt.mapSettings'), action: () => {
         this.modalService.open(GameTableSettingComponent);
       }
     });
-    this.contextMenuService.open(menuPosition, menuActions, this.currentTable.name);
+    EventSystem.trigger('OPEN_TOOLBOX', {
+      x: menuPosition.x,
+      y: menuPosition.y,
+      extraActions
+    });
   }
 
   private makeSceneCreateMenuActions(position: PointerCoordinate): ContextMenuAction[] {
