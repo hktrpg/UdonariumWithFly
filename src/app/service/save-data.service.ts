@@ -2,6 +2,8 @@ import { Injectable, NgZone } from '@angular/core';
 
 import { ChatTabList } from '@udonarium/chat-tab-list';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import { AudioFile, AudioState } from '@udonarium/core/file-storage/audio-file';
+import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
@@ -96,6 +98,14 @@ export class SaveDataService {
     }
     let imageTagXml = this.convertToXml(ImageTagList.create(images));
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
+
+    // User-uploaded BGM / SE (preset asset sounds are isHidden and omitted).
+    for (const audio of AudioStorage.instance.audios) {
+      if (audio.isHidden) continue;
+      if (audio.state !== AudioState.COMPLETE || !audio.blob) continue;
+      const ext = MimeType.extension(audio.blob.type) || 'mp3';
+      files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
+    }
     return files;
   }
 

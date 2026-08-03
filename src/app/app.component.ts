@@ -70,6 +70,8 @@ import { animate, keyframes, style, transition, trigger } from '@angular/animati
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { RoomInviteService } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
+import { GuidedTourService } from 'service/guided-tour.service';
+import { TeachingTipService } from 'service/teaching-tip.service';
 
 @Component({
     selector: 'app-root',
@@ -115,10 +117,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   
   private noticeIntervalTimer: NodeJS.Timer = null;
 
+  get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
+
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
   get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
-  get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -157,6 +160,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private i18n: I18nService,
     private roomInvite: RoomInviteService,
     private folderBackup: FolderBackupService,
+    private guidedTour: GuidedTourService,
+    private teachingTips: TeachingTipService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -638,8 +643,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngAfterViewInit() {
     PanelService.defaultParentViewContainerRef = ModalService.defaultParentViewContainerRef = ContextMenuService.defaultParentViewContainerRef = StandImageService.defaultParentViewContainerRef = CutInService.defaultParentViewContainerRef = this.modalLayerViewContainerRef;
     queueMicrotask(() => {
-      this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100 });
-      this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450 });
+      this.guidedTour.tryOfferFirstRun();
+      if (!this.guidedTour.isActive) {
+        this.openDefaultPanels();
+      }
+    });
+    let tourWasActive = false;
+    this.guidedTour.state$.subscribe(s => {
+      const active = s.phase === 'welcome' || s.phase === 'running';
+      if (tourWasActive && !active) {
+        this.ngZone.run(() => this.openDefaultPanels());
+      }
+      tourWasActive = active;
     });
     
     // PWA
@@ -762,6 +777,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
       this.openPanelCount = this.openPanelCount + 1;
       this.panelService.open(component, option);
+      const tourId = this.tourIdForComponent(componentName);
+      if (tourId) this.guidedTour.notifyPanelOpened(tourId);
+    }
+  }
+
+  private openDefaultPanels() {
+    this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100 });
+    this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450 });
+  }
+
+  private tourIdForComponent(componentName: string): string | null {
+    switch (componentName) {
+      case 'PeerMenuComponent': return 'menu.connection';
+      case 'ChatWindowComponent': return 'menu.chat';
+      case 'GameTableSettingComponent': return 'menu.table';
+      case 'FileStorageComponent': return 'menu.images';
+      case 'JukeboxComponent': return 'menu.music';
+      case 'CombatTrackerComponent': return 'menu.combat';
+      case 'SceneToolsComponent': return 'menu.sceneTools';
+      case 'GameObjectInventoryComponent': return 'menu.inventory';
+      case 'NoteInventoryComponent': return 'menu.notes';
+      default: return null;
     }
   }
 
@@ -818,6 +855,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   toolBox(event: Event) {
+    this.guidedTour.notifyMenuClick('menu.toolbox');
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = {
@@ -1111,6 +1149,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   standSetteings(event: Event) {
+    this.guidedTour.notifyMenuClick('menu.settings');
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = { 
@@ -1182,8 +1221,39 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         })),
       },
       ContextMenuSeparator,
+      contextMenuToggleCheck({
+        get: () => this.teachingTips.isEnabled,
+        set: (v) => this.teachingTips.setEnabled(v),
+        on: `☑${this.i18n.t('tour.hoverTips')}`,
+        off: `☐${this.i18n.t('tour.hoverTips')}`,
+      }),
+      {
+        name: this.i18n.t('tour.replay'),
+        materialIcon: 'school',
+        action: () => this.guidedTour.replay(),
+      },
+      {
+        name: this.i18n.t('tour.helpControls'),
+        materialIcon: 'help_outline',
+        action: () => this.openControlsHelp(),
+      },
+      ContextMenuSeparator,
       { name: this.i18n.t('menu.settings.clearStands'), action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
     ], this.i18n.t('menu.settings'));
+  }
+
+  private openControlsHelp() {
+    const text = [
+      this.i18n.t('tutorial.welcome'),
+      this.i18n.t('tutorial.view'),
+      this.i18n.t('tutorial.keyboard'),
+      this.i18n.t('tutorial.chat'),
+      this.i18n.t('tutorial.scene'),
+    ].join('\n\n');
+    this.modalService.open(TextViewComponent, {
+      title: this.i18n.t('tour.helpControls'),
+      text,
+    });
   }
 /*
   farewellStandAll() {

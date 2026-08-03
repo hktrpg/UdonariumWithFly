@@ -5,7 +5,7 @@
         <chat-message *ngIf="chatMessage.isDisplayable" [chatMessage]="chatMessage" [compact]="compact" [leftOnly]="leftOnly" [@.disabled]="compact || checkAnimated(chatMessage)"></chat-message>
       </ng-container>
     </ng-container>
-    <ng-container *ngIf="isEmpty">
+    <ng-container *ngIf="showSampleMessages">
       <chat-message *ngFor="let chatMessage of sampleMessages" [chatMessage]="chatMessage" [compact]="compact" [@.disabled]="compact || checkAnimated(chatMessage)"></chat-message>
     </ng-container>
   </div>

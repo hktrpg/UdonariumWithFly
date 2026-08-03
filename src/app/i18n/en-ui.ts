@@ -442,7 +442,7 @@ export const en_ui: I18nDictionary = {
   'lang.zhCN': 'Simplified Chinese',
   'jukebox.hintAudition': '※ <b>Preview<sup class="self-only">*</sup></b> and <b>SFX test<sup class="self-only">*</sup></b> play once on your device only.',
   'jukebox.hintBgm': '※ <b>BGM</b> loops the same track for everyone in the room.',
-  'jukebox.hintZip': '※ Room saves (zip) do not include music files. (Re-upload each time.)',
+  'jukebox.hintZip': '※ Room saves (zip) include uploaded music files.',
   'jukebox.mute': 'Mute',
   'jukebox.unmute': 'Unmute',
   'jukebox.seTestTitle': 'SFX test',

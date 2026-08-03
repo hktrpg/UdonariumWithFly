@@ -442,7 +442,7 @@ export const zhCN_ui: I18nDictionary = {
   'lang.zhCN': '简体中文',
   'jukebox.hintAudition': '※ <b>试听<sup class="self-only">*</sup></b>、<b>SE测试<sup class="self-only">*</sup></b> 会在自己的环境播放一次音乐。',
   'jukebox.hintBgm': '※ <b>BGM</b> 会在房间内全员循环播放同一首音乐。',
-  'jukebox.hintZip': '※现行版本的存档数据（zip）不包含音乐文件。（每次都需要重新上传）',
+  'jukebox.hintZip': '※现行版本的存档数据（zip）会一并包含已上传的音乐文件。',
   'jukebox.mute': '静音',
   'jukebox.unmute': '解除静音',
   'jukebox.seTestTitle': 'SE测试',

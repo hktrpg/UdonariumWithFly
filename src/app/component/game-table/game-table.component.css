@@ -386,3 +386,42 @@
     opacity: 1;
   }
 }
+
+.path-move-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 11000;
+  max-width: min(720px, calc(100vw - 24px));
+  padding: 8px 12px;
+  box-sizing: border-box;
+  pointer-events: none;
+  color: #fff;
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid #888;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.vision-banner {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 11000;
+  max-width: min(640px, calc(100vw - 24px));
+  padding: 8px 12px;
+  box-sizing: border-box;
+  pointer-events: none;
+  color: #fff8e1;
+  background: rgba(90, 60, 10, 0.92);
+  border: 1px solid #c9a227;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}

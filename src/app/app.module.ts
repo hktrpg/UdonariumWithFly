@@ -77,12 +77,15 @@ import { ChatLogOutputComponent } from './component/chat-log-output/chat-log-out
 import { YouTubePlayerModule } from "@angular/youtube-player";
 import { CardListImageComponent } from './component/card-list-image/card-list-image.component';
 import { LoggingInputDirective } from './directive/logging-input.directive';
+import { TeachingTipDirective } from 'directive/teaching-tip.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
 import { FolderBackupListComponent } from './component/folder-backup-list/folder-backup-list.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
+import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
+import { GuidedTourComponent } from './component/guided-tour/guided-tour.component';
 
 // Ensure SyncObject registration for table FX
 import '@udonarium/table-fx/table-wall';
@@ -155,7 +158,10 @@ import '@udonarium/table-fx/combat-tracker';
     RangeComponent,
     SceneToolsComponent,
     CombatTrackerComponent,
-    CombatAnnounceComponent
+    CombatAnnounceComponent,
+    TeachingTipDirective,
+    TeachingTipComponent,
+    GuidedTourComponent
   ],
   imports: [
     BrowserModule,

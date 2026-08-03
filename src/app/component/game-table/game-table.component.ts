@@ -322,6 +322,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   ) { }
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
+  get showPathMoveHud(): boolean {
+    return this.tokenPath.hasDraft || this.tokenPath.isAnimating;
+  }
+  get showVisionBanner(): boolean {
+    if (PeerCursor.myCursor?.isGMMode) return false;
+    const table = this.currentTable;
+    if (!table?.visionEnabled) return false;
+    const userId = Network.peer?.userId;
+    if (!userId) return false;
+    return !ObjectStore.instance.getObjects(GameCharacter).some(ch => ch.providesVisionTo(userId));
+  }
   get pathPointsAttr(): string {
     const pts: string[] = [];
     if (this.tokenPath.origin) {

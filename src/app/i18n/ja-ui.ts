@@ -442,7 +442,7 @@ export const ja_ui: I18nDictionary = {
   'lang.zhCN': '簡体字中国語',
   'jukebox.hintAudition': '※ <b>試聴<sup class="self-only">*</sup></b>・<b>SEテスト<sup class="self-only">*</sup></b> は自分の環境でのみ一度再生します。',
   'jukebox.hintBgm': '※ <b>BGM</b> は部屋の全員に同じ曲をループ再生します。',
-  'jukebox.hintZip': '※現行バージョンのセーブデータ（zip）に音楽ファイルは含まれません。（毎回再アップロードが必要です）',
+  'jukebox.hintZip': '※現行バージョンのセーブデータ（zip）にはアップロードした音楽ファイルも含まれます。',
   'jukebox.mute': 'ミュート',
   'jukebox.unmute': 'ミュート解除',
   'jukebox.seTestTitle': 'SEテスト',

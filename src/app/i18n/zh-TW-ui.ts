@@ -450,7 +450,7 @@ export const zhTW_ui: I18nDictionary = {
   'lang.zhCN': '简体中文',
   'jukebox.hintAudition': '※ <b>試聽<sup class="self-only">*</sup></b>、<b>SE測試<sup class="self-only">*</sup></b> 會在自己的環境播放一次音樂。',
   'jukebox.hintBgm': '※ <b>BGM</b> 會在房間內全員循環播放同一首音樂。',
-  'jukebox.hintZip': '※現行版本的存檔資料（zip）不包含音樂檔案。（每次都需要重新上傳）',
+  'jukebox.hintZip': '※現行版本的存檔資料（zip）會一併包含已上傳的音樂檔。',
   'jukebox.mute': '靜音',
   'jukebox.unmute': '解除靜音',
   'jukebox.seTestTitle': 'SE測試',

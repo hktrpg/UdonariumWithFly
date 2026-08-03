@@ -100,6 +100,10 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   get isEmpty(): boolean { return this.chatTab.chatMessages.every(chatMessage => !chatMessage.isDisplayable); }
 
+  get showSampleMessages(): boolean {
+    return this.isEmpty;
+  }
+
   private scrollEventShortTimer: ResettableTimeout = null;
   private scrollEventLongTimer: ResettableTimeout = null;
   private addMessageEventTimer: NodeJS.Timeout = null;

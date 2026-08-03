@@ -83,7 +83,10 @@
     </div>
   </section>
 
-  <p class="empty-hint" *ngIf="!encounter.isStarted">
+  <p class="empty-hint" *ngIf="!encounter.isStarted && encounter.combatants.length === 0">
+    {{ 'combat.emptyHint' | i18n }}
+  </p>
+  <p class="empty-hint" *ngIf="!encounter.isStarted && encounter.combatants.length > 0">
     {{ 'combat.notStartedParticipantsN' | i18n:{ n: encounter.combatants.length } }}
   </p>
 

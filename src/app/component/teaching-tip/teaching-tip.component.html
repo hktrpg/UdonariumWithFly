@@ -1,0 +1,10 @@
+<div
+  class="teaching-tip-box"
+  *ngIf="state.visible"
+  [style.left.px]="state.left"
+  [style.top.px]="state.top"
+  role="tooltip"
+>
+  <div class="teaching-tip-title">{{ state.titleKey | i18n }}</div>
+  <div class="teaching-tip-body">{{ state.bodyKey | i18n }}</div>
+</div>
