@@ -84,12 +84,6 @@
       </span>
     </div>
   </div>
-  <div class="room-zip-row" *ngIf="!GuestMode()">
-    <button type="button" (click)="loadZip()">
-      <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
-      {{ 'menu.loadZip' | i18n }}
-    </button>
-  </div>
   <ng-container *ngIf="networkService.peer.password">
     <div>
       {{ 'peer.password' | i18n }}
@@ -110,6 +104,33 @@
     </div>
   </ng-container>
 </ng-container>
+<div class="room-zip-row" *ngIf="!GuestMode() && folderBackup.isSupported">
+  <button type="button" *ngIf="folderBackup.needsBind" (click)="bindFolderBackup()">
+    <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder</i>
+    {{ (folderBackup.status === 'needAuth' ? 'menu.folderBackup.reauth' : 'menu.folderBackup.bind') | i18n }}
+  </button>
+  <button type="button" *ngIf="networkService.peer.isRoom" (click)="saveFolderBackup()"
+    [disabled]="folderBackup.status === 'writing'">
+    <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
+    {{ 'menu.folderBackup.saveRoom' | i18n }}
+  </button>
+  <button type="button" (click)="loadFolderBackup()">
+    <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
+    {{ 'menu.folderBackup.loadRoom' | i18n }}
+  </button>
+  <button type="button" *ngIf="networkService.peer.isRoom" (click)="loadZip()">
+    <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
+    {{ 'menu.loadZip' | i18n }}
+  </button>
+  <span class="folder-status" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
+    {{ folderBackup.status === 'writing'
+      ? ('menu.folderBackup.status.writing' | i18n)
+      : ('menu.folderBackup.status.ready' | i18n:{ name: folderBackup.folderName || '-' }) }}
+  </span>
+  <div class="folder-auto-hint" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
+    {{ 'menu.folderBackup.autoStoreHint' | i18n }}
+  </div>
+</div>
 <hr/>
 <ng-container *ngIf="isGMMode">
   <div style="font-weight: bold; margin-bottom: 4px">{{ 'peer.scenePermTitle' | i18n }}</div>

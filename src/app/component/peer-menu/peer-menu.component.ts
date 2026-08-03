@@ -21,6 +21,7 @@ import { PanelService } from 'service/panel.service';
 import { animate, style, transition, trigger } from '@angular/animations';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { FolderBackupService } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
 import { RoomInviteService } from 'service/room-invite.service';
 import { AppLocale } from 'i18n';
@@ -182,6 +183,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     private roomInvite: RoomInviteService,
     public appConfigService: AppConfigService,
     public i18n: I18nService,
+    public folderBackup: FolderBackupService,
   ) { }
 
   GuestMode() {
@@ -362,6 +364,22 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       input.value = '';
     };
     input.click();
+  }
+
+  bindFolderBackup() {
+    if (this.GuestMode()) return;
+    void this.folderBackup.ensureBound();
+  }
+
+  async saveFolderBackup() {
+    if (this.GuestMode() || !this.networkService.peer?.isRoom) return;
+    if (!(await this.folderBackup.ensureBound())) return;
+    await this.folderBackup.flush({ timeoutMs: 15000 });
+  }
+
+  loadFolderBackup() {
+    if (this.GuestMode()) return;
+    void this.folderBackup.openLoadUi();
   }
 
   stringFromSessionGrade(grade: PeerSessionGrade): string {

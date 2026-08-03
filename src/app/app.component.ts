@@ -69,6 +69,7 @@ import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { RoomInviteService } from 'service/room-invite.service';
+import { FolderBackupService } from 'service/folder-backup.service';
 
 @Component({
     selector: 'app-root',
@@ -155,12 +156,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private cutInService: CutInService,
     private i18n: I18nService,
     private roomInvite: RoomInviteService,
+    private folderBackup: FolderBackupService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
       EventSystem;
       Network;
       FileArchiver.instance.initialize();
+      void this.folderBackup.initialize();
       ImageSharingSystem.instance.initialize();
       ImageStorage.instance;
       AudioSharingSystem.instance.initialize();
@@ -513,7 +516,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           const data = event.data || {};
           this.openToolboxAt(
             { x: data.x ?? 0, y: data.y ?? 0 },
-            Array.isArray(data.extraActions) ? data.extraActions : []
+            Array.isArray(data.extraActions) ? data.extraActions : [],
+            { compact: true }
           );
         });
       });
@@ -545,10 +549,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private promptRefreshDownload() {
     if (this.isRefreshPromptOpen || this.GuestMode()) return;
     this.isRefreshPromptOpen = true;
+    const folderReady = this.folderBackup.isReady;
     this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('menu.confirm.refresh.title'),
       text: this.i18n.t('menu.confirm.refresh.text'),
-      help: this.i18n.t('menu.confirm.refresh.help'),
+      help: this.i18n.t(folderReady ? 'menu.confirm.refresh.helpFolder' : 'menu.confirm.refresh.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sd_storage',
       okLabel: this.i18n.t('menu.downloadZip'),
@@ -557,7 +562,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         void this.saveThenReload();
       },
       cancelAction: () => {
-        this.reloadWithoutPrompt();
+        void this.flushFolderThenReload();
       },
     }).finally(() => {
       this.isRefreshPromptOpen = false;
@@ -566,6 +571,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveThenReload() {
     await this.save();
+    await this.folderBackup.flush({ timeoutMs: 15000 });
+    this.reloadWithoutPrompt();
+  }
+
+  private async flushFolderThenReload() {
+    await this.folderBackup.flush({ timeoutMs: 15000 });
     this.reloadWithoutPrompt();
   }
 
@@ -792,8 +803,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.openToolboxAt(position);
   }
 
-  private openToolboxAt(position: { x: number, y: number }, extraActions: ContextMenuAction[] = []) {
-    const menu = this.buildToolboxMenuActions();
+  private openToolboxAt(
+    position: { x: number, y: number },
+    extraActions: ContextMenuAction[] = [],
+    options?: { compact?: boolean }
+  ) {
+    const menu = this.buildToolboxMenuActions(!!options?.compact);
     if (extraActions.length) {
       menu.push(ContextMenuSeparator);
       Array.prototype.push.apply(menu, extraActions);
@@ -801,59 +816,63 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
   }
 
-  private buildToolboxMenuActions(): ContextMenuAction[] {
+  private buildToolboxMenuActions(compact: boolean = false): ContextMenuAction[] {
     const menu: ContextMenuAction[] = [];
-    const cunIns = CutInList.instance.cutIns;
-    menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
-      action: null, subActions: cunIns.length === 0 ? [
-        {
-          name: this.i18n.t('toolbox.noCutIn'),
-          disabled: true,
-          center: true
-        }
-      ] : cunIns.map(cutIn => {
-        return {
-          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
-          subActions: [{
-              name: this.i18n.t('cutin.all'),
-              action: () => {
-                EventSystem.call('PLAY_CUT_IN', {
-                  identifier: cutIn.identifier,
-                  secret: false,
-                  sender: PeerCursor.myCursor.peerId
-                });
-                this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
-              }
-            }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
-            return {
-              name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
-              color: peer.color,
-              default: true,
-              action: () => {
-                if (peer !== PeerCursor.myCursor) {
+    if (!compact) {
+      const cunIns = CutInList.instance.cutIns;
+      menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
+        action: null, subActions: cunIns.length === 0 ? [
+          {
+            name: this.i18n.t('toolbox.noCutIn'),
+            disabled: true,
+            center: true
+          }
+        ] : cunIns.map(cutIn => {
+          return {
+            name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
+            subActions: [{
+                name: this.i18n.t('cutin.all'),
+                action: () => {
+                  EventSystem.call('PLAY_CUT_IN', {
+                    identifier: cutIn.identifier,
+                    secret: false,
+                    sender: PeerCursor.myCursor.peerId
+                  });
+                  this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
+                }
+              }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
+              return {
+                name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
+                color: peer.color,
+                default: true,
+                action: () => {
+                  if (peer !== PeerCursor.myCursor) {
+                    EventSystem.call('PLAY_CUT_IN', {
+                      identifier: cutIn.identifier,
+                      secret: true,
+                      sender: PeerCursor.myCursor.peerId
+                    }, peer.peerId);
+                  }
                   EventSystem.call('PLAY_CUT_IN', {
                     identifier: cutIn.identifier,
                     secret: true,
                     sender: PeerCursor.myCursor.peerId
-                  }, peer.peerId);
+                  }, PeerCursor.myCursor.peerId);
                 }
-                EventSystem.call('PLAY_CUT_IN', {
-                  identifier: cutIn.identifier,
-                  secret: true,
-                  sender: PeerCursor.myCursor.peerId
-                }, PeerCursor.myCursor.peerId);
               }
-            }
-          })]
-        };
-      })
-    });
-    menu.push(ContextMenuSeparator);
+            })]
+          };
+        })
+      });
+      menu.push(ContextMenuSeparator);
+    }
     menu.push(this.makeWeatherToolboxMenu());
     menu.push(this.makeDayNightToolboxMenu());
-    menu.push(ContextMenuSeparator);
-    menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
-    menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
+    if (!compact) {
+      menu.push(ContextMenuSeparator);
+      menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
+      menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
+    }
     menu.push(ContextMenuSeparator);
     menu.push({
       name: this.i18n.t('menu.viewReset'),
@@ -865,15 +884,61 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       ]
     });
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
-    menu.push(ContextMenuSeparator);
-    menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
-    menu.push({
-      name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
-      materialIcon: 'sd_storage',
-      disabled: this.isSaveing,
-      action: () => this.save()
-    });
+    if (!compact) {
+      menu.push(ContextMenuSeparator);
+      menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
+      menu.push({
+        name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+        materialIcon: 'sd_storage',
+        disabled: this.isSaveing,
+        action: () => this.save()
+      });
+      menu.push(this.makeFolderBackupToolboxMenu());
+    }
     return menu;
+  }
+
+  private makeFolderBackupToolboxMenu(): ContextMenuAction {
+    const status = this.folderBackup.status;
+    const statusName = status === 'writing'
+      ? this.i18n.t('menu.folderBackup.status.writing')
+      : status === 'ready'
+        ? this.i18n.t('menu.folderBackup.status.ready', { name: this.folderBackup.folderName || '-' })
+        : this.i18n.t(`menu.folderBackup.status.${status}`);
+    const unsupported = status === 'unsupported';
+    const subActions: ContextMenuAction[] = [
+      {
+        name: statusName,
+        disabled: true,
+      },
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('menu.folderBackup.bind'),
+        disabled: unsupported,
+        action: () => { void this.folderBackup.bindFolder(); }
+      },
+      {
+        name: this.i18n.t('menu.folderBackup.reauth'),
+        disabled: unsupported || status === 'unbound',
+        action: () => { void this.folderBackup.requestAccess(); }
+      },
+      {
+        name: this.i18n.t('menu.folderBackup.load'),
+        disabled: unsupported || (status !== 'ready' && status !== 'writing' && status !== 'error'),
+        action: () => { void this.openFolderBackupLoad(); }
+      },
+      {
+        name: this.i18n.t('menu.folderBackup.unbind'),
+        disabled: unsupported || status === 'unbound',
+        action: () => { void this.folderBackup.unbindFolder(); }
+      },
+    ];
+    return {
+      name: this.i18n.t('menu.folderBackup'),
+      materialIcon: 'folder',
+      disabled: unsupported,
+      subActions,
+    };
   }
 
   private makeWeatherToolboxMenu() {
@@ -1007,6 +1072,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pickZipFiles();
   }
 
+  openFolderBackupLoad() {
+    if (this.GuestMode()) return;
+    void this.folderBackup.openLoadUi();
+  }
+
   private pickZipFiles() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1110,14 +1180,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   logout() {
+    const folderReady = this.folderBackup.isReady;
     const option: any = {
       title: this.i18n.t('menu.confirm.logout.title'),
       text: this.i18n.t(this.isRoom ? 'menu.confirm.logout.textRoom' : 'menu.confirm.logout.text'),
-      help: this.i18n.t(this.GuestMode() ? 'menu.confirm.logout.helpGuest' : 'menu.confirm.logout.help'),
+      help: this.i18n.t(
+        this.GuestMode()
+          ? 'menu.confirm.logout.helpGuest'
+          : (folderReady ? 'menu.confirm.logout.helpFolder' : 'menu.confirm.logout.help')
+      ),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {
-        this.reloadWithoutPrompt();
+        void this.flushFolderThenReload();
       },
     };
     if (!this.GuestMode()) {

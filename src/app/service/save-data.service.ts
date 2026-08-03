@@ -45,8 +45,18 @@ export class SaveDataService {
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(name, updateCallback)));
   }
 
-  private _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
-    fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
+  saveRoomToDirectoryAsync(
+    dirHandle: FileSystemDirectoryHandle,
+    roomId: string,
+    displayName: string,
+    updateCallback?: UpdateCallback
+  ): Promise<void> {
+    return SaveDataService.queue.add((resolve, reject) =>
+      resolve(this._saveRoomToDirectoryAsync(dirHandle, roomId, displayName, updateCallback))
+    );
+  }
+
+  buildRoomFiles(): File[] {
     let files: File[] = [];
     let roomXml = this.convertToXml(new Room());
     let chatXml = this.convertToXml(ChatTabList.instance);
@@ -65,8 +75,6 @@ export class SaveDataService {
     files.push(new File([combatXml], 'fly_combat.xml', { type: 'text/plain' }));
     files.push(new File([scenePermXml], 'fly_scenePerm.xml', { type: 'text/plain' }));
 
-    //files = files.concat(this.searchImageFiles(roomXml));
-    //files = files.concat(this.searchImageFiles(chatXml));
     let images: ImageFile[] = [];
     images = images.concat(this.searchImageFiles(roomXml));
     images = images.concat(this.searchImageFiles(chatXml));
@@ -77,9 +85,43 @@ export class SaveDataService {
       }
     }
     let imageTagXml = this.convertToXml(ImageTagList.create(images));
-
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
-    return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
+    return files;
+  }
+
+  private _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
+    fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
+    return this.saveAsync(this.buildRoomFiles(), this.appendTimestamp(fileName), updateCallback);
+  }
+
+  private async _saveRoomToDirectoryAsync(
+    dirHandle: FileSystemDirectoryHandle,
+    roomId: string,
+    displayName: string,
+    updateCallback?: UpdateCallback
+  ): Promise<void> {
+    const files = this.buildRoomFiles();
+    let progresPercent = -1;
+    const zipBlob = await FileArchiver.instance.createZipBlobAsync(files, meta => {
+      if (!updateCallback) return;
+      let percent = meta.percent | 0;
+      if (percent <= progresPercent) return;
+      progresPercent = percent;
+      this.ngZone.run(() => updateCallback(progresPercent));
+    });
+    const zipFile = `${roomId}.zip`;
+    await FileArchiver.instance.writeBlobToDirectory(dirHandle, zipFile, zipBlob);
+    const meta = {
+      roomId,
+      displayName,
+      savedAt: new Date().toISOString(),
+      zipFile,
+    };
+    await FileArchiver.instance.writeBlobToDirectory(
+      dirHandle,
+      `${roomId}.meta.json`,
+      new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' })
+    );
   }
 
   saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
@@ -113,6 +155,7 @@ export class SaveDataService {
   private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void> {
     let progresPercent = -1;
     return FileArchiver.instance.saveAsync(files, zipName, meta => {
+      if (!updateCallback) return;
       let percent = meta.percent | 0;
       if (percent <= progresPercent) return;
       progresPercent = percent;

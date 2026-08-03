@@ -77,6 +77,7 @@ import { YouTubePlayerModule } from "@angular/youtube-player";
 import { CardListImageComponent } from './component/card-list-image/card-list-image.component';
 import { LoggingInputDirective } from './directive/logging-input.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
+import { FolderBackupListComponent } from './component/folder-backup-list/folder-backup-list.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
@@ -148,6 +149,7 @@ import '@udonarium/table-fx/combat-tracker';
     CardListImageComponent,
     LoggingInputDirective,
     ConfirmationComponent,
+    FolderBackupListComponent,
     RangeComponent,
     SceneToolsComponent,
     CombatTrackerComponent,
