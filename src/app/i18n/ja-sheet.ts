@@ -49,8 +49,8 @@ export const ja_sheet: I18nDictionary = {
 ルビの例）
 　くらえ！｜約束された勝利の剣《Excalibur》！
 
-・💭
-　キャラクターで送信する際、「 と 」で囲んだ内容は💭で表示されます。`,
+・キャラ台詞
+　キャラクターで送信する際、「 と 」で囲んだ内容はキャラ台詞で表示されます。`,
   'stand.sortNameList': 'チャット入力時に名前を並べ替える', 'stand.heightGlobal': '高さ（0=元画像を維持）: ', 'stand.keepOriginalImage': '元画像を維持', 'stand.noOverview': '一覧で立ち絵を使用しない', 'stand.add': '立ち絵設定を追加', 'stand.restore': '削除した立ち絵設定を復元', 'stand.title': '{{name}} の立ち絵設定', 'stand.deleteTitle': '立ち絵設定を削除', 'stand.deleteText': '立ち絵設定を削除しますか？', 'stand.helpTitle': '立ち絵設定の説明', 'stand.changeImage': '画像を変更', 'stand.condition': '条件: ', 'stand.condition.default': 'デフォルト', 'stand.condition.image': '指定画像', 'stand.condition.postfix': 'チャット末尾', 'stand.condition.postfixOrImage': 'チャット末尾 または 指定画像', 'stand.condition.postfixAndImage': 'チャット末尾 かつ 指定画像', 'stand.condition.selectedOnly': '選択時のみ', 'stand.showName': '名前タグ', 'stand.applyImageEffect': '画像効果を反映', 'stand.applyRoll': '回転を反映', 'stand.speakingImage': '口パク同期画像（APNG等）', 'stand.test': 'テスト（自分だけに表示）', 'stand.positionSpecialize': '位置を個別指定: ', 'stand.heightIndividual': '高さ（0=未指定）: ', 'stand.unspecified': '未指定', 'stand.postfixPlaceholder': '1行に1つ。先頭の @ は一致時に本文から削除されます\r\n@怒り\r\n@必殺技', 'stand.noCharacterImages': 'キャラクター画像・顔アイコンが未設定です', 'stand.testMessage': 'これは自分だけに見えるテストです。立ち絵を調整するときは、個人設定で「立ち絵をフェードアウトして自動退場」をオフにすると微調整しやすくなります。',
   'stand.help': `　キャラクター立ち絵の名前・位置・画像高さ（いずれも画面サイズ相対）、およびチャット送信時に表示する条件を設定できます。
 

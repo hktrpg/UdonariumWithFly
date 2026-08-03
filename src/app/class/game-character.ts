@@ -88,6 +88,37 @@ export class GameCharacter extends TabletopObject {
   // 很醜，有沒有別的方法
   chatBubbleAltitude = 0;
 
+  /** Synced character speech balloon (public). Secret balloons still use EventSystem unicast. */
+  @SyncVar() chatDialogText: string = '';
+  @SyncVar() chatDialogColor: string = '';
+  @SyncVar() chatDialogFaceIconIdentifier: string = '';
+  @SyncVar() chatDialogIsEmote: boolean = false;
+  /** Non-zero while a public balloon is active; bump to retrigger. */
+  @SyncVar() chatDialogStamp: number = 0;
+
+  openChatDialog(opts: {
+    text: string;
+    color?: string;
+    faceIconIdentifier?: string;
+    isEmote?: boolean;
+    stamp?: number;
+  }) {
+    this.chatDialogText = opts.text || '';
+    this.chatDialogColor = opts.color || '';
+    this.chatDialogFaceIconIdentifier = opts.faceIconIdentifier || '';
+    this.chatDialogIsEmote = !!opts.isEmote;
+    this.chatDialogStamp = opts.stamp || Date.now();
+  }
+
+  clearChatDialog() {
+    if (!this.chatDialogStamp && !this.chatDialogText) return;
+    this.chatDialogText = '';
+    this.chatDialogColor = '';
+    this.chatDialogFaceIconIdentifier = '';
+    this.chatDialogIsEmote = false;
+    this.chatDialogStamp = 0;
+  }
+
   get name(): string { return this.getCommonValue('name', ''); }
   set name(name) { this.setCommonValue('name', name); }
   get size(): number { return this.getCommonValue('size', 1); }

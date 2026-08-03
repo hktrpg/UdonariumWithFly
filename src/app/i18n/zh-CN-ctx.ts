@@ -3,7 +3,7 @@ import { I18nDictionary } from './types';
 export const zhCN_ctx: I18nDictionary = {
   'char.congregate': '集中到这里', 'char.selectedCharacters': '已选择的角色', 'char.moveAllToCommon': '全部移至公共仓库', 'char.moveAllToPersonal': '全部移至个人仓库', 'char.moveAllToGraveyard': '全部移至回收区',
   'char.revealPosition': '公开位置', 'char.selfOnlyStealth': '仅自己可见（隐身）', 'char.stealthTitle': '隐身模式', 'char.stealthText': '已开启隐身：其他人看不到你的光标位置。', 'char.stealthHelp': '只要桌面上有“仅自己可见”的角色，其他人就看不到你的光标位置。',
-  'char.imageSwitch': '图片切换', 'char.overviewFaceOn': '☑ 总览显示头像', 'char.overviewFaceOff': '☐ 总览显示头像', 'char.overviewFaceRequired': '请先在角色卡设置头像', 'char.chatBubbleOn': '☑ 显示💭', 'char.chatBubbleOff': '☐ 显示💭', 'char.shadowOn': '☑ 显示阴影', 'char.shadowOff': '☐ 显示阴影',
+  'char.imageSwitch': '图片切换', 'char.overviewFaceOn': '☑ 总览显示头像', 'char.overviewFaceOff': '☐ 总览显示头像', 'char.overviewFaceRequired': '请先在角色卡设置头像', 'char.chatBubbleOn': '☑ 显示角色对话框', 'char.chatBubbleOff': '☐ 显示角色对话框', 'char.shadowOn': '☑ 显示阴影', 'char.shadowOff': '☐ 显示阴影',
   'char.affectsLightOn': '☑ 与灯光互动', 'char.affectsLightOff': '☐ 与灯光互动', 'char.stackOn': '☑ 可叠在其他角色上', 'char.stackOff': '☐ 可叠在其他角色上', 'char.altitudeOn': '☑ 显示高度', 'char.altitudeOff': '☐ 显示高度', 'char.resetAltitude': '将高度设为0',
   'char.showDetail': '显示详情...', 'char.nextImage': '切换下一张图像', 'char.chatOn': '☑ 可进行聊天', 'char.chatOff': '☐ 可进行聊天', 'char.showChatPalette': '显示聊天面板...', 'char.standSetting': '立绘设置...', 'char.openReferenceUrl': '打开参考网址', 'char.invalidUrl': '网址无效',
   'char.inventoryOn': '☑ 在桌面仓库显示', 'char.inventoryOff': '☐ 在桌面仓库显示', 'char.moveTo': '移动位置', 'char.commonInventory': '公共仓库', 'char.personalInventory': '个人仓库', 'char.graveyard': '回收区', 'char.clone': '建立副本', 'char.cloneNumbered': '建立副本（自动编号）', 'char.deleteToGraveyard': '删除（移至回收区）', 'char.sheetTitle': '角色卡',

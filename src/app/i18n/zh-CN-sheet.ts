@@ -49,8 +49,8 @@ export const zhCN_sheet: I18nDictionary = {
 注音示例）
 　接招吧！｜约定的胜利之剑《Excalibur》！
 
-・💭
-　以角色发送聊天时，「 与 」包住的内容会以💭显示。`,
+・角色对话框
+　以角色发送聊天时，「 与 」包住的内容会以角色对话框显示。`,
   'stand.sortNameList': '聊天输入时排序名称', 'stand.heightGlobal': '高度（0=保持原图片）: ', 'stand.keepOriginalImage': '保持原图片', 'stand.noOverview': '总览不使用立绘图片', 'stand.add': '新增立绘设置', 'stand.restore': '还原刚删除的立绘设置', 'stand.title': '{{name}} 的立绘设置', 'stand.deleteTitle': '删除立绘设置', 'stand.deleteText': '要删除立绘设置吗？', 'stand.helpTitle': '立绘设置说明', 'stand.changeImage': '更改图片', 'stand.condition': '条件: ', 'stand.condition.default': '默认', 'stand.condition.image': '指定图片', 'stand.condition.postfix': '聊天末尾', 'stand.condition.postfixOrImage': '聊天末尾 或 指定图片', 'stand.condition.postfixAndImage': '聊天末尾 且 指定图片', 'stand.condition.selectedOnly': '仅在选择时', 'stand.showName': '名称标签', 'stand.applyImageEffect': '应用图片效果', 'stand.applyRoll': '应用旋转', 'stand.speakingImage': '口型同步图片（APNG 等）', 'stand.test': '测试（仅自己可见）', 'stand.positionSpecialize': '位置单独指定: ', 'stand.heightIndividual': '高度（0=未指定）: ', 'stand.unspecified': '未指定', 'stand.postfixPlaceholder': '每行一个，开头加上 @ 时会在符合时从文字中截掉\r\n@愤怒\r\n@必杀技', 'stand.noCharacterImages': '尚未设置角色图片、头像', 'stand.testMessage': '这是测试，只有你看得到。调整立绘设置时，可从菜单的“个人设置”关闭“立绘淡出并自动退场”，会更容易微调。',
   'stand.help': `　可设置角色立绘的名称、位置与图片高度（皆为相对画面尺寸）、以及发送聊天时显示立绘的条件。
 

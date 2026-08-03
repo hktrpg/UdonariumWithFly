@@ -346,11 +346,13 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
         this.batchService.requireChangeDetection();
       });
     this.syncChatCharacterVision(this.sendFrom);
+    this.ensureCharacterDialogQuotes();
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['_sendFrom'] && !changes['_sendFrom'].firstChange) {
       this.syncChatCharacterVision(this._sendFrom);
+      this.ensureCharacterDialogQuotes();
     }
   }
 
@@ -473,6 +475,34 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     this.standName = '';
     this.shouldUpdateCharacterList = true;
     this.syncChatCharacterVision(this.sendFrom);
+    this.ensureCharacterDialogQuotes();
+  }
+
+  /** When speaking as a character token, keep empty dialog quotes 「」 ready for chat balloons. */
+  private ensureCharacterDialogQuotes() {
+    const textArea = this.textAreaElementRef?.nativeElement;
+    const blankOrEmptyQuotes = !this.text.trim() || this.text === '「」';
+
+    if (this.character) {
+      if (!blankOrEmptyQuotes) return;
+      this.text = '「」';
+      this.previousWritingLength = this.text.length;
+      if (textArea) {
+        textArea.value = this.text;
+        textArea.setSelectionRange(1, 1);
+        this.calcFitHeight();
+      }
+      return;
+    }
+
+    if (this.text === '「」') {
+      this.text = '';
+      this.previousWritingLength = 0;
+      if (textArea) {
+        textArea.value = '';
+        this.calcFitHeight();
+      }
+    }
   }
 
   sendChat(event: Partial<KeyboardEvent>) {
@@ -508,6 +538,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     const textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
     if (textArea) textArea.value = '';
     this.calcFitHeight();
+    this.ensureCharacterDialogQuotes();
     EventSystem.trigger('MESSAGE_EDITING_START', null);
 
     (async () => {  
@@ -834,12 +865,14 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           //const gameCharacter = this.character;
           //const color = this.color;
           
+          const stamp = Date.now();
           const dialogObj = {
             characterIdentifier: targetCharacter.identifier, 
             text: dialog.join("\n\n"),
             faceIconIdentifier: (isUseFaceIcon && targetCharacter.faceIcon) ? targetCharacter.faceIcon.identifier : null,
             color: color,
-            secret: sendTo ? true : false
+            secret: sendTo ? true : false,
+            stamp,
           };
           if (dialogObj.secret) {
             const targetPeer = ObjectStore.instance.get<PeerCursor>(sendTo);
@@ -848,9 +881,18 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
               EventSystem.call('POPUP_CHAT_BALLOON', dialogObj, PeerCursor.myCursor.peerId);
             }
           } else {
+            // SyncVar reaches all peers reliably (same path as HP / position).
+            targetCharacter.openChatDialog({
+              text: dialogObj.text,
+              color: dialogObj.color,
+              faceIconIdentifier: dialogObj.faceIconIdentifier || '',
+              isEmote: StringUtil.isEmote(dialogObj.text),
+              stamp,
+            });
             EventSystem.call('POPUP_CHAT_BALLOON', dialogObj);
           }
-        } else if (StringUtil.cr(text).trim() && targetCharacter.text) {
+        } else if (StringUtil.cr(text).trim() && (targetCharacter.text || targetCharacter.chatDialogStamp)) {
+          targetCharacter.clearChatDialog();
           EventSystem.call('FAREWELL_CHAT_BALLOON', { characterIdentifier: targetCharacter.identifier });
         }
       }

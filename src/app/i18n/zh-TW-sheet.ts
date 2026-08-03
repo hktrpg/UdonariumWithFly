@@ -63,8 +63,8 @@ export const zhTW_sheet: I18nDictionary = {
 注音範例）
 　接招吧！｜約定的勝利之劍《Excalibur》！
 
-・💭
-　以角色傳送聊天時，「 與 」包住的內容會以💭顯示。`,
+・角色對話框
+　以角色傳送聊天時，「 與 」包住的內容會以角色對話框顯示。`,
   'stand.sortNameList': '聊天輸入時排序名稱', 'stand.heightGlobal': '高度（0=維持原圖片）: ', 'stand.keepOriginalImage': '維持原圖片',
   'stand.noOverview': '總覽不使用立繪圖片', 'stand.add': '新增立繪設定', 'stand.restore': '還原剛刪除的立繪設定',
   'stand.title': '{{name}} 的立繪設定', 'stand.deleteTitle': '刪除立繪設定', 'stand.deleteText': '要刪除立繪設定嗎？',

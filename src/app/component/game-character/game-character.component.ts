@@ -182,8 +182,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   heightWidthRatio = 1.5;
 
   set dialog(dialog) {
-    if (this.GuestMode()) return;
-    if (!this.gameCharacter || this.gameCharacter.isHideIn) return;
+    if (!dialog || !dialog.text) return;
+    // Guests may view speech balloons; only block when this peer cannot see the token.
+    if (!this.gameCharacter) return;
+    if (!this.gameCharacter.isVisible && !this.isGMMode) return;
     clearTimeout(this.dialogTimeOutId);
     clearInterval(this.chatIntervalId);
     let text = StringUtil.cr(dialog.text);
@@ -207,9 +209,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     let speechDelay = 1000 / Array.from(text).length > 36 ? 1000 / Array.from(text).length : 36;
     if (speechDelay > 200) speechDelay = 200;
     this.dialogTimeOutId = setTimeout(() => {
-      this.gameCharacter.dialog = null;
-      this.gameCharacter.text = '';
-      this.gameCharacter.isEmote = false; 
+      const stamp = dialog.stamp || this.lastChatDialogStamp;
+      this.clearChatDialogLocal();
+      if (stamp && this.gameCharacter.chatDialogStamp === stamp) {
+        this.gameCharacter.clearChatDialog();
+      }
       this.changeDetector.markForCheck();
     }, Array.from(text).length * speechDelay + 6000);
 
@@ -284,6 +288,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   selected = false;
   private dialogTimeOutId = null;
   private chatIntervalId = null;
+  private lastChatDialogStamp = 0;
 
   get chatBubbleXDeg(): number {
     //console.log(this.viewRotateX)
@@ -436,6 +441,42 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return Network.GuestMode();
   }
 
+  private applySyncedChatDialog() {
+    if (!this.gameCharacter) return;
+    const stamp = this.gameCharacter.chatDialogStamp || 0;
+    if (!stamp) {
+      if (this.lastChatDialogStamp) this.clearChatDialogLocal();
+      return;
+    }
+    if (stamp === this.lastChatDialogStamp) return;
+    this.applyChatDialogPayload({
+      characterIdentifier: this.gameCharacter.identifier,
+      text: this.gameCharacter.chatDialogText,
+      color: this.gameCharacter.chatDialogColor,
+      faceIconIdentifier: this.gameCharacter.chatDialogFaceIconIdentifier || null,
+      secret: false,
+      stamp,
+      isEmote: this.gameCharacter.chatDialogIsEmote,
+    });
+  }
+
+  private applyChatDialogPayload(data: any) {
+    if (!data || !data.text) return;
+    const stamp = data.stamp || 0;
+    if (stamp && stamp === this.lastChatDialogStamp) return;
+    if (stamp) this.lastChatDialogStamp = stamp;
+    this.dialog = data;
+  }
+
+  private clearChatDialogLocal() {
+    this.lastChatDialogStamp = 0;
+    this.gameCharacter.dialog = null;
+    this.gameCharacter.text = '';
+    this.gameCharacter.isEmote = false;
+    clearTimeout(this.dialogTimeOutId);
+    clearInterval(this.chatIntervalId);
+  }
+
   
   /*
   ngOnInit() {
@@ -464,6 +505,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.naturalImageWidth = 0;
           this.naturaHeightWidthRatio = 1;
         }
+        this.applySyncedChatDialog();
         this.changeDetector.markForCheck();
       })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameCharacter?.identifier}`, event => {
@@ -504,7 +546,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       .on('POPUP_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
           this.ngZone.run(() => {
-            this.dialog = event.data;
+            this.applyChatDialogPayload(event.data);
             this.changeDetector.markForCheck();
           });
         }
@@ -512,18 +554,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       .on('FAREWELL_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
           this.ngZone.run(() => {
-            this.gameCharacter.dialog = null;
-            this.gameCharacter.text = '';
-            this.gameCharacter.isEmote = false;
+            this.clearChatDialogLocal();
             this.changeDetector.markForCheck();
           });
-          clearTimeout(this.dialogTimeOutId);
-          clearInterval(this.chatIntervalId);
         }
       })
       .on(`UPDATE_SELECTION/identifier/${this.gameCharacter?.identifier}`, event => {
         this.changeDetector.markForCheck();
       });
+    this.applySyncedChatDialog();
     this.movableOption = {
       tabletopObject: this.gameCharacter,
       transformCssOffset: 'translateZ(1.0px)',
@@ -545,12 +584,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   ngOnDestroy() {
-    clearTimeout(this.dialogTimeOutId);
-    clearInterval(this.chatIntervalId);
-    if (this.gameCharacter) {
-      this.gameCharacter.text = '';
-      this.gameCharacter.isEmote = false;
-    }
+    this.clearChatDialogLocal();
     EventSystem.unregister(this);
   }
 
