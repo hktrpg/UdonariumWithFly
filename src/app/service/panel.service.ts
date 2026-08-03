@@ -12,6 +12,8 @@ export interface PanelOption {
   top?: number;
   width?: number;
   height?: number;
+  /** Marks the panel root for guided-tour spotlight (`[data-tour-panel="…"]`). */
+  tourPanelId?: string;
 }
 
 @Injectable()
@@ -33,6 +35,8 @@ export class PanelService {
   isAbleFullScreenButton: boolean = true;
   isAbleCloseButton: boolean = true;
   isAbleRotateButton: boolean = false;
+  /** Guided tour panel spotlight id (see PanelOption.tourPanelId). */
+  tourPanelId: string = null;
 
   scrollablePanel: HTMLDivElement = null;
 
@@ -49,6 +53,36 @@ export class PanelService {
     for (const panel of Array.from(PanelService.openPanels)) {
       if (panel.isAbleCloseButton) panel.close();
     }
+  }
+
+  /** Close panels tagged with the same guided-tour id (avoid duplicate PeerMenu etc.). */
+  static closePanelsByTourId(tourPanelId: string) {
+    if (!tourPanelId) return;
+    for (const panel of Array.from(PanelService.openPanels)) {
+      if (panel.tourPanelId === tourPanelId) panel.close();
+    }
+  }
+
+  /** Topmost open panel chrome for a tour id (by z-index, then DOM order). */
+  static getTourPanelElement(tourPanelId: string): HTMLElement | null {
+    if (!tourPanelId) return null;
+    let best: HTMLElement = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (panel.tourPanelId !== tourPanelId || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el || !el.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!best || zSafe >= bestZ) {
+        best = el;
+        bestZ = zSafe;
+      }
+    }
+    if (best) return best;
+    // Fallback for panels that set the attribute but are not yet in openPanels timing edge cases.
+    const nodes = document.querySelectorAll(`[data-tour-panel="${tourPanelId}"]`);
+    return (nodes.item(nodes.length - 1) as HTMLElement) || null;
   }
 
   open<T>(childComponent: Type<T>, option?: PanelOption, parentViewContainerRef?: ViewContainerRef): T {
@@ -71,6 +105,7 @@ export class PanelService {
       if (option.left) childPanelService.left = option.left;
       if (option.width) childPanelService.width = option.width;
       if (option.height) childPanelService.height = option.height;
+      if (option.tourPanelId) childPanelService.tourPanelId = option.tourPanelId;
     }
     panelComponentRef.onDestroy(() => {
       PanelService.openPanels.delete(childPanelService);

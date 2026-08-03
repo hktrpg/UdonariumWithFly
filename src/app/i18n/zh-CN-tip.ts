@@ -105,14 +105,14 @@ export const zhCN_tip: I18nDictionary = {
   'tour.step.controlsUndo.title': '上一步／下一步',
   'tour.step.controlsUndo.body': 'Ctrl＋Z＝上一步。\nCtrl＋Y 或 Ctrl＋Shift＋Z＝下一步。',
   'tour.step.controlsPath.title': '路径移动',
-  'tour.step.controlsPath.body': '选取 Token → Ctrl＋左键加路点 → 左键点终点开始移动。\n右键＝取消最后一个路点。\n请试一次：选取后 Ctrl＋左键加一个路点。',
+  'tour.step.controlsPath.body': '选取单个 Token → Ctrl＋左键加路点 → 左键点终点开始移动，或按 Space 以当前路点开始移动。\n（多选时只会移动最先选取的那个。）\n右键＝取消最后一个路点　Esc＝取消路径。\n请试一次：选取后 Ctrl＋左键加一个路点。',
   'tour.step.controlsPing.title': 'Ping 标记',
   'tour.step.controlsPing.body': '地图空白处长按约 1 秒＝标记。\nShift＋长按＝警告标记。\n请试一次长按。',
 
   'tour.step.saveGuide.title': '完整指南',
   'tour.step.saveGuide.body': '更多说明：https://bothelp.hktrpg.com/guide\n可随时在「设定*」重播本教学，或滑过按钮查看教学 BOX。\n记得：离开前请 ZIP 或文件夹备份。',
 
-  'tip.pathMove.hud': '路径移动：Ctrl＋点路点 → 左键点终点开始　右键撤销最后路点　Esc 取消',
+  'tip.pathMove.hud': '路径移动：Ctrl＋点路点 → 左键点终点或 Space 开始　右键撤销最后路点　Esc 取消（仅单个 Token）',
   'tip.vision.noCharacter': '已启用视野，但尚未设定「我的视野角色」。请右键角色 → 作为我的视野角色。',
   'combat.emptyHint': '尚无参战者。先在桌面选取角色，按「加入选取」或「加入全部」，再掷先攻并开始。',
   'peer.confirm.switchIdentity.helpGuest': '访客限制：无法 ZIP 下载／读取、文件夹备份、编辑笔记、图片／音乐库、地图／工具箱编辑，以及多数编辑快捷键。主要可观看与受限聊天。',

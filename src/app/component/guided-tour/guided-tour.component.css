@@ -7,7 +7,7 @@
 
 .guided-tour-scrim,
 .gt-shade {
-  position: absolute;
+  position: fixed;
   background: rgba(0, 0, 0, 0.55);
   pointer-events: auto;
 }
@@ -17,7 +17,7 @@
 }
 
 .gt-ring {
-  position: absolute;
+  position: fixed;
   box-sizing: border-box;
   border: 2px solid #ffe08a;
   border-radius: 4px;
@@ -26,7 +26,7 @@
 }
 
 .guided-tour-bubble {
-  position: absolute;
+  position: fixed;
   left: 24px;
   top: 24px;
   width: 320px;

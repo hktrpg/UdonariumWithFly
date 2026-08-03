@@ -105,14 +105,14 @@ export const ja_tip: I18nDictionary = {
   'tour.step.controlsUndo.title': '元に戻す／やり直し',
   'tour.step.controlsUndo.body': 'Ctrl＋Z＝元に戻す。\nCtrl＋Y または Ctrl＋Shift＋Z＝やり直し。',
   'tour.step.controlsPath.title': 'パス移動',
-  'tour.step.controlsPath.body': 'Token を選択 → Ctrl＋左クリックで経由点 → 左クリックで移動開始。\n右クリック＝最後の経由点を取消。\n一度試してください：選択後に Ctrl＋左クリックで経由点を追加。',
+  'tour.step.controlsPath.body': 'Token を1つ選択 → Ctrl＋左クリックで経由点 → 左クリックで移動開始、または Space で現在の経由点のまま移動開始。\n（複数選択時は最初に選んだ1体のみ移動。）\n右クリック＝最後の経由点を取消　Esc＝経路取消。\n一度試してください：選択後に Ctrl＋左クリックで経由点を追加。',
   'tour.step.controlsPing.title': 'Ping',
   'tour.step.controlsPing.body': '空白を約1秒長押し＝Ping。\nShift＋長押し＝警告 Ping。\n長押しを一度試してください。',
 
   'tour.step.saveGuide.title': 'ガイド',
   'tour.step.saveGuide.body': '詳細：https://bothelp.hktrpg.com/guide\n設定* からいつでもツアー再開、またはボタンをホバーして教學 BOX。\n退出前に ZIP またはフォルダバックアップを忘れずに。',
 
-  'tip.pathMove.hud': 'パス移動：Ctrl+クリックで経由点 → 左クリックで移動開始　右クリックで末点取消　Esc で取消',
+  'tip.pathMove.hud': 'パス移動：Ctrl+クリックで経由点 → 左クリック終点または Space で開始　右クリックで末点取消　Esc で取消（1体のみ）',
   'tip.vision.noCharacter': '視界オンですが「自分の視界キャラ」未設定です。駒を右クリック→自分の視界に設定。',
   'combat.emptyHint': '参加者なし。テーブルで駒を選び「選択を追加」または「すべて追加」→イニシアチブ→開始。',
   'peer.confirm.switchIdentity.helpGuest': 'ゲスト制限：ZIP 保存／読込、フォルダバックアップ、メモ編集、画像／音楽編集、テーブル／ツール編集、多くの編集ショートカット不可。主に閲覧と制限付きチャット。',

@@ -104,14 +104,14 @@ export const zhTW_tip: I18nDictionary = {
   'tour.step.controlsUndo.title': '上一步／下一步',
   'tour.step.controlsUndo.body': 'Ctrl＋Z＝上一步。\nCtrl＋Y 或 Ctrl＋Shift＋Z＝下一步。',
   'tour.step.controlsPath.title': '路徑移動',
-  'tour.step.controlsPath.body': '選取 Token → Ctrl＋左鍵加路點（可放開 Ctrl）→ 左鍵點終點開始移動。\n右鍵＝取消最後一個路點。\n請試一次：選取後 Ctrl＋左鍵加一個路點。',
+  'tour.step.controlsPath.body': '選取單一 Token → Ctrl＋左鍵加路點（可放開 Ctrl）→ 左鍵點終點開始移動，或按 Space 以目前路點開始移動。\n（多選時只會移動最先選取的那個。）\n右鍵＝取消最後一個路點　Esc＝取消路徑。\n請試一次：選取後 Ctrl＋左鍵加一個路點。',
   'tour.step.controlsPing.title': 'Ping 標記',
   'tour.step.controlsPing.body': '地圖空白處長按約 1 秒＝標記。\nShift＋長按＝警告標記。\n請試一次長按。',
 
   'tour.step.saveGuide.title': '完整指南',
   'tour.step.saveGuide.body': '更多說明：https://bothelp.hktrpg.com/guide\n可隨時在「設定*」重播本教學，或滑過按鈕查看教學 BOX。\n記得：離開前請 ZIP 或資料夾備份。',
 
-  'tip.pathMove.hud': '路徑移動：Ctrl＋點路點 → 左鍵點終點開始　右鍵撤銷最後路點　Esc 取消',
+  'tip.pathMove.hud': '路徑移動：Ctrl＋點路點 → 左鍵點終點或 Space 開始　右鍵撤銷最後路點　Esc 取消（僅單一 Token）',
   'tip.vision.noCharacter': '已啟用視野，但尚未設定「我的視野角色」。請右鍵角色 → 作為我的視野角色。',
   'combat.emptyHint': '尚無參戰者。先在桌面選取角色，按「加入選取」或「加入全部」，再擲先攻並開始。',
   'peer.confirm.switchIdentity.helpGuest': '訪客限制：無法 ZIP 下載／讀取、資料夾備份、編輯筆記、圖片／音樂庫、地圖／工具箱編輯，以及多數編輯快捷鍵。主要可觀看與受限聊天。',

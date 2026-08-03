@@ -105,14 +105,14 @@ export const en_tip: I18nDictionary = {
   'tour.step.controlsUndo.title': 'Undo / redo',
   'tour.step.controlsUndo.body': 'Ctrl + Z = undo.\nCtrl + Y or Ctrl + Shift + Z = redo.',
   'tour.step.controlsPath.title': 'Path move',
-  'tour.step.controlsPath.body': 'Select token → Ctrl + left-click waypoints → left-click destination to move.\nRight-click undoes the last waypoint.\nTry once: select a token, then Ctrl + left-click to add a waypoint.',
+  'tour.step.controlsPath.body': 'Select one token → Ctrl + left-click waypoints → left-click destination to move, or press Space to go with the current waypoints.\n(With multi-select, only the first selected token moves.)\nRight-click undoes the last waypoint · Esc cancels the path.\nTry once: select a token, then Ctrl + left-click to add a waypoint.',
   'tour.step.controlsPing.title': 'Ping',
   'tour.step.controlsPing.body': 'Long-press empty map (~1s) = ping.\nShift + long-press = warning ping.\nTry a long-press once.',
 
   'tour.step.saveGuide.title': 'Full guide',
   'tour.step.saveGuide.body': 'More help: https://bothelp.hktrpg.com/guide\nReplay this tour from Settings *, or hover buttons for tip boxes.\nRemember: ZIP or folder backup before you leave.',
 
-  'tip.pathMove.hud': 'Path move: Ctrl+click waypoints → left-click destination to go · right-click undoes last point · Esc cancels',
+  'tip.pathMove.hud': 'Path move: Ctrl+click waypoints → left-click destination or Space to go · right-click undoes last point · Esc cancels (one token only)',
   'tip.vision.noCharacter': 'Vision is on, but you have no “My vision character”. Right-click a token → set as my vision character.',
   'combat.emptyHint': 'No combatants yet. Select tokens on the table, then Add selected — or Add all — then roll initiative and start.',
   'peer.confirm.switchIdentity.helpGuest': 'Guest limits: no ZIP download/load, no folder backup, no notes editing, no image/music library edits, no table/toolbox editing, limited shortcuts. View and chat (restricted) only.',

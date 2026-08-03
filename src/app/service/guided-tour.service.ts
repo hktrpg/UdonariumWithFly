@@ -43,6 +43,8 @@ export class GuidedTourService {
   private readonly onResize = () => this.refreshHole();
 
   private panLast: { x: number; y: number } | null = null;
+  /** Bumped to cancel pending panel-open auto-advance timers. */
+  private autoAdvanceToken = 0;
 
   constructor(
     private tips: TeachingTipService,
@@ -91,6 +93,7 @@ export class GuidedTourService {
 
   skipChapter() {
     if (this.phase !== 'running' || this.stepIndex < 0) return;
+    this.cancelAutoAdvance();
     const chapter = this.steps[this.stepIndex]?.chapter;
     if (!chapter) {
       this.next();
@@ -103,7 +106,7 @@ export class GuidedTourService {
       this.complete();
       return;
     }
-    this.prepareStep();
+    this.prepareStep({ allowAutoAdvance: false });
   }
 
   next() {
@@ -113,6 +116,7 @@ export class GuidedTourService {
     }
     if (this.phase !== 'running') return;
     if (!this.actionDone && this.currentRequire() !== 'ack') return;
+    this.cancelAutoAdvance();
     this.stepIndex++;
     while (this.stepIndex < this.steps.length && shouldSkipStep(this.steps[this.stepIndex])) {
       this.stepIndex++;
@@ -121,16 +125,18 @@ export class GuidedTourService {
       this.complete();
       return;
     }
-    this.prepareStep();
+    this.prepareStep({ allowAutoAdvance: true });
   }
 
   prev() {
     if (this.phase !== 'running' || this.stepIndex <= 0) return;
+    this.cancelAutoAdvance();
     this.stepIndex--;
     while (this.stepIndex > 0 && shouldSkipStep(this.steps[this.stepIndex])) {
       this.stepIndex--;
     }
-    this.prepareStep();
+    // Never auto-skip when walking backward — otherwise「上一步」bounces forward again.
+    this.prepareStep({ allowAutoAdvance: false });
   }
 
   replay() {
@@ -159,10 +165,15 @@ export class GuidedTourService {
     this.ngZone.run(() => {
       this.actionDone = true;
       this.emit();
+      if (require === 'panel-open') {
+        this.scheduleHoleRefresh();
+        if (step.autoAdvance) this.scheduleAutoAdvance(320);
+      }
     });
   }
 
-  private prepareStep() {
+  private prepareStep(opts?: { allowAutoAdvance?: boolean }) {
+    const allowAutoAdvance = opts?.allowAutoAdvance !== false;
     const step = this.steps[this.stepIndex];
     this.actionDone = !step || step.require === 'ack';
     this.panLast = null;
@@ -177,8 +188,51 @@ export class GuidedTourService {
       this.selection.clear();
       this.actionDone = false;
     }
+    // Panel already open: enable Next; auto-advance only when moving forward (e.g. Connection).
+    if (step?.require === 'panel-open' && step.tourId && PanelService.getTourPanelElement(step.tourId)) {
+      this.actionDone = true;
+      this.refreshHole();
+      this.emit();
+      if (allowAutoAdvance && step.autoAdvance) this.scheduleAutoAdvance(0);
+      else this.scheduleHoleRefresh();
+      return;
+    }
     this.refreshHole();
     this.emit();
+    if (step?.require === 'panel-open' && this.actionDone) {
+      this.scheduleHoleRefresh();
+    }
+  }
+
+  private scheduleHoleRefresh() {
+    const delays = [0, 50, 120, 220];
+    for (const ms of delays) {
+      setTimeout(() => {
+        if (this.phase !== 'running') return;
+        this.ngZone.run(() => this.refreshHole());
+      }, ms);
+    }
+  }
+
+  private cancelAutoAdvance() {
+    this.autoAdvanceToken++;
+  }
+
+  /** After panel-open succeeds, move on without requiring「下一步」. */
+  private scheduleAutoAdvance(delayMs: number) {
+    if (!this.steps[this.stepIndex]?.autoAdvance) return;
+    const token = ++this.autoAdvanceToken;
+    const stepIndex = this.stepIndex;
+    const stepId = this.steps[this.stepIndex]?.id;
+    setTimeout(() => {
+      if (token !== this.autoAdvanceToken) return;
+      if (this.phase !== 'running') return;
+      if (this.stepIndex !== stepIndex) return;
+      if (this.steps[this.stepIndex]?.id !== stepId) return;
+      if (!this.steps[this.stepIndex]?.autoAdvance) return;
+      if (this.currentRequire() !== 'panel-open' || !this.actionDone) return;
+      this.ngZone.run(() => this.next());
+    }, delayMs);
   }
 
   private complete() {
@@ -193,6 +247,7 @@ export class GuidedTourService {
   }
 
   private teardown() {
+    this.cancelAutoAdvance();
     this.unbindListeners();
     this.phase = 'idle';
     this.stepIndex = -1;
@@ -364,21 +419,29 @@ export class GuidedTourService {
     let hole: GuidedTourUiState['hole'] = null;
     let bubbleLeft = Math.max(16, window.innerWidth / 2 - 160);
     let bubbleTop = Math.max(16, window.innerHeight / 2 - 80);
-    if (step?.target) {
-      const el = document.querySelector(step.target) as HTMLElement | null;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        const pad = 6;
+    const el = this.resolveHighlightElement(step);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width >= 1 && r.height >= 1) {
+        const pad = 4;
         hole = {
-          left: r.left - pad,
-          top: r.top - pad,
-          width: r.width + pad * 2,
-          height: r.height + pad * 2,
+          left: Math.round(r.left) - pad,
+          top: Math.round(r.top) - pad,
+          width: Math.round(r.width) + pad * 2,
+          height: Math.round(r.height) + pad * 2,
         };
         bubbleLeft = Math.min(window.innerWidth - 340, Math.max(8, r.right + 12));
         bubbleTop = Math.min(window.innerHeight - 200, Math.max(8, r.top));
         if (bubbleLeft + 320 > window.innerWidth) {
           bubbleLeft = Math.max(8, r.left - 332);
+        }
+        // Large panels: keep bubble near the panel's right edge
+        if (r.width > window.innerWidth * 0.45) {
+          bubbleLeft = Math.min(window.innerWidth - 340, Math.max(8, r.right + 8));
+          if (bubbleLeft + 320 > window.innerWidth) {
+            bubbleLeft = Math.max(8, r.left - 332);
+          }
+          bubbleTop = Math.min(window.innerHeight - 220, Math.max(8, r.top + 8));
         }
       }
     }
@@ -394,6 +457,27 @@ export class GuidedTourService {
       phase: this.phase,
       steps: this.steps,
     });
+  }
+
+  /** Nav button until panel opens; then the opened panel chrome. */
+  private resolveHighlightElement(step: GuidedTourStep | null): HTMLElement | null {
+    if (!step) return null;
+    if (step.require === 'panel-open' && step.tourId) {
+      if (this.actionDone) {
+        const panel = PanelService.getTourPanelElement(step.tourId);
+        if (panel) return panel;
+      }
+      return step.target ? document.querySelector(step.target) as HTMLElement | null : null;
+    }
+    if (step.tourId && (step.focusTarget || step.target?.includes('data-tour-panel'))) {
+      const panel = PanelService.getTourPanelElement(step.tourId);
+      if (panel) return panel;
+    }
+    if (step.focusTarget) {
+      const focused = document.querySelector(step.focusTarget) as HTMLElement | null;
+      if (focused) return focused;
+    }
+    return step.target ? document.querySelector(step.target) as HTMLElement | null : null;
   }
 
   private snapshot(): GuidedTourUiState {

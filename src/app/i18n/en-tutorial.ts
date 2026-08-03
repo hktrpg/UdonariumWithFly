@@ -15,7 +15,7 @@ Full guide: https://bothelp.hktrpg.com/guide`,
 　　　　“Next image” for characters is in the right-click menu
 　　　　Flip cards, draw from decks, roll dice: use the right-click menu
 <Path move> Select a token, Ctrl+left-click to add waypoints (release Ctrl — path stays)
-　　　　Then left-click a new position = final stop and go  Right-click = undo last waypoint
+　　　　Then left-click a new position = final stop and go  or Space = go with current waypoints  Right-click = undo last waypoint  Esc = cancel path
 <Select> Left-click = select (highlight)  Shift+click = add/remove
 　　　　Left-drag empty = box select  Shift+drag = additive box  Click empty / Esc = clear
 Drag images or music into the browser to import.`,
@@ -72,7 +72,7 @@ Upgraded to 1.13.2`,
 ・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor), Ctrl+Z/Y undo/redo
 ・[ / ] layer order; Alt+wheel 15° / Ctrl+Shift+wheel 45° rotate
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
-・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination to go; right-click undoes last waypoint
+・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels
 ・“Next image” moved to right-click; shadow scales with size/height`,
   'changelog.2026scene': `2026/08/03 Scene・combat・vision
 ・Ping: long-press empty map; Shift+long-press warning

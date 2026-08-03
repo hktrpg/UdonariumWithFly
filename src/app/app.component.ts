@@ -776,15 +776,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       option.top = (this.openPanelCount % 10 + 1) * 20;
       option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
       this.openPanelCount = this.openPanelCount + 1;
-      this.panelService.open(component, option);
       const tourId = this.tourIdForComponent(componentName);
+      if (tourId) {
+        PanelService.closePanelsByTourId(tourId);
+        option.tourPanelId = tourId;
+      }
+      this.panelService.open(component, option);
       if (tourId) this.guidedTour.notifyPanelOpened(tourId);
     }
   }
 
   private openDefaultPanels() {
-    this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100 });
-    this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450 });
+    this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100, tourPanelId: 'menu.connection' });
+    this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450, tourPanelId: 'menu.chat' });
   }
 
   private tourIdForComponent(componentName: string): string | null {

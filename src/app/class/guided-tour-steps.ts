@@ -19,29 +19,35 @@ export interface GuidedTourStep {
   titleKey: string;
   bodyKey: string;
   target?: string;
+  /** After panel-open succeeds, spotlight this instead of `target` (usually the opened panel). */
+  focusTarget?: string;
   require: TourRequire;
   tourId?: string;
   chapter?: string;
   skipIfGuest?: boolean;
   skipIfNoSceneTools?: boolean;
+  /** When true, panel-open auto-advances (e.g. Connection → room explain). */
+  autoAdvance?: boolean;
 }
 
 function menuOpen(
   id: string,
   tourId: string,
   require: 'panel-open' | 'click',
-  opts?: { skipIfGuest?: boolean; skipIfNoSceneTools?: boolean; chapter?: string },
+  opts?: { skipIfGuest?: boolean; skipIfNoSceneTools?: boolean; chapter?: string; autoAdvance?: boolean },
 ): GuidedTourStep {
   return {
     id,
     titleKey: `tour.step.${id}.title`,
     bodyKey: `tour.step.${id}.body`,
     target: `[data-tour-id="${tourId}"]`,
+    focusTarget: require === 'panel-open' ? `[data-tour-panel="${tourId}"]` : undefined,
     tourId,
     require,
     chapter: opts?.chapter ?? 'menu',
     skipIfGuest: opts?.skipIfGuest,
     skipIfNoSceneTools: opts?.skipIfNoSceneTools,
+    autoAdvance: opts?.autoAdvance,
   };
 }
 
@@ -55,11 +61,13 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       require: 'ack',
       chapter: 'room',
     },
-    menuOpen('connection', 'menu.connection', 'panel-open', { chapter: 'room' }),
+    menuOpen('connection', 'menu.connection', 'panel-open', { chapter: 'room', autoAdvance: true }),
     {
       id: 'roomHow',
       titleKey: 'tour.step.roomHow.title',
       bodyKey: 'tour.step.roomHow.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
       require: 'ack',
       chapter: 'room',
     },
@@ -67,6 +75,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'saveFolder',
       titleKey: 'tour.step.saveFolder.title',
       bodyKey: 'tour.step.saveFolder.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
       require: 'ack',
       chapter: 'room',
     },
@@ -74,6 +84,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'saveZip',
       titleKey: 'tour.step.saveZip.title',
       bodyKey: 'tour.step.saveZip.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
       require: 'ack',
       chapter: 'room',
     },

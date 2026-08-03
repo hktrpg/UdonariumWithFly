@@ -11,8 +11,9 @@ export type PathWaypoint = { x: number; y: number };
 
 /**
  * Ctrl+left-click adds waypoints (draft persists after releasing Ctrl).
- * Plain left-click starts movement along the path.
- * Right-click removes the last waypoint.
+ * Plain left-click starts movement along the path (adds click as final stop).
+ * Space commits with the current waypoints (no extra point).
+ * Right-click removes the last waypoint. Esc cancels the draft.
  */
 @Injectable({ providedIn: 'root' })
 export class TokenPathMoveService {
@@ -62,9 +63,12 @@ export class TokenPathMoveService {
   addWaypoint(x: number, y: number) {
     if (!this.canDraft()) return false;
     if (!this.targets.length) {
-      this.targets = this.pathableTargets();
-      if (!this.targets.length) return false;
-      this.origin = MovableSelectionSynchronizer.centerOf(this.targets[0]);
+      // Path waypoints are absolute destinations for one unit center.
+      // Multi-token would stack everyone on the same points — refuse that.
+      const primary = this.pathableTargets()[0];
+      if (!primary) return false;
+      this.targets = [primary];
+      this.origin = MovableSelectionSynchronizer.centerOf(primary);
     }
     this.waypoints = [...this.waypoints, { x, y }];
     SoundEffect.playLocal(PresetSound.selectionStart);

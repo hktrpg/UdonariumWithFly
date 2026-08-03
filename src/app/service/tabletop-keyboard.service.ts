@@ -22,6 +22,7 @@ import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchr
 import { CoordinateService } from './coordinate.service';
 import { SceneToolService } from './scene-tool.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
+import { TokenPathMoveService } from './token-path-move.service';
 import { DeleteEntry, UndoService } from './undo.service';
 
 const MOVE_CODES = new Set([
@@ -51,6 +52,7 @@ export class TabletopKeyboardService {
     private coordinateService: CoordinateService,
     private sceneTools: SceneToolService,
     private undoService: UndoService,
+    private tokenPath: TokenPathMoveService,
   ) { }
 
   initialize() {
@@ -118,7 +120,22 @@ export class TabletopKeyboardService {
 
     if (Network.GuestMode()) return;
 
+    // Path draft: Space commits movement along existing waypoints.
+    if (code === 'Space' && !mod && !e.altKey && !e.shiftKey) {
+      if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
+        void this.tokenPath.commit();
+        this.consume(e);
+      }
+      // Always stop here so Space does not fall through to WASD / other handlers.
+      return;
+    }
+
     if (code === 'Escape' && !mod && !e.altKey && !e.shiftKey) {
+      if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
+        this.tokenPath.cancelDraft();
+        this.consume(e);
+        return;
+      }
       if (this.sceneTools.selectionCount > 0) {
         this.sceneTools.clearSelection();
         this.consume(e);
