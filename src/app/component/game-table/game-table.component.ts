@@ -66,7 +66,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('gameObjects', { static: true }) gameObjects: ElementRef<HTMLElement>;
   @ViewChild('gridCanvas', { static: true }) gridCanvas: ElementRef<HTMLCanvasElement>;
   @ViewChild('fxCanvas', { static: true }) fxCanvas: ElementRef<HTMLCanvasElement>;
-  @ViewChild('weatherCanvas', { static: true }) weatherCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasLow', { static: true }) weatherCanvasLow: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasMid', { static: true }) weatherCanvasMid: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasHigh', { static: true }) weatherCanvasHigh: ElementRef<HTMLCanvasElement>;
   @ViewChild('pickArea', { static: true }) pickArea: ElementRef<HTMLElement>;
   @ViewChild('pickCursor', { static: true }) pickCursor: ElementRef<HTMLElement>;
 
@@ -103,6 +105,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
+
+  /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
+  weatherLayerZ(layer: number): number {
+    const gh = this.gridHeight;
+    const g = this.currentTable?.gridSize || 50;
+    const lifts = [g * 0.12, g * 1.6, g * 3.6];
+    return gh + (lifts[Math.max(0, Math.min(2, layer | 0))] || lifts[0]);
+  }
   get tablePixelWidth(): number { return this.currentTable.width * this.currentTable.gridSize; }
   get tablePixelHeight(): number { return this.currentTable.height * this.currentTable.gridSize; }
   get drawings(): TableDrawing[] { return this.currentTable?.drawings || []; }
@@ -415,7 +425,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.setTransform(0, 0, 0, 0, 0, 0);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
-    this.weatherRender = new WeatherRender(this.weatherCanvas.nativeElement);
+    this.weatherRender = new WeatherRender([
+      this.weatherCanvasLow.nativeElement,
+      this.weatherCanvasMid.nativeElement,
+      this.weatherCanvasHigh.nativeElement,
+    ]);
     this.refreshFx();
     this.fxTimer = setInterval(() => this.refreshFx(), 200);
   }

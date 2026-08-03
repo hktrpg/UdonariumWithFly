@@ -65,9 +65,23 @@
   backface-visibility: hidden;
 }
 
-.fx-canvas, .weather-canvas, .drawings-layer, .pings-layer {
+.fx-canvas, .weather-canvas, .weather-stack, .drawings-layer, .pings-layer {
   pointer-events: none;
   backface-visibility: hidden;
+}
+
+.weather-stack {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.weather-stack .weather-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
 }
 
 .table-ping {
