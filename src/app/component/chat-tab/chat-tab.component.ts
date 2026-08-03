@@ -47,23 +47,54 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
 完整說明：https://bothelp.hktrpg.com/guide`, 'mine', 0),
 
-    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞Shift＋左鍵拖曳＝平移　右鍵拖曳＝旋轉　滾輪＝縮放
-＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單　雙擊＝顯示詳情（角色／牌／地形／筆記等）
-＜選取＞左鍵點物件＝選取（會高亮）　左鍵空白拖曳＝框選　Esc＝取消
-　　　　Ctrl＋點＝加減選
-＜鍵盤＞選取後：WASD／方向鍵移動（可對角）
-　　　　Shift＋WASD＝面向　Delete＝刪除（角色進回收區）
-　　　　Ctrl＋C／X／V＝複製／剪下／貼上（貼在游標處）
-　　　　[ / ]＝送後／送前　Ctrl＋滾輪旋轉／Ctrl＋Shift＋滾輪快轉
-　　　　拖曳放開時按住 Shift＝暫時不吸附格線
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜視角＞Shift＋左鍵拖曳＝平移地圖　右鍵拖曳＝旋轉視角　滾輪＝縮放
+＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單
+　　　　雙擊＝開啟詳情（角色／卡牌／牌堆／骰子／地形／筆記／遮罩／範圍等）
+　　　　角色「下一張圖像」改在右鍵選單「切換下一張圖像」
+　　　　卡牌翻面、牌堆抽牌、骰子擲骰：請用右鍵選單
+＜選取＞左鍵點物件＝選取（高亮）　Ctrl＋點＝加減選
+　　　　左鍵空白拖曳＝框選　點空白／Esc＝取消選取
 圖片、音樂可直接拖進瀏覽器匯入。`, 'mine', 0),
 
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜鍵盤（選取後）＞WASD／方向鍵＝移動（可對角）
+　　　　Shift＋WASD＝改變面向　Delete＝刪除（角色進回收區）
+　　　　Ctrl＋C／X／V＝複製／剪下／貼上（貼在滑鼠游標處；選取文字時仍可複製文字）
+　　　　[ ＝送到後層　] ＝送到前層
+　　　　Ctrl＋滾輪＝旋轉 15°　Ctrl＋Shift＋滾輪＝旋轉 45°
+　　　　拖曳放開時按住 Shift＝暫時不吸附格線　Esc＝取消選取
+　　　　訪客模式無法使用編輯類快捷鍵。`, 'mine', 0),
+
     this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜聊天＞上方可切頻道；工具列（本機）：提示音／靠左／列表／靜音／精簡
-　　　　精簡＝收起標籤與工具列，右上小鈕可還原
-＜骰子＞輸入區選規則後直接打指令（BCDice）；角色卡欄位可快速擲骰
+　　　　精簡＝收起標籤列與工具列，只留輸入區；右下小鈕可還原
+＜骰子＞輸入區選規則後直接打指令（BCDice）
+　　　　角色卡數值欄旁可「快速擲骰」送到目前聊天頻道
 ＜訪客＞開房可「允許訪客」；訪客功能受限。有密碼仍要密碼
-＜筆記＞選單可開「筆記倉庫」整理桌面／公用／私人筆記
+＜筆記＞選單可開「筆記倉庫」整理桌面／公用／私人／回收區筆記
 ＜密語＞不會進 ZIP；換了連線 ID 後舊密語也看不到，請留意。`, 'mine', 0),
+
+    this.makeSampleMessage('System', null, '連結:', null, `根據 https://nanasunana.github.io/ 私家改造版重新中文化，並加入各種功能。
+升級 1.13.2 版本`, 'mine', 1615253220000),
+
+    this.makeSampleMessage('System', null, '連結:', null, `升級成 1.13.3b 版本
+2021/05/11 改良 HTML 及 TXT 匯出功能，增加 COIN 功能
+2021/05/13 更新 TOKEN 底部框大小
+2021/05/27 更新 CutIn 功能（可使用 YouTube）；陰影會依高度改變`, 'mine', 1615253220000),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2021/08/17 更新成 F 版，更新組件版本。修正角色卡不能擲骰的 BUG，感謝吐司兔的回報。`, 'mine', 1635253220000),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2026 重大更新（hktrpg-main）
+・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
+・介面全面繁體中文化；品牌與說明對齊 HKTRPG
+・訪客模式、聊天精簡、筆記倉庫、角色卡快速擲骰
+・聊天工具列：新訊息提示音／訊息靠左／列表模式／完全靜音
+・BCDice 4.9.0`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2026/08/03 操作更新
+・桌面選取高亮；左鍵空白框選；Shift＋左鍵平移地圖
+・雙擊物件開啟詳情（翻面／抽牌／擲骰改右鍵選單）
+・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）
+・[ / ] 調整前後層；Ctrl＋滾輪 15°／Ctrl＋Shift＋滾輪 45° 旋轉
+・角色「切換下一張圖像」改右鍵；陰影隨尺寸／高度變化`, 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
 
     this.makeSampleMessage('System', null, '連結:', null, `本站：https://z01.hktrpg.com
 教學：https://bothelp.hktrpg.com/guide
@@ -72,7 +103,7 @@ Facebook：https://www.facebook.com/groups/HKTRPG
 百科：https://www.hktrpg.com/
 原版烏冬：https://udonarium.app/
 with Fly：https://nanasunana.github.io/
-支援開發：https://www.patreon.com/HKTRPG`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
+支援開發：https://www.patreon.com/HKTRPG`, 'mine', Date.UTC(2026, 7, 3, 2, 0, 0)),
   ];
 
   private topTimestamp = 0;
