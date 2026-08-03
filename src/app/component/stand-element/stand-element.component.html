@@ -4,12 +4,14 @@
       <ng-container *ngIf="standImage">
         <div>
           <div [ngStyle]="{'transform': isApplyRoll ? 'rotate(' + gameCharacter.roll + 'deg)' : ''}">
-            <div class="inverser" [ngClass]="{inverse: isApplyImageEffect && gameCharacter.isInverse}">
+            <div class="inverser"
+              [style.filter]="isApplyImageEffect ? standImageFilter : null"
+              [style.opacity]="isApplyImageEffect ? standImageOpacity : null"
+              [style.transform]="isApplyImageEffect ? standImageTransform : null">
               <div class="aura" style="display: inline" [ngClass]="{black: isApplyImageEffect && gameCharacter.aura == 0, blue: isApplyImageEffect && gameCharacter.aura == 1, 
                 green: isApplyImageEffect && gameCharacter.aura == 2, cyan: isApplyImageEffect && gameCharacter.aura == 3, red: isApplyImageEffect && gameCharacter.aura == 4,
                 magenta: isApplyImageEffect && gameCharacter.aura == 5, yellow: isApplyImageEffect && gameCharacter.aura == 6, white: isApplyImageEffect && gameCharacter.aura == 7}">
-                <img class="stand-image" (dblclick)="openModal()" [src]="standImage.url | safe: 'resourceUrl'" draggable="false"
-                  [ngClass]="{'black-paint': isApplyImageEffect && gameCharacter.isBlackPaint, 'hollow': isApplyImageEffect && gameCharacter.isHollow}">
+                <img class="stand-image" (dblclick)="openModal()" [src]="standImage.url | safe: 'resourceUrl'" draggable="false">
               </div>
             </div>
           </div>

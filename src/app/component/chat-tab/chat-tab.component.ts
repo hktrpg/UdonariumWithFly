@@ -414,6 +414,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
       this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026base'), 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
       this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026ops'), 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
       this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026scene'), 'mine', Date.UTC(2026, 7, 3, 1, 30, 0)),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026fx'), 'mine', Date.UTC(2026, 7, 3, 1, 45, 0)),
       this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.links'), 'mine', Date.UTC(2026, 7, 3, 2, 0, 0)),
     ];
   }

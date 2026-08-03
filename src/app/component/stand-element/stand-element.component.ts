@@ -6,6 +6,7 @@ import { UUID } from '@udonarium/core/system/util/uuid';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
 import { StandConditionType } from '@udonarium/stand-list';
+import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ModalService } from 'service/modal.service';
 import { I18nService } from 'service/i18n.service';
@@ -121,6 +122,16 @@ export class StandElementComponent implements OnInit {
       return true;
     }
     return false;
+  }
+
+  get standImageFilter(): string | null {
+    return this.gameCharacter ? imageEffectFilter(this.gameCharacter) : null;
+  }
+  get standImageOpacity(): number | null {
+    return this.gameCharacter ? imageEffectOpacity(this.gameCharacter) : null;
+  }
+  get standImageTransform(): string | null {
+    return this.gameCharacter ? imageEffectTransform(this.gameCharacter) : null;
   }
 
   get isApplyRoll(): boolean {

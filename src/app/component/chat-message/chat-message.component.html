@@ -27,9 +27,12 @@
   </div>
 </div>
 <ng-template #image>
-  <div class="image" [ngClass]="{inverse: chatMessage.isInverseIcon == 1, hollow: chatMessage.isHollowIcon == 1}">
+  <div class="image"
+    [style.filter]="msgImageFilter"
+    [style.opacity]="msgImageOpacity"
+    [style.transform]="msgImageTransform">
     <span class="aura" [ngClass]="{black: chatMessage.aura == 0, blue: chatMessage.aura == 1, green: chatMessage.aura == 2, cyan: chatMessage.aura == 3, red: chatMessage.aura == 4, magenta: chatMessage.aura == 5, yellow: chatMessage.aura == 6, white: chatMessage.aura == 7}">
-      <img draggable="false" *ngIf="0 < imageFile?.url?.length" [src]="imageFile?.url | safe: 'resourceUrl'" [ngClass]="{'black-paint': chatMessage.isBlackPaint == 1, 'face-icon': chatMessage.isFaceIcon }" />
+      <img draggable="false" *ngIf="0 < imageFile?.url?.length" [src]="imageFile?.url | safe: 'resourceUrl'" [ngClass]="{'face-icon': chatMessage.isFaceIcon }" />
     </span>
   </div>
 </ng-template>

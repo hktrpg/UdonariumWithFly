@@ -26,11 +26,13 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { I18nService } from 'service/i18n.service';
+import { hasStatus } from '@udonarium/table-fx/character-status';
+import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'game-object-inventory',
     templateUrl: './game-object-inventory.component.html',
-    styleUrls: ['../shared/settings-ui.css', './game-object-inventory.component.css'],
+    styleUrls: ['../shared/settings-ui.css', '../shared/image-effects.css', './game-object-inventory.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('SlideInOut', [
@@ -296,8 +298,16 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       actions.push(ContextMenuSeparator);
     }
 
-    if (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) {
-      actions.push({
+    const afterInv = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const hasMultiImage = gameObject.imageFiles.length > 1;
+    const hasFace = this.hasOverviewFaceIcon(gameObject);
+    if (!hasFace && gameObject.isUseIconToOverviewImage) {
+      gameObject.isUseIconToOverviewImage = false;
+    }
+    const inGraveyard = gameObject.location.name === 'graveyard';
+
+    const identity: (ContextMenuAction | null)[] = [
+      (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.findOnTable'),
         action: () => {
           if (gameObject.location.name === 'table') EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
@@ -305,10 +315,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         default: gameObject.location.name === 'table',
         disabled: gameObject.location.name !== 'table',
         selfOnly: true
-      });
-    }
-    if (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) {
-      actions.push({
+      } : null,
+      (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.moveToTable'),
         action: () => {
           let isStealthMode = GameCharacter.isStealthMode;
@@ -327,21 +335,16 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
-      });
-    }
-
-    if (gameObject.isHideIn) {
-      actions.push({
+      } : null,
+      gameObject.isHideIn ? {
         name: this.i18n.t('char.revealPosition'),
         action: () => {
           gameObject.owner = '';
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.trigger('UPDATE_INVENTORY', null);
         }
-      });
-    }
-    if (!gameObject.isHideIn || !gameObject.isVisible) {
-      actions.push({
+      } : null,
+      (!gameObject.isHideIn || !gameObject.isVisible) ? {
         name: this.i18n.t('char.selfOnlyStealth'),
         action: () => {
           if (gameObject.location.name === 'table' && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
@@ -357,156 +360,145 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.sweep);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
-      });
-    }
-    actions.push(ContextMenuSeparator);
-    if (gameObject.imageFiles.length > 1) {
-      actions.push({
+      } : null,
+      this.characterFxMenu.makeMyTokenMenu(gameObject),
+      this.characterFxMenu.makeCombatMenu(gameObject),
+    ];
+
+    const appearance: (ContextMenuAction | null)[] = [
+      hasMultiImage ? {
         name: this.i18n.t('char.imageSwitch'),
         action: null,
-        subActions: gameObject.imageFiles.map((image, i) => {
+        subActions: gameObject.imageFiles.map((image, i) => ({
+          name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+          action: () => {
+            gameObject.currntImageIndex = i;
+            if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          default: gameObject.currntImageIndex == i,
+          icon: image,
+          checkBox: 'radio' as const
+        })),
+      } : null,
+      contextMenuToggleCheck({
+        get: () => hasFace && gameObject.isUseIconToOverviewImage,
+        set: (v) => {
+          if (!this.hasOverviewFaceIcon(gameObject)) return;
+          gameObject.isUseIconToOverviewImage = v;
+        },
+        on: this.i18n.t('char.overviewFaceOn'),
+        off: this.i18n.t('char.overviewFaceOff'),
+        after: afterInv,
+        disabled: !hasFace,
+        error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isDropShadow,
+        set: (v) => { gameObject.isDropShadow = v; },
+        on: this.i18n.t('char.shadowOn'),
+        off: this.i18n.t('char.shadowOff'),
+        after: afterInv,
+      }),
+      this.characterFxMenu.makeImageEffectMenu(gameObject),
+    ];
+
+    const fx: ContextMenuAction[] = [
+      this.characterFxMenu.makeAuraMenu(gameObject),
+      this.characterFxMenu.makeRingMenu(gameObject),
+      this.characterFxMenu.makeStatusMenu(gameObject),
+    ];
+
+    const pose: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => !gameObject.isNotRide,
+        set: (v) => { gameObject.isNotRide = !v; },
+        on: this.i18n.t('char.stackOn'),
+        off: this.i18n.t('char.stackOff'),
+        after: afterInv,
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isAltitudeIndicate,
+        set: (v) => { gameObject.isAltitudeIndicate = v; },
+        on: this.i18n.t('char.altitudeOn'),
+        off: this.i18n.t('char.altitudeOff'),
+        after: afterInv,
+      }),
+      {
+        name: this.i18n.t('char.resetAltitude'),
+        action: () => {
+          if (gameObject.altitude != 0) {
+            gameObject.altitude = 0;
+            if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
+          }
+        },
+        altitudeHande: gameObject
+      },
+    ];
+
+    const chatPanels: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => gameObject.isShowChatBubble,
+        set: (v) => { gameObject.isShowChatBubble = v; },
+        on: this.i18n.t('char.chatBubbleOn'),
+        off: this.i18n.t('char.chatBubbleOff'),
+        tip: this.i18n.t('char.chatBubbleTip'),
+        after: afterInv,
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isAllowsChat,
+        set: (v) => { gameObject.isAllowsChat = v; },
+        on: this.i18n.t('char.chatOn'),
+        off: this.i18n.t('char.chatOff'),
+        after: afterInv,
+        disabled: inGraveyard,
+      }),
+      { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(gameObject); } },
+      { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+      { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+      {
+        name: this.i18n.t('char.openReferenceUrl'),
+        action: null,
+        subActions: gameObject.getUrls().map((urlElement) => {
+          const url = urlElement.value.toString();
           return {
-            name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+            name: urlElement.name ? urlElement.name : url,
             action: () => {
-              gameObject.currntImageIndex = i;
-              if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
-              EventSystem.trigger('UPDATE_INVENTORY', null);
+              if (StringUtil.sameOrigin(url)) {
+                window.open(url.trim(), '_blank', 'noopener');
+              } else {
+                this.modalService.open(OpenUrlComponent, { url: url, title: gameObject.name, subTitle: urlElement.name });
+              }
             },
-            default: gameObject.currntImageIndex == i,
-            icon: image,
-            checkBox: 'radio'
+            disabled: !StringUtil.validUrl(url),
+            error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
+            isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
-      });
-      actions.push(ContextMenuSeparator);
-    }
-    const hasFace = this.hasOverviewFaceIcon(gameObject);
-    if (!hasFace && gameObject.isUseIconToOverviewImage) {
-      gameObject.isUseIconToOverviewImage = false;
-    }
-    const afterInv = () => EventSystem.trigger('UPDATE_INVENTORY', null);
-    actions.push(contextMenuToggleCheck({
-      get: () => hasFace && gameObject.isUseIconToOverviewImage,
-      set: (v) => {
-        if (!this.hasOverviewFaceIcon(gameObject)) return;
-        gameObject.isUseIconToOverviewImage = v;
+        disabled: gameObject.getUrls().length <= 0
       },
-      on: this.i18n.t('char.overviewFaceOn'),
-      off: this.i18n.t('char.overviewFaceOff'),
-      after: afterInv,
-      disabled: !hasFace,
-      error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
-    }));
-    actions.push(contextMenuToggleCheck({
-      get: () => gameObject.isShowChatBubble,
-      set: (v) => { gameObject.isShowChatBubble = v; },
-      on: this.i18n.t('char.chatBubbleOn'),
-      off: this.i18n.t('char.chatBubbleOff'),
-      after: afterInv,
-    }));
-    actions.push(contextMenuToggleCheck({
-      get: () => gameObject.isDropShadow,
-      set: (v) => { gameObject.isDropShadow = v; },
-      on: this.i18n.t('char.shadowOn'),
-      off: this.i18n.t('char.shadowOff'),
-      after: afterInv,
-    }));
-    if (gameObject instanceof GameCharacter) {
-      actions.push(this.characterFxMenu.makeMyTokenMenu(gameObject));
-      actions.push(this.characterFxMenu.makeAuraMenu(gameObject));
-      actions.push(this.characterFxMenu.makeRingMenu(gameObject));
-      actions.push(this.characterFxMenu.makeStatusMenu(gameObject));
-      actions.push(this.characterFxMenu.makeCombatMenu(gameObject));
-      actions.push(this.characterFxMenu.makeImageEffectMenu({
-        getInverse: () => gameObject.isInverse,
-        setInverse: v => gameObject.isInverse = v,
-        getHollow: () => gameObject.isHollow,
-        setHollow: v => gameObject.isHollow = v,
-        getBlackPaint: () => gameObject.isBlackPaint,
-        setBlackPaint: v => gameObject.isBlackPaint = v,
-      }));
-    }
-    actions.push(ContextMenuSeparator);
-    actions.push(contextMenuToggleCheck({
-      get: () => !gameObject.isNotRide,
-      set: (v) => { gameObject.isNotRide = !v; },
-      on: this.i18n.t('char.stackOn'),
-      off: this.i18n.t('char.stackOff'),
-      after: afterInv,
-    }));
-    actions.push(contextMenuToggleCheck({
-      get: () => gameObject.isAltitudeIndicate,
-      set: (v) => { gameObject.isAltitudeIndicate = v; },
-      on: this.i18n.t('char.altitudeOn'),
-      off: this.i18n.t('char.altitudeOff'),
-      after: afterInv,
-    }));
-    actions.push(
-    {
-      name: this.i18n.t('char.resetAltitude'), action: () => {
-        if (gameObject.altitude != 0) {
-          gameObject.altitude = 0;
-          if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
-        }
-      },
-      altitudeHande: gameObject
-    });
-    actions.push(ContextMenuSeparator);
-    actions.push({ name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(gameObject); } });
-    actions.push(contextMenuToggleCheck({
-      get: () => gameObject.isAllowsChat,
-      set: (v) => { gameObject.isAllowsChat = v; },
-      on: this.i18n.t('char.chatOn'),
-      off: this.i18n.t('char.chatOff'),
-      after: afterInv,
-      disabled: gameObject.location.name === 'graveyard',
-    }));
-    //if (gameObject.location.name !== 'graveyard') {
-      actions.push({ name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
-    //}
-    actions.push({ name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
-    actions.push(ContextMenuSeparator);
-    actions.push({
-      name: this.i18n.t('char.openReferenceUrl'), action: null,
-      subActions: gameObject.getUrls().map((urlElement) => {
-        const url = urlElement.value.toString();
-        return {
-          name: urlElement.name ? urlElement.name : url,
-          action: () => {
-            if (StringUtil.sameOrigin(url)) {
-              window.open(url.trim(), '_blank', 'noopener');
-            } else {
-              this.modalService.open(OpenUrlComponent, { url: url, title: gameObject.name, subTitle: urlElement.name });
-            }
-          },
-          disabled: !StringUtil.validUrl(url),
-          error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
-          isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
-        };
-      }),
-      disabled: gameObject.getUrls().length <= 0
-    });
-    actions.push(ContextMenuSeparator);
-    actions.push(contextMenuToggleCheck({
-      get: () => gameObject.isInventoryIndicate,
-      set: (v) => { gameObject.isInventoryIndicate = v; },
-      on: this.i18n.t('char.inventoryOn'),
-      off: this.i18n.t('char.inventoryOff'),
-      after: afterInv,
-    }));
-    let locations = [
+    ];
+
+    const locations = [
       { name: 'table', aliasKey: 'char.table' },
       { name: 'common', aliasKey: 'char.commonInventory' },
       { name: Network.peerId, aliasKey: 'char.personalInventory' },
       { name: 'graveyard', aliasKey: 'char.graveyard' }
     ];
-    actions.push({
-      name: this.i18n.t('char.moveFrom', { from: this.i18n.t((locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).aliasKey) }),
-      action: null,
-      subActions: locations
-        .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
-        .map((location) => {
-          return {
+    const locationGroup: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => gameObject.isInventoryIndicate,
+        set: (v) => { gameObject.isInventoryIndicate = v; },
+        on: this.i18n.t('char.inventoryOn'),
+        off: this.i18n.t('char.inventoryOff'),
+        after: afterInv,
+      }),
+      {
+        name: this.i18n.t('char.moveFrom', { from: this.i18n.t((locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).aliasKey) }),
+        action: null,
+        subActions: locations
+          .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
+          .map((location) => ({
             name: this.i18n.t(location.aliasKey),
             action: () => {
               let isStealthMode = GameCharacter.isStealthMode;
@@ -529,72 +521,83 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               }
               EventSystem.call('UPDATE_INVENTORY', true);
             }
-          }
-        }),
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    /*
-    for (let location of locations) {
-      if (gameObject.location.name === location.name) continue;
-      actions.push({
-        name: location.alias, action: () => {
-          gameObject.setLocation(location.name);
+          })),
+        disabled: !gameObject.isVisible && !this.isGMMode
+      },
+    ];
+
+    const cloneDelete: ContextMenuAction[] = [
+      {
+        name: this.i18n.t('char.clone'),
+        action: () => {
+          this.cloneGameObject(gameObject);
           SoundEffect.play(PresetSound.piecePut);
-        }
-      });
-    }
-    */
-    actions.push(ContextMenuSeparator);
-    actions.push({
-      name: this.i18n.t('char.clone'), action: () => {
-        this.cloneGameObject(gameObject);
-        SoundEffect.play(PresetSound.piecePut);
+        },
+        disabled: !gameObject.isVisible && !this.isGMMode
       },
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    actions.push({
-      name: this.i18n.t('char.cloneNumbered'), action: () => {
-        const cloneObject = gameObject.clone();
-        const tmp = cloneObject.name.split('_');
-        let baseName;
-        if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-          baseName = tmp.slice(0, tmp.length - 1).join('_');
-        } else {
-          baseName = tmp.join('_');
-        }
-        let maxIndex = 0;
-        for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-          if(!character.name.startsWith(baseName)) continue;
-          let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-          if (index > maxIndex) maxIndex = index;
-        }
-        cloneObject.name = baseName + '_' + (maxIndex + 1);
-        cloneObject.update();
-        SoundEffect.play(PresetSound.piecePut);
+      {
+        name: this.i18n.t('char.cloneNumbered'),
+        action: () => {
+          const cloneObject = gameObject.clone();
+          const tmp = cloneObject.name.split('_');
+          let baseName;
+          if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
+            baseName = tmp.slice(0, tmp.length - 1).join('_');
+          } else {
+            baseName = tmp.join('_');
+          }
+          let maxIndex = 0;
+          for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
+            if (!character.name.startsWith(baseName)) continue;
+            let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
+            if (index > maxIndex) maxIndex = index;
+          }
+          cloneObject.name = baseName + '_' + (maxIndex + 1);
+          cloneObject.update();
+          SoundEffect.play(PresetSound.piecePut);
+        },
+        disabled: !gameObject.isVisible && !this.isGMMode
       },
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    if (gameObject.location.name === 'graveyard') {
-      actions.push(ContextMenuSeparator);
-      actions.push({
-        name: this.i18n.t('char.deleteForever'), action: () => {
+      inGraveyard ? {
+        name: this.i18n.t('char.deleteForever'),
+        action: () => {
           this.selectionService.remove(gameObject);
           this.deleteGameObject(gameObject);
           SoundEffect.play(PresetSound.sweep);
         }
-      });
-    } else {
-      actions.push(ContextMenuSeparator);
-      actions.push({
-        name: this.i18n.t('char.deleteToGraveyard'), action: () => {
+      } : {
+        name: this.i18n.t('char.deleteToGraveyard'),
+        action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
           this.selectionService.remove(gameObject);
           gameObject.setLocation('graveyard');
           SoundEffect.play(PresetSound.sweep);
         }
-      });
-    }
+      },
+    ];
+
+    actions = actions.concat(this.joinContextMenuGroups([
+      identity,
+      appearance,
+      fx,
+      pose,
+      chatPanels,
+      locationGroup,
+      cloneDelete,
+    ]));
     this.contextMenuService.open(position, actions, gameObject.name);
+  }
+
+  /** Flatten menu groups with a single separator between non-empty groups. */
+  private joinContextMenuGroups(groups: (ContextMenuAction | null)[][]): ContextMenuAction[] {
+    const out: ContextMenuAction[] = [];
+    for (const group of groups) {
+      const items = group.filter((a): a is ContextMenuAction => !!a);
+      if (!items.length) continue;
+      if (out.length) out.push(ContextMenuSeparator);
+      out.push(...items);
+    }
+    return out;
   }
 
   toggleEdit() {
@@ -670,6 +673,32 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (gameObject.location.name !== 'table' || (!gameObject.isVisible && !this.isGMMode)) return;
     EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x + gameObject.size * 50 / 2, y: gameObject.location.y + gameObject.size * 50 / 2, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
   }
+
+  invImageFilter(gameObject: GameCharacter): string | null {
+    return imageEffectFilter({
+      ...gameObject,
+      isDead: hasStatus(gameObject.statusesJson, 'dead'),
+    });
+  }
+  invImageOpacity(gameObject: GameCharacter): number | null {
+    return imageEffectOpacity(gameObject);
+  }
+  invImageTransform(gameObject: GameCharacter): string | null {
+    return imageEffectTransform(gameObject);
+  }
+
+  private _invMatrixRain = new Map<string, MatrixRainColumn[]>();
+  invMatrixRainColumns(gameObject: GameCharacter): MatrixRainColumn[] {
+    if (!gameObject?.isMatrix) return [];
+    const key = gameObject.identifier;
+    let cols = this._invMatrixRain.get(key);
+    if (!cols) {
+      cols = buildMatrixRainColumns(`inv:${key}`, 5, 10);
+      this._invMatrixRain.set(key, cols);
+    }
+    return cols;
+  }
+  trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
 
   hasOverviewFaceIcon(gameObject: TabletopObject): boolean {
     return !!(gameObject?.faceIcon && 0 < gameObject.faceIcon.url.length);

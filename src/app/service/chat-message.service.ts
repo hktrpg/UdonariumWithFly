@@ -81,7 +81,7 @@ export class ChatMessageService {
     return Math.floor(this.timeOffset + (performance.now() - this.performanceOffset));
   }
 
-  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean): ChatMessage {
+  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean, imageFx?: string): ChatMessage {
     // TODO: 再整理一下
     let effective = !(isUseFaceIcon && this.findFaceIconIdentifier(sendFrom));
     let chatMessage: ChatMessageContext = {
@@ -100,6 +100,7 @@ export class ChatMessageService {
       isInverseIcon: effective && isInverseIcon ? 1 : 0,
       isHollowIcon: effective && isHollowIcon ? 1 : 0,
       isBlackPaint: effective && isBlackPaint ? 1 : 0,
+      imageFx: effective && imageFx ? imageFx : '',
       aura: effective ? aura : -1,
       characterIdentifier: characterIdentifier,
       standIdentifier: standIdentifier,

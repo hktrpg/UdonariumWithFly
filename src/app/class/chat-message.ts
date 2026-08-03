@@ -28,6 +28,7 @@ export interface ChatMessageContext {
   isInverseIcon?: number;
   isHollowIcon?: number;
   isBlackPaint?: number;
+  imageFx?: string;
   aura?: number;
   characterIdentifier?: string;
   standIdentifier?: string;
@@ -51,6 +52,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   @SyncVar() isInverseIcon: number;
   @SyncVar() isHollowIcon: number;
   @SyncVar() isBlackPaint: number;
+  @SyncVar() imageFx: string = '';
   @SyncVar() aura: number = -1;
   @SyncVar() characterIdentifier: string;
   @SyncVar() standIdentifier: string;
@@ -252,10 +254,29 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
       const auraClassList = ['aura'];
       if (this.isInverseIcon == 1) iconContainerClassList.push('inverse');
       if (this.isHollowIcon == 1) iconContainerClassList.push('hollow');
+      if (this.imageFx) {
+        for (const tag of this.imageFx.split(/\s+/)) {
+          if (tag === 'flip-vertical') iconContainerClassList.push('flip-vertical');
+          else if (tag === 'grayscale' || tag === 'sepia' || tag === 'matrix' || tag === 'white-paint' || tag === 'contrast') {
+            // applied on img
+          }
+        }
+      }
       if (0 <= this.aura && this.aura <= 7) {
         auraClassList.push(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'][this.aura]);
       }
-      const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="icon${this.isBlackPaint == 1 ? ' black-paint' : ''}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
+      const imgClasses = ['icon'];
+      if (this.isBlackPaint == 1) imgClasses.push('black-paint');
+      if (this.imageFx) {
+        for (const tag of this.imageFx.split(/\s+/)) {
+          if (tag === 'white-paint') imgClasses.push('white-paint');
+          else if (tag === 'grayscale') imgClasses.push('grayscale');
+          else if (tag === 'sepia') imgClasses.push('sepia');
+          else if (tag === 'matrix') imgClasses.push('matrix');
+          else if (tag === 'contrast') imgClasses.push('contrast-fx');
+        }
+      }
+      const imageIconHtml = (this.imageIdentifier && imageDict[this.imageIdentifier]) ? `<img class="${imgClasses.join(' ')}" src="${ StringUtil.escapeHtml(imageDict[this.imageIdentifier]) }">` : '<span class="icon-space"></span>';
       return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
   <div class="msg-header">${ tabNameHtml }${ tabNameHtml == '' ? '' : '<br>' }${ dateHtml }</div>
   <div class="${ iconContainerClassList.join(' ') }">
@@ -326,12 +347,33 @@ span.icon-space {
 .inverse {
   transform: scaleX(-1);
 }
+.flip-vertical {
+  transform: scaleY(-1);
+}
+.inverse.flip-vertical {
+  transform: scale(-1, -1);
+}
 .hollow {
   opacity: 0.6;
   filter: blur(1px);
 }
 .black-paint {
   filter: brightness(0);
+}
+.white-paint {
+  filter: brightness(0) invert(1);
+}
+.grayscale {
+  filter: grayscale(1);
+}
+.sepia {
+  filter: sepia(1);
+}
+.matrix {
+  filter: grayscale(1) contrast(1.4) brightness(0.72) sepia(1) hue-rotate(85deg) saturate(5.5);
+}
+.contrast-fx {
+  filter: contrast(1.7) brightness(1.15);
 }
 .aura.black {
   filter: drop-shadow(0 -0.2rem 0.2rem black);

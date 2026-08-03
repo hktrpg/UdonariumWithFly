@@ -33,12 +33,13 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { getStatusDef } from '@udonarium/table-fx/character-status';
+import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-character',
     templateUrl: './game-character.component.html',
-    styleUrls: ['./game-character.component.css'],
+    styleUrls: ['./game-character.component.css', '../shared/image-effects.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('switchImage', [
@@ -122,6 +123,40 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   set isHollow(isHollow: boolean) { this.gameCharacter.isHollow = isHollow; }
   get isBlackPaint(): boolean { return this.gameCharacter.isBlackPaint; }
   set isBlackPaint(isBlackPaint: boolean) { this.gameCharacter.isBlackPaint = isBlackPaint; }
+
+  private imageEffectSource() {
+    return {
+      isInverse: this.gameCharacter.isInverse,
+      isHollow: this.gameCharacter.isHollow,
+      isBlackPaint: this.gameCharacter.isBlackPaint,
+      isGrayscale: this.gameCharacter.isGrayscale,
+      isSepia: this.gameCharacter.isSepia,
+      isWhitePaint: this.gameCharacter.isWhitePaint,
+      isMatrix: this.gameCharacter.isMatrix,
+      isFlipVertical: this.gameCharacter.isFlipVertical,
+      isContrast: this.gameCharacter.isContrast,
+      isDead: this.hasDeadStatus,
+    };
+  }
+  get imageEffectFilter(): string | null { return imageEffectFilter(this.imageEffectSource()); }
+  get imageEffectTransform(): string | null { return imageEffectTransform(this.imageEffectSource()); }
+  get imageEffectOpacity(): number | null { return imageEffectOpacity(this.imageEffectSource()); }
+
+  private _matrixRainCacheKey = '';
+  private _matrixRainColumns: MatrixRainColumn[] = [];
+  get matrixRainColumns(): MatrixRainColumn[] {
+    if (!this.gameCharacter?.isMatrix) return [];
+    const w = this.characterImageWidth || this.size * this.gridSize;
+    const count = Math.max(4, Math.min(16, Math.round(w / 9)));
+    const key = `${this.gameCharacter.identifier}:${count}`;
+    if (key !== this._matrixRainCacheKey) {
+      this._matrixRainCacheKey = key;
+      this._matrixRainColumns = buildMatrixRainColumns(key, count);
+    }
+    return this._matrixRainColumns;
+  }
+  trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
+
   get aura(): number { return this.gameCharacter.aura; }
   set aura(aura: number) { this.gameCharacter.aura = aura; }
   get floorRing(): string { return this.gameCharacter.floorRing || 'none'; }
@@ -132,7 +167,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   /** Cap name-tag / status icon strip to roughly the token footprint. */
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
-  statusTooltip(id: string): string { return this.i18n.t(`fx.status.${id}.tip`); }
+  get hasDeadStatus(): boolean { return this.statusEntries.some(s => s.id === 'dead'); }
   statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }
   statusName(id: string): string {
     const name = this.i18n.t(`fx.status.${id}`);
@@ -685,53 +720,62 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   private makeContextMenu(): ContextMenuAction[] {
-    let actions: ContextMenuAction[] = [
-      { 
-        name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
-        action: () => {
-          if (this.isHideIn) {
-            this.gameCharacter.owner = '';
-            SoundEffect.play(PresetSound.piecePut);
-          } else {
-            if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
-              this.modalService.open(ConfirmationComponent, {
-                title: this.i18n.t('char.stealthTitle'),
-                text: this.i18n.t('char.stealthText'),
-                help: this.i18n.t('char.stealthHelp'),
-                type: ConfirmationType.OK,
-                materialIcon: 'disabled_visible'
-              });
+    const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const hasMultiImage = this.gameCharacter.imageFiles.length > 1;
+    const hasFace = this.hasOverviewFaceIcon();
+    if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
+
+    return this.joinContextMenuGroups([
+      // Identity / claim
+      [
+        {
+          name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
+          action: () => {
+            if (this.isHideIn) {
+              this.gameCharacter.owner = '';
+              SoundEffect.play(PresetSound.piecePut);
+            } else {
+              if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
+                this.modalService.open(ConfirmationComponent, {
+                  title: this.i18n.t('char.stealthTitle'),
+                  text: this.i18n.t('char.stealthText'),
+                  help: this.i18n.t('char.stealthHelp'),
+                  type: ConfirmationType.OK,
+                  materialIcon: 'disabled_visible'
+                });
+              }
+              this.gameCharacter.owner = Network.peer.userId;
+              if (!this.gameCharacter.visionOwner) {
+                this.gameCharacter.visionOwner = Network.peer.userId;
+              }
+              SoundEffect.play(PresetSound.sweep);
+              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             }
-            this.gameCharacter.owner = Network.peer.userId;
-            // Stealth claim also registers as vision source unless already set.
-            if (!this.gameCharacter.visionOwner) {
-              this.gameCharacter.visionOwner = Network.peer.userId;
-            }
-            SoundEffect.play(PresetSound.sweep);
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-          }
-          EventSystem.call('UPDATE_INVENTORY', true);
+            EventSystem.call('UPDATE_INVENTORY', true);
+          },
         },
-      },
-      ContextMenuSeparator,
-      (this.gameCharacter.imageFiles.length <= 1 ? null : {
-        name: this.i18n.t('char.imageSwitch'),
-        action: null,
-        subActions: this.gameCharacter.imageFiles.map((image, i) => {
-          return { 
-            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`, 
-            action: () => { this.changeImage(i); }, 
+        this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
+        this.characterFxMenu.makeCombatMenu(this.gameCharacter),
+      ],
+      // Image / appearance
+      [
+        hasMultiImage ? {
+          name: this.i18n.t('char.imageSwitch'),
+          action: null,
+          subActions: this.gameCharacter.imageFiles.map((image, i) => ({
+            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`,
+            action: () => { this.changeImage(i); },
             default: this.gameCharacter.currntImageIndex == i,
             icon: image,
-            checkBox: 'radio'
-          };
-        })
-      }),
-      (this.gameCharacter.imageFiles.length <= 1 ? null : ContextMenuSeparator),
-      (() => {
-        const hasFace = this.hasOverviewFaceIcon();
-        if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
-        return contextMenuToggleCheck({
+            checkBox: 'radio' as const
+          }))
+        } : null,
+        {
+          name: this.i18n.t('char.nextImage'),
+          action: () => { this.nextImage(); },
+          disabled: !hasMultiImage
+        },
+        contextMenuToggleCheck({
           get: () => hasFace && this.isUseIconToOverviewImage,
           set: (v) => {
             if (!this.hasOverviewFaceIcon()) return;
@@ -739,185 +783,197 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           },
           on: this.i18n.t('char.overviewFaceOn'),
           off: this.i18n.t('char.overviewFaceOff'),
-          after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+          after,
           disabled: !hasFace,
           error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
-        });
-      })(),
-      contextMenuToggleCheck({
-        get: () => this.gameCharacter.isShowChatBubble,
-        set: (v) => { this.gameCharacter.isShowChatBubble = v; },
-        on: this.i18n.t('char.chatBubbleOn'),
-        off: this.i18n.t('char.chatBubbleOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      contextMenuToggleCheck({
-        get: () => this.isDropShadow,
-        set: (v) => { this.isDropShadow = v; },
-        on: this.i18n.t('char.shadowOn'),
-        off: this.i18n.t('char.shadowOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
-      this.characterFxMenu.makeAuraMenu(this.gameCharacter),
-      this.characterFxMenu.makeRingMenu(this.gameCharacter),
-      this.characterFxMenu.makeVisionMenu(this.gameCharacter),
-      contextMenuToggleCheck({
-        get: () => this.gameCharacter.affectsLight !== false,
-        set: (v) => { this.gameCharacter.affectsLight = v; },
-        on: this.i18n.t('char.affectsLightOn'),
-        off: this.i18n.t('char.affectsLightOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      this.characterFxMenu.makeStatusMenu(this.gameCharacter),
-      this.characterFxMenu.makeCombatMenu(this.gameCharacter),
-      this.characterFxMenu.makeImageEffectMenu({
-        getInverse: () => this.isInverse,
-        setInverse: v => this.isInverse = v,
-        getHollow: () => this.isHollow,
-        setHollow: v => this.isHollow = v,
-        getBlackPaint: () => this.isBlackPaint,
-        setBlackPaint: v => this.isBlackPaint = v,
-      }),
-      ContextMenuSeparator,
-      contextMenuToggleCheck({
-        get: () => !this.isNotRide,
-        set: (v) => { this.isNotRide = !v; },
-        on: this.i18n.t('char.stackOn'),
-        off: this.i18n.t('char.stackOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      contextMenuToggleCheck({
-        get: () => this.isAltitudeIndicate,
-        set: (v) => { this.isAltitudeIndicate = v; },
-        on: this.i18n.t('char.altitudeOn'),
-        off: this.i18n.t('char.altitudeOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      {
-        name: this.i18n.t('char.resetAltitude'), action: () => {
-          if (this.altitude != 0) {
-            this.altitude = 0;
-            if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
-          }
-        },
-        altitudeHande: this.gameCharacter
-      },
-      ContextMenuSeparator,
-      { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
-      {
-        name: this.i18n.t('char.nextImage'), action: () => { this.nextImage(); },
-        disabled: this.gameCharacter.imageFiles.length <= 1
-      },
-      contextMenuToggleCheck({
-        get: () => this.gameCharacter.isAllowsChat,
-        set: (v) => { this.gameCharacter.isAllowsChat = v; },
-        on: this.i18n.t('char.chatOn'),
-        off: this.i18n.t('char.chatOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      ContextMenuSeparator,
-      {
-        name: this.i18n.t('char.openReferenceUrl'), action: null,
-        subActions: this.gameCharacter.getUrls().map((urlElement) => {
-          const url = urlElement.value.toString();
-          return {
-            name: urlElement.name ? urlElement.name : url,
-            action: () => {
-              if (StringUtil.sameOrigin(url)) {
-                window.open(url.trim(), '_blank', 'noopener');
-              } else {
-                this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
-              } 
-            },
-            disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
-            isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
-          };
         }),
-        disabled: this.gameCharacter.getUrls().length <= 0
-      },
-      ContextMenuSeparator,
-      contextMenuToggleCheck({
-        get: () => this.gameCharacter.isInventoryIndicate,
-        set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
-        on: this.i18n.t('char.inventoryOn'),
-        off: this.i18n.t('char.inventoryOff'),
-        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-      }),
-      { name: this.i18n.t('char.moveTo'), action: null, subActions: [
+        contextMenuToggleCheck({
+          get: () => this.isDropShadow,
+          set: (v) => { this.isDropShadow = v; },
+          on: this.i18n.t('char.shadowOn'),
+          off: this.i18n.t('char.shadowOff'),
+          after,
+        }),
+        this.characterFxMenu.makeImageEffectMenu(this.gameCharacter),
+      ],
+      // FX / lighting / status
+      [
+        this.characterFxMenu.makeAuraMenu(this.gameCharacter),
+        this.characterFxMenu.makeRingMenu(this.gameCharacter),
+        this.characterFxMenu.makeVisionMenu(this.gameCharacter),
+        this.characterFxMenu.makeStatusMenu(this.gameCharacter),
+      ],
+      // Pose
+      [
+        contextMenuToggleCheck({
+          get: () => !this.isNotRide,
+          set: (v) => { this.isNotRide = !v; },
+          on: this.i18n.t('char.stackOn'),
+          off: this.i18n.t('char.stackOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('char.altitudeOn'),
+          off: this.i18n.t('char.altitudeOff'),
+          after,
+        }),
         {
-          name: this.i18n.t('char.commonInventory'), action: () => {
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation('common');
-            this.selectionService.remove(this.gameCharacter);
+          name: this.i18n.t('char.resetAltitude'),
+          action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
+            }
+          },
+          altitudeHande: this.gameCharacter
+        },
+      ],
+      // Chat / panels
+      [
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isShowChatBubble,
+          set: (v) => { this.gameCharacter.isShowChatBubble = v; },
+          on: this.i18n.t('char.chatBubbleOn'),
+          off: this.i18n.t('char.chatBubbleOff'),
+          tip: this.i18n.t('char.chatBubbleTip'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isAllowsChat,
+          set: (v) => { this.gameCharacter.isAllowsChat = v; },
+          on: this.i18n.t('char.chatOn'),
+          off: this.i18n.t('char.chatOff'),
+          after,
+        }),
+        { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
+        { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        {
+          name: this.i18n.t('char.openReferenceUrl'),
+          action: null,
+          subActions: this.gameCharacter.getUrls().map((urlElement) => {
+            const url = urlElement.value.toString();
+            return {
+              name: urlElement.name ? urlElement.name : url,
+              action: () => {
+                if (StringUtil.sameOrigin(url)) {
+                  window.open(url.trim(), '_blank', 'noopener');
+                } else {
+                  this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
+                }
+              },
+              disabled: !StringUtil.validUrl(url),
+              error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
+              isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
+            };
+          }),
+          disabled: this.gameCharacter.getUrls().length <= 0
+        },
+      ],
+      // Inventory / location
+      [
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isInventoryIndicate,
+          set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
+          on: this.i18n.t('char.inventoryOn'),
+          off: this.i18n.t('char.inventoryOff'),
+          after,
+        }),
+        {
+          name: this.i18n.t('char.moveTo'),
+          action: null,
+          subActions: [
+            {
+              name: this.i18n.t('char.commonInventory'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation('common');
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.personalInventory'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation(Network.peerId);
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.graveyard'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation('graveyard');
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.sweep);
+              }
+            },
+          ]
+        },
+      ],
+      // Clone / delete
+      [
+        {
+          name: this.i18n.t('char.clone'),
+          action: () => {
+            let cloneObject = this.gameCharacter.clone();
+            cloneObject.location.x += this.gridSize;
+            cloneObject.location.y += this.gridSize;
+            cloneObject.update();
             SoundEffect.play(PresetSound.piecePut);
           }
         },
         {
-          name: this.i18n.t('char.personalInventory'), action: () => {
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation(Network.peerId);
-            this.selectionService.remove(this.gameCharacter);
+          name: this.i18n.t('char.cloneNumbered'),
+          action: () => {
+            const cloneObject = this.gameCharacter.clone();
+            const tmp = cloneObject.name.split('_');
+            let baseName;
+            if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
+              baseName = tmp.slice(0, tmp.length - 1).join('_');
+            } else {
+              baseName = tmp.join('_');
+            }
+            let maxIndex = 0;
+            for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
+              if (!character.name.startsWith(baseName)) continue;
+              let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
+              if (index > maxIndex) maxIndex = index;
+            }
+            cloneObject.name = baseName + '_' + (maxIndex + 1);
+            cloneObject.location.x += this.gridSize;
+            cloneObject.location.y += this.gridSize;
+            cloneObject.update();
             SoundEffect.play(PresetSound.piecePut);
           }
         },
         {
-          name: this.i18n.t('char.graveyard'), action: () => {
+          name: this.i18n.t('char.deleteToGraveyard'),
+          action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
             SoundEffect.play(PresetSound.sweep);
           }
         },
-      ]},
-      ContextMenuSeparator,
-      {
-        name: this.i18n.t('char.clone'), action: () => {
-          let cloneObject = this.gameCharacter.clone();
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.update();
-          SoundEffect.play(PresetSound.piecePut);
-        }
-      },
-      {
-        name: this.i18n.t('char.cloneNumbered'), action: () => {
-          const cloneObject = this.gameCharacter.clone();
-          const tmp = cloneObject.name.split('_');
-          let baseName;
-          if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-            baseName = tmp.slice(0, tmp.length - 1).join('_');
-          } else {
-            baseName = tmp.join('_');
-          }
-          let maxIndex = 0;
-          for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-            if(!character.name.startsWith(baseName)) continue;
-            let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-            if (index > maxIndex) maxIndex = index;
-          }
-          cloneObject.name = baseName + '_' + (maxIndex + 1);
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.update();
-          SoundEffect.play(PresetSound.piecePut);
-        }
-      },
-      ContextMenuSeparator,
-      {
-        name: this.i18n.t('char.deleteToGraveyard'), action: () => {
-          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-          this.gameCharacter.setLocation('graveyard');
-          this.selectionService.remove(this.gameCharacter);
-          SoundEffect.play(PresetSound.sweep);
-        }
-      }
-    ];
+      ],
+    ]);
+  }
 
-    return actions;
+  /** Flatten menu groups with a single separator between non-empty groups. */
+  private joinContextMenuGroups(groups: (ContextMenuAction | null)[][]): ContextMenuAction[] {
+    const out: ContextMenuAction[] = [];
+    for (const group of groups) {
+      const items = group.filter((a): a is ContextMenuAction => !!a);
+      if (!items.length) continue;
+      if (out.length) out.push(ContextMenuSeparator);
+      out.push(...items);
+    }
+    return out;
   }
 
   onDoubleClick(e: Event) {

@@ -29,6 +29,8 @@ Drag images or music into the browser to import.`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
+<Floating dialog> Speaking as a character pre-fills 「」; text inside appears above the token
+　　　　Toggle via right-click / inventory “Show floating dialog”
 <Dice> Pick a system in the input, then type BCDice commands
 　　　　Quick roll beside character sheet numbers goes to the current chat channel
 <Guest> Rooms can “allow guests”; guests are limited. Passwords still apply
@@ -39,8 +41,10 @@ Drag images or music into the browser to import.`,
 <Vision> When on, players only see around their vision character (GM unrestricted)
 　　　　Picking a speaker in chat = temporary vision; closing that chat clears it
 　　　　For persistent vision, right-click “My vision character”; set vision / bright / dim
-　　　　Tokens・masks・terrain block light by default; right-click can disable light interaction
-　　　　Status icons stay on the nameplate; rings via right-click “Ring”
+　　　　Character tokens always block light; masks・terrain block by default — right-click can disable light interaction
+　　　　Status icons stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
+　　　　Image effects: right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
+　　　　Base rings via right-click “Ring”
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
 　　　　After select: WASD/arrows move, Delete removes; wall・polygon: Enter/double-click finish; Esc cancel
 <Combat> Open from menu; add selection / all on table, roll initiative, rounds
@@ -73,6 +77,13 @@ Upgraded to 1.13.2`,
 ・Chat speaker = temporary vision; only manual “My vision character” persists
 ・Combat: initiative, turn announce; status icons & base rings
 ・Map settings can download map; status icons wrap on nameplate`,
+  'changelog.2026fx': `2026/08/03 Character FX・floating dialog
+・Floating dialog: toggle in right-click / inventory; 「」 text shows above the token; character chat pre-fills 「」
+・Image effects: grayscale / sepia / contrast / silhouette / flip; Matrix digital rain (digits & letters)
+・New Dead status; syncs both ways with combat Defeated; status tip = name + level only
+・Character context menu regrouped; menu offset so it does not cover the token
+・Double-click token art opens details; combat “Add all on table” for everyone except guests
+・Removed character “Interact with light” (tokens always occlude); masks / terrain still toggleable`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://bothelp.hktrpg.com/guide
 Discord: https://support.hktrpg.com

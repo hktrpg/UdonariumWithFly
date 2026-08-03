@@ -135,6 +135,12 @@ export class TabletopObject extends ObjectNode {
   @SyncVar() isInverse: boolean = false;
   @SyncVar() isHollow: boolean = false;
   @SyncVar() isBlackPaint: boolean = false;
+  @SyncVar() isGrayscale: boolean = false;
+  @SyncVar() isSepia: boolean = false;
+  @SyncVar() isWhitePaint: boolean = false;
+  @SyncVar() isMatrix: boolean = false;
+  @SyncVar() isFlipVertical: boolean = false;
+  @SyncVar() isContrast: boolean = false;
   @SyncVar() aura = -1;
 
   @SyncVar() isNotRide: boolean = true;

@@ -25,6 +25,7 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { RangeArea } from '@udonarium/range';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
+import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'game-character-sheet',
@@ -518,6 +519,21 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     if (this.tabletopObject instanceof GameCharacter) return this.tabletopObject.isBlackPaint;
     if (this.tabletopObject instanceof DiceSymbol) return !this.isVisible;
     return false;
+  }
+
+  get sheetImageFilter(): string | null {
+    if (this.tabletopObject instanceof GameCharacter) return imageEffectFilter(this.tabletopObject);
+    if (this.isBlackPaint) return imageEffectFilter({ isBlackPaint: true });
+    return null;
+  }
+  get sheetImageOpacity(): number | null {
+    if (this.tabletopObject instanceof GameCharacter) return imageEffectOpacity(this.tabletopObject);
+    return null;
+  }
+  get sheetImageTransform(): string | null {
+    if (this.tabletopObject instanceof GameCharacter) return imageEffectTransform(this.tabletopObject);
+    if (this.tabletopObject?.isInverse) return imageEffectTransform({ isInverse: true });
+    return null;
   }
 
   get isNoLogging(): boolean {

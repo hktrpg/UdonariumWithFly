@@ -41,6 +41,8 @@ export interface ContextMenuAction {
   sampleColor?: string,
   hotkey?: string,
   checkBox?: string,
+  /** Native browser tooltip (HTML title). */
+  tip?: string,
   /** Override close behavior. Default: stay open for checkBox/radio, close for normal actions. */
   keepOpen?: boolean,
   /** Optional: refresh displayed name after action while menu stays open. */
@@ -56,6 +58,7 @@ export function contextMenuToggleCheck(options: {
   after?: () => void;
   disabled?: boolean;
   error?: string;
+  tip?: string;
   level?: number;
   selfOnly?: boolean;
 }): ContextMenuAction {
@@ -70,6 +73,7 @@ export function contextMenuToggleCheck(options: {
     checkBox: 'check',
     disabled: options.disabled,
     error: options.error,
+    tip: options.tip,
     level: options.level,
     selfOnly: options.selfOnly,
   };

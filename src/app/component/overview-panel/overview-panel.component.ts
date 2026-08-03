@@ -27,6 +27,7 @@ import { Card, CardState } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { RangeArea } from '@udonarium/range';
+import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'overview-panel',
@@ -163,6 +164,23 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     }
     return false;
   }
+
+  get charOverviewFilter(): string | null {
+    if (!(this.tabletopObject instanceof GameCharacter) || !this.applyImageEffect) return null;
+    return imageEffectFilter(this.tabletopObject);
+  }
+  get charOverviewOpacity(): number | null {
+    if (!(this.tabletopObject instanceof GameCharacter) || !this.applyImageEffect) return null;
+    return imageEffectOpacity(this.tabletopObject);
+  }
+  get charOverviewTransform(): string | null {
+    if (!(this.tabletopObject instanceof GameCharacter) || !this.applyImageEffect) return null;
+    return imageEffectTransform(this.tabletopObject);
+  }
+
+  followImageFilter(ch: GameCharacter): string | null { return imageEffectFilter(ch); }
+  followImageOpacity(ch: GameCharacter): number | null { return imageEffectOpacity(ch); }
+  followImageTransform(ch: GameCharacter): string | null { return imageEffectTransform(ch); }
 
   get aura(): number {
     if (this.tabletopObject instanceof GameCharacter) {

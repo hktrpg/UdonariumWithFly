@@ -1,7 +1,7 @@
 {
-  "name": "Udonarium with Fly (Powered by Udonarium)",
-  "short_name": "Udonarium with Fly",
-  "theme_color": "#002699",
+  "name": "烏冬桌 @ HKTRPG",
+  "short_name": "烏冬 @ HKTRPG",
+  "theme_color": "#dd0000",
   "background_color": "#ffffff",
   "display": "standalone",
   "scope": "./",
@@ -9,6 +9,18 @@
   "start_url": "./",
   "lang": "zh-Hant",
   "icons": [
+    {
+      "src": "hktrpg-icon.png",
+      "sizes": "142x141",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/hktrpg-icon.png",
+      "sizes": "142x141",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "assets/icons/icon-72x72m.jpg",
       "sizes": "72x72",
@@ -108,17 +120,17 @@
   ],
   "screenshots": [
     {
-     "src": "./card.png",
+      "src": "./card.png",
       "sizes": "1631x905",
       "type": "image/png",
       "form_factor": "wide"
     },
     {
       "src": "./mobile.jpg",
-       "sizes": "540x1163",
-       "type": "image/jpeg",
-       "form_factor": "narrow"
-     }
+      "sizes": "540x1163",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    }
   ],
-  "description": "Udonarium 改造版＠HKTRPG：高度、聊天文字顏色、立繪、訪客、筆記倉庫等功能。"
+  "description": "HKTRPG 線上 TRPG 桌面（Udonarium）：地圖、棋子、立繪、聊天與擲骰。"
 }

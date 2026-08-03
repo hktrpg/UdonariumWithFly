@@ -2,14 +2,14 @@ export type CharacterStatusId =
   | 'blinded' | 'charmed' | 'deafened' | 'frightened'
   | 'grappled' | 'incapacitated' | 'invisible' | 'paralyzed'
   | 'petrified' | 'poisoned' | 'prone' | 'restrained'
-  | 'stunned' | 'unconscious' | 'exhaustion';
+  | 'stunned' | 'unconscious' | 'exhaustion' | 'dead';
 
 export interface CharacterStatusEntry {
   id: CharacterStatusId;
   level?: number;
 }
 
-/** Display name/tooltip come from i18n keys fx.status.* / fx.status.*.tip */
+/** Display names come from i18n keys fx.status.* */
 export interface CharacterStatusDef {
   id: CharacterStatusId;
   icon: string;
@@ -32,6 +32,7 @@ export const CHARACTER_STATUS_DEFS: CharacterStatusDef[] = [
   { id: 'stunned', icon: 'flash_on' },
   { id: 'unconscious', icon: 'hotel' },
   { id: 'exhaustion', icon: 'battery_alert', hasLevel: true },
+  { id: 'dead', icon: 'skull' },
 ];
 
 export function getStatusDef(id: CharacterStatusId): CharacterStatusDef {
@@ -51,4 +52,20 @@ export function parseStatusesJson(json: string): CharacterStatusEntry[] {
 
 export function stringifyStatuses(entries: CharacterStatusEntry[]): string {
   return JSON.stringify(entries || []);
+}
+
+export function hasStatus(jsonOrEntries: string | CharacterStatusEntry[], id: CharacterStatusId): boolean {
+  const list = typeof jsonOrEntries === 'string' ? parseStatusesJson(jsonOrEntries) : jsonOrEntries;
+  return list.some(s => s.id === id);
+}
+
+/** Add or remove a non-leveled status flag; returns new list. */
+export function setStatusFlag(
+  entries: CharacterStatusEntry[],
+  id: CharacterStatusId,
+  enabled: boolean,
+): CharacterStatusEntry[] {
+  const list = entries.filter(s => s.id !== id);
+  if (enabled) list.push({ id });
+  return list;
 }

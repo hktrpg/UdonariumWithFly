@@ -187,6 +187,28 @@ export class CombatTracker extends GameObject implements InnerXml {
     });
   }
 
+  /** Sync isDefeated for a character across all encounters (linked to FX status dead). */
+  setDefeatedForCharacter(characterIdentifier: string, defeated: boolean) {
+    if (!characterIdentifier) return;
+    const list = this.encounters.slice();
+    let changed = false;
+    for (let i = 0; i < list.length; i++) {
+      const e = JSON.parse(JSON.stringify(list[i])) as EncounterData;
+      let touch = false;
+      for (const c of e.combatants) {
+        if (c.characterIdentifier === characterIdentifier && c.isDefeated !== defeated) {
+          c.isDefeated = defeated;
+          touch = true;
+        }
+      }
+      if (touch) {
+        list[i] = e;
+        changed = true;
+      }
+    }
+    if (changed) this.commit(list);
+  }
+
   sortCombatants(e: EncounterData) {
     e.combatants.sort((a, b) => {
       const ai = a.initiative == null ? -Infinity : a.initiative;

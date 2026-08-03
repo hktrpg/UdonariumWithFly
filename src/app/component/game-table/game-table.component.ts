@@ -899,7 +899,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     for (const ch of this.characters) {
       if (ch.location?.name !== 'table') continue;
-      if (ch.affectsLight === false) continue;
       const s = Math.max(grid * 0.35, (ch.size || 1) * grid);
       out.push({ id: ch.identifier, points: this.rectOccluder(ch.location.x, ch.location.y, s, s) });
     }

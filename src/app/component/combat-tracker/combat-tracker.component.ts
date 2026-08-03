@@ -9,7 +9,10 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import {
   CharacterStatusEntry,
   getStatusDef,
+  hasStatus,
   parseStatusesJson,
+  setStatusFlag,
+  stringifyStatuses,
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker, CombatantData, EncounterData, InitiativeDice } from '@udonarium/table-fx/combat-tracker';
 import { ChatMessageService } from 'service/chat-message.service';
@@ -200,9 +203,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   statusTitle(s: CharacterStatusEntry): string {
     const name = this.i18n.t(`fx.status.${s.id}`);
-    const tip = this.i18n.t(`fx.status.${s.id}.tip`);
-    const title = s.level ? `${name} ${s.level}` : name;
-    return tip && tip !== `fx.status.${s.id}.tip` ? `${title}\n${tip}` : title;
+    return s.level ? `${name} ${s.level}` : name;
   }
 
   ownerLabel(c: CombatantData): string {
@@ -228,21 +229,21 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       characterIdentifier: obj.identifier,
       name: obj.name || this.i18n.t('combat.unnamed'),
       isNpc: !obj.hasPlayerController,
-      isDefeated: false,
+      isDefeated: hasStatus(obj.statusesJson, 'dead'),
       isHidden: false,
       imageIdentifier: obj.imageFile?.identifier || '',
     })));
   }
 
   addAllOnTable() {
-    if (this.isGuest || !this.isGM) return;
+    if (this.isGuest) return;
     const chars = this.tabletopService.characters.filter(ch => ch.location?.name === 'table');
     if (!chars.length) return;
     this.tracker.addCombatants(chars.map(obj => ({
       characterIdentifier: obj.identifier,
       name: obj.name || this.i18n.t('combat.unnamed'),
       isNpc: !obj.hasPlayerController,
-      isDefeated: false,
+      isDefeated: hasStatus(obj.statusesJson, 'dead'),
       isHidden: false,
       imageIdentifier: obj.imageFile?.identifier || '',
     })));
@@ -278,10 +279,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   toggleDefeated(c: CombatantData) {
     if (this.isGuest) return;
-    this.tracker.updateActive(e => {
-      const target = e.combatants.find(x => x.id === c.id);
-      if (target) target.isDefeated = !target.isDefeated;
-    });
+    const next = !c.isDefeated;
+    this.tracker.setDefeatedForCharacter(c.characterIdentifier, next);
+    const ch = this.characterOf(c);
+    if (ch) {
+      ch.statusesJson = stringifyStatuses(setStatusFlag(parseStatusesJson(ch.statusesJson), 'dead', next));
+      EventSystem.trigger('UPDATE_INVENTORY', null);
+    }
   }
 
   rollOne(c: CombatantData) {

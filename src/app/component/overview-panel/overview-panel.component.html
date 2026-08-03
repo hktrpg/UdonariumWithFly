@@ -92,9 +92,12 @@
       [ngClass]="{ 'has-icon': isUseIcon,'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
       <ng-container *ngIf="!isUseIcon">
         <div [ngStyle]="{'transform': ('rotate(' + roll + 'deg)') }">
-          <div class="inverser" [ngClass]="{inverse: isInverse, hollow: isHollow}">
+          <div class="inverser"
+            [style.filter]="charOverviewFilter"
+            [style.opacity]="charOverviewOpacity"
+            [style.transform]="charOverviewTransform">
             <span class="aura" [ngClass]="{black: aura == 0, blue: aura == 1, green: aura == 2, cyan: aura == 3, red: aura == 4, magenta: aura == 5, yellow: aura == 6, white: aura == 7}">
-              <img class="character-image" [ngClass]="{'black-paint': isBlackPaint}" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none">
+              <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none">
             </span>
           </div>
         </div>
@@ -207,9 +210,12 @@
           <ng-container *ngIf="range.followingCharactor">
             <div class="tag">➡ {{ range.followingCharactor.name }}</div>
             <div class="value" style="margin-top: 3px; pointer-events: none">
-              <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px" [ngClass]="{inverse: range.followingCharactor.isInverse, hollow: range.followingCharactor.isHollow}">
+              <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px"
+                [style.filter]="followImageFilter(range.followingCharactor)"
+                [style.opacity]="followImageOpacity(range.followingCharactor)"
+                [style.transform]="followImageTransform(range.followingCharactor)">
                 <span class="aura-following" [ngClass]="{black: range.followingCharactor.aura == 0, blue: range.followingCharactor.aura == 1, green: range.followingCharactor.aura == 2, cyan: range.followingCharactor.aura == 3, red: range.followingCharactor.aura == 4, magenta: range.followingCharactor.aura == 5, yellow: range.followingCharactor.aura == 6, white: range.followingCharactor.aura == 7}">
-                  <img style="max-width: 32px; max-height: 32px" class="character-image" draggable="false" [ngClass]="{'black-paint': range.followingCharactor.isBlackPaint}" [src]="range.followingCharactor.imageFile.url | safe: 'resourceUrl'" style="pointer-events: none">
+                  <img style="max-width: 32px; max-height: 32px" class="character-image" draggable="false" [src]="range.followingCharactor.imageFile.url | safe: 'resourceUrl'" style="pointer-events: none">
                 </span>
               </div>
             </div>

@@ -19,6 +19,13 @@
   z-index: 0;
 }
 
+.matrix-rain-host {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  line-height: 0;
+}
+
 .name-tag {
   color: #444;
   background-color: whitesmoke;

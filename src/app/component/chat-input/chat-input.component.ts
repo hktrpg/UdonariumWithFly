@@ -30,6 +30,8 @@ import { ChatTab } from '@udonarium/chat-tab';
 import { CutInList } from '@udonarium/cut-in-list';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DataElement } from '@udonarium/data-element';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
+import { anyImageEffect, clearImageEffects, imageEffectFilter, imageEffectOpacity, imageEffectTransform, packImageFx } from '@udonarium/table-fx/image-effect';
 
 interface StandGroup {
   name: string,
@@ -100,7 +102,8 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     color?: string, 
     isInverse?:boolean, 
     isHollow?: boolean, 
-    isBlackPaint?: boolean, 
+    isBlackPaint?: boolean,
+    imageFx?: string,
     aura?: number, 
     isUseFaceIcon?: boolean, 
     characterIdentifier?: string, 
@@ -280,6 +283,16 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     return !this.character || this.allowsChat(this.character);
   }
 
+  get charImageFilter(): string | null {
+    return this.character ? imageEffectFilter(this.character) : null;
+  }
+  get charImageOpacity(): number | null {
+    return this.character ? imageEffectOpacity(this.character) : null;
+  }
+  get charImageTransform(): string | null {
+    return this.character ? imageEffectTransform(this.character) : null;
+  }
+
   constructor(
     private ngZone: NgZone,
     public chatMessageService: ChatMessageService,
@@ -287,6 +300,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
     private contextMenuService: ContextMenuService,
+    private characterFxMenu: CharacterFxMenuService,
     private i18n: I18nService,
   ) { }
 
@@ -913,6 +927,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           isInverse: targetCharacter ? targetCharacter.isInverse : false,
           isHollow: targetCharacter? targetCharacter.isHollow : false,
           isBlackPaint: targetCharacter ? targetCharacter.isBlackPaint : false,
+          imageFx: targetCharacter ? packImageFx(targetCharacter) : '',
           aura: targetCharacter ? targetCharacter.aura : -1,
           isUseFaceIcon: isUseFaceIcon,
           characterIdentifier: targetCharacter ? targetCharacter.identifier : null,
@@ -1019,43 +1034,26 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           });
         }
         contextMenuActions.push(ContextMenuSeparator);
-        contextMenuActions.push(
-          { name: this.i18n.t('chat.ctx.imageEffect'), action: null, subActions: [
-            contextMenuToggleCheck({
-              get: () => this.character.isInverse,
-              set: (v) => { this.character.isInverse = v; },
-              on: this.i18n.t('chat.ctx.inverseOn'),
-              off: this.i18n.t('chat.ctx.inverseOff'),
-              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-            }),
-            contextMenuToggleCheck({
-              get: () => this.character.isHollow,
-              set: (v) => { this.character.isHollow = v; },
-              on: this.i18n.t('chat.ctx.blurOn'),
-              off: this.i18n.t('chat.ctx.blurOff'),
-              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-            }),
-            contextMenuToggleCheck({
-              get: () => this.character.isBlackPaint,
-              set: (v) => { this.character.isBlackPaint = v; },
-              on: this.i18n.t('chat.ctx.silhouetteOn'),
-              off: this.i18n.t('chat.ctx.silhouetteOff'),
-              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
-            }),
-              { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
-                const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
-                return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
-              })) },
+        const fxSubs = this.characterFxMenu.makeImageEffectMenu(this.character).subActions || [];
+        const fxWithoutReset = fxSubs.slice(0, -1);
+        contextMenuActions.push({
+          name: this.i18n.t('chat.ctx.imageEffect'),
+          action: null,
+          subActions: [
+            ...fxWithoutReset,
+            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
+              const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
+              return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
+            })) },
             ContextMenuSeparator,
             {
-              name: this.i18n.t('chat.ctx.reset'), action: () => {
-                this.character.isInverse = false;
-                this.character.isHollow = false;
-                this.character.isBlackPaint = false;
+              name: this.i18n.t('chat.ctx.reset'),
+              action: () => {
+                clearImageEffects(this.character);
                 this.character.aura = -1;
                 EventSystem.trigger('UPDATE_INVENTORY', null);
               },
-              disabled: !this.character.isInverse && !this.character.isHollow && !this.character.isBlackPaint && this.character.aura == -1
+              disabled: !anyImageEffect(this.character) && this.character.aura == -1
             }
           ]
         });

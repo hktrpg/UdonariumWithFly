@@ -3,7 +3,8 @@
   (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="component-content is-3d" [@bounceInOut]="'in'">
     <div class="component-content is-3d is-pointer-events-auto" appRotable [rotable.option]="rotableOption"
-      [rotable.disable]="isMoveLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
+      [rotable.disable]="isMoveLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()"
+      (dblclick)="onDoubleClick($event)">
       <div class="pedestal-grab rotate-grab">
         <div class="pedestal-grab-border">
           <div class="material-icons of-front">autorenew</div>
@@ -30,7 +31,7 @@
           </div>
         </div>
       </div>
-      <div class="upright-transform is-fit-width is-3d" [ngClass]="{fall: altitude == 0}" (dblclick)="onDoubleClick($event)"
+      <div class="upright-transform is-fit-width is-3d" [ngClass]="{fall: altitude == 0}"
         [ngStyle]="{'transform': 'rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(' + (-altitude) * gridSize +'px)'}">
         <div class="rotate-frame is-3d" style="position: absolute" [style.transform-origin]="'center ' + (-characterImageHeight * 0.333) + 'px'"
           appRotable [rotable.option]="rollOption" [rotable.disable]="isMoveLocked"
@@ -46,7 +47,7 @@
               [ngStyle]="{'transform': 'translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateX(' + nameTagRotate + 'deg)'}">
               <div class="fornt-tag is-3d name-tag-row">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + ('common.colon' | i18n) + statusTooltip(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
@@ -54,19 +55,32 @@
               </div>
               <div class="back-tag is-3d name-tag-row">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + ('common.colon' | i18n) + statusTooltip(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
                 <span class="has-length-limit name-text" *ngIf="0 < name.length">{{name}}</span>
               </div>
             </div>
-            <div class="is-pointer-events-none is-3d aura" [@switchImage]="gameCharacter.currntImageIndex"
+            <div class="is-3d aura" [@switchImage]="gameCharacter.currntImageIndex"
               [ngClass]="{black: aura == 0, blue: aura == 1, green: aura == 2, cyan: aura == 3, red: aura == 4, magenta: aura == 5, yellow: aura == 6, white: aura == 7}">
-              <div class="inverser is-3d" [ngClass]="{inverse: isInverse, 'black-paint': isBlackPaint, 'hollow': isHollow}">
+              <div class="inverser is-3d"
+                [style.opacity]="imageEffectOpacity"
+                [style.transform]="imageEffectTransform">
                 <span class="image-box is-3d" [style.width.px]="characterImageWidth" [style.height.px]="characterImageHeight" [style.transform]="'translateX(' + ((size * gridSize - characterImageWidth) / 2) + 'px)'">
                   <img #characterImage *ngIf="0 < imageFile.url.length" class="image is-3d chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" [ngClass]="{'is-hide-in': isHideIn}"
-                    [style.height.px]="characterImageHeight" [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
+                    [style.height.px]="characterImageHeight"
+                    [style.filter]="imageEffectFilter"
+                    [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
+                  <div *ngIf="gameCharacter.isMatrix" class="matrix-rain is-3d" aria-hidden="true">
+                    <span *ngFor="let col of matrixRainColumns; trackBy: trackByMatrixCol"
+                      class="matrix-rain-col"
+                      [class.up]="col.up"
+                      [style.animation-duration]="col.duration"
+                      [style.animation-delay]="col.delay"
+                      [style.font-size]="col.fontSize"
+                      [style.opacity]="col.opacity">{{ col.text }}</span>
+                  </div>
                 </span>
               </div>
             </div>

@@ -155,6 +155,8 @@
 .image-box {
   display: inline-block;
   text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 .image-box img {
   object-fit: contain;
@@ -164,13 +166,14 @@
 
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
+  transition: filter 132ms 0s ease;
 }
 
 .inverse {
   transform: rotateY(-180deg);
 }
 .inverser {
-  transition: transform 132ms 0s ease;
+  transition: transform 132ms 0s ease, opacity 132ms 0s ease;
 }
 .hollow {
   opacity: 0.6;

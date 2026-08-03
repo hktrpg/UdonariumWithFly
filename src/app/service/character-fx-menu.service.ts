@@ -9,9 +9,14 @@ import {
   CharacterStatusEntry,
   CharacterStatusId,
   parseStatusesJson,
+  setStatusFlag,
   stringifyStatuses,
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import {
+  anyImageEffect,
+  clearImageEffects,
+} from '@udonarium/table-fx/image-effect';
 import { ContextMenuAction, ContextMenuSeparator, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
@@ -150,7 +155,7 @@ export class CharacterFxMenuService {
           characterIdentifier: obj.identifier,
           name: obj.name || this.i18n.t('fx.unnamed'),
           isNpc: !obj.hasPlayerController,
-          isDefeated: false,
+          isDefeated: parseStatusesJson(obj.statusesJson).some(s => s.id === 'dead'),
           isHidden: false,
           imageIdentifier: obj.imageFile?.identifier || '',
         })));
@@ -249,47 +254,91 @@ export class CharacterFxMenuService {
     };
   }
 
-  makeImageEffectMenu(accessors: {
-    getInverse: () => boolean; setInverse: (v: boolean) => void;
-    getHollow: () => boolean; setHollow: (v: boolean) => void;
-    getBlackPaint: () => boolean; setBlackPaint: (v: boolean) => void;
-  }): ContextMenuAction {
+  makeImageEffectMenu(character: GameCharacter): ContextMenuAction {
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     return {
       name: this.i18n.t('fx.imageEffects'),
       action: null,
       subActions: [
         contextMenuToggleCheck({
-          get: accessors.getInverse,
-          set: accessors.setInverse,
+          get: () => character.isInverse,
+          set: (v) => { character.isInverse = v; },
           on: this.i18n.t('fx.inverseOn'),
           off: this.i18n.t('fx.inverseOff'),
           after,
         }),
         contextMenuToggleCheck({
-          get: accessors.getHollow,
-          set: accessors.setHollow,
+          get: () => character.isFlipVertical,
+          set: (v) => { character.isFlipVertical = v; },
+          on: this.i18n.t('fx.flipVerticalOn'),
+          off: this.i18n.t('fx.flipVerticalOff'),
+          after,
+        }),
+        ContextMenuSeparator,
+        contextMenuToggleCheck({
+          get: () => character.isHollow,
+          set: (v) => { character.isHollow = v; },
           on: this.i18n.t('fx.blurOn'),
           off: this.i18n.t('fx.blurOff'),
           after,
         }),
         contextMenuToggleCheck({
-          get: accessors.getBlackPaint,
-          set: accessors.setBlackPaint,
+          get: () => character.isGrayscale,
+          set: (v) => { character.isGrayscale = v; },
+          on: this.i18n.t('fx.grayscaleOn'),
+          off: this.i18n.t('fx.grayscaleOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => character.isSepia,
+          set: (v) => { character.isSepia = v; },
+          on: this.i18n.t('fx.sepiaOn'),
+          off: this.i18n.t('fx.sepiaOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => character.isMatrix,
+          set: (v) => { character.isMatrix = v; },
+          on: this.i18n.t('fx.matrixOn'),
+          off: this.i18n.t('fx.matrixOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => character.isContrast,
+          set: (v) => { character.isContrast = v; },
+          on: this.i18n.t('fx.contrastOn'),
+          off: this.i18n.t('fx.contrastOff'),
+          after,
+        }),
+        ContextMenuSeparator,
+        contextMenuToggleCheck({
+          get: () => character.isBlackPaint,
+          set: (v) => {
+            character.isBlackPaint = v;
+            if (v) character.isWhitePaint = false;
+          },
           on: this.i18n.t('fx.silhouetteOn'),
           off: this.i18n.t('fx.silhouetteOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => character.isWhitePaint,
+          set: (v) => {
+            character.isWhitePaint = v;
+            if (v) character.isBlackPaint = false;
+          },
+          on: this.i18n.t('fx.whiteSilhouetteOn'),
+          off: this.i18n.t('fx.whiteSilhouetteOff'),
           after,
         }),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.resetImageEffects'),
           action: () => {
-            accessors.setInverse(false);
-            accessors.setHollow(false);
-            accessors.setBlackPaint(false);
+            clearImageEffects(character);
             after();
           },
-          disabled: !accessors.getInverse() && !accessors.getHollow() && !accessors.getBlackPaint()
+          disabled: !anyImageEffect(character),
         }
       ]
     };
@@ -297,10 +346,11 @@ export class CharacterFxMenuService {
 
   private toggleStatus(character: GameCharacter, id: CharacterStatusId) {
     const list = parseStatusesJson(character.statusesJson);
-    const idx = list.findIndex(s => s.id === id);
-    if (idx >= 0) list.splice(idx, 1);
-    else list.push({ id });
-    character.statusesJson = stringifyStatuses(list);
+    const enable = !list.some(s => s.id === id);
+    character.statusesJson = stringifyStatuses(setStatusFlag(list, id, enable));
+    if (id === 'dead') {
+      CombatTracker.instance.setDefeatedForCharacter(character.identifier, enable);
+    }
     EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 

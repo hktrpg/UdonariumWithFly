@@ -48,7 +48,7 @@
         [title]="'combat.addSelectedTitle' | i18n">
         {{ selectedCharacterCount > 0 ? ('combat.addSelectedN' | i18n:{ n: selectedCharacterCount }) : ('combat.addSelected' | i18n) }}
       </button>
-      <button type="button" class="btn btn-sm" (click)="addAllOnTable()" [disabled]="isGuest || !isGM" [title]="'combat.addAllTitle' | i18n">{{ 'combat.addAll' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="addAllOnTable()" [disabled]="isGuest" [title]="'combat.addAllTitle' | i18n">{{ 'combat.addAll' | i18n }}</button>
       <button type="button" class="btn btn-sm" (click)="rollAll(false)" [disabled]="isGuest">{{ 'combat.rollAll' | i18n }}</button>
       <button type="button" class="btn btn-sm" (click)="rollAll(true)" [disabled]="isGuest">{{ 'combat.rollNpc' | i18n }}</button>
       <button type="button" class="btn btn-sm" (click)="applyResourceInitiative()"

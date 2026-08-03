@@ -39,8 +39,6 @@ export class GameCharacter extends TabletopObject {
    * Chat-window auto links use {@link claimAutoVision} instead and do not write here.
    */
   @SyncVar() visionOwner: string = '';
-  /** When true (default), footprint blocks light and vision. */
-  @SyncVar() affectsLight: boolean = true;
 
   /** Local preferred chat character (last「作為我的角色」claim). */
   private static preferredChatCharacterId = '';

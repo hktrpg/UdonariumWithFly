@@ -33,8 +33,8 @@ Write \\n to insert a newline. Write \\s for a half-width space and \\ｓ for a 
 ・Ruby text
 Prefix text with | and wrap its reading in 《 and 》.
 
-・Speech balloon
-When a character sends chat, text wrapped in 「 and 」 is displayed as a speech balloon.`,
+・Floating dialog
+When a character sends chat, text wrapped in 「 and 」 appears immediately above the token.`,
   'stand.sortNameList': 'Sort names while entering chat', 'stand.heightGlobal': 'Height (0 = keep original image): ', 'stand.keepOriginalImage': 'Keep original image', 'stand.noOverview': 'Do not use a stand image in the overview', 'stand.add': 'Add stand setting', 'stand.restore': 'Restore recently deleted stand setting', 'stand.title': '{{name}}\'s stand settings', 'stand.deleteTitle': 'Delete stand setting', 'stand.deleteText': 'Delete this stand setting?', 'stand.helpTitle': 'Stand settings help', 'stand.changeImage': 'Change image', 'stand.condition': 'Condition: ', 'stand.condition.default': 'Default', 'stand.condition.image': 'Specified image', 'stand.condition.postfix': 'Chat suffix', 'stand.condition.postfixOrImage': 'Chat suffix or specified image', 'stand.condition.postfixAndImage': 'Chat suffix and specified image', 'stand.condition.selectedOnly': 'Only when selected', 'stand.showName': 'Show name tag', 'stand.applyImageEffect': 'Apply image effects', 'stand.applyRoll': 'Apply rotation', 'stand.speakingImage': 'Speaking image (APNG, etc.)', 'stand.test': 'Test (only visible to you)', 'stand.positionSpecialize': 'Per-stand position: ', 'stand.heightIndividual': 'Height (0 = unspecified): ', 'stand.unspecified': 'Unspecified', 'stand.postfixPlaceholder': 'One per line. A leading @ is removed from matching text.\r\n@angry\r\n@special move', 'stand.noCharacterImages': 'No character image or face icon is set', 'stand.testMessage': 'This is a test that only you can see. For finer stand adjustments, turn off “Fade out and automatically exit stands” in Personal settings.',
   'stand.help': `Set a character stand's name, position, image height, and the condition for displaying it when chat is sent.
 

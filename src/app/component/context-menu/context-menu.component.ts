@@ -103,8 +103,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
 
-    panel.style.left = this.contextMenuService.position.x + 'px';
-    panel.style.top = this.contextMenuService.position.y + 'px';
+    // Nudge away from the cursor so the menu does not cover the target token.
+    const OFFSET_X = 20;
+    const OFFSET_Y = 4;
+    panel.style.left = (this.contextMenuService.position.x + OFFSET_X) + 'px';
+    panel.style.top = (this.contextMenuService.position.y + OFFSET_Y) + 'px';
 
     let panelBox = panel.getBoundingClientRect();
 
