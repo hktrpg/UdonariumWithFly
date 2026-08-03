@@ -512,7 +512,7 @@ export class DiceBot extends GameObject {
           count += 1;
           counter.set(name == '' ? translate('cutin.unnamed') : name, count);
         }
-        const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
+        const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join(translate('common.listSep'))}`;
         this.chatMessageService.sendOperationLog(translate('chat.op.cutinStarted', { text }));
       }
     }

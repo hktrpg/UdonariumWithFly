@@ -393,7 +393,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
                   card.faceUp();
                 });
                 this.chatMessageService.sendOperationLog(this.i18n.t('card.revealed', {
-                  cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join('、')
+                  cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join(this.i18n.t('common.listSep'))
                 }));
                 SoundEffect.play(PresetSound.cardDraw);
               }
@@ -424,7 +424,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
                 });
                 const messages = [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) })));
                 if (faceDownCount) messages.push(this.i18n.t('card.facedownCount', { count: faceDownCount }));
-                this.chatMessageService.sendOperationLog(this.i18n.t('card.selfOnlyMany', { cards: messages.join('、') }));
+                this.chatMessageService.sendOperationLog(this.i18n.t('card.selfOnlyMany', { cards: messages.join(this.i18n.t('common.listSep')) }));
                 SoundEffect.play(PresetSound.cardDraw);
               }
             },

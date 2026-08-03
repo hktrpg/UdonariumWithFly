@@ -54,7 +54,8 @@ export class SkyWayFacade {
       if (this.onOpen) this.onOpen(this.peer);
     } catch (err) {
       console.error(err);
-      if (this.onFatalError) this.onFatalError(this.peer, err.name, err.message, err);
+      const fatal = this.formatFatalError(err);
+      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     }
   }
 
@@ -117,7 +118,8 @@ export class SkyWayFacade {
         this.close();
         if (this.onClose) this.onClose(this.peer);
       }
-      if (this.onFatalError) this.onFatalError(this.peer, err.name, err.message, err);
+      const fatal = this.formatFatalError(err);
+      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.context = context;
@@ -177,6 +179,8 @@ export class SkyWayFacade {
 
     lobbyPerson.onFatalError.add(err => {
       console.error('lobbyPerson onFatalError', err);
+      const fatal = this.formatFatalError(err);
+      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.lobbyPerson = lobbyPerson;
@@ -226,7 +230,8 @@ export class SkyWayFacade {
         this.close();
         if (this.onClose) this.onClose(this.peer);
       }
-      if (this.onFatalError) this.onFatalError(this.peer, err.name, err.message, err);
+      const fatal = this.formatFatalError(err);
+      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.roomPerson = roomPerson;
@@ -390,5 +395,20 @@ export class SkyWayFacade {
     });
 
     return sorted;
+  }
+
+  /** Map SDK errors to localized user-facing text; keep raw details in console only. */
+  private formatFatalError(err: any): { type: string; message: string } {
+    const rawType = String(err?.name || err?.type || 'default');
+    const kebab = rawType
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/[\s_]+/g, '-')
+      .toLowerCase();
+    const candidates = [`skyway.${rawType}`, `skyway.${kebab}`, `skyway.${rawType.toLowerCase()}`];
+    for (const key of candidates) {
+      const text = translate(key);
+      if (text !== key) return { type: kebab || rawType, message: text };
+    }
+    return { type: kebab || 'default', message: translate('skyway.default') };
   }
 }

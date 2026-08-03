@@ -102,4 +102,6 @@ export const ja: I18nDictionary = {
   'app.documentTitle': 'Udonarium with Fly HKTRPG',
   'app.ogTitle': 'Udonarium with Fly HKTRPG',
   'common.keyCtrl': 'Ctrl',
+  'common.listSep': '、',
+  'common.colon': '：',
 };

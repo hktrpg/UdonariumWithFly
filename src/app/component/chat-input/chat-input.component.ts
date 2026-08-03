@@ -699,7 +699,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
                     if (rollResult.isDiceRollTable) {
                       loggingText += ` (${rollResult.tableName}：${rollResult.isEmptyDice ? '' : '🎲'}${rollResult.result.split(/\s＞\s/)[0]})`;
                     } else {
-                      loggingText += ` (${ rollResult.result.split(/\s＞\s/g).map((str, j) => (j == 0 ? (rollResult.isEmptyDice ? this.i18n.t('chat.op.calcResult') : '🎲' + gameType + '：' + str.replace(/^c?\(/i, '').replace(/\)$/, '')) : str)).join(' → ') })`;
+                      loggingText += ` (${ rollResult.result.split(/\s＞\s/g).map((str, j) => (j == 0 ? (rollResult.isEmptyDice ? this.i18n.t('chat.op.calcResult') : '🎲' + gameType + this.i18n.t('common.colon') + str.replace(/^c?\(/i, '').replace(/\)$/, '')) : str)).join(' → ') })`;
                     }
                     if (!rollResult.isEmptyDice) isDiceRoll = true;
                   }
@@ -793,7 +793,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
             count += 1;
             counter.set(name == '' ? this.i18n.t('chat.op.unnamedCutin') : name, count);
           }
-          const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
+          const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join(this.i18n.t('common.listSep'))}`;
           this.chatMessageService.sendOperationLog(this.i18n.t('chat.op.cutinStarted', { text }));
         }
       }

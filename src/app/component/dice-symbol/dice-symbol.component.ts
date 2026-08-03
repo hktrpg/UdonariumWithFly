@@ -365,7 +365,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
                     messages.push(message);
                   }
                 });
-                if (messages.length) this.chatMessageService.sendOperationLog(messages.join('、'));
+                if (messages.length) this.chatMessageService.sendOperationLog(messages.join(this.i18n.t('common.listSep')));
                 if (needsSound) {
                   if (isContainCoin) SoundEffect.play(PresetSound.coinToss);
                   if (isContainDice) SoundEffect.play(PresetSound.diceRoll1);
@@ -385,7 +385,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
                   }
                   diceSymbol.owner = '';
                 });
-                if (messages.length) this.chatMessageService.sendOperationLog(messages.join('、'));
+                if (messages.length) this.chatMessageService.sendOperationLog(messages.join(this.i18n.t('common.listSep')));
                 SoundEffect.play(PresetSound.unlock);
               },
               disabled: !selectedDiceSymbols().some(diceSymbol => diceSymbol.owner != '')
@@ -399,7 +399,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
                   }
                   diceSymbol.owner = Network.peer.userId;
                 });
-                if (names.length) this.chatMessageService.sendOperationLog(this.i18n.t('dice.selfOnlyMany', { names: names.join('、') }));
+                if (names.length) this.chatMessageService.sendOperationLog(this.i18n.t('dice.selfOnlyMany', { names: names.join(this.i18n.t('common.listSep')) }));
                 SoundEffect.play(PresetSound.lock);
               },
               disabled: !selectedDiceSymbols().some(diceSymbol => diceSymbol.owner != Network.peer.userId)

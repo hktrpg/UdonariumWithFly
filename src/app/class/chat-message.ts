@@ -157,7 +157,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   logFragmentText(tabName: string=null, dateFormat='HH:mm'): string {
     tabName = (!tabName || tabName.trim() == '') ? '' : `[${ tabName }] `;
-    const dateStr = (dateFormat == '') ? '' : formatDate(new Date(this.timestamp), dateFormat, this.locale) + '：';
+    const dateStr = (dateFormat == '') ? '' : formatDate(new Date(this.timestamp), dateFormat, this.locale) + translate('common.colon');
     const lastUpdateStr = !this.isEdited ? '' : 
       (dateFormat == '') ? translate('chat.editedParen') : translate('chat.editedParenWithTime', { time: formatDate(new Date(this.lastUpdate), dateFormat, this.locale) });
     let text = StringUtil.rubyToText(this.text);

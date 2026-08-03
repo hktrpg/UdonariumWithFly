@@ -541,7 +541,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
                   }
                   let text = this.i18n.t('stack.drewMulti', {
                     stack: this.stackDisplayName(),
-                    cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join('、')
+                    cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join(this.i18n.t('common.listSep'))
                   });
                   if (frontCards.length !== cards.length) {
                     text += this.i18n.t('stack.alsoFacedown', { count: cards.length - frontCards.length });

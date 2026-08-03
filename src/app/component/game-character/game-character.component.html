@@ -46,7 +46,7 @@
               [ngStyle]="{'transform': 'translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateX(' + nameTagRotate + 'deg)'}">
               <div class="fornt-tag is-3d name-tag-row">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + '：' + statusTooltip(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + ('common.colon' | i18n) + statusTooltip(s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
@@ -54,7 +54,7 @@
               </div>
               <div class="back-tag is-3d name-tag-row">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + '：' + statusTooltip(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id) + ('common.colon' | i18n) + statusTooltip(s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
