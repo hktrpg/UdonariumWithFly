@@ -2,5 +2,6 @@
 <hr />
 <div class="help" *ngIf="help && !helpHtml">{{help}}</div>
 <div class="help" *ngIf="helpHtml" [innerHTML]="helpHtml | safe: 'html'"></div>
+<button *ngIf="extraLabel" type="button" (click)="extra()">{{ extraLabel }}</button>
 <button type="submit" (click)="ok()">{{ okLabel || ('confirm.ok' | i18n) }}</button>
 <button *ngIf="type > 1" type="button" (click)="cancel()">{{ cancelLabel || ('confirm.cancel' | i18n) }}</button>

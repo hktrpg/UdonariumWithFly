@@ -1110,16 +1110,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   logout() {
-      this.modalService.open(ConfirmationComponent, {
+    const option: any = {
       title: this.i18n.t('menu.confirm.logout.title'),
       text: this.i18n.t(this.isRoom ? 'menu.confirm.logout.textRoom' : 'menu.confirm.logout.text'),
-      help: this.i18n.t('menu.confirm.logout.help'),
+      help: this.i18n.t(this.GuestMode() ? 'menu.confirm.logout.helpGuest' : 'menu.confirm.logout.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {
         this.reloadWithoutPrompt();
-      }
-    });
+      },
+    };
+    if (!this.GuestMode()) {
+      option.extraLabel = this.i18n.t('menu.downloadZip');
+      option.extraAction = () => { void this.save(); };
+    }
+    this.modalService.open(ConfirmationComponent, option);
   }
 
   deleteGameObject(gameObject: any) {

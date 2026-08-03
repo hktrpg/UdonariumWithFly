@@ -19,9 +19,13 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   materialIcon: string = '';
   okLabel: string = '';
   cancelLabel: string = '';
+  extraLabel: string = '';
   type: ConfirmationType = ConfirmationType.OK;
   action: Function = null;
   cancelAction: Function = null;
+  extraAction: Function = null;
+  /** When true, extra button closes the modal after running extraAction. Default false. */
+  extraCloses: boolean = false;
 
   constructor(
     private panelService: PanelService,
@@ -36,9 +40,12 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.materialIcon = modalService.option.materialIcon ? modalService.option.materialIcon : '';
     this.okLabel = modalService.option.okLabel ? modalService.option.okLabel : '';
     this.cancelLabel = modalService.option.cancelLabel ? modalService.option.cancelLabel : '';
+    this.extraLabel = modalService.option.extraLabel ? modalService.option.extraLabel : '';
     this.type = modalService.option.type ? modalService.option.type : ConfirmationType.OK;
     this.action = modalService.option.action ? modalService.option.action : null;
     this.cancelAction = modalService.option.cancelAction ? modalService.option.cancelAction : null;
+    this.extraAction = modalService.option.extraAction ? modalService.option.extraAction : null;
+    this.extraCloses = !!modalService.option.extraCloses;
   }
 
   ngOnInit() {
@@ -77,6 +84,11 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   cancel() {
     this.modalService.resolve(false);
     if (this.cancelAction) this.cancelAction();
+  }
+
+  extra() {
+    if (this.extraAction) this.extraAction();
+    if (this.extraCloses) this.modalService.resolve('extra');
   }
 }
 
