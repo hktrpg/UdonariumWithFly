@@ -1,0 +1,104 @@
+# Udonarium 乌冬 @ HKTRPG
+
+[English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
+
+---
+
+[Udonarium（ユドナリウム）](https://github.com/TK11235/udonarium) 是在 Web 浏览器中运行的桌游／TRPG 在线跑团支援工具。
+
+本项目是以 [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) 为基底的 [HKTRPG](https://www.hktrpg.com/) 改造版：界面为繁体中文，并保留 With Fly 的高度、立绘（Stand）、Cut-in、聊天文字颜色等扩展。
+
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
+
+## 立即试用
+
+- **本站（乌冬 @ HKTRPG）**：https://z01.hktrpg.com/
+- 本家试用：https://udonarium.app/
+- With Fly 试用：https://nanasunana.github.io/
+
+推荐浏览器：桌面版 Google Chrome（需 HTTPS）。
+
+## 功能
+
+- **在线跑团**
+  - 房间、多桌面管理
+  - 桌面遮罩、立体地形
+  - 棋子、卡片、共用备忘
+  - 聊天与指令板（Chat Palette）
+  - 骰子机器人（[BCDice](https://github.com/bcdice/bcdice-js)）
+  - 图片共用、BGM、ZIP 存档
+
+- **浏览器间通信**
+  - 以 WebRTC（[SkyWay](https://skyway.ntt.com/)）连接；连接后处理尽量在浏览器完成
+
+- **轻量实时**
+  - 操作实时同步给其他参加者
+
+## 本项目追加（相对于 With Fly／本家）
+
+| 功能 | 说明 |
+|------|------|
+| 繁体中文界面 | 主要 UI／说明已本地化为 zh-Hant |
+| 访客模式 | 开房可「允许访客」；访客 UI 受限（无法存档等）；有密码的房间仍需密码 |
+| 精简模式（ClarifyMode） | 聊天窗口可切换精简显示 |
+| 笔记仓库 | 按桌面／共用／私人／坟场整理备忘 |
+| 快速掷骰 | 角色卡字段可一键送到聊天给 BCDice 结算 |
+| SkyWay 2023 | 使用最新 `@skyway-sdk` 与自建 backend |
+
+继承自 With Fly：高度、聊天文字颜色、立绘（Stand）、Cut-in、骰子机器人表等。
+
+功能验收清单：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
+
+## 本地开发
+
+需要 Node.js、npm，以及自建的 [udonarium-backend](https://github.com/TK11235/udonarium-backend)（SkyWay Auth Token）。  
+**请勿**把本地／HKTRPG 站点指向 WithFly 公开 Workers（仅允许 `nanasunana.github.io` Origin）。
+
+详见：
+
+- [`docs/hktrpg-backend.md`](docs/hktrpg-backend.md) — 本地 backend、CORS、proxy
+- [`docs/hktrpg-deploy.md`](docs/hktrpg-deploy.md) — 正式环境 Workers＋前端
+- [`docs/hktrpg-sync.md`](docs/hktrpg-sync.md) — 同步 upstream WithFly
+
+```bash
+npm i
+# 编辑 src/assets/config.yaml（gitignored），设定 backend.url
+# 建议：Angular proxy → 本地 :8787，见 proxy.conf.js
+npx ng serve --ssl --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.js
+```
+
+正式构建：
+
+```bash
+ng build
+```
+
+产物在 `dist/`。部署前请将 `backend.url` 设为你的 Workers URL，并让 `ACCESS_CONTROL_ALLOW_ORIGIN` 等于站点 Origin（例如 `https://z01.hktrpg.com`）。
+
+### BCDice-API（可选）
+
+在 `config.yaml` 设定 `dice.url` 后可改走 BCDice-API；默认 API 版本为 2（成功／失败着色需要 v2）。
+
+```yaml
+backend:
+  mode: skyway2023
+  url: https://{your-backend-hostname}/
+dice:
+  url: # BCDice-API 端点
+  api: 2
+```
+
+## 上游项目
+
+1. [TK11235/udonarium](https://github.com/TK11235/udonarium) — Udonarium 本家  
+2. [NanasuNANA/UdonariumWithFly](https://github.com/NanasuNANA/UdonariumWithFly) — With Fly（高度、立绘、Cut-in 等）
+
+本家开发与贡献说明请见上游 README。Issue／PR 请开到对应上游或本 fork（HKTRPG 相关）。
+
+聊天平台掷骰、角色卡等 HKTRPG Bot 功能请见：[HKTRPG 使用教程](https://bothelp.hktrpg.com/guide)。
+
+## License
+
+[MIT License](https://github.com/TK11235/udonarium/blob/master/LICENSE)
+
+Udonarium、Udonarium with Fly 与第三方素材（图片／音效）之授权与署名，请一并遵守各原始项目与 `src/assets/**/copyright.txt`、`license.txt`。
