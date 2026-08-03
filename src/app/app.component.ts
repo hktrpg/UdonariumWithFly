@@ -34,7 +34,7 @@ import { TextViewComponent } from 'component/text-view/text-view.component';
 import { UIPanelComponent } from 'component/ui-panel/ui-panel.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
-import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -772,59 +772,58 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
       y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
     };
-    const isShowStand = StandImageComponent.isShowStand;
-    const isShowNameTag = StandImageComponent.isShowNameTag;
-    const isCanBeGone = StandImageComponent.isCanBeGone; 
     this.contextMenuService.open(position, [
-      { name: `${ TableSelecter.instance.gridShow ? '☑' : '☐' }${this.i18n.t('menu.settings.showGrid')}`,
-        action: () => {
-          TableSelecter.instance.gridShow = !TableSelecter.instance.gridShow;
-          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext()); 
+      contextMenuToggleCheck({
+        get: () => TableSelecter.instance.gridShow,
+        set: (v) => {
+          TableSelecter.instance.gridShow = v;
+          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext());
         },
-        checkBox: 'check'
-      },
-      { name: `${ TableSelecter.instance.gridSnap ? '☑' : '☐' }${this.i18n.t('menu.settings.gridSnap')}`,
-        action: () => {
-          TableSelecter.instance.gridSnap = !TableSelecter.instance.gridSnap;
-        },
-        checkBox: 'check'
-      },
+        on: `☑${this.i18n.t('menu.settings.showGrid')}`,
+        off: `☐${this.i18n.t('menu.settings.showGrid')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => TableSelecter.instance.gridSnap,
+        set: (v) => { TableSelecter.instance.gridSnap = v; },
+        on: `☑${this.i18n.t('menu.settings.gridSnap')}`,
+        off: `☐${this.i18n.t('menu.settings.gridSnap')}`,
+      }),
       ContextMenuSeparator,
-      { name: `${ ChatWindowComponent.isNoticeOn ? '☑' : '☐' }${this.i18n.t('menu.settings.noticeSound')}`,
-        action: () => {
-          ChatWindowComponent.setChatNotice(!ChatWindowComponent.isNoticeOn);
-        },
-        checkBox: 'check'
-      },
-      { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }${this.i18n.t('menu.settings.leftOnly')}`,
-        action: () => {
-          ChatWindowComponent.setChatLeftOnly(!ChatWindowComponent.isLeftOnly);
-        },
-        checkBox: 'check'
-      },
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.isNoticeOn,
+        set: (v) => { ChatWindowComponent.setChatNotice(v); },
+        on: `☑${this.i18n.t('menu.settings.noticeSound')}`,
+        off: `☐${this.i18n.t('menu.settings.noticeSound')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.isLeftOnly,
+        set: (v) => { ChatWindowComponent.setChatLeftOnly(v); },
+        on: `☑${this.i18n.t('menu.settings.leftOnly')}`,
+        off: `☐${this.i18n.t('menu.settings.leftOnly')}`,
+      }),
       ContextMenuSeparator,
-      { name: `${ isShowStand ? '☑' : '☐' }${this.i18n.t('menu.settings.showStand')}`,
-        action: () => {
-          StandImageComponent.isShowStand = !isShowStand;
-        },
-        checkBox: 'check'
-      },
-      { name: `${ isShowNameTag ? '☑' : '☐' }${this.i18n.t('menu.settings.showNameTag')}`,
-        action: () => {
-          StandImageComponent.isShowNameTag = !isShowNameTag;
-        },
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isShowStand,
+        set: (v) => { StandImageComponent.isShowStand = v; },
+        on: `☑${this.i18n.t('menu.settings.showStand')}`,
+        off: `☐${this.i18n.t('menu.settings.showStand')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isShowNameTag,
+        set: (v) => { StandImageComponent.isShowNameTag = v; },
+        on: `☑${this.i18n.t('menu.settings.showNameTag')}`,
+        off: `☐${this.i18n.t('menu.settings.showNameTag')}`,
         level: 1,
         disabled: !StandImageComponent.isShowStand,
-        checkBox: 'check'
-      },
-      { name: `${ isCanBeGone ? '☑' : '☐' }${this.i18n.t('menu.settings.standAutoExit')}`,
-        action: () => {
-          StandImageComponent.isCanBeGone = !isCanBeGone;
-        },
+      }),
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isCanBeGone,
+        set: (v) => { StandImageComponent.isCanBeGone = v; },
+        on: `☑${this.i18n.t('menu.settings.standAutoExit')}`,
+        off: `☐${this.i18n.t('menu.settings.standAutoExit')}`,
         level: 1,
         disabled: !StandImageComponent.isShowStand,
-        checkBox: 'check'
-      },
+      }),
       ContextMenuSeparator,
       {
         name: this.i18n.t('lang.label'),

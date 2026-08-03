@@ -26,7 +26,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -478,20 +478,15 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [
-      (this.isLocked
-        ? {
-          name: this.i18n.t('stack.menu.7'), action: () => {
-            this.isLocked = false;
-            SoundEffect.play(PresetSound.unlock);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('stack.menu.8'), action: () => {
-            this.isLocked = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.isLocked,
+        set: (v) => {
+          this.isLocked = v;
+          SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+        },
+        on: this.i18n.t('stack.menu.7'),
+        off: this.i18n.t('stack.menu.8'),
+      }),
       ContextMenuSeparator,
       {
         name: this.i18n.t('stack.menu.9'), action: () => {
@@ -611,10 +606,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
         this.chatMessageService.sendOperationLog(this.i18n.t('stack.viewedList', { stack: this.stackDisplayName() }));
       }, disabled: this.cards.length == 0 },
       ContextMenuSeparator,
-      (this.isShowTotal
-        ? { name: this.i18n.t('stack.menu.18'), action: () => { this.cardStack.isShowTotal = false; }, checkBox: 'check' }
-        : { name: this.i18n.t('stack.menu.19'), action: () => { this.cardStack.isShowTotal = true; }, checkBox: 'check' }
-      ),
+      contextMenuToggleCheck({
+        get: () => this.isShowTotal,
+        set: (v) => { this.cardStack.isShowTotal = v; },
+        on: this.i18n.t('stack.menu.18'),
+        off: this.i18n.t('stack.menu.19'),
+      }),
       { name: this.i18n.t('stack.menu.20'), action: () => { if (this.cardStack.topCard) this.cardStack.unifyCardsSize(this.cardStack.topCard.size); }, disabled: this.cards.length == 0 },
       ContextMenuSeparator,
       {

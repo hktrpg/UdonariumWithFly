@@ -26,7 +26,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -438,20 +438,15 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [];
-    actions.push(this.isLocked
-      ? {
-        name: this.i18n.t('card.menu.6'), action: () => {
-          this.isLocked = false;
-          SoundEffect.play(PresetSound.unlock);
-        },
-        checkBox: 'check'
-      } : {
-        name: this.i18n.t('card.menu.7'), action: () => {
-          this.isLocked = true;
-          SoundEffect.play(PresetSound.lock);
-        },
-        checkBox: 'check'
-      });
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isLocked,
+      set: (v) => {
+        this.isLocked = v;
+        SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+      },
+      on: this.i18n.t('card.menu.6'),
+      off: this.i18n.t('card.menu.7'),
+    }));
     actions.push(ContextMenuSeparator);
     actions.push(!this.isVisible || this.isHand
       ? {

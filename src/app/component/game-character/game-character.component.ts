@@ -19,7 +19,7 @@ import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.compon
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -697,109 +697,69 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       (() => {
         const hasFace = this.hasOverviewFaceIcon();
         if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
-        return hasFace && this.isUseIconToOverviewImage
-          ? {
-            name: this.i18n.t('char.overviewFaceOn'), action: () => {
-              this.isUseIconToOverviewImage = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check' as const
-          } : {
-            name: this.i18n.t('char.overviewFaceOff'), action: () => {
-              if (!this.hasOverviewFaceIcon()) return;
-              this.isUseIconToOverviewImage = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check' as const,
-            disabled: !hasFace,
-            error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
-          };
+        return contextMenuToggleCheck({
+          get: () => hasFace && this.isUseIconToOverviewImage,
+          set: (v) => {
+            if (!this.hasOverviewFaceIcon()) return;
+            this.isUseIconToOverviewImage = v;
+          },
+          on: this.i18n.t('char.overviewFaceOn'),
+          off: this.i18n.t('char.overviewFaceOff'),
+          after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+          disabled: !hasFace,
+          error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+        });
       })(),
-      (this.gameCharacter.isShowChatBubble
-        ? {
-          name: this.i18n.t('char.chatBubbleOn'), action: () => {
-            this.gameCharacter.isShowChatBubble = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.chatBubbleOff'), action: () => {
-            this.gameCharacter.isShowChatBubble = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (this.isDropShadow
-        ? {
-          name: this.i18n.t('char.shadowOn'), action: () => {
-            this.isDropShadow = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.shadowOff'), action: () => {
-            this.isDropShadow = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.gameCharacter.isShowChatBubble,
+        set: (v) => { this.gameCharacter.isShowChatBubble = v; },
+        on: this.i18n.t('char.chatBubbleOn'),
+        off: this.i18n.t('char.chatBubbleOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isDropShadow,
+        set: (v) => { this.isDropShadow = v; },
+        on: this.i18n.t('char.shadowOn'),
+        off: this.i18n.t('char.shadowOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
       this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
       this.characterFxMenu.makeAuraMenu(this.gameCharacter),
       this.characterFxMenu.makeRingMenu(this.gameCharacter),
       this.characterFxMenu.makeVisionMenu(this.gameCharacter),
-      (this.gameCharacter.affectsLight !== false
-        ? {
-          name: this.i18n.t('char.affectsLightOn'), action: () => {
-            this.gameCharacter.affectsLight = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check' as const,
-        } : {
-          name: this.i18n.t('char.affectsLightOff'), action: () => {
-            this.gameCharacter.affectsLight = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check' as const,
-        }),
+      contextMenuToggleCheck({
+        get: () => this.gameCharacter.affectsLight !== false,
+        set: (v) => { this.gameCharacter.affectsLight = v; },
+        on: this.i18n.t('char.affectsLightOn'),
+        off: this.i18n.t('char.affectsLightOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
       this.characterFxMenu.makeStatusMenu(this.gameCharacter),
       this.characterFxMenu.makeCombatMenu(this.gameCharacter),
-      this.characterFxMenu.makeImageEffectMenu(this.gameCharacter, {
-        isInverse: this.isInverse,
-        isHollow: this.isHollow,
-        isBlackPaint: this.isBlackPaint,
+      this.characterFxMenu.makeImageEffectMenu({
+        getInverse: () => this.isInverse,
         setInverse: v => this.isInverse = v,
+        getHollow: () => this.isHollow,
         setHollow: v => this.isHollow = v,
+        getBlackPaint: () => this.isBlackPaint,
         setBlackPaint: v => this.isBlackPaint = v,
       }),
       ContextMenuSeparator,
-      (!this.isNotRide
-        ? {
-          name: this.i18n.t('char.stackOn'), action: () => {
-            this.isNotRide = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.stackOff'), action: () => {
-            this.isNotRide = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (this.isAltitudeIndicate
-        ? {
-          name: this.i18n.t('char.altitudeOn'), action: () => {
-            this.isAltitudeIndicate = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.altitudeOff'), action: () => {
-            this.isAltitudeIndicate = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => !this.isNotRide,
+        set: (v) => { this.isNotRide = !v; },
+        on: this.i18n.t('char.stackOn'),
+        off: this.i18n.t('char.stackOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('char.altitudeOn'),
+        off: this.i18n.t('char.altitudeOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
       {
         name: this.i18n.t('char.resetAltitude'), action: () => {
           if (this.altitude != 0) {
@@ -815,20 +775,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         name: this.i18n.t('char.nextImage'), action: () => { this.nextImage(); },
         disabled: this.gameCharacter.imageFiles.length <= 1
       },
-      (this.gameCharacter.isAllowsChat
-        ? {
-          name: this.i18n.t('char.chatOn'), action: () => {
-            this.gameCharacter.isAllowsChat = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.chatOff'), action: () => {
-            this.gameCharacter.isAllowsChat = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.gameCharacter.isAllowsChat,
+        set: (v) => { this.gameCharacter.isAllowsChat = v; },
+        on: this.i18n.t('char.chatOn'),
+        off: this.i18n.t('char.chatOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
       { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
       { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
       ContextMenuSeparator,
@@ -853,20 +806,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         disabled: this.gameCharacter.getUrls().length <= 0
       },
       ContextMenuSeparator,
-      (this.gameCharacter.isInventoryIndicate
-        ? {
-          name: this.i18n.t('char.inventoryOn'), action: () => {
-            this.gameCharacter.isInventoryIndicate = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('char.inventoryOff'), action: () => {
-            this.gameCharacter.isInventoryIndicate = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.gameCharacter.isInventoryIndicate,
+        set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
+        on: this.i18n.t('char.inventoryOn'),
+        off: this.i18n.t('char.inventoryOff'),
+        after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+      }),
       { name: this.i18n.t('char.moveTo'), action: null, subActions: [
         {
           name: this.i18n.t('char.commonInventory'), action: () => {

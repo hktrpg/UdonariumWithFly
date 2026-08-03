@@ -12,7 +12,7 @@ import {
   stringifyStatuses,
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
-import { ContextMenuAction, ContextMenuSeparator } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 
@@ -249,39 +249,47 @@ export class CharacterFxMenuService {
     };
   }
 
-  makeImageEffectMenu(character: GameCharacter, getters: {
-    isInverse: boolean; isHollow: boolean; isBlackPaint: boolean;
-    setInverse: (v: boolean) => void; setHollow: (v: boolean) => void; setBlackPaint: (v: boolean) => void;
+  makeImageEffectMenu(accessors: {
+    getInverse: () => boolean; setInverse: (v: boolean) => void;
+    getHollow: () => boolean; setHollow: (v: boolean) => void;
+    getBlackPaint: () => boolean; setBlackPaint: (v: boolean) => void;
   }): ContextMenuAction {
+    const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     return {
       name: this.i18n.t('fx.imageEffects'),
       action: null,
       subActions: [
-        {
-          name: this.i18n.t(getters.isInverse ? 'fx.inverseOn' : 'fx.inverseOff'),
-          action: () => { getters.setInverse(!getters.isInverse); EventSystem.trigger('UPDATE_INVENTORY', null); },
-          checkBox: 'check'
-        },
-        {
-          name: this.i18n.t(getters.isHollow ? 'fx.blurOn' : 'fx.blurOff'),
-          action: () => { getters.setHollow(!getters.isHollow); EventSystem.trigger('UPDATE_INVENTORY', null); },
-          checkBox: 'check'
-        },
-        {
-          name: this.i18n.t(getters.isBlackPaint ? 'fx.silhouetteOn' : 'fx.silhouetteOff'),
-          action: () => { getters.setBlackPaint(!getters.isBlackPaint); EventSystem.trigger('UPDATE_INVENTORY', null); },
-          checkBox: 'check'
-        },
+        contextMenuToggleCheck({
+          get: accessors.getInverse,
+          set: accessors.setInverse,
+          on: this.i18n.t('fx.inverseOn'),
+          off: this.i18n.t('fx.inverseOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: accessors.getHollow,
+          set: accessors.setHollow,
+          on: this.i18n.t('fx.blurOn'),
+          off: this.i18n.t('fx.blurOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: accessors.getBlackPaint,
+          set: accessors.setBlackPaint,
+          on: this.i18n.t('fx.silhouetteOn'),
+          off: this.i18n.t('fx.silhouetteOff'),
+          after,
+        }),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.resetImageEffects'),
           action: () => {
-            getters.setInverse(false);
-            getters.setHollow(false);
-            getters.setBlackPaint(false);
-            EventSystem.trigger('UPDATE_INVENTORY', null);
+            accessors.setInverse(false);
+            accessors.setHollow(false);
+            accessors.setBlackPaint(false);
+            after();
           },
-          disabled: !getters.isInverse && !getters.isHollow && !getters.isBlackPaint
+          disabled: !accessors.getInverse() && !accessors.getHollow() && !accessors.getBlackPaint()
         }
       ]
     };

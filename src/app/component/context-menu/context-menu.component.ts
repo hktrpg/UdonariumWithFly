@@ -181,13 +181,20 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private refreshActionVisual(action: ContextMenuAction) {
-    // Prefer live nameUpdate when present (and refresh siblings that also use it).
-    if (typeof action.nameUpdate === 'function') {
-      for (const a of this.actions) {
-        if (a && typeof a.nameUpdate === 'function') {
+    const refreshList = (list: ContextMenuAction[]) => {
+      for (const a of list) {
+        if (!a) continue;
+        if (typeof a.nameUpdate === 'function') {
           a.name = a.nameUpdate() ?? a.name;
         }
+        if (a.subActions?.length) refreshList(a.subActions);
       }
+    };
+
+    // Prefer live nameUpdate when present (and refresh siblings / nested menus that also use it).
+    if (typeof action.nameUpdate === 'function') {
+      refreshList(this.actions);
+      if (this.subMenu) refreshList(this.subMenu);
       return;
     }
 
@@ -197,7 +204,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     if (action.checkBox === 'radio' && action.name) {
-      for (const a of this.actions) {
+      const list = this.subMenu && this.subMenu.includes(action) ? this.subMenu : this.actions;
+      for (const a of list) {
         if (!a || a.checkBox !== 'radio' || !a.name) continue;
         if (typeof a.nameUpdate === 'function') {
           a.name = a.nameUpdate() ?? a.name;

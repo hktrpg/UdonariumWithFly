@@ -24,7 +24,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { ImageService } from 'service/image.service';
@@ -449,22 +449,16 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
         }
       });
     }
-    actions.push((this.isLock
-      ? {
-        name: this.i18n.t('dice.menu.5'), action: () => {
-          this.isLock = false;
-          SoundEffect.play(PresetSound.unlock);
-        },
-        disabled: this.hasOwner && !this.isVisible,
-        checkBox: 'check'
-      } : {
-        name: this.i18n.t('dice.menu.6'), action: () => {
-          this.isLock = true;
-          SoundEffect.play(PresetSound.lock);
-        },
-        disabled: this.hasOwner && !this.isVisible,
-        checkBox: 'check'
-      }));
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isLock,
+      set: (v) => {
+        this.isLock = v;
+        SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+      },
+      on: this.i18n.t('dice.menu.5'),
+      off: this.i18n.t('dice.menu.6'),
+      disabled: this.hasOwner && !this.isVisible,
+    }));
     if (this.isVisible) {
       let subActions: ContextMenuAction[] = [];
       let nothingFaces = this.nothingFaces;
@@ -501,18 +495,12 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
 
     actions.push(ContextMenuSeparator);
 
-    actions.push((this.isDropShadow
-      ? {
-        name: this.i18n.t('dice.menu.7'), action: () => {
-          this.isDropShadow = false;
-        },
-        checkBox: 'check'
-      } : {
-        name: this.i18n.t('dice.menu.8'), action: () => {
-          this.isDropShadow = true;
-        },
-        checkBox: 'check'
-      }));
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isDropShadow,
+      set: (v) => { this.isDropShadow = v; },
+      on: this.i18n.t('dice.menu.7'),
+      off: this.i18n.t('dice.menu.8'),
+    }));
 
     actions.push(ContextMenuSeparator);
     actions.push({ name: this.i18n.t('dice.menu.9'), action: () => { this.showDetail(this.diceSymbol); } });

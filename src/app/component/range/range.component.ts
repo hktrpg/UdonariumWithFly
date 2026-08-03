@@ -29,7 +29,7 @@ import { GameCharacterSheetComponent } from 'component/game-character-sheet/game
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -528,23 +528,15 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       menuArray.push(ContextMenuSeparator);
     }
 
-    menuArray.push(
-      this.isLocked
-        ? {
-          name: this.i18n.t('range.menu.2'), action: () => {
-            this.isLocked = false;
-            SoundEffect.play(PresetSound.unlock);
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: this.i18n.t('range.menu.3'), action: () => {
-            this.isLocked = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          checkBox: 'check'
-        }
-    )
+    menuArray.push(contextMenuToggleCheck({
+      get: () => this.isLocked,
+      set: (v) => {
+        this.isLocked = v;
+        SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+      },
+      on: this.i18n.t('range.menu.2'),
+      off: this.i18n.t('range.menu.3'),
+    }));
     menuArray.push(
       {
         name: this.i18n.t('range.menu.4'), action: null, 
@@ -591,83 +583,56 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
           name: this.i18n.t('range.menu.7'), action: null, 
           subActions: menu
         });
-      menuArray.push(
-        this.range.isExpandByFollowing
-        ? {
-          name: this.i18n.t('range.menu.8'), action: () => {
-            this.range.isExpandByFollowing = false;
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: this.i18n.t('range.menu.9'), action: () => {
-            this.range.isExpandByFollowing = true;
-          },
-          checkBox: 'check'
-        });
-        menuArray.push(
-          this.range.isFollowAltitude
-          ? {
-            name: this.i18n.t('range.menu.10'), action: () => {
-              this.range.isFollowAltitude = false;
-            },
-            checkBox: 'check'
-          }
-          : {
-            name: this.i18n.t('range.menu.11'), action: () => {
-              this.range.isFollowAltitude = true;
-              if (this.followingCharactor) this.range.following();
-            },
-            checkBox: 'check'
-          });
+      menuArray.push(contextMenuToggleCheck({
+        get: () => this.range.isExpandByFollowing,
+        set: (v) => { this.range.isExpandByFollowing = v; },
+        on: this.i18n.t('range.menu.8'),
+        off: this.i18n.t('range.menu.9'),
+      }));
+      menuArray.push(contextMenuToggleCheck({
+        get: () => this.range.isFollowAltitude,
+        set: (v) => {
+          this.range.isFollowAltitude = v;
+          if (v && this.followingCharactor) this.range.following();
+        },
+        on: this.i18n.t('range.menu.10'),
+        off: this.i18n.t('range.menu.11'),
+      }));
     } else {
-      menuArray.push(
-        this.range.subDivisionSnapPolygonal
-        ? {
-          name: this.i18n.t('range.menu.12'), action: () => {
-            this.range.subDivisionSnapPolygonal = false;
-          },
-          checkBox: 'check'
-        } :
-        {
-          name: this.i18n.t('range.menu.13'), action: () => {
-            this.range.subDivisionSnapPolygonal = true;
-          },
-          checkBox: 'check'
-        }
-      );
+      menuArray.push(contextMenuToggleCheck({
+        get: () => this.range.subDivisionSnapPolygonal,
+        set: (v) => { this.range.subDivisionSnapPolygonal = v; },
+        on: this.i18n.t('range.menu.12'),
+        off: this.i18n.t('range.menu.13'),
+      }));
     }
     menuArray.push(ContextMenuSeparator);
     menuArray.push(
       {
         name: this.i18n.t('range.menu.14'), action: null,
         subActions: [
-          this.range.offSetX
-          ? { name: this.i18n.t('range.menu.15'), action: () => { this.range.offSetX = false; },
-                checkBox: 'check' }
-          : { name: this.i18n.t('range.menu.16'), action: () => { this.range.offSetX = true; },
-                checkBox: 'check' },
-          this.range.offSetY
-          ? { name: this.i18n.t('range.menu.25'), action: () => { this.range.offSetY = false; },
-                checkBox: 'check' }
-          : { name: this.i18n.t('range.menu.26'), action: () => { this.range.offSetY = true; },
-                checkBox: 'check' },
+          contextMenuToggleCheck({
+            get: () => this.range.offSetX,
+            set: (v) => { this.range.offSetX = v; },
+            on: this.i18n.t('range.menu.15'),
+            off: this.i18n.t('range.menu.16'),
+          }),
+          contextMenuToggleCheck({
+            get: () => this.range.offSetY,
+            set: (v) => { this.range.offSetY = v; },
+            on: this.i18n.t('range.menu.25'),
+            off: this.i18n.t('range.menu.26'),
+          }),
         ],
         disabled: this.range.fillType == 0
       }
     );
-    menuArray.push(this.isAltitudeIndicate
-      ? {
-        name: this.i18n.t('range.menu.17'), action: () => {
-          this.isAltitudeIndicate = false;
-        },
-        checkBox: 'check'
-      } : {
-        name: this.i18n.t('range.menu.18'), action: () => {
-          this.isAltitudeIndicate = true;
-        },
-        checkBox: 'check'
-      });
+    menuArray.push(contextMenuToggleCheck({
+      get: () => this.isAltitudeIndicate,
+      set: (v) => { this.isAltitudeIndicate = v; },
+      on: this.i18n.t('range.menu.17'),
+      off: this.i18n.t('range.menu.18'),
+    }));
     menuArray.push({
       name: this.i18n.t('range.menu.19'), action: () => {
         if (this.altitude != 0) {

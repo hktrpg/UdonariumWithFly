@@ -16,7 +16,7 @@ import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
-import { ContextMenuSeparator, ContextMenuService, ContextMenuAction } from 'service/context-menu.service';
+import { ContextMenuSeparator, ContextMenuService, ContextMenuAction, contextMenuToggleCheck } from 'service/context-menu.service';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 
@@ -979,48 +979,27 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
         contextMenuActions.push(ContextMenuSeparator);
         contextMenuActions.push(
           { name: this.i18n.t('chat.ctx.imageEffect'), action: null, subActions: [
-            (this.character.isInverse
-              ? {
-                name: this.i18n.t('chat.ctx.inverseOn'), action: () => {
-                  this.character.isInverse = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: this.i18n.t('chat.ctx.inverseOff'), action: () => {
-                  this.character.isInverse = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
-            (this.character.isHollow
-              ? {
-                name: this.i18n.t('chat.ctx.blurOn'), action: () => {
-                  this.character.isHollow = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: this.i18n.t('chat.ctx.blurOff'), action: () => {
-                  this.character.isHollow = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
-            (this.character.isBlackPaint
-              ? {
-                name: this.i18n.t('chat.ctx.silhouetteOn'), action: () => {
-                  this.character.isBlackPaint = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: this.i18n.t('chat.ctx.silhouetteOff'), action: () => {
-                  this.character.isBlackPaint = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
+            contextMenuToggleCheck({
+              get: () => this.character.isInverse,
+              set: (v) => { this.character.isInverse = v; },
+              on: this.i18n.t('chat.ctx.inverseOn'),
+              off: this.i18n.t('chat.ctx.inverseOff'),
+              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+            }),
+            contextMenuToggleCheck({
+              get: () => this.character.isHollow,
+              set: (v) => { this.character.isHollow = v; },
+              on: this.i18n.t('chat.ctx.blurOn'),
+              off: this.i18n.t('chat.ctx.blurOff'),
+              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+            }),
+            contextMenuToggleCheck({
+              get: () => this.character.isBlackPaint,
+              set: (v) => { this.character.isBlackPaint = v; },
+              on: this.i18n.t('chat.ctx.silhouetteOn'),
+              off: this.i18n.t('chat.ctx.silhouetteOff'),
+              after: () => EventSystem.trigger('UPDATE_INVENTORY', null),
+            }),
               { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
                 const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
                 return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };

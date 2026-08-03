@@ -21,7 +21,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { ModalService } from 'service/modal.service';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -518,65 +518,38 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     let actions: ContextMenuAction[] = [
       (this.isGMMode ?
-        this.gameTableMask.isTransparentOnGMMode ? {
-          name: this.i18n.t('mask.menu.5'), action: () => {
-            this.gameTableMask.isTransparentOnGMMode = false;
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: this.i18n.t('mask.menu.6'), action: () => {
-            this.gameTableMask.isTransparentOnGMMode = true;
-          },
-          checkBox: 'check'
-        }
+        contextMenuToggleCheck({
+          get: () => this.gameTableMask.isTransparentOnGMMode,
+          set: (v) => { this.gameTableMask.isTransparentOnGMMode = v; },
+          on: this.i18n.t('mask.menu.5'),
+          off: this.i18n.t('mask.menu.6'),
+        })
       : null),
       (this.isGMMode ?
-        this.gameTableMask.isScratchPreviewOnGMMode ? {
-          name: this.i18n.t('mask.menu.7'), action: () => {
-            this.gameTableMask.isScratchPreviewOnGMMode = false;
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: this.i18n.t('mask.menu.8'), action: () => {
-            this.gameTableMask.isScratchPreviewOnGMMode = true;
-          },
-          checkBox: 'check'
-        }
+        contextMenuToggleCheck({
+          get: () => this.gameTableMask.isScratchPreviewOnGMMode,
+          set: (v) => { this.gameTableMask.isScratchPreviewOnGMMode = v; },
+          on: this.i18n.t('mask.menu.7'),
+          off: this.i18n.t('mask.menu.8'),
+        })
       : null),
       (this.isGMMode ? ContextMenuSeparator : null),
-      (this.gameTableMask.affectsLight !== false
-        ? {
-          name: this.i18n.t('mask.menu.9'), action: () => {
-            this.gameTableMask.affectsLight = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('mask.menu.10'), action: () => {
-            this.gameTableMask.affectsLight = true;
-          },
-          checkBox: 'check'
-        }),
-      (this.isLock
-        ? {
-          name: this.i18n.t('mask.menu.11'), action: () => {
-            this.isLock = false;
-            //this.chatMessageService.sendOperationLog(`${this.gameTableMask.name} 已解除固定`);
-            SoundEffect.play(PresetSound.unlock);
-          },
-          disabled: this.isScratching,
-          checkBox: 'check'
-        }
-        : {
-          name: this.i18n.t('mask.menu.12'), action: () => {
-            this.isLock = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          disabled: this.isScratching,
-          checkBox: 'check'
-        }
-      ),
+      contextMenuToggleCheck({
+        get: () => this.gameTableMask.affectsLight !== false,
+        set: (v) => { this.gameTableMask.affectsLight = v; },
+        on: this.i18n.t('mask.menu.9'),
+        off: this.i18n.t('mask.menu.10'),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isLock,
+        set: (v) => {
+          this.isLock = v;
+          SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+        },
+        on: this.i18n.t('mask.menu.11'),
+        off: this.i18n.t('mask.menu.12'),
+        disabled: this.isScratching,
+      }),
       (this.isLock ? null : { name: this.i18n.t('mask.menu.13'), action: null, subActions: [
         {
           name: this.i18n.t('mask.menu.14'), action: () => {
@@ -746,18 +719,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         disabled: this.isScratching
       },
       ContextMenuSeparator,
-      (this.isAltitudeIndicate
-        ? {
-          name: this.i18n.t('mask.menu.27'), action: () => {
-            this.isAltitudeIndicate = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('mask.menu.28'), action: () => {
-            this.isAltitudeIndicate = true;
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('mask.menu.27'),
+        off: this.i18n.t('mask.menu.28'),
+      }),
       {
         name: this.i18n.t('mask.menu.29'), action: () => {
           if (this.altitude != 0) {

@@ -47,6 +47,34 @@ export interface ContextMenuAction {
   nameUpdate?: () => string,
 }
 
+/** Checkbox that toggles live state (safe to click repeatedly while menu stays open). */
+export function contextMenuToggleCheck(options: {
+  get: () => boolean;
+  set: (value: boolean) => void;
+  on: string;
+  off: string;
+  after?: () => void;
+  disabled?: boolean;
+  error?: string;
+  level?: number;
+  selfOnly?: boolean;
+}): ContextMenuAction {
+  const nameUpdate = () => (options.get() ? options.on : options.off);
+  return {
+    name: nameUpdate(),
+    nameUpdate,
+    action: () => {
+      options.set(!options.get());
+      options.after?.();
+    },
+    checkBox: 'check',
+    disabled: options.disabled,
+    error: options.error,
+    level: options.level,
+    selfOnly: options.selfOnly,
+  };
+}
+
 @Injectable()
 export class ContextMenuService {
   /* Todo */

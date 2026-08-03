@@ -22,7 +22,7 @@ import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ModalService } from 'service/modal.service';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
@@ -336,21 +336,15 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   private makeContextMenu(): ContextMenuAction[] {
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     let actions: ContextMenuAction[] = [
-      (this.isLocked
-        ? {
-          name: this.i18n.t('terrain.menu.5'), action: () => {
-            this.isLocked = false;
-            SoundEffect.play(PresetSound.unlock);
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('terrain.menu.6'), action: () => {
-            this.isLocked = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          checkBox: 'check'
-        }
-      ),
+      contextMenuToggleCheck({
+        get: () => this.isLocked,
+        set: (v) => {
+          this.isLocked = v;
+          SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+        },
+        on: this.i18n.t('terrain.menu.5'),
+        off: this.i18n.t('terrain.menu.6'),
+      }),
       (this.isLocked ? null : { name: this.i18n.t('terrain.overlapOrder', { flatOnly: this.height === 0 ? '' : this.i18n.t('terrain.dynamic.1') }), action: null, subActions: [
         {
           name: this.i18n.t('terrain.menu.7'), action: () => {
@@ -450,42 +444,24 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         }),
       ContextMenuSeparator,
       */
-      (this.terrain.affectsLight !== false
-        ? {
-          name: this.i18n.t('terrain.menu.13'), action: () => {
-            this.terrain.affectsLight = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('terrain.menu.14'), action: () => {
-            this.terrain.affectsLight = true;
-          },
-          checkBox: 'check'
-        }),
-      (this.isDropShadow
-        ? {
-          name: this.i18n.t('terrain.menu.15'), action: () => {
-            this.isDropShadow = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('terrain.menu.16'), action: () => {
-            this.isDropShadow = true;
-          },
-          checkBox: 'check'
-        }),
-      (this.isAltitudeIndicate
-        ? {
-          name: this.i18n.t('terrain.menu.17'), action: () => {
-            this.isAltitudeIndicate = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: this.i18n.t('terrain.menu.18'), action: () => {
-            this.isAltitudeIndicate = true;
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.terrain.affectsLight !== false,
+        set: (v) => { this.terrain.affectsLight = v; },
+        on: this.i18n.t('terrain.menu.13'),
+        off: this.i18n.t('terrain.menu.14'),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isDropShadow,
+        set: (v) => { this.isDropShadow = v; },
+        on: this.i18n.t('terrain.menu.15'),
+        off: this.i18n.t('terrain.menu.16'),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('terrain.menu.17'),
+        off: this.i18n.t('terrain.menu.18'),
+      }),
       {
         name: this.i18n.t('terrain.menu.19'), action: () => {
           if (this.altitude != 0) {
