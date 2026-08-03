@@ -3,13 +3,13 @@
     <div *ngIf="isEdit" class="table-cell table-cell_solid">
       <ng-container *ngTemplateOutlet="editButtons"></ng-container>
       <select #select (change)="setElementType(select.value)" [ngModel]="gameDataElement.type ?? ''">
-        <option value="">一般</option>
-        <option value="simpleNumber">數值</option>
-        <option value="numberResource">資源</option>
-        <option value="abilityScore">能力值</option>
-        <option value="checkProperty">勾選</option>
-        <option value="note">筆記</option>
-        <option value="url">參考網址</option>
+        <option value="">{{ 'sheet.data.type.normal' | i18n }}</option>
+        <option value="simpleNumber">{{ 'sheet.data.type.number' | i18n }}</option>
+        <option value="numberResource">{{ 'sheet.data.type.resource' | i18n }}</option>
+        <option value="abilityScore">{{ 'sheet.data.type.ability' | i18n }}</option>
+        <option value="checkProperty">{{ 'sheet.data.type.check' | i18n }}</option>
+        <option value="note">{{ 'sheet.data.type.note' | i18n }}</option>
+        <option value="url">{{ 'sheet.data.type.url' | i18n }}</option>
       </select>
     </div>
     <div class="table-cell table-cell_solid">
@@ -18,7 +18,7 @@
           <i class="material-icons" style="font-size: 1rem;">send</i>
         </button>
         <span style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</span>
-        <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">0=依圖片</span></ng-container>
+        <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">{{ 'sheet.data.heightImage' | i18n }}</span></ng-container>
       </ng-container>
       <ng-container *ngIf="!isTagLocked">
         <button type="button" title="Send to chat" (click)="sendLogMessage()">
@@ -75,7 +75,7 @@
             <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width:40%; max-width:5em; text-align:right" type="{{isNum(value) ? 'number' : 'text'}}" size="1" [(ngModel)]="value" placeholder="Value">
             <ng-container *ngIf="isEdit">
               <select class="modeifire-type" style="width:40%; max-width:5em" [(ngModel)]="currentValue">
-                <option value="">無</option>
+                <option value="">{{ 'sheet.data.none' | i18n }}</option>
                 <option value="div2">÷2</option>
                 <option value="div3">÷3 SRS,LHZ</option>
                 <option value="div4">÷4</option>
@@ -107,7 +107,7 @@
             <!-- 沒有 size 屬性就無法縮小 -->
             <div class="hidden-spacer" style="font-size: 1.0em; font-family: Cambria, Georgia;">{{value}}</div>
             <input *ngIf="!(isHideText && isTabletopObjectName)" style="width:100%; min-width:10px;" size="1" [(ngModel)]="value" placeholder="" />
-            <span *ngIf="isHideText && isTabletopObjectName" style="color: gray; font-size: 1.0em; font-family: Cambria, Georgia;">卡片（背面）</span>
+            <span *ngIf="isHideText && isTabletopObjectName" style="color: gray; font-size: 1.0em; font-family: Cambria, Georgia;">{{ 'sheet.data.cardBack' | i18n }}</span>
           </ng-container>
         </ng-container>
       </ng-container>

@@ -8,6 +8,7 @@ import { StandList } from './stand-list';
 import { Network } from './core/system';
 import { PeerCursor } from './peer-cursor';
 import { ObjectStore } from './core/synchronize-object/object-store';
+import { translate } from 'i18n';
 
 @SyncObject('character')
 export class GameCharacter extends TabletopObject {
@@ -119,7 +120,7 @@ export class GameCharacter extends TabletopObject {
 
   get playerOwnerName(): string {
     const object = PeerCursor.findByUserId(this.playerOwner);
-    return object ? object.name : (this.playerOwner ? '（未知玩家）' : '');
+    return object ? object.name : (this.playerOwner ? translate('char.unknownPlayer') : '');
   }
 
   get playerOwnerColor(): string {

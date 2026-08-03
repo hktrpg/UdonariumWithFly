@@ -37,9 +37,11 @@ export interface ContextMenuAction {
   color?: string,
   center?: boolean,
   colorSample?: boolean,
+  /** CSS color for the color-sample swatch (preferred over matching Chinese labels). */
+  sampleColor?: string,
   hotkey?: string,
   checkBox?: string,
-  /** When set, menu stays open after this action (default: stay open for all actionable items). */
+  /** Override close behavior. Default: stay open for checkBox/radio, close for normal actions. */
   keepOpen?: boolean,
   /** Optional: refresh displayed name after action while menu stays open. */
   nameUpdate?: () => string,

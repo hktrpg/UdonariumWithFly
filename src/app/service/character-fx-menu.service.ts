@@ -3,7 +3,7 @@ import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
-import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
+import { AuraNameConfig, DEFAULT_AURA_NAMES } from '@udonarium/table-fx/aura-name-config';
 import {
   CHARACTER_STATUS_DEFS,
   CharacterStatusEntry,
@@ -13,32 +13,36 @@ import {
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ContextMenuAction, ContextMenuSeparator } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 
 const VISION_RANGE_PRESETS = [0, 3, 6, 9, 12, 18, 24];
 const BRIGHT_LIGHT_PRESETS = [0, 1, 2, 3, 4, 5, 6, 8];
 const DIM_LIGHT_PRESETS = [0, 2, 4, 6, 8, 10, 12, 16];
 
-const RING_OPTIONS: { id: string; name: string }[] = [
-  { id: 'none', name: '無' },
-  { id: 'fire', name: '火環' },
-  { id: 'magic', name: '魔法陣' },
-  { id: 'tech', name: '科技環' },
-  { id: 'eldritch', name: '邪異環' },
-  { id: 'holy', name: '聖光環' },
-];
+const RING_OPTIONS = ['none', 'fire', 'magic', 'tech', 'eldritch', 'holy'];
+const AURA_COLOR_KEYS = ['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'] as const;
+const AURA_SAMPLE_COLORS = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
 
 @Injectable({ providedIn: 'root' })
 export class CharacterFxMenuService {
-  constructor(private selectionService: TabletopSelectionService) {}
+  constructor(
+    private selectionService: TabletopSelectionService,
+    private i18n: I18nService,
+  ) {}
 
   get auraNames(): string[] { return AuraNameConfig.instance.names; }
 
+  private auraDisplayName(index: number, custom: string): string {
+    if (custom && custom !== DEFAULT_AURA_NAMES[index]) return custom;
+    return this.i18n.t(`chat.aura.${AURA_COLOR_KEYS[index]}`);
+  }
+
   makeAuraMenu(character: GameCharacter): ContextMenuAction {
     const names = this.auraNames;
-    const auraLabel = (i: number) => `${character.aura == i ? '◉' : '○'} ${i < 0 ? '無' : names[i]}`;
+    const auraLabel = (i: number) => `${character.aura == i ? '◉' : '○'} ${i < 0 ? this.i18n.t('fx.none') : this.auraDisplayName(i, names[i])}`;
     return {
-      name: '光環',
+      name: this.i18n.t('fx.aura'),
       action: null,
       subActions: [
         {
@@ -51,13 +55,14 @@ export class CharacterFxMenuService {
         ...names.map((color, i) => ({
           name: auraLabel(i),
           colorSample: true,
+          sampleColor: AURA_SAMPLE_COLORS[i],
           action: () => { character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null); },
           nameUpdate: () => auraLabel(i),
           checkBox: 'radio' as const
         })),
         ContextMenuSeparator,
         {
-          name: '清除光環',
+          name: this.i18n.t('fx.clearAura'),
           action: () => { character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null); },
           disabled: character.aura === -1
         }
@@ -67,12 +72,12 @@ export class CharacterFxMenuService {
 
   makeRingMenu(character: GameCharacter): ContextMenuAction {
     return {
-      name: '套圈',
+      name: this.i18n.t('fx.ring'),
       action: null,
-      subActions: RING_OPTIONS.map(opt => ({
-        name: `${character.floorRing === opt.id ? '◉' : '○'} ${opt.name}`,
-        action: () => { character.floorRing = opt.id; EventSystem.trigger('UPDATE_INVENTORY', null); },
-        nameUpdate: () => `${character.floorRing === opt.id ? '◉' : '○'} ${opt.name}`,
+      subActions: RING_OPTIONS.map(id => ({
+        name: `${character.floorRing === id ? '◉' : '○'} ${this.i18n.t(`fx.ring.${id}`)}`,
+        action: () => { character.floorRing = id; EventSystem.trigger('UPDATE_INVENTORY', null); },
+        nameUpdate: () => `${character.floorRing === id ? '◉' : '○'} ${this.i18n.t(`fx.ring.${id}`)}`,
         checkBox: 'radio' as const
       }))
     };
@@ -84,12 +89,12 @@ export class CharacterFxMenuService {
       const active = parseStatusesJson(character.statusesJson).find(s => s.id === id);
       if (!def) return '☐';
       if (def.hasLevel) {
-        return `${active ? '☑' : '☐'} ${def.name}${active?.level ? ` (${active.level})` : ''}`;
+        return `${active ? '☑' : '☐'} ${this.i18n.t(`fx.status.${id}`)}${active?.level ? ` (${active.level})` : ''}`;
       }
-      return `${active ? '☑' : '☐'} ${def.name}`;
+      return `${active ? '☑' : '☐'} ${this.i18n.t(`fx.status.${id}`)}`;
     };
     return {
-      name: '狀態',
+      name: this.i18n.t('fx.status'),
       action: null,
       subActions: CHARACTER_STATUS_DEFS.map(def => {
         if (def.hasLevel) {
@@ -116,7 +121,7 @@ export class CharacterFxMenuService {
     const takenByOther = () => !!character.playerOwner && character.playerOwner !== mine();
     const isGM = () => !!PeerCursor.myCursor?.isGMMode;
     return {
-      name: isMine() ? '☑ 作為我的角色' : '☐ 作為我的角色',
+      name: this.i18n.t('fx.myToken', { mark: isMine() ? '☑' : '☐' }),
       action: () => {
         if (GuestSession.isGuest || !mine()) return;
         if (takenByOther() && !isGM()) return;
@@ -124,9 +129,9 @@ export class CharacterFxMenuService {
         EventSystem.trigger('UPDATE_INVENTORY', null);
       },
       nameUpdate: () => {
-        if (isMine()) return '☑ 作為我的角色';
-        if (takenByOther()) return `☐ 作為我的角色（${character.playerOwnerName}）`;
-        return '☐ 作為我的角色';
+        if (isMine()) return this.i18n.t('fx.myToken', { mark: '☑' });
+        if (takenByOther()) return this.i18n.t('fx.myTokenOwned', { mark: '☐', name: character.playerOwnerName });
+        return this.i18n.t('fx.myToken', { mark: '☐' });
       },
       checkBox: 'check',
       disabled: GuestSession.isGuest || (takenByOther() && !isGM()),
@@ -137,13 +142,13 @@ export class CharacterFxMenuService {
     const selectedCount = () =>
       this.selectionService.objects.filter(o => o instanceof GameCharacter).length;
     return {
-      name: '加入戰鬥',
+      name: this.i18n.t('fx.addToCombat'),
       action: () => {
         if (GuestSession.isGuest) return;
         const chars = this.combatCharactersFor(character);
         CombatTracker.instance.addCombatants(chars.map(obj => ({
           characterIdentifier: obj.identifier,
-          name: obj.name || '未命名',
+          name: obj.name || this.i18n.t('fx.unnamed'),
           isNpc: !obj.hasPlayerController,
           isDefeated: false,
           isHidden: false,
@@ -152,7 +157,7 @@ export class CharacterFxMenuService {
       },
       nameUpdate: () => {
         const n = selectedCount();
-        return n > 1 ? `加入戰鬥（${n}）` : '加入戰鬥';
+        return n > 1 ? this.i18n.t('fx.addToCombatCount', { count: n }) : this.i18n.t('fx.addToCombat');
       },
       disabled: GuestSession.isGuest,
       keepOpen: false,
@@ -172,7 +177,11 @@ export class CharacterFxMenuService {
     // Manual claim only — chat auto-vision must not drive this checkbox.
     const isMyVision = !!mine && character.visionOwner === mine;
     const title = () =>
-      `視野／光照（視${character.visionRangeGrid} 亮${character.brightLightGrid} 昏${character.dimLightGrid}）`;
+      this.i18n.t('fx.visionLighting', {
+        vision: character.visionRangeGrid,
+        bright: character.brightLightGrid,
+        dim: character.dimLightGrid,
+      });
 
     const rangeSub = (
       label: string,
@@ -180,16 +189,16 @@ export class CharacterFxMenuService {
       getter: () => number,
       setter: (n: number) => void,
     ): ContextMenuAction => ({
-      name: `${label}：${getter()} 格`,
+      name: this.i18n.t('fx.rangeLabel', { label, value: getter() }),
       action: null,
-      nameUpdate: () => `${label}：${getter()} 格`,
+      nameUpdate: () => this.i18n.t('fx.rangeLabel', { label, value: getter() }),
       subActions: presets.map(n => ({
-        name: `${getter() === n ? '◉' : '○'} ${n} 格`,
+        name: this.i18n.t('fx.rangeOption', { mark: getter() === n ? '◉' : '○', value: n }),
         action: () => {
           setter(n);
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
-        nameUpdate: () => `${getter() === n ? '◉' : '○'} ${n} 格`,
+        nameUpdate: () => this.i18n.t('fx.rangeOption', { mark: getter() === n ? '◉' : '○', value: n }),
         checkBox: 'radio' as const,
       })),
     });
@@ -200,7 +209,7 @@ export class CharacterFxMenuService {
       nameUpdate: title,
       subActions: [
         {
-          name: isMyVision ? '☑ 作為我的視野角色' : '☐ 作為我的視野角色',
+          name: this.i18n.t('fx.myVision', { mark: isMyVision ? '☑' : '☐' }),
           action: () => {
             if (!mine) return;
             character.visionOwner = character.visionOwner === mine ? '' : mine;
@@ -208,27 +217,27 @@ export class CharacterFxMenuService {
           },
           nameUpdate: () => {
             const on = !!mine && character.visionOwner === mine;
-            return on ? '☑ 作為我的視野角色' : '☐ 作為我的視野角色';
+            return this.i18n.t('fx.myVision', { mark: on ? '☑' : '☐' });
           },
           checkBox: 'check',
           disabled: GuestSession.isGuest,
         },
         ContextMenuSeparator,
-        rangeSub('視野距離', VISION_RANGE_PRESETS,
+        rangeSub(this.i18n.t('fx.visionRange'), VISION_RANGE_PRESETS,
           () => character.visionRangeGrid,
           n => { character.visionRange = n; }),
-        rangeSub('亮光', BRIGHT_LIGHT_PRESETS,
+        rangeSub(this.i18n.t('fx.brightLight'), BRIGHT_LIGHT_PRESETS,
           () => character.brightLightGrid,
           n => {
             character.brightLight = n;
             if (character.dimLightGrid < n) character.dimLight = n;
           }),
-        rangeSub('昏暗光', DIM_LIGHT_PRESETS,
+        rangeSub(this.i18n.t('fx.dimLight'), DIM_LIGHT_PRESETS,
           () => character.dimLightGrid,
           n => { character.dimLight = n; }),
         ContextMenuSeparator,
         {
-          name: '清除發出光照',
+          name: this.i18n.t('fx.clearLight'),
           action: () => {
             character.brightLight = 0;
             character.dimLight = 0;
@@ -245,27 +254,27 @@ export class CharacterFxMenuService {
     setInverse: (v: boolean) => void; setHollow: (v: boolean) => void; setBlackPaint: (v: boolean) => void;
   }): ContextMenuAction {
     return {
-      name: '圖片效果',
+      name: this.i18n.t('fx.imageEffects'),
       action: null,
       subActions: [
         {
-          name: getters.isInverse ? '☑ 反轉' : '☐ 反轉',
+          name: this.i18n.t(getters.isInverse ? 'fx.inverseOn' : 'fx.inverseOff'),
           action: () => { getters.setInverse(!getters.isInverse); EventSystem.trigger('UPDATE_INVENTORY', null); },
           checkBox: 'check'
         },
         {
-          name: getters.isHollow ? '☑ 模糊' : '☐ 模糊',
+          name: this.i18n.t(getters.isHollow ? 'fx.blurOn' : 'fx.blurOff'),
           action: () => { getters.setHollow(!getters.isHollow); EventSystem.trigger('UPDATE_INVENTORY', null); },
           checkBox: 'check'
         },
         {
-          name: getters.isBlackPaint ? '☑ 設為黑色剪影' : '☐ 設為黑色剪影',
+          name: this.i18n.t(getters.isBlackPaint ? 'fx.silhouetteOn' : 'fx.silhouetteOff'),
           action: () => { getters.setBlackPaint(!getters.isBlackPaint); EventSystem.trigger('UPDATE_INVENTORY', null); },
           checkBox: 'check'
         },
         ContextMenuSeparator,
         {
-          name: '重置圖片效果',
+          name: this.i18n.t('fx.resetImageEffects'),
           action: () => {
             getters.setInverse(false);
             getters.setHollow(false);

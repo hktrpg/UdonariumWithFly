@@ -6,7 +6,7 @@
         <div>{{filter.label}} ({{countByFilter(filter.id)}})</div>
       </label>
     </div>
-    <button type="button" class="refresh" title="重新整理" (click)="refresh()">
+    <button type="button" class="refresh" [title]="'note.refresh' | i18n" (click)="refresh()">
       <i class="material-icons" style="font-size: 1rem;">refresh</i>
     </button>
   </div>
@@ -17,13 +17,13 @@
       <div class="object-name">
         <strong>{{showgameObject(gameObject)}}</strong>
         <span class="location-badge">{{locationLabel(gameObject)}}</span>
-        <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="menu-btn" title="選單"
+        <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="menu-btn" [title]="'note.menu' | i18n"
           (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
           <i class="material-icons" style="font-size: 1em;">settings</i>
         </button>
         <span *ngIf="!isittable(gameObject)">
           <button type="button" class="move-btn" (click)="settotable(gameObject); $event.stopPropagation()">
-            移到桌面
+            {{ 'note.moveToTable' | i18n }}
             <i class="material-icons" style="font-size: 1em;">open_with</i>
           </button>
         </span>
@@ -33,11 +33,11 @@
       </div>
       <button *ngIf="gameObject.text && gameObject.text.length > 80" type="button" class="expand-btn"
         (click)="toggleExpand(gameObject); $event.stopPropagation()">
-        {{expandedId === gameObject.identifier ? '收合' : '展開'}}
+        {{expandedId === gameObject.identifier ? ('note.collapse' | i18n) : ('note.expand' | i18n)}}
       </button>
     </div>
   </div>
 
-  <div *ngIf="filteredNotes().length < 1" class="empty">尚無筆記（桌面上的共用筆記會顯示在這裡）</div>
+  <div *ngIf="filteredNotes().length < 1" class="empty">{{ 'note.empty' | i18n }}</div>
 </div>
-<div *ngIf="GuestMode()" class="empty">訪客模式無法使用筆記倉庫</div>
+<div *ngIf="GuestMode()" class="empty">{{ 'note.guestUnavailable' | i18n }}</div>

@@ -6,6 +6,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth } from '@udonarium/room-auth';
 
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
 
 @Component({
@@ -15,7 +16,7 @@ import { PanelService } from 'service/panel.service';
     standalone: false
 })
 export class RoomSettingComponent implements OnInit, OnDestroy {
-  roomName: string = '普通房間';
+  roomName: string;
   gmPassword: string = '';
   userPassword: string = '';
   guestPassword: string = '';
@@ -26,17 +27,24 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
 
   constructor(
     private panelService: PanelService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService,
   ) { }
 
   ngOnInit() {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = '新增房間');
-    EventSystem.register(this);
+    this.roomName = this.i18n.t('room.defaultName');
+    Promise.resolve().then(() => this.refreshPanelTitle());
+    EventSystem.register(this)
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
     this.recalcPeerId();
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('room.title');
   }
 
   recalcPeerId() {

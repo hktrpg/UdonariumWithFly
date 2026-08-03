@@ -408,8 +408,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.collidableElements.forEach(element => element.style.pointerEvents = css);
   }
 
-  setAnimatedTransition(isEnable: boolean) {
-    this.nativeElement.style.transition = isEnable ? 'transform 132ms linear' : '';
+  setAnimatedTransition(isEnable: boolean, durationMs: number = 132) {
+    this.nativeElement.style.transition = isEnable ? `transform ${Math.max(0, durationMs)}ms linear` : '';
   }
 
   private shouldTransition(object: TabletopObject): boolean {

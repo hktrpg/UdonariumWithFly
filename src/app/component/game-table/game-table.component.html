@@ -68,6 +68,10 @@
           <circle *ngFor="let p of polygonDraftPoints" [attr.cx]="p.x" [attr.cy]="p.y" r="4"
             [attr.fill]="drawStrokeColor" />
         </g>
+        <rect *ngIf="sceneMarquee as mq"
+          [attr.x]="mq.x" [attr.y]="mq.y" [attr.width]="mq.width" [attr.height]="mq.height"
+          fill="hsla(200, 100%, 60%, 0.12)" stroke="hsl(200, 100%, 50%)" stroke-width="1.5"
+          stroke-dasharray="5 4" />
       </svg>
       <div class="is-fill is-3d is-pointer-events-none">
         <ng-container *ngFor="let terrain of terrains; trackBy: trackByGameObject; index as z">
@@ -118,6 +122,16 @@
       <div *ngIf="showSceneEditOverlay" class="edit-markers is-pointer-events-none" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.5) + 'px)'}">
         <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
           [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
+      </div>
+      <div *ngIf="pathWaypoints.length" class="path-waypoints is-pointer-events-none is-3d"
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.3) + 'px)'}">
+        <svg class="path-line is-fill" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight">
+          <polyline *ngIf="pathWaypoints.length > 1" [attr.points]="pathPointsAttr"
+            fill="none" stroke="hsla(200, 90%, 55%, 0.85)" stroke-width="2" stroke-dasharray="6 4"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div *ngFor="let p of pathWaypoints; let i = index" class="path-dot"
+          [style.left.px]="p.x" [style.top.px]="p.y">{{ i + 1 }}</div>
       </div>
     </div>
   </div>

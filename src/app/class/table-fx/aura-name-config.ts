@@ -1,6 +1,7 @@
 import { SyncObject, SyncVar } from '../core/synchronize-object/decorator';
 import { GameObject } from '../core/synchronize-object/game-object';
 import { InnerXml } from '../core/synchronize-object/object-serializer';
+import { translate } from 'i18n';
 
 export const DEFAULT_AURA_NAMES = ['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'];
 
@@ -37,7 +38,7 @@ export class AuraNameConfig extends GameObject implements InnerXml {
   }
 
   nameOf(index: number): string {
-    if (index < 0 || index > 7) return '無';
+    if (index < 0 || index > 7) return translate('fx.none');
     return this.names[index] || DEFAULT_AURA_NAMES[index];
   }
 

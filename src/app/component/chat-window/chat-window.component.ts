@@ -10,6 +10,7 @@ import { ChatLogOutputComponent } from 'component/chat-log-output/chat-log-outpu
 import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-setting.component';
 import { ChatTabComponent } from 'component/chat-tab/chat-tab.component';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -137,6 +138,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(
     public chatMessageService: ChatMessageService,
+    private i18n: I18nService,
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
     private changeDetector: ChangeDetectorRef,
@@ -165,6 +167,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('CHANGE_JUKEBOX_VOLUME', event => {
         this.changeDetector.markForCheck();
+      })
+      .on('LOCALE_CHANGED', () => {
+        this.updatePanelTitle();
       });
     Promise.resolve().then(() => this.updatePanelTitle());
   }
@@ -207,9 +212,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   updatePanelTitle() {
     if (this.chatTab && this.chatTab.name !== '') {
-      this.panelService.title = '聊天視窗 - ' + this.chatTab.name;
+      this.panelService.title = this.i18n.t('chat.titleWithTab', { tabName: this.chatTab.name });
     } else {
-      this.panelService.title = '聊天視窗';
+      this.panelService.title = this.i18n.t('chat.title');
     }
   }
 

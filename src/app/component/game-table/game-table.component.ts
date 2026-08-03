@@ -23,16 +23,20 @@ import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
+import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
 import { ModalService } from 'service/modal.service';
-import { PointerDeviceService } from 'service/pointer-device.service';
+import { PanelService } from 'service/panel.service';
+import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SceneToolService } from 'service/scene-tool.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopKeyboardService } from 'service/tabletop-keyboard.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
+import { TokenPathMoveService } from 'service/token-path-move.service';
+import { I18nService } from 'service/i18n.service';
 
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
@@ -86,6 +90,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   drawDraftTick = 0;
   private static readonly FREEHAND_MIN_DIST_SQ = 2.5 * 2.5;
   private static readonly FREEHAND_MAX_POINTS = 1200;
+  private static readonly SCENE_MARQUEE_MIN_SQ = 6 * 6;
+  private static readonly PATH_CLICK_MOVE_SQ = 8 * 8;
+  /** Scene-select marquee in tabletop coordinates. */
+  private sceneMarqueeStart: { x: number; y: number } = null;
+  private sceneMarqueeCurrent: { x: number; y: number } = null;
+  /** True once drag exceeds threshold — commit as box select instead of click. */
+  private sceneMarqueeActive = false;
+  /** Shift+click candidate for token path waypoint. */
+  private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number } = null;
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
@@ -135,6 +148,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       kind: this.sceneTools.mode === 'draw-rect' ? 'rect' : 'ellipse',
       x, y, width, height,
     };
+  }
+
+  get sceneMarquee(): { x: number; y: number; width: number; height: number } | null {
+    if (!this.sceneMarqueeActive || !this.sceneMarqueeStart || !this.sceneMarqueeCurrent) return null;
+    const x = Math.min(this.sceneMarqueeStart.x, this.sceneMarqueeCurrent.x);
+    const y = Math.min(this.sceneMarqueeStart.y, this.sceneMarqueeCurrent.y);
+    const width = Math.abs(this.sceneMarqueeCurrent.x - this.sceneMarqueeStart.x);
+    const height = Math.abs(this.sceneMarqueeCurrent.y - this.sceneMarqueeStart.y);
+    return { x, y, width: Math.max(1, width), height: Math.max(1, height) };
   }
 
   get polygonRubberPoints(): { x: number; y: number }[] {
@@ -276,8 +298,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private selectionService: TabletopSelectionService,
     private tabletopKeyboardService: TabletopKeyboardService,
     private modalService: ModalService,
+    private panelService: PanelService,
     private sceneTools: SceneToolService,
+    private tokenPath: TokenPathMoveService,
+    private i18n: I18nService,
   ) { }
+
+  get pathWaypoints() { return this.tokenPath.waypoints; }
+  get pathPointsAttr(): string {
+    return this.tokenPath.waypoints.map(p => `${p.x},${p.y}`).join(' ');
+  }
 
   ngOnInit() {
     EventSystem.register(this)
@@ -470,9 +500,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableMouseStart(e: any) {
-    // Shift+left = pan map (swapped with former bare-left pan).
-    // Bare left on empty table = region select (handled by TablePickGesture).
-    if (e.button === 0 && e.shiftKey) {
+    // Shift+left with a selected token = path waypoints (not pan).
+    // Shift+right with draft path = commit (handled in contextmenu).
+    if (e.button === 2 && this.tokenPath.hasDraft && e.shiftKey) {
+      this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = false;
+    } else if (e.button === 0 && e.shiftKey && this.tokenPath.canDraft()) {
+      this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = false;
+    } else if (e.button === 0 && e.shiftKey) {
+      // Shift+left = pan map when no path draft applies.
       this.isTableTransformMode = true;
       this.pointerDeviceService.isDragging = false;
     } else if (e.button === 1 || e.button === 2) {
@@ -567,12 +604,22 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
+    // Shift+right commits token path while draft waypoints exist.
+    if (this.tokenPath.hasDraft && e.shiftKey && !this.tokenPath.isAnimating) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.ngZone.run(async () => {
+        await this.tokenPath.commit();
+        this.changeDetector.detectChanges();
+      });
+      return;
+    }
     if (this.canCreateCurrentMode && this.sceneTools.mode === 'wall' && this.sceneTools.wallDraftPoints.length >= 2) {
       e.preventDefault();
       const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
       this.currentTable.appendChild(wall);
       this.sceneTools.resetDrafts();
-      this.sceneTools.selectedWall = wall;
+      this.sceneTools.selectWall(wall);
       this.refreshFx();
       return;
     }
@@ -594,7 +641,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (0 < this.selectionService.size) {
       menuActions.push({
-        name: '集中到這裡',
+        name: this.i18n.t('gt.congregate'),
         action: () => {
           this.selectionService.congregate(objectPosition);
         },
@@ -602,13 +649,122 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       menuActions.push(ContextMenuSeparator);
     }
     Array.prototype.push.apply(menuActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
+    const sceneCreates = this.makeSceneCreateMenuActions(objectPosition);
+    if (sceneCreates.length) {
+      menuActions.push(ContextMenuSeparator);
+      Array.prototype.push.apply(menuActions, sceneCreates);
+    }
     menuActions.push(ContextMenuSeparator);
     menuActions.push({
-      name: '地圖設定...', action: () => {
+      name: this.i18n.t('gt.mapSettings'), action: () => {
         this.modalService.open(GameTableSettingComponent);
       }
     });
     this.contextMenuService.open(menuPosition, menuActions, this.currentTable.name);
+  }
+
+  private makeSceneCreateMenuActions(position: PointerCoordinate): ContextMenuAction[] {
+    const perm = SceneToolPermission.instance;
+    if (!perm.canOpenPanel) return [];
+    const actions: ContextMenuAction[] = [];
+    if (perm.canCreateKind('light')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addLight'),
+        action: () => this.createSceneLightAt(position),
+      });
+    }
+    if (perm.canCreateKind('wall')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addWall'),
+        action: () => this.beginSceneWallAt(position),
+      });
+    }
+    if (perm.canCreateKind('draw-freehand')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addFreehand'),
+        action: () => this.beginSceneFreehand(),
+      });
+    }
+    if (perm.canCreateKind('draw-text')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addText'),
+        action: () => this.createSceneTextAt(position),
+      });
+    }
+    return actions;
+  }
+
+  private ensureSceneToolsPanel() {
+    if (this.sceneTools.isPanelOpen) return;
+    this.panelService.open(SceneToolsComponent, { width: 380, height: 560, left: 100 });
+  }
+
+  /** Scene-tools panel idles on open; run after that microtask. */
+  private runAfterSceneToolsReady(fn: () => void) {
+    const alreadyOpen = this.sceneTools.isPanelOpen;
+    this.ensureSceneToolsPanel();
+    if (alreadyOpen) {
+      fn();
+      return;
+    }
+    setTimeout(fn, 0);
+  }
+
+  private createSceneLightAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('light') || !this.currentTable) return;
+    this.runAfterSceneToolsReady(() => {
+      const grid = this.currentTable.gridSize || 50;
+      const dim = Math.max(grid * 0.5, this.sceneTools.lightDimGrid * grid);
+      const ratio = this.sceneTools.lightDimGrid > 0
+        ? Math.min(1, this.sceneTools.lightBrightGrid / this.sceneTools.lightDimGrid)
+        : 0.5;
+      const light = TableLight.create(position.x, position.y, dim);
+      light.brightRadius = Math.max(0, dim * ratio);
+      light.color = this.sceneTools.lightColor;
+      light.intensity = this.sceneTools.lightIntensity;
+      light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
+      this.currentTable.appendChild(light);
+      this.sceneTools.selectLight(light);
+      this.sceneTools.enterSelect();
+      this.refreshFx();
+      SoundEffect.play(PresetSound.piecePut);
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private createSceneTextAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('draw-text') || !this.currentTable) return;
+    this.runAfterSceneToolsReady(() => {
+      const d = TableDrawing.create('text', Network.peer?.userId || '');
+      d.x = position.x;
+      d.y = position.y;
+      d.text = this.sceneTools.draftText || this.i18n.t('scene.defaultNote');
+      d.fontSize = this.sceneTools.draftFontSize || 18;
+      this.applyDrawStyle(d, false);
+      this.currentTable.appendChild(d);
+      this.sceneTools.selectDrawing(d);
+      this.sceneTools.enterSelect();
+      SoundEffect.play(PresetSound.piecePut);
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private beginSceneWallAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('wall')) return;
+    this.runAfterSceneToolsReady(() => {
+      this.sceneTools.setMode('wall');
+      this.sceneTools.wallDraftPoints = [{ x: position.x, y: position.y }];
+      this.scheduleDrawDraftRefresh();
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private beginSceneFreehand() {
+    if (!SceneToolPermission.instance.canCreateKind('draw-freehand')) return;
+    this.runAfterSceneToolsReady(() => {
+      this.sceneTools.setMode('draw-freehand');
+      this.changeDetector.detectChanges();
+    });
   }
 
   @HostListener('document:mousedown', ['$event'])
@@ -706,15 +862,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   isDrawingSelected(d: TableDrawing): boolean {
-    return this.sceneTools.selectedDrawing === d;
+    return this.sceneTools.isDrawingSelected(d);
   }
 
   isWallSelected(w: TableWall): boolean {
-    return this.sceneTools.selectedWall === w;
+    return this.sceneTools.isWallSelected(w);
   }
 
   isLightSelected(l: TableLight): boolean {
-    return this.sceneTools.selectedLight === l;
+    return this.sceneTools.isLightSelected(l);
   }
 
   private refreshFx() {
@@ -799,6 +955,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const pos = this.coordinateService.calcTabletopLocalCoordinate();
     // clearPingHold must run before setting origin (it nulls origin/timer).
     this.clearPingHold();
+
+    // Shift+left on map with selected token(s): place path waypoint on click (not drag).
+    if (e.shiftKey && this.tokenPath.canDraft()) {
+      this.pathClickOrigin = { clientX: e.clientX, clientY: e.clientY, x: pos.x, y: pos.y };
+      return;
+    }
+
     this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
     this.pingHoldLast = { x: e.clientX, y: e.clientY };
     this.pingHoldShift = e.shiftKey;
@@ -816,15 +979,19 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (!this.canUseSceneTools) return;
 
-    // Scene select: only drawings / lights / walls — never characters or other tabletop objects.
+    // Scene select: drag a marquee to multi-select; short click hits one object.
     if (this.sceneTools.isSceneSelectMode) {
       if (!this.canModifyScene) return;
       e.preventDefault();
       e.stopPropagation();
       this.selectionService.clear();
-      if (!this.trySelectSceneObject(pos.x, pos.y)) {
-        this.sceneTools.clearSelection();
-      }
+      this.clearSceneMarquee();
+      this.pickGesture?.cancel();
+      const tablePos = this.tablePosFromClient(e.pageX, e.pageY);
+      this.sceneMarqueeStart = { x: tablePos.x, y: tablePos.y };
+      this.sceneMarqueeCurrent = { x: tablePos.x, y: tablePos.y };
+      this.sceneMarqueeActive = false;
+      this.scheduleDrawDraftRefresh();
       return;
     }
 
@@ -845,7 +1012,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
         this.currentTable.appendChild(wall);
         this.sceneTools.resetDrafts();
-        this.sceneTools.selectedWall = wall;
+        this.sceneTools.selectWall(wall);
         this.refreshFx();
       }
       return;
@@ -855,7 +1022,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         const d = TableDrawing.create('text', Network.peer?.userId || '');
         d.x = pos.x;
         d.y = pos.y;
-        d.text = this.sceneTools.draftText || '註記';
+        d.text = this.sceneTools.draftText || this.i18n.t('scene.defaultNote');
         d.fontSize = this.sceneTools.draftFontSize || 18;
         this.applyDrawStyle(d, false);
         this.currentTable.appendChild(d);
@@ -888,26 +1055,74 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       const dy = e.clientY - this.pingHoldOrigin.y;
       if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
     }
+    this.updateSceneMarqueeFromEvent(e);
     this.updateDrawDraftFromPointer();
   }
 
   @HostListener('document:pointermove', ['$event'])
-  onDocumentPointerMove(_e: PointerEvent) {
+  onDocumentPointerMove(e: PointerEvent) {
+    if (this.sceneMarqueeStart) {
+      this.updateSceneMarqueeFromEvent(e);
+      return;
+    }
     if (!this.drawDragStart && this.sceneTools.mode !== 'draw-polygon' && this.sceneTools.mode !== 'light') return;
     this.updateDrawDraftFromPointer();
   }
 
   @HostListener('pointerup', ['$event'])
-  onPointerUp(_e: PointerEvent) {
+  onPointerUp(e: PointerEvent) {
     this.clearPingHold();
+    if (this.finishPathClick(e)) return;
+    if (this.sceneMarqueeStart) {
+      this.commitSceneMarquee();
+      return;
+    }
     this.commitDrawDrag();
   }
 
   @HostListener('document:pointerup', ['$event'])
-  onDocumentPointerUp(_e: PointerEvent) {
+  onDocumentPointerUp(e: PointerEvent) {
+    if (this.finishPathClick(e)) {
+      this.clearPingHold();
+      return;
+    }
+    if (this.sceneMarqueeStart) {
+      this.clearPingHold();
+      this.commitSceneMarquee();
+      return;
+    }
     if (!this.drawDragStart) return;
     this.clearPingHold();
     this.commitDrawDrag();
+  }
+
+  @HostListener('document:keyup', ['$event'])
+  onDocumentKeyup(e: KeyboardEvent) {
+    if (e.key !== 'Shift') return;
+    if (this.tokenPath.isAnimating) return;
+    if (!this.tokenPath.hasDraft && !this.pathClickOrigin) return;
+    this.pathClickOrigin = null;
+    this.tokenPath.cancelDraft();
+    this.changeDetector.detectChanges();
+  }
+
+  /** Resolve Shift+click waypoint; returns true if this pointerup was a path gesture. */
+  private finishPathClick(e: PointerEvent): boolean {
+    if (!this.pathClickOrigin) return false;
+    const origin = this.pathClickOrigin;
+    this.pathClickOrigin = null;
+    if (!e.shiftKey) {
+      this.tokenPath.cancelDraft();
+      this.changeDetector.detectChanges();
+      return true;
+    }
+    const dx = e.clientX - origin.clientX;
+    const dy = e.clientY - origin.clientY;
+    if (dx * dx + dy * dy > GameTableComponent.PATH_CLICK_MOVE_SQ) return true;
+    if (this.tokenPath.addWaypoint(origin.x, origin.y)) {
+      this.changeDetector.detectChanges();
+    }
+    return true;
   }
 
   @HostListener('dragover', ['$event'])
@@ -926,8 +1141,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (GuestSession.isGuest) return;
     const ch = ObjectStore.instance.get(id);
     if (!(ch instanceof GameCharacter)) return;
-    const loc = ch.location?.name;
-    if (loc !== 'common' && loc !== Network.peerId) return;
+    if (!ch.isVisible && !this.isGMMode) return;
 
     const pos = this.coordinateService.calcTabletopLocalCoordinate(
       { x: e.clientX, y: e.clientY, z: 0 },
@@ -964,6 +1178,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.isTypingTarget(e.target)) return;
 
     if (e.key === 'Escape') {
+      if (this.sceneMarqueeStart) {
+        e.preventDefault();
+        this.clearSceneMarquee();
+        this.scheduleDrawDraftRefresh();
+        return;
+      }
       if (
         this.drawDragStart
         || this.freehandPoints.length
@@ -996,7 +1216,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
       this.currentTable.appendChild(wall);
       this.sceneTools.resetDrafts();
-      this.sceneTools.selectedWall = wall;
+      this.sceneTools.selectWall(wall);
       this.refreshFx();
       return true;
     }
@@ -1118,10 +1338,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       light.brightRadius = Math.max(0, dim * ratio);
       light.color = this.sceneTools.lightColor;
       light.intensity = this.sceneTools.lightIntensity;
-      light.name = this.sceneTools.lightName || '燈光';
+      light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
       this.currentTable.appendChild(light);
-      this.sceneTools.clearSelection();
-      this.sceneTools.selectedLight = light;
+      this.sceneTools.selectLight(light);
       this.refreshFx();
     } else if (this.sceneTools.mode === 'draw-rect' || this.sceneTools.mode === 'draw-ellipse') {
       const width = Math.abs(pos.x - this.drawDragStart.x);
@@ -1208,8 +1427,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         const l = this.lights[i];
         const dx = l.x - x, dy = l.y - y;
         if (dx * dx + dy * dy <= 16 * 16) {
-          this.sceneTools.clearSelection();
-          this.sceneTools.selectedLight = l;
+          this.sceneTools.selectLight(l);
           return true;
         }
       }
@@ -1218,13 +1436,138 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       for (let i = this.walls.length - 1; i >= 0; i--) {
         const w = this.walls[i];
         if (this.hitWall(w, x, y, pad)) {
-          this.sceneTools.clearSelection();
-          this.sceneTools.selectedWall = w;
+          this.sceneTools.selectWall(w);
           return true;
         }
       }
     }
     return false;
+  }
+
+  /** Map page coords → tabletop local (always via origin; ignore hover target). */
+  private tablePosFromClient(pageX: number, pageY: number): { x: number; y: number } {
+    const origin = this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement;
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: pageX, y: pageY, z: 0 },
+      origin
+    );
+    return { x: pos.x, y: pos.y };
+  }
+
+  private updateSceneMarqueeFromEvent(e: PointerEvent) {
+    if (!this.sceneMarqueeStart || !this.sceneTools.isSceneSelectMode) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    if (this.sceneMarqueeCurrent?.x === pos.x && this.sceneMarqueeCurrent?.y === pos.y) return;
+    this.sceneMarqueeCurrent = { x: pos.x, y: pos.y };
+    if (!this.sceneMarqueeActive) {
+      const dx = pos.x - this.sceneMarqueeStart.x;
+      const dy = pos.y - this.sceneMarqueeStart.y;
+      if (dx * dx + dy * dy >= GameTableComponent.SCENE_MARQUEE_MIN_SQ) {
+        this.sceneMarqueeActive = true;
+      }
+    }
+    this.scheduleDrawDraftRefresh();
+  }
+
+  private commitSceneMarquee() {
+    const start = this.sceneMarqueeStart;
+    const current = this.sceneMarqueeCurrent;
+    const wasActive = this.sceneMarqueeActive;
+    this.clearSceneMarquee();
+    if (!start || !current || !this.sceneTools.isSceneSelectMode || !this.canModifyScene) {
+      this.scheduleDrawDraftRefresh();
+      return;
+    }
+    if (wasActive) {
+      const rect = {
+        x: Math.min(start.x, current.x),
+        y: Math.min(start.y, current.y),
+        width: Math.abs(current.x - start.x),
+        height: Math.abs(current.y - start.y),
+      };
+      this.selectSceneObjectsInRect(rect);
+    } else {
+      // Short click: pick one scene object or clear selection.
+      if (!this.trySelectSceneObject(start.x, start.y)) {
+        this.sceneTools.clearSelection();
+      }
+    }
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private clearSceneMarquee() {
+    this.sceneMarqueeStart = null;
+    this.sceneMarqueeCurrent = null;
+    this.sceneMarqueeActive = false;
+  }
+
+  private selectSceneObjectsInRect(rect: { x: number; y: number; width: number; height: number }) {
+    const perm = SceneToolPermission.instance;
+    const drawings: TableDrawing[] = [];
+    const lights: TableLight[] = [];
+    const walls: TableWall[] = [];
+    if (perm.canModifyKind('drawing')) {
+      for (const d of this.drawings) {
+        if (this.boundsIntersects(rect, this.drawingBounds(d))) drawings.push(d);
+      }
+    }
+    if (perm.canModifyKind('light')) {
+      for (const l of this.lights) {
+        if (this.pointInRect(l.x, l.y, rect, 8)) lights.push(l);
+      }
+    }
+    if (perm.canModifyKind('wall')) {
+      for (const w of this.walls) {
+        if (this.boundsIntersects(rect, this.pointsBounds(w.points || []))) walls.push(w);
+      }
+    }
+    this.sceneTools.setMultiSelection(drawings, lights, walls);
+    if (this.sceneTools.selectionCount > 0) {
+      SoundEffect.playLocal(PresetSound.selectionStart);
+    }
+  }
+
+  private drawingBounds(d: TableDrawing): { x: number; y: number; width: number; height: number } {
+    if (d.type === 'text') {
+      const w = Math.max(40, (d.text?.length || 1) * (d.fontSize || 18) * 0.6);
+      const h = (d.fontSize || 18) + 8;
+      return { x: d.x, y: d.y, width: w, height: h };
+    }
+    if (d.type === 'rect' || d.type === 'ellipse') {
+      return { x: d.x, y: d.y, width: Math.abs(d.width || 0), height: Math.abs(d.height || 0) };
+    }
+    const pts = d.geom?.points || [];
+    if (pts.length) return this.pointsBounds(pts);
+    return { x: d.x || 0, y: d.y || 0, width: Math.abs(d.width || 0), height: Math.abs(d.height || 0) };
+  }
+
+  private pointsBounds(pts: { x: number; y: number }[]): { x: number; y: number; width: number; height: number } {
+    if (!pts.length) return { x: 0, y: 0, width: 0, height: 0 };
+    let minX = pts[0].x, minY = pts[0].y, maxX = pts[0].x, maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+  }
+
+  private boundsIntersects(
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number }
+  ): boolean {
+    return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
+  }
+
+  private pointInRect(
+    x: number, y: number,
+    rect: { x: number; y: number; width: number; height: number },
+    pad = 0
+  ): boolean {
+    return x >= rect.x - pad && x <= rect.x + rect.width + pad
+      && y >= rect.y - pad && y <= rect.y + rect.height + pad;
   }
 
   private hitDrawing(d: TableDrawing, x: number, y: number, pad: number): boolean {

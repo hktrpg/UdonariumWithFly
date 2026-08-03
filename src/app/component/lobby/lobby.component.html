@@ -1,14 +1,14 @@
 <div *ngIf="!isConnected;else other_content">
-  <button (click)="reload()" [disabled]="isReloading"><i class="material-icons" style="display: inline-block; margin-right: 2px">refresh</i>更新列表</button>
-  <button (click)="showRoomSetting()"><i class="material-icons" style="display: inline-block; margin-right: 2px">room_preferences</i>建立新房間</button>
+  <button (click)="reload()" [disabled]="isReloading"><i class="material-icons" style="display: inline-block; margin-right: 2px">refresh</i>{{ 'lobby.refresh' | i18n }}</button>
+  <button (click)="showRoomSetting()"><i class="material-icons" style="display: inline-block; margin-right: 2px">room_preferences</i>{{ 'lobby.createRoom' | i18n }}</button>
   <hr/>
   <ng-container *ngIf="rooms.length">
     <table class="room-list">
       <tr>
-        <th class="is-0-width is-small-font">房間ID</th>
-        <th class="is-small-font">房間名稱</th>
-        <th class="is-0-width is-small-font">密碼</th>
-        <th class="is-0-width is-small-font">參加者</th>
+        <th class="is-0-width is-small-font">{{ 'lobby.colId' | i18n }}</th>
+        <th class="is-small-font">{{ 'lobby.colName' | i18n }}</th>
+        <th class="is-0-width is-small-font">{{ 'lobby.colPassword' | i18n }}</th>
+        <th class="is-0-width is-small-font">{{ 'lobby.colPeers' | i18n }}</th>
         <th class="is-0-width is-small-font"></th>
       </tr>
       <ng-container *ngFor="let room of rooms">
@@ -19,14 +19,14 @@
             <i class="material-icons" style="vertical-align: middle; font-size:0.9rem;">lock</i>
           </td>
           <td *ngIf="!roomHasLock(room)">-</td>
-          <td>{{room.peers.length}}人</td>
+          <td>{{ 'lobby.peerCount' | i18n:{ count: room.peers.length } }}</td>
           <td>
             <ng-container *ngIf="isRoleAuthRoom(room)">
-              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room)">選擇身份進入</button>
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room)">{{ 'lobby.joinWithRole' | i18n }}</button>
             </ng-container>
             <ng-container *ngIf="!isRoleAuthRoom(room)">
-              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">連線</button>
-              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" type="submit" (click)="connect(room, true)">訪客</button>
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">{{ 'lobby.connect' | i18n }}</button>
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" type="submit" (click)="connect(room, true)">{{ 'lobby.guest' | i18n }}</button>
             </ng-container>
           </td>
         </tr>
@@ -35,4 +35,4 @@
   </ng-container>
   <span *ngIf="rooms.length < 1" style="font-size: 12px;">{{help}}</span>
 </div>
-<ng-template #other_content><span style="font-size: 12px;">如果要連線到另一個房間，請與其他參與者斷開連線。<br>（※您可以從選單斷開連線。）</span></ng-template>
+<ng-template #other_content><span style="font-size: 12px;">{{ 'lobby.helpConnected' | i18n }}</span></ng-template>

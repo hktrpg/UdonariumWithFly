@@ -5,17 +5,17 @@
       <span class="label">{{ r.label }}</span>
       <span class="hint">{{ r.hint }}</span>
       <span class="lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)">🔒</span>
-      <span class="open" *ngIf="isRoleAvailable(r.id) && !needsPasswordFor(r.id)">無密碼</span>
+      <span class="open" *ngIf="isRoleAvailable(r.id) && !needsPasswordFor(r.id)">{{ 'roomJoin.noPassword' | i18n }}</span>
     </label>
   </div>
   <div class="pw" *ngIf="needsPassword()">
-    <label>{{ role === 'gm' ? 'GM' : (role === 'guest' ? '訪客' : '玩家') }}密碼
-      <input type="password" [(ngModel)]="password" (keydown.enter)="submit()" placeholder="輸入密碼" autocomplete="current-password" />
+    <label>{{ 'roomJoin.passwordLabel' | i18n:{ role: roleLabel } }}
+      <input type="password" [(ngModel)]="password" (keydown.enter)="submit()" [placeholder]="'roomJoin.passwordPlaceholder' | i18n" autocomplete="current-password" />
     </label>
   </div>
   <div class="actions">
     <button type="button" (click)="submit()"><b>{{ submitLabel }}</b></button>
-    <button type="button" class="cancel" (click)="cancel()">取消</button>
+    <button type="button" class="cancel" (click)="cancel()">{{ 'roomJoin.cancel' | i18n }}</button>
   </div>
   <div class="help">{{ help }}</div>
 </div>

@@ -51,8 +51,8 @@
     </div>
     <div class="component-title title-background"
       [ngClass]="{'with-button-marign': hasImage}">
-      <ng-container *ngIf="!(cardState === CardStateBack) && (cardState === CardStateFront || card.isVisible == null || card.isVisible || card.isGMMode)">{{card.name}}</ng-container><ng-container *ngIf="card.aliasName == 'card-stack' && !card.isEmpty"> 的頂部</ng-container>
-      <ng-container *ngIf="!(cardState === CardStateFront) && (cardState === CardStateBack || (card.isVisible != null && !card.isVisible && !card.isGMMode))">卡牌（背面）</ng-container>
+      <ng-container *ngIf="!(cardState === CardStateBack) && (cardState === CardStateFront || card.isVisible == null || card.isVisible || card.isGMMode)">{{card.name}}</ng-container><ng-container *ngIf="card.aliasName == 'card-stack' && !card.isEmpty">{{ i18n.t('overview.top') }}</ng-container>
+      <ng-container *ngIf="!(cardState === CardStateFront) && (cardState === CardStateBack || (card.isVisible != null && !card.isVisible && !card.isGMMode))">{{ i18n.t('overview.cardBack') }}</ng-container>
     </div>
     <div class="component-background">
       <div class="grid-container-root" *ngIf="hasDataElms && (card.isVisible || card.isGMMode)">
@@ -100,7 +100,10 @@
         </div>
       </ng-container>
       <ng-container *ngIf="isUseIcon">
-        <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none" />
+        <div class="overview-face-icon-wrap">
+          <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none" alt="" />
+          <span class="overview-face-icon-badge">{{ i18n.t('overview.icon') }}</span>
+        </div>
       </ng-container>
       <!--<img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" />-->
     </div>
@@ -309,7 +312,7 @@
       </ng-container>
       <ng-container *ngSwitchCase="'url'">
         <div class="tag">
-          <span *ngIf="!stringUtil.validUrl(dataElm.value)" title="網址無效">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
+          <span *ngIf="!stringUtil.validUrl(dataElm.value)" [attr.title]="'common.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
           (click)="stringUtil.validUrl(dataElm.value) ? openUrl(dataElm.value, name, dataElm.name) : false"><span class="url-link">{{dataElm.name}}</span></a>
         </div>
       </ng-container>

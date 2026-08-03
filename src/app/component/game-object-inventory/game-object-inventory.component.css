@@ -235,6 +235,18 @@ input[type='range']::-ms-tooltip {
   color: #CCC;
 }
 
+.tab label.is-drop-target {
+  background-color: #4a7c59;
+  color: #fff;
+  outline: 2px dashed #cfe8d5;
+  outline-offset: -2px;
+}
+
+.tab label.is-drop-target input[type="radio"] + div {
+  background-color: #4a7c59;
+  color: #fff;
+}
+
 .is-sticky-top {
   position: sticky;
   top : 0;
@@ -512,6 +524,12 @@ button.link {
     */
 }
 
+/* Claim / stealth tags sit above the row so they don't cover the token name. */
+.object-container:has(.player-owner-tag),
+.object-container:has(.owner-tag) {
+  padding-top: 16px;
+}
+
 @keyframes fadeIn {
   0% {
     opacity: 0;
@@ -542,8 +560,9 @@ button.link {
 
 .player-owner-tag {
   position: absolute;
-  font-size: 9px;
-  max-width: calc(100% - 8px);
+  font-size: 8px;
+  width: min-content;
+  max-width: calc(50% - 4px);
   overflow: hidden;
   color: whitesmoke;
   background-color: #2563eb;

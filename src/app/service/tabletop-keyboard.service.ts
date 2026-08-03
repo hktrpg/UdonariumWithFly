@@ -17,6 +17,7 @@ import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchr
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
 import { CoordinateService } from './coordinate.service';
+import { SceneToolService } from './scene-tool.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
 
 const MOVE_CODES = new Set([
@@ -44,6 +45,7 @@ export class TabletopKeyboardService {
   constructor(
     private selectionService: TabletopSelectionService,
     private coordinateService: CoordinateService,
+    private sceneTools: SceneToolService,
   ) { }
 
   initialize() {
@@ -93,6 +95,11 @@ export class TabletopKeyboardService {
     if (Network.GuestMode()) return;
 
     if (code === 'Escape' && !mod && !e.altKey && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) {
+        this.sceneTools.clearSelection();
+        this.consume(e);
+        return;
+      }
       if (this.selectionService.size > 0) {
         this.selectionService.clear();
         this.consume(e);
@@ -101,6 +108,10 @@ export class TabletopKeyboardService {
     }
 
     if (code === 'Delete' && !mod && !e.altKey) {
+      if (this.sceneTools.selectionCount > 0) {
+        if (this.sceneTools.deleteSelection()) this.consume(e);
+        return;
+      }
       if (this.deleteSelection()) this.consume(e);
       return;
     }
@@ -111,6 +122,20 @@ export class TabletopKeyboardService {
     }
 
     if (!MOVE_CODES.has(code) || mod || e.altKey) return;
+
+    // Scene-tool selection: WASD / arrows nudge drawings, lights, walls.
+    if (this.sceneTools.selectionCount > 0) {
+      if (e.shiftKey) return;
+      const sceneDelta = this.moveDeltaFromPressed();
+      if (!sceneDelta) return;
+      const sceneGrid = TableSelecter.instance.viewTable?.gridSize ?? 50;
+      if (this.sceneTools.nudgeSelection(sceneDelta.dx * sceneGrid, sceneDelta.dy * sceneGrid)) {
+        if (!e.repeat) SoundEffect.play(PresetSound.piecePut);
+        this.consume(e);
+      }
+      return;
+    }
+
     if (this.selectionService.size < 1) return;
 
     if (e.shiftKey) {
@@ -139,9 +164,11 @@ export class TabletopKeyboardService {
     if (this.shouldIgnore(e)) return;
     if (Network.GuestMode()) return;
     if (this.selectionService.size < 1) return;
-    // Require Ctrl/Cmd. Bare Shift+wheel is remapped to horizontal scroll on many OSes
-    // (deltaX / noisy deltaY), which feels like rotation reversing around 180°.
-    if (!e.ctrlKey && !e.metaKey) return;
+    // Ctrl/Shift+wheel pan the view; object rotate uses Alt (15°) or Ctrl+Shift (45°).
+    const stepDeg = (e.ctrlKey || e.metaKey) && e.shiftKey ? 45
+      : e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey ? 15
+      : null;
+    if (stepDeg == null) return;
 
     // Prefer the dominant axis (Shift may still contribute deltaX while Ctrl is held).
     const scroll = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -151,7 +178,6 @@ export class TabletopKeyboardService {
     if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) amount *= 16;
     else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) amount *= 800;
 
-    const stepDeg = e.shiftKey ? 45 : 15;
     const notch = 100;
     this.wheelAcc += amount;
 

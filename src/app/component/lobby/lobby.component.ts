@@ -11,6 +11,7 @@ import { PasswordCheckComponent } from 'component/password-check/password-check.
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
 
 @Component({
@@ -24,7 +25,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   isReloading: boolean = false;
 
-  help: string = '按「更新列表」以顯示可連線的房間。';
+  help: string;
 
   get currentRoom(): string { return Network.peer.roomId };
   get peerId(): string { return Network.peerId; }
@@ -32,7 +33,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   constructor(
     private panelService: PanelService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService,
   ) { }
 
   ngOnInit() {
@@ -43,15 +45,20 @@ export class LobbyComponent implements OnInit, OnDestroy {
       })
       .on('CONNECT_PEER', event => {
         this.changeTitle();
+      })
+      .on('LOCALE_CHANGED', () => {
+        this.changeTitle();
+        this.refreshHelp();
       });
+    this.help = this.i18n.t('lobby.helpInitial');
     this.reload();
   }
 
   private changeTitle() {
-    this.modalService.title = this.panelService.title = '大廳';
+    this.modalService.title = this.panelService.title = this.i18n.t('lobby.title');
     if (Network.peer.roomName.length) {
       const name = RoomAuth.displayRoomName(Network.peer.roomName);
-      this.modalService.title = this.panelService.title = '〈' + name + '/' + Network.peer.roomId + '〉'
+      this.modalService.title = this.panelService.title = this.i18n.t('lobby.titleRoom', { name, id: Network.peer.roomId });
     }
   }
 
@@ -61,9 +68,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   async reload() {
     this.isReloading = true;
-    this.help = '搜索中...';
+    this.help = this.i18n.t('lobby.helpSearching');
     this.rooms = await Network.listAllRooms();
-    this.help = '找不到連線的房間。您可以使用「建立新房間」。';
+    this.help = this.i18n.t('lobby.helpEmpty');
     this.isReloading = false;
   }
 
@@ -191,6 +198,16 @@ export class LobbyComponent implements OnInit, OnDestroy {
   async showRoomSetting() {
     let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
     if (isCreate) this.modalService.resolve();
-    this.help = '按「更新列表」以顯示可連線的房間。';
+    this.help = this.i18n.t('lobby.helpInitial');
+  }
+
+  private refreshHelp() {
+    if (this.isReloading) {
+      this.help = this.i18n.t('lobby.helpSearching');
+    } else if (this.rooms.length < 1) {
+      this.help = this.i18n.t('lobby.helpEmpty');
+    } else {
+      this.help = this.i18n.t('lobby.helpInitial');
+    }
   }
 }

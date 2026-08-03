@@ -45,6 +45,7 @@ import { ResizableDirective } from 'directive/resizable.directive';
 import { RotableDirective } from 'directive/rotable.directive';
 import { TooltipDirective } from 'directive/tooltip.directive';
 import { SafePipe } from 'pipe/safe.pipe';
+import { I18nPipe } from 'pipe/i18n.pipe';
 
 import { AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
@@ -120,6 +121,7 @@ import '@udonarium/table-fx/combat-tracker';
     RoomSettingComponent,
     UIPanelComponent,
     SafePipe,
+    I18nPipe,
     ChatPaletteComponent,
     TextViewComponent,
     TerrainComponent,

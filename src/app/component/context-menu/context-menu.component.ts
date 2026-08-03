@@ -169,9 +169,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     action.action();
     this.refreshActionVisual(action);
 
-    // Keep menu open after checkbox / radio / button clicks; close only on outside blank click.
-    // Explicit keepOpen === false still closes (for rare one-shot items).
-    if (action.keepOpen === false) {
+    // Checkbox / radio stay open so users can toggle several options.
+    // Normal one-shot actions close. Explicit keepOpen overrides.
+    const stayOpen = action.keepOpen === true
+      || (action.keepOpen !== false && !!action.checkBox);
+    if (!stayOpen) {
       this.close();
       return;
     }
@@ -179,14 +181,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private refreshActionVisual(action: ContextMenuAction) {
-    let updatedByNameUpdate = false;
-    for (const a of this.actions) {
-      if (a && typeof a.nameUpdate === 'function') {
-        a.name = a.nameUpdate() ?? a.name;
-        updatedByNameUpdate = true;
+    // Prefer live nameUpdate when present (and refresh siblings that also use it).
+    if (typeof action.nameUpdate === 'function') {
+      for (const a of this.actions) {
+        if (a && typeof a.nameUpdate === 'function') {
+          a.name = a.nameUpdate() ?? a.name;
+        }
       }
+      return;
     }
-    if (updatedByNameUpdate) return;
 
     if (action.checkBox === 'check' && action.name) {
       if (action.name.startsWith('☑')) action.name = '☐' + action.name.substring(1);
@@ -196,6 +199,10 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     if (action.checkBox === 'radio' && action.name) {
       for (const a of this.actions) {
         if (!a || a.checkBox !== 'radio' || !a.name) continue;
+        if (typeof a.nameUpdate === 'function') {
+          a.name = a.nameUpdate() ?? a.name;
+          continue;
+        }
         if (a === action) a.name = a.name.replace(/^[◉○]/, '◉');
         else a.name = a.name.replace(/^[◉○]/, '○');
       }

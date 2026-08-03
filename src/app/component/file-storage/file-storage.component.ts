@@ -15,6 +15,7 @@ import { ModalService } from 'service/modal.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { AppComponent } from '../../app.component';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'file-storage',
@@ -114,7 +115,8 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
     private modalService: ModalService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    public i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -123,7 +125,7 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   
   ngOnInit() {
-    Promise.resolve().then(() => this.panelService.title = '圖片庫');
+    Promise.resolve().then(() => this.panelService.title = this.i18n.t('file.title'));
     this.searchWords = this.allImagesOwnWords;
     //FileStorageComponent.sortOrder = [null].concat(this.searchWords);
     this.panelId = UUID.generateUuid();
@@ -269,13 +271,13 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示已設為隱藏的圖片', 
-        text: '要顯示已設為隱藏的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('file.showHiddenTitle'), 
+        text: this.i18n.t('file.showHiddenText'),
+        help: this.i18n.t('file.showHiddenHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從圖片庫顯示了已設為隱藏的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('file.showHiddenLog'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -286,9 +288,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   setectedImagesToHidden(toHidden: boolean) {
     this.modalService.open(ConfirmationComponent, {
-      title: toHidden ? '設為隱藏' : '解除隱藏設定', 
-      text: `要${ toHidden ? '將圖片設為隱藏' : '解除圖片的隱藏設定'}嗎？`,
-      help: toHidden ? '將選擇的圖片設為隱藏。\n這是為了避免「無意中看到劇透」等情況，並非對其他人完全隱藏。' : '解除選擇圖片的隱藏設定。',
+      title: toHidden ? this.i18n.t('file.hideTitle') : this.i18n.t('file.unhideTitle'), 
+      text: toHidden ? this.i18n.t('file.hideText') : this.i18n.t('file.unhideText'),
+      help: toHidden ? this.i18n.t('file.hideHelp') : this.i18n.t('file.unhideHelp'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: toHidden ? 'visibility_off' : 'visibility',
       action: () => {
@@ -305,9 +307,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.addingTagWord == null || this.addingTagWord.trim() == '') return;
     const words = this.addingTagWord.trim().split(/\s+/);
     this.modalService.open(ConfirmationComponent, {
-      title: '為圖片新增標籤', 
-      text: `要為圖片新增標籤嗎？`,
-      helpHtml: '將為選擇的圖片新增 ' + words.map(word => `<b class="word-tag">${ StringUtil.escapeHtml(word) }</b>`).join(' ') + ' 。',
+      title: this.i18n.t('file.addTagTitle'), 
+      text: this.i18n.t('file.addTagText'),
+      helpHtml: this.i18n.t('file.addTagHelpPrefix') + words.map(word => `<b class="word-tag">${ StringUtil.escapeHtml(word) }</b>`).join(' ') + this.i18n.t('file.addTagHelpSuffix'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sell',
       action: () => {
@@ -332,9 +334,9 @@ export class FileStorageComponent implements OnInit, OnDestroy, AfterViewInit {
 
   removeTagWord(word: string) {
     this.modalService.open(ConfirmationComponent, {
-      title: '從圖片刪除標籤', 
-      text: `要從圖片刪除標籤嗎？`,
-      helpHtml: `將從選擇的圖片刪除 <b class="word-tag">${ StringUtil.escapeHtml(word) }</b> 。`,
+      title: this.i18n.t('file.removeTagTitle'), 
+      text: this.i18n.t('file.removeTagText'),
+      helpHtml: `${this.i18n.t('file.removeTagHelpPrefix')}<b class="word-tag">${ StringUtil.escapeHtml(word) }</b>${this.i18n.t('file.removeTagHelpSuffix')}`,
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sell',
       action: () => {

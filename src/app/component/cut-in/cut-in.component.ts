@@ -10,6 +10,7 @@ import { CutIn } from '@udonarium/cut-in';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'cut-in',
@@ -138,7 +139,8 @@ export class CutInComponent implements OnInit, OnDestroy {
   constructor(
     private pointerDeviceService: PointerDeviceService,
     private contextMenuService: ContextMenuService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private i18n: I18nService
   ) { }
 
   ngOnInit(): void {
@@ -530,26 +532,26 @@ export class CutInComponent implements OnInit, OnDestroy {
     let position = this.pointerDeviceService.pointers[0];
     this.contextMenuService.open(position, [
       {
-        name: '關閉（僅自己停止）',
+        name: this.i18n.t('cutin.closeSelf'),
         action: () => { this.stop(); },
         default: true,
         selfOnly: true
       },
       ContextMenuSeparator,
       {
-        name: `${this.isIndicateSender ? '☑' : '☐'}顯示傳送者`,
+        name: this.isIndicateSender ? this.i18n.t('cutin.showSenderOn') : this.i18n.t('cutin.showSenderOff'),
         action: () => { this.isIndicateSender = !this.isIndicateSender; },
         selfOnly: true,
         checkBox: 'check'
       },
       {
-        name: `${this.isBackyard ? '☑' : '☐'}顯示在視窗後方`,
+        name: this.isBackyard ? this.i18n.t('cutin.backyardOn') : this.i18n.t('cutin.backyardOff'),
         action: () => { this.isBackyard = !this.isBackyard; },
         selfOnly: true,
         checkBox: 'check'
       },
       {
-        name: `${this.isMinimize ? '☑' : '☐'}最小化`,
+        name: this.isMinimize ? this.i18n.t('cutin.minimizeOn') : this.i18n.t('cutin.minimizeOff'),
         action: () => { this.isMinimize = !this.isMinimize; },
         selfOnly: true,
         checkBox: 'check'

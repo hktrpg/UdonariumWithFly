@@ -2,5 +2,5 @@
 <hr />
 <div class="help" *ngIf="help && !helpHtml">{{help}}</div>
 <div class="help" *ngIf="helpHtml" [innerHTML]="helpHtml | safe: 'html'"></div>
-<button type="submit" (click)="ok()">ＯＫ</button>
-<button *ngIf="type > 1" type="button" (click)="cancel()">取消</button>
+<button type="submit" (click)="ok()">{{ 'confirm.ok' | i18n }}</button>
+<button *ngIf="type > 1" type="button" (click)="cancel()">{{ 'confirm.cancel' | i18n }}</button>

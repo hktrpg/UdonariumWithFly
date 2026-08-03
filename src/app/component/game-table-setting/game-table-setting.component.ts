@@ -12,6 +12,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ImageService } from 'service/image.service';
+import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
@@ -131,7 +132,8 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private saveDataService: SaveDataService,
     private imageService: ImageService,
     private panelService: PanelService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
@@ -140,7 +142,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '地圖設定' });
+    Promise.resolve().then(() => this.refreshPanelTitle());
     this.selectedTable = this.tableSelecter.viewTable;
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 2000, event => {
@@ -149,11 +151,16 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
         if (object !== null) {
           this.selectedTableXml = object.toXml();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('table.title');
   }
 
   selectGameTable(identifier: string) {
@@ -170,7 +177,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   createGameTable() {
     if (this.GuestMode()) return;
     let gameTable = new GameTable();
-    gameTable.name = '空白地圖';
+    gameTable.name = this.i18n.t('table.defaultName');
     gameTable.imageIdentifier = 'testTableBackgroundImage_image';
     gameTable.initialize();
     this.selectGameTable(gameTable.identifier);
@@ -258,13 +265,13 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示隱藏設定的圖片', 
-        text: '要顯示設為隱藏的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('table.confirmShowHidden.title'),
+        text: this.i18n.t('table.confirmShowHidden.text'),
+        help: this.i18n.t('table.confirmShowHidden.help'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從地圖設定顯示了隱藏設定的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('table.operationShowHidden'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();

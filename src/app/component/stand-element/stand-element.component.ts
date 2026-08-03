@@ -8,6 +8,7 @@ import { GameCharacter } from '@udonarium/game-character';
 import { StandConditionType } from '@udonarium/stand-list';
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'stand-element',
@@ -27,7 +28,8 @@ export class StandElementComponent implements OnInit {
   standConditionType = StandConditionType;
 
   constructor(
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService
   ) { }
 
   ngOnInit(): void {
@@ -214,7 +216,7 @@ export class StandElementComponent implements OnInit {
     });
     EventSystem.trigger('POPUP_CHAT_BALLOON', { 
       characterIdentifier: this.gameCharacter.identifier, 
-      text: '這是測試，只有你看得到。調整立繪設定時，可從選單的「個人設定」關閉「立繪淡出並自動退場」，會較容易微調。', 
+      text: this.i18n.t('stand.testMessage'),
       color: this.gameCharacter.chatPalette ? this.gameCharacter.chatPalette.color : null,
       dialogTest: true
     });

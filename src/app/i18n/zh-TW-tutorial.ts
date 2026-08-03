@@ -1,0 +1,84 @@
+import { I18nDictionary } from './types';
+
+export const zhTW_tutorial: I18nDictionary = {
+  'tutorial.name': '教學Zzzzzz',
+  'tutorial.linkName': '連結:',
+  'tutorial.welcome': `歡迎使用 HKTRPG 烏冬桌（基於 Udonarium with Fly）。
+地圖是 2.5D；資料在玩家之間互傳，伺服器不幫你長期保管棋子與圖片。
+★ 離開前請「下載 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
+建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
+完整說明：https://bothelp.hktrpg.com/guide`,
+  'tutorial.view': `＜視角＞Shift＋左鍵拖曳＝平移地圖　右鍵拖曳＝旋轉視角　滾輪＝縮放
+　　　　Shift＋滾輪＝左右移動畫面　Ctrl＋滾輪＝上下移動畫面
+＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單
+　　　　雙擊＝開啟詳情（角色／卡牌／牌堆／骰子／地形／筆記／遮罩／範圍等）
+　　　　角色「下一張圖像」改在右鍵選單「切換下一張圖像」
+　　　　卡牌翻面、牌堆抽牌、骰子擲骰：請用右鍵選單
+＜路徑移動＞先選取 Token，按住 Shift＋左鍵點地圖加路點，再 Shift＋右鍵依序移動
+　　　　放開 Shift（未右鍵確認）＝取消路點
+＜選取＞左鍵點物件＝選取（高亮）　Ctrl＋點＝加減選
+　　　　左鍵空白拖曳＝框選　點空白／Esc＝取消選取
+圖片、音樂可直接拖進瀏覽器匯入。`,
+  'tutorial.keyboard': `＜鍵盤（選取後）＞WASD／方向鍵＝移動（可對角）
+　　　　Shift＋WASD＝改變面向　Delete＝刪除（角色進回收區）
+　　　　Ctrl＋C／X／V＝複製／剪下／貼上（貼在滑鼠游標處；選取文字時仍可複製文字）
+　　　　[ ＝送到後層　] ＝送到前層
+　　　　Alt＋滾輪＝旋轉 15°　Ctrl＋Shift＋滾輪＝旋轉 45°
+　　　　拖曳放開時按住 Shift＝暫時不吸附格線　Esc＝取消選取
+　　　　訪客模式無法使用編輯類快捷鍵。`,
+  'tutorial.chat': `＜聊天＞上方可切頻道；工具列（本機，ON＝開／OFF＝關）：
+　　　　音樂／效果音／提示音／靠左／列表（一般氣泡）／精簡工具列
+　　　　精簡＝收起標籤列與工具列，只留輸入區；右下小鈕可還原
+＜骰子＞輸入區選規則後直接打指令（BCDice）
+　　　　角色卡數值欄旁可「快速擲骰」送到目前聊天頻道
+＜訪客＞開房可「允許訪客」；訪客功能受限。有密碼仍要密碼
+＜筆記＞選單可開「筆記倉庫」整理桌面／公用／私人／回收區筆記
+＜密語＞不會進 ZIP；換了連線 ID 後舊密語也看不到，請留意。`,
+  'tutorial.scene': `＜Ping＞地圖空白處長按＝標記；Shift＋長按＝警告標記
+＜地圖設定＞黑暗／全域亮度／天氣（雨・雪・霧）／啟用視野
+＜視野＞開啟後玩家只看得到自己的視野角色周圍（GM 不受限）
+　　　　聊天選發言角色＝暫時帶入視野；關閉該聊天窗即取消
+　　　　長留請右鍵勾「作為我的視野角色」；可設視野／亮光／昏暗光
+　　　　棋子・遮罩・地形預設擋光；右鍵可關「與燈光互動」
+　　　　狀態圖示常駐於名牌；套圈可在右鍵「套圈」選擇
+＜場景工具＞僅 GM（選單）；選取／燈光／牆壁／矩形／橢圓／多邊形／手繪／文字
+　　　　選取後：WASD／方向鍵移動　Delete 刪除；牆・多邊形：Enter／雙擊完成；Esc 取消
+＜戰鬥輪＞選單開啟；可加入選取／桌面全部、擲先攻、回合與輪次
+　　　　角色右鍵「加入戰鬥」；開始後會有回合宣告提示`,
+  'changelog.v1132': `根據 https://nanasunana.github.io/ 私家改造版重新中文化，並加入各種功能。
+升級 1.13.2 版本`,
+  'changelog.v1133b': `升級成 1.13.3b 版本
+2021/05/11 改良 HTML 及 TXT 匯出功能，增加 COIN 功能
+2021/05/13 更新 TOKEN 底部框大小
+2021/05/27 更新 CutIn 功能（可使用 YouTube）；陰影會依高度改變`,
+  'changelog.vF': `2021/08/17 更新成 F 版，更新組件版本。修正角色卡不能擲骰的 BUG，感謝吐司兔的回報。`,
+  'changelog.2026base': `2026 重大更新（hktrpg-main）
+・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
+・介面全面繁體中文化；品牌與說明對齊 HKTRPG
+・訪客模式、聊天精簡、筆記倉庫、角色卡快速擲骰
+・聊天工具列：音樂／效果音／提示音／靠左／列表／精簡
+・BCDice 4.9.0`,
+  'changelog.2026ops': `2026/08/03 操作更新
+・桌面選取高亮；左鍵空白框選；Shift＋左鍵平移地圖
+・雙擊物件開啟詳情（翻面／抽牌／擲骰改右鍵選單）
+・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）
+・[ / ] 調整前後層；Alt＋滾輪 15°／Ctrl＋Shift＋滾輪 45° 旋轉
+・Shift＋滾輪左右移動畫面；Ctrl＋滾輪上下移動畫面
+・路徑移動：選取 Token → Shift＋左鍵加路點 → Shift＋右鍵移動；放開 Shift 取消
+・角色「切換下一張圖像」改右鍵；陰影隨尺寸／高度變化`,
+  'changelog.2026scene': `2026/08/03 場景・戰鬥・視野
+・Ping：空白處長按標記；Shift＋長按警告
+・地圖：黑暗／亮度／天氣；可啟用視野（擋光牆、點光源）
+・場景工具（GM）：牆／燈／繪圖；Enter 完成牆與多邊形等
+・聊天選角暫時帶入視野；僅手動「作為我的視野角色」會長留
+・戰鬥輪：先攻、回合宣告；角色狀態圖示與底盤套圈
+・地圖設定可下載地圖；狀態 icon 常駐顯示並自動換行`,
+  'changelog.links': `本站：https://z01.hktrpg.com
+教學：https://bothelp.hktrpg.com/guide
+Discord：https://support.hktrpg.com
+Facebook：https://www.facebook.com/groups/HKTRPG
+百科：https://www.hktrpg.com/
+原版烏冬：https://udonarium.app/
+with Fly：https://nanasunana.github.io/
+支援開發：https://www.patreon.com/HKTRPG`,
+};

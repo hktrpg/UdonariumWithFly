@@ -8,6 +8,7 @@ import { Network } from '@udonarium/core/system';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { I18nService } from './i18n.service';
 
 const HOURS = 60 * 60 * 1000;
 
@@ -23,7 +24,7 @@ export class ChatMessageService {
 
   gameType: string = '';
 
-  constructor() { }
+  constructor(private i18n: I18nService) { }
 
   GuestMode() {
     return Network.GuestMode();
@@ -142,9 +143,9 @@ export class ChatMessageService {
   private findObjectName(identifier: string): string {
     let object = ObjectStore.instance.get(identifier);
     if (object instanceof GameCharacter) {
-      return object.name && object.name.length ? object.name : '（無名角色）';
+      return object.name && object.name.length ? object.name : this.i18n.t('chat.unnamedCharacter');
     } else if (object instanceof PeerCursor) {
-      return object.name && object.name.length ? object.name : '（無名玩家）';
+      return object.name && object.name.length ? object.name : this.i18n.t('chat.unnamedPlayer');
     }
     return identifier;
   }
@@ -162,7 +163,7 @@ export class ChatMessageService {
   /** Character name with player nick, e.g. `愛麗絲 (小明)`. */
   private makeSpeakerDisplayName(sendFrom: string): string {
     let name = this.findObjectName(sendFrom);
-    if (this.GuestMode()) name += '(訪客)';
+    if (this.GuestMode()) name += this.i18n.t('chat.guestSuffix');
     const object = ObjectStore.instance.get(sendFrom);
     if (object instanceof GameCharacter) {
       const nick = PeerCursor.myCursor?.name?.trim();

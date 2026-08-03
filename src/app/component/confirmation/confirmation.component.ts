@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { EventSystem } from '@udonarium/core/system';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'app-confirmation',
@@ -22,7 +23,8 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
 
   constructor(
     private panelService: PanelService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService
   ) { 
     this.title = modalService.option.title ? modalService.option.title : '';
     this.subTitle = modalService.option.subTitle ? modalService.option.subTitle : '';
@@ -37,7 +39,7 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     Promise.resolve().then(() => {
-      let titleBar = '確認';
+      let titleBar = this.i18n.t('confirm.title');
       if (this.title) {
         titleBar += ('〈' + this.title + (this.subTitle ? `：${this.subTitle}` : '') + '〉');
       } else if (this.subTitle) {
@@ -45,11 +47,22 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
       }
       this.modalService.title = this.panelService.title = titleBar;
     });
-    EventSystem.register(this);
+    EventSystem.register(this)
+      .on('LOCALE_CHANGED', () => this.refreshTitle());
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private refreshTitle() {
+    let titleBar = this.i18n.t('confirm.title');
+    if (this.title) {
+      titleBar += ('〈' + this.title + (this.subTitle ? `：${this.subTitle}` : '') + '〉');
+    } else if (this.subTitle) {
+      titleBar += `〈${this.subTitle}〉`;
+    }
+    this.modalService.title = this.panelService.title = titleBar;
   }
 
   ok() {

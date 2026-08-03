@@ -18,6 +18,8 @@ import { PanelService } from 'service/panel.service';
 import { animate, style, transition, trigger } from '@angular/animations';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { I18nService } from 'service/i18n.service';
+import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
@@ -156,9 +158,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   get currentRoleLabel(): string {
     switch (this.currentRole) {
-      case 'gm': return 'GM';
-      case 'guest': return '訪客';
-      default: return '玩家';
+      case 'gm': return this.i18n.t('peer.role.gm');
+      case 'guest': return this.i18n.t('peer.role.guest');
+      default: return this.i18n.t('peer.role.user');
     }
   }
 
@@ -171,23 +173,36 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
-    public appConfigService: AppConfigService
+    public appConfigService: AppConfigService,
+    public i18n: I18nService,
   ) { }
 
   GuestMode() {
     return Network.GuestMode();
   }
 
+  onLocaleChange(locale: AppLocale) {
+    this.i18n.setLocale(locale);
+    this.refreshPanelTitle();
+  }
+
+  private refreshPanelTitle() {
+    this.panelService.title = this.i18n.t('peer.title');
+  }
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.panelService.title = '連線資訊'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => {
+      this.refreshPanelTitle();
+      this.panelService.isAbleFullScreenButton = false;
+    });
   }
 
   ngAfterViewInit() {
     EventSystem.register(this)
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => { });
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()));
     this.interval = setInterval(() => { }, 1000);
   }
 
@@ -229,10 +244,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     ObjectStore.instance.clearDeleteHistory();
     Network.connect(peer);
     if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
-      if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('解除 GM 模式');
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
@@ -240,10 +256,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   showLobby() {
     if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
-      if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('解除 GM 模式');
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
@@ -304,9 +321,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyPassword() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: '複製密碼', 
-        text: '要將密碼複製到剪貼簿嗎？',
-        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.copyPassword.title'),
+        text: this.i18n.t('peer.confirm.copyPassword.text'),
+        helpHtml: this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
@@ -325,13 +342,16 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyRoomInfo() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: '複製房間資訊', 
-        text: '要將房間資訊（房間名稱/房間 ID、密碼）複製到剪貼簿嗎？',
-        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.copyRoomInfo.title'),
+        text: this.i18n.t('peer.confirm.copyRoomInfo.text'),
+        helpHtml: this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
-          navigator.clipboard.writeText('房間名稱：' + this.networkService.peer.roomName + '/' + this.networkService.peer.roomId + '  密碼：' + this.networkService.peer.password);
+          navigator.clipboard.writeText(this.i18n.t('peer.clipboardRoomInfo', {
+            room: this.networkService.peer.roomName + '/' + this.networkService.peer.roomId,
+            password: this.networkService.peer.password,
+          }));
           this.isRoomInfoCopied = true;
           clearTimeout(this._timeOutId4);
           this._timeOutId4 = setTimeout(() => {
@@ -353,9 +373,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示密碼', 
-        text: '要顯示密碼嗎？',
-        helpHtml: '直播時請注意不要讓密碼出現在畫面上。<br>分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.showPassword.title'),
+        text: this.i18n.t('peer.confirm.showPassword.text'),
+        helpHtml: this.i18n.t('peer.confirm.showPassword.help') + '<br>' + this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
@@ -371,7 +391,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     const peer = this.networkService.peer;
     const room = peer.isRoom
       ? new RoomInfo(peer.roomId, peer.roomName, [peer as any])
-      : new RoomInfo('local', RoomAuth.encode('本機', 'local', { gm: '', user: '', guest: '' }), []);
+      : new RoomInfo('local', RoomAuth.encode(this.i18n.t('peer.localRoom'), 'local', { gm: '', user: '', guest: '' }), []);
 
     const result = await this.modalService.open<RoomJoinResult>(RoomJoinComponent, {
       room,
@@ -382,13 +402,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     });
     if (!result) return;
 
-    const label = result.role === 'gm' ? 'GM' : (result.role === 'guest' ? '訪客' : '玩家');
+    const label = result.role === 'gm'
+      ? this.i18n.t('peer.role.gm')
+      : (result.role === 'guest' ? this.i18n.t('peer.role.guest') : this.i18n.t('peer.role.user'));
     this.modalService.open(ConfirmationComponent, {
-      title: '轉換身份',
-      text: `確定將身份轉換為「${label}」嗎？`,
+      title: this.i18n.t('peer.confirm.switchIdentity.title'),
+      text: this.i18n.t('peer.confirm.switchIdentity.text', { role: label }),
       helpHtml: result.role === 'gm'
-        ? 'GM 可查看密語、卡片背面、未公開骰子與角色／游標位置；且無法由自己發起房間／私人連線。'
-        : (result.role === 'guest' ? '訪客模式功能受限（例如無法存檔）。' : '以一般玩家身份參加。'),
+        ? this.i18n.t('peer.confirm.switchIdentity.helpGm')
+        : (result.role === 'guest'
+          ? this.i18n.t('peer.confirm.switchIdentity.helpGuest')
+          : this.i18n.t('peer.confirm.switchIdentity.helpUser')),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'swap_horiz',
       action: () => {
@@ -396,13 +420,16 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
         RoomAuth.applyIdentity(result.role);
         // Clear legacy hold state.
         PeerCursor.isGMHold = false;
-        this.chatMessageService.sendOperationLog(`身份轉換：${this.roleLabel(prev)} → ${label}`);
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {
+          from: this.roleLabel(prev),
+          to: label
+        }));
         EventSystem.trigger('CHANGE_GM_MODE', null);
         if (prev === 'gm' && result.role !== 'gm' && GameCharacter.isStealthMode) {
           this.modalService.open(ConfirmationComponent, {
-            title: '隱身模式',
-            text: '已開啟隱身：其他人看不到你的游標位置。',
-            help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+            title: this.i18n.t('peer.confirm.stealth.title'),
+            text: this.i18n.t('peer.confirm.stealth.text'),
+            help: this.i18n.t('peer.confirm.stealth.help'),
             type: ConfirmationType.OK,
             materialIcon: 'disabled_visible'
           });
@@ -413,9 +440,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   private roleLabel(role: RoomRole): string {
     switch (role) {
-      case 'gm': return 'GM';
-      case 'guest': return '訪客';
-      default: return '玩家';
+      case 'gm': return this.i18n.t('peer.role.gm');
+      case 'guest': return this.i18n.t('peer.role.guest');
+      default: return this.i18n.t('peer.role.user');
     }
   }
 

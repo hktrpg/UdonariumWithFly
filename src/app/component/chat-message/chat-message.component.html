@@ -68,7 +68,7 @@
     <span style="display: inline-block">
       <span [style.color]="!chatMessage.isSpecialColor && chatMessage.color && chatMessage.color != '#ffffff' ? chatMessage.color : ''" 
         [innerHTML]="htmlEscapedText | safe: 'html'" (click)="onLinkClick($event)"></span>
-      <span *ngIf="!isEditing && chatMessage.isEdited" class="is-edited"><b style="white-space: nowrap">已編輯</b> {{chatMessage.lastUpdate | date:'M/d H:mm'}}</span>
+      <span *ngIf="!isEditing && chatMessage.isEdited" class="is-edited"><b style="white-space: nowrap">{{ 'chat.edited' | i18n }}</b> {{chatMessage.lastUpdate | date:'M/d H:mm'}}</span>
       <button *ngIf="chatMessage.isSecret" (click)="discloseMessage()" style="padding-top: 1px; padding-bottom: 1px; margin-left: 3px;">公開結果</button>
     </span>
   </div>
@@ -78,9 +78,9 @@
 </ng-template>
 <ng-template #editor>
   <span class="edit-buttons" style="margin-left: 4px; white-space: nowrap">
-    <button *ngIf="!isEditing" class="edit-button" (click)="editStart()" title="編輯"><i class="material-icons small-font">edit</i></button>
+    <button *ngIf="!isEditing" class="edit-button" (click)="editStart()" [title]="'chat.edit' | i18n"><i class="material-icons small-font">edit</i></button>
     <button *ngIf="!isEditing" class="edit-button" aria-hidden="true" style="visibility: hidden"><i class="material-icons small-font">clear</i></button>
-    <button *ngIf="isEditing" class="edit-button" [disabled]="editingText.trim().length == 0" (click)="editEnd()" title="確定"><i class="material-icons small-font">done</i></button>
-    <button *ngIf="isEditing" class="edit-button" (click)="editCancel()" title="取消"><i class="material-icons small-font">clear</i></button>
+    <button *ngIf="isEditing" class="edit-button" [disabled]="editingText.trim().length == 0" (click)="editEnd()" [title]="'common.ok' | i18n"><i class="material-icons small-font">done</i></button>
+    <button *ngIf="isEditing" class="edit-button" (click)="editCancel()" [title]="'common.cancel' | i18n"><i class="material-icons small-font">clear</i></button>
   </span>
 </ng-template>

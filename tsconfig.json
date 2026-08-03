@@ -35,6 +35,12 @@
       ],
       "service/*": [
         "./src/app/service/*"
+      ],
+      "i18n": [
+        "./src/app/i18n/index.ts"
+      ],
+      "i18n/*": [
+        "./src/app/i18n/*"
       ]
     }
   },

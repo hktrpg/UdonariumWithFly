@@ -1,6 +1,7 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 import { EventSystem } from '@udonarium/core/system';
+import { I18nService } from 'service/i18n.service';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 
 export interface CombatRoundAnnounceData {
@@ -43,10 +44,11 @@ export class CombatAnnounceComponent implements OnInit, OnDestroy {
   constructor(
     private ngZone: NgZone,
     private changeDetector: ChangeDetectorRef,
+    private i18n: I18nService
   ) {}
 
   get label(): string {
-    return this.kind === 'begin' ? '戰鬥開始' : '下一輪';
+    return this.i18n.t(this.kind === 'begin' ? 'combat.begin' : 'combat.nextRound');
   }
 
   /** Force re-enter animation when announce fires again while still visible. */

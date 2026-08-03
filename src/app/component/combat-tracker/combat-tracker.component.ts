@@ -13,6 +13,7 @@ import {
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker, CombatantData, EncounterData, InitiativeDice } from '@udonarium/table-fx/combat-tracker';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
@@ -32,6 +33,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     private selectionService: TabletopSelectionService,
     private chatMessageService: ChatMessageService,
     private tabletopService: TabletopService,
+    private i18n: I18nService,
   ) {}
 
   get tracker(): CombatTracker { return CombatTracker.instance; }
@@ -42,8 +44,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   ngOnInit() {
     CombatTrackerComponent.openCount += 1;
     Promise.resolve().then(() => {
-      this.panelService.title = '戰鬥輪';
-      this.tracker.ensureActiveEncounter('戰鬥 1');
+      this.refreshPanelTitle();
+      this.tracker.ensureActiveEncounter(this.encounterName(1));
     });
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.tracker.identifier}`, () => { /* refresh via zone */ })
@@ -52,7 +54,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         if (this.encounter?.combatants.some(c => c.characterIdentifier === event.data.identifier)) {
           /* zone refresh */
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
@@ -60,16 +63,24 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     EventSystem.unregister(this);
   }
 
+  private refreshPanelTitle() {
+    this.panelService.title = this.i18n.t('combat.title');
+  }
+
+  private encounterName(n: number): string {
+    return this.i18n.t('combat.encounterN', { name: this.i18n.t('combat.defaultName'), n });
+  }
+
   createEncounter() {
     if (this.isGuest) return;
     const n = this.tracker.encounters.length + 1;
-    this.tracker.createEncounter(`戰鬥 ${n}`);
+    this.tracker.createEncounter(this.encounterName(n));
   }
 
   deleteEncounter() {
     if (this.isGuest) return;
     this.tracker.deleteActiveEncounter();
-    if (!this.tracker.encounters.length) this.tracker.createEncounter('戰鬥 1');
+    if (!this.tracker.encounters.length) this.tracker.createEncounter(this.encounterName(1));
   }
 
   renameEncounter(name: string) {
@@ -162,7 +173,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   displayName(c: CombatantData): string {
-    return this.characterOf(c)?.name || c.name || '未命名';
+    return this.characterOf(c)?.name || c.name || this.i18n.t('combat.unnamed');
   }
 
   portraitUrl(c: CombatantData): string {
@@ -188,18 +199,21 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   statusTitle(s: CharacterStatusEntry): string {
-    const def = getStatusDef(s.id);
-    if (!def) return s.id;
-    return s.level ? `${def.name} ${s.level}` : def.name;
+    const name = this.i18n.t(`fx.status.${s.id}`);
+    const tip = this.i18n.t(`fx.status.${s.id}.tip`);
+    const title = s.level ? `${name} ${s.level}` : name;
+    return tip && tip !== `fx.status.${s.id}.tip` ? `${title}\n${tip}` : title;
   }
 
   ownerLabel(c: CombatantData): string {
     const ch = this.characterOf(c);
-    if (!ch) return c.isNpc ? 'NPC' : 'PC';
+    if (!ch) return c.isNpc ? this.i18n.t('combat.npc') : this.i18n.t('combat.pc');
     const controllerId = ch.playerOwner || ch.owner;
-    if (!controllerId) return 'NPC';
+    if (!controllerId) return this.i18n.t('combat.npc');
     const peer = PeerCursor.findByUserId(controllerId);
-    return peer?.name ? `PC · ${peer.name}` : 'PC';
+    return peer?.name
+      ? this.i18n.t('combat.pcWithName', { name: peer.name })
+      : this.i18n.t('combat.pc');
   }
 
   get selectedCharacterCount(): number {
@@ -212,7 +226,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (!chars.length) return;
     this.tracker.addCombatants(chars.map(obj => ({
       characterIdentifier: obj.identifier,
-      name: obj.name || '未命名',
+      name: obj.name || this.i18n.t('combat.unnamed'),
       isNpc: !obj.hasPlayerController,
       isDefeated: false,
       isHidden: false,
@@ -226,7 +240,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (!chars.length) return;
     this.tracker.addCombatants(chars.map(obj => ({
       characterIdentifier: obj.identifier,
-      name: obj.name || '未命名',
+      name: obj.name || this.i18n.t('combat.unnamed'),
       isNpc: !obj.hasPlayerController,
       isDefeated: false,
       isHidden: false,
@@ -305,7 +319,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         if (value == null) continue;
         c.initiative = value;
         this.chatMessageService.sendOperationLog(
-          `【先攻】${c.name || '未命名'}：${value}（資源 ${resourceName}）`
+          this.i18n.t('combat.resourceInitiativeLog', {
+            name: c.name || this.i18n.t('combat.unnamed'),
+            value,
+            resource: resourceName,
+          })
         );
       }
     });
@@ -382,6 +400,6 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   private logRoll(name: string, roll: number) {
     const dice = this.encounter?.initiativeDice || 'd20';
-    this.chatMessageService.sendOperationLog(`【先攻】${name}：${roll}（${dice}）`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('combat.initiativeLog', { name, roll, dice }));
   }
 }

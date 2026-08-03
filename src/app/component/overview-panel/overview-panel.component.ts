@@ -12,6 +12,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { I18nService } from 'service/i18n.service';
 import { DataElement } from '@udonarium/data-element';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { GameObjectInventoryService } from 'service/game-object-inventory.service';
@@ -197,7 +198,8 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     private inventoryService: GameObjectInventoryService,
     private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    public i18n: I18nService
   ) { }
 
   GuestMode() {

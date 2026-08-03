@@ -22,6 +22,7 @@ import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { I18nService } from './i18n.service';
 import saveAs from 'file-saver';
 
 type UpdateCallback = (percent: number) => void;
@@ -34,15 +35,18 @@ export class SaveDataService {
 
   constructor(
     private ngZone: NgZone,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
-  saveRoomAsync(fileName: string = 'fly_房間數據', updateCallback?: UpdateCallback): Promise<void> {
-    this.chatMessageService.sendOperationLog(`房間數據 ${fileName}.zip 已下載`);
-    return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(fileName, updateCallback)));
+  saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
+    const name = fileName ?? this.i18n.t('save.roomFilePrefix');
+    this.chatMessageService.sendOperationLog(this.i18n.t('save.roomDownloaded', { file: name }));
+    return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(name, updateCallback)));
   }
 
-  private _saveRoomAsync(fileName: string = 'fly_房間數據', updateCallback?: UpdateCallback): Promise<void> {
+  private _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
+    fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
     let files: File[] = [];
     let roomXml = this.convertToXml(new Room());
     let chatXml = this.convertToXml(ChatTabList.instance);
@@ -79,7 +83,10 @@ export class SaveDataService {
   }
 
   saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
-    this.chatMessageService.sendOperationLog(`${StringUtil.aliasNameToClassName(gameObject.aliasName)}的數據 ${fileName}.zip 已下載`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('save.objectDownloaded', {
+      type: this.aliasLabel(gameObject.aliasName),
+      file: fileName
+    }));
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveGameObjectAsync(gameObject, fileName, updateCallback)));
   }
 
@@ -176,7 +183,7 @@ export class SaveDataService {
     const mimeType = (logFormat == 0 ? 'text/plain' : 'text/html');
     const ext = (logFormat == 0 ? '.txt' : '.html');
     const trueFileName = 'fly_' + this.appendTimestamp(fileName) + ext;
-    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName} 已下載`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('save.chatLogDownloaded', { file: trueFileName }));
     //const xml = ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, chatTabs);
     
     //const files: File[] = [];
@@ -187,7 +194,7 @@ export class SaveDataService {
 
   async saveChatLogAsync(logFormat: number, fileName: string, chatTabs: ChatTab[]=null, dateFormat='HH:mm', isWriteOerationLog=true, updateCallback?: UpdateCallback): Promise<void> {
     const trueFileName = 'fly_' + this.appendTimestamp(fileName);
-    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName}.zip 已下載`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('save.chatLogZipDownloaded', { file: trueFileName }));
     const files: File[] = [];
     const images: ImageFile[] = (chatTabs ? chatTabs : [ChatTabList.instance]).reduce<ImageFile[]>((acm, obj) => acm.concat(this.searchImageFiles(this.convertToXml(obj))), []);
     const imageDict = {};
@@ -236,5 +243,11 @@ export class SaveDataService {
     }
     files.push(new File([ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, imageDict, chatTabs)], 'index.html', {type: 'text/html;charset=utf-8'}));
     return this.saveAsync(files, trueFileName, updateCallback);
+  }
+
+  private aliasLabel(aliasName: string): string {
+    const key = `alias.${aliasName}`;
+    const text = this.i18n.t(key);
+    return text === key ? (StringUtil.aliasNameToClassName(aliasName) || aliasName) : text;
   }
 }

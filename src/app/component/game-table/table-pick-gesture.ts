@@ -99,6 +99,11 @@ export class TablePickGesture {
     this.clearActivateTimer();
     this.pickCursor.update(this.input.pointer);
 
+    // Scene tools / transform already own this gesture — do not start region pick.
+    if (this.oncancelifneeded != null && this.oncancelifneeded()) {
+      return this.cancel();
+    }
+
     let isMainButton = (e instanceof MouseEvent && e.button === 0) || (e as TouchEvent).touches;
     if (!isMainButton) return this.cancel();
 

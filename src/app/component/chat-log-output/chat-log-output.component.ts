@@ -7,6 +7,7 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'app-chat-log-output',
@@ -51,7 +52,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   get roomName():string {
     let roomName = Network.peer && 0 < Network.peer.roomName.length
       ? Network.peer.roomName
-      : '房間資料';
+      : this.i18n.t('room.dataFallback');
     return roomName;
   }
 
@@ -59,7 +60,8 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
-    private saveDataService: SaveDataService
+    private saveDataService: SaveDataService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -68,7 +70,7 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '聊天日誌輸出'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => { this.refreshPanelTitle(); this.panelService.isAbleFullScreenButton = false });
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 1000, event => {
         if (this.selectedTabs.length == 0 || !event.data.identifier) return;
@@ -77,7 +79,8 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
           this.selectedTabs = this.selectedTabs.filter(tab => tab && tab.identifier != event.data.identifier);
         }
         this.selectTabsApplay();
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
     this.panelId = UUID.generateUuid();
   }
 
@@ -108,14 +111,14 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
   saveLog() {
     if (this.GuestMode()) return;
     if (this.isDisable) return;
-    const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? '全部標籤' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、其他' : ''));
+    const fileName = this.roomName + '_chatLog_' + (this.isAllTabs ? this.i18n.t('chatLog.fileAllTabs') : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? this.i18n.t('chatLog.fileAndOthers') : ''));
     const tabs = this.isAllTabs ? null : this.selectedTabs;
     this.saveDataService.saveChatLog(this.logFormat, fileName, tabs, this.dateFormat, this.isWriteOerationLog);
   }
 
   async saveLogWithImages() {
     if (this.isDisable) return;
-    const fileName = this.roomName + '_chatLogWithImages_' + (this.isAllTabs ? '全部標籤' : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? '、其他' : ''));
+    const fileName = this.roomName + '_chatLogWithImages_' + (this.isAllTabs ? this.i18n.t('chatLog.fileAllTabs') : this.selectedTabs[0].name + (this.selectedTabs.length > 1 ? this.i18n.t('chatLog.fileAndOthers') : ''));
     const tabs = this.isAllTabs ? null : this.selectedTabs;
 
     this.isSaveing = true;
@@ -129,5 +132,9 @@ export class ChatLogOutputComponent implements OnInit, AfterViewInit {
       this.isSaveing = false;
       this.progresPercent = 0;
     }, 500);
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('chatLog.title');
   }
 }

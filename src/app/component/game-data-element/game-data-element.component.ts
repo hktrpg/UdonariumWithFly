@@ -9,6 +9,7 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-data-element, [game-data-element]',
@@ -103,7 +104,8 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   constructor(
     private changeDetector: ChangeDetectorRef,
     private chatMessageService: ChatMessageService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService
   ) { }
 
   ngOnInit() {
@@ -131,7 +133,8 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
         if (this.gameDataElement && this.gameDataElement.identifier === event.data.identifier) {
           this.changeDetector.markForCheck();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.changeDetector.markForCheck());
   }
 
   ngOnDestroy() {
@@ -139,7 +142,7 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   }
 
   addElement() {
-    this.gameDataElement.appendChild(DataElement.create('標籤', '', {}));
+    this.gameDataElement.appendChild(DataElement.create(this.i18n.t('sheet.data.tag'), '', {}));
   }
 
   deleteElement() {

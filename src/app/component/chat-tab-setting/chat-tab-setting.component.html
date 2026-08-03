@@ -1,27 +1,27 @@
 <div class="flex-container">
   <div class="flex-item no-grow">
     <div>
-      <button (click)="create()" style="margin: 0px 0px 2px 0px; font-size: smaller">新增聊天標籤</button>
+      <button (click)="create()" style="margin: 0px 0px 2px 0px; font-size: smaller">{{ 'chatTab.create' | i18n }}</button>
     </div>
     <select #select style="width: 100%; max-width: 140px" size="10" (change)="onChangeSelectTab(select.value)" [ngModel]="selectedTab?.identifier">
-      <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}" title="{{chatTab.name}}" [style.color]="chatTab.name == '' ? 'gray' : ''">{{chatTab.name == '' ? '(未命名標籤)' : chatTab.name}}</option>
+      <option *ngFor="let chatTab of chatTabs" value="{{chatTab.identifier}}" title="{{chatTab.name}}" [style.color]="chatTab.name == '' ? 'gray' : ''">{{chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name}}</option>
     </select>
   </div>
   <div class="flex-item">
     <ng-container *ngIf="!isEmpty && selectedTab">
-      <div><b style="font-size: smaller">標籤名稱: </b>
+      <div><b style="font-size: smaller">{{ 'chatTab.name' | i18n }}</b>
         <input style="width: 200px" [(ngModel)]="tabName" placeholder="Name" [attr.disabled]="!isEditable ? '' : null" />
       </div>
       <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
         <label [style.cursor]="isEditable ? 'pointer' : 'default'">
           <input type="checkbox" [(ngModel)]="isUseStandImage" checked="{{isUseStandImage ? 'checked' : ''}}" (change)="isUseStandImage = (isUseStandImage ? true : false)" [attr.disabled]="!isEditable ? '' : null" />
-          <span style="text-shadow: #111 0 0 1px">💭</span>、過場、立繪啟用
+          <span style="text-shadow: #111 0 0 1px">💭</span>{{ 'chatTab.enableStand' | i18n }}
         </label>
       </div>
       <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
         <label [style.cursor]="isEditable ? 'pointer' : 'default'">
           <input type="checkbox" [(ngModel)]="recieveOperationLogLevel" checked="{{recieveOperationLogLevel > 0 ? 'checked' : ''}}" (change)="recieveOperationLogLevel = (recieveOperationLogLevel > 0 ? 1 : 0)" [attr.disabled]="!isEditable ? '' : null" />
-          顯示操作紀錄
+          {{ 'chatTab.showOperationLog' | i18n }}
         </label>
       </div>
       <hr/>
@@ -30,23 +30,23 @@
           <button (click)="upTabIndex()">↑</button>
           <button (click)="downTabIndex()">↓</button>
           <div style="float: right">
-          <button (click)="showLogOutput()"><i class="material-icons small-font">history_edu</i>日誌</button>
+          <button (click)="showLogOutput()"><i class="material-icons small-font">history_edu</i>{{ 'chatTab.log' | i18n }}</button>
           <button [disabled]="isSaveing" (click)="save()">
             <div style="position: relative;">
-              <div [ngClass]="{'is-hidden': isSaveing}">下載</div>
+              <div [ngClass]="{'is-hidden': isSaveing}">{{ 'chatTab.download' | i18n }}</div>
               <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
             </div>
           </button>
-          <button class="danger" (click)="delete()" [attr.disabled]="chatTabs.length <= 1 ? '' : null">刪除</button>
+          <button class="danger" (click)="delete()" [attr.disabled]="chatTabs.length <= 1 ? '' : null">{{ 'chatTab.delete' | i18n }}</button>
           </div>
         </ng-container>
         <ng-container *ngIf="isDeleted">
-          <button (click)="restore()">復原</button>
+          <button (click)="restore()">{{ 'chatTab.restore' | i18n }}</button>
         </ng-container>
       </div>
     </ng-container>
   </div>
 </div>
 <ng-container *ngIf="isEmpty">
-  <div style="font-size: 12px;">*尚未新增聊天標籤。您可以使用「新增聊天標籤」來建立。</div>
+  <div style="font-size: 12px;">{{ 'chatTab.empty' | i18n }}</div>
 </ng-container>

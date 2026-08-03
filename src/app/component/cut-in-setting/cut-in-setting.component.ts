@@ -22,6 +22,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { CutInComponent } from 'component/cut-in/cut-in.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 
 
 @Component({
@@ -173,12 +174,14 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     private modalService: ModalService,
     private panelService: PanelService,
     private saveDataService: SaveDataService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    public i18n: I18nService
   ) { }
 
   ngOnInit(): void {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'CutIn 設定');
+    Promise.resolve().then(() => this.updateTitle());
     EventSystem.register(this)
+      .on('LOCALE_CHANGED', -1000, () => this.updateTitle())
       .on('SYNCHRONIZE_AUDIO_LIST', -1000, event => {
         this.onAudioFileChange();
       });
@@ -196,6 +199,10 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private updateTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('cutin.title');
   }
 
   onChangeCutIn(identifier: string) {
@@ -298,13 +305,13 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示隱藏設定的圖片', 
-        text: '要顯示隱藏設定的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('cutin.showHiddenTitle'), 
+        text: this.i18n.t('cutin.showHiddenText'),
+        help: this.i18n.t('cutin.showHiddenHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從 CutIn 設定顯示了隱藏設定的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('cutin.showHiddenLog'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -329,7 +336,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     } else {
       EventSystem.call('PLAY_CUT_IN', sendObj);
-      this.chatMessageService.sendOperationLog('播放了 ' + (cutIn.name == '' ? '(無名的 CutIn)' : cutIn.name));
+      this.chatMessageService.sendOperationLog(this.i18n.t('cutin.playedLog', { name: cutIn.name == '' ? this.i18n.t('cutin.unnamed') : cutIn.name }));
     }
   }
 
@@ -372,7 +379,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openYouTubeTerms() {
-    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: 'YouTube 服務條款' });
+    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: this.i18n.t('cutin.youtubeTerms') });
     return false;
   }
 
@@ -380,7 +387,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
     let textView = this.panelService.open(TextViewComponent, option);
-    textView.title = 'CutIn 說明';
+    textView.title = this.i18n.t('cutin.help');
     textView.text = 
 `　可設定 CutIn 的名稱、顯示時間、位置與寬高（皆為相對畫面尺寸）、以及發送聊天時顯示 CutIn 的條件。另外，播放影片時以及勾選「防止超出畫面」時，會調整位置與尺寸以收進畫面內。
 

@@ -33,6 +33,7 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CHARACTER_STATUS_DEFS, getStatusDef } from '@udonarium/table-fx/character-status';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-character',
@@ -132,19 +133,22 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
   get statusDefs() { return CHARACTER_STATUS_DEFS; }
-  statusTooltip(id: string): string { return getStatusDef(id as any)?.tooltip || ''; }
+  statusTooltip(id: string): string { return this.i18n.t(`fx.status.${id}.tip`); }
   statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }
   statusName(id: string): string {
-    const def = getStatusDef(id as any);
+    const name = this.i18n.t(`fx.status.${id}`);
     const entry = this.statusEntries.find(s => s.id === id);
-    if (!def) return id;
-    return entry?.level ? `${def.name} ${entry.level}` : def.name;
+    return entry?.level ? `${name} ${entry.level}` : name;
   }
 
   get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
   set isNotRide(isNotRide: boolean) { this.gameCharacter.isNotRide = isNotRide; }
   get isUseIconToOverviewImage(): boolean { return this.gameCharacter.isUseIconToOverviewImage; }
   set isUseIconToOverviewImage(isUseIconToOverviewImage: boolean) { this.gameCharacter.isUseIconToOverviewImage = isUseIconToOverviewImage; }
+
+  hasOverviewFaceIcon(): boolean {
+    return !!(this.faceIcon && 0 < this.faceIcon.url.length);
+  }
 
   get ownerName(): string { return this.gameCharacter.ownerName; }
   get ownerColor(): string { return this.gameCharacter.ownerColor; }
@@ -426,6 +430,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private modalService: ModalService,
     private selectionService: TabletopSelectionService,
     private characterFxMenu: CharacterFxMenuService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
@@ -604,15 +609,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
       z: this.gameCharacter.posZ
     };
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedCharacter = () => this.selectionService.objects.filter(object => object.aliasName === this.gameCharacter.aliasName) as GameCharacter[];
       actions.push(
         {
-          name: '已選擇的角色', action: null, subActions: [
+          name: this.i18n.t('char.selectedCharacters'), action: null, subActions: [
             {
-              name: '全部移至公用倉庫', action: () => {
+              name: this.i18n.t('char.moveAllToCommon'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('common')
                   this.selectionService.remove(gameCharacter);
@@ -621,7 +626,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: '全部移至個人倉庫', action: () => {
+              name: this.i18n.t('char.moveAllToPersonal'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation(Network.peerId);
                   this.selectionService.remove(gameCharacter);
@@ -630,7 +635,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: '全部移至回收區', action: () => {
+              name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('graveyard');
                   this.selectionService.remove(gameCharacter);
@@ -649,7 +654,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [
       { 
-        name: this.isHideIn ? '公開位置' : '僅自己可見（隱身）',
+        name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
         action: () => {
           if (this.isHideIn) {
             this.gameCharacter.owner = '';
@@ -657,9 +662,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           } else {
             if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
               this.modalService.open(ConfirmationComponent, {
-                title: '隱身模式', 
-                text: '已開啟隱身：其他人看不到你的游標位置。',
-                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+                title: this.i18n.t('char.stealthTitle'),
+                text: this.i18n.t('char.stealthText'),
+                help: this.i18n.t('char.stealthHelp'),
                 type: ConfirmationType.OK,
                 materialIcon: 'disabled_visible'
               });
@@ -677,7 +682,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       (this.gameCharacter.imageFiles.length <= 1 ? null : {
-        name: '圖片切換',
+        name: this.i18n.t('char.imageSwitch'),
         action: null,
         subActions: this.gameCharacter.imageFiles.map((image, i) => {
           return { 
@@ -690,29 +695,36 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         })
       }),
       (this.gameCharacter.imageFiles.length <= 1 ? null : ContextMenuSeparator),
-      (this.isUseIconToOverviewImage
-        ? {
-          name: '☑ 總覽顯示大頭貼', action: () => {
-            this.isUseIconToOverviewImage = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 總覽顯示大頭貼', action: () => {
-            this.isUseIconToOverviewImage = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
+      (() => {
+        const hasFace = this.hasOverviewFaceIcon();
+        if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
+        return hasFace && this.isUseIconToOverviewImage
+          ? {
+            name: this.i18n.t('char.overviewFaceOn'), action: () => {
+              this.isUseIconToOverviewImage = false;
+              EventSystem.trigger('UPDATE_INVENTORY', null);
+            },
+            checkBox: 'check' as const
+          } : {
+            name: this.i18n.t('char.overviewFaceOff'), action: () => {
+              if (!this.hasOverviewFaceIcon()) return;
+              this.isUseIconToOverviewImage = true;
+              EventSystem.trigger('UPDATE_INVENTORY', null);
+            },
+            checkBox: 'check' as const,
+            disabled: !hasFace,
+            error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+          };
+      })(),
       (this.gameCharacter.isShowChatBubble
         ? {
-          name: '☑ 顯示💭', action: () => {
+          name: this.i18n.t('char.chatBubbleOn'), action: () => {
             this.gameCharacter.isShowChatBubble = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 顯示💭', action: () => {
+          name: this.i18n.t('char.chatBubbleOff'), action: () => {
             this.gameCharacter.isShowChatBubble = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -720,13 +732,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }),
       (this.isDropShadow
         ? {
-          name: '☑ 顯示陰影', action: () => {
+          name: this.i18n.t('char.shadowOn'), action: () => {
             this.isDropShadow = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 顯示陰影', action: () => {
+          name: this.i18n.t('char.shadowOff'), action: () => {
             this.isDropShadow = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -738,13 +750,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       this.characterFxMenu.makeVisionMenu(this.gameCharacter),
       (this.gameCharacter.affectsLight !== false
         ? {
-          name: '☑ 與燈光互動', action: () => {
+          name: this.i18n.t('char.affectsLightOn'), action: () => {
             this.gameCharacter.affectsLight = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check' as const,
         } : {
-          name: '☐ 與燈光互動', action: () => {
+          name: this.i18n.t('char.affectsLightOff'), action: () => {
             this.gameCharacter.affectsLight = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -763,13 +775,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ContextMenuSeparator,
       (!this.isNotRide
         ? {
-          name: '☑ 可疊在其他角色上', action: () => {
+          name: this.i18n.t('char.stackOn'), action: () => {
             this.isNotRide = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 可疊在其他角色上', action: () => {
+          name: this.i18n.t('char.stackOff'), action: () => {
             this.isNotRide = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
@@ -777,20 +789,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }),
       (this.isAltitudeIndicate
         ? {
-          name: '☑ 顯示高度', action: () => {
+          name: this.i18n.t('char.altitudeOn'), action: () => {
             this.isAltitudeIndicate = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 顯示高度', action: () => {
+          name: this.i18n.t('char.altitudeOff'), action: () => {
             this.isAltitudeIndicate = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
       {
-        name: '將高度設為0', action: () => {
+        name: this.i18n.t('char.resetAltitude'), action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
@@ -799,30 +811,30 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         altitudeHande: this.gameCharacter
       },
       ContextMenuSeparator,
-      { name: '顯示詳情...', action: () => { this.showDetail(this.gameCharacter); } },
+      { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
       {
-        name: '切換下一張圖像', action: () => { this.nextImage(); },
+        name: this.i18n.t('char.nextImage'), action: () => { this.nextImage(); },
         disabled: this.gameCharacter.imageFiles.length <= 1
       },
       (this.gameCharacter.isAllowsChat
         ? {
-          name: '☑ 可進行聊天', action: () => {
+          name: this.i18n.t('char.chatOn'), action: () => {
             this.gameCharacter.isAllowsChat = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 可進行聊天', action: () => {
+          name: this.i18n.t('char.chatOff'), action: () => {
             this.gameCharacter.isAllowsChat = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-      { name: '顯示聊天面板...', action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      { name: '立繪設定...', action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
+      { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
+      { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
       ContextMenuSeparator,
       {
-        name: '開啟參考網址', action: null,
+        name: this.i18n.t('char.openReferenceUrl'), action: null,
         subActions: this.gameCharacter.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -835,7 +847,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
@@ -844,21 +856,21 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ContextMenuSeparator,
       (this.gameCharacter.isInventoryIndicate
         ? {
-          name: '☑ 在桌面倉庫中顯示', action: () => {
+          name: this.i18n.t('char.inventoryOn'), action: () => {
             this.gameCharacter.isInventoryIndicate = false;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 在桌面倉庫中顯示', action: () => {
+          name: this.i18n.t('char.inventoryOff'), action: () => {
             this.gameCharacter.isInventoryIndicate = true;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           checkBox: 'check'
         }),
-      { name: '移動位置', action: null, subActions: [
+      { name: this.i18n.t('char.moveTo'), action: null, subActions: [
         {
-          name: '公用倉庫', action: () => {
+          name: this.i18n.t('char.commonInventory'), action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('common');
             this.selectionService.remove(this.gameCharacter);
@@ -866,7 +878,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: '個人倉庫', action: () => {
+          name: this.i18n.t('char.personalInventory'), action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation(Network.peerId);
             this.selectionService.remove(this.gameCharacter);
@@ -874,7 +886,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: '回收區', action: () => {
+          name: this.i18n.t('char.graveyard'), action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
@@ -884,7 +896,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ]},
       ContextMenuSeparator,
       {
-        name: '建立副本', action: () => {
+        name: this.i18n.t('char.clone'), action: () => {
           let cloneObject = this.gameCharacter.clone();
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
@@ -893,7 +905,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         }
       },
       {
-        name: '建立副本（自動編號）', action: () => {
+        name: this.i18n.t('char.cloneNumbered'), action: () => {
           const cloneObject = this.gameCharacter.clone();
           const tmp = cloneObject.name.split('_');
           let baseName;
@@ -917,7 +929,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       ContextMenuSeparator,
       {
-        name: '刪除（移至回收區）', action: () => {
+        name: this.i18n.t('char.deleteToGraveyard'), action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
           this.gameCharacter.setLocation('graveyard');
           this.selectionService.remove(this.gameCharacter);
@@ -937,7 +949,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '角色卡';
+    let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

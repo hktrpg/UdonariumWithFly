@@ -24,6 +24,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { RangeArea } from '@udonarium/range';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-character-sheet',
@@ -102,7 +103,8 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     private panelService: PanelService,
     private modalService: ModalService,
     private pointerDeviceService: PointerDeviceService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
   ngOnInit() {
@@ -114,43 +116,18 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
       })
       .on('UPDATE_GAME_OBJECT', -1000, event => {
         if (this.tabletopObject && this.tabletopObject.identifier === event.data.identifier) {
-          switch (this.tabletopObject.aliasName) {
-            case 'terrain':
-              this.panelService.title = `地形設定 - ${this.tabletopObjectName}`;
-              break;
-            case 'card':
-              const card = this.tabletopObject;
-              if (card instanceof Card) { 
-                this.panelService.title = `卡片設定 - ${card.isFront ? this.tabletopObjectName : '卡片（背面）'}`;
-              } 
-              break;
-            case 'card-stack':
-              this.panelService.title = `牌堆設定 - ${this.tabletopObjectName}`;
-              break;
-            case 'table-mask':
-              this.panelService.title = `地圖遮罩設定 - ${this.tabletopObjectName}`;
-              break;
-            case 'text-note':
-              this.panelService.title = `共用筆記設定 - ${this.tabletopObjectName}`;
-              break;
-            case 'dice-symbol':
-              this.panelService.title = `骰子符號設定 - ${this.tabletopObjectName}`;
-              break;
-            case 'character':
-              this.panelService.title = `角色卡 - ${this.tabletopObjectName}`;
-              break;
-            case 'range':
-              this.panelService.title = `射程／範圍設定 - ${this.tabletopObjectName}`;
-              break;
-          }
+          this.updatePanelTitle();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.updatePanelTitle());
   }
 
   ngAfterViewInit() {
     queueMicrotask(() => {
-      const title = (this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? '卡片設定 - 卡片（背面）' : this.panelService.title;
-      this.chatMessageService.sendOperationLog(`${title} 已開啟`);
+      const title = (this.tabletopObject instanceof Card && !this.tabletopObject.isFront)
+        ? this.i18n.t('sheet.title.card', { name: this.i18n.t('sheet.cardBack') })
+        : this.panelService.title;
+      this.chatMessageService.sendOperationLog(this.i18n.t('sheet.logOpened', { title }));
     });
   }
 
@@ -164,8 +141,8 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   addDataElement() {
     if (this.tabletopObject.detailDataElement) {
-      let title = DataElement.create('標題', '', {});
-      let tag = DataElement.create('標籤', '', {});
+      let title = DataElement.create(this.i18n.t('sheet.data.title'), '', {});
+      let tag = DataElement.create(this.i18n.t('sheet.data.tag'), '', {});
       title.appendChild(tag);
       this.tabletopObject.detailDataElement.appendChild(title);
     }
@@ -245,7 +222,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
     //let element = this.tabletopObject.commonDataElement.getFirstElementByName('name') || this.tabletopObject.commonDataElement.getFirstElementByName('title');
     //let objectName: string = element ? <string>element.value : '';
-    const objectName = ((this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? '卡片' : this.tabletopObjectName);
+    const objectName = ((this.tabletopObject instanceof Card && !this.tabletopObject.isFront) ? this.i18n.t('sheet.cardBack') : this.tabletopObjectName);
 
     await this.saveDataService.saveGameObjectAsync(this.tabletopObject, 'fly_xml_' + objectName, percent => {
       this.progresPercent = percent;
@@ -559,5 +536,26 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     let len = this.tabletopObject.faceIcons.length;
     if (len <= 5) return 0;
     return (50 - (200 / (len - 1))) * index + 2;
+  }
+
+  private updatePanelTitle() {
+    if (!this.tabletopObject) return;
+    const aliasToKey: Record<string, string> = {
+      terrain: 'sheet.title.terrain',
+      'card-stack': 'sheet.title.cardStack',
+      'table-mask': 'sheet.title.tableMask',
+      'text-note': 'sheet.title.textNote',
+      'dice-symbol': 'sheet.title.diceSymbol',
+      character: 'sheet.title.character',
+      range: 'sheet.title.range'
+    };
+    if (this.tabletopObject.aliasName === 'card' && this.tabletopObject instanceof Card) {
+      this.panelService.title = this.i18n.t('sheet.title.card', {
+        name: this.tabletopObject.isFront ? this.tabletopObjectName : this.i18n.t('sheet.cardBack')
+      });
+      return;
+    }
+    const key = aliasToKey[this.tabletopObject.aliasName];
+    if (key) this.panelService.title = this.i18n.t(key, { name: this.tabletopObjectName });
   }
 }

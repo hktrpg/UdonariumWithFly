@@ -1,9 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
+import { EventSystem } from '@udonarium/core/system';
 import { RoomAuth, RoomJoinResult, RoomRole } from '@udonarium/room-auth';
 
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
 
 @Component({
@@ -21,15 +23,10 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
   switchMode = false;
   currentRole: RoomRole = null;
 
-  readonly roles: { id: RoomRole; label: string; hint: string }[] = [
-    { id: 'gm', label: 'GM', hint: '遊戲主持人' },
-    { id: 'user', label: '玩家', hint: '一般參加者' },
-    { id: 'guest', label: '訪客', hint: '功能受限' },
-  ];
-
   constructor(
     private panelService: PanelService,
     private modalService: ModalService,
+    private i18n: I18nService,
   ) {
     this.room = modalService.option.room;
     this.switchMode = !!modalService.option.switchMode;
@@ -41,17 +38,31 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     return `${RoomAuth.displayRoomName(this.room.name)}/${this.room.id}`;
   }
 
+  get roles(): { id: RoomRole; label: string; hint: string }[] {
+    return ['gm', 'user', 'guest'].map(id => ({
+      id: id as RoomRole,
+      label: this.i18n.t(`roomJoin.role.${id}.label`),
+      hint: this.i18n.t(`roomJoin.role.${id}.hint`),
+    }));
+  }
+
+  get roleLabel(): string {
+    return this.i18n.t(`roomJoin.role.${this.role}.label`);
+  }
+
   get submitLabel(): string {
-    return this.switchMode ? '確認轉換' : '進入房間';
+    return this.i18n.t(this.switchMode ? 'roomJoin.confirmSwitch' : 'roomJoin.submit');
   }
 
   ngOnInit() {
     Promise.resolve().then(() => {
-      const head = this.switchMode ? '轉換身份' : '選擇身份';
+      const head = this.i18n.t(this.switchMode ? 'roomJoin.switchRole' : 'roomJoin.selectRole');
       this.modalService.title = this.panelService.title = this.room
-        ? `${head}〈${this.title}〉`
+        ? this.i18n.t('roomJoin.titleWithRoom', { head, room: this.title })
         : head;
     });
+    EventSystem.register(this)
+      .on('LOCALE_CHANGED', () => this.refreshTitle());
     if (this.currentRole && this.isRoleAvailable(this.currentRole)) {
       this.role = this.currentRole;
       return;
@@ -61,7 +72,16 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     if (first) this.role = first;
   }
 
-  ngOnDestroy() { }
+  ngOnDestroy() {
+    EventSystem.unregister(this);
+  }
+
+  private refreshTitle() {
+    const head = this.i18n.t(this.switchMode ? 'roomJoin.switchRole' : 'roomJoin.selectRole');
+    this.modalService.title = this.panelService.title = this.room
+      ? this.i18n.t('roomJoin.titleWithRoom', { head, room: this.title })
+      : head;
+  }
 
   isRoleAvailable(role: RoomRole): boolean {
     if (!this.room) {
@@ -88,21 +108,21 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
 
   submit() {
     if (!this.isRoleAvailable(this.role)) {
-      this.help = '此身份不可用';
+      this.help = this.i18n.t('roomJoin.errorRoleUnavailable');
       return;
     }
     if (this.switchMode && this.currentRole && this.role === this.currentRole) {
-      this.help = '已是此身份';
+      this.help = this.i18n.t('roomJoin.errorAlreadyRole');
       return;
     }
     if (this.room && RoomAuth.isRoleAuthRoom(this.room.name)) {
       if (this.needsPassword()) {
         if (!RoomAuth.verify(this.room.id, this.room.name, this.role, this.password)) {
-          this.help = '密碼錯誤';
+          this.help = this.i18n.t('roomJoin.errorWrongPassword');
           return;
         }
       } else if (!RoomAuth.verify(this.room.id, this.room.name, this.role, '')) {
-        this.help = '無法切換為此身份';
+        this.help = this.i18n.t('roomJoin.errorSwitchFailed');
         return;
       }
     }

@@ -181,6 +181,36 @@
 .light-marker.selected {
   box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.7);
 }
+.path-waypoints {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.path-waypoints .path-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.path-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: hsl(200, 90%, 48%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
 .offscreen-pings {
   position: fixed;
   inset: 0;

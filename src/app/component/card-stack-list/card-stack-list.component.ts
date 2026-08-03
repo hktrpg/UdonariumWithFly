@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges
 import { Card, CardState } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { I18nService } from 'service/i18n.service';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
@@ -28,7 +29,8 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   constructor(
     private panelService: PanelService,
     private changeDetector: ChangeDetectorRef,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -37,7 +39,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
 
 
   ngOnChanges() {
-    Promise.resolve().then(() => this.panelService.title = this.cardStack.name + ' 的卡牌一覽');
+    Promise.resolve().then(() => this.panelService.title = this.cardStack.name + this.i18n.t('stack.listSuffix'));
     EventSystem.unregister(this);
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.cardStack?.identifier}`, event => {
@@ -73,10 +75,12 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
     if (360 < card.rotate) card.rotate -= 360;
     card.toTopmost();
     SoundEffect.play(PresetSound.cardDraw);
+    const stackName = this.cardStack.name == '' ? this.i18n.t('stack.unnamed') : this.cardStack.name;
     if (card.isFront) {
-      this.chatMessageService.sendOperationLog(`${this.cardStack.name == '' ? '(無名的牌堆)' : this.cardStack.name} 取出了 ${card.name == '' ? '(無名的卡牌)' : card.name}`);
+      const cardName = card.name == '' ? this.i18n.t('card.unnamed') : card.name;
+      this.chatMessageService.sendOperationLog(this.i18n.t('stack.takeOut', { stack: stackName, card: cardName }));
     } else {
-      this.chatMessageService.sendOperationLog(`${this.cardStack.name == '' ? '(無名的牌堆)' : this.cardStack.name} 取出 1 張並蓋起`);
+      this.chatMessageService.sendOperationLog(this.i18n.t('stack.takeOutFacedown', { stack: stackName }));
     }
   } 
 
@@ -116,7 +120,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
       x: this.panelService.left,
       y: this.panelService.top
     };
-    let title = '卡牌設定';
+    let title = this.i18n.t('cardList.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 600, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

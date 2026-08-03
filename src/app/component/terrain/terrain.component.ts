@@ -23,6 +23,7 @@ import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ModalService } from 'service/modal.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -150,6 +151,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
     private coordinateService: CoordinateService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -298,21 +300,21 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('terrain.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedGameTableMasks = () => this.selectionService.objects.filter(object => object.aliasName === this.terrain.aliasName) as Terrain[];
       actions.push(
         {
-          name: '選擇的地形', action: null, subActions: [
+          name: this.i18n.t('terrain.menu.2'), action: null, subActions: [
             {
-              name: '全部固定', action: () => {
+              name: this.i18n.t('terrain.menu.3'), action: () => {
                 selectedGameTableMasks().forEach(terrain => terrain.isLocked = true);
                 SoundEffect.play(PresetSound.lock);
               }
             },
             {
-              name: '全部建立副本', action: () => {
+              name: this.i18n.t('terrain.menu.4'), action: () => {
                 selectedGameTableMasks().forEach(terrain => {
                   let cloneObject = terrain.clone();
                   cloneObject.location.x += this.gridSize;
@@ -336,22 +338,22 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let actions: ContextMenuAction[] = [
       (this.isLocked
         ? {
-          name: '☑ 固定', action: () => {
+          name: this.i18n.t('terrain.menu.5'), action: () => {
             this.isLocked = false;
             SoundEffect.play(PresetSound.unlock);
           },
           checkBox: 'check'
         } : {
-          name: '☐ 固定', action: () => {
+          name: this.i18n.t('terrain.menu.6'), action: () => {
             this.isLocked = true;
             SoundEffect.play(PresetSound.lock);
           },
           checkBox: 'check'
         }
       ),
-      (this.isLocked ? null : { name: `重疊順序 ${this.height === 0 ? '' : ' （僅平面地形）' }`, action: null, subActions: [
+      (this.isLocked ? null : { name: this.i18n.t('terrain.overlapOrder', { flatOnly: this.height === 0 ? '' : this.i18n.t('terrain.dynamic.1') }), action: null, subActions: [
         {
-          name: '移到平面地形最上層', action: () => {
+          name: this.i18n.t('terrain.menu.7'), action: () => {
             if (!this.isLocked) {
               const parent = this.terrain.parent;
               if (parent) parent.appendChild(this.terrain);
@@ -360,7 +362,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           disabled: this.isLocked
         },
         {
-          name: '移到平面地形最下層', action: () => {
+          name: this.i18n.t('terrain.menu.8'), action: () => {
             if (!this.isLocked) {
               const parent = this.terrain.parent;
               if (parent) parent.prependChild(this.terrain);
@@ -371,56 +373,56 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         disabled: this.isLocked || this.height != 0
       }),
       ContextMenuSeparator,
-      { name: '傾斜', action: null, subActions: [
+      { name: this.i18n.t('terrain.menu.9'), action: null, subActions: [
         {
-          name: `${ this.slopeDirection == SlopeDirection.NONE ? '◉' : '○' } 無`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.NONE ? '◉' : '○' } ${this.i18n.t('terrain.slope.none')}`, action: () => {
             this.slopeDirection = SlopeDirection.NONE;
           },
           checkBox: 'radio'
         },
         ContextMenuSeparator,
         {
-          name: `${ this.slopeDirection == SlopeDirection.TOP ? '◉' : '○' } 上（北）`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.TOP ? '◉' : '○' } ${this.i18n.t('terrain.slope.top')}`, action: () => {
             this.slopeDirection = SlopeDirection.TOP;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ this.slopeDirection == SlopeDirection.BOTTOM ? '◉' : '○' } 下（南）`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.BOTTOM ? '◉' : '○' } ${this.i18n.t('terrain.slope.bottom')}`, action: () => {
             this.slopeDirection = SlopeDirection.BOTTOM;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ this.slopeDirection == SlopeDirection.LEFT ? '◉' : '○' } 左（西）`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.LEFT ? '◉' : '○' } ${this.i18n.t('terrain.slope.left')}`, action: () => {
             this.slopeDirection = SlopeDirection.LEFT;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ this.slopeDirection == SlopeDirection.RIGHT ? '◉' : '○' } 右（東）`, action: () => {
+          name: `${ this.slopeDirection == SlopeDirection.RIGHT ? '◉' : '○' } ${this.i18n.t('terrain.slope.right')}`, action: () => {
             this.slopeDirection = SlopeDirection.RIGHT;
           },
           checkBox: 'radio'
         }
       ]},
-      { name: '牆壁顯示', action: null, subActions: [
+      { name: this.i18n.t('terrain.menu.10'), action: null, subActions: [
         {
-          name: `${ this.hasWall && this.isSurfaceShading ? '◉' : '○' } 通常`, action: () => {
+          name: `${ this.hasWall && this.isSurfaceShading ? '◉' : '○' } ${this.i18n.t('terrain.wall.normal')}`, action: () => {
             this.mode = TerrainViewState.ALL;
             this.isSurfaceShading = true;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ this.hasWall && !this.isSurfaceShading ? '◉' : '○' } 沒有陰影`, action: () => {
+          name: `${ this.hasWall && !this.isSurfaceShading ? '◉' : '○' } ${this.i18n.t('terrain.wall.noShade')}`, action: () => {
             this.mode = TerrainViewState.ALL;
             this.isSurfaceShading = false;
           },
           checkBox: 'radio'
         },
         {
-          name: `${ !this.hasWall ? '◉' : '○' } 不顯示`, action: () => {
+          name: `${ !this.hasWall ? '◉' : '○' } ${this.i18n.t('terrain.wall.hidden')}`, action: () => {
             this.mode = TerrainViewState.FLOOR;
             if (this.depth * this.width === 0) {
               this.terrain.width = this.width <= 0 ? 1 : this.width;
@@ -434,13 +436,13 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       /*
       (this.isInteract
         ? {
-          name: '☑ 疊在其他地形上', action: () => {
+          name: this.i18n.t('terrain.menu.11'), action: () => {
             this.isInteract = false;
             SoundEffect.play(PresetSound.unlock);
           },
                 checkBox: 'check'
         } : {
-          name: '☐ 疊在其他地形上', action: () => {
+          name: this.i18n.t('terrain.menu.12'), action: () => {
             this.isInteract = true;
             SoundEffect.play(PresetSound.lock);
           },
@@ -450,42 +452,42 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       */
       (this.terrain.affectsLight !== false
         ? {
-          name: '☑ 與燈光互動', action: () => {
+          name: this.i18n.t('terrain.menu.13'), action: () => {
             this.terrain.affectsLight = false;
           },
           checkBox: 'check'
         } : {
-          name: '☐ 與燈光互動', action: () => {
+          name: this.i18n.t('terrain.menu.14'), action: () => {
             this.terrain.affectsLight = true;
           },
           checkBox: 'check'
         }),
       (this.isDropShadow
         ? {
-          name: '☑ 加上陰影', action: () => {
+          name: this.i18n.t('terrain.menu.15'), action: () => {
             this.isDropShadow = false;
           },
           checkBox: 'check'
         } : {
-          name: '☐ 加上陰影', action: () => {
+          name: this.i18n.t('terrain.menu.16'), action: () => {
             this.isDropShadow = true;
           },
           checkBox: 'check'
         }),
       (this.isAltitudeIndicate
         ? {
-          name: '☑ 顯示高度', action: () => {
+          name: this.i18n.t('terrain.menu.17'), action: () => {
             this.isAltitudeIndicate = false;
           },
           checkBox: 'check'
         } : {
-          name: '☐ 顯示高度', action: () => {
+          name: this.i18n.t('terrain.menu.18'), action: () => {
             this.isAltitudeIndicate = true;
           },
           checkBox: 'check'
         }),
       {
-        name: '將高度設為0', action: () => {
+        name: this.i18n.t('terrain.menu.19'), action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             SoundEffect.play(PresetSound.sweep);
@@ -494,9 +496,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         altitudeHande: this.terrain
       },
       ContextMenuSeparator,
-      { name: '編輯地形設定...', action: () => { this.showDetail(this.terrain); } },
+      { name: this.i18n.t('terrain.menu.20'), action: () => { this.showDetail(this.terrain); } },
       (this.terrain.getUrls().length <= 0 ? null : {
-        name: '打開參考網址', action: null,
+        name: this.i18n.t('terrain.menu.21'), action: null,
         subActions: this.terrain.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -509,14 +511,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('common.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         })
       }),
       (this.terrain.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: '建立副本', action: () => {
+        name: this.i18n.t('terrain.menu.22'), action: () => {
           let cloneObject = this.terrain.clone();
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
@@ -526,13 +528,13 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         }
       },
       {
-        name: '刪除', action: () => {
+        name: this.i18n.t('terrain.menu.23'), action: () => {
           this.terrain.destroy();
           SoundEffect.play(PresetSound.sweep);
         }
       },
       ContextMenuSeparator,
-      { name: '新增物件', action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
+      { name: this.i18n.t('terrain.menu.24'), action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
     ];
 
     return actions;
@@ -547,7 +549,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '地形設定';
+    let title = this.i18n.t('terrain.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 250, top: coordinate.y - 150, width: 550, height: 380 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

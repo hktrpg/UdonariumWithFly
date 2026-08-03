@@ -6,6 +6,7 @@ import { TableLight } from '@udonarium/table-fx/table-light';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { SceneCreateKind, SceneModifyKind, SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { EventSystem } from '@udonarium/core/system';
+import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
 import { SceneToolMode, SceneToolService } from 'service/scene-tool.service';
 import { TabletopService } from 'service/tabletop.service';
@@ -21,6 +22,7 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
     public tools: SceneToolService,
     private panelService: PanelService,
     private tabletopService: TabletopService,
+    private i18n: I18nService,
   ) {}
 
   get isGuest(): boolean { return GuestSession.isGuest; }
@@ -44,7 +46,7 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
     this.tools.isPanelOpen = true;
     EventSystem.trigger('SCENE_TOOLS_PANEL', true);
     Promise.resolve().then(() => {
-      this.panelService.title = this.isGM ? '場景工具（GM）' : '場景工具';
+      this.refreshPanelTitle();
       this.tools.idle();
       if (!this.canOpen) {
         this.panelService.close();
@@ -52,7 +54,8 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
     });
     EventSystem.register(this)
       .on('CHANGE_GM_MODE', () => this.enforceAccess())
-      .on(`UPDATE_GAME_OBJECT/identifier/${this.perm.identifier}`, () => this.enforceAccess());
+      .on(`UPDATE_GAME_OBJECT/identifier/${this.perm.identifier}`, () => this.enforceAccess())
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
@@ -61,6 +64,10 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
     this.tools.idle();
     this.tools.clearSelection();
     EventSystem.trigger('SCENE_TOOLS_PANEL', false);
+  }
+
+  private refreshPanelTitle() {
+    this.panelService.title = this.i18n.t(this.isGM ? 'scene.titleGm' : 'scene.title');
   }
 
   private enforceAccess() {
@@ -75,9 +82,18 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
       this.tools.idle();
     }
     if (this.tools.mode === 'select' && !this.canModify) this.tools.idle();
-    if (this.tools.selectedLight && !this.canModifyKind('light')) this.tools.selectedLight = null;
-    if (this.tools.selectedWall && !this.canModifyKind('wall')) this.tools.selectedWall = null;
-    if (this.tools.selectedDrawing && !this.canModifyKind('drawing')) this.tools.selectedDrawing = null;
+    if (!this.canModifyKind('light') && this.tools.selectedLights.length) {
+      this.tools.selectedLights = [];
+      this.tools.selectedLight = null;
+    }
+    if (!this.canModifyKind('wall') && this.tools.selectedWalls.length) {
+      this.tools.selectedWalls = [];
+      this.tools.selectedWall = null;
+    }
+    if (!this.canModifyKind('drawing') && this.tools.selectedDrawings.length) {
+      this.tools.selectedDrawings = [];
+      this.tools.selectedDrawing = null;
+    }
   }
 
   /** Light dim radius in grid squares (selected or next-place default). */
@@ -152,36 +168,19 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
   }
 
   deleteSelected() {
-    const table = this.tabletopService.currentTable;
-    if (!table) return;
-    if (this.tools.selectedDrawing) {
-      if (!this.canModifyKind('drawing')) return;
-      this.tools.selectedDrawing.destroy();
-      this.tools.selectedDrawing = null;
-    } else if (this.tools.selectedLight) {
-      if (!this.canModifyKind('light')) return;
-      this.tools.selectedLight.destroy();
-      this.tools.selectedLight = null;
-    } else if (this.tools.selectedWall) {
-      if (!this.canModifyKind('wall')) return;
-      this.tools.selectedWall.destroy();
-      this.tools.selectedWall = null;
-    }
-    EventSystem.trigger('UPDATE_GAME_OBJECT', table.toContext());
+    this.tools.deleteSelection();
   }
 
   selectWall(w: TableWall) {
     if (!this.canModifyKind('wall')) return;
     this.tools.enterSelect();
-    this.tools.clearSelection();
-    this.tools.selectedWall = w;
+    this.tools.selectWall(w);
   }
 
   selectLight(l: TableLight) {
     if (!this.canModifyKind('light')) return;
     this.tools.enterSelect();
-    this.tools.clearSelection();
-    this.tools.selectedLight = l;
+    this.tools.selectLight(l);
   }
 
   selectDrawing(d: TableDrawing) {

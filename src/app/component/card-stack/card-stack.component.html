@@ -26,10 +26,10 @@
       </div>
     </ng-container>
     <div *ngIf="isShowTotal" class="name-tag is-nowrap is-black-background is-3d number-of-cards is-pointer-events-none" style="z-index: 10" [ngStyle]="{'transform': 'translateY(-50%) translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateZ(' + (isInverse ? 180 : 0) + 'deg)'}">
-      <span [ngClass]="{'is-inverse': isInverse}">{{cards.length}}張</span>
+      <span [ngClass]="{'is-inverse': isInverse}">{{ 'card.count' | i18n:{ count: cards.length } }}</span>
     </div>
     <div *ngIf="hasOwner" class="name-tag has-length-limit is-nowrap is-black-background is-3d" style="z-index: 10; color: whitesmoke" [ngStyle]="{'background-color': ownerColor,'transform': 'translateY(50%) translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateZ(' + (isInverse ? 180 : 0) + 'deg)'}">
-      <span [ngClass]="{'is-inverse': isInverse}"><b>{{ownerName}}</b> 確認中</span>
+      <span [ngClass]="{'is-inverse': isInverse}">{{ 'stack.checking' | i18n:{ name: ownerName } }}</span>
     </div>
     <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
   </div>

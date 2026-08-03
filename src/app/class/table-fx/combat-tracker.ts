@@ -3,6 +3,7 @@ import { GameObject } from '../core/synchronize-object/game-object';
 import { InnerXml } from '../core/synchronize-object/object-serializer';
 import { EventSystem } from '../core/system';
 import { UUID } from '../core/system/util/uuid';
+import { translate } from 'i18n';
 
 export type InitiativeDice = 'd20' | 'd100';
 
@@ -71,7 +72,8 @@ export class CombatTracker extends GameObject implements InnerXml {
   }
 
   /** Ensure an encounter exists and activeEncounterId points at it. */
-  ensureActiveEncounter(name: string = '戰鬥 1'): EncounterData {
+  ensureActiveEncounter(name?: string): EncounterData {
+    name = name ?? translate('combat.encounterN', { n: 1 });
     const list = this.encounters;
     if (!list.length) return this.createEncounter(name);
     const active = list.find(e => e.id === this.activeEncounterId) || list[0];
@@ -91,7 +93,8 @@ export class CombatTracker extends GameObject implements InnerXml {
     }
   }
 
-  createEncounter(name: string = '戰鬥'): EncounterData {
+  createEncounter(name?: string): EncounterData {
+    name = name ?? translate('combat.encounter');
     const encounter: EncounterData = {
       id: UUID.generateUuid(),
       name,

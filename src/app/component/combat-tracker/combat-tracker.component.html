@@ -1,59 +1,59 @@
 <div class="combat-tracker" *ngIf="encounter">
   <div class="row">
     <button type="button" (click)="tracker.prevEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">◀</button>
-    <input class="enc-name" [ngModel]="encounter.name" (ngModelChange)="renameEncounter($event)" [ngModelOptions]="{updateOn: 'blur'}" [disabled]="isGuest" title="戰鬥名稱">
+    <input class="enc-name" [ngModel]="encounter.name" (ngModelChange)="renameEncounter($event)" [ngModelOptions]="{updateOn: 'blur'}" [disabled]="isGuest" [title]="'combat.name' | i18n">
     <button type="button" (click)="tracker.nextEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">▶</button>
-    <button type="button" (click)="createEncounter()" [disabled]="isGuest" title="新增戰鬥">＋</button>
-    <button type="button" class="danger" (click)="deleteEncounter()" [disabled]="isGuest" title="刪除此戰鬥">刪</button>
+    <button type="button" (click)="createEncounter()" [disabled]="isGuest" [title]="'combat.add' | i18n">＋</button>
+    <button type="button" class="danger" (click)="deleteEncounter()" [disabled]="isGuest" [title]="'combat.delete' | i18n">{{ 'combat.deleteShort' | i18n }}</button>
   </div>
 
   <div class="row">
-    <label>先攻骰
+    <label>{{ 'combat.initiativeDice' | i18n }}
       <select [ngModel]="encounter.initiativeDice" (ngModelChange)="setDice($event)" [disabled]="isGuest">
         <option value="d20">d20</option>
         <option value="d100">d100</option>
       </select>
     </label>
-    <label>追蹤資源
+    <label>{{ 'combat.trackResource' | i18n }}
       <select [ngModel]="encounter.trackedResourceName || ''" (ngModelChange)="setTrackedResource($event)" [disabled]="isGuest">
-        <option value="">（無）</option>
+        <option value="">{{ 'combat.none' | i18n }}</option>
         <option *ngFor="let n of resourceNameOptions()" [value]="n">{{ n }}</option>
       </select>
     </label>
     <label>
       <input type="checkbox" [ngModel]="encounter.skipDefeated" (ngModelChange)="setSkipDefeated($event)" [disabled]="isGuest">
-      跳過敗北
+      {{ 'combat.skipDefeated' | i18n }}
     </label>
   </div>
 
   <div class="row">
     <button type="button" (click)="addSelected()" [disabled]="isGuest || selectedCharacterCount < 1"
-      title="一次加入目前選取的所有角色棋子">
-      加入選取{{ selectedCharacterCount > 0 ? '（' + selectedCharacterCount + '）' : '' }}
+      [title]="'combat.addSelectedTitle' | i18n">
+      {{ selectedCharacterCount > 0 ? ('combat.addSelectedN' | i18n:{ n: selectedCharacterCount }) : ('combat.addSelected' | i18n) }}
     </button>
-    <button type="button" (click)="addAllOnTable()" [disabled]="isGuest || !isGM" title="桌面上所有角色">加入桌面全部</button>
-    <button type="button" (click)="rollAll(false)" [disabled]="isGuest">全部擲先攻</button>
-    <button type="button" (click)="rollAll(true)" [disabled]="isGuest">NPC 擲先攻</button>
+    <button type="button" (click)="addAllOnTable()" [disabled]="isGuest || !isGM" [title]="'combat.addAllTitle' | i18n">{{ 'combat.addAll' | i18n }}</button>
+    <button type="button" (click)="rollAll(false)" [disabled]="isGuest">{{ 'combat.rollAll' | i18n }}</button>
+    <button type="button" (click)="rollAll(true)" [disabled]="isGuest">{{ 'combat.rollNpc' | i18n }}</button>
     <button type="button" (click)="applyResourceInitiative()"
       [disabled]="isGuest || !encounter.trackedResourceName"
-      title="以「追蹤資源」數值填入先攻；已有先攻值的不會覆寫">
-      使用資源先攻
+      [title]="'combat.applyResourceInitiativeTitle' | i18n">
+      {{ 'combat.applyResourceInitiative' | i18n }}
     </button>
-    <button type="button" (click)="resetInitiative()" [disabled]="isGuest">重置先攻</button>
+    <button type="button" (click)="resetInitiative()" [disabled]="isGuest">{{ 'combat.resetInitiative' | i18n }}</button>
   </div>
 
   <!-- Current turn highlight -->
   <div class="current-card" *ngIf="encounter.isStarted && currentCombatant() as cur">
-    <div class="portrait lg" [class.empty]="!portraitUrl(cur)" (click)="focusCombatant(cur)" title="點擊對焦棋子">
+    <div class="portrait lg" [class.empty]="!portraitUrl(cur)" (click)="focusCombatant(cur)" [title]="'combat.focusCombatant' | i18n">
       <img *ngIf="portraitUrl(cur)" [src]="portraitUrl(cur) | safe: 'resourceUrl'" alt="">
       <i *ngIf="!portraitUrl(cur)" class="material-icons">person</i>
     </div>
     <div class="current-meta">
-      <div class="round-line">第 {{ encounter.round }} 輪　回合 {{ encounter.turnIndex + 1 }}／{{ encounter.combatants.length }}</div>
+      <div class="round-line">{{ 'combat.roundTurnN' | i18n:{ round: encounter.round, turn: encounter.turnIndex + 1, total: encounter.combatants.length } }}</div>
       <div class="current-name">{{ displayName(cur) }}</div>
       <div class="current-sub">
         <span class="badge" [class.npc]="cur.isNpc">{{ ownerLabel(cur) }}</span>
-        <span class="init-label">先攻 {{ cur.initiative != null ? cur.initiative : '—' }}</span>
+        <span class="init-label">{{ 'combat.initiativeValue' | i18n:{ n: cur.initiative != null ? cur.initiative : '—' } }}</span>
         <span *ngIf="encounter.trackedResourceName" class="res-label">{{ encounter.trackedResourceName }} {{ resourceDisplay(cur) }}</span>
       </div>
       <div class="status-row" *ngIf="statusesOf(cur).length">
@@ -64,7 +64,7 @@
     </div>
   </div>
   <div class="status idle" *ngIf="!encounter.isStarted">
-    尚未開始　參與者 {{ encounter.combatants.length }} 人
+    {{ 'combat.notStartedParticipantsN' | i18n:{ n: encounter.combatants.length } }}
   </div>
 
   <ul class="list">
@@ -72,29 +72,29 @@
       [class.current]="isCurrent(c)" [class.defeated]="c.isDefeated" [class.hidden-row]="c.isHidden"
       (dblclick)="focusCombatant(c)">
       <span class="order" [class.on]="isCurrent(c)">{{ turnOrder(c) }}</span>
-      <div class="portrait" [class.empty]="!portraitUrl(c)" (click)="focusCombatant(c); $event.stopPropagation()" title="對焦／選取棋子">
+      <div class="portrait" [class.empty]="!portraitUrl(c)" (click)="focusCombatant(c); $event.stopPropagation()" [title]="'combat.focusOrSelectCombatant' | i18n">
         <img *ngIf="portraitUrl(c)" [src]="portraitUrl(c) | safe: 'resourceUrl'" alt="">
         <i *ngIf="!portraitUrl(c)" class="material-icons">person</i>
       </div>
       <div class="info">
         <div class="name-line">
           <span class="name" [title]="displayName(c)">{{ displayName(c) }}</span>
-          <span class="badge tiny" [class.npc]="c.isNpc || !characterOf(c)?.hasPlayerController">{{ c.isNpc || !characterOf(c)?.hasPlayerController ? 'NPC' : 'PC' }}</span>
-          <span class="hidden-mark" *ngIf="c.isHidden" title="對玩家隱藏">隱</span>
+          <span class="badge tiny" [class.npc]="c.isNpc || !characterOf(c)?.hasPlayerController">{{ c.isNpc || !characterOf(c)?.hasPlayerController ? ('combat.npc' | i18n) : ('combat.pc' | i18n) }}</span>
+          <span class="hidden-mark" *ngIf="c.isHidden" [title]="'combat.hiddenFromPlayers' | i18n">{{ 'combat.hiddenShort' | i18n }}</span>
         </div>
         <div class="status-row" *ngIf="statusesOf(c).length">
           <span *ngFor="let s of statusesOf(c); trackBy: trackStatus" class="status-chip" [title]="statusTitle(s)">
             <i class="material-icons">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
           </span>
         </div>
-        <div class="hp-bar" *ngIf="hpBar(c) as hp" [title]="'HP ' + hp.cur + '/' + hp.max">
+        <div class="hp-bar" *ngIf="hpBar(c) as hp" [title]="'combat.hp' | i18n:{ current: hp.cur, max: hp.max }">
           <div class="hp-fill" [style.width.%]="hp.pct" [class.low]="hp.pct <= 25" [class.mid]="hp.pct > 25 && hp.pct <= 50"></div>
           <span class="hp-text">{{ hp.cur }}/{{ hp.max }}</span>
         </div>
       </div>
       <div class="cols">
         <label class="col">
-          <span class="col-label">先攻</span>
+          <span class="col-label">{{ 'combat.initiative' | i18n }}</span>
           <input class="init" type="number" [ngModel]="c.initiative" (ngModelChange)="setInitiative(c, $event)" [ngModelOptions]="{updateOn: 'blur'}" [disabled]="isGuest" placeholder="-">
         </label>
         <div class="col resource" *ngIf="encounter.trackedResourceName" [title]="encounter.trackedResourceName">
@@ -103,25 +103,25 @@
         </div>
       </div>
       <div class="actions">
-        <button type="button" (click)="rollOne(c)" [disabled]="isGuest" title="擲先攻">🎲</button>
-        <button *ngIf="isGM" type="button" (click)="toggleHidden(c)" [title]="c.isHidden ? '顯示' : '隱藏'">{{ c.isHidden ? '隱' : '見' }}</button>
-        <button type="button" (click)="toggleDefeated(c)" [disabled]="isGuest" [title]="c.isDefeated ? '取消敗北' : '標記敗北'">{{ c.isDefeated ? '敗' : '活' }}</button>
-        <button type="button" (click)="remove(c)" [disabled]="isGuest" title="移出戰鬥">×</button>
+        <button type="button" (click)="rollOne(c)" [disabled]="isGuest" [title]="'combat.rollInitiative' | i18n">🎲</button>
+        <button *ngIf="isGM" type="button" (click)="toggleHidden(c)" [title]="(c.isHidden ? 'combat.show' : 'combat.hide') | i18n">{{ (c.isHidden ? 'combat.hiddenShort' : 'combat.visibleShort') | i18n }}</button>
+        <button type="button" (click)="toggleDefeated(c)" [disabled]="isGuest" [title]="(c.isDefeated ? 'combat.undoDefeated' : 'combat.markDefeated') | i18n">{{ (c.isDefeated ? 'combat.defeatedShort' : 'combat.aliveShort') | i18n }}</button>
+        <button type="button" (click)="remove(c)" [disabled]="isGuest" [title]="'combat.remove' | i18n">×</button>
       </div>
     </li>
   </ul>
 
   <div class="row controls">
     <ng-container *ngIf="!encounter.isStarted">
-      <button type="button" (click)="begin()" [disabled]="isGuest || !encounter.combatants.length">開始戰鬥</button>
+      <button type="button" (click)="begin()" [disabled]="isGuest || !encounter.combatants.length">{{ 'combat.start' | i18n }}</button>
     </ng-container>
     <ng-container *ngIf="encounter.isStarted">
-      <button type="button" (click)="prevRound()" [disabled]="isGuest">⟸輪</button>
-      <button type="button" (click)="prevTurn()" [disabled]="isGuest">⟵回合</button>
-      <button type="button" (click)="nextTurn()" [disabled]="isGuest">回合⟶</button>
-      <button type="button" (click)="nextRound()" [disabled]="isGuest">輪⟹</button>
-      <button type="button" *ngIf="isMyCombatTurn()" (click)="endMyTurn()">結束我的回合</button>
-      <button type="button" class="danger" (click)="end()" [disabled]="isGuest">結束戰鬥</button>
+      <button type="button" (click)="prevRound()" [disabled]="isGuest">{{ 'combat.prevRound' | i18n }}</button>
+      <button type="button" (click)="prevTurn()" [disabled]="isGuest">{{ 'combat.prevTurn' | i18n }}</button>
+      <button type="button" (click)="nextTurn()" [disabled]="isGuest">{{ 'combat.nextTurn' | i18n }}</button>
+      <button type="button" (click)="nextRound()" [disabled]="isGuest">{{ 'combat.nextRound' | i18n }}</button>
+      <button type="button" *ngIf="isMyCombatTurn()" (click)="endMyTurn()">{{ 'combat.endMyTurn' | i18n }}</button>
+      <button type="button" class="danger" (click)="end()" [disabled]="isGuest">{{ 'combat.end' | i18n }}</button>
     </ng-container>
   </div>
 </div>

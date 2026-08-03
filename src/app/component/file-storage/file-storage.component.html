@@ -3,11 +3,11 @@
     <span>
       <i class="material-icons large-font">add_photo_alternate</i>
     </span>
-    <span>將圖片拖放到這裡</span>
-    <span class="small-font">或點這裡選擇</span>
+    <span>{{ 'file.drop' | i18n }}</span>
+    <span class="small-font">{{ 'file.orClick' | i18n }}</span>
     <input type="file" style="display: none;" (change)="handleFileSelect($event)" multiple accept="image/*"/>
     <span class="small-font">
-      <br>每個檔案最大 2MB</span>
+      <br>{{ 'file.maxSize' | i18n }}</span>
   </span>
 </label>
 <div class="sticky-top">
@@ -20,11 +20,11 @@
   <span class="word-selecter">
     <label>
       <input name="word-selecter" type="checkbox" value="ALL" checked="{{searchAllImage ? 'checked' : ''}}" (click)="onSearchAllImage()">
-      <div class="all-tags"><b>ALL</b><badge class="badge" [count]="images.length" [@.disabled]="true"></badge></div>
+      <div class="all-tags"><b>{{ 'file.all' | i18n }}</b><badge class="badge" [count]="images.length" [@.disabled]="true"></badge></div>
     </label>
     <label *ngIf="countAllImagesHasWord(null) > 0">
       <input name="word-selecter" type="checkbox" value="No Tag" [(ngModel)]="searchNoTagImage" checked="{{searchNoTagImage ? 'checked' : ''}}" (change)="searchNoTagImage = (searchNoTagImage ? true : false)">
-      <div class="no-tag"><s>No Tag</s><badge *ngIf="countImagesHasWord(null) > 0" class="badge" [count]="countImagesHasWord(null)" [@.disabled]="true"></badge></div>
+      <div class="no-tag"><s>{{ 'file.noTag' | i18n }}</s><badge *ngIf="countImagesHasWord(null) > 0" class="badge" [count]="countImagesHasWord(null)" [@.disabled]="true"></badge></div>
     </label>
     <label *ngFor="let word of allImagesOwnWords">
       <input name="word-selecter" type="checkbox" value="{{word}}" [checked]="searchWords.includes(word)" (change)="onSelectedWord(word)">
@@ -33,12 +33,12 @@
   </span>
   <span style="white-space: nowrap">
     <select [(ngModel)]="serchCondIsOr" style="margin-left: 3px">
-      <option value="true">符合任一 (OR)</option>
-      <option value="">符合全部 (AND)</option>
+      <option value="true">{{ 'file.or' | i18n }}</option>
+      <option value="">{{ 'file.and' | i18n }}</option>
     </select>
-    <label sytle="white-space: nowrap" title="最近使用的標籤圖片排在前面">
+    <label sytle="white-space: nowrap" [attr.title]="'file.recentFirst' | i18n">
       <input name="is-sort" value="Sort" type="checkbox" [(ngModel)]="isSort" checked="{{isSort ? 'checked' : ''}}" (change)="isSort = (isSort ? true : false)">
-      <b style="font-size: smaller; margin-right: 3px">排序</b>
+      <b style="font-size: smaller; margin-right: 3px">{{ 'file.sort' | i18n }}</b>
     </label>
   </span>
 </div>
@@ -56,7 +56,7 @@
       </ng-template>
       <ng-template #noTagBlock>
         <div style="position: absolute; bottom: 0px; z-index: 5">
-          <s class="grow" style="color:gray; display: block; padding-left: 2px; font-weight: bold; text-overflow: ellipsis; white-space: nowrap; pointer-events: none">No Tag</s>
+          <s class="grow" style="color:gray; display: block; padding-left: 2px; font-weight: bold; text-overflow: ellipsis; white-space: nowrap; pointer-events: none">{{ 'file.noTag' | i18n }}</s>
         </div>
       </ng-template>
       <div class="zoom-in" style="z-index: 10; position: absolute; right: 0px; bottom: 2px">
@@ -77,19 +77,19 @@
 <div *ngIf="isSelected" class="sticky-bottom" @fadeAndUpInOut>
   <div>
     <div style="margin-left: 3px; float: right">
-      <button style="padding: 2px 0.5em;" [attr.title]="selectedImagesIsHidden ? '將選擇的圖片設為顯示' : '將選擇的圖片設為隱藏'" (click)="setectedImagesToHidden(!selectedImagesIsHidden)">
+      <button style="padding: 2px 0.5em;" [attr.title]="selectedImagesIsHidden ? ('file.show' | i18n) : ('file.hide' | i18n)" (click)="setectedImagesToHidden(!selectedImagesIsHidden)">
         <i class="material-icons" style="font-size: smaller" [ngClass]="{'red-eye': selectedImagesIsHidden}">{{ selectedImagesIsHidden ? 'visibility' : 'visibility_off' }}</i>
       </button>
     </div>
-    <button style="font-size: x-small; margin-right: 2em" (click)="onUnselect()">取消選擇 (已選 {{ selectedImageFiles.length }})</button>
-    <input attr.list="{{panelId}}_suggest" type="text" [(ngModel)]="addingTagWord" style="width: 14em" placeholder="可用空白分隔多個"><button style="font-size: x-small" [disabled]="addingTagWord == null || addingTagWord.trim() === ''" (click)="addTagWord()">新增標籤 ➡</button>
+    <button style="font-size: x-small; margin-right: 2em" (click)="onUnselect()">{{ 'file.cancelSelection' | i18n:{ count: selectedImageFiles.length } }}</button>
+    <input attr.list="{{panelId}}_suggest" type="text" [(ngModel)]="addingTagWord" style="width: 14em" [placeholder]="'file.tagsPlaceholder' | i18n"><button style="font-size: x-small" [disabled]="addingTagWord == null || addingTagWord.trim() === ''" (click)="addTagWord()">{{ 'file.addTag' | i18n }}</button>
     <ng-container *ngIf="selectedImagesOwnWords().length > 0">
       <span style="user-select: none">
         <label *ngFor="let word of selectedImagesOwnWords()" class="word-tag" (click)="removeTagWord(word)" style="cursor: pointer; font-size: smaller">{{ word }}<sup style="font-size: xx-small; color: red">×</sup></label>
       </span>
     </ng-container>
     <ng-container *ngIf="selectedImagesOwnWords().length == 0">
-      <span style="font-size: smaller; font-weight: bolder; margin-left: 3px; color: gray"><s>No Tag</s></span>
+      <span style="font-size: smaller; font-weight: bolder; margin-left: 3px; color: gray"><s>{{ 'file.noTag' | i18n }}</s></span>
     </ng-container>
   </div>
   <datalist id="{{panelId}}_suggest">

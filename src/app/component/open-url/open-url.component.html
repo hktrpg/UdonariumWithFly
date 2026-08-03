@@ -3,9 +3,9 @@
   <div *ngIf="!isValid" class="url">{{url}}</div>
   <hr />
   <div class="help">
-    <div *ngIf="isValid">您要打開此URL嗎？ （在新窗口中打開，請允許彈出窗口）</div>
-    <div *ngIf="!isValid">⚠️網址無效。</div>
+    <div *ngIf="isValid">{{ 'url.confirm' | i18n }}</div>
+    <div *ngIf="!isValid">{{ 'url.invalid' | i18n }}</div>
   </div>
 </div>
-<button type="submit" (click)="openUrl()" [disabled]="!isValid">開啓</button>
-<button type="button" (click)="cancel()">取消</button>
+<button type="submit" (click)="openUrl()" [disabled]="!isValid">{{ 'url.open' | i18n }}</button>
+<button type="button" (click)="cancel()">{{ 'url.cancel' | i18n }}</button>

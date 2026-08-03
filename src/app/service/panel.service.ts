@@ -1,4 +1,5 @@
 import { ComponentRef, Injectable, OnChanges, ViewContainerRef } from '@angular/core';
+import { I18nService } from './i18n.service';
 
 declare var Type: FunctionConstructor;
 interface Type<T> extends Function {
@@ -20,7 +21,7 @@ export class PanelService {
   static UIPanelComponentClass: { new(...args: any[]): any } = null;
 
   private panelComponentRef: ComponentRef<any>
-  title: string = '無名面板';
+  title: string = 'Untitled panel';
   left: number = 0;
   top: number = 0;
   width: number = 100;
@@ -31,6 +32,10 @@ export class PanelService {
   isAbleRotateButton: boolean = false;
 
   scrollablePanel: HTMLDivElement = null;
+
+  constructor(private i18n: I18nService) {
+    this.title = this.i18n.t('panel.untitled');
+  }
 
   get isShow(): boolean {
     return this.panelComponentRef ? true : false;

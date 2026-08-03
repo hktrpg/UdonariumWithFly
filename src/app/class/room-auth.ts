@@ -2,6 +2,7 @@ import { CryptoUtil } from './core/system/util/crypto-util';
 import { EventSystem } from './core/system';
 import { GuestSession } from './guest-session';
 import { PeerCursor } from './peer-cursor';
+import { translate } from 'i18n';
 
 /** Join / create identity. */
 export type RoomRole = 'gm' | 'user' | 'guest';
@@ -40,7 +41,7 @@ export class RoomAuth {
     roomId: string,
     passwords: { gm?: string; user?: string; guest?: string },
   ): string {
-    const clean = RoomAuth.sanitizeDisplayName(displayName || '普通房間');
+    const clean = RoomAuth.sanitizeDisplayName(displayName || translate('room.defaultName'));
     const blob =
       RoomAuth.encodeGate(roomId, clean, 'gm', passwords.gm) +
       RoomAuth.encodeGate(roomId, clean, 'user', passwords.user) +
@@ -135,7 +136,7 @@ export class RoomAuth {
     return name
       .split(RoomAuth.AUTH_MARKER).join('')
       .split(GuestSession.ALLOW_GUEST_MARKER).join('')
-      .trim() || '普通房間';
+      .trim() || translate('room.defaultName');
   }
 
   private static encodeGate(roomId: string, display: string, role: RoomRole, password: string): string {

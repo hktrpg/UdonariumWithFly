@@ -40,6 +40,8 @@ import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SaveDataService } from 'service/save-data.service';
 import { StandImageService } from 'service/stand-image.service';
+import { I18nService } from 'service/i18n.service';
+import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from '@udonarium/data-element';
 import { StandImageComponent } from 'component/stand-image/stand-image.component';
@@ -143,7 +145,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private ngZone: NgZone,
     private contextMenuService: ContextMenuService,
     private standImageService: StandImageService,
-    private cutInService: CutInService
+    private cutInService: CutInService,
+    private i18n: I18nService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -176,8 +179,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let soundEffect: SoundEffect = new SoundEffect('SoundEffect');
     soundEffect.initialize();
 
-    ChatTabList.instance.addChatTab('主要標籤', 'MainTab');
-    let subTab = ChatTabList.instance.addChatTab('閒聊標籤', 'SubTab');
+    ChatTabList.instance.addChatTab(this.i18n.t('sample.mainTab'), 'MainTab');
+    let subTab = ChatTabList.instance.addChatTab(this.i18n.t('sample.subTab'), 'SubTab');
     subTab.recieveOperationLogLevel = 1;
 
     CutInList.instance.initialize();
@@ -187,21 +190,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
     sampleDiceRollTable.initialize();
-    sampleDiceRollTable.name = '範例骰子機器人表'
+    sampleDiceRollTable.name = this.i18n.t('sample.diceTable')
     sampleDiceRollTable.command = 'SAMPLE'
     sampleDiceRollTable.dice = '1d6';
-    sampleDiceRollTable.value = "1:這是骰子機器人表的範例\n2:數字與對應結果以一行一個、用:（冒號）分隔\n3:寫成 數字:結果 的形式\n4:\\\\n  \\n 可換行\n5-6:也可以用-（連字號）指定數字範圍";
+    sampleDiceRollTable.value = this.i18n.t('sample.diceTableValue');
     DiceRollTableList.instance.addDiceRollTable(sampleDiceRollTable);
 
     let fileContext = ImageFile.createEmpty('none_icon').toContext();
     fileContext.url = './assets/images/ic_account_circle_black_24dp_2x.png';
     let noneIconImage = ImageStorage.instance.add(fileContext);
-    ImageTag.create(noneIconImage.identifier).tag = '*default 圖示';
+    ImageTag.create(noneIconImage.identifier).tag = this.i18n.t('sample.tagIcon');
 
     fileContext = ImageFile.createEmpty('stand_no_image').toContext();
     fileContext.url = './assets/images/nc96424.png';
     let standNoIconImage = ImageStorage.instance.add(fileContext);
-    ImageTag.create(standNoIconImage.identifier).tag = '*default 立繪';
+    ImageTag.create(standNoIconImage.identifier).tag = this.i18n.t('sample.tagStand');
 
     try {
       localForage.getItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY).then(volume => { 
@@ -343,10 +346,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                 let group = { index: tempInfos[0].normalize.substring(0, 1), infos: [] };
                 for (let info of tempInfos) {
                   let index = info.lang == 'Other' ? 'Other' 
-                    : info.lang == 'ChineseTraditional' ? '正體中文'
+                    : info.lang == 'ChineseTraditional' ? this.i18n.t('lang.zhTW')
                     : info.lang == 'Korean' ? '한국어'
                     : info.lang == 'English' ? 'English'
-                    : info.lang == 'SimplifiedChinese' ? '简体中文'
+                    : info.lang == 'SimplifiedChinese' ? this.i18n.t('lang.zhCN')
                     : info.normalize.substring(0, 1);
                   if (index !== sentinel) {
                     sentinel = index;
@@ -386,19 +389,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           let configErrorTypes = ['server-error', 'authentication', 'token-expired'];
 
           if (quietErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: '網路錯誤', text: errorMessage });
+          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
 
           if (configErrorTypes.includes(errorType)) {
             await this.modalService.open(TextViewComponent, {
-              title: '網路錯誤',
-              text: '無法連線到後端（SkyWay 認證權杖伺服器）。\n\n請確認 src/assets/config.yaml 的 backend.url，並在 ACCESS_CONTROL_ALLOW_ORIGIN 中允許本站 Origin（例如: https://localhost:4200），設定自架的 udonarium-backend。\n\n公開示範用 backend 僅能從 nanasunana.github.io 使用。\n重新載入頁面後會再試一次。'
+              title: this.i18n.t('net.errorTitle'),
+              text: this.i18n.t('net.backendHelp')
             });
             this.isLoggedin = false;
             return;
           }
 
           if (!reconnectErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: '網路錯誤', text: '關閉此視窗後將嘗試重新連線。' });
+          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: this.i18n.t('net.reconnectHint') });
           Network.open();
           this.isLoggedin = false;
         });
@@ -408,7 +411,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
-            chatMessageService.sendOperationLog((this.isRoom ? '已連線到 ' + Network.peer.roomName : '已與其他人連線'));
+            chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
           }
         }
         this.lazyNgZoneUpdate(event.isSendFromSelf);
@@ -429,7 +432,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                 const option: { body: string, icon?: string, tag?: string } = { body: message.plainText(), tag: 'chat-message' };
                 const image = message.image;
                 if (image) option.icon = message.image.url;
-                const notification = new Notification(tab.name + ' - ' + message.name + (message.toColor ? (' ➡ ' + message.toName + ' (密語)') : ''), option);
+                const notification = new Notification(tab.name + ' - ' + message.name + (message.toColor ? (' ➡ ' + message.toName + ' ' + this.i18n.t('net.whisper')) : ''), option);
                 document.addEventListener('visibilitychange', () => {
                   if (document.visibilityState === 'visible') notification.close();
                 });
@@ -511,7 +514,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           Notification.requestPermission().then((permission) => {
             if (permission === 'granted') {
               notification = new Notification('Udonarium with Fly', { 
-                body: '正在下載 Udonarium with Fly 的新版本。',
+                body: this.i18n.t('update.downloading'),
                 icon: 'card.png'
               });
               notification.addEventListener('click', function(e) {
@@ -531,9 +534,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           console.log(`New app version ready for use: ${event.latestVersion.hash}`);
           if (!this.isUpdateCanceled) {
             this.modalService.open(ConfirmationComponent, {
-              title: 'Udonarium with Fly 更新', 
-              text: '已下載 Udonarium with Fly 的新版本。要進行更新嗎？',
-              helpHtml: '<b style="color: red">更新時會重新載入頁面。</b>也可以手動重新載入來完成更新。',
+              title: this.i18n.t('update.title'), 
+              text: this.i18n.t('update.text'),
+              helpHtml: this.i18n.t('update.help'),
               type: ConfirmationType.OK_CANCEL,
               materialIcon: 'browser_updated',
               action: () => {
@@ -684,29 +687,29 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     };
     const menu = [];
     const cunIns = CutInList.instance.cutIns;
-    menu.push({ name: '播放過場', materialIcon: 'play_arrow',
+    menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
       action: null, subActions: cunIns.length === 0 ? [
         {
-          name: '(沒有過場)',
+          name: this.i18n.t('toolbox.noCutIn'),
           disabled: true,
           center: true
         }
       ] : cunIns.map(cutIn => {
         return { 
-          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? '(無名過場)' : cutIn.name}`, 
+          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`, 
           subActions: [{
-              name: '全員',
+              name: this.i18n.t('cutin.all'),
               action: () => {
                 EventSystem.call('PLAY_CUT_IN', {
                   identifier: cutIn.identifier,
                   secret: false,
                   sender: PeerCursor.myCursor.peerId
                 });
-                this.chatMessageService.sendOperationLog((cutIn.name == '' ? '(無名過場)' : cutIn.name) + ' 已播放');
+                this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
               }
             }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
             return {
-              name: peer.name + (peer === PeerCursor.myCursor ? ' (你)' : ''),
+              name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
               color: peer.color,
               default: true,
               action: () => {
@@ -729,9 +732,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
     });
     menu.push(ContextMenuSeparator);
-    menu.push({ name: '過場設定...', materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
-    menu.push({ name: '骰子機器人表設定...', materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') })
-    this.contextMenuService.open(position, menu, '工具箱');
+    menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
+    menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') })
+    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
   }
 
   resetPointOfView(event: Event) {
@@ -742,9 +745,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
     };
     this.contextMenuService.open(position, [
-      { name: '回到最初的視點', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-      { name: '使用正上方視點', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-    ], '視點重置');
+      { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+      { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+    ], this.i18n.t('menu.viewReset'));
   }
 
   standSetteings(event: Event) {
@@ -758,40 +761,40 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const isShowNameTag = StandImageComponent.isShowNameTag;
     const isCanBeGone = StandImageComponent.isCanBeGone; 
     this.contextMenuService.open(position, [
-      { name: `${ TableSelecter.instance.gridShow ? '☑' : '☐' }一律顯示桌面格線`, 
+      { name: `${ TableSelecter.instance.gridShow ? '☑' : '☐' }${this.i18n.t('menu.settings.showGrid')}`,
         action: () => {
           TableSelecter.instance.gridShow = !TableSelecter.instance.gridShow;
           EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext()); 
         },
         checkBox: 'check'
       },
-      { name: `${ TableSelecter.instance.gridSnap ? '☑' : '☐' }物件移動時對齊格線`, 
+      { name: `${ TableSelecter.instance.gridSnap ? '☑' : '☐' }${this.i18n.t('menu.settings.gridSnap')}`,
         action: () => {
           TableSelecter.instance.gridSnap = !TableSelecter.instance.gridSnap;
         },
         checkBox: 'check'
       },
       ContextMenuSeparator,
-      { name: `${ ChatWindowComponent.isNoticeOn ? '☑' : '☐' }新訊息提示音`, 
+      { name: `${ ChatWindowComponent.isNoticeOn ? '☑' : '☐' }${this.i18n.t('menu.settings.noticeSound')}`,
         action: () => {
           ChatWindowComponent.setChatNotice(!ChatWindowComponent.isNoticeOn);
         },
         checkBox: 'check'
       },
-      { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }訊息一律靠左顯示`, 
+      { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }${this.i18n.t('menu.settings.leftOnly')}`,
         action: () => {
           ChatWindowComponent.setChatLeftOnly(!ChatWindowComponent.isLeftOnly);
         },
         checkBox: 'check'
       },
       ContextMenuSeparator,
-      { name: `${ isShowStand ? '☑' : '☐' }顯示立繪`, 
+      { name: `${ isShowStand ? '☑' : '☐' }${this.i18n.t('menu.settings.showStand')}`,
         action: () => {
           StandImageComponent.isShowStand = !isShowStand;
         },
         checkBox: 'check'
       },
-      { name: `${ isShowNameTag ? '☑' : '☐' }顯示名稱標籤`, 
+      { name: `${ isShowNameTag ? '☑' : '☐' }${this.i18n.t('menu.settings.showNameTag')}`,
         action: () => {
           StandImageComponent.isShowNameTag = !isShowNameTag;
         },
@@ -799,7 +802,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         disabled: !StandImageComponent.isShowStand,
         checkBox: 'check'
       },
-      { name: `${ isCanBeGone ? '☑' : '☐' }立繪淡出並自動退場`, 
+      { name: `${ isCanBeGone ? '☑' : '☐' }${this.i18n.t('menu.settings.standAutoExit')}`,
         action: () => {
           StandImageComponent.isCanBeGone = !isCanBeGone;
         },
@@ -808,8 +811,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         checkBox: 'check'
       },
       ContextMenuSeparator,
-      { name: '清除所有顯示中的立繪', action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
-    ], '個人設定');
+      {
+        name: this.i18n.t('lang.label'),
+        materialIcon: 'language',
+        subActions: this.i18n.locales.map(locale => ({
+          name: `${this.i18n.locale === locale.id ? '☑' : '☐'} ${locale.nativeLabel}`,
+          checkBox: 'check',
+          keepOpen: true,
+          action: () => this.i18n.setLocale(locale.id as AppLocale),
+          nameUpdate: () => `${this.i18n.locale === locale.id ? '☑' : '☐'} ${locale.nativeLabel}`,
+        })),
+      },
+      ContextMenuSeparator,
+      { name: this.i18n.t('menu.settings.clearStands'), action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
+    ], this.i18n.t('menu.settings'));
   }
 /*
   farewellStandAll() {
@@ -818,9 +833,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 */
   diceAllOpne() {
     this.modalService.open(ConfirmationComponent, {
-      title: '一次公開桌面骰子', 
-      text: '要公開桌面上的骰子、硬幣嗎？',
-      help: '標記為「不一齊公開」的骰子／硬幣不會一起翻開。',
+      title: this.i18n.t('menu.confirm.diceOpen.title'),
+      text: this.i18n.t('menu.confirm.diceOpen.text'),
+      help: this.i18n.t('menu.confirm.diceOpen.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'all_out',
       action: () => {
@@ -831,9 +846,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   logout() {
       this.modalService.open(ConfirmationComponent, {
-      title: '斷開連線', 
-      text: `將切斷與其他參與者的連線${ this.isRoom ? '，並退出房間' : '' }。`,
-      helpHtml: '<b style="color: red">頁面將重新載入。</b>若尚未存檔，請先取消並下載 ZIP。',
+      title: this.i18n.t('menu.confirm.logout.title'),
+      text: this.i18n.t(this.isRoom ? 'menu.confirm.logout.textRoom' : 'menu.confirm.logout.text'),
+      help: this.i18n.t('menu.confirm.logout.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {

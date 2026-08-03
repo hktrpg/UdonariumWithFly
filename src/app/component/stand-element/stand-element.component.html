@@ -13,7 +13,7 @@
               </div>
             </div>
           </div>
-          <button class="stand-image-button" (click)="openModal()" style="font-size: smaller; padding: 2px 3px;"><b>{{ isSpeakable ? '通常' : '' }}變更圖片</b></button>
+          <button class="stand-image-button" (click)="openModal()" style="font-size: smaller; padding: 2px 3px;"><b>{{ 'stand.changeImage' | i18n }}</b></button>
           <div *ngIf="isSpeakable" style="position: absolute; margin-top: -26px; margin-left: 120px; font-size: 22px; filter: grayscale(100%); opacity: 0.5; cursor: default;">{{ isSpeaking ? '😃' : '🤐' }}</div>
         </div>
       </ng-container>
@@ -22,17 +22,17 @@
       <div>
         <ng-container *ngIf="nameElement">
           <span style="font-size: smaller;">
-            <input type="text" style="width: 7em" [(ngModel)]="nameElement.value" placeholder="Name">
+            <input type="text" style="width: 7em" [(ngModel)]="nameElement.value" [placeholder]="'stand.namePlaceholder' | i18n">
           </span>
         </ng-container>
         <ng-container *ngIf="conditionTypeElement">
-          <b style="font-size: smaller">　條件: </b><select style="width: 15.5em" [(ngModel)]="conditionTypeElement.value">
-            <option value="{{ standConditionType.Default }}">預設</option>
-            <option value="{{ standConditionType.Image }}">指定圖片</option>
-            <option value="{{ standConditionType.Postfix }}">聊天末尾</option>
-            <option value="{{ standConditionType.PostfixOrImage }}">聊天末尾 或 指定圖片</option>
-            <option value="{{ standConditionType.PostfixAndImage }}">聊天末尾 且 指定圖片</option>
-            <option value="{{ standConditionType.NotConditionStandUp }}">僅在選擇時</option>
+          <b style="font-size: smaller">　{{ 'stand.condition' | i18n }}</b><select style="width: 15.5em" [(ngModel)]="conditionTypeElement.value">
+            <option value="{{ standConditionType.Default }}">{{ 'stand.condition.default' | i18n }}</option>
+            <option value="{{ standConditionType.Image }}">{{ 'stand.condition.image' | i18n }}</option>
+            <option value="{{ standConditionType.Postfix }}">{{ 'stand.condition.postfix' | i18n }}</option>
+            <option value="{{ standConditionType.PostfixOrImage }}">{{ 'stand.condition.postfixOrImage' | i18n }}</option>
+            <option value="{{ standConditionType.PostfixAndImage }}">{{ 'stand.condition.postfixAndImage' | i18n }}</option>
+            <option value="{{ standConditionType.NotConditionStandUp }}">{{ 'stand.condition.selectedOnly' | i18n }}</option>
           </select>
         </ng-container>
         <ng-container *ngIf="nameElement">
@@ -45,19 +45,19 @@
         <ng-container *ngIf="showNameElement">
           <label style="margin-right: 0.6em">
             <input type="checkbox" [(ngModel)]="showNameElement.value" checked="{{showNameElement.value ? 'checked' : ''}}" (change)="showNameElement.value = (showNameElement.value ? 'showName' : '')">
-            <b style="font-size: smaller;">名稱標籤</b>
+            <b style="font-size: smaller;">{{ 'stand.showName' | i18n }}</b>
           </label>
         </ng-container>
         <ng-container *ngIf="applyImageEffectElement">
           <label style="margin-right: 0.6em">
             <input type="checkbox" [(ngModel)]="applyImageEffectElement.value" checked="{{applyImageEffectElement.value ? 'checked' : ''}}" (change)="applyImageEffectElement.value = (applyImageEffectElement.value ? 'applyImageEffect' : '')">
-            <b style="font-size: smaller;">反映圖片效果</b>
+            <b style="font-size: smaller;">{{ 'stand.applyImageEffect' | i18n }}</b>
           </label>
         </ng-container>
         <ng-container *ngIf="applyRollElement">
           <label style="margin-right: 0.6em">
             <input type="checkbox" [(ngModel)]="applyRollElement.value" checked="{{applyRollElement.value ? 'checked' : ''}}" (change)="applyRollElement.value = (applyRollElement.value ? 'applyRoll' : '')">
-            <b style="font-size: smaller;">反映旋轉</b>
+            <b style="font-size: smaller;">{{ 'stand.applyRoll' | i18n }}</b>
           </label>
         </ng-container>
         <ng-container *ngIf="applyDialogElement">
@@ -66,12 +66,12 @@
             <b style="font-size: smaller; text-shadow: #111 0 0 1px">💭</b>
           </label>
         </ng-container>
-        <button (click)="openSpeakingModal()" style="font-size: 9px" [style.font-weight]="isSpeakable ? 'bolder' : 'normal'">口型同步圖片（APNG 等）</button>
+        <button (click)="openSpeakingModal()" style="font-size: 9px" [style.font-weight]="isSpeakable ? 'bolder' : 'normal'">{{ 'stand.speakingImage' | i18n }}</button>
         <ng-container *ngIf="positionElement">
-          <br><button style="font-size: 9px; margin-right: 1em;" (click)="testStandUp()"><b>測試（僅本人看見）<sup class="self-only">*</sup></b></button>
+          <br><button style="font-size: 9px; margin-right: 1em;" (click)="testStandUp()"><b>{{ 'stand.test' | i18n }}<sup class="self-only">*</sup></b></button>
           <label style="margin-right: 0.3em;">
             <input type="checkbox" [(ngModel)]="positionElement.currentValue" checked="{{positionElement.currentValue ? 'checked' : ''}}" (change)="positionElement.currentValue = (positionElement.currentValue ? 'posSpecialize' : '')">
-            <b style="font-size: smaller;">Pos 個別指定: </b>
+            <b style="font-size: smaller;">{{ 'stand.positionSpecialize' | i18n }}</b>
           </label>
           <span style="white-space: nowrap; font-size: smaller">
             <input style="width: 140px" type="range" [title]="positionElement.value + '%'" min="0" max="100" [(ngModel)]="positionElement.value" [disabled]="!positionElement.currentValue">
@@ -81,8 +81,8 @@
         </ng-container>
         <ng-container *ngIf="heightElement">
           <br><div style="display: inline; white-space: nowrap; font-size: smaller">
-            <b style="display: inline-block; margin-left: 3px">Height (0=未指定): </b>
-            <input style="width: 130px" type="range" [title]="heightElement.value ? heightElement.value + '%' : '未指定'" min="0" max="100" [(ngModel)]="heightElement.value">
+            <b style="display: inline-block; margin-left: 3px">{{ 'stand.heightIndividual' | i18n }}</b>
+            <input style="width: 130px" type="range" [title]="heightElement.value ? heightElement.value + '%' : ('stand.unspecified' | i18n)" min="0" max="100" [(ngModel)]="heightElement.value">
             <input style="width: 3em; text-align: right;" type="number" min="0" max="200" [(ngModel)]="heightElement.value">
             <b style="display: inline-block; font-size: smaller; margin-left: 3px">%</b>
           </div>
@@ -94,7 +94,7 @@
         </ng-container>
       </div>
       <div *ngIf="postfixElement && (conditionTypeElement.value == standConditionType.Postfix || conditionTypeElement.value == standConditionType.PostfixOrImage || conditionTypeElement.value == standConditionType.PostfixAndImage)">
-        <textarea [(ngModel)]="postfixElement.value" style="width: 100%; margin-top: 3px; height: 2.4rem" placeholder="每行一個，開頭加上 @ 時會在符合時從文字中截掉&#13;&#10;@憤怒&#13;&#10;@必殺技"></textarea>
+        <textarea [(ngModel)]="postfixElement.value" style="width: 100%; margin-top: 3px; height: 2.4rem" [placeholder]="'stand.postfixPlaceholder' | i18n"></textarea>
       </div>
       <div *ngIf="conditionTypeElement.value == standConditionType.Image || conditionTypeElement.value == standConditionType.PostfixOrImage || conditionTypeElement.value == standConditionType.PostfixAndImage">
         <div *ngIf="imageList && imageList.length > 0" style="display: flex; flex-wrap: wrap; margin-right: -30px;">
@@ -104,7 +104,7 @@
             </span>
           </ng-container>
         </div>
-        <div *ngIf="!imageList || imageList.length == 0"><b style="font-size: smaller; color: red">尚未設定角色圖片、臉部 IC</b></div>
+        <div *ngIf="!imageList || imageList.length == 0"><b style="font-size: smaller; color: red">{{ 'stand.noCharacterImages' | i18n }}</b></div>
       </div>
     </div>
   </div>
