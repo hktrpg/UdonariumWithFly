@@ -156,3 +156,5 @@
   <div *ngFor="let arrow of offscreenArrows" class="offscreen-arrow" [style.transform]="'translate(' + arrow.x + 'px,' + arrow.y + 'px) rotate(' + arrow.deg + 'deg)'"
     [style.border-bottom-color]="arrow.color"></div>
 </div>
+<div class="path-move-hud" *ngIf="showPathMoveHud">{{ 'tip.pathMove.hud' | i18n }}</div>
+<div class="vision-banner" *ngIf="showVisionBanner">{{ 'tip.vision.noCharacter' | i18n }}</div>

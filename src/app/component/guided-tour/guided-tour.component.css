@@ -1,0 +1,132 @@
+.guided-tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  pointer-events: none;
+}
+
+.guided-tour-scrim,
+.gt-shade {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.gt-shade.full {
+  inset: 0;
+}
+
+.gt-ring {
+  position: fixed;
+  box-sizing: border-box;
+  border: 2px solid #ffe08a;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(255, 224, 138, 0.35);
+  pointer-events: none;
+}
+
+.guided-tour-bubble {
+  position: fixed;
+  left: 24px;
+  top: 24px;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  padding: 12px 14px;
+  box-sizing: border-box;
+  pointer-events: auto;
+  color: #f5f5f5;
+  background: rgba(24, 24, 24, 0.96);
+  border: 1px solid #999;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.guided-tour-bubble.welcome {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 380px;
+}
+
+.gt-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #555;
+}
+
+.gt-lang-label {
+  font-size: 12px;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.gt-lang-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #777;
+  border-radius: 3px;
+  background: #2a2a2a;
+  color: #eee;
+  font-size: 13px;
+}
+
+.gt-progress {
+  font-size: 11px;
+  color: #bbb;
+  margin-bottom: 4px;
+}
+
+.gt-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.gt-body {
+  white-space: pre-wrap;
+  color: #ddd;
+  margin-bottom: 8px;
+}
+
+.gt-hint {
+  color: #ffe08a;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.gt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.gt-btn {
+  cursor: pointer;
+  border: 1px solid #777;
+  background: #333;
+  color: #eee;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.gt-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.gt-btn.primary {
+  background: #5a7d4a;
+  border-color: #7a9d6a;
+}
+
+.gt-btn:not(:disabled):hover {
+  filter: brightness(1.1);
+}

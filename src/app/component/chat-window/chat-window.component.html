@@ -23,7 +23,7 @@
           <i class="material-icons" style="font-size: 1em">{{ isSoundEffectOn ? 'volume_up' : 'volume_off'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.noticeTitle' | i18n" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [appTeachingTip]="'tip.chat.notice'" [title]="'chat.noticeTitle' | i18n" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
           <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_paused'}}</i>
           <sup style="color: red">*</sup>
         </button>
@@ -31,11 +31,11 @@
           <i class="material-icons" [ngStyle]="{'font-size': isLeftOnly ? '1em' : '1.3em' }">{{ isLeftOnly ? 'arrow_forward' : 'compare_arrows'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.compactTitle' | i18n" [ngClass]="{'is-active': isCompactOff}" (click)="toggleCompact()">
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [appTeachingTip]="'tip.chat.compact'" [title]="'chat.compactTitle' | i18n" [ngClass]="{'is-active': isCompactOff}" (click)="toggleCompact()">
           <i class="material-icons" style="font-size: 1em">{{ isCompactOff ? 'forum' : 'list'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.clarifyTitle' | i18n" [ngClass]="{'is-active': isClarifyOff}" (click)="toggleClarifyMode()">
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [appTeachingTip]="'tip.chat.clarify'" [title]="'chat.clarifyTitle' | i18n" [ngClass]="{'is-active': isClarifyOff}" (click)="toggleClarifyMode()">
           <i class="material-icons" style="font-size: 1em">{{ isClarifyOff ? 'view_agenda' : 'view_day'}}</i>
           <sup style="color: red">*</sup>
         </button>

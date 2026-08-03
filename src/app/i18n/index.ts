@@ -2,24 +2,28 @@ import { AppLocale, DEFAULT_LOCALE, I18nDictionary, I18nParams } from './types';
 import { en } from './en';
 import { en_ui } from './en-ui';
 import { en_tutorial } from './en-tutorial';
+import { en_tip } from './en-tip';
 import { en_ctx } from './en-ctx';
 import { en_sheet } from './en-sheet';
 import { en_obj } from './en-obj';
 import { ja } from './ja';
 import { ja_ui } from './ja-ui';
 import { ja_tutorial } from './ja-tutorial';
+import { ja_tip } from './ja-tip';
 import { ja_ctx } from './ja-ctx';
 import { ja_sheet } from './ja-sheet';
 import { ja_obj } from './ja-obj';
 import { zhCN } from './zh-CN';
 import { zhCN_ui } from './zh-CN-ui';
 import { zhCN_tutorial } from './zh-CN-tutorial';
+import { zhCN_tip } from './zh-CN-tip';
 import { zhCN_ctx } from './zh-CN-ctx';
 import { zhCN_sheet } from './zh-CN-sheet';
 import { zhCN_obj } from './zh-CN-obj';
 import { zhTW } from './zh-TW';
 import { zhTW_ui } from './zh-TW-ui';
 import { zhTW_tutorial } from './zh-TW-tutorial';
+import { zhTW_tip } from './zh-TW-tip';
 import { zhTW_ctx } from './zh-TW-ctx';
 import { zhTW_sheet } from './zh-TW-sheet';
 import { zhTW_obj } from './zh-TW-obj';
@@ -28,10 +32,10 @@ export * from './types';
 export { ensureI18nLocalesRegistered, toIntlLocale } from './locales';
 
 export const I18N_DICTIONARIES: Record<AppLocale, I18nDictionary> = {
-  'zh-TW': { ...zhTW, ...zhTW_ui, ...zhTW_tutorial, ...zhTW_ctx, ...zhTW_sheet, ...zhTW_obj },
-  'zh-CN': { ...zhCN, ...zhCN_ui, ...zhCN_tutorial, ...zhCN_ctx, ...zhCN_sheet, ...zhCN_obj },
-  en: { ...en, ...en_ui, ...en_tutorial, ...en_ctx, ...en_sheet, ...en_obj },
-  ja: { ...ja, ...ja_ui, ...ja_tutorial, ...ja_ctx, ...ja_sheet, ...ja_obj },
+  'zh-TW': { ...zhTW, ...zhTW_ui, ...zhTW_tutorial, ...zhTW_tip, ...zhTW_ctx, ...zhTW_sheet, ...zhTW_obj },
+  'zh-CN': { ...zhCN, ...zhCN_ui, ...zhCN_tutorial, ...zhCN_tip, ...zhCN_ctx, ...zhCN_sheet, ...zhCN_obj },
+  en: { ...en, ...en_ui, ...en_tutorial, ...en_tip, ...en_ctx, ...en_sheet, ...en_obj },
+  ja: { ...ja, ...ja_ui, ...ja_tutorial, ...ja_tip, ...ja_ctx, ...ja_sheet, ...ja_obj },
 };
 
 const LOCALE_STORAGE_KEY = 'udonarium.ui.locale';

@@ -1,0 +1,225 @@
+import { Network } from '@udonarium/core/system';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+
+export type TourRequire =
+  | 'ack'
+  | 'panel-open'
+  | 'gesture-pan'
+  | 'gesture-wheel-pan'
+  | 'gesture-zoom'
+  | 'context-menu'
+  | 'click'
+  | 'key-move'
+  | 'select-object'
+  | 'path-draft'
+  | 'table-ping';
+
+export interface GuidedTourStep {
+  id: string;
+  titleKey: string;
+  bodyKey: string;
+  target?: string;
+  /** After panel-open succeeds, spotlight this instead of `target` (usually the opened panel). */
+  focusTarget?: string;
+  require: TourRequire;
+  tourId?: string;
+  chapter?: string;
+  skipIfGuest?: boolean;
+  skipIfNoSceneTools?: boolean;
+  /** When true, panel-open auto-advances (e.g. Connection → room explain). */
+  autoAdvance?: boolean;
+}
+
+function menuOpen(
+  id: string,
+  tourId: string,
+  require: 'panel-open' | 'click',
+  opts?: { skipIfGuest?: boolean; skipIfNoSceneTools?: boolean; chapter?: string; autoAdvance?: boolean },
+): GuidedTourStep {
+  return {
+    id,
+    titleKey: `tour.step.${id}.title`,
+    bodyKey: `tour.step.${id}.body`,
+    target: `[data-tour-id="${tourId}"]`,
+    focusTarget: require === 'panel-open' ? `[data-tour-panel="${tourId}"]` : undefined,
+    tourId,
+    require,
+    chapter: opts?.chapter ?? 'menu',
+    skipIfGuest: opts?.skipIfGuest,
+    skipIfNoSceneTools: opts?.skipIfNoSceneTools,
+    autoAdvance: opts?.autoAdvance,
+  };
+}
+
+export function buildGuidedTourSteps(): GuidedTourStep[] {
+  return [
+    // Chapter 1: room + save — open Connection first, then explain; folder backup before ZIP
+    {
+      id: 'roomChapter',
+      titleKey: 'tour.step.roomChapter.title',
+      bodyKey: 'tour.step.roomChapter.body',
+      require: 'ack',
+      chapter: 'room',
+    },
+    menuOpen('connection', 'menu.connection', 'panel-open', { chapter: 'room', autoAdvance: true }),
+    {
+      id: 'roomHow',
+      titleKey: 'tour.step.roomHow.title',
+      bodyKey: 'tour.step.roomHow.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
+      require: 'ack',
+      chapter: 'room',
+    },
+    {
+      id: 'saveFolder',
+      titleKey: 'tour.step.saveFolder.title',
+      bodyKey: 'tour.step.saveFolder.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
+      require: 'ack',
+      chapter: 'room',
+    },
+    {
+      id: 'saveZip',
+      titleKey: 'tour.step.saveZip.title',
+      bodyKey: 'tour.step.saveZip.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
+      require: 'ack',
+      chapter: 'room',
+    },
+
+    // Chapter 2: other menus
+    {
+      id: 'menuChapter',
+      titleKey: 'tour.step.menuChapter.title',
+      bodyKey: 'tour.step.menuChapter.body',
+      require: 'ack',
+      chapter: 'menu',
+    },
+    menuOpen('chat', 'menu.chat', 'panel-open'),
+    menuOpen('table', 'menu.table', 'panel-open', { skipIfGuest: true }),
+    menuOpen('images', 'menu.images', 'panel-open', { skipIfGuest: true }),
+    menuOpen('music', 'menu.music', 'panel-open', { skipIfGuest: true }),
+    menuOpen('toolbox', 'menu.toolbox', 'click', { skipIfGuest: true }),
+    menuOpen('combat', 'menu.combat', 'panel-open'),
+    menuOpen('sceneTools', 'menu.sceneTools', 'panel-open', { skipIfNoSceneTools: true }),
+    menuOpen('inventory', 'menu.inventory', 'panel-open', { skipIfGuest: true }),
+    menuOpen('notes', 'menu.notes', 'panel-open', { skipIfGuest: true }),
+    menuOpen('settings', 'menu.settings', 'click'),
+
+    // Chapter 3: table
+    {
+      id: 'tableChapter',
+      titleKey: 'tour.step.tableChapter.title',
+      bodyKey: 'tour.step.tableChapter.body',
+      require: 'ack',
+      chapter: 'table',
+    },
+    {
+      id: 'mapPan',
+      titleKey: 'tour.step.mapPan.title',
+      bodyKey: 'tour.step.mapPan.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'gesture-pan',
+      chapter: 'table',
+    },
+    {
+      id: 'mapWheel',
+      titleKey: 'tour.step.mapWheel.title',
+      bodyKey: 'tour.step.mapWheel.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'gesture-wheel-pan',
+      chapter: 'table',
+    },
+    {
+      id: 'mapZoom',
+      titleKey: 'tour.step.mapZoom.title',
+      bodyKey: 'tour.step.mapZoom.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'gesture-zoom',
+      chapter: 'table',
+    },
+    {
+      id: 'contextMenu',
+      titleKey: 'tour.step.contextMenu.title',
+      bodyKey: 'tour.step.contextMenu.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'context-menu',
+      chapter: 'table',
+    },
+
+    // Chapter 4: controls
+    {
+      id: 'controlsChapter',
+      titleKey: 'tour.step.controlsChapter.title',
+      bodyKey: 'tour.step.controlsChapter.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'select-object',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsWasd',
+      titleKey: 'tour.step.controlsWasd.title',
+      bodyKey: 'tour.step.controlsWasd.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'key-move',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsDelete',
+      titleKey: 'tour.step.controlsDelete.title',
+      bodyKey: 'tour.step.controlsDelete.body',
+      require: 'ack',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsClipboard',
+      titleKey: 'tour.step.controlsClipboard.title',
+      bodyKey: 'tour.step.controlsClipboard.body',
+      require: 'ack',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsUndo',
+      titleKey: 'tour.step.controlsUndo.title',
+      bodyKey: 'tour.step.controlsUndo.body',
+      require: 'ack',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsPath',
+      titleKey: 'tour.step.controlsPath.title',
+      bodyKey: 'tour.step.controlsPath.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'path-draft',
+      chapter: 'controls',
+      skipIfGuest: true,
+    },
+    {
+      id: 'controlsPing',
+      titleKey: 'tour.step.controlsPing.title',
+      bodyKey: 'tour.step.controlsPing.body',
+      target: '[data-tour-id="table.layer"]',
+      require: 'table-ping',
+      chapter: 'controls',
+    },
+    {
+      id: 'saveGuide',
+      titleKey: 'tour.step.saveGuide.title',
+      bodyKey: 'tour.step.saveGuide.body',
+      require: 'ack',
+      chapter: 'controls',
+    },
+  ];
+}
+
+export function shouldSkipStep(step: GuidedTourStep): boolean {
+  if (step.skipIfGuest && Network.GuestMode()) return true;
+  if (step.skipIfNoSceneTools && !SceneToolPermission.instance.canOpenPanel) return true;
+  if (step.target && typeof document !== 'undefined' && !document.querySelector(step.target)) {
+    if (step.require === 'panel-open' || step.require === 'click') return true;
+  }
+  return false;
+}

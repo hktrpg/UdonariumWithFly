@@ -438,6 +438,13 @@ export class MovableSelectionSynchronizer {
     pauseMs: number = 300
   ): Promise<boolean> {
     if (!targets.length || !waypoints.length) return false;
+
+    const before = new Map<string, TransformPose>();
+    for (const object of targets) {
+      if (MovableSelectionSynchronizer.isLocked(object)) continue;
+      before.set(object.identifier, poseFromObject(object));
+    }
+
     let any = false;
     for (const wp of waypoints) {
       if (MovableSelectionSynchronizer.moveCentersTo(targets, wp.x, wp.y, stepMs)) any = true;
@@ -448,6 +455,15 @@ export class MovableSelectionSynchronizer {
     }
     for (const object of targets) {
       MovableSelectionSynchronizer.objectMap.get(object)?.forEach(m => m.setAnimatedTransition(true));
+    }
+
+    if (any && before.size > 0) {
+      const after = new Map<string, TransformPose>();
+      for (const id of before.keys()) {
+        const object = targets.find(t => t.identifier === id);
+        if (object) after.set(id, poseFromObject(object));
+      }
+      UndoService.instance?.recordTransform('path', before, after);
     }
     return any;
   }

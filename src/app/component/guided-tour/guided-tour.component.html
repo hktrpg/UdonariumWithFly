@@ -1,0 +1,55 @@
+<div class="guided-tour-root" *ngIf="state.phase === 'welcome' || state.phase === 'running'">
+  <div class="guided-tour-scrim" *ngIf="state.phase === 'welcome'"></div>
+
+  <ng-container *ngIf="state.phase === 'running'">
+    <ng-container *ngIf="state.hole as hole">
+      <div class="gt-shade" [style.top.px]="0" [style.left.px]="0" [style.right.px]="0" [style.height.px]="hole.top"></div>
+      <div class="gt-shade" [style.top.px]="hole.top + hole.height" [style.left.px]="0" [style.right.px]="0" [style.bottom.px]="0"></div>
+      <div class="gt-shade" [style.top.px]="hole.top" [style.left.px]="0" [style.width.px]="hole.left" [style.height.px]="hole.height"></div>
+      <div class="gt-shade" [style.top.px]="hole.top" [style.left.px]="hole.left + hole.width" [style.right.px]="0" [style.height.px]="hole.height"></div>
+      <div
+        class="gt-ring"
+        [style.left.px]="hole.left"
+        [style.top.px]="hole.top"
+        [style.width.px]="hole.width"
+        [style.height.px]="hole.height"
+      ></div>
+    </ng-container>
+    <div class="gt-shade full" *ngIf="!state.hole"></div>
+  </ng-container>
+
+  <div
+    class="guided-tour-bubble"
+    [class.welcome]="state.phase === 'welcome'"
+    [style.left.px]="state.phase === 'welcome' ? null : state.bubbleLeft"
+    [style.top.px]="state.phase === 'welcome' ? null : state.bubbleTop"
+  >
+    <ng-container *ngIf="state.phase === 'welcome'">
+      <div class="gt-lang">
+        <label class="gt-lang-label">{{ 'tour.welcome.language' | i18n }}</label>
+        <select class="gt-lang-select" [ngModel]="i18n.locale" (ngModelChange)="onLocaleChange($event)">
+          <option *ngFor="let loc of i18n.locales" [value]="loc.id">{{ loc.nativeLabel }}</option>
+        </select>
+      </div>
+      <div class="gt-title">{{ 'tour.welcome.title' | i18n }}</div>
+      <div class="gt-body">{{ 'tour.welcome.body' | i18n }}</div>
+      <div class="gt-actions">
+        <button type="button" class="gt-btn primary" (click)="start()">{{ 'tour.welcome.start' | i18n }}</button>
+        <button type="button" class="gt-btn" (click)="skipAll()">{{ 'tour.welcome.skip' | i18n }}</button>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="state.phase === 'running' && state.current">
+      <div class="gt-progress">{{ progressLabel }}</div>
+      <div class="gt-title">{{ state.current.titleKey | i18n }}</div>
+      <div class="gt-body">{{ state.current.bodyKey | i18n }}</div>
+      <div class="gt-hint" *ngIf="!canNext">{{ 'tour.hint.doAction' | i18n }}</div>
+      <div class="gt-actions">
+        <button type="button" class="gt-btn" (click)="prev()" [disabled]="state.stepIndex <= 0">{{ 'tour.prev' | i18n }}</button>
+        <button type="button" class="gt-btn" (click)="skipChapter()">{{ 'tour.skipChapter' | i18n }}</button>
+        <button type="button" class="gt-btn" (click)="skipAll()">{{ 'tour.skipAll' | i18n }}</button>
+        <button type="button" class="gt-btn primary" (click)="next()" [disabled]="!canNext">{{ 'tour.next' | i18n }}</button>
+      </div>
+    </ng-container>
+  </div>
+</div>

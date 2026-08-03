@@ -1,76 +1,76 @@
-<div id="app-table-layer" style="position: absolute; width: 100%; height: 100%; overflow: hidden;">
+<div id="app-table-layer" data-tour-id="table.layer" style="position: absolute; width: 100%; height: 100%; overflow: hidden;">
   <game-table></game-table>
 </div>
 <ui-panel (rotateEvent)="rotateChange($event)" [top]="0" [left]="0" [width]="100" [height]="765" [title]="'menu.title' | i18n" [isAbleFullScreenButton]="false" [isAbleCloseButton]="false"  [isAbleRotateButton]="true">
   <nav [ngClass]="{'horizontal': isHorizontal, 'vertical': !isHorizontal}">
     <ul>
-      <li (click)="open('PeerMenuComponent')">
+      <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">people</i></div>
           <div>{{ 'menu.connection' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('ChatWindowComponent')">
+      <li data-tour-id="menu.chat" [appTeachingTip]="'tip.menu.chat'" (click)="open('ChatWindowComponent')">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">speaker_notes</i></div>
           <div>{{ 'menu.chat' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('GameTableSettingComponent')" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.table" [appTeachingTip]="'tip.menu.table'" (click)="open('GameTableSettingComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">layers</i></div>
           <div>{{ 'menu.table' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('FileStorageComponent')" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.images" [appTeachingTip]="'tip.menu.images'" (click)="open('FileStorageComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">photo_library</i></div>
           <div>{{ 'menu.images' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('JukeboxComponent')" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.music" [appTeachingTip]="'tip.menu.music'" (click)="open('JukeboxComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons">queue_music</i></div>
           <div>{{ 'menu.music' | i18n }}</div>
         </a>
       </li>
-      <li (click)="toolBox($event)" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.toolbox" [appTeachingTip]="'tip.menu.toolbox'" (click)="toolBox($event)" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
           <div><i class="material-icons">build</i></div>
           <div>{{ 'menu.toolbox' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('CombatTrackerComponent')">
+      <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">sports_mma</i></div>
           <div>{{ 'menu.combat' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('SceneToolsComponent')" *ngIf="canOpenSceneTools">
+      <li data-tour-id="menu.sceneTools" [appTeachingTip]="'tip.menu.sceneTools'" (click)="open('SceneToolsComponent')" *ngIf="canOpenSceneTools">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">architecture</i></div>
           <div>{{ 'menu.sceneTools' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">folder_shared</i></div>
           <div>{{ 'menu.inventory' | i18n }}</div>
         </a>
       </li>
-      <li (click)="open('NoteInventoryComponent')" *ngIf="!GuestMode()">
+      <li data-tour-id="menu.notes" [appTeachingTip]="'tip.menu.notes'" (click)="open('NoteInventoryComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">note</i></div>
           <div>{{ 'menu.notes' | i18n }}</div>
         </a>
       </li>
-      <li (click)="standSetteings($event)">
+      <li data-tour-id="menu.settings" [appTeachingTip]="'tip.menu.settings'" (click)="standSetteings($event)">
         <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
           <div><i class="material-icons icon-size">how_to_reg</i></div>
           <div>{{ 'menu.settings' | i18n }}<sup class="self-only">*</sup></div>
         </a>
       </li>
-      <li (click)="logout()">
+      <li data-tour-id="menu.disconnect" [appTeachingTip]="'tip.menu.disconnect'" (click)="logout()">
         <a routerLink="/" routerLinkActive="active">
           <label>
             <div><i class="material-icons">logout</i></div>
@@ -83,6 +83,8 @@
   </nav>
 </ui-panel>
 <div #modalLayer></div>
+<teaching-tip></teaching-tip>
+<guided-tour></guided-tour>
 <combat-announce></combat-announce>
 <network-indicator class="networkIndicator"></network-indicator>
 <div *ngIf="imageUrl" class="image-view-background is-fill" (click)="closeImagePreview()" [@fadeInOut]="'in'">

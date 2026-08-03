@@ -15,7 +15,7 @@ export const zhTW_tutorial: I18nDictionary = {
 　　　　角色「下一張圖像」改在右鍵選單「切換下一張圖像」
 　　　　卡牌翻面、牌堆抽牌、骰子擲骰：請用右鍵選單
 ＜路徑移動＞先選取 Token，Ctrl＋左鍵加路點（可放開 Ctrl，路點仍保留）
-　　　　再左鍵點新位置＝設為終點並開始移動　右鍵＝取消最後一個路點
+　　　　再左鍵點新位置＝設為終點並開始移動　或按 Space＝以目前路點開始移動　右鍵＝取消最後一個路點　Esc＝取消路徑
 ＜選取＞左鍵點物件＝選取（高亮）　Shift＋點＝加減選
 　　　　左鍵空白拖曳＝框選　Shift＋拖曳＝加選框選　點空白／Esc＝取消選取
 圖片、音樂可直接拖進瀏覽器匯入。`,
@@ -72,7 +72,7 @@ export const zhTW_tutorial: I18nDictionary = {
 ・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）、Ctrl＋Z／Y 復原重做
 ・[ / ] 調整前後層；Alt＋滾輪 15°／Ctrl＋Shift＋滾輪 45° 旋轉
 ・Shift＋滾輪左右移動畫面；Ctrl＋滾輪上下移動畫面
-・路徑移動：選取 Token → Ctrl＋左鍵加路點（可放開 Ctrl）→ 左鍵點終點開始移動；右鍵取消最後路點
+・路徑移動：選取 Token → Ctrl＋左鍵加路點（可放開 Ctrl）→ 左鍵點終點或 Space 開始移動；右鍵取消最後路點；Esc 取消路徑
 ・角色「切換下一張圖像」改右鍵；陰影隨尺寸／高度變化`,
   'changelog.2026scene': `2026/08/03 場景・戰鬥・視野
 ・Ping：空白處長按標記；Shift＋長按警告
