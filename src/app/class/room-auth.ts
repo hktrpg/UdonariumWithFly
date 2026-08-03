@@ -31,10 +31,16 @@ export interface RoomJoinResult {
  * Role passwords are advertised as digests in the room name (like guest marker).
  * Network/skyway password stays empty for role-auth rooms so each role can have
  * an independent password (or none). Legacy single-password rooms are unchanged.
+ *
+ * Markers:
+ * - \u2060A — legacy (7-hex digests)
+ * - \u2060B — compact (4-hex digests) — used for new rooms to keep peerId short
  */
 export class RoomAuth {
   static readonly AUTH_MARKER = '\u2060A';
+  static readonly AUTH_MARKER_V2 = '\u2060B';
   private static readonly DIGEST_LEN = 7;
+  private static readonly DIGEST_LEN_V2 = 3;
 
   static encode(
     displayName: string,
@@ -46,7 +52,8 @@ export class RoomAuth {
       RoomAuth.encodeGate(roomId, clean, 'gm', passwords.gm) +
       RoomAuth.encodeGate(roomId, clean, 'user', passwords.user) +
       RoomAuth.encodeGate(roomId, clean, 'guest', passwords.guest);
-    return clean + RoomAuth.AUTH_MARKER + blob;
+    // Compact marker keeps peerId under SkyWay length limits more reliably.
+    return clean + RoomAuth.AUTH_MARKER_V2 + blob;
   }
 
   static parse(roomName: string): RoomAuthInfo {
@@ -56,19 +63,19 @@ export class RoomAuth {
       user: { mode: 'open', digest: '' },
       guest: { mode: 'disabled', digest: '' },
     };
-    if (!roomName || !roomName.includes(RoomAuth.AUTH_MARKER)) {
+    const markerInfo = RoomAuth.detectMarker(roomName);
+    if (!markerInfo) {
       // Legacy: guest allowed via GuestSession marker.
       if (GuestSession.isAllowGuestRoomName(roomName)) {
         empty.guest = { mode: 'open', digest: '' };
       }
       return empty;
     }
-    const idx = roomName.indexOf(RoomAuth.AUTH_MARKER);
-    const blob = roomName.slice(idx + RoomAuth.AUTH_MARKER.length);
+    const blob = roomName.slice(markerInfo.index + markerInfo.marker.length);
     let i = 0;
-    const gm = RoomAuth.readGate(blob, i); i = gm.next;
-    const user = RoomAuth.readGate(blob, i); i = user.next;
-    const guest = RoomAuth.readGate(blob, i);
+    const gm = RoomAuth.readGate(blob, i, markerInfo.digestLen); i = gm.next;
+    const user = RoomAuth.readGate(blob, i, markerInfo.digestLen); i = user.next;
+    const guest = RoomAuth.readGate(blob, i, markerInfo.digestLen);
     return {
       isRoleAuth: true,
       gm: gm.gate,
@@ -80,13 +87,13 @@ export class RoomAuth {
   static displayRoomName(roomName: string): string {
     if (!roomName) return roomName;
     let name = roomName;
-    const authIdx = name.indexOf(RoomAuth.AUTH_MARKER);
-    if (authIdx >= 0) name = name.slice(0, authIdx);
+    const markerInfo = RoomAuth.detectMarker(name);
+    if (markerInfo) name = name.slice(0, markerInfo.index);
     return GuestSession.displayRoomName(name);
   }
 
   static isRoleAuthRoom(roomName: string): boolean {
-    return !!roomName && roomName.includes(RoomAuth.AUTH_MARKER);
+    return !!RoomAuth.detectMarker(roomName);
   }
 
   static isRoleAvailable(roomName: string, role: RoomRole): boolean {
@@ -112,7 +119,9 @@ export class RoomAuth {
     if (gate.mode === 'disabled') return false;
     if (gate.mode === 'open') return true;
     const display = RoomAuth.displayRoomName(roomName);
-    return RoomAuth.calcDigest(roomId, display, role, password || '') === gate.digest;
+    const markerInfo = RoomAuth.detectMarker(roomName);
+    const digestLen = markerInfo ? markerInfo.digestLen : RoomAuth.DIGEST_LEN_V2;
+    return RoomAuth.calcDigest(roomId, display, role, password || '', digestLen) === gate.digest;
   }
 
   static hasAnyRolePassword(roomName: string): boolean {
@@ -132,8 +141,22 @@ export class RoomAuth {
     }
   }
 
+  private static detectMarker(roomName: string): { marker: string; digestLen: number; index: number } | null {
+    if (!roomName) return null;
+    const idxV2 = roomName.indexOf(RoomAuth.AUTH_MARKER_V2);
+    const idxV1 = roomName.indexOf(RoomAuth.AUTH_MARKER);
+    if (idxV2 >= 0 && (idxV1 < 0 || idxV2 < idxV1)) {
+      return { marker: RoomAuth.AUTH_MARKER_V2, digestLen: RoomAuth.DIGEST_LEN_V2, index: idxV2 };
+    }
+    if (idxV1 >= 0) {
+      return { marker: RoomAuth.AUTH_MARKER, digestLen: RoomAuth.DIGEST_LEN, index: idxV1 };
+    }
+    return null;
+  }
+
   private static sanitizeDisplayName(name: string): string {
     return name
+      .split(RoomAuth.AUTH_MARKER_V2).join('')
       .split(RoomAuth.AUTH_MARKER).join('')
       .split(GuestSession.ALLOW_GUEST_MARKER).join('')
       .trim() || translate('room.defaultName');
@@ -142,22 +165,22 @@ export class RoomAuth {
   private static encodeGate(roomId: string, display: string, role: RoomRole, password: string): string {
     // Empty string = open (no password). All three roles are always available on new rooms.
     if (!password) return '*';
-    return '1' + RoomAuth.calcDigest(roomId, display, role, password);
+    return '1' + RoomAuth.calcDigest(roomId, display, role, password, RoomAuth.DIGEST_LEN_V2);
   }
 
-  private static readGate(blob: string, start: number): { gate: RoleGate; next: number } {
+  private static readGate(blob: string, start: number, digestLen: number): { gate: RoleGate; next: number } {
     if (start >= blob.length) return { gate: { mode: 'disabled', digest: '' }, next: start };
     const flag = blob.charAt(start);
     if (flag === '*') return { gate: { mode: 'open', digest: '' }, next: start + 1 };
     if (flag === '0') return { gate: { mode: 'disabled', digest: '' }, next: start + 1 };
     if (flag === '1') {
-      const digest = blob.slice(start + 1, start + 1 + RoomAuth.DIGEST_LEN);
-      return { gate: { mode: 'password', digest }, next: start + 1 + RoomAuth.DIGEST_LEN };
+      const digest = blob.slice(start + 1, start + 1 + digestLen);
+      return { gate: { mode: 'password', digest }, next: start + 1 + digestLen };
     }
     return { gate: { mode: 'disabled', digest: '' }, next: start + 1 };
   }
 
-  private static calcDigest(roomId: string, displayName: string, role: RoomRole, password: string): string {
-    return CryptoUtil.sha256Hex(`${role}\n${roomId}\n${displayName}\n${password}`).slice(0, RoomAuth.DIGEST_LEN);
+  private static calcDigest(roomId: string, displayName: string, role: RoomRole, password: string, digestLen: number): string {
+    return CryptoUtil.sha256Hex(`${role}\n${roomId}\n${displayName}\n${password}`).slice(0, digestLen);
   }
 }

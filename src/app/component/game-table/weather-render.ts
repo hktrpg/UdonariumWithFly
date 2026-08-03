@@ -10,6 +10,13 @@ interface Particle {
   phase: number;
   /** Variant: leaf/ember/ash/color band index. */
   kind?: number;
+  /** Leaf path: secondary phase / spin / layered sway. */
+  phase2?: number;
+  spin?: number;
+  swayAmp?: number;
+  swayAmp2?: number;
+  swayFreq?: number;
+  swayFreq2?: number;
 }
 
 interface WeatherLayer {
@@ -36,6 +43,8 @@ export const WEATHER_MENU_ORDER: WeatherType[] = [
   'snow',
   'fog',
   'wind',
+  'sakura',
+  'maple',
   'sandstorm',
   'rainbow',
   'aurora',
@@ -49,6 +58,8 @@ export const WEATHER_LABEL_KEY: Record<WeatherType, string> = {
   snow: 'table.snow',
   fog: 'table.fog',
   wind: 'table.wind',
+  sakura: 'table.sakura',
+  maple: 'table.maple',
   sandstorm: 'table.sandstorm',
   rainbow: 'table.rainbow',
   aurora: 'table.aurora',
@@ -61,9 +72,11 @@ const PRESET: Record<Exclude<WeatherType, 'none'>, WeatherPreset> = {
   snow: { count: 88, floorScale: 1, motion: 'fall' },
   fog: { count: 72, floorScale: 1, motion: 'drift' },
   wind: { count: 105, floorScale: 1, motion: 'blow' },
+  sakura: { count: 90, floorScale: 1, motion: 'fall' },
+  maple: { count: 75, floorScale: 1, motion: 'fall' },
   sandstorm: { count: 125, floorScale: 1, motion: 'blow' },
   rainbow: { count: 40, floorScale: 0.28, motion: 'sky' },
-  aurora: { count: 32, floorScale: 0.28, motion: 'sky' },
+  aurora: { count: 48, floorScale: 0.2, motion: 'sky' },
   burning: { count: 135, floorScale: 1, motion: 'rise' },
 };
 
@@ -226,28 +239,61 @@ export class WeatherRender {
       };
     }
     if (type === 'wind') {
-      const leaf = Math.random() < 0.32 ? 1 : 0;
+      // 0=streak, 1=green leaf, 2=sakura petal, 3=maple
+      const roll = Math.random();
+      const kind = roll < 0.55 ? 0 : roll < 0.72 ? 1 : roll < 0.88 ? 2 : 3;
+      const isLeaf = kind > 0;
       return {
         x: anywhere ? Math.random() * width : -35 - Math.random() * 55,
         y: Math.random() * height,
         vx: (7.5 + Math.random() * 12) * (0.65 + depth * 0.6),
         vy: (-1.3 + Math.random() * 2.6) * depth,
-        size: leaf ? (3.2 + Math.random() * 5.2) * depth : (0.65 + Math.random() * 1.9) * depth,
+        size: isLeaf ? (3.2 + Math.random() * 5.2) * depth : (0.65 + Math.random() * 1.9) * depth,
         alpha: (0.24 + Math.random() * 0.4) * dA,
         phase,
-        kind: leaf,
+        kind,
+      };
+    }
+    if (type === 'sakura' || type === 'maple') {
+      const petal = type === 'sakura';
+      const fallScale = petal ? 1 : 0.82;
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      return {
+        x: Math.random() * width,
+        y: anywhere ? Math.random() * height : -25 - Math.random() * 90,
+        // Very slow base drift; path beauty comes from layered sway.
+        vx: dir * (0.04 + Math.random() * 0.18) * (0.5 + depth * 0.25),
+        vy: (0.08 + Math.random() * 0.18) * (0.4 + depth * 0.35) * fallScale,
+        size: petal
+          ? (4 + Math.random() * 6) * depth
+          : (5 + Math.random() * 7) * depth,
+        alpha: (0.45 + Math.random() * 0.45) * dA,
+        phase: Math.random() * Math.PI * 2,
+        phase2: Math.random() * 1000,
+        spin: dir * (0.004 + Math.random() * 0.014) * (0.7 + Math.random() * 0.6),
+        swayAmp: 0.4 + Math.random() * 1.1,
+        swayAmp2: 0.2 + Math.random() * 0.7,
+        swayFreq: 0.008 + Math.random() * 0.018,
+        swayFreq2: 0.02 + Math.random() * 0.035,
+        kind: petal ? Math.floor(Math.random() * 3) : Math.floor(Math.random() * 4),
       };
     }
     if (type === 'rainbow' || type === 'aurora') {
+      const isAurora = type === 'aurora';
       return {
         x: Math.random() * width,
-        y: Math.random() * height * (type === 'aurora' ? 0.72 : 1),
-        vx: (0.12 + Math.random() * 0.32) * (0.7 + depth * 0.25),
-        vy: (Math.random() - 0.5) * 0.22,
-        size: (2.2 + Math.random() * 5.5) * depth,
-        alpha: (0.14 + Math.random() * 0.24) * dA,
+        y: Math.random() * height * (isAurora ? 0.62 : 1),
+        vx: (0.08 + Math.random() * 0.22) * (0.7 + depth * 0.25) * (Math.random() < 0.5 ? 1 : -1),
+        vy: (Math.random() - 0.5) * (isAurora ? 0.12 : 0.22),
+        size: isAurora
+          ? (1.2 + Math.random() * 3.2) * depth
+          : (2.2 + Math.random() * 5.5) * depth,
+        alpha: isAurora
+          ? (0.18 + Math.random() * 0.45) * dA
+          : (0.14 + Math.random() * 0.24) * dA,
         phase,
-        kind: type === 'aurora' ? Math.floor(Math.random() * 3) : 0,
+        kind: isAurora ? Math.floor(Math.random() * 3) : 0,
+        spin: isAurora ? 0.01 + Math.random() * 0.03 : undefined,
       };
     }
     if (type === 'burning') {
@@ -340,6 +386,29 @@ export class WeatherRender {
 
   private stepParticle(type: WeatherType, p: Particle, depth: number) {
     const motion = PRESET[type as Exclude<WeatherType, 'none'>]?.motion;
+    if (type === 'sakura' || type === 'maple') {
+      // Layered sine paths: slow fall + organic side curves + gentle tumble.
+      const t = (p.phase2 = (p.phase2 ?? 0) + 1);
+      const f1 = p.swayFreq ?? 0.012;
+      const f2 = p.swayFreq2 ?? 0.028;
+      const a1 = p.swayAmp ?? 0.6;
+      const a2 = p.swayAmp2 ?? 0.35;
+      const sway =
+        Math.sin(t * f1 + p.phase) * a1 +
+        Math.sin(t * f2 + p.phase * 1.7) * a2 +
+        Math.sin(t * 0.0045 + p.phase * 0.6) * 0.55;
+      // Soft vertical “breathing” so fall speed isn’t constant.
+      const fallPulse = 0.75 + 0.35 * Math.sin(t * (f1 * 0.55) + p.phase);
+      p.x += p.vx + sway * (0.22 + depth * 0.12);
+      p.y += p.vy * fallPulse;
+      p.phase += p.spin ?? 0.008;
+      // Rare tiny gust nudge (per-particle deterministic via t)
+      if ((t | 0) % (180 + ((p.kind ?? 0) * 37)) === 0) {
+        p.vx += (Math.sin(t * 0.11 + p.phase) > 0 ? 1 : -1) * (0.02 + depth * 0.015);
+        p.vx = Math.max(-0.35, Math.min(0.35, p.vx));
+      }
+      return;
+    }
     if (motion === 'fall' && type === 'snow') {
       p.x += p.vx + Math.sin(p.phase) * (0.55 + depth * 0.35);
       p.y += p.vy;
@@ -347,9 +416,17 @@ export class WeatherRender {
       return;
     }
     if (motion === 'drift' || motion === 'sky') {
+      if (type === 'aurora') {
+        p.x += p.vx + Math.sin(p.phase) * 0.15;
+        p.y += p.vy + Math.cos(p.phase * 0.7) * 0.08;
+        p.phase += p.spin ?? 0.018;
+        // Twinkle
+        p.alpha = Math.max(0.05, Math.min(0.85, p.alpha + Math.sin(p.phase * 2.2) * 0.008));
+        return;
+      }
       p.x += p.vx;
       p.y += p.vy + Math.sin(p.phase) * 0.1;
-      p.phase += type === 'aurora' ? 0.02 : 0.012;
+      p.phase += 0.012;
       return;
     }
     if (motion === 'blow') {
@@ -411,6 +488,12 @@ export class WeatherRender {
       case 'snow':
         this.wash(ctx, width, height, [200, 215, 235], this.layerWash(index, 0.12, 0.07, 0.04) * i);
         break;
+      case 'sakura':
+        this.wash(ctx, width, height, [255, 220, 235], this.layerWash(index, 0.08, 0.05, 0.03) * i);
+        break;
+      case 'maple':
+        this.wash(ctx, width, height, [255, 200, 140], this.layerWash(index, 0.07, 0.045, 0.025) * i);
+        break;
       case 'fog':
         this.wash(ctx, width, height, [168, 180, 198], this.layerWash(index, 0.3, 0.18, 0.11) * i);
         if (index === 0) this.wash(ctx, width, height, [215, 222, 232], 0.14 * i);
@@ -432,9 +515,19 @@ export class WeatherRender {
       case 'rainbow':
         this.wash(ctx, width, height, [175, 205, 245], this.layerWash(index, 0.03, 0.04, 0.07) * i);
         break;
-      case 'aurora':
-        this.wash(ctx, width, height, [10, 16, 38], this.layerWash(index, 0.2, 0.13, 0.09) * i);
+      case 'aurora': {
+        // Deep night sky with a soft horizon lift
+        this.wash(ctx, width, height, [6, 10, 28], this.layerWash(index, 0.22, 0.16, 0.12) * i);
+        const sky = ctx.createLinearGradient(0, 0, 0, height);
+        const topA = this.layerWash(index, 0.08, 0.14, 0.2) * i;
+        sky.addColorStop(0, `rgba(20, 40, 90, ${topA})`);
+        sky.addColorStop(0.35, `rgba(12, 28, 55, ${topA * 0.45})`);
+        sky.addColorStop(0.7, 'rgba(8, 14, 32, 0)');
+        sky.addColorStop(1, `rgba(4, 8, 18, ${0.06 * i})`);
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height);
         break;
+      }
       case 'burning': {
         this.wash(ctx, width, height, [78, 24, 8], this.layerWash(index, 0.24, 0.15, 0.09) * i);
         const ha = this.layerWash(index, 0.38, 0.24, 0.14) * i;
@@ -462,7 +555,7 @@ export class WeatherRender {
     height: number,
   ) {
     if (type === 'rainbow' && index >= 1) this.drawRainbow(ctx, intensity, index, width, height);
-    if (type === 'aurora' && index >= 1) this.drawAurora(ctx, intensity, index, width, height);
+    if (type === 'aurora' && index >= 0) this.drawAurora(ctx, intensity, index, width, height);
     if (type === 'thunderstorm' && this.flash > 0 && index === 2) this.drawBolt(ctx, intensity);
   }
 
@@ -496,41 +589,102 @@ export class WeatherRender {
     width: number,
     height: number,
   ) {
-    const t = this.frame * 0.011;
-    const bands = index === 2
+    const t = this.frame * 0.0065;
+    // Soft ground layer: faint reflected glow only
+    if (index === 0) {
+      const glow = ctx.createLinearGradient(0, height * 0.55, 0, height);
+      const a = 0.1 * intensity;
+      glow.addColorStop(0, 'rgba(40, 180, 140, 0)');
+      glow.addColorStop(0.55, `rgba(60, 200, 160, ${a * 0.35})`);
+      glow.addColorStop(1, `rgba(80, 160, 220, ${a * 0.2})`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, height * 0.5, width, height * 0.5);
+      return;
+    }
+
+    type AuroraRibbon = {
+      y: number;
+      h: number;
+      rgb: readonly [number, number, number];
+      rgb2: readonly [number, number, number];
+      phase: number;
+      speed: number;
+      waves: number;
+      lean: number;
+    };
+
+    const ribbons: AuroraRibbon[] = index === 2
       ? [
-        { y: height * 0.06, h: height * 0.44, rgb: [48, 255, 150] as const, phase: 0 },
-        { y: height * 0.0, h: height * 0.4, rgb: [70, 205, 255] as const, phase: 1.15 },
-        { y: height * 0.1, h: height * 0.36, rgb: [170, 100, 255] as const, phase: 2.3 },
+        { y: height * 0.02, h: height * 0.48, rgb: [40, 255, 160], rgb2: [120, 255, 210], phase: 0.0, speed: 1.0, waves: 3.2, lean: 0.04 },
+        { y: height * -0.02, h: height * 0.42, rgb: [50, 190, 255], rgb2: [140, 230, 255], phase: 1.4, speed: 0.85, waves: 2.6, lean: -0.03 },
+        { y: height * 0.08, h: height * 0.38, rgb: [160, 90, 255], rgb2: [210, 150, 255], phase: 2.6, speed: 1.15, waves: 3.8, lean: 0.05 },
+        { y: height * 0.0, h: height * 0.34, rgb: [80, 255, 200], rgb2: [180, 255, 230], phase: 3.8, speed: 0.7, waves: 4.4, lean: -0.02 },
       ]
       : [
-        { y: height * 0.09, h: height * 0.34, rgb: [55, 235, 140] as const, phase: 0.55 },
-        { y: height * 0.04, h: height * 0.3, rgb: [95, 175, 255] as const, phase: 1.75 },
+        { y: height * 0.06, h: height * 0.36, rgb: [55, 230, 150], rgb2: [130, 255, 200], phase: 0.7, speed: 0.9, waves: 2.8, lean: 0.03 },
+        { y: height * 0.02, h: height * 0.32, rgb: [70, 170, 255], rgb2: [150, 210, 255], phase: 2.1, speed: 1.05, waves: 3.4, lean: -0.04 },
+        { y: height * 0.1, h: height * 0.28, rgb: [150, 100, 240], rgb2: [200, 160, 255], phase: 3.3, speed: 0.8, waves: 2.4, lean: 0.02 },
       ];
-    const alphaScale = (index === 2 ? 0.42 : 0.24) * intensity;
+
+    const alphaScale = (index === 2 ? 0.48 : 0.28) * intensity;
+    const steps = index === 2 ? 56 : 40;
+
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const band of bands) {
-      const [r, g, b] = band.rgb;
-      const steps = 32;
+
+    for (const ribbon of ribbons) {
+      const [r, g, b] = ribbon.rgb;
+      const [r2, g2, b2] = ribbon.rgb2;
+      const tt = t * ribbon.speed + ribbon.phase;
+
       for (let i = 0; i <= steps; i++) {
         const u = i / steps;
-        const x = width * (u * 1.22 - 0.11);
+        const x = width * (u * 1.28 - 0.14) + Math.sin(u * 2.2 + tt * 0.4) * width * ribbon.lean;
         const wave =
-          Math.sin(u * 4.0 + t + band.phase) * height * 0.055 +
-          Math.sin(u * 8.5 + t * 1.35 + band.phase) * height * 0.022;
-        const top = band.y + wave;
-        const bottom = top + band.h * (0.72 + 0.28 * Math.sin(u * 3.2 + t));
+          Math.sin(u * ribbon.waves + tt) * height * 0.06 +
+          Math.sin(u * (ribbon.waves * 2.1) + tt * 1.4) * height * 0.025 +
+          Math.sin(u * 1.1 + tt * 0.35) * height * 0.03;
+        const top = ribbon.y + wave;
+        const heightPulse = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(u * 5.5 + tt * 1.2));
+        const bottom = top + ribbon.h * heightPulse;
+        const pillar = 0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(u * 7 + tt * 0.9), 1.6);
+        const edge = Math.sin(u * Math.PI);
+        const a = alphaScale * pillar * (0.35 + 0.65 * edge);
+
         const grad = ctx.createLinearGradient(x, top, x, bottom);
-        const a = alphaScale * (0.5 + 0.5 * Math.sin(u * Math.PI));
-        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
-        grad.addColorStop(0.12, `rgba(${r}, ${g}, ${b}, ${a})`);
-        grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${a * 0.32})`);
+        grad.addColorStop(0, `rgba(${r2}, ${g2}, ${b2}, 0)`);
+        grad.addColorStop(0.06, `rgba(255, 255, 255, ${a * 0.55})`);
+        grad.addColorStop(0.14, `rgba(${r2}, ${g2}, ${b2}, ${a})`);
+        grad.addColorStop(0.38, `rgba(${r}, ${g}, ${b}, ${a * 0.55})`);
+        grad.addColorStop(0.72, `rgba(${r}, ${g}, ${b}, ${a * 0.18})`);
         grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         ctx.fillStyle = grad;
-        ctx.fillRect(x - width / steps * 0.55, top, width / steps + 2.5, bottom - top);
+        const slab = width / steps + 3;
+        ctx.fillRect(x - slab * 0.55, top, slab, Math.max(1, bottom - top));
       }
+
+      // Fine bright filaments near the top edge
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps;
+        const x = width * (u * 1.28 - 0.14) + Math.sin(u * 2.2 + tt * 0.4) * width * ribbon.lean;
+        const wave =
+          Math.sin(u * ribbon.waves + tt) * height * 0.06 +
+          Math.sin(u * (ribbon.waves * 2.1) + tt * 1.4) * height * 0.025 +
+          Math.sin(u * 1.1 + tt * 0.35) * height * 0.03;
+        const y = ribbon.y + wave + height * 0.015;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = `rgba(${r2}, ${g2}, ${b2}, ${alphaScale * 0.45})`;
+      ctx.lineWidth = index === 2 ? 2.2 : 1.4;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alphaScale * 0.22})`;
+      ctx.lineWidth = index === 2 ? 0.9 : 0.55;
+      ctx.stroke();
     }
+
     ctx.restore();
   }
 
@@ -581,6 +735,105 @@ export class WeatherRender {
     ctx.fill();
   }
 
+  private drawGreenLeaf(ctx: CanvasRenderingContext2D, p: Particle) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.phase);
+    const leaf = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size);
+    leaf.addColorStop(0, `rgba(130, 185, 90, ${p.alpha})`);
+    leaf.addColorStop(1, `rgba(70, 120, 55, ${p.alpha * 0.2})`);
+    ctx.fillStyle = leaf;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.size, p.size * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Five soft sakura petals around a pale center. */
+  private drawSakura(ctx: CanvasRenderingContext2D, p: Particle) {
+    const palettes = [
+      [255, 182, 210],
+      [255, 160, 195],
+      [255, 210, 230],
+    ] as const;
+    const [r, g, b] = palettes[Math.max(0, Math.min(2, p.kind | 0))];
+    const s = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.phase);
+    ctx.globalAlpha = Math.min(1, p.alpha + 0.1);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0, -s * 0.42, s * 0.28, s * 0.48, 0, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(0, -s * 0.35, 0, 0, -s * 0.35, s * 0.5);
+      grad.addColorStop(0, `rgba(255, 245, 250, ${p.alpha})`);
+      grad.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${p.alpha})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+    // Center
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.14, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 230, 160, ${p.alpha * 0.85})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Stylized maple leaf (5 lobes) with autumn colors. */
+  private drawMaple(ctx: CanvasRenderingContext2D, p: Particle) {
+    const palettes = [
+      [220, 70, 40],
+      [235, 120, 35],
+      [200, 55, 50],
+      [240, 160, 40],
+    ] as const;
+    const [r, g, b] = palettes[Math.max(0, Math.min(3, p.kind | 0))];
+    const s = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.phase);
+    ctx.beginPath();
+    // Stem tip at bottom, lobes upward / side
+    ctx.moveTo(0, s * 0.55);
+    ctx.quadraticCurveTo(-s * 0.08, s * 0.25, -s * 0.15, s * 0.1);
+    // Left lower lobe
+    ctx.quadraticCurveTo(-s * 0.55, s * 0.2, -s * 0.7, -s * 0.05);
+    ctx.quadraticCurveTo(-s * 0.45, -s * 0.05, -s * 0.35, -s * 0.15);
+    // Left upper lobe
+    ctx.quadraticCurveTo(-s * 0.55, -s * 0.45, -s * 0.25, -s * 0.55);
+    ctx.quadraticCurveTo(-s * 0.15, -s * 0.4, -s * 0.08, -s * 0.45);
+    // Top center lobe
+    ctx.quadraticCurveTo(-s * 0.05, -s * 0.85, 0, -s * 0.95);
+    ctx.quadraticCurveTo(s * 0.05, -s * 0.85, s * 0.08, -s * 0.45);
+    // Right upper lobe
+    ctx.quadraticCurveTo(s * 0.15, -s * 0.4, s * 0.25, -s * 0.55);
+    ctx.quadraticCurveTo(s * 0.55, -s * 0.45, s * 0.35, -s * 0.15);
+    // Right lower lobe
+    ctx.quadraticCurveTo(s * 0.45, -s * 0.05, s * 0.7, -s * 0.05);
+    ctx.quadraticCurveTo(s * 0.55, s * 0.2, s * 0.15, s * 0.1);
+    ctx.quadraticCurveTo(s * 0.08, s * 0.25, 0, s * 0.55);
+    ctx.closePath();
+    const fill = ctx.createRadialGradient(0, -s * 0.1, 0, 0, 0, s);
+    fill.addColorStop(0, `rgba(255, 210, 120, ${p.alpha})`);
+    fill.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, ${p.alpha})`);
+    fill.addColorStop(1, `rgba(${Math.max(0, r - 40)}, ${Math.max(0, g - 30)}, ${b}, ${p.alpha * 0.35})`);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    // Vein
+    ctx.strokeStyle = `rgba(120, 40, 20, ${p.alpha * 0.35})`;
+    ctx.lineWidth = Math.max(0.5, s * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.45);
+    ctx.lineTo(0, -s * 0.7);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawParticle(ctx: CanvasRenderingContext2D, type: WeatherType, p: Particle, depth: number) {
     switch (type) {
       case 'rain':
@@ -627,19 +880,10 @@ export class WeatherRender {
         break;
       }
       case 'wind':
-        if (p.kind === 1) {
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.phase);
-          const leaf = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size);
-          leaf.addColorStop(0, `rgba(130, 185, 90, ${p.alpha})`);
-          leaf.addColorStop(1, `rgba(70, 120, 55, ${p.alpha * 0.2})`);
-          ctx.fillStyle = leaf;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.size, p.size * 0.42, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        } else {
+        if (p.kind === 1) this.drawGreenLeaf(ctx, p);
+        else if (p.kind === 2) this.drawSakura(ctx, p);
+        else if (p.kind === 3) this.drawMaple(ctx, p);
+        else {
           const len = 1.45 + depth * 1.25;
           ctx.strokeStyle = `rgba(205, 225, 235, ${p.alpha})`;
           ctx.lineWidth = Math.max(0.5, p.size * 0.55);
@@ -649,6 +893,12 @@ export class WeatherRender {
           ctx.lineTo(p.x - p.vx * len * 0.28, p.y - p.vy * 0.14);
           ctx.stroke();
         }
+        break;
+      case 'sakura':
+        this.drawSakura(ctx, p);
+        break;
+      case 'maple':
+        this.drawMaple(ctx, p);
         break;
       case 'rainbow':
       case 'aurora': {

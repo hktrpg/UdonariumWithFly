@@ -55,6 +55,41 @@
   <div *ngIf="isRoleAuthRoom" style="font-size: 12px; color: #64748b; margin-top: 2px;">
     {{ 'peer.roleAuthHint' | i18n }}
   </div>
+  <div *ngIf="isRoleAuthRoom" class="invite-block">
+    <div class="invite-label">{{ 'peer.copyInvite.title' | i18n }}</div>
+    <div class="invite-row">
+      <button type="button" *ngIf="isAbleClipboardCopy()"
+        (click)="copyInvite('gm')"
+        [disabled]="!isInviteRoleAvailable('gm') || inviteCopiedRole === 'gm'"
+        [title]="'peer.copyInvite.gm' | i18n">
+        <b class="material-icons" style="font-size: 1em; vertical-align: middle">link</b>
+        {{ 'peer.copyInvite.gm' | i18n }}
+      </button>
+      <button type="button" *ngIf="isAbleClipboardCopy()"
+        (click)="copyInvite('user')"
+        [disabled]="!isInviteRoleAvailable('user') || inviteCopiedRole === 'user'"
+        [title]="'peer.copyInvite.user' | i18n">
+        <b class="material-icons" style="font-size: 1em; vertical-align: middle">link</b>
+        {{ 'peer.copyInvite.user' | i18n }}
+      </button>
+      <button type="button" *ngIf="isAbleClipboardCopy()"
+        (click)="copyInvite('guest')"
+        [disabled]="!isInviteRoleAvailable('guest') || inviteCopiedRole === 'guest'"
+        [title]="'peer.copyInvite.guest' | i18n">
+        <b class="material-icons" style="font-size: 1em; vertical-align: middle">link</b>
+        {{ 'peer.copyInvite.guest' | i18n }}
+      </button>
+      <span *ngIf="inviteCopiedRole" [@fadeInOut]="!!inviteCopiedRole" class="copied" [style.color]="myPeerColor">
+        {{ 'peer.copyInvite.copied' | i18n }}
+      </span>
+    </div>
+  </div>
+  <div class="room-zip-row" *ngIf="!GuestMode()">
+    <button type="button" (click)="loadZip()">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
+      {{ 'menu.loadZip' | i18n }}
+    </button>
+  </div>
   <ng-container *ngIf="networkService.peer.password">
     <div>
       {{ 'peer.password' | i18n }}
@@ -139,6 +174,7 @@
     <button (click)="connectPeer()" [disabled]="!networkService.isOpen || targetUserId == null || targetUserId == '' || isDisableConnect">{{ 'peer.privateConnect' | i18n }}</button><br>
   </ng-container>
   <button *ngIf="networkService.peers.length < 1" style="margin-left: 0px" (click)="showLobby()" [disabled]="!networkService.isOpen || isDisableConnect"><i class="material-icons" style="vertical-align: bottom">meeting_room</i>{{ 'peer.lobby' | i18n }}</button>
+  <button *ngIf="networkService.peers.length < 1" (click)="showCreateRoom()" [disabled]="!networkService.isOpen || isDisableConnect"><i class="material-icons" style="vertical-align: bottom">room_preferences</i>{{ 'lobby.createRoom' | i18n }}</button>
 </div>
 <div><span style="font-size: 12px;">{{help}}</span></div>
 <ng-container *ngIf="!isGMMode && !isGMHold">

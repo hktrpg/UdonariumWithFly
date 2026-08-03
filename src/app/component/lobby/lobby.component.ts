@@ -1,11 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth, RoomJoinResult } from '@udonarium/room-auth';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
@@ -115,7 +115,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (targetPeers.length < 1) return;
 
     RoomAuth.applyIdentity(result.role);
-    this.openAndConnect(room, '', targetPeers);
+    await this.openAndConnect(room, '', targetPeers);
   }
 
   private async connectLegacy(room: IRoomInfo, asGuest: boolean) {
@@ -135,64 +135,12 @@ export class LobbyComponent implements OnInit, OnDestroy {
       PeerCursor.isGMHold = false;
       PeerCursor.myCursor.isGMMode = false;
     }
-    this.openAndConnect(room, password, targetPeers);
+    await this.openAndConnect(room, password, targetPeers);
   }
 
-  private openAndConnect(room: IRoomInfo, password: string, targetPeers: any[]) {
-    let userId = Network.peer.userId;
-    Network.open(userId, room.id, room.name, password);
-    PeerCursor.myCursor.peerId = Network.peerId;
-
-    let triedPeer: string[] = [];
-
-    let onTried = () => {
-      if (triedPeer.length < targetPeers.length) return false;
-      this.resetNetwork();
-      EventSystem.unregister(triedPeer);
-      this.closeIfConnected();
-      return true;
-    }
-    let onConnect = (peerId) => {
-      console.log('連線成功！', peerId);
-      triedPeer.push(peerId);
-      console.log('連線成功 ' + triedPeer.length + '/' + targetPeers.length);
-      return onTried();
-    }
-    let onDisconnect = (peerId) => {
-      console.warn('連線失敗', peerId);
-      triedPeer.push(peerId);
-      console.warn('連線失敗 ' + triedPeer.length + '/' + targetPeers.length);
-      return onTried();
-    }
-
-    EventSystem.register(triedPeer)
-      .on('OPEN_NETWORK', event => {
-        console.log('LobbyComponent OPEN_PEER', event.data.peerId);
-        EventSystem.unregister(triedPeer);
-        ObjectStore.instance.clearDeleteHistory();
-        for (let peer of targetPeers) {
-          if (!Network.connect(peer) && onDisconnect(peer.peerId)) return;
-        }
-        EventSystem.register(triedPeer)
-          .on('CONNECT_PEER', event => onConnect(event.data.peerId))
-          .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId));
-      });
-  }
-
-  private resetNetwork() {
-    if (Network.peers.length < 1) {
-      GuestSession.isGuest = false;
-      if (PeerCursor.myCursor) {
-        PeerCursor.isGMHold = false;
-        PeerCursor.myCursor.isGMMode = false;
-      }
-      Network.open();
-      PeerCursor.myCursor.peerId = Network.peerId;
-    }
-  }
-
-  private closeIfConnected() {
-    if (0 < Network.peers.length) this.modalService.resolve();
+  private async openAndConnect(room: IRoomInfo, password: string, targetPeers: any[]) {
+    const connected = await RoomConnectHelper.openAndConnect(room, password, targetPeers);
+    if (connected) this.modalService.resolve();
   }
 
   async showRoomSetting() {

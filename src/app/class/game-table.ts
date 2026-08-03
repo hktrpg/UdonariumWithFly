@@ -21,7 +21,7 @@ export enum FilterType {
   BLACK = 'black',
 }
 
-export type WeatherType = 'none' | 'rain' | 'snow' | 'fog' | 'sandstorm' | 'wind' | 'thunderstorm' | 'rainbow' | 'aurora' | 'burning';
+export type WeatherType = 'none' | 'rain' | 'snow' | 'fog' | 'sandstorm' | 'wind' | 'thunderstorm' | 'rainbow' | 'aurora' | 'burning' | 'sakura' | 'maple';
 
 @SyncObject('game-table')
 export class GameTable extends ObjectNode {

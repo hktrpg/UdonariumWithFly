@@ -37,7 +37,7 @@ Drag images or music into the browser to import.`,
 <Notes> Menu → Note inventory for table / shared / private / trash notes
 <Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone.`,
   'tutorial.scene': `<Ping> Long-press empty map = marker; Shift+long-press = warning
-<Map settings> Darkness / global brightness / weather (rain・thunderstorm・snow・fog・wind・sandstorm・rainbow・aurora・burning) / enable vision
+<Map settings> Darkness / global brightness / weather (rain・thunderstorm・snow・fog・wind・sakura・maple・sandstorm・rainbow・aurora・burning) / enable vision
 　　　　Grid: off / square / hex (vertical・horizontal); optional coordinates; local grid snap
 　　　　Toolbox can switch weather and day/night quickly
 <Vision> When on, players only see around their vision character (GM unrestricted)

@@ -4,6 +4,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
+import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -11,7 +12,9 @@ import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
+import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
+import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
@@ -19,6 +22,7 @@ import { animate, style, transition, trigger } from '@angular/animations';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { I18nService } from 'service/i18n.service';
+import { RoomInviteService } from 'service/room-invite.service';
 import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
@@ -51,7 +55,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   isRoomNameCopied = false;
   isPasswordCopied = false;
   isPasswordOpen = false;
-  isRoomInfoCopied = false
+  isRoomInfoCopied = false;
+  inviteCopiedRole: RoomRole = null;
 
   help: string = '';
 
@@ -59,6 +64,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   private _timeOutId2: NodeJS.Timeout;
   private _timeOutId3: NodeJS.Timeout;
   private _timeOutId4: NodeJS.Timeout;
+  private _timeOutIdInvite: NodeJS.Timeout;
 
   private interval: NodeJS.Timeout;
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
@@ -173,6 +179,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
+    private roomInvite: RoomInviteService,
     public appConfigService: AppConfigService,
     public i18n: I18nService,
   ) { }
@@ -211,8 +218,60 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     clearTimeout(this._timeOutId2);
     clearTimeout(this._timeOutId3);
     clearTimeout(this._timeOutId4);
+    clearTimeout(this._timeOutIdInvite);
     EventSystem.unregister(this);
     clearInterval(this.interval);
+  }
+
+  isInviteRoleAvailable(role: RoomRole): boolean {
+    if (!this.isRoleAuthRoom) return false;
+    return RoomAuth.isRoleAvailable(this.networkService.peer.roomName || '', role);
+  }
+
+  async copyInvite(role: RoomRole) {
+    if (!navigator.clipboard || !this.networkService.peer.isRoom || !this.isRoleAuthRoom) return;
+    if (!this.isInviteRoleAvailable(role)) return;
+
+    const roomId = this.networkService.peer.roomId;
+    const roomName = this.networkService.peer.roomName || '';
+    let password = '';
+
+    if (RoomAuth.roleNeedsPassword(roomName, role)) {
+      password = this.roomInvite.getRolePassword(role);
+      if (!password) {
+        const entered = await this.modalService.open<string>(RolePasswordPromptComponent, {
+          roomId,
+          roomName,
+          role,
+          width: 420,
+          height: 280,
+        });
+        if (entered == null) return;
+        password = entered;
+        this.roomInvite.setRolePassword(role, password);
+      }
+
+      const confirmed = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('peer.confirm.copyInvite.title'),
+        text: this.i18n.t('peer.confirm.copyInvite.text', { role: this.roleLabel(role) }),
+        helpHtml: this.i18n.t('peer.confirm.copyInvite.help') + '<br>' + this.i18n.t('peer.confirm.passwordShareHelp'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'link',
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      const url = this.roomInvite.buildInviteUrl(role, password || undefined);
+      await navigator.clipboard.writeText(url);
+      this.inviteCopiedRole = role;
+      clearTimeout(this._timeOutIdInvite);
+      this._timeOutIdInvite = setTimeout(() => {
+        this.inviteCopiedRole = null;
+      }, 1000);
+    } catch (e) {
+      console.warn('copyInvite failed', e);
+    }
   }
 
   changeIcon() {
@@ -265,6 +324,33 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       }
     }
     this.modalService.open(LobbyComponent, { width: 700, height: 400, left: 0, top: 400 });
+  }
+
+  showCreateRoom() {
+    if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
+      PeerCursor.isGMHold = false;
+      this.isGMMode = false;
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
+        EventSystem.trigger('CHANGE_GM_MODE', null);
+      }
+    }
+    this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
+  }
+
+  loadZip() {
+    if (this.GuestMode() || !this.networkService.peer.isRoom) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/xml,text/xml,application/zip';
+    input.onchange = (event: Event) => {
+      const files = (event.target as HTMLInputElement).files;
+      if (files?.length) FileArchiver.instance.load(files);
+      input.value = '';
+    };
+    input.click();
   }
 
   stringFromSessionGrade(grade: PeerSessionGrade): string {

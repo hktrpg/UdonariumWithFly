@@ -244,3 +244,27 @@
   vertical-align: text-bottom;
   margin-bottom: 1px;
 }
+
+.invite-block {
+  margin-top: 6px;
+}
+.invite-label {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.invite-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.invite-row button {
+  font-size: 12px;
+}
+.room-zip-row {
+  margin-top: 8px;
+}
+.room-zip-row button {
+  font-size: 12px;
+}

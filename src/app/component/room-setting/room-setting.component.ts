@@ -8,6 +8,7 @@ import { RoomAuth } from '@udonarium/room-auth';
 import { ModalService } from 'service/modal.service';
 import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
+import { RoomInviteService } from 'service/room-invite.service';
 
 @Component({
     selector: 'room-setting',
@@ -29,6 +30,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private modalService: ModalService,
     private i18n: I18nService,
+    private roomInvite: RoomInviteService,
   ) { }
 
   ngOnInit() {
@@ -72,7 +74,15 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     PeerCursor.myCursor.peerId = Network.peerId;
     // Host joins as GM.
     RoomAuth.applyIdentity('gm');
+    // Keep plaintext role passwords in-session for invite-link generation.
+    this.roomInvite.setRolePasswords({
+      gm: this.gmPassword,
+      user: this.userPassword,
+      guest: this.guestPassword,
+    });
 
+    const afterCreate = this.modalService.option?.afterCreate;
     this.modalService.resolve(true);
+    if (typeof afterCreate === 'function') afterCreate();
   }
 }

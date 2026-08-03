@@ -62,10 +62,12 @@ import { CutInService } from 'service/cut-in.service';
 import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { SwUpdate } from '@angular/service-worker';
 
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
+import { RoomInviteService } from 'service/room-invite.service';
 
 @Component({
     selector: 'app-root',
@@ -101,6 +103,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isHorizontal = false;
   isLoggedin = false;
   isUpdateCanceled = false;
+  private inviteHandled = false;
 
   static imageUrl = '';
   get imageUrl(): string {
@@ -149,6 +152,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private standImageService: StandImageService,
     private cutInService: CutInService,
     private i18n: I18nService,
+    private roomInvite: RoomInviteService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -377,6 +381,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
+        if (!this.inviteHandled && !Network.peer.isRoom) {
+          this.inviteHandled = true;
+          this.ngZone.run(() => this.tryConsumeInvite());
+        }
       })
       .on('NETWORK_ERROR', event => {
         console.log('NETWORK_ERROR', event.data.peerId);
@@ -495,6 +503,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     event.preventDefault();
     event.returnValue = '';
   };
+
+  private async tryConsumeInvite() {
+    const payload = this.roomInvite.parseInviteFromLocation();
+    if (!payload) return;
+    this.roomInvite.clearInviteFromLocation();
+
+    // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
+    for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    const result = await this.roomInvite.joinFromInvite(payload);
+    if (result === 'ok') return;
+
+    const errorKey = `invite.error.${result}`;
+    await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('invite.errorTitle'),
+      text: this.i18n.t(errorKey),
+      type: ConfirmationType.OK,
+      materialIcon: 'link_off',
+    });
+  }
 
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
@@ -857,7 +887,42 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
-  openZipFileSelect() {
+  async openZipFileSelect() {
+    if (!this.isRoom) {
+      let loadDirectOpened = false;
+      const choice = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('menu.confirm.loadZip.title'),
+        text: this.i18n.t('menu.confirm.loadZip.text'),
+        help: this.i18n.t('menu.confirm.loadZip.help'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'meeting_room',
+        okLabel: this.i18n.t('menu.confirm.loadZip.createRoom'),
+        cancelLabel: this.i18n.t('menu.confirm.loadZip.loadDirect'),
+        // Open file picker in the click handler so browsers allow it.
+        cancelAction: () => {
+          loadDirectOpened = true;
+          this.pickZipFiles();
+        },
+      });
+      if (choice === true) {
+        await this.modalService.open(RoomSettingComponent, {
+          width: 700,
+          height: 420,
+          left: 0,
+          top: 400,
+          // Keep file picker in the create-button click stack.
+          afterCreate: () => this.pickZipFiles(),
+        });
+        return;
+      }
+      if (loadDirectOpened || choice === false) return;
+      return;
+    }
+
+    this.pickZipFiles();
+  }
+
+  private pickZipFiles() {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;

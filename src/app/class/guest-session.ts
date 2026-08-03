@@ -5,8 +5,10 @@
  */
 export class GuestSession {
   static readonly ALLOW_GUEST_MARKER = '\u2060G';
-  /** Same marker as RoomAuth.AUTH_MARKER — strip for display. */
+  /** Legacy RoomAuth marker — strip for display. */
   static readonly AUTH_MARKER = '\u2060A';
+  /** Compact RoomAuth marker — strip for display. */
+  static readonly AUTH_MARKER_V2 = '\u2060B';
 
   /** True when this browser joined / acts as guest. */
   static isGuest: boolean = false;
@@ -28,7 +30,12 @@ export class GuestSession {
   static displayRoomName(roomName: string): string {
     if (!roomName) return roomName;
     let name = roomName;
-    const authIdx = name.indexOf(GuestSession.AUTH_MARKER);
+    const idxA = name.indexOf(GuestSession.AUTH_MARKER);
+    const idxB = name.indexOf(GuestSession.AUTH_MARKER_V2);
+    let authIdx = -1;
+    if (idxA >= 0 && idxB >= 0) authIdx = Math.min(idxA, idxB);
+    else if (idxA >= 0) authIdx = idxA;
+    else if (idxB >= 0) authIdx = idxB;
     if (authIdx >= 0) name = name.slice(0, authIdx);
     return name.split(GuestSession.ALLOW_GUEST_MARKER).join('');
   }
