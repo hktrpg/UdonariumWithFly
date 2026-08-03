@@ -54,7 +54,7 @@ Upgraded to 1.13.2`,
   'changelog.vF': `2021/08/17 Updated to F build / dependencies. Fixed character-sheet dice roll bug (thanks Toast Rabbit).`,
   'changelog.2026base': `2026 major update (hktrpg-main)
 ・Based on latest Udonarium with Fly (Angular 20, SkyWay 2023)
-・Full Traditional Chinese UI; branding aligned with HKTRPG
+・Full UI localization (zh-TW / zh-CN / en / ja); branding aligned with HKTRPG
 ・Guest mode, compact chat, note inventory, quick sheet rolls
 ・Chat toolbar: music / SFX / notice / align left / list / compact
 ・BCDice 4.9.0`,
@@ -81,4 +81,5 @@ Wiki: https://www.hktrpg.com/
 Original Udonarium: https://udonarium.app/
 with Fly: https://nanasunana.github.io/
 Support: https://www.patreon.com/HKTRPG`,
+  'tutorial.systemFrom': 'System',
 };

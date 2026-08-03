@@ -11,6 +11,9 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { I18nService } from 'service/i18n.service';
+import { ModalService } from 'service/modal.service';
+import { OpenUrlComponent } from 'component/open-url/open-url.component';
+import { StringUtil } from '@udonarium/core/system/util/string-util';
 
 @Component({
     selector: 'cut-in',
@@ -140,7 +143,8 @@ export class CutInComponent implements OnInit, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private contextMenuService: ContextMenuService,
     private ngZone: NgZone,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private modalService: ModalService
   ) { }
 
   ngOnInit(): void {
@@ -556,35 +560,32 @@ export class CutInComponent implements OnInit, OnDestroy {
         selfOnly: true,
         checkBox: 'check'
       },
-            /*
       (!this.videoId ? null : ContextMenuSeparator),
-      (!this.videoId ? null :
-        {
-          name: '在 YouTube 開啟',
-          action: () => { 
-            this.modalService.open(OpenUrlComponent, { url: `https://www.youtube.com/watch?v=${this.cutIn.videoId}`, title: this.cutIn.name });
-          },
-          //disabled: !StringUtil.validUrl(url),
-          //error: !StringUtil.validUrl(url) ? '網址無效' : null,
-          isOuterLink: true
-        }
-      )
+      (!this.videoId ? null : {
+        name: this.i18n.t('cutin.openYoutube'),
+        action: () => {
+          const url = `https://www.youtube.com/watch?v=${this.cutIn.videoId}`;
+          this.modalService.open(OpenUrlComponent, { url, title: this.cutIn.name });
+        },
+        disabled: !StringUtil.validUrl(`https://www.youtube.com/watch?v=${this.cutIn.videoId}`),
+        error: !StringUtil.validUrl(`https://www.youtube.com/watch?v=${this.cutIn.videoId}`) ? this.i18n.t('url.invalid') : null,
+        isOuterLink: true
+      }),
       ContextMenuSeparator,
       {
-        name: '開始／從頭播放音效',
-        action: () => { this.audioPlayer.play() },
-        disabled: !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio), 
+        name: this.i18n.t('cutin.playAudio'),
+        action: () => { this.audioPlayer.play(); },
+        disabled: !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio),
         selfOnly: true,
         materialIcon: 'play_arrow'
       },
       {
-        name: '停止音效',
-        action: () => { this.audioPlayer.stop() },
-        disabled: !this.audioPlayer.paused && !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio), 
+        name: this.i18n.t('cutin.stopAudio'),
+        action: () => { this.audioPlayer.stop(); },
+        disabled: this.audioPlayer.paused || !(this.cutIn && this.cutIn.audioIdentifier && this.cutIn.isValidAudio),
         selfOnly: true,
         materialIcon: 'stop'
       }
-      */
     ], this.cutIn.name);
   }
 }

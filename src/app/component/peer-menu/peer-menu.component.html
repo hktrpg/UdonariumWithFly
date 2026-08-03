@@ -35,7 +35,7 @@
         <span [@fadeInOut]="isCopied" class="copied" [style.color]="myPeerColor"> {{ isCopied ? ('peer.copied' | i18n) : '' }}</span>
       </ng-container>
     </span>
-    <span *ngIf="!networkService.isOpen" style="font-weight: bold">???</span>
+    <span *ngIf="!networkService.isOpen" style="font-weight: bold">{{ 'peer.offline' | i18n }}</span>
   </div>
 </div>
 <ng-container *ngIf="networkService.peer.isRoom">
@@ -59,7 +59,7 @@
     <div>
       {{ 'peer.password' | i18n }}
       <label sytle="white-space: nowrap">
-        <input name="show-hide-password" type="checkbox" value="Show Hides" class="show-hides" checked="{{ isPasswordOpen ? 'checked' : '' }}" (click)="onPasswordOpen($event)">
+        <input name="show-hide-password" type="checkbox" value="Show Hides" class="show-hides" [attr.title]="'peer.showPassword' | i18n" checked="{{ isPasswordOpen ? 'checked' : '' }}" (click)="onPasswordOpen($event)">
         <b class="material-icons show-hides" [ngClass]="{'red-eye': isPasswordOpen}" style="font-size: smaller">{{ isPasswordOpen ? 'visibility' : 'visibility_off' }}</b>：
       </label>
       <div style="display: inline">
@@ -126,10 +126,10 @@
     </span>
     <div class="session-info" [style.border-left-color]="findPeerColor(peer.peerId)">
       <span>{{ 'peer.sessionStatus' | i18n }}
-        Grade:{{stringFromSessionGrade(peer.session.grade)}} ({{peer.session.description}})
-        Health:{{(peer.session.health * 100).toFixed(0)}}%
-        Speed:{{(peer.session.speed * 100).toFixed(0)}}%
-        Ping:{{peer.session.ping.toFixed(1)}}ms</span>
+        {{ 'peer.grade' | i18n }}:{{stringFromSessionGrade(peer.session.grade)}} ({{ candidateLabel(peer.session.description) }})
+        {{ 'peer.health' | i18n }}:{{(peer.session.health * 100).toFixed(0)}}%
+        {{ 'peer.speed' | i18n }}:{{(peer.session.speed * 100).toFixed(0)}}%
+        {{ 'peer.ping' | i18n:{ n: peer.session.ping.toFixed(1) } }}</span>
     </div>
   </div>
 </div>

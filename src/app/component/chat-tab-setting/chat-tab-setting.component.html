@@ -10,7 +10,7 @@
   <div class="flex-item">
     <ng-container *ngIf="!isEmpty && selectedTab">
       <div><b style="font-size: smaller">{{ 'chatTab.name' | i18n }}</b>
-        <input style="width: 200px" [(ngModel)]="tabName" placeholder="Name" [attr.disabled]="!isEditable ? '' : null" />
+        <input style="width: 200px" [(ngModel)]="tabName" [placeholder]="'chatTab.namePlaceholder' | i18n" [attr.disabled]="!isEditable ? '' : null" />
       </div>
       <div style="font-weight: bolder; font-size: smaller; padding-top: 3px">
         <label [style.cursor]="isEditable ? 'pointer' : 'default'">

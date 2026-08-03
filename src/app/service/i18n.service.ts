@@ -98,6 +98,14 @@ export class I18nService {
 
   private applyDocumentLang(locale: AppLocale) {
     if (typeof document === 'undefined') return;
-    document.documentElement.lang = locale;
+    const htmlLang: Record<AppLocale, string> = {
+      'zh-TW': 'zh-Hant',
+      'zh-CN': 'zh-Hans',
+      en: 'en',
+      ja: 'ja',
+    };
+    document.documentElement.lang = htmlLang[locale] || locale;
+    const title = translate('app.documentTitle', undefined, locale);
+    if (title && title !== 'app.documentTitle') document.title = title;
   }
 }

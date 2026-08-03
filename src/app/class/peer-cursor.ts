@@ -4,6 +4,7 @@ import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject, ObjectContext } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem, Network } from './core/system';
+import { translate } from 'i18n';
 
 import * as localForage from 'localforage';
 
@@ -27,7 +28,7 @@ export class PeerCursor extends GameObject {
   static readonly CHAT_MY_ICON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-my-icon-local-storage';
 
   static readonly CHAT_DEFAULT_COLOR = '#444444';
-  static readonly CHAT_DEFAULT_NAME = '玩家';
+  static get CHAT_DEFAULT_NAME(): string { return translate('peer.defaultName'); }
   static readonly CHAT_TRANSPARENT_COLOR = '#ffffff';
 
   static myCursor: PeerCursor = null;

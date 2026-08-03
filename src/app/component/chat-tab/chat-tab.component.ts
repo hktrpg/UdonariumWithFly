@@ -403,18 +403,18 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
     const tutorial = t('tutorial.name');
     const link = t('tutorial.linkName');
     this.sampleMessages = [
-      this.makeSampleMessage('System', null, tutorial, null, t('tutorial.welcome'), 'mine', 0),
-      this.makeSampleMessage('System', null, tutorial, null, t('tutorial.view'), 'mine', 0),
-      this.makeSampleMessage('System', null, tutorial, null, t('tutorial.keyboard'), 'mine', 0),
-      this.makeSampleMessage('System', null, tutorial, null, t('tutorial.chat'), 'mine', 0),
-      this.makeSampleMessage('System', null, tutorial, null, t('tutorial.scene'), 'mine', 0),
-      this.makeSampleMessage('System', null, link, null, t('changelog.v1132'), 'mine', 1615253220000),
-      this.makeSampleMessage('System', null, link, null, t('changelog.v1133b'), 'mine', 1615253220000),
-      this.makeSampleMessage('System', null, link, null, t('changelog.vF'), 'mine', 1635253220000),
-      this.makeSampleMessage('System', null, link, null, t('changelog.2026base'), 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
-      this.makeSampleMessage('System', null, link, null, t('changelog.2026ops'), 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
-      this.makeSampleMessage('System', null, link, null, t('changelog.2026scene'), 'mine', Date.UTC(2026, 7, 3, 1, 30, 0)),
-      this.makeSampleMessage('System', null, link, null, t('changelog.links'), 'mine', Date.UTC(2026, 7, 3, 2, 0, 0)),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.welcome'), 'mine', 0),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.view'), 'mine', 0),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.keyboard'), 'mine', 0),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.chat'), 'mine', 0),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.scene'), 'mine', 0),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.v1132'), 'mine', 1615253220000),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.v1133b'), 'mine', 1615253220000),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.vF'), 'mine', 1635253220000),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026base'), 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026ops'), 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026scene'), 'mine', Date.UTC(2026, 7, 3, 1, 30, 0)),
+      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.links'), 'mine', Date.UTC(2026, 7, 3, 2, 0, 0)),
     ];
   }
 

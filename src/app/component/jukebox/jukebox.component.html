@@ -2,8 +2,8 @@
   <div *ngFor="let audio of audios; last as last" class="box" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden" [ngClass]="{last: last}">
     <button *ngIf="audio !== auditionPlayer?.audio || auditionPlayer?.paused" (click)="play(audio)" [disabled]="!audio.isReady"><i class="material-icons">play_arrow</i>{{ 'jukebox.audition' | i18n }}<sup style="font-size: larger" class="self-only">*</sup></button>
     <button *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused" (click)="stop()" [disabled]="!audio.isReady"><i class="material-icons">stop</i>{{ 'jukebox.audition' | i18n }}<sup style="font-size: larger" class="self-only">*</sup></button>
-    <button *ngIf="audio !== jukebox?.audio" (click)="playBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">loop</i>ＢＧＭ</button>
-    <button *ngIf="audio === jukebox?.audio" (click)="stopBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">stop</i>ＢＧＭ</button>
+    <button *ngIf="audio !== jukebox?.audio" (click)="playBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">loop</i>{{ 'jukebox.bgm' | i18n }}</button>
+    <button *ngIf="audio === jukebox?.audio" (click)="stopBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">stop</i>{{ 'jukebox.bgm' | i18n }}</button>
     <span *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused && audio != jukebox?.audio" style="padding-left: 2px"><b>{{ 'jukebox.auditionPlaying' | i18n }}</b></span>
     <ng-container *ngIf="audio === jukebox?.audio">
       <span *ngIf="audio != auditionPlayer?.audio || (audio == auditionPlayer?.audio && auditionPlayer?.paused)" style="padding-left: 2px"><i class="material-icons" style="font-size: 16px; vertical-align: middle">volume_up</i></span>

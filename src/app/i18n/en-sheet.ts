@@ -35,7 +35,7 @@ Prefix text with | and wrap its reading in 《 and 》.
 
 ・💭
 When a character sends chat, text wrapped in 「 and 」 is displayed as 💭.`,
-  'stand.sortNameList': 'Sort names while entering chat', 'stand.heightGlobal': 'Height (0 = keep original image): ', 'stand.keepOriginalImage': 'Keep original image', 'stand.noOverview': 'Do not use a stand image in the overview', 'stand.add': 'Add stand setting', 'stand.restore': 'Restore recently deleted stand setting', 'stand.title': '{{name}}\'s stand settings', 'stand.deleteTitle': 'Delete stand setting', 'stand.deleteText': 'Delete this stand setting?', 'stand.helpTitle': 'Stand settings help', 'stand.changeImage': 'Change image', 'stand.condition': 'Condition: ', 'stand.condition.default': 'Default', 'stand.condition.image': 'Specified image', 'stand.condition.postfix': 'Chat suffix', 'stand.condition.postfixOrImage': 'Chat suffix or specified image', 'stand.condition.postfixAndImage': 'Chat suffix and specified image', 'stand.condition.selectedOnly': 'Only when selected', 'stand.showName': 'Show name tag', 'stand.applyImageEffect': 'Apply image effects', 'stand.applyRoll': 'Apply rotation', 'stand.speakingImage': 'Speaking image (APNG, etc.)', 'stand.test': 'Test (only visible to you)', 'stand.positionSpecialize': 'Individual Pos: ', 'stand.heightIndividual': 'Height (0 = unspecified): ', 'stand.unspecified': 'Unspecified', 'stand.postfixPlaceholder': 'One per line. A leading @ is removed from matching text.\r\n@angry\r\n@special move', 'stand.noCharacterImages': 'No character image or face icon is set', 'stand.testMessage': 'This is a test that only you can see. For finer stand adjustments, turn off “Fade out and automatically exit stands” in Personal settings.',
+  'stand.sortNameList': 'Sort names while entering chat', 'stand.heightGlobal': 'Height (0 = keep original image): ', 'stand.keepOriginalImage': 'Keep original image', 'stand.noOverview': 'Do not use a stand image in the overview', 'stand.add': 'Add stand setting', 'stand.restore': 'Restore recently deleted stand setting', 'stand.title': '{{name}}\'s stand settings', 'stand.deleteTitle': 'Delete stand setting', 'stand.deleteText': 'Delete this stand setting?', 'stand.helpTitle': 'Stand settings help', 'stand.changeImage': 'Change image', 'stand.condition': 'Condition: ', 'stand.condition.default': 'Default', 'stand.condition.image': 'Specified image', 'stand.condition.postfix': 'Chat suffix', 'stand.condition.postfixOrImage': 'Chat suffix or specified image', 'stand.condition.postfixAndImage': 'Chat suffix and specified image', 'stand.condition.selectedOnly': 'Only when selected', 'stand.showName': 'Show name tag', 'stand.applyImageEffect': 'Apply image effects', 'stand.applyRoll': 'Apply rotation', 'stand.speakingImage': 'Speaking image (APNG, etc.)', 'stand.test': 'Test (only visible to you)', 'stand.positionSpecialize': 'Per-stand position: ', 'stand.heightIndividual': 'Height (0 = unspecified): ', 'stand.unspecified': 'Unspecified', 'stand.postfixPlaceholder': 'One per line. A leading @ is removed from matching text.\r\n@angry\r\n@special move', 'stand.noCharacterImages': 'No character image or face icon is set', 'stand.testMessage': 'This is a test that only you can see. For finer stand adjustments, turn off “Fade out and automatically exit stands” in Personal settings.',
   'stand.help': `Set a character stand's name, position, image height, and the condition for displaying it when chat is sent.
 
 Stand names can be selected from the chat window and chat palette. Different tags for the same character play separate entrance and exit animations.
@@ -53,4 +53,24 @@ Priority, highest first:
 　6. Specified image
 
 If nothing matches, Default is used. Equal-priority matches are selected randomly.`,
+  'sheet.data.cardBack': 'Card (back)',
+  'stand.namePlaceholder': 'Name',
+  'sheet.sendToChat': 'Send to chat',
+  'sheet.placeholder.value': 'Value',
+  'sheet.placeholder.opacity': 'Opacity',
+  'sheet.placeholder.number': 'Number',
+  'sheet.placeholder.note': 'Note',
+  'sheet.placeholder.option': 'Option',
+  'stand.tagLabel': 'Tag: ',
+  'stand.tagPlaceholder': 'Tag',
+  'stand.adjY': 'AdjY: ',
+  'stand.posLabel': 'Pos: ',
+  'sheet.modifier.div2': '÷2',
+  'sheet.modifier.div3': '÷3 SRS,LHZ',
+  'sheet.modifier.div4': '÷4',
+  'sheet.modifier.div5': '÷5',
+  'sheet.modifier.div6': '÷6 SW',
+  'sheet.modifier.div10': '÷10',
+  'sheet.modifier.dnd3e': 'D&D 3e～',
+  'sheet.data.heightScale': '× size',
 };

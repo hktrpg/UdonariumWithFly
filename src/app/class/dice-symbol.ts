@@ -4,6 +4,7 @@ import { Network } from './core/system';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
+import { translate } from 'i18n';
 
 export enum DiceType {
   D2,
@@ -39,9 +40,11 @@ export class DiceSymbol extends TabletopObject {
   }
   get backFaceImageFile(): ImageFile {
     if (!this.isCoin) return this.imageFile;
+    const faces = this.faces;
+    if (faces.length < 2) return this.imageFile;
     return this.isVisible ?
-    this.getImageFile(this.face == '正面' ? '背面' : '正面')
-    : this.getImageFile(this.faces[1])
+      this.getImageFile(this.face === faces[0] ? faces[1] : faces[0])
+      : this.getImageFile(faces[1]);
   }
   get nothingFaces(): string[] { return this.imageDataElement.children.filter(element => (element as DataElement).currentValue == 'nothing').map(element => (element as DataElement).name); }
 
@@ -79,7 +82,7 @@ export class DiceSymbol extends TabletopObject {
     switch (type) {
       case DiceType.D2:
         sided = 2;
-        faceGeneratorFunc = index => (index === 0) ? '正面' : '背面';
+        faceGeneratorFunc = index => (index === 0) ? translate('dice.heads') : translate('dice.tails');
         break;
       case DiceType.D4:
         sided = 4;
@@ -87,7 +90,7 @@ export class DiceSymbol extends TabletopObject {
       case DiceType.D6:
         sided = 6;
         let identifier = identifierSuffix != null ? 'nothing_' + identifierSuffix : null;
-        faces.push(DataElement.create('無', '', { type: 'image', currentValue: 'nothing' }, identifier));
+        faces.push(DataElement.create(translate('dice.blank'), '', { type: 'image', currentValue: 'nothing' }, identifier));
         break;
       case DiceType.D8:
         sided = 8;

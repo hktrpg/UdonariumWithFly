@@ -10,6 +10,9 @@ import { EventSystem } from '@udonarium/core/system';
 
 import { COMPOSITION_BUFFER_MODE } from '@angular/forms'
 import Autolinker from 'autolinker';
+import { formatDate } from '@angular/common';
+import { I18nService } from 'service/i18n.service';
+import { toIntlLocale } from 'i18n';
 
 @Component({
     selector: 'chat-message',
@@ -71,9 +74,15 @@ export class ChatMessageComponent implements OnInit {
   constructor(
     private modalService: ModalService,
     private changeDetector: ChangeDetectorRef,
+    private i18n: I18nService,
   ) { }
 
   stringUtil = StringUtil;
+
+  formatTimestamp(value: number, format: string): string {
+    if (!value) return '';
+    return formatDate(value, format, toIntlLocale(this.i18n.locale));
+  }
 
   ngOnInit() {
     EventSystem.register(this)
@@ -83,6 +92,9 @@ export class ChatMessageComponent implements OnInit {
       }
     })
     .on('CHANGE_GM_MODE', event => {
+      this.changeDetector.markForCheck();
+    })
+    .on('LOCALE_CHANGED', () => {
       this.changeDetector.markForCheck();
     });
 

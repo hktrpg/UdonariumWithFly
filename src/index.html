@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="google" content="notranslate">
-  <title>Udonarium with Fly HKTRPG</title>
+  <title id="document-title">Udonarium with Fly HKTRPG</title>
   <base href="./">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="mobile-web-app-capable" content="yes">
@@ -12,13 +12,74 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Nanasu7">
   <meta property="og:url" content="https://z01.hktrpg.com/">
-  <meta property="og:title" content="Udonarium with Fly HKTRPG">
-  <meta property="og:description" content="Udonarium 改造版＠HKTRPG：高度、聊天文字顏色、立繪、訪客、筆記倉庫等功能。">
+  <meta id="og-title" property="og:title" content="Udonarium with Fly HKTRPG">
+  <meta id="og-description" property="og:description" content="Udonarium 改造版＠HKTRPG：高度、聊天文字顏色、立繪、訪客、筆記倉庫等功能。">
   <meta property="og:image" content="https://raw.githubusercontent.com/zeteticl/UdonariumWithFly/CHT/src/card.png">
   <link rel="icon" type="image/x-icon" href="https://www.hktrpg.com/favicon.ico">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#dd0000">
+  <script>
+    (function () {
+      var KEY = 'udonarium.ui.locale';
+      var dict = {
+        'zh-TW': {
+          lang: 'zh-Hant',
+          loading: '載入中…',
+          title: 'Udonarium with Fly HKTRPG',
+          ogTitle: 'Udonarium with Fly HKTRPG',
+          og: 'Udonarium 改造版＠HKTRPG：高度、聊天文字顏色、立繪、訪客、筆記倉庫等功能。',
+          noscript: '請啟用 JavaScript 後繼續使用本應用程式。'
+        },
+        'zh-CN': {
+          lang: 'zh-Hans',
+          loading: '加载中…',
+          title: 'Udonarium with Fly HKTRPG',
+          ogTitle: 'Udonarium with Fly HKTRPG',
+          og: 'Udonarium 改造版＠HKTRPG：高度、聊天文字颜色、立绘、访客、笔记仓库等功能。',
+          noscript: '请启用 JavaScript 后继续使用本应用程序。'
+        },
+        en: {
+          lang: 'en',
+          loading: 'Now Loading.',
+          title: 'Udonarium with Fly HKTRPG',
+          ogTitle: 'Udonarium with Fly HKTRPG',
+          og: 'Udonarium with Fly @HKTRPG: altitude, chat colors, stands, guests, note inventory, and more.',
+          noscript: 'Please enable JavaScript to continue using this application.'
+        },
+        ja: {
+          lang: 'ja',
+          loading: '読み込み中…',
+          title: 'Udonarium with Fly HKTRPG',
+          ogTitle: 'Udonarium with Fly HKTRPG',
+          og: 'Udonarium with Fly @HKTRPG：高度・チャット色・立ち絵・ゲスト・メモ倉庫などの機能。',
+          noscript: 'このアプリケーションを使うには JavaScript を有効にしてください。'
+        }
+      };
+      var locale = 'zh-TW';
+      try {
+        var stored = localStorage.getItem(KEY);
+        if (stored && dict[stored]) locale = stored;
+      } catch (e) { /* ignore */ }
+      var d = dict[locale];
+      document.documentElement.lang = d.lang;
+      document.documentElement.setAttribute('data-ui-locale', locale);
+      window.__UDON_SHELL_I18N__ = d;
+      document.addEventListener('DOMContentLoaded', function () {
+        var loading = document.getElementById('boot-loading-title');
+        if (loading) loading.textContent = d.loading;
+        var docTitle = document.getElementById('document-title');
+        if (docTitle) docTitle.textContent = d.title;
+        document.title = d.title;
+        var ogTitle = document.getElementById('og-title');
+        if (ogTitle) ogTitle.setAttribute('content', d.ogTitle);
+        var og = document.getElementById('og-description');
+        if (og) og.setAttribute('content', d.og);
+        var noscript = document.getElementById('boot-noscript');
+        if (noscript) noscript.textContent = d.noscript;
+      });
+    })();
+  </script>
 </head>
 <body>
   <app-root>
@@ -32,11 +93,11 @@
       <div class="sk-cube sk-cube7"></div>
       <div class="sk-cube sk-cube8"></div>
       <div class="sk-cube sk-cube9"></div>
-      <div class="sk-title">Now Loading.</div>
+      <div id="boot-loading-title" class="sk-title">載入中…</div>
     </div>
   </app-root>
   <script type="text/yaml" src="./assets/config.yaml"></script>
   <script type="text/javascript" src="https://www.youtube.com/iframe_api"></script>
-  <noscript>Please enable JavaScript to continue using this application.</noscript>
+  <noscript id="boot-noscript">Please enable JavaScript to continue using this application. / 請啟用 JavaScript 後繼續使用本應用程式。 / 请启用 JavaScript 后继续使用本应用程序。 / このアプリケーションを使うには JavaScript を有効にしてください。</noscript>
 </body>
 </html>

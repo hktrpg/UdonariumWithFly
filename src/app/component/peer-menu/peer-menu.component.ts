@@ -271,6 +271,13 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     return PeerSessionGrade[grade] ?? PeerSessionGrade[PeerSessionGrade.UNSPECIFIED];
   }
 
+  candidateLabel(description: string): string {
+    if (!description) return this.i18n.t('peer.candidate.unknown');
+    const key = `peer.candidate.${description}`;
+    const label = this.i18n.t(key);
+    return label === key ? description : label;
+  }
+
   findUserId(peerId: string) {
     const peerCursor = PeerCursor.findByPeerId(peerId);
     return peerCursor ? peerCursor.userId : '';

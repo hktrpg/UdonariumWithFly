@@ -1,7 +1,7 @@
 import { I18nDictionary } from './types';
 
 export const zhCN_tutorial: I18nDictionary = {
-  'tutorial.name': '教学Zzzzzz',
+  'tutorial.name': '教学',
   'tutorial.linkName': '链接:',
   'tutorial.welcome': `欢迎使用 HKTRPG 乌冬桌（基于 Udonarium with Fly）。
 地图是 2.5D；数据在玩家之间互传，服务器不帮你长期保管棋子与图片。
@@ -35,7 +35,7 @@ export const zhCN_tutorial: I18nDictionary = {
 ＜笔记＞菜单可开「笔记仓库」整理桌面／公用／私人／回收区笔记
 ＜密语＞不会进 ZIP；换了连接 ID 后旧密语也看不到，请留意。`,
   'tutorial.scene': `＜Ping＞地图空白处长按＝标记；Shift＋长按＝警告标记
-＜地图设定＞黑暗／全局亮度／天气（雨・雪・雾）／启用视野
+＜地图设置＞黑暗／全局亮度／天气（雨・雪・雾）／启用视野
 ＜视野＞开启后玩家只看得到自己的视野角色周围（GM 不受限）
 　　　　聊天选发言角色＝暂时带入视野；关闭该聊天窗即取消
 　　　　长留请右键勾「作为我的视野角色」；可设视野／亮光／昏暗光
@@ -54,7 +54,7 @@ export const zhCN_tutorial: I18nDictionary = {
   'changelog.vF': `2021/08/17 更新成 F 版，更新组件版本。修正角色卡不能掷骰的 BUG，感谢吐司兔的回报。`,
   'changelog.2026base': `2026 重大更新（hktrpg-main）
 ・改以最新 Udonarium with Fly 为基底（Angular 20、SkyWay 2023）
-・界面全面繁体中文化；品牌与说明对齐 HKTRPG
+・界面全面中文化（简／繁）；品牌与说明对齐 HKTRPG
 ・访客模式、聊天精简、笔记仓库、角色卡快速掷骰
 ・聊天工具栏：音乐／效果音／提示音／靠左／列表／精简
 ・BCDice 4.9.0`,
@@ -72,7 +72,7 @@ export const zhCN_tutorial: I18nDictionary = {
 ・场景工具（GM）：墙／灯／绘图；Enter 完成墙与多边形等
 ・聊天选角暂时带入视野；仅手动「作为我的视野角色」会长留
 ・战斗轮：先攻、回合宣告；角色状态图标与底盘套圈
-・地图设定可下载地图；状态 icon 常驻显示并自动换行`,
+・地图设置可下载地图；状态 icon 常驻显示并自动换行`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教学：https://bothelp.hktrpg.com/guide
 Discord：https://support.hktrpg.com
@@ -81,4 +81,5 @@ Facebook：https://www.facebook.com/groups/HKTRPG
 原版乌冬：https://udonarium.app/
 with Fly：https://nanasunana.github.io/
 支援开发：https://www.patreon.com/HKTRPG`,
+  'tutorial.systemFrom': '系统',
 };

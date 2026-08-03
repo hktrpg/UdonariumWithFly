@@ -54,7 +54,7 @@ export const ja_tutorial: I18nDictionary = {
   'changelog.vF': `2021/08/17 F 版／依存更新。キャラシート骰子不可バグ修正（Toast Rabbit さん報告感謝）。`,
   'changelog.2026base': `2026 大型更新（hktrpg-main）
 ・最新 Udonarium with Fly ベース（Angular 20、SkyWay 2023）
-・繁体中文 UI；HKTRPG ブランド整合
+・UI 多言語化（繁／簡／英／日）；HKTRPG ブランド整合
 ・ゲスト、チャット簡易、メモ倉庫、シート・クイックロール
 ・チャットツールバー：音楽／SE／通知／左寄せ／リスト／簡易
 ・BCDice 4.9.0`,
@@ -81,4 +81,5 @@ Wiki：https://www.hktrpg.com/
 本家うどん：https://udonarium.app/
 with Fly：https://nanasunana.github.io/
 支援：https://www.patreon.com/HKTRPG`,
+  'tutorial.systemFrom': 'システム',
 };

@@ -1,5 +1,6 @@
 import { SyncObject, SyncVar } from '../core/synchronize-object/decorator';
 import { ObjectNode } from '../core/synchronize-object/object-node';
+import { translate } from 'i18n';
 
 @SyncObject('table-light')
 export class TableLight extends ObjectNode {
@@ -13,7 +14,7 @@ export class TableLight extends ObjectNode {
   @SyncVar() darknessActivationMin: number = 0;
   @SyncVar() darknessActivationMax: number = 1;
   @SyncVar() cookieId: string = 'soft';
-  @SyncVar() name: string = '燈光';
+  @SyncVar() name: string = translate('scene.defaultLightName');
 
   static create(x: number, y: number, radius: number = 150): TableLight {
     const light = new TableLight();
@@ -22,6 +23,7 @@ export class TableLight extends ObjectNode {
     light.y = y;
     light.dimRadius = radius;
     light.brightRadius = radius * 0.5;
+    light.name = translate('scene.defaultLightName');
     return light;
   }
 

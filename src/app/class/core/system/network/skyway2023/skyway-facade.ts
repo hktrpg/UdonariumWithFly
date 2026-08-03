@@ -13,6 +13,7 @@ import {
 import { CryptoUtil } from '../../util/crypto-util';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
+import { translate } from 'i18n';
 
 export class SkyWayFacade {
   url = '';
@@ -83,7 +84,7 @@ export class SkyWayFacade {
 
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
     if (authToken.length < 1) {
-      let message = `無法存取 API 後端 < ${backend.url} >。需要能發行 SkyWay 認證權杖的伺服器。`
+      let message = translate('skyway.backendUnavailable', { url: backend.url });
       if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
       return;
     }
@@ -93,7 +94,7 @@ export class SkyWayFacade {
       console.log(`skyWay onTokenUpdateReminder ${new Date().toISOString()}`);
       let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
       if (authToken.length < 1) {
-        let message = `無法存取 API 後端 < ${backend.url} >。`
+        let message = translate('skyway.backendUnavailableShort', { url: backend.url });
         if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
         return;
       }
@@ -106,7 +107,7 @@ export class SkyWayFacade {
         this.close();
         if (this.onClose) this.onClose(this.peer);
       }
-      let message = 'SkyWay 認證權杖已過期。'
+      let message = translate('skyway.tokenExpired');
       if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
     });
 

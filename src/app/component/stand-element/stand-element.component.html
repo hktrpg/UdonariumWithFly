@@ -37,7 +37,7 @@
         </ng-container>
         <ng-container *ngIf="nameElement">
           <div style="display: inline; font-size: smaller;">
-            <b style="margin-left: 1em;">Tag: </b><input type="text" style="width: 3em" [(ngModel)]="nameElement.currentValue" placeholder="Tag">
+            <b style="margin-left: 1em;">{{ 'stand.tagLabel' | i18n }}</b><input type="text" style="width: 3em" [(ngModel)]="nameElement.currentValue" [placeholder]="'stand.tagPlaceholder' | i18n">
           </div>
         </ng-container>
       </div>
@@ -87,7 +87,7 @@
             <b style="display: inline-block; font-size: smaller; margin-left: 3px">%</b>
           </div>
           <div style="display: inline; white-space: nowrap; margin-left: 0.8em; font-size: smaller">
-            <b style="display: inline-block; margin-left: 3px">AdjY: </b>
+            <b style="display: inline-block; margin-left: 3px">{{ 'stand.adjY' | i18n }}</b>
             <input type="number" min="-100" max="100" style="width: 3.4em; text-align: right" [(ngModel)]="heightElement.currentValue">
             <b style="display: inline-block; font-size: smaller; margin-left: 3px">%</b>
           </div>

@@ -36,25 +36,25 @@
 <ng-template #title>
   <div class="title">
     <ng-container *ngIf="isCompact && !isLeft && chatMessage.timestamp">
-      <span class='tip msg-timestamp'>{{chatMessage.timestamp | date:'H:mm'}}</span>
+      <span class='tip msg-timestamp'>{{ formatTimestamp(chatMessage.timestamp, 'H:mm') }}</span>
     </ng-container>
     <span class="msg-name">
       <ng-container *ngIf="!isMine && chatMessage.toColor && isGMMode"> 
         <img draggable="false" class="mini-icon" *ngIf="0 < toImageFile?.url?.length" [src]="toImageFile?.url | safe: 'resourceUrl'" 
-        /><span [ngClass]="{grow: (chatMessage.isDirect || chatMessage.isSecret)}" [style.color]="chatMessage.toColor && chatMessage.toColor != '#ffffff' ? chatMessage.toColor : ''">{{chatMessage.toName}}<ng-container *ngIf="chatMessage.isSendToMe">（你）</ng-container></span>
+        /><span [ngClass]="{grow: (chatMessage.isDirect || chatMessage.isSecret)}" [style.color]="chatMessage.toColor && chatMessage.toColor != '#ffffff' ? chatMessage.toColor : ''">{{chatMessage.toName}}<ng-container *ngIf="chatMessage.isSendToMe">{{ 'chat.you' | i18n }}</ng-container></span>
         <span style="display: inline-block; margin: 0px 6px; user-select: none; transform: rotateY(180deg)">➡</span>
       </ng-container>
       <span [ngClass]="{grow: (chatMessage.isDirect || chatMessage.isSecret)}" [style.color]="chatMessage.color && chatMessage.color != '#ffffff' ? chatMessage.color : ''">{{chatMessage.name}}</span>
       <ng-container *ngIf="isMine && chatMessage.toColor">
         <span style="display: inline-block; margin: 0px 6px; user-select: none">➡</span>
         <img draggable="false" class="mini-icon" *ngIf="0 < toImageFile?.url?.length" [src]="toImageFile?.url | safe: 'resourceUrl'" 
-        /><span [ngClass]="{grow: (chatMessage.isDirect || chatMessage.isSecret)}" [style.color]="chatMessage.toColor && chatMessage.toColor != '#ffffff' ? chatMessage.toColor : ''">{{chatMessage.toName}}<ng-container *ngIf="chatMessage.isSendToMe">（你）</ng-container></span>
+        /><span [ngClass]="{grow: (chatMessage.isDirect || chatMessage.isSecret)}" [style.color]="chatMessage.toColor && chatMessage.toColor != '#ffffff' ? chatMessage.toColor : ''">{{chatMessage.toName}}<ng-container *ngIf="chatMessage.isSendToMe">{{ 'chat.you' | i18n }}</ng-container></span>
       </ng-container>
     </span>
     <ng-container *ngIf="!isCompact || isLeft">
       <span *ngIf="!isCompact" class='tip msg-from' [innerHTML]="htmlEscapedFrom | safe: 'html'" (click)="onLinkClick($event)"></span>
-      <span *ngIf="!isCompact && chatMessage.timestamp" class='tip msg-timestamp'>{{chatMessage.timestamp | date:'y/M/d H:mm'}}</span>
-      <span *ngIf="isCompact && chatMessage.timestamp" class='tip msg-timestamp'>{{chatMessage.timestamp | date:'H:mm'}}</span>
+      <span *ngIf="!isCompact && chatMessage.timestamp" class='tip msg-timestamp'>{{ formatTimestamp(chatMessage.timestamp, 'y/M/d H:mm') }}</span>
+      <span *ngIf="isCompact && chatMessage.timestamp" class='tip msg-timestamp'>{{ formatTimestamp(chatMessage.timestamp, 'H:mm') }}</span>
       <ng-container *ngIf="!(isEditable && !isCompact); else editor"></ng-container>
     </ng-container>
   </div>
@@ -68,13 +68,13 @@
     <span style="display: inline-block">
       <span [style.color]="!chatMessage.isSpecialColor && chatMessage.color && chatMessage.color != '#ffffff' ? chatMessage.color : ''" 
         [innerHTML]="htmlEscapedText | safe: 'html'" (click)="onLinkClick($event)"></span>
-      <span *ngIf="!isEditing && chatMessage.isEdited" class="is-edited"><b style="white-space: nowrap">{{ 'chat.edited' | i18n }}</b> {{chatMessage.lastUpdate | date:'M/d H:mm'}}</span>
-      <button *ngIf="chatMessage.isSecret" (click)="discloseMessage()" style="padding-top: 1px; padding-bottom: 1px; margin-left: 3px;">公開結果</button>
+      <span *ngIf="!isEditing && chatMessage.isEdited" class="is-edited"><b style="white-space: nowrap">{{ 'chat.edited' | i18n }}</b> {{ formatTimestamp(chatMessage.lastUpdate, 'M/d H:mm') }}</span>
+      <button *ngIf="chatMessage.isSecret" (click)="discloseMessage()" style="padding-top: 1px; padding-bottom: 1px; margin-left: 3px;">{{ 'chat.disclose' | i18n }}</button>
     </span>
   </div>
 </ng-template>
 <ng-template #secret>
-  <span><s>（秘密骰子）</s></span>
+  <span><s>{{ 'chat.secretDiceAlt' | i18n }}</s></span>
 </ng-template>
 <ng-template #editor>
   <span class="edit-buttons" style="margin-left: 4px; white-space: nowrap">

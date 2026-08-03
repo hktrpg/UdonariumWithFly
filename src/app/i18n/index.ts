@@ -25,6 +25,7 @@ import { zhTW_sheet } from './zh-TW-sheet';
 import { zhTW_obj } from './zh-TW-obj';
 
 export * from './types';
+export { ensureI18nLocalesRegistered, toIntlLocale } from './locales';
 
 export const I18N_DICTIONARIES: Record<AppLocale, I18nDictionary> = {
   'zh-TW': { ...zhTW, ...zhTW_ui, ...zhTW_tutorial, ...zhTW_ctx, ...zhTW_sheet, ...zhTW_obj },

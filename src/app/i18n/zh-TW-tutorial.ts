@@ -1,7 +1,7 @@
 import { I18nDictionary } from './types';
 
 export const zhTW_tutorial: I18nDictionary = {
-  'tutorial.name': '教學Zzzzzz',
+  'tutorial.name': '教學',
   'tutorial.linkName': '連結:',
   'tutorial.welcome': `歡迎使用 HKTRPG 烏冬桌（基於 Udonarium with Fly）。
 地圖是 2.5D；資料在玩家之間互傳，伺服器不幫你長期保管棋子與圖片。
@@ -54,7 +54,7 @@ export const zhTW_tutorial: I18nDictionary = {
   'changelog.vF': `2021/08/17 更新成 F 版，更新組件版本。修正角色卡不能擲骰的 BUG，感謝吐司兔的回報。`,
   'changelog.2026base': `2026 重大更新（hktrpg-main）
 ・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
-・介面全面繁體中文化；品牌與說明對齊 HKTRPG
+・介面多語系（繁／簡／英／日）；品牌與說明對齊 HKTRPG
 ・訪客模式、聊天精簡、筆記倉庫、角色卡快速擲骰
 ・聊天工具列：音樂／效果音／提示音／靠左／列表／精簡
 ・BCDice 4.9.0`,
@@ -81,4 +81,5 @@ Facebook：https://www.facebook.com/groups/HKTRPG
 原版烏冬：https://udonarium.app/
 with Fly：https://nanasunana.github.io/
 支援開發：https://www.patreon.com/HKTRPG`,
+  'tutorial.systemFrom': '系統',
 };

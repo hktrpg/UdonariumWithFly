@@ -1,5 +1,6 @@
 import { SyncObject, SyncVar } from '../core/synchronize-object/decorator';
 import { ObjectNode } from '../core/synchronize-object/object-node';
+import { translate } from 'i18n';
 
 export interface TablePoint {
   x: number;
@@ -12,7 +13,7 @@ export class TableWall extends ObjectNode {
   @SyncVar() blocksLight: boolean = true;
   @SyncVar() blocksVision: boolean = true;
   @SyncVar() color: string = '#ffcc00';
-  @SyncVar() name: string = '牆';
+  @SyncVar() name: string = translate('scene.wallDefault');
 
   get points(): TablePoint[] {
     try {
@@ -30,6 +31,7 @@ export class TableWall extends ObjectNode {
     const wall = new TableWall();
     wall.initialize();
     wall.points = points;
+    wall.name = translate('scene.wallDefault');
     return wall;
   }
 }

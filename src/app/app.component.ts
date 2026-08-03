@@ -345,10 +345,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                 let sentinel = tempInfos[0].normalize.substring(0, 1);
                 let group = { index: tempInfos[0].normalize.substring(0, 1), infos: [] };
                 for (let info of tempInfos) {
-                  let index = info.lang == 'Other' ? 'Other' 
+                  let index = info.lang == 'Other' ? this.i18n.t('lang.other')
                     : info.lang == 'ChineseTraditional' ? this.i18n.t('lang.zhTW')
-                    : info.lang == 'Korean' ? '한국어'
-                    : info.lang == 'English' ? 'English'
+                    : info.lang == 'Korean' ? this.i18n.t('lang.ko')
+                    : info.lang == 'English' ? this.i18n.t('lang.en')
                     : info.lang == 'SimplifiedChinese' ? this.i18n.t('lang.zhCN')
                     : info.normalize.substring(0, 1);
                   if (index !== sentinel) {

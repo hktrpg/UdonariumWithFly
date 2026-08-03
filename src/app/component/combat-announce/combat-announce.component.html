@@ -10,9 +10,9 @@
     <div class="combat-announce-shine"></div>
     <div class="combat-announce-label">{{ label }}</div>
     <div class="combat-announce-round">
-      <span class="combat-announce-round-prefix">ROUND</span>
+      <span class="combat-announce-round-prefix">{{ 'combat.roundPrefix' | i18n }}</span>
       <span class="combat-announce-round-num">{{ round }}</span>
-      <span class="combat-announce-round-suffix">第 {{ round }} 輪</span>
+      <span class="combat-announce-round-suffix">{{ 'combat.roundSuffix' | i18n:{ round: round } }}</span>
     </div>
     <div class="combat-announce-name" *ngIf="name">{{ name }}</div>
   </div>

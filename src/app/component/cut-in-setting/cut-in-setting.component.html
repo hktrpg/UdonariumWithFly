@@ -29,7 +29,7 @@
           <div style="padding-bottom: 2px">
             <div style="float: right">
               <label sytle="white-space: nowrap">
-                <input name="show-hide-images" type="checkbox" value="Show Hides" checked="{{isShowHideImages ? 'checked' : ''}}" (click)="onShowHiddenImages($event)">
+                <input name="show-hide-images" type="checkbox" value="Show Hides" [attr.title]="'table.showHiddenImages' | i18n" checked="{{isShowHideImages ? 'checked' : ''}}" (click)="onShowHiddenImages($event)">
                 <i class="material-icons" style="font-size: smaller" [ngClass]="{'red-eye': isShowHideImages}">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
               </label>
             </div>
@@ -54,7 +54,7 @@
           </div>
           <div style="padding-left: 2px">
             <b style="font-size: smaller">{{ 'cutin.condition' | i18n }}: </b><br>
-            <textarea style="width: 100%; height: 3em" [placeholder]="('cutin.conditionPlaceholder' | i18n) + '\n@街景'" [(ngModel)]="cutInCond" [attr.disabled]="!isEditable ? '' : null"></textarea>
+            <textarea style="width: 100%; height: 3em" [placeholder]="('cutin.conditionPlaceholder' | i18n) + '\n' + ('cutin.conditionExample' | i18n)" [(ngModel)]="cutInCond" [attr.disabled]="!isEditable ? '' : null"></textarea>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@
           <div style="margin-left: 1em; display: table; width: 65%">
             <div style="display: table-row">
               <div style="display: table-cell; width: 3.5em">
-                <b>PosX: </b>
+                <b>{{ 'cutin.posX' | i18n }}</b>
               </div>
               <div style="display: table-cell; width: calc(100% - 9.5em)">
                 <input [(ngModel)]="cutInPosX" type="range" style="width: 100%" [title]="cutInPosX + '%'" min="{{minSize}}" max="{{maxSize}}" name="cutInPosX" [attr.disabled]="!isEditable ? '' : null" />
@@ -93,7 +93,7 @@
             </div>
             <div style="display: table-row">
               <div style="display: table-cell; width: 3.5em">
-                <b>PosY: </b>
+                <b>{{ 'cutin.posY' | i18n }}</b>
               </div>
               <div style="display: table-cell; width: calc(100% - 9.5em)">
                 <input [(ngModel)]="cutInPosY" type="range" style="width: 100%" [title]="cutInPosY + '%'" min="{{minSize}}" max="{{maxSize}}" name="cutInPosY" [attr.disabled]="!isEditable ? '' : null" />
@@ -163,8 +163,8 @@
               <option style="color: black" *ngFor="let audio of audios" value="{{audio.identifier}}">{{ audio.name }}</option>
             </select>
             <ng-container *ngIf="isEditable && this.cutInAudioFileName.length > 0">
-              <span *ngIf="isValidAudio" style="margin-left: 0.6em"><i class="material-icons" style="font-size: 14px">check</i> <span style="color: blue">Link OK</span></span>
-              <span *ngIf="!isValidAudio" style="margin-left: 0.6em; color: red; display:inline-block; white-space: nowrap; max-width: 20em; overflow: hidden; text-overflow: ellipsis"><i class="material-icons"></i><span style="font-weight: bolder">⚠️Link NG:</span> {{ this.cutInAudioFileName }}</span>
+              <span *ngIf="isValidAudio" style="margin-left: 0.6em"><i class="material-icons" style="font-size: 14px">check</i> <span style="color: blue">{{ 'cutin.linkOk' | i18n }}</span></span>
+              <span *ngIf="!isValidAudio" style="margin-left: 0.6em; color: red; display:inline-block; white-space: nowrap; max-width: 20em; overflow: hidden; text-overflow: ellipsis"><i class="material-icons"></i><span style="font-weight: bolder">⚠️{{ 'cutin.linkNg' | i18n }}</span> {{ this.cutInAudioFileName }}</span>
             </ng-container>
           </div>
           <div style="padding-left: 1em">

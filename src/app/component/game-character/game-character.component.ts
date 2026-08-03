@@ -32,7 +32,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
-import { CHARACTER_STATUS_DEFS, getStatusDef } from '@udonarium/table-fx/character-status';
+import { getStatusDef } from '@udonarium/table-fx/character-status';
 import { I18nService } from 'service/i18n.service';
 
 @Component({
@@ -132,7 +132,6 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   /** Cap name-tag / status icon strip to roughly the token footprint. */
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
-  get statusDefs() { return CHARACTER_STATUS_DEFS; }
   statusTooltip(id: string): string { return this.i18n.t(`fx.status.${id}.tip`); }
   statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }
   statusName(id: string): string {

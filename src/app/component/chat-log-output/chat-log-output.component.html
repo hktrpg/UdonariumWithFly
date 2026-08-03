@@ -15,9 +15,9 @@
           <div>
             {{ 'chatLog.format' | i18n }}
             <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 0" [value]="0">{{ 'chatLog.text' | i18n }}</label>
-            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 1" [value]="1">HTML</label>
-            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">HTML（含圖片）</label>
-            <div style="font-weight: normal; padding-left: 1em">※<b>HTML（含圖片）</b> 會輸出為 ZIP 檔，<br>　請保持資料夾結構後解壓縮。</div>
+            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 1" [value]="1">{{ 'chatLog.html' | i18n }}</label>
+            <label><input name="{{panelId}}-log-output-format" type="radio" [(ngModel)]="logFormat" [checked]="logFormat == 2" [value]="2">{{ 'chatLog.htmlWithImages' | i18n }}</label>
+            <div style="font-weight: normal; padding-left: 1em" [innerHTML]="'chatLog.htmlWithImagesHelp' | i18n"></div>
           </div>
           <div>
             {{ 'chatLog.time' | i18n }}

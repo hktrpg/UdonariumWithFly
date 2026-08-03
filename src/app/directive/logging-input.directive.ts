@@ -10,6 +10,7 @@ import { RangeArea } from '@udonarium/range';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { ChatMessageService } from 'service/chat-message.service';
+import { translate } from 'i18n';
 
 interface LoggingValue {
   timerId?: NodeJS.Timeout;
@@ -29,34 +30,34 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
   @Input('logging.loggingValue') showValue: boolean = true;
 
   private static LoggingValueMap = new Map<string, LoggingValue>(); 
-  type = '物件';
+  type = translate('chat.op.typeObject');
 
   ngAfterViewInit() {
     let elm = <ObjectNode>this.dataElement;
     while (elm = elm.parent) {
       if (elm instanceof Card) {
-        this.type = '卡牌';
+        this.type = translate('alias.card');
       }
       if (elm instanceof CardStack) {
-        this.type = '牌堆';
+        this.type = translate('alias.card-stack');
       }
       if (elm instanceof DiceSymbol) {
-        this.type = (elm.isCoin ? '硬幣' : '骰子');
+        this.type = elm.isCoin ? translate('dice.dynamic.1') : translate('dice.dynamic.2');
       }
       if (elm instanceof GameCharacter) {
-        this.type = '角色';
+        this.type = translate('alias.character');
       }
       if (elm instanceof GameTableMask) {
-        this.type = '地圖遮罩';
+        this.type = translate('alias.table-mask');
       }
       if (elm instanceof Terrain) {
-        this.type = '地形';
+        this.type = translate('alias.terrain');
       }
       if (elm instanceof TextNote) {
-        this.type = '共用備忘';
+        this.type = translate('alias.text-note');
       }
       if (elm instanceof RangeArea) {
-        this.type = '射程範圍';
+        this.type = translate('alias.range');
       }
       if (!elm.parentIsAssigned || elm.parentIsUnknown) break;
     }
@@ -122,7 +123,10 @@ export class LoggingInputDirective implements AfterViewInit, OnDestroy {
     const value = this.dataElement.loggingValue;
     const dataElement = this.dataElement;
     if (sendMsssage && !this.isDisable && value != oldValue) {
-      let text = `${this.name == '' ? `(無名的${this.type})` : this.name} 的 ${dataElement.name == '' ? '(無名變數)' : dataElement.name} 已變更`;
+      let text = translate('chat.op.fieldChanged', {
+        owner: this.name == '' ? translate('chat.op.unnamedObject', { type: this.type }) : this.name,
+        field: dataElement.name == '' ? translate('chat.op.unnamedVar') : dataElement.name
+      });
       if (this.showValue && (dataElement.isSimpleNumber || dataElement.isNumberResource || dataElement.isAbilityScore)) {
         text += ` ${oldValue} → ${value}`;
       } else if (dataElement.isCheckProperty) {

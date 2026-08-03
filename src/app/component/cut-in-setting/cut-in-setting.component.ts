@@ -388,25 +388,6 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
     let textView = this.panelService.open(TextViewComponent, option);
     textView.title = this.i18n.t('cutin.help');
-    textView.text = 
-`　可設定 CutIn 的名稱、顯示時間、位置與寬高（皆為相對畫面尺寸）、以及發送聊天時顯示 CutIn 的條件。另外，播放影片時以及勾選「防止超出畫面」時，會調整位置與尺寸以收進畫面內。
-
-　判定聊天末尾是否符合時，不區分全形半形、英文字母大小寫。另外為了與其他使用 BCDice 的線上團工具相容，判定時會將兩側有空白的「 ＞ 」與「 → 」視為相同。
-　
-　橫位置（PosX）與縱位置（PosY）是從畫面左上角到 CutIn 中心的距離。尺寸的寬（Width）與高（Height）任一為 0 時，會維持原圖片長寬比縮放（不過 CutIn 的最小寬高為 ${CutInComponent.MIN_SIZE} 像素）。
-　
-　播放影片的 CutIn 一定在最前面，其他則是後顯示的 CutIn 圖片會更前面，但可透過重疊順序（Z-Index）控制。播放相同 CutIn、播放影片的 CutIn、或相同標籤的 CutIn 時，先前的會停止。另外，若符合聊天末尾條件的 CutIn 有多個：
-
-　　- 未設定標籤的全部播放
-　　- 有設定標籤的，從相同標籤之中隨機選 1 個
-　　- 播放影片的 CutIn 從上述之中再隨機選 1 個
-
-　CutIn 可用拖曳移動（播放影片的 CutIn 請拖邊緣）。另可雙擊關閉（僅自己停止）、右鍵從選單操作（可「關閉」「顯示在視窗後方」「最小化」；播放影片的 CutIn 請在邊緣操作）。
-
-　可將上傳的音樂檔案設為 CutIn 顯示時的音效。音量依「音樂播放器」設定（「測試（僅本人看見）」時使用試聽音量）。CutIn 與房間存檔（zip）不含音樂檔，需要時請另外上傳（連結依檔案內容判定，即使檔名相同也不會自動重新連結）。
-
-　因顯示時間（Duration）或手動操作而停止 CutIn 時，即使尚未播完，影片／音效也會結束。另外，若音效／影片結束時設為「停止 CutIn」，會優先於顯示時間而停止。
-
-　CutIn 使用影片時，目前僅支援 YouTube 網址。使用影片時請參照並遵守權利人與 YouTube 訂定的服務條款。`;
+    textView.text = this.i18n.t('cutin.helpText', { minSize: CutInComponent.MIN_SIZE });
   }
 }

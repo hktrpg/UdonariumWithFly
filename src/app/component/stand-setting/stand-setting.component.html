@@ -1,7 +1,7 @@
 <div style="margin-bottom: 4px;">
   <button style="float: right; cursor: help" (click)="helpStandSeteing()">?</button>
   <div class="position-indicate">
-    <b>Pos: </b>
+    <b>{{ 'stand.posLabel' | i18n }}</b>
     <input style="width: 350px" type="range" [title]="position + '%'" min="0" max="100" [(ngModel)]="position">
     <input style="width: 3em; text-align: right; margin-right: 3px;" type="number" min="0" max="100" [(ngModel)]="position"><b sytle="margin-left: 3px; margin-right: 1em ">％　</b>
     <label style="margin-left: 1em; white-space: nowrap">

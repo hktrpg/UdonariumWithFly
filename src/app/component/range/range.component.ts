@@ -638,26 +638,24 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       );
     }
     menuArray.push(ContextMenuSeparator);
-/*
     menuArray.push(
       {
-        name: this.i18n.t('range.menu.14'), action: null, 
+        name: this.i18n.t('range.menu.14'), action: null,
         subActions: [
-          this.range.offSetX 
+          this.range.offSetX
           ? { name: this.i18n.t('range.menu.15'), action: () => { this.range.offSetX = false; },
                 checkBox: 'check' }
           : { name: this.i18n.t('range.menu.16'), action: () => { this.range.offSetX = true; },
                 checkBox: 'check' },
-          this.range.offSetY 
-          ? { name: `☑ 縱（上下）方向`, action: () => { this.range.offSetY = false; },
+          this.range.offSetY
+          ? { name: this.i18n.t('range.menu.25'), action: () => { this.range.offSetY = false; },
                 checkBox: 'check' }
-          : { name: `☐ 縱（上下）方向`, action: () => { this.range.offSetY = true; },
+          : { name: this.i18n.t('range.menu.26'), action: () => { this.range.offSetY = true; },
                 checkBox: 'check' },
         ],
         disabled: this.range.fillType == 0
       }
     );
-*/
     menuArray.push(this.isAltitudeIndicate
       ? {
         name: this.i18n.t('range.menu.17'), action: () => {
@@ -742,7 +740,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   dockingWindowOpen() {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 350, height: 200 };
-    option.title = '跟隨角色';
+    option.title = this.i18n.t('range.followTitle');
     let component = this.panelService.open<RangeDockingCharacterComponent>(RangeDockingCharacterComponent, option);
     component.tabletopObject = <RangeArea>this.range;
   }

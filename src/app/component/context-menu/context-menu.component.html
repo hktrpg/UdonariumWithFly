@@ -30,16 +30,6 @@
       <input *ngIf="action.name && action.checkBox == 'radio' && action.name.indexOf('◉') == 0" type="radio" class="menu-check" tabindex="-1" checked/>
       <input *ngIf="action.name && action.checkBox == 'radio' && action.name.indexOf('○') == 0" type="radio" class="menu-check" tabindex="-1"/>
       <span *ngIf="action.sampleColor" class="color-indicator" [style.color]="action.sampleColor">■</span>
-      <ng-container *ngIf="!action.sampleColor">
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('黑色') == 2 || action.name.indexOf('黑') == 2)" class="color-indicator" style="color: #000">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('藍色') == 2 || action.name.indexOf('藍') == 2)" class="color-indicator" style="color: #00f">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('綠色') == 2 || action.name.indexOf('綠') == 2)" class="color-indicator" style="color: #0f0">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('青色') == 2 || action.name.indexOf('青') == 2)" class="color-indicator" style="color: #0ff">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('紅色') == 2 || action.name.indexOf('紅') == 2)" class="color-indicator" style="color: #f00">■</span>
-      <span *ngIf="action.name && action.colorSample && action.name.indexOf('洋紅') == 2" class="color-indicator" style="color: #f0f">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('黃色') == 2 || action.name.indexOf('黃') == 2)" class="color-indicator" style="color: #ff0">■</span>
-      <span *ngIf="action.name && action.colorSample && (action.name.indexOf('白色') == 2 || action.name.indexOf('白') == 2)" class="color-indicator" style="color: #fff">■</span>
-      </ng-container>
       <span *ngIf="action.materialIcon" style="vertical-align: top"><i style="font-size: 150%; padding-left: 2px;" class="material-icons">{{action.materialIcon}}</i></span>
       <span [innerHTML]="actionNameHtmlEscape(action.name, action.checkBox) | safe: 'html'"></span><sup *ngIf="action.selfOnly" class="self-only">*</sup>
       <span *ngIf="action.hotkey != ''" class="hotkey" [innerHtml]="action.hotkey"></span>

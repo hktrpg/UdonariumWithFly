@@ -29,9 +29,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   expandedId: string = '';
 
   readonly filters: { id: NoteFilterId, label: string }[] = [
-    { id: 'all', label: '全部' },
-    { id: 'table', label: '桌面' },
-    { id: 'other', label: '其他' },
+    { id: 'all', label: '' },
+    { id: 'table', label: '' },
+    { id: 'other', label: '' },
   ];
 
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote));

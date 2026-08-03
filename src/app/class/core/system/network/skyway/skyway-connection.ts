@@ -226,7 +226,7 @@ export class SkyWayConnection implements Connection {
 
     skyWay.on('error', err => {
       console.error('<' + this.peerId + '> ' + err.type + ' => ' + err.message);
-      let errorMessage = `${this.getSkyWayErrorMessage(err.type)}\n\n${err.type}: ${err.message}`;
+      let errorMessage = this.getSkyWayErrorMessage(err.type);
       switch (err.type) {
         case 'peer-unavailable':
           let peerId = /"(.+)"/.exec(err.message)[1];

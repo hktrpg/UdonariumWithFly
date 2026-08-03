@@ -94,12 +94,12 @@
   <ng-container *ngTemplateOutlet="image"></ng-container>
 </div>
 <ng-template #image>
-  <div *ngIf="isTest" class="test-indicator grow left-top">TEST</div>
-  <div *ngIf="isTest" class="test-indicator grow right-top">TEST</div>
-  <div *ngIf="isTest" class="test-indicator grow left-bottom">TEST</div>
-  <div *ngIf="isTest" class="test-indicator grow right-bottom">TEST</div>
-  <div *ngIf="isSecret" class="secret-indicator grow left-top"><i class="material-icons" style="font-size: smaller">visibility</i> For Your Eyes Only</div>
-  <div *ngIf="isSecret" class="secret-indicator grow right-bottom" style="text-align: right">For Your Eyes Only <i class="material-icons" style="font-size: smaller">visibility</i></div>
+  <div *ngIf="isTest" class="test-indicator grow left-top">{{ 'cutin.testBadge' | i18n }}</div>
+  <div *ngIf="isTest" class="test-indicator grow right-top">{{ 'cutin.testBadge' | i18n }}</div>
+  <div *ngIf="isTest" class="test-indicator grow left-bottom">{{ 'cutin.testBadge' | i18n }}</div>
+  <div *ngIf="isTest" class="test-indicator grow right-bottom">{{ 'cutin.testBadge' | i18n }}</div>
+  <div *ngIf="isSecret" class="secret-indicator grow left-top"><i class="material-icons" style="font-size: smaller">visibility</i> {{ 'cutin.forYourEyesOnly' | i18n }}</div>
+  <div *ngIf="isSecret" class="secret-indicator grow right-bottom" style="text-align: right">{{ 'cutin.forYourEyesOnly' | i18n }} <i class="material-icons" style="font-size: smaller">visibility</i></div>
   <div *ngIf="isIndicateSender" class="name-indicator grow right-top" style="text-align: right"><span [style.color]="senderColor"><span style="display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis" [style.width.px]="pixcelWidth - (isBordered ? 6 : 0)">{{ senderName }}{{ isMine ? ('cutin.you' | i18n) : '' }}</span></span></div>
   <div *ngIf="isIndicateSender" class="name-indicator grow left-bottom"><span [style.color]="senderColor"><span style="display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis" [style.width.px]="pixcelWidth - (isBordered ? 6 : 0)">{{ senderName }}{{ isMine ? ('cutin.you' | i18n) : '' }}</span></span></div>
   <div [style.width.px]="pixcelWidth + 3" [style.height.px]="19" class="handler top" [ngStyle]="{transform: 'translateX(-' + (isBordered ? 6 : 3) + 'px) translateY(-' + (isBordered ? 6 : 3) + 'px)'}" (contextmenu)="onContextMenu($event)"></div>

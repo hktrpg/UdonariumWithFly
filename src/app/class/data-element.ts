@@ -1,3 +1,4 @@
+import { translate } from 'i18n';
 import { Attributes } from './core/synchronize-object/attributes';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
@@ -39,9 +40,9 @@ export class DataElement extends ObjectNode {
     if (this.isSimpleNumber) {
       ret = `${this.value}`;
     } else if (this.isNumberResource) {
-      ret = `${this.currentValue}/${this.value && this.value != 0 ? this.value : '???'}`;
+      ret = `${this.currentValue}/${this.value && this.value != 0 ? this.value : translate('common.unknown')}`;
     } else if (this.isCheckProperty) {
-      ret = `${this.value ? ' → ✔ON' : ' → OFF'}`;
+      ret = `${this.value ? translate('chat.op.checkOn') : translate('chat.op.checkOff')}`;
     } else if (this.isAbilityScore) {
       const modifire = this.calcAbilityScore();
       ret = `${this.value}`;

@@ -274,7 +274,7 @@ export class GameCharacter extends TabletopObject {
       this.imageDataElement.getFirstElementByName('imageIdentifier').value = imageIdentifier;
     }
 
-    let resourceElement: DataElement = DataElement.create('資源', '', {}, '資源' + this.identifier);
+    let resourceElement: DataElement = DataElement.create(translate('sample.char.resources'), '', {}, '資源' + this.identifier);
     let hpElement: DataElement = DataElement.create('HP', 200, { 'type': 'numberResource', 'currentValue': '200' }, 'HP_' + this.identifier);
     let mpElement: DataElement = DataElement.create('MP', 100, { 'type': 'numberResource', 'currentValue': '100' }, 'MP_' + this.identifier);
 
@@ -288,44 +288,37 @@ export class GameCharacter extends TabletopObject {
     resourceElement.appendChild(mpElement);
 
     //TEST
-    let testElement: DataElement = DataElement.create('情報', '', {}, '情報' + this.identifier);
+    let testElement: DataElement = DataElement.create(translate('sample.char.info'), '', {}, '情報' + this.identifier);
     this.detailDataElement.appendChild(testElement);
-    testElement.appendChild(DataElement.create('說明', '在此撰寫說明\n一二三四五', { 'type': 'note' }, '說明' + this.identifier));
-    testElement.appendChild(DataElement.create('筆記', '任意文字\n１\n２\n３\n４\n５', { 'type': 'note' }, '筆記' + this.identifier));
-    testElement.appendChild(DataElement.create('參考URL', 'https://www.example.com', { 'type': 'url' }, '參考URL' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.desc'), translate('sample.char.descValue'), { 'type': 'note' }, '說明' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.note'), translate('sample.char.noteValue'), { 'type': 'note' }, '筆記' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.url'), 'https://www.example.com', { 'type': 'url' }, '參考URL' + this.identifier));
 
     //TEST
-    testElement = DataElement.create('能力', '', {}, '能力' + this.identifier);
+    testElement = DataElement.create(translate('sample.char.abilities'), '', {}, '能力' + this.identifier);
     this.detailDataElement.appendChild(testElement);
-    testElement.appendChild(DataElement.create('靈巧', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '靈巧' + this.identifier));
-    testElement.appendChild(DataElement.create('敏捷', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '敏捷' + this.identifier));
-    testElement.appendChild(DataElement.create('筋力', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '筋力' + this.identifier));
-    testElement.appendChild(DataElement.create('生命力', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '生命力' + this.identifier));
-    testElement.appendChild(DataElement.create('智力', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '智力' + this.identifier));
-    testElement.appendChild(DataElement.create('精神力', 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '精神力' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.dex'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '靈巧' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.agi'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '敏捷' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.str'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '筋力' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.vit'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '生命力' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.int'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '智力' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.mnd'), 24, { 'type': 'abilityScore', 'currentValue': 'div6' }, '精神力' + this.identifier));
 
     //TEST
-    testElement = DataElement.create('戰鬥特技', '', {}, '戰鬥特技' + this.identifier);
+    testElement = DataElement.create(translate('sample.char.skills'), '', {}, '戰鬥特技' + this.identifier);
     this.detailDataElement.appendChild(testElement);
-    testElement.appendChild(DataElement.create('Lv1', '1d100 全力攻擊', {}, 'Lv1' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv3', '1d100 武器專精/劍', {}, 'Lv3' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv5', '1d100 武器專精/劍Ⅱ', {}, 'Lv5' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv7', '1d100 頑強', {}, 'Lv7' + this.identifier));
-    testElement.appendChild(DataElement.create('Lv9', '1d100 橫掃', {}, 'Lv9' + this.identifier));
-    testElement.appendChild(DataElement.create('自動', '1d100 治癒適性', {}, '自動' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv1', translate('sample.char.skill1'), {}, 'Lv1' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv3', translate('sample.char.skill3'), {}, 'Lv3' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv5', translate('sample.char.skill5'), {}, 'Lv5' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv7', translate('sample.char.skill7'), {}, 'Lv7' + this.identifier));
+    testElement.appendChild(DataElement.create('Lv9', translate('sample.char.skill9'), {}, 'Lv9' + this.identifier));
+    testElement.appendChild(DataElement.create(translate('sample.char.auto'), translate('sample.char.skillAuto'), {}, '自動' + this.identifier));
 
     let domParser: DOMParser = new DOMParser();
     let gameCharacterXMLDocument: Document = domParser.parseFromString(this.rootDataElement.toXml(), 'application/xml');
 
     let palette: ChatPalette = new ChatPalette('ChatPalette_' + this.identifier);
-    palette.setPalette(`聊天面板輸入範例：
-2d6+1 擲骰
-１ｄ２０＋{敏捷}＋｛格鬥｝　{name}的格鬥！
-:ｈｐ-3d6 2d20KH1+{靈巧}+2>=15 《{Lv1}》使用　HP｛＄1｝
-:HP={最大HP}:MP-10 HP全回復！ MP{$2}、HP{HP} → {$HP}（回復{$1}點）
-//敏捷=10+{敏捷A}
-//敏捷A=10
-//格鬥＝１`);
+    palette.setPalette(translate('sample.char.palette'));
     palette.initialize();
     this.appendChild(palette);
 

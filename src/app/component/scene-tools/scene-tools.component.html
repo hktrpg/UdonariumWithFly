@@ -98,7 +98,7 @@
 
   <div class="section" *ngIf="tools.selectionCount > 0 && canModify">
     <div class="sub">{{ 'scene.selectedCount' | i18n:{ count: tools.selectionCount } }}
-      <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedDrawing">{{ 'scene.selectedDrawing' | i18n:{ type: tools.selectedDrawing.type } }}</ng-container>
+      <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedDrawing">{{ 'scene.selectedDrawing' | i18n:{ type: drawingTypeLabel(tools.selectedDrawing.type) } }}</ng-container>
       <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedLight">{{ 'scene.selectedLight' | i18n }}</ng-container>
       <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedWall">{{ 'scene.selectedWall' | i18n }}</ng-container>
     </div>
@@ -169,7 +169,7 @@
       <div class="sub">{{ 'scene.drawingList' | i18n:{ count: drawings.length } }}</div>
       <ul class="list" *ngIf="drawings.length">
         <li *ngFor="let d of drawings" [class.active]="tools.isDrawingSelected(d)" (click)="selectDrawing(d)">
-          {{ d.type }}<ng-container *ngIf="d.type === 'text'">：{{ d.text }}</ng-container>
+          {{ drawingTypeLabel(d.type) }}<ng-container *ngIf="d.type === 'text'">：{{ d.text }}</ng-container>
         </li>
       </ul>
     </ng-container>

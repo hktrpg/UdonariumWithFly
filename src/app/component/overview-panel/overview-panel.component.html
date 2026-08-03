@@ -133,7 +133,7 @@
     </div>
     <div class="title-area component-title"
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
-      <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">???</ng-container>
+      <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">{{ 'dice.hidden' | i18n }}</ng-container>
     </div>
     <div *ngIf="dice.hasOwner && 0 < dice.ownerName.length" class="owner-name-area component-owner"
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
@@ -176,7 +176,7 @@
         <div class="grid-container">
           <ng-container *ngFor="let dataElm of rangeElms">
             <ng-container *ngIf="dataElm.name == 'length' || dataElm.name == 'width'">
-              <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+              <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
               <div class="value">
                 <div style="display: inline-block; width: min-content;">
                   <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
@@ -190,7 +190,7 @@
               </div>
             </ng-container>
             <ng-container *ngIf="dataElm.name == 'opacity'">
-              <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+              <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
               <div class="value">
                 <div style="display: inline-block; width: min-content;">
                   <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
@@ -288,7 +288,7 @@
             <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
             <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
           </div>
-          <div style="display: inline;"> / {{!+dataElm.value ? '???' : dataElm.value}}</div>
+          <div style="display: inline;"> / {{!+dataElm.value ? ('common.unknown' | i18n) : dataElm.value}}</div>
         </div>
         <div class="section" style="line-height: 1em;">
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" type="range" title="{{dataElm.currentValue}}"

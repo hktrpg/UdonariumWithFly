@@ -7,6 +7,7 @@ import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { translate } from 'i18n';
 import { I18nService } from './i18n.service';
 
 /** `none` = idle (no tool lit). `select` = scene-object pick only. */
@@ -25,7 +26,7 @@ export class SceneToolService {
   drawStrokeWidth = 4;
   drawStrokeOpacity = 1;
   /** Text content for next place / edit. */
-  draftText = 'Note';
+  draftText = translate('scene.draftText');
   draftFontSize = 18;
 
   /** Defaults for next placed light (radii in grid squares). */
@@ -33,7 +34,7 @@ export class SceneToolService {
   lightIntensity = 0.75;
   lightBrightGrid = 2;
   lightDimGrid = 4;
-  lightName = 'Light';
+  lightName = translate('scene.lightName');
 
   /** Multi-select sets (box / list). Primaries below drive the property panel. */
   selectedDrawings: TableDrawing[] = [];

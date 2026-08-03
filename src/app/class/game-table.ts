@@ -6,6 +6,7 @@ import { TableDrawing } from './table-fx/table-drawing';
 import { TableLight } from './table-fx/table-light';
 import { TableWall } from './table-fx/table-wall';
 import { Terrain } from './terrain';
+import { translate } from 'i18n';
 
 export enum GridType {
   NONE = -1,
@@ -24,7 +25,7 @@ export type WeatherType = 'none' | 'rain' | 'snow' | 'fog';
 
 @SyncObject('game-table')
 export class GameTable extends ObjectNode {
-  @SyncVar() name: string = '桌面';
+  @SyncVar() name: string = translate('alias.game-table');
   @SyncVar() width: number = 20;
   @SyncVar() height: number = 20;
   @SyncVar() gridSize: number = 50;

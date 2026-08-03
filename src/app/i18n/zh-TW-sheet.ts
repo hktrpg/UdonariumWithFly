@@ -65,15 +65,15 @@ export const zhTW_sheet: I18nDictionary = {
 
 ・💭
 　以角色傳送聊天時，「 與 」包住的內容會以💭顯示。`,
-  'stand.sortNameList': '聊天輸入時排序名稱', 'stand.heightGlobal': 'Height (0=維持原圖片): ', 'stand.keepOriginalImage': '維持原圖片',
+  'stand.sortNameList': '聊天輸入時排序名稱', 'stand.heightGlobal': '高度（0=維持原圖片）: ', 'stand.keepOriginalImage': '維持原圖片',
   'stand.noOverview': '總覽不使用立繪圖片', 'stand.add': '新增立繪設定', 'stand.restore': '還原剛刪除的立繪設定',
   'stand.title': '{{name}} 的立繪設定', 'stand.deleteTitle': '刪除立繪設定', 'stand.deleteText': '要刪除立繪設定嗎？',
-  'stand.helpTitle': '立繪設定說明', 'stand.changeImage': '變更圖片', 'stand.namePlaceholder': 'Name', 'stand.condition': '條件: ',
+  'stand.helpTitle': '立繪設定說明', 'stand.changeImage': '變更圖片', 'stand.namePlaceholder': '名稱', 'stand.condition': '條件: ',
   'stand.condition.default': '預設', 'stand.condition.image': '指定圖片', 'stand.condition.postfix': '聊天末尾',
   'stand.condition.postfixOrImage': '聊天末尾 或 指定圖片', 'stand.condition.postfixAndImage': '聊天末尾 且 指定圖片',
   'stand.condition.selectedOnly': '僅在選擇時', 'stand.showName': '名稱標籤', 'stand.applyImageEffect': '反映圖片效果',
   'stand.applyRoll': '反映旋轉', 'stand.speakingImage': '口型同步圖片（APNG 等）', 'stand.test': '測試（僅本人看見）',
-  'stand.positionSpecialize': 'Pos 個別指定: ', 'stand.heightIndividual': 'Height (0=未指定): ', 'stand.unspecified': '未指定',
+  'stand.positionSpecialize': '位置個別指定: ', 'stand.heightIndividual': '高度（0=未指定）: ', 'stand.unspecified': '未指定',
   'stand.postfixPlaceholder': '每行一個，開頭加上 @ 時會在符合時從文字中截掉\r\n@憤怒\r\n@必殺技', 'stand.noCharacterImages': '尚未設定角色圖片、臉部 IC',
   'stand.testMessage': '這是測試，只有你看得到。調整立繪設定時，可從選單的「個人設定」關閉「立繪淡出並自動退場」，會較容易微調。',
   'stand.help': `　可設定角色立繪的名稱、位置與圖片高度（皆為相對畫面尺寸）、以及發送聊天時顯示立繪的條件。
@@ -97,4 +97,22 @@ export const zhTW_sheet: I18nDictionary = {
 
 　判定聊天末尾是否符合時，不區分全形半形、英文字母大小寫。另外為了與其他使用 BCDice 的線上團工具相容，判定時會將兩側有空白的「 ＞ 」與「 → 」視為相同。
 　此外，以「@退場」、「@farewell」退場時，或設定了如「@笑」這類以「@」開頭的條件時，（無論立繪是否啟用、條件是否符合）以該角色發送時，符合條件的聊天文字末尾的 @ 之後都會被截掉。`,
+  'sheet.sendToChat': '傳送到聊天',
+  'sheet.placeholder.value': '數值',
+  'sheet.placeholder.opacity': '不透明度',
+  'sheet.placeholder.number': '數字',
+  'sheet.placeholder.note': '筆記',
+  'sheet.placeholder.option': '選項',
+  'stand.tagLabel': 'Tag: ',
+  'stand.tagPlaceholder': 'Tag',
+  'stand.adjY': 'AdjY: ',
+  'stand.posLabel': 'Pos: ',
+  'sheet.modifier.div2': '÷2',
+  'sheet.modifier.div3': '÷3 SRS,LHZ',
+  'sheet.modifier.div4': '÷4',
+  'sheet.modifier.div5': '÷5',
+  'sheet.modifier.div6': '÷6 SW',
+  'sheet.modifier.div10': '÷10',
+  'sheet.modifier.dnd3e': 'D&D 3e～',
+  'sheet.data.heightScale': '× 尺寸',
 };

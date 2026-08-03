@@ -34,6 +34,12 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
   canCreateKind(kind: SceneCreateKind): boolean { return this.perm.canCreateKind(kind); }
   canModifyKind(kind: SceneModifyKind): boolean { return this.perm.canModifyKind(kind); }
 
+  drawingTypeLabel(type: string): string {
+    const key = `scene.${type}`;
+    const label = this.i18n.t(key);
+    return label === key ? type : label;
+  }
+
   get walls(): TableWall[] { return this.tabletopService.currentTable?.walls || []; }
   get lights(): TableLight[] { return this.tabletopService.currentTable?.lights || []; }
   get drawings(): TableDrawing[] { return this.tabletopService.currentTable?.drawings || []; }
