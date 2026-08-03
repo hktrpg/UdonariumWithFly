@@ -99,8 +99,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private sceneMarqueeCurrent: { x: number; y: number } = null;
   /** True once drag exceeds threshold — commit as box select instead of click. */
   private sceneMarqueeActive = false;
-  /** Shift+click candidate for token path waypoint. */
-  private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number } = null;
+  /** Path gesture candidate: Ctrl+click adds a waypoint; plain click starts move. */
+  private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number; mode: 'add' | 'go' } = null;
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
@@ -323,7 +323,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
   get pathPointsAttr(): string {
-    return this.tokenPath.waypoints.map(p => `${p.x},${p.y}`).join(' ');
+    const pts: string[] = [];
+    if (this.tokenPath.origin) {
+      pts.push(`${this.tokenPath.origin.x},${this.tokenPath.origin.y}`);
+    }
+    for (const p of this.tokenPath.waypoints) {
+      pts.push(`${p.x},${p.y}`);
+    }
+    return pts.join(' ');
   }
 
   ngOnInit() {
@@ -521,16 +528,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableMouseStart(e: any) {
-    // Shift+left with a selected token = path waypoints (not pan).
-    // Shift+right with draft path = commit (handled in contextmenu).
-    if (e.button === 2 && this.tokenPath.hasDraft && e.shiftKey) {
+    // Ctrl+left with a selected token = path waypoints (not pan).
+    // Plain left with draft = start move (handled in pointerup).
+    // Right-click with draft = undo last waypoint (handled in contextmenu; drag still rotates).
+    if (e.button === 0 && e.ctrlKey && this.tokenPath.canDraft()) {
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = false;
-    } else if (e.button === 0 && e.shiftKey && this.tokenPath.canDraft()) {
+    } else if (e.button === 0 && !e.ctrlKey && !e.shiftKey && this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = false;
-    } else if (e.button === 0 && e.shiftKey) {
-      // Shift+left = pan map when no path draft applies.
+    } else if (e.button === 0 && e.ctrlKey) {
+      // Ctrl+left = pan map when no path draft applies.
       this.isTableTransformMode = true;
       this.pointerDeviceService.isDragging = false;
     } else if (e.button === 1 || e.button === 2) {
@@ -592,6 +600,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       return;
     }
+    // Path waypoint clicks must keep the token selected for more Ctrl+clicks.
+    if (this.pathClickOrigin || this.tokenPath.hasDraft) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!this.contextMenuService.isShow) this.selectionService.clear();
@@ -602,6 +612,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onTablePickCancelIfNeeded(): boolean {
     // Scene tools take pointer while a tool is active — don't steal picks.
     if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return true;
+    // Ctrl+click path waypoints: pointerdown sets pathClickOrigin before mousedown.
+    if (this.pathClickOrigin) return true;
     return this.isTableTransformMode;
   }
 
@@ -625,12 +637,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
-    // Shift+right commits token path while draft waypoints exist.
-    if (this.tokenPath.hasDraft && e.shiftKey && !this.tokenPath.isAnimating) {
+    // Right-click removes the last path waypoint while a draft exists.
+    if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
+      if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
       e.preventDefault();
       e.stopPropagation();
-      this.ngZone.run(async () => {
-        await this.tokenPath.commit();
+      this.ngZone.run(() => {
+        this.tokenPath.undoLastWaypoint();
         this.changeDetector.detectChanges();
       });
       return;
@@ -639,6 +652,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       e.preventDefault();
       const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
       this.currentTable.appendChild(wall);
+      this.sceneTools.trackCreated(wall);
       this.sceneTools.resetDrafts();
       this.sceneTools.selectWall(wall);
       this.refreshFx();
@@ -749,6 +763,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       light.intensity = this.sceneTools.lightIntensity;
       light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
       this.currentTable.appendChild(light);
+      this.sceneTools.trackCreated(light);
       this.sceneTools.selectLight(light);
       this.sceneTools.enterSelect();
       this.refreshFx();
@@ -767,6 +782,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       d.fontSize = this.sceneTools.draftFontSize || 18;
       this.applyDrawStyle(d, false);
       this.currentTable.appendChild(d);
+      this.sceneTools.trackCreated(d);
       this.sceneTools.selectDrawing(d);
       this.sceneTools.enterSelect();
       SoundEffect.play(PresetSound.piecePut);
@@ -980,9 +996,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     // clearPingHold must run before setting origin (it nulls origin/timer).
     this.clearPingHold();
 
-    // Shift+left on map with selected token(s): place path waypoint on click (not drag).
-    if (e.shiftKey && this.tokenPath.canDraft()) {
-      this.pathClickOrigin = { clientX: e.clientX, clientY: e.clientY, x: pos.x, y: pos.y };
+    // Ctrl+left: add waypoint. Plain left with draft: start moving.
+    if (e.ctrlKey && this.tokenPath.canDraft()) {
+      this.pathClickOrigin = { clientX: e.clientX, clientY: e.clientY, x: pos.x, y: pos.y, mode: 'add' };
+      return;
+    }
+    if (!e.ctrlKey && !e.shiftKey && this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
+      this.pathClickOrigin = { clientX: e.clientX, clientY: e.clientY, x: pos.x, y: pos.y, mode: 'go' };
       return;
     }
 
@@ -1035,6 +1055,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.sceneTools.wallDraftPoints.length >= 2 && e.detail >= 2) {
         const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
         this.currentTable.appendChild(wall);
+        this.sceneTools.trackCreated(wall);
         this.sceneTools.resetDrafts();
         this.sceneTools.selectWall(wall);
         this.refreshFx();
@@ -1050,6 +1071,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         d.fontSize = this.sceneTools.draftFontSize || 18;
         this.applyDrawStyle(d, false);
         this.currentTable.appendChild(d);
+        this.sceneTools.trackCreated(d);
         this.sceneTools.selectDrawing(d);
         return;
       }
@@ -1120,32 +1142,26 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.commitDrawDrag();
   }
 
-  @HostListener('document:keyup', ['$event'])
-  onDocumentKeyup(e: KeyboardEvent) {
-    if (e.key !== 'Shift') return;
-    if (this.tokenPath.isAnimating) return;
-    if (!this.tokenPath.hasDraft && !this.pathClickOrigin) return;
-    this.pathClickOrigin = null;
-    this.tokenPath.cancelDraft();
-    this.changeDetector.detectChanges();
-  }
-
-  /** Resolve Shift+click waypoint; returns true if this pointerup was a path gesture. */
+  /** Resolve path add / go click; returns true if this pointerup was a path gesture. */
   private finishPathClick(e: PointerEvent): boolean {
     if (!this.pathClickOrigin) return false;
     const origin = this.pathClickOrigin;
     this.pathClickOrigin = null;
-    if (!e.shiftKey) {
-      this.tokenPath.cancelDraft();
-      this.changeDetector.detectChanges();
-      return true;
-    }
     const dx = e.clientX - origin.clientX;
     const dy = e.clientY - origin.clientY;
     if (dx * dx + dy * dy > GameTableComponent.PATH_CLICK_MOVE_SQ) return true;
-    if (this.tokenPath.addWaypoint(origin.x, origin.y)) {
-      this.changeDetector.detectChanges();
+    if (origin.mode === 'add') {
+      if (this.tokenPath.addWaypoint(origin.x, origin.y)) {
+        this.changeDetector.detectChanges();
+      }
+      return true;
     }
+    // Plain click: add this position as the final waypoint, then start moving.
+    this.ngZone.run(async () => {
+      this.tokenPath.addWaypoint(origin.x, origin.y);
+      await this.tokenPath.commit();
+      this.changeDetector.detectChanges();
+    });
     return true;
   }
 
@@ -1239,6 +1255,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.sceneTools.mode === 'wall' && this.sceneTools.wallDraftPoints.length >= 2) {
       const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
       this.currentTable.appendChild(wall);
+      this.sceneTools.trackCreated(wall);
       this.sceneTools.resetDrafts();
       this.sceneTools.selectWall(wall);
       this.refreshFx();
@@ -1364,6 +1381,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       light.intensity = this.sceneTools.lightIntensity;
       light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
       this.currentTable.appendChild(light);
+      this.sceneTools.trackCreated(light);
       this.sceneTools.selectLight(light);
       this.refreshFx();
     } else if (this.sceneTools.mode === 'draw-rect' || this.sceneTools.mode === 'draw-ellipse') {
@@ -1377,6 +1395,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         d.height = Math.max(8, height);
         this.applyDrawStyle(d, true);
         this.currentTable.appendChild(d);
+        this.sceneTools.trackCreated(d);
         this.sceneTools.selectDrawing(d);
       }
     } else if (this.sceneTools.mode === 'draw-freehand' && this.freehandPoints.length > 1) {
@@ -1397,6 +1416,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       d.width = Math.max(1, maxX - minX);
       d.height = Math.max(1, maxY - minY);
       this.currentTable.appendChild(d);
+      this.sceneTools.trackCreated(d);
       this.sceneTools.selectDrawing(d);
     }
     this.clearDrawDragState();
@@ -1425,6 +1445,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     d.geom = { points: this.sceneTools.polygonDraftPoints.slice() };
     this.applyDrawStyle(d, true);
     this.currentTable.appendChild(d);
+    this.sceneTools.trackCreated(d);
     this.sceneTools.resetDrafts();
     this.drawDragCurrent = null;
     this.sceneTools.selectDrawing(d);

@@ -158,6 +158,7 @@ export class SceneToolsComponent implements OnInit, OnDestroy {
     if (this.tools.wallDraftPoints.length < 2) return;
     const wall = TableWall.create(this.tools.wallDraftPoints.slice());
     this.tabletopService.currentTable?.appendChild(wall);
+    this.tools.trackCreated(wall);
     this.tools.resetDrafts();
     EventSystem.trigger('UPDATE_GAME_OBJECT', this.tabletopService.currentTable.toContext());
   }

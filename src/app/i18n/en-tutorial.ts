@@ -8,24 +8,26 @@ The map is 2.5D. Data is shared peer-to-peer; the server does not keep your toke
 ★ Before leaving, Download ZIP; next time Load ZIP. Without saving, everything vanishes.
 Desktop Chrome recommended. This tutorial hides after your first chat message.
 Full guide: https://bothelp.hktrpg.com/guide`,
-  'tutorial.view': `<View> Shift+left-drag = pan  Right-drag = rotate  Wheel = zoom
+  'tutorial.view': `<View> Ctrl+left-drag = pan  Right-drag = rotate  Wheel = zoom
 　　　　Shift+wheel = pan left/right  Ctrl+wheel = pan up/down
 <Objects> Left-drag to move  Drag the rotate handle  Right-click = menu
 　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…)
 　　　　“Next image” for characters is in the right-click menu
 　　　　Flip cards, draw from decks, roll dice: use the right-click menu
-<Path move> Select a token, Shift+left-click the map for waypoints, then Shift+right-click to move along them
-　　　　Release Shift (without right-click confirm) = cancel waypoints
-<Select> Left-click = select (highlight)  Ctrl+click = add/remove
-　　　　Left-drag empty space = box select  Click empty / Esc = clear
+<Path move> Select a token, Ctrl+left-click to add waypoints (release Ctrl — path stays)
+　　　　Then left-click a new position = final stop and go  Right-click = undo last waypoint
+<Select> Left-click = select (highlight)  Shift+click = add/remove
+　　　　Left-drag empty = box select  Shift+drag = additive box  Click empty / Esc = clear
 Drag images or music into the browser to import.`,
   'tutorial.keyboard': `<Keyboard (with selection)> WASD / arrows = move (diagonals OK)
 　　　　Shift+WASD = face direction  Delete = delete (characters go to trash)
 　　　　Ctrl+C/X/V = copy / cut / paste (paste at cursor; text selection still copies text)
+　　　　Ctrl+Z = undo  Ctrl+Y / Ctrl+Shift+Z = redo
+　　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
 　　　　[ = send back  ] = bring front
 　　　　Alt+wheel = rotate 15°  Ctrl+Shift+wheel = rotate 45°
 　　　　Hold Shift on drop = temporary no grid snap  Esc = clear selection
-　　　　Guest mode cannot use edit shortcuts.`,
+　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
@@ -48,7 +50,7 @@ Drag images or music into the browser to import.`,
 　　　　Image effects: right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
 　　　　Base rings via right-click “Ring”
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
-　　　　After select: WASD/arrows move, Delete removes; wall・polygon: Enter/double-click finish; Esc cancel
+　　　　After select: WASD/arrows move, Delete removes, Ctrl+Z/Y undo/redo; wall・polygon: Enter/double-click finish; Esc cancel
 <Combat> Open from menu; add selection / all on table, roll initiative, rounds
 　　　　Character right-click “Join combat”; turn announce appears when started`,
   'changelog.v1132': `Re-localized from https://nanasunana.github.io/ private build with extra features.
@@ -65,12 +67,12 @@ Upgraded to 1.13.2`,
 ・Chat toolbar: music / SFX / notice / align left / list / compact
 ・BCDice 4.9.0`,
   'changelog.2026ops': `2026/08/03 Controls update
-・Selection highlight; left-drag empty box select; Shift+left pan map
+・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; Ctrl+left pan map
 ・Double-click opens details (flip / draw / roll via right-click)
-・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor)
+・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor), Ctrl+Z/Y undo/redo
 ・[ / ] layer order; Alt+wheel 15° / Ctrl+Shift+wheel 45° rotate
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
-・Path move: select token → Shift+left waypoints → Shift+right move; release Shift cancels
+・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination to go; right-click undoes last waypoint
 ・“Next image” moved to right-click; shadow scales with size/height`,
   'changelog.2026scene': `2026/08/03 Scene・combat・vision
 ・Ping: long-press empty map; Shift+long-press warning

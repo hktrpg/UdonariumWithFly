@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
@@ -13,12 +15,14 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { moveToBackmost, moveToTopmost, Stackable } from '@udonarium/tabletop-object-util';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { MovableDirective } from 'directive/movable.directive';
 import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchronizer';
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
 import { CoordinateService } from './coordinate.service';
 import { SceneToolService } from './scene-tool.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
+import { DeleteEntry, UndoService } from './undo.service';
 
 const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
@@ -46,10 +50,17 @@ export class TabletopKeyboardService {
     private selectionService: TabletopSelectionService,
     private coordinateService: CoordinateService,
     private sceneTools: SceneToolService,
+    private undoService: UndoService,
   ) { }
 
   initialize() {
     if (this.listening) return;
+    this.undoService.setPoseVisualSync((object, pose) => {
+      MovableDirective.syncPoseFromUndo(object, pose.x, pose.y, pose.posZ);
+      if (pose.rotate != null) {
+        RotableSelectionSynchronizer.syncRotateFromUndo(object, pose.rotate);
+      }
+    });
     document.addEventListener('keydown', this.onKeyDown, true);
     document.addEventListener('keyup', this.onKeyUp, true);
     document.addEventListener('wheel', this.onWheel, { capture: true, passive: false });
@@ -76,6 +87,14 @@ export class TabletopKeyboardService {
     const mod = e.ctrlKey || e.metaKey;
 
     if (mod && !e.altKey && !e.shiftKey) {
+      if (code === 'KeyZ') {
+        if (this.undoService.undo()) this.consume(e);
+        return;
+      }
+      if (code === 'KeyY') {
+        if (this.undoService.redo()) this.consume(e);
+        return;
+      }
       if (code === 'KeyC') {
         if (this.hasTextSelection()) return;
         if (this.copySelection()) this.consume(e);
@@ -90,6 +109,11 @@ export class TabletopKeyboardService {
         if (this.pasteClipboard()) this.consume(e);
         return;
       }
+    }
+
+    if (mod && e.shiftKey && !e.altKey && code === 'KeyZ') {
+      if (this.undoService.redo()) this.consume(e);
+      return;
     }
 
     if (Network.GuestMode()) return;
@@ -237,12 +261,46 @@ export class TabletopKeyboardService {
 
   private changeLayerOrder(toFront: boolean): boolean {
     if (this.selectionService.size < 1) return false;
+    const before = this.snapshotZindexes(this.selectionService.objects);
+    const beforeOrder = this.snapshotChildOrders(this.selectionService.objects);
     let changed = false;
     for (const object of this.selectionService.objects) {
       if (this.isLocked(object)) continue;
       if (toFront ? this.bringToFront(object) : this.sendToBack(object)) changed = true;
     }
+    if (changed) {
+      const after = this.snapshotZindexes(this.selectionService.objects);
+      const afterOrder = this.snapshotChildOrders(this.selectionService.objects);
+      this.undoService.recordLayerChange(before, after, beforeOrder, afterOrder, 'layer');
+    }
     return changed;
+  }
+
+  private snapshotZindexes(objects: TabletopObject[]): Map<string, number> {
+    const map = new Map<string, number>();
+    const aliases = new Set<string>();
+    for (const object of objects) {
+      if (!('zindex' in object)) continue;
+      aliases.add(object.aliasName);
+    }
+    for (const alias of aliases) {
+      for (const peer of ObjectStore.instance.getObjects(alias) as Stackable[]) {
+        if (!peer.isVisibleOnTable) continue;
+        map.set(peer.identifier, peer.zindex);
+      }
+    }
+    return map;
+  }
+
+  private snapshotChildOrders(objects: TabletopObject[]): Map<string, string[]> {
+    const map = new Map<string, string[]>();
+    for (const object of objects) {
+      if (!(object instanceof Terrain || object instanceof GameTableMask)) continue;
+      const parent = (object as ObjectNode).parent;
+      if (!parent || map.has(parent.identifier)) continue;
+      map.set(parent.identifier, parent.children.map(c => c.identifier));
+    }
+    return map;
   }
 
   private bringToFront(object: TabletopObject): boolean {
@@ -353,6 +411,7 @@ export class TabletopKeyboardService {
     for (const object of pasted) {
       this.selectionService.add(object);
     }
+    this.undoService.recordCreated(pasted as ObjectNode[], 'paste');
     SoundEffect.play(PresetSound.piecePut);
     return true;
   }
@@ -362,12 +421,18 @@ export class TabletopKeyboardService {
     if (this.selectionService.size < 1) return false;
 
     const targets = [...this.selectionService.objects];
+    const entries: DeleteEntry[] = [];
     let deleted = false;
 
     for (const object of targets) {
       if (this.isLocked(object)) continue;
 
       if (object instanceof GameCharacter) {
+        entries.push({
+          kind: 'graveyard',
+          id: object.identifier,
+          fromLocation: object.location.name,
+        });
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: object.identifier });
         object.setLocation('graveyard');
         this.selectionService.remove(object);
@@ -375,12 +440,21 @@ export class TabletopKeyboardService {
         continue;
       }
 
+      entries.push({
+        kind: 'destroy',
+        xml: object.toXml(),
+        parentId: (object as ObjectNode).parentId || TableSelecter.instance.viewTable?.identifier || '',
+        liveId: object.identifier,
+      });
       object.destroy();
       this.selectionService.remove(object);
       deleted = true;
     }
 
-    if (deleted) SoundEffect.play(PresetSound.sweep);
+    if (deleted) {
+      this.undoService.recordDeleted(entries, 'delete');
+      SoundEffect.play(PresetSound.sweep);
+    }
     return deleted;
   }
 

@@ -5,6 +5,7 @@ import { Stackable } from '@udonarium/tabletop-object-util';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TransformPose, UndoService } from 'service/undo.service';
 
 import { MovableDirective } from './movable.directive';
 
@@ -28,6 +29,8 @@ export class MovableSelectionSynchronizer {
 
   private latestDomRect: DOMRect;
   private latestRectPoints: IPoint2D[] = [];
+  /** Movables participating in the current drag (includes absorbed MAGNETIC). */
+  private undoTargets: Set<MovableDirective> = new Set();
 
   constructor(
     private movable: MovableDirective,
@@ -122,6 +125,8 @@ export class MovableSelectionSynchronizer {
   }
 
   prepareMove() {
+    this.beginUndoCapture();
+
     if (!this.shouldSynchronize()) return;
 
     for (let movable of this.selectedMovables) {
@@ -132,6 +137,7 @@ export class MovableSelectionSynchronizer {
         movable.state = SelectionState.SELECTED;
         movable.setPointerEvents(false);
         movable.setAnimatedTransition(false);
+        this.trackUndoTarget(movable);
       }
     }
   }
@@ -153,6 +159,7 @@ export class MovableSelectionSynchronizer {
               movable.state = SelectionState.MAGNETIC;
               movable.setPointerEvents(false);
               movable.setAnimatedTransition(false);
+              this.trackUndoTarget(movable);
               //movable.ondragstart.emit(e as PointerEvent);
             }
           }
@@ -180,6 +187,7 @@ export class MovableSelectionSynchronizer {
     if (!this.shouldSynchronize()) {
       // Do not clear here: a plain click may end with no sync window while
       // click-to-select already registered the object on input start.
+      this.commitUndoCapture();
       return;
     }
 
@@ -212,11 +220,46 @@ export class MovableSelectionSynchronizer {
       movable.posY = center.y + distance * Math.cos(rad) - (movable.height / 2);
     }
 
+    // Capture after-state before selection clear drops MAGNETIC targets.
+    this.commitUndoCapture();
+
     if (this.movable.state === SelectionState.MAGNETIC && this.selection.size <= 1) {
       this.selection.clear();
     } else {
       this.refreshState();
     }
+  }
+
+  private beginUndoCapture() {
+    const undo = UndoService.instance;
+    if (!undo) return;
+    undo.beginTransformGesture();
+    this.undoTargets.clear();
+    this.trackUndoTarget(this.movable);
+  }
+
+  private trackUndoTarget(movable: MovableDirective) {
+    if (!movable?.tabletopObject) return;
+    this.undoTargets.add(movable);
+    UndoService.instance?.rememberBeforePose(
+      movable.tabletopObject.identifier,
+      poseFromMovable(movable),
+    );
+  }
+
+  private commitUndoCapture() {
+    const undo = UndoService.instance;
+    if (!undo) {
+      this.undoTargets.clear();
+      return;
+    }
+    const after = new Map<string, TransformPose>();
+    for (const movable of this.undoTargets) {
+      if (!movable?.tabletopObject) continue;
+      after.set(movable.tabletopObject.identifier, poseFromMovable(movable));
+    }
+    this.undoTargets.clear();
+    undo.commitTransformGesture(after, 'move');
   }
 
   private shouldSynchronize(): boolean {
@@ -305,6 +348,11 @@ export class MovableSelectionSynchronizer {
 
   static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
     if (dx === 0 && dy === 0) return false;
+    const before = new Map<string, TransformPose>();
+    for (const object of targets) {
+      if (MovableSelectionSynchronizer.isLocked(object)) continue;
+      before.set(object.identifier, poseFromObject(object));
+    }
     let moved = false;
     for (let object of targets) {
       let movables = MovableSelectionSynchronizer.objectMap.get(object);
@@ -322,6 +370,14 @@ export class MovableSelectionSynchronizer {
         movable.posY += dy;
         moved = true;
       }
+    }
+    if (moved) {
+      const after = new Map<string, TransformPose>();
+      for (const id of before.keys()) {
+        const object = targets.find(t => t.identifier === id);
+        if (object) after.set(id, poseFromObject(object));
+      }
+      UndoService.instance?.recordTransform('nudge', before, after, 'nudge');
     }
     return moved;
   }
@@ -355,17 +411,40 @@ export class MovableSelectionSynchronizer {
     return moved;
   }
 
+  /** Center of a tabletop object in table coordinates. */
+  static centerOf(object: TabletopObject): { x: number; y: number } {
+    for (const movable of MovableDirective.layerMap.get(object.aliasName) ?? []) {
+      if (movable.tabletopObject !== object || movable.isDisable) continue;
+      if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
+      if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
+      return {
+        x: movable.posX + movable.width / 2,
+        y: movable.posY + movable.height / 2,
+      };
+    }
+    const size = typeof (object as any).size === 'number' ? (object as any).size : 1;
+    const half = (size * 50) / 2;
+    return {
+      x: object.location.x + half,
+      y: object.location.y + half,
+    };
+  }
+
   /** Animate selected movables through absolute center waypoints. */
   static async animatePath(
     targets: TabletopObject[],
     waypoints: { x: number; y: number }[],
-    stepMs: number = 320
+    stepMs: number = 640,
+    pauseMs: number = 300
   ): Promise<boolean> {
     if (!targets.length || !waypoints.length) return false;
     let any = false;
     for (const wp of waypoints) {
       if (MovableSelectionSynchronizer.moveCentersTo(targets, wp.x, wp.y, stepMs)) any = true;
       await new Promise<void>(resolve => setTimeout(resolve, stepMs));
+      if (pauseMs > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, pauseMs));
+      }
     }
     for (const object of targets) {
       MovableSelectionSynchronizer.objectMap.get(object)?.forEach(m => m.setAnimatedTransition(true));
@@ -382,6 +461,33 @@ export class MovableSelectionSynchronizer {
     if (object instanceof GameCharacter && object.isLockedByPlayerOwner) return true;
     return false;
   }
+}
+
+function poseFromMovable(movable: MovableDirective): TransformPose {
+  const pose: TransformPose = {
+    x: movable.posX,
+    y: movable.posY,
+    posZ: movable.posZ,
+  };
+  const object = movable.tabletopObject;
+  if (object && 'rotate' in object) pose.rotate = +(object as any).rotate || 0;
+  return pose;
+}
+
+function poseFromObject(object: TabletopObject): TransformPose {
+  // Prefer live directive positions (BatchService may lag object.location).
+  for (const movable of MovableDirective.layerMap.get(object.aliasName) ?? []) {
+    if (movable.tabletopObject === object && !movable.isDisable) {
+      return poseFromMovable(movable);
+    }
+  }
+  const pose: TransformPose = {
+    x: object.location.x,
+    y: object.location.y,
+    posZ: object.posZ,
+  };
+  if ('rotate' in object) pose.rotate = +(object as any).rotate || 0;
+  return pose;
 }
 
 function checkOverlapSAT(rectA: IPoint2D[], rectB: IPoint2D[]) {

@@ -136,7 +136,7 @@
       <div *ngIf="pathWaypoints.length" class="path-waypoints is-pointer-events-none is-3d"
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.3) + 'px)'}">
         <svg class="path-line is-fill" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight">
-          <polyline *ngIf="pathWaypoints.length > 1" [attr.points]="pathPointsAttr"
+          <polyline *ngIf="pathPointsAttr" [attr.points]="pathPointsAttr"
             fill="none" stroke="hsla(200, 90%, 55%, 0.85)" stroke-width="2" stroke-dasharray="6 4"
             stroke-linecap="round" stroke-linejoin="round" />
         </svg>

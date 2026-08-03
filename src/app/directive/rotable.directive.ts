@@ -7,6 +7,7 @@ import { CoordinateService } from 'service/coordinate.service';
 import { TabletopService } from 'service/tabletop.service';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { UndoService } from 'service/undo.service';
 
 import { InputHandler } from './input-handler';
 import { RotableSelectionSynchronizer } from './rotable-selection-synchronizer';
@@ -88,7 +89,8 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private coordinateService: CoordinateService,
     private tabletopService: TabletopService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    _undoService: UndoService,
   ) { }
 
   ngAfterViewInit() {
@@ -103,6 +105,7 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
         if ((event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) || !this.shouldTransition(this.tabletopObject)) return;
         this.batchService.add(() => {
           if (this.input.isGrabbing) {
+            UndoService.instance?.discardTransformGesture();
             this.cancel();
           } else {
             this.setAnimatedTransition(true);
@@ -244,6 +247,12 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   private setRotate(object: TabletopObject) {
     if (object && this.targetPropertyName in object) this._rotate = object[this.targetPropertyName];
+    this.updateTransformCss();
+  }
+
+  /** Sync visual rotate from undo/redo (self-UPDATE ignored while selected). */
+  applyExternalRotate(rotate: number) {
+    this._rotate = rotate;
     this.updateTransformCss();
   }
 

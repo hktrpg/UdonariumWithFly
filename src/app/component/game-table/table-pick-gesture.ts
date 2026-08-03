@@ -1,7 +1,8 @@
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { TabletopObject } from '@udonarium/tabletop-object';
 import { InputHandler } from 'directive/input-handler';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
-import { TabletopSelectionService } from 'service/tabletop-selection.service';
+import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 
 type Callback = () => void;
 type CancelCheckCallback = () => boolean;
@@ -25,10 +26,13 @@ export class TablePickGesture {
   isPickRegionMode = false;
   isMagneticMode = false;
   isStrokeMode = false;
+  /** Shift multi-select: keep / add to selection (click toggle or box). */
+  isAdditiveMode = false;
   isKeepSelection = false;
   private isObjectDragging = false;
   private isPointerMoved = false;
   private target: HTMLElement = null;
+  private additiveBase: TabletopObject[] = null;
 
   private callbackOnKeydown = (e) => this.onKeydown(e);
 
@@ -67,12 +71,14 @@ export class TablePickGesture {
     this.isPickRegionMode = false;
     this.isMagneticMode = false;
     this.isStrokeMode = false;
+    this.isAdditiveMode = false;
 
     this.isActive = false;
     this.isKeepSelection = false;
     this.isObjectDragging = false;
     this.isPointerMoved = false;
     this.target = null;
+    this.additiveBase = null;
 
     this.clearKeyDownTimer();
     this.clearTappedTimer();
@@ -91,6 +97,8 @@ export class TablePickGesture {
     this.isPickRegionMode = false;
     this.isMagneticMode = false;
     this.isStrokeMode = false;
+    this.isAdditiveMode = false;
+    this.additiveBase = null;
 
     this.isPointerMoved = false;
     this.isObjectDragging = false;
@@ -107,11 +115,12 @@ export class TablePickGesture {
     let isMainButton = (e instanceof MouseEvent && e.button === 0) || (e as TouchEvent).touches;
     if (!isMainButton) return this.cancel();
 
-    this.isStrokeMode = (e instanceof MouseEvent && e.button === 0 && e.ctrlKey);
-    // Swapped from former Shift+left: bare left on empty table = region select.
-    // Shift+left is reserved for panning the map (see game-table onTableMouseStart).
     const isBackground = (e.target instanceof HTMLElement) && e.target.contains(this.gameObjectsElement);
-    const isQuickActivate = (e instanceof MouseEvent && e.button === 0 && !e.shiftKey && !e.ctrlKey && isBackground);
+    this.isAdditiveMode = (e instanceof MouseEvent && e.shiftKey);
+    // Shift+object = toggle stroke; Shift+empty = additive box select.
+    // Ctrl+left is path / pan (see game-table onTableMouseStart).
+    this.isStrokeMode = (e instanceof MouseEvent && e.button === 0 && e.shiftKey && !isBackground);
+    const isQuickActivate = (e instanceof MouseEvent && e.button === 0 && !e.ctrlKey && isBackground);
 
     if (this.isStrokeMode || isQuickActivate) {
       this.startQuickCursor(e);
@@ -138,7 +147,7 @@ export class TablePickGesture {
     this.pickCursor.update(this.input.pointer);
     this.pickCursor.scale(0);
 
-    if (this.isPickObjectMode && e instanceof MouseEvent && e.ctrlKey) {
+    if (this.isPickObjectMode && e instanceof MouseEvent && e.shiftKey) {
       this.pickObject(e);
     } else if (this.isPointerMoved && this.isPickRegionMode) {
       this.pickRegion(e);
@@ -157,7 +166,8 @@ export class TablePickGesture {
     this.isKeepSelection = this.isKeepSelection
       || this.isPointerMoved
       || this.isObjectDragging
-      || this.target != null;
+      || this.target != null
+      || this.isAdditiveMode;
 
     if (this.onend) this.onend();
     this.cancel();
@@ -171,15 +181,18 @@ export class TablePickGesture {
   private onKeydown(e: KeyboardEvent) {
     if (this.isActive && (!this.input.isGrabbing)) return;
     switch (e.key) {
-      case 'Control':
+      case 'Shift':
         this.clearActivateTimer();
         this.clearKeyDownTimer();
 
         this.target = null;
         this.isPointerMoved = false;
         this.isObjectDragging = false;
-        this.isKeepSelection = false;
+        this.isKeepSelection = true;
+        this.isAdditiveMode = true;
         this.isStrokeMode = true;
+        this.isPickObjectMode = true;
+        this.isPickRegionMode = false;
 
         this.isActive = true;
         this.pickCursor.update(this.input.pointer);
@@ -191,8 +204,8 @@ export class TablePickGesture {
         this.pointerDevice.isDragging = false;
         this.pickStart();
         break;
-      case 'Shift':
-        // Shift = pan map; abort in-progress pick so transform can take over next gesture.
+      case 'Control':
+        // Ctrl = path / pan; abort in-progress pick so those gestures can take over.
         this.cancel();
         break;
     }
@@ -283,7 +296,15 @@ export class TablePickGesture {
 
     this.pickArea.update(x, y, width, height);
 
-    this.selection.clear();
+    if (!this.isAdditiveMode) {
+      this.selection.clear();
+    } else {
+      if (!this.additiveBase) this.additiveBase = this.selection.objects.slice();
+      this.selection.clear();
+      for (const object of this.additiveBase) {
+        this.selection.add(object, SelectionState.SELECTED);
+      }
+    }
     let event = new CustomEvent(
       'pickregion',
       {
