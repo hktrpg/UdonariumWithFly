@@ -4,7 +4,10 @@
       (click)="changeIcon()" style="cursor: pointer">
     </span>
     <div>
-      <label style="display: inline-block; margin-bottom: 2px" [ngClass]="{'i-am-gm': isGMMode || isGMHold}"><b style="font-size: smaller"><input type="checkbox" name="i-am-gamemaster" value="I'm Gamemaster" checked="{{ isGMMode || isGMHold ? 'checked' : '' }}" (click)="onGMMode($event)">{{ isGMMode ? '目前為 GM 模式' : (isGMHold ? 'GM 模式保留中' : '進入 GM 模式') }}</b></label><br />
+      <div class="identity-row" [ngClass]="{'i-am-gm': isGMMode}">
+        <span class="identity-label">目前身份：<b>{{ currentRoleLabel }}</b></span>
+        <button type="button" (click)="switchIdentity()">轉換身份</button>
+      </div>
       <button (click)="changeIcon()">變更玩家圖示</button>
     </div>
   </div>
@@ -35,13 +38,16 @@
     <span>
       <ng-container *ngIf="networkService.isOpen">
         <span class="id-input-container">
-          <span class="id-spacer room-data">{{ networkService.peer.roomName }}/{{ networkService.peer.roomId }}</span>
-          <input class="id-input room-data" type="text" value="{{ networkService.peer.roomName + '/' + networkService.peer.roomId }}" readonly>
+          <span class="id-spacer room-data">{{ displayRoomLabel }}</span>
+          <input class="id-input room-data" type="text" value="{{ displayRoomLabel }}" readonly>
         </span>
         <button *ngIf="isAbleClipboardCopy" (click)="copyRoomName()" [disabled]="isRoomNameCopied" title="複製到剪貼簿"><b class="material-icons" style="font-size: 1em; vertical-align: bottom">content_copy</b></button>
         <span [@fadeInOut]="isRoomNameCopied" class="copied" [style.color]="myPeerColor"> {{ isRoomNameCopied ? '已複製到剪貼簿。' : '' }}</span>
       </ng-container>
     </span>
+  </div>
+  <div *ngIf="isRoleAuthRoom" style="font-size: 12px; color: #64748b; margin-top: 2px;">
+    此房間使用 GM／玩家／訪客角色密碼（進房時選擇身份）。
   </div>
   <ng-container *ngIf="networkService.peer.password">
     <div>
@@ -64,6 +70,43 @@
   </ng-container>
 </ng-container>
 <hr/>
+<ng-container *ngIf="isGMMode">
+  <div style="font-weight: bold; margin-bottom: 4px">場景工具權限（玩家）</div>
+  <div class="scene-perm-group">
+    <div class="scene-perm-row scene-perm-head">
+      <label>
+        <input type="checkbox" [ngModel]="sceneAllCreate" (ngModelChange)="setAllSceneCreate($event)">
+        <b>可新增</b>
+      </label>
+    </div>
+    <div class="scene-perm-sub">
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateLight"> 燈光</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateWall"> 牆壁</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateRect"> 矩形</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateEllipse"> 圓形</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreatePolygon"> 多邊形</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateFreehand"> 手繪</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanCreateText"> 文字</label>
+    </div>
+  </div>
+  <div class="scene-perm-group">
+    <div class="scene-perm-row scene-perm-head">
+      <label>
+        <input type="checkbox" [ngModel]="sceneAllModify" (ngModelChange)="setAllSceneModify($event)">
+        <b>可修改／刪除</b>
+      </label>
+    </div>
+    <div class="scene-perm-sub">
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyLight"> 燈光</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyWall"> 牆壁</label>
+      <label><input type="checkbox" [(ngModel)]="sceneCanModifyDrawing"> 繪圖</label>
+    </div>
+  </div>
+  <div style="font-size: 12px; color: #64748b; margin-bottom: 6px">
+    預設全部允許。GM 不受限；訪客不可使用。
+  </div>
+  <hr/>
+</ng-container>
 <div *ngFor="let peer of networkService.peers; index as i">
   <div *ngIf="i == 0" style="font-weight: bold">與其他參加者的連線狀態<span class="health">（良好 </span><i class="material-icons health health-blue">sentiment_very_satisfied</i><span class="health"> ＞ </span><i class="material-icons health health-green">sentiment_dissatisfied</i><span class="health"> ＞ </span><i class="material-icons health health-yellow">mood_bad</i><span class="health"> ＞ </span><i class="material-icons health health-red">sentiment_very_dissatisfied</i><span class="health"> 不良）</span>：</div>
   <div class="peer-info">

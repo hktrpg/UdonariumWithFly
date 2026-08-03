@@ -29,7 +29,7 @@
 <button (click)="clone()">建立副本</button>
 <button [disabled]="isSaveing" (click)="saveToXML()">
   <div style="position: relative;">
-    <div [ngClass]="{'is-hidden': isSaveing}">保存</div>
+    <div [ngClass]="{'is-hidden': isSaveing}">下載</div>
     <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
   </div>
 </button>

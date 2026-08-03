@@ -544,6 +544,18 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         }
       : null),
       (this.isGMMode ? ContextMenuSeparator : null),
+      (this.gameTableMask.affectsLight !== false
+        ? {
+          name: '☑ 與燈光互動', action: () => {
+            this.gameTableMask.affectsLight = false;
+          },
+          checkBox: 'check'
+        } : {
+          name: '☐ 與燈光互動', action: () => {
+            this.gameTableMask.affectsLight = true;
+          },
+          checkBox: 'check'
+        }),
       (this.isLock
         ? {
           name: '☑ 固定', action: () => {

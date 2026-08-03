@@ -1,0 +1,19 @@
+<div
+  class="combat-announce"
+  *ngIf="visible"
+  [@announce]
+  [attr.data-kind]="kind"
+  [attr.data-key]="showKey"
+>
+  <div class="combat-announce-glow"></div>
+  <div class="combat-announce-bar">
+    <div class="combat-announce-shine"></div>
+    <div class="combat-announce-label">{{ label }}</div>
+    <div class="combat-announce-round">
+      <span class="combat-announce-round-prefix">ROUND</span>
+      <span class="combat-announce-round-num">{{ round }}</span>
+      <span class="combat-announce-round-suffix">第 {{ round }} 輪</span>
+    </div>
+    <div class="combat-announce-name" *ngIf="name">{{ name }}</div>
+  </div>
+</div>

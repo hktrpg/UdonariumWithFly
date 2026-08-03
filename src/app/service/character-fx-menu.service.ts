@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
-import { EventSystem } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
+import { PeerCursor } from '@udonarium/peer-cursor';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import {
   CHARACTER_STATUS_DEFS,
@@ -12,6 +13,11 @@ import {
 } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ContextMenuAction, ContextMenuSeparator } from 'service/context-menu.service';
+import { TabletopSelectionService } from 'service/tabletop-selection.service';
+
+const VISION_RANGE_PRESETS = [0, 3, 6, 9, 12, 18, 24];
+const BRIGHT_LIGHT_PRESETS = [0, 1, 2, 3, 4, 5, 6, 8];
+const DIM_LIGHT_PRESETS = [0, 2, 4, 6, 8, 10, 12, 16];
 
 const RING_OPTIONS: { id: string; name: string }[] = [
   { id: 'none', name: '無' },
@@ -24,6 +30,8 @@ const RING_OPTIONS: { id: string; name: string }[] = [
 
 @Injectable({ providedIn: 'root' })
 export class CharacterFxMenuService {
+  constructor(private selectionService: TabletopSelectionService) {}
+
   get auraNames(): string[] { return AuraNameConfig.instance.names; }
 
   makeAuraMenu(character: GameCharacter): ContextMenuAction {
@@ -102,22 +110,133 @@ export class CharacterFxMenuService {
     };
   }
 
+  makeMyTokenMenu(character: GameCharacter): ContextMenuAction {
+    const mine = () => Network.peer?.userId || '';
+    const isMine = () => !!mine() && character.playerOwner === mine();
+    const takenByOther = () => !!character.playerOwner && character.playerOwner !== mine();
+    const isGM = () => !!PeerCursor.myCursor?.isGMMode;
+    return {
+      name: isMine() ? '☑ 作為我的角色' : '☐ 作為我的角色',
+      action: () => {
+        if (GuestSession.isGuest || !mine()) return;
+        if (takenByOther() && !isGM()) return;
+        GameCharacter.setAsMyToken(character, !isMine());
+        EventSystem.trigger('UPDATE_INVENTORY', null);
+      },
+      nameUpdate: () => {
+        if (isMine()) return '☑ 作為我的角色';
+        if (takenByOther()) return `☐ 作為我的角色（${character.playerOwnerName}）`;
+        return '☐ 作為我的角色';
+      },
+      checkBox: 'check',
+      disabled: GuestSession.isGuest || (takenByOther() && !isGM()),
+    };
+  }
+
   makeCombatMenu(character: GameCharacter): ContextMenuAction {
+    const selectedCount = () =>
+      this.selectionService.objects.filter(o => o instanceof GameCharacter).length;
     return {
       name: '加入戰鬥',
       action: () => {
         if (GuestSession.isGuest) return;
-        CombatTracker.instance.addCombatant({
-          characterIdentifier: character.identifier,
-          name: character.name || '未命名',
-          isNpc: !character.owner,
+        const chars = this.combatCharactersFor(character);
+        CombatTracker.instance.addCombatants(chars.map(obj => ({
+          characterIdentifier: obj.identifier,
+          name: obj.name || '未命名',
+          isNpc: !obj.hasPlayerController,
           isDefeated: false,
           isHidden: false,
-          imageIdentifier: character.imageFile?.identifier || '',
-        });
+          imageIdentifier: obj.imageFile?.identifier || '',
+        })));
+      },
+      nameUpdate: () => {
+        const n = selectedCount();
+        return n > 1 ? `加入戰鬥（${n}）` : '加入戰鬥';
       },
       disabled: GuestSession.isGuest,
       keepOpen: false,
+    };
+  }
+
+  /** All selected character tokens, ensuring the context-menu target is included. */
+  private combatCharactersFor(character: GameCharacter): GameCharacter[] {
+    const selected = this.selectionService.objects.filter((o): o is GameCharacter => o instanceof GameCharacter);
+    if (!selected.length) return [character];
+    if (selected.some(c => c.identifier === character.identifier)) return selected;
+    return [...selected, character];
+  }
+
+  makeVisionMenu(character: GameCharacter): ContextMenuAction {
+    const mine = Network.peer?.userId || '';
+    // Manual claim only — chat auto-vision must not drive this checkbox.
+    const isMyVision = !!mine && character.visionOwner === mine;
+    const title = () =>
+      `視野／光照（視${character.visionRangeGrid} 亮${character.brightLightGrid} 昏${character.dimLightGrid}）`;
+
+    const rangeSub = (
+      label: string,
+      presets: number[],
+      getter: () => number,
+      setter: (n: number) => void,
+    ): ContextMenuAction => ({
+      name: `${label}：${getter()} 格`,
+      action: null,
+      nameUpdate: () => `${label}：${getter()} 格`,
+      subActions: presets.map(n => ({
+        name: `${getter() === n ? '◉' : '○'} ${n} 格`,
+        action: () => {
+          setter(n);
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        },
+        nameUpdate: () => `${getter() === n ? '◉' : '○'} ${n} 格`,
+        checkBox: 'radio' as const,
+      })),
+    });
+
+    return {
+      name: title(),
+      action: null,
+      nameUpdate: title,
+      subActions: [
+        {
+          name: isMyVision ? '☑ 作為我的視野角色' : '☐ 作為我的視野角色',
+          action: () => {
+            if (!mine) return;
+            character.visionOwner = character.visionOwner === mine ? '' : mine;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          nameUpdate: () => {
+            const on = !!mine && character.visionOwner === mine;
+            return on ? '☑ 作為我的視野角色' : '☐ 作為我的視野角色';
+          },
+          checkBox: 'check',
+          disabled: GuestSession.isGuest,
+        },
+        ContextMenuSeparator,
+        rangeSub('視野距離', VISION_RANGE_PRESETS,
+          () => character.visionRangeGrid,
+          n => { character.visionRange = n; }),
+        rangeSub('亮光', BRIGHT_LIGHT_PRESETS,
+          () => character.brightLightGrid,
+          n => {
+            character.brightLight = n;
+            if (character.dimLightGrid < n) character.dimLight = n;
+          }),
+        rangeSub('昏暗光', DIM_LIGHT_PRESETS,
+          () => character.dimLightGrid,
+          n => { character.dimLight = n; }),
+        ContextMenuSeparator,
+        {
+          name: '清除發出光照',
+          action: () => {
+            character.brightLight = 0;
+            character.dimLight = 0;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          disabled: character.brightLightGrid <= 0 && character.dimLightGrid <= 0,
+        },
+      ],
     };
   }
 

@@ -33,6 +33,7 @@ import { OverviewPanelComponent } from 'component/overview-panel/overview-panel.
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
 import { PeerCursorComponent } from 'component/peer-cursor/peer-cursor.component';
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
+import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { TerrainComponent } from 'component/terrain/terrain.component';
 import { TextNoteComponent } from 'component/text-note/text-note.component';
@@ -76,6 +77,7 @@ import { LoggingInputDirective } from './directive/logging-input.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
+import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
 
 // Ensure SyncObject registration for table FX
@@ -114,6 +116,7 @@ import '@udonarium/table-fx/combat-tracker';
     OverviewPanelComponent,
     PasswordCheckComponent,
     PeerMenuComponent,
+    RoomJoinComponent,
     RoomSettingComponent,
     UIPanelComponent,
     SafePipe,
@@ -143,7 +146,8 @@ import '@udonarium/table-fx/combat-tracker';
     ConfirmationComponent,
     RangeComponent,
     SceneToolsComponent,
-    CombatTrackerComponent
+    CombatTrackerComponent,
+    CombatAnnounceComponent
   ],
   imports: [
     BrowserModule,

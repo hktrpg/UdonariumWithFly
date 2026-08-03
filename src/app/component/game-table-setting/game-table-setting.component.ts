@@ -7,7 +7,6 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -86,12 +85,6 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableWeatherIntensity(v: number) { if (this.isEditable) this.selectedTable.weatherIntensity = Number(v); }
   get tableVisionEnabled(): boolean { return !!this.selectedTable?.visionEnabled; }
   set tableVisionEnabled(v: boolean) { if (this.isEditable) this.selectedTable.visionEnabled = !!v; }
-
-  get auraNames(): string[] { return AuraNameConfig.instance.names; }
-  setAuraName(index: number, name: string) {
-    if (!this.isEditable) return;
-    AuraNameConfig.instance.setName(index, name);
-  }
 
   transitionDay() {
     if (!this.isEditable) return;
@@ -181,6 +174,10 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     gameTable.imageIdentifier = 'testTableBackgroundImage_image';
     gameTable.initialize();
     this.selectGameTable(gameTable.identifier);
+  }
+
+  confirm() {
+    this.panelService.close();
   }
 
   async save() {

@@ -128,6 +128,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
   get floorRingColor(): string { return this.gameCharacter.floorRingColor || ''; }
   get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
+  /** Cap name-tag / status icon strip to roughly the token footprint. */
+  get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
   get statusDefs() { return CHARACTER_STATUS_DEFS; }
   statusTooltip(id: string): string { return getStatusDef(id as any)?.tooltip || ''; }
@@ -149,6 +151,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get isHideIn(): boolean { return !!this.gameCharacter.owner; }
   get isVisible(): boolean { return this.gameCharacter.isVisible; }
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
+  /** Other players cannot drag a token claimed as someone's PC. */
+  get isMoveLocked(): boolean { return this.gameCharacter.isLockedByPlayerOwner; }
 
   get faceIcon(): ImageFile { return this.gameCharacter.faceIcon; }
   
@@ -661,6 +665,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               });
             }
             this.gameCharacter.owner = Network.peer.userId;
+            // Stealth claim also registers as vision source unless already set.
+            if (!this.gameCharacter.visionOwner) {
+              this.gameCharacter.visionOwner = Network.peer.userId;
+            }
             SoundEffect.play(PresetSound.sweep);
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
           }
@@ -724,8 +732,24 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           },
           checkBox: 'check'
         }),
+      this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
       this.characterFxMenu.makeAuraMenu(this.gameCharacter),
       this.characterFxMenu.makeRingMenu(this.gameCharacter),
+      this.characterFxMenu.makeVisionMenu(this.gameCharacter),
+      (this.gameCharacter.affectsLight !== false
+        ? {
+          name: '☑ 與燈光互動', action: () => {
+            this.gameCharacter.affectsLight = false;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          checkBox: 'check' as const,
+        } : {
+          name: '☐ 與燈光互動', action: () => {
+            this.gameCharacter.affectsLight = true;
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          checkBox: 'check' as const,
+        }),
       this.characterFxMenu.makeStatusMenu(this.gameCharacter),
       this.characterFxMenu.makeCombatMenu(this.gameCharacter),
       this.characterFxMenu.makeImageEffectMenu(this.gameCharacter, {

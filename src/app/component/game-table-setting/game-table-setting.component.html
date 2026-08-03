@@ -1,94 +1,205 @@
-<div class="flex-container" *ngIf="!GuestMode()">
-  <div class="flex-item no-grow">
-    <div>
-      <button style="margin: 0px 0px 2px 0px; font-size: smaller" (click)="createGameTable()">建立新地圖</button>
-    </div>
-    <select #select style="width: 100%; max-width: 155px" size="19" (change)="selectGameTable(select.value)" [ngModel]="selectedTable?.identifier">
-      <option *ngFor="let gameTable of getGameTables()" value="{{gameTable.identifier}}" title="{{gameTable.name}}" [style.color]="gameTable.name == '' ? 'gray' : ''">{{gameTable.name == '' ? '(無名地圖)' : gameTable.name}}</option>
+<div class="table-setting" *ngIf="!GuestMode()">
+  <aside class="table-setting-aside">
+    <button type="button" class="btn btn-primary btn-block" (click)="createGameTable()">
+      <i class="material-icons">add</i>建立新地圖
+    </button>
+    <select
+      #select
+      class="table-list"
+      size="16"
+      (change)="selectGameTable(select.value)"
+      [ngModel]="selectedTable?.identifier"
+    >
+      <option
+        *ngFor="let gameTable of getGameTables()"
+        [value]="gameTable.identifier"
+        [title]="gameTable.name"
+        [class.is-unnamed]="gameTable.name == ''"
+      >
+        {{ gameTable.name == '' ? '(無名地圖)' : gameTable.name }}
+      </option>
     </select>
-  </div>
-  <div class="flex-item">
-    <div style="float: right; margin-top: 3px; margin-right: 3px">
-      <label sytle="white-space: nowrap">
-        <input name="show-hide-images" type="checkbox" value="Show Hides" checked="{{isShowHideImages ? 'checked' : ''}}" (click)="onShowHiddenImages($event)">
-        <i class="material-icons" style="font-size: smaller" [ngClass]="{'red-eye': isShowHideImages}">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
-      </label>
-    </div>
-    <ng-container *ngIf="!isEmpty || selectedTable">
-      <div class="images-select">
-        <div>
-          <b>圖片</b>
-          <span (click)="openBgImageModal()" style="display: block; position: relative; overflow: hidden" [style.cursor]="(!isEditable || tableGridType == -1) ? 'default' : 'pointer'">
-            <span *ngIf="getHidden(tableBackgroundImage)" style="display: block; position: absolute; text-align: right; top: 0px; right: 0px; pointer-events: none; z-index: 5">
-              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'" style="margin-right: 2px; font-size: 16px; display: block">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
+  </aside>
+
+  <main class="table-setting-main" *ngIf="!isEmpty || selectedTable">
+    <section class="card">
+      <header class="card-head">
+        <h3>圖片</h3>
+        <label class="icon-toggle" title="顯示隱藏圖片">
+          <input
+            name="show-hide-images"
+            type="checkbox"
+            [checked]="isShowHideImages"
+            (click)="onShowHiddenImages($event)"
+          >
+          <i class="material-icons" [ngClass]="{'red-eye': isShowHideImages}">
+            {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+          </i>
+        </label>
+      </header>
+      <div class="image-grid">
+        <div class="image-slot">
+          <span class="image-label">地圖圖片</span>
+          <button
+            type="button"
+            class="image-frame"
+            (click)="openBgImageModal()"
+            [disabled]="!isEditable || tableGridType == -1"
+          >
+            <span *ngIf="getHidden(tableBackgroundImage)" class="image-badge">
+              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
+                {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+              </i>
             </span>
-            <img height="120" [ngClass]="{ blackout: !isShowHideImages && getHidden(tableBackgroundImage) }" [src]="tableBackgroundImage.url | safe: 'resourceUrl'" draggable="false">
-          </span>
+            <img
+              [ngClass]="{ blackout: !isShowHideImages && getHidden(tableBackgroundImage) }"
+              [src]="tableBackgroundImage.url | safe: 'resourceUrl'"
+              draggable="false"
+              alt=""
+            >
+          </button>
         </div>
-      </div>
-      <div class="images-select">
-        <div>
-          <b>背景１（前面）</b>
-          <div *ngIf="!tableDistanceviewImage.url">
-            <button (click)="openDistanceViewImageModal()" style="height: 120px; margin: 0px 1px 2px 0px" [disabled]="!isEditable">新增背景圖片１</button>
-          </div>
-          <span *ngIf="tableDistanceviewImage.url" style="display: block; position: relative; overflow: hidden" [style.cursor]="(!isEditable || tableGridType == -1) ? 'default' : 'pointer'" (click)="openDistanceViewImageModal()">
-            <span *ngIf="getHidden(tableDistanceviewImage)" style="display: block; position: absolute; text-align: right; top: 0px; right: 0px; pointer-events: none; z-index: 5">
-              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'" style="margin-right: 2px; font-size: 16px; display: block">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
+
+        <div class="image-slot">
+          <span class="image-label">背景１（前面）</span>
+          <button
+            *ngIf="!tableDistanceviewImage.url"
+            type="button"
+            class="image-frame image-frame-empty"
+            (click)="openDistanceViewImageModal()"
+            [disabled]="!isEditable"
+          >
+            <i class="material-icons">add_photo_alternate</i>
+            <span>新增</span>
+          </button>
+          <button
+            *ngIf="tableDistanceviewImage.url"
+            type="button"
+            class="image-frame"
+            (click)="openDistanceViewImageModal()"
+            [disabled]="!isEditable || tableGridType == -1"
+          >
+            <span *ngIf="getHidden(tableDistanceviewImage)" class="image-badge">
+              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
+                {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+              </i>
             </span>
-            <img height="120" [ngClass]="{ blackout: !isShowHideImages && getHidden(tableDistanceviewImage) }" [src]="tableDistanceviewImage.url | safe: 'resourceUrl'" draggable="false">
-          </span>
+            <img
+              [ngClass]="{ blackout: !isShowHideImages && getHidden(tableDistanceviewImage) }"
+              [src]="tableDistanceviewImage.url | safe: 'resourceUrl'"
+              draggable="false"
+              alt=""
+            >
+          </button>
         </div>
-        <div>
-          <b>背景２（背面）</b>
-          <div *ngIf="!tableDistanceviewImage2.url">
-            <button (click)="openDistanceViewImageModal2()" style="height: 120px; margin: 0px 0px 2px 0px" [disabled]="!isEditable">新增背景圖片２</button>
-          </div>
-          <span *ngIf="tableDistanceviewImage2.url" style="display: block; position: relative; overflow: hidden" [style.cursor]="(!isEditable || tableGridType == -1) ? 'default' : 'pointer'" (click)="openDistanceViewImageModal2()">
-            <span *ngIf="getHidden(tableDistanceviewImage2)" style="display: block; position: absolute; text-align: right; top: 0px; right: 0px; pointer-events: none; z-index: 5">
-              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'" style="margin-right: 2px; font-size: 16px; display: block">{{ isShowHideImages ? 'visibility' : 'visibility_off' }}</i>
+
+        <div class="image-slot">
+          <span class="image-label">背景２（背面）</span>
+          <button
+            *ngIf="!tableDistanceviewImage2.url"
+            type="button"
+            class="image-frame image-frame-empty"
+            (click)="openDistanceViewImageModal2()"
+            [disabled]="!isEditable"
+          >
+            <i class="material-icons">add_photo_alternate</i>
+            <span>新增</span>
+          </button>
+          <button
+            *ngIf="tableDistanceviewImage2.url"
+            type="button"
+            class="image-frame"
+            (click)="openDistanceViewImageModal2()"
+            [disabled]="!isEditable || tableGridType == -1"
+          >
+            <span *ngIf="getHidden(tableDistanceviewImage2)" class="image-badge">
+              <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
+                {{ isShowHideImages ? 'visibility' : 'visibility_off' }}
+              </i>
             </span>
-            <img height="120" [ngClass]="{ blackout: !isShowHideImages && getHidden(tableDistanceviewImage2) }" [src]="tableDistanceviewImage2.url | safe: 'resourceUrl'" draggable="false">
-          </span>
+            <img
+              [ngClass]="{ blackout: !isShowHideImages && getHidden(tableDistanceviewImage2) }"
+              [src]="tableDistanceviewImage2.url | safe: 'resourceUrl'"
+              draggable="false"
+              alt=""
+            >
+          </button>
         </div>
       </div>
-      <div>
-        <div style="display: inline" class="self-setting">Name：<input [(ngModel)]="tableName" placeholder="Name" [disabled]="!isEditable" /></div>
+      <div class="field-row">
+        <label class="field">
+          <span>背景濾鏡</span>
+          <select [(ngModel)]="tableDistanceviewFilter" name="tableDistanceviewFilter" [disabled]="!isEditable">
+            <option value="">無</option>
+            <option value="white">白色</option>
+            <option value="black">黑色</option>
+          </select>
+        </label>
       </div>
-      <div style="display: table; width: 90%">
-        <div style="display: table-row">
-          <div style="display: table-cell; width: 4em">
-            <div style="display: inline" class="self-setting">Width：</div>
-          </div>
-          <div style="display: table-cell">
-            <input [(ngModel)]="tableWidth" type="range" style="width: calc(100% - 4px)" title="{{tableWidth}}" min="{{minSize}}" max="{{maxSize}}" name="tableWidth" [disabled]="!isEditable" />
-          </div>
-          <div style="display: table-cell; width: 5em">
-            <input [(ngModel)]="tableWidth" type="number" min="{{minSize}}" max="{{maxSize}}" style="width: 5em;" [disabled]="!isEditable">
-          </div>
-        </div>
-        <div style="display: table-row">
-          <div style="display: table-cell; width: 4em">
-            <div style="display: inline" class="self-setting">Height：</div>
-          </div>
-          <div style="display: table-cell">
-            <input [(ngModel)]="tableHeight" type="range" style="width: calc(100% - 4px)" title="{{tableHeight}}" min="{{minSize}}" max="{{maxSize}}" name="tableHeight" [disabled]="!isEditable"/>
-          </div>
-          <div style="display: table-cell; width: 5em">
-            <input [(ngModel)]="tableHeight" type="number" min="{{minSize}}" max="{{maxSize}}" style="width: 5em;" [disabled]="!isEditable">
-          </div>
-        </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>基本</h3></header>
+      <div class="field-row">
+        <label class="field grow">
+          <span>名稱</span>
+          <input type="text" [(ngModel)]="tableName" placeholder="地圖名稱" [disabled]="!isEditable" />
+        </label>
       </div>
-      <div>
-        <div style="display: inline" class="self-setting">網格：
+      <div class="slider-row">
+        <span class="slider-label">寬度</span>
+        <input
+          [(ngModel)]="tableWidth"
+          type="range"
+          [min]="minSize"
+          [max]="maxSize"
+          name="tableWidth"
+          [disabled]="!isEditable"
+        >
+        <input
+          [(ngModel)]="tableWidth"
+          type="number"
+          [min]="minSize"
+          [max]="maxSize"
+          class="num"
+          [disabled]="!isEditable"
+        >
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">高度</span>
+        <input
+          [(ngModel)]="tableHeight"
+          type="range"
+          [min]="minSize"
+          [max]="maxSize"
+          name="tableHeight"
+          [disabled]="!isEditable"
+        >
+        <input
+          [(ngModel)]="tableHeight"
+          type="number"
+          [min]="minSize"
+          [max]="maxSize"
+          class="num"
+          [disabled]="!isEditable"
+        >
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>網格</h3></header>
+      <div class="field-row wrap">
+        <label class="field">
+          <span>類型</span>
           <select [(ngModel)]="tableGridType" name="tableGridType" [disabled]="!isEditable">
             <option value="-1">無</option>
             <option value="0">方格</option>
-            <option value="1">六角（直向對齊）</option>
-            <option value="2">六角（橫向對齊）</option>
+            <option value="1">六角（直向）</option>
+            <option value="2">六角（橫向）</option>
           </select>
-        </div>
-        <div style="display: inline; margin-left: 1.2em" class="self-setting">顏色：
+        </label>
+        <label class="field">
+          <span>顏色</span>
           <select [(ngModel)]="tableGridColor" name="tableGridColor" [disabled]="!isEditable || tableGridType == -1">
             <option value="#000000e6">黑</option>
             <option value="#0000dde6">藍</option>
@@ -99,79 +210,93 @@
             <option value="#dddd00e6">黃</option>
             <option value="#dddddde6">白</option>
           </select>
-        </div>
-      </div>
-      <div>
-        <label class="self-setting">
-          <input type="checkbox" [(ngModel)]="tableGridNumberShow" name="tableGridNumberShow" [disabled]="!isEditable || tableGridType == -1" />
-          <span [ngClass]="{disabled: !isEditable || tableGridType == -1}" [style.cursor]="(!isEditable || tableGridType == -1) ? 'default' : 'pointer'">顯示網格座標編號</span>
         </label>
       </div>
-      <div>
-        <div style="display: inline" class="self-setting">背景濾鏡：
-          <select [(ngModel)]="tableDistanceviewFilter" name="tableDistanceviewFilter" [disabled]="!isEditable">
-            <option value="">無</option>
-            <option value="white">白色</option>
-            <option value="black">黑色</option>
-          </select>
-        </div>
-      </div>
-      <hr/>
-      <div><b>氣氛／光影</b></div>
-      <div class="self-setting">黑暗度：
-        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable" style="width: 8em">
-        {{ tableDarkness | number:'1.0-2' }}
-        <button type="button" (click)="transitionDay()" [disabled]="!isEditable">日</button>
-        <button type="button" (click)="transitionNight()" [disabled]="!isEditable">夜</button>
-      </div>
-      <div class="self-setting">全域亮度：
-        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable" style="width: 8em">
-        {{ tableGlobalIllumination | number:'1.0-2' }}
-      </div>
-      <div class="self-setting">天氣：
-        <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable">
-          <option value="none">無</option>
-          <option value="rain">雨</option>
-          <option value="snow">雪</option>
-          <option value="fog">霧</option>
-        </select>
-        強度
-        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableWeatherIntensity" [disabled]="!isEditable || tableWeatherType === 'none'" style="width: 6em">
-      </div>
-      <div class="self-setting">
-        <label><input type="checkbox" [(ngModel)]="tableVisionEnabled" [disabled]="!isEditable"> 啟用視野（擁有角色）</label>
-      </div>
-      <div><b>光環名稱（全局）</b></div>
-      <div *ngFor="let name of auraNames; let i = index" class="self-setting">
-        {{ i + 1 }}.
-        <input [ngModel]="auraNames[i]" (ngModelChange)="setAuraName(i, $event)" [disabled]="!isEditable" style="width: 8em">
-      </div>
-      <hr/>
-      <div>
-        <label class="self-setting">
+      <div class="check-row">
+        <label [class.disabled]="!isEditable || tableGridType == -1">
+          <input type="checkbox" [(ngModel)]="tableGridNumberShow" name="tableGridNumberShow" [disabled]="!isEditable || tableGridType == -1" />
+          顯示座標編號
+        </label>
+        <label>
           <input type="checkbox" [(ngModel)]="tableGridShow" name="tableGridShow" />
           始終顯示網格<sup class="self-only">*</sup>
         </label>
-        <label style="margin-left: 1em" class="self-setting">
+        <label>
           <input type="checkbox" [(ngModel)]="tableGridSnap" name="tableGridSnap" />
           吸附<sup class="self-only">*</sup>
         </label>
-        <ng-container *ngIf="!isDeleted">
-          <button style="margin-left: 2em" [disabled]="isSaveing" (click)="save()">
-            <div style="position: relative;">
-              <div [ngClass]="{'is-hidden': isSaveing}">保存</div>
-              <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
-            </div>
-          </button>
-          <button class="danger" (click)="delete()" [disabled]="getGameTables().length <= 1">刪除</button>
-        </ng-container>
-        <ng-container *ngIf="isDeleted">
-          <button (click)="restore()">復原</button>
-        </ng-container>
       </div>
-    </ng-container>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h3>氣氛／光影</h3></header>
+      <div class="slider-row">
+        <span class="slider-label">黑暗度</span>
+        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable">
+        <span class="val">{{ tableDarkness | number:'1.0-2' }}</span>
+        <span class="btn-group">
+          <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable">日</button>
+          <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable">夜</button>
+        </span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">全域亮度</span>
+        <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable">
+        <span class="val">{{ tableGlobalIllumination | number:'1.0-2' }}</span>
+      </div>
+      <div class="field-row wrap">
+        <label class="field">
+          <span>天氣</span>
+          <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable">
+            <option value="none">無</option>
+            <option value="rain">雨</option>
+            <option value="snow">雪</option>
+            <option value="fog">霧</option>
+          </select>
+        </label>
+        <label class="field grow" [class.disabled]="tableWeatherType === 'none'">
+          <span>強度</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            [(ngModel)]="tableWeatherIntensity"
+            [disabled]="!isEditable || tableWeatherType === 'none'"
+          >
+        </label>
+      </div>
+      <div class="check-row">
+        <label>
+          <input type="checkbox" [(ngModel)]="tableVisionEnabled" [disabled]="!isEditable">
+          啟用視野（擁有角色）
+        </label>
+      </div>
+      <p class="hint">
+        開啟後玩家只看得到自己的視野角色周圍。請在角色右鍵設定視野／亮光／昏暗光，並勾選「作為我的視野角色」。GM 不受限。
+      </p>
+    </section>
+
+    <footer class="actions">
+      <ng-container *ngIf="!isDeleted">
+        <button type="button" class="btn" [disabled]="isSaveing" (click)="save()">
+          <span class="btn-label" [class.is-hidden]="isSaveing">下載地圖</span>
+          <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
+        </button>
+        <button type="button" class="btn btn-danger" (click)="delete()" [disabled]="getGameTables().length <= 1">刪除</button>
+      </ng-container>
+      <ng-container *ngIf="isDeleted">
+        <button type="button" class="btn" (click)="restore()">復原</button>
+      </ng-container>
+      <button type="button" class="btn btn-primary" (click)="confirm()">確認</button>
+      <span class="local-note"><sup class="self-only">*</sup>僅本機設定</span>
+    </footer>
+  </main>
+</div>
+
+<div class="empty-hint" *ngIf="isEmpty">
+  ※尚未建立任何地圖。可從左側「建立新地圖」新增。
+  <div class="actions" style="margin-top:8px">
+    <button type="button" class="btn btn-primary" (click)="confirm()">確認</button>
   </div>
 </div>
-<ng-container *ngIf="isEmpty">
-  <div style="font-size: 12px;">※尚未建立任何地圖。可從「建立新地圖」新增。</div>
-</ng-container>

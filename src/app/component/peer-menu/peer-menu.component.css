@@ -2,6 +2,31 @@
   display: block;
 }
 
+.scene-perm-group {
+  margin: 4px 0 8px;
+}
+.scene-perm-row {
+  margin: 2px 0;
+  font-size: 13px;
+}
+.scene-perm-row label,
+.scene-perm-sub label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.scene-perm-head {
+  margin-bottom: 2px;
+}
+.scene-perm-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 2px 0 0 1.4em;
+  font-size: 12px;
+}
+
 .image {
   padding: 0px;
   width: 64px;
@@ -146,6 +171,17 @@
 -1px  0px 0px #eee,
   0px -1px 0px #eee,
   0px 0px 2px crimson; 
+}
+
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.identity-label {
+  font-size: smaller;
 }
 
 .peer-info {

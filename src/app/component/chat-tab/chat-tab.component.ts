@@ -43,7 +43,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   sampleMessages: ChatMessage[] = [
     this.makeSampleMessage('System', null, '教學Zzzzzz', null, `歡迎使用 HKTRPG 烏冬桌（基於 Udonarium with Fly）。
 地圖是 2.5D；資料在玩家之間互傳，伺服器不幫你長期保管棋子與圖片。
-★ 離開前請「保存 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
+★ 離開前請「下載 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
 完整說明：https://bothelp.hktrpg.com/guide`, 'mine', 0),
 
@@ -64,13 +64,26 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 　　　　拖曳放開時按住 Shift＝暫時不吸附格線　Esc＝取消選取
 　　　　訪客模式無法使用編輯類快捷鍵。`, 'mine', 0),
 
-    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜聊天＞上方可切頻道；工具列（本機）：提示音／靠左／列表／靜音／精簡
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜聊天＞上方可切頻道；工具列（本機，ON＝開／OFF＝關）：
+　　　　音樂／效果音／提示音／靠左／列表（一般氣泡）／精簡工具列
 　　　　精簡＝收起標籤列與工具列，只留輸入區；右下小鈕可還原
 ＜骰子＞輸入區選規則後直接打指令（BCDice）
 　　　　角色卡數值欄旁可「快速擲骰」送到目前聊天頻道
 ＜訪客＞開房可「允許訪客」；訪客功能受限。有密碼仍要密碼
 ＜筆記＞選單可開「筆記倉庫」整理桌面／公用／私人／回收區筆記
 ＜密語＞不會進 ZIP；換了連線 ID 後舊密語也看不到，請留意。`, 'mine', 0),
+
+    this.makeSampleMessage('System', null, '教學Zzzzzz', null, `＜Ping＞地圖空白處長按＝標記；Shift＋長按＝警告標記
+＜地圖設定＞黑暗／全域亮度／天氣（雨・雪・霧）／啟用視野
+＜視野＞開啟後玩家只看得到自己的視野角色周圍（GM 不受限）
+　　　　聊天選發言角色＝暫時帶入視野；關閉該聊天窗即取消
+　　　　長留請右鍵勾「作為我的視野角色」；可設視野／亮光／昏暗光
+　　　　棋子・遮罩・地形預設擋光；右鍵可關「與燈光互動」
+　　　　狀態圖示常駐於名牌；套圈可在右鍵「套圈」選擇
+＜場景工具＞僅 GM（選單）；選取／燈光／牆壁／矩形／橢圓／多邊形／手繪／文字
+　　　　牆・多邊形：點加點，Enter／雙擊完成；Esc 取消；牆亦可右鍵完成
+＜戰鬥輪＞選單開啟；可加入選取／桌面全部、擲先攻、回合與輪次
+　　　　角色右鍵「加入戰鬥」；開始後會有回合宣告提示`, 'mine', 0),
 
     this.makeSampleMessage('System', null, '連結:', null, `根據 https://nanasunana.github.io/ 私家改造版重新中文化，並加入各種功能。
 升級 1.13.2 版本`, 'mine', 1615253220000),
@@ -86,7 +99,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 ・改以最新 Udonarium with Fly 為基底（Angular 20、SkyWay 2023）
 ・介面全面繁體中文化；品牌與說明對齊 HKTRPG
 ・訪客模式、聊天精簡、筆記倉庫、角色卡快速擲骰
-・聊天工具列：新訊息提示音／訊息靠左／列表模式／完全靜音
+・聊天工具列：音樂／效果音／提示音／靠左／列表／精簡
 ・BCDice 4.9.0`, 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
 
     this.makeSampleMessage('System', null, '連結:', null, `2026/08/03 操作更新
@@ -95,6 +108,14 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 ・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）
 ・[ / ] 調整前後層；Ctrl＋滾輪 15°／Ctrl＋Shift＋滾輪 45° 旋轉
 ・角色「切換下一張圖像」改右鍵；陰影隨尺寸／高度變化`, 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
+
+    this.makeSampleMessage('System', null, '連結:', null, `2026/08/03 場景・戰鬥・視野
+・Ping：空白處長按標記；Shift＋長按警告
+・地圖：黑暗／亮度／天氣；可啟用視野（擋光牆、點光源）
+・場景工具（GM）：牆／燈／繪圖；Enter 完成牆與多邊形等
+・聊天選角暫時帶入視野；僅手動「作為我的視野角色」會長留
+・戰鬥輪：先攻、回合宣告；角色狀態圖示與底盤套圈
+・地圖設定可下載地圖；狀態 icon 常駐顯示並自動換行`, 'mine', Date.UTC(2026, 7, 3, 1, 30, 0)),
 
     this.makeSampleMessage('System', null, '連結:', null, `本站：https://z01.hktrpg.com
 教學：https://bothelp.hktrpg.com/guide

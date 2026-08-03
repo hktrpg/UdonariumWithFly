@@ -4,10 +4,14 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
+import { GuestSession } from '@udonarium/guest-session';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
+import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
@@ -17,6 +21,8 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { RoomInfo } from '@udonarium/core/system/network/room-info';
+import { RoomJoinResult, RoomRole } from '@udonarium/room-auth';
 
 import * as localForage from 'localforage';
 
@@ -90,8 +96,71 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
   set isGMMode(isGMMode: boolean) { if (PeerCursor.myCursor) PeerCursor.myCursor.isGMMode = isGMMode; }
 
+  get scenePerm() { return SceneToolPermission.instance; }
+
+  get sceneCanCreateLight(): boolean { return this.scenePerm.playerCanCreateLight; }
+  set sceneCanCreateLight(v: boolean) { this.scenePerm.playerCanCreateLight = !!v; }
+  get sceneCanCreateWall(): boolean { return this.scenePerm.playerCanCreateWall; }
+  set sceneCanCreateWall(v: boolean) { this.scenePerm.playerCanCreateWall = !!v; }
+  get sceneCanCreateRect(): boolean { return this.scenePerm.playerCanCreateRect; }
+  set sceneCanCreateRect(v: boolean) { this.scenePerm.playerCanCreateRect = !!v; }
+  get sceneCanCreateEllipse(): boolean { return this.scenePerm.playerCanCreateEllipse; }
+  set sceneCanCreateEllipse(v: boolean) { this.scenePerm.playerCanCreateEllipse = !!v; }
+  get sceneCanCreatePolygon(): boolean { return this.scenePerm.playerCanCreatePolygon; }
+  set sceneCanCreatePolygon(v: boolean) { this.scenePerm.playerCanCreatePolygon = !!v; }
+  get sceneCanCreateFreehand(): boolean { return this.scenePerm.playerCanCreateFreehand; }
+  set sceneCanCreateFreehand(v: boolean) { this.scenePerm.playerCanCreateFreehand = !!v; }
+  get sceneCanCreateText(): boolean { return this.scenePerm.playerCanCreateText; }
+  set sceneCanCreateText(v: boolean) { this.scenePerm.playerCanCreateText = !!v; }
+
+  get sceneCanModifyLight(): boolean { return this.scenePerm.playerCanModifyLight; }
+  set sceneCanModifyLight(v: boolean) { this.scenePerm.playerCanModifyLight = !!v; }
+  get sceneCanModifyWall(): boolean { return this.scenePerm.playerCanModifyWall; }
+  set sceneCanModifyWall(v: boolean) { this.scenePerm.playerCanModifyWall = !!v; }
+  get sceneCanModifyDrawing(): boolean { return this.scenePerm.playerCanModifyDrawing; }
+  set sceneCanModifyDrawing(v: boolean) { this.scenePerm.playerCanModifyDrawing = !!v; }
+
+  get sceneAllCreate(): boolean {
+    const p = this.scenePerm;
+    return p.playerCanCreateLight && p.playerCanCreateWall
+      && p.playerCanCreateRect && p.playerCanCreateEllipse
+      && p.playerCanCreatePolygon && p.playerCanCreateFreehand
+      && p.playerCanCreateText;
+  }
+  get sceneAllModify(): boolean {
+    const p = this.scenePerm;
+    return p.playerCanModifyLight && p.playerCanModifyWall && p.playerCanModifyDrawing;
+  }
+  setAllSceneCreate(v: boolean) { this.scenePerm.setAllCreate(v); }
+  setAllSceneModify(v: boolean) { this.scenePerm.setAllModify(v); }
+
   get isGMHold(): boolean { return PeerCursor.isGMHold; }
   get isDisableConnect(): boolean { return this.isGMHold || this.isGMMode; }
+
+  get displayRoomName(): string {
+    return RoomAuth.displayRoomName(this.networkService.peer.roomName || '');
+  }
+  get displayRoomLabel(): string {
+    return this.displayRoomName + '/' + this.networkService.peer.roomId;
+  }
+  get isRoleAuthRoom(): boolean {
+    return RoomAuth.isRoleAuthRoom(this.networkService.peer.roomName || '');
+  }
+  get isGuest(): boolean { return GuestSession.isGuest; }
+
+  get currentRole(): RoomRole {
+    if (this.isGuest) return 'guest';
+    if (this.isGMMode || this.isGMHold) return 'gm';
+    return 'user';
+  }
+
+  get currentRoleLabel(): string {
+    switch (this.currentRole) {
+      case 'gm': return 'GM';
+      case 'guest': return '訪客';
+      default: return '玩家';
+    }
+  }
 
   get maskedPassword(): string { return '●●●●●●●●' }
   get config(): AppConfig { return AppConfigService.appConfig; }
@@ -223,7 +292,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   copyRoomName() {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(this.networkService.peer.roomName + '/' + this.networkService.peer.roomId);
+      navigator.clipboard.writeText(this.displayRoomLabel);
       this.isRoomNameCopied = true;
       clearTimeout(this._timeOutId2);
       this._timeOutId2 = setTimeout(() => {
@@ -298,59 +367,55 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     }
   }
 
-  onGMMode($event: Event) {
-    if (PeerCursor.isGMHold || this.isGMMode) {
-      if (this.isGMMode) {
-        $event.preventDefault();
-        this.modalService.open(ConfirmationComponent, {
-          title: '解除 GM 模式', 
-          text: '要解除 GM 模式嗎？',
-          type: ConfirmationType.OK_CANCEL,
-          materialIcon: 'person_remove',
-          action: () => {
-            PeerCursor.isGMHold = false;
-            this.isGMMode = false;
-            (<HTMLInputElement>$event.target).checked = false;
-            this.chatMessageService.sendOperationLog('解除 GM 模式');
-            EventSystem.trigger('CHANGE_GM_MODE', null);
-            //this.changeDetector.markForCheck();
-            if (GameCharacter.isStealthMode) {
-              this.modalService.open(ConfirmationComponent, {
-                title: '隱身模式', 
-                text: '已開啟隱身：其他人看不到你的游標位置。',
-                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
-                type: ConfirmationType.OK,
-                materialIcon: 'disabled_visible'
-              });
-            }
-          }
-        });
-      } else {
+  async switchIdentity() {
+    const peer = this.networkService.peer;
+    const room = peer.isRoom
+      ? new RoomInfo(peer.roomId, peer.roomName, [peer as any])
+      : new RoomInfo('local', RoomAuth.encode('本機', 'local', { gm: '', user: '', guest: '' }), []);
+
+    const result = await this.modalService.open<RoomJoinResult>(RoomJoinComponent, {
+      room,
+      switchMode: true,
+      currentRole: this.currentRole,
+      width: 420,
+      height: 380,
+    });
+    if (!result) return;
+
+    const label = result.role === 'gm' ? 'GM' : (result.role === 'guest' ? '訪客' : '玩家');
+    this.modalService.open(ConfirmationComponent, {
+      title: '轉換身份',
+      text: `確定將身份轉換為「${label}」嗎？`,
+      helpHtml: result.role === 'gm'
+        ? 'GM 可查看密語、卡片背面、未公開骰子與角色／游標位置；且無法由自己發起房間／私人連線。'
+        : (result.role === 'guest' ? '訪客模式功能受限（例如無法存檔）。' : '以一般玩家身份參加。'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'swap_horiz',
+      action: () => {
+        const prev = this.currentRole;
+        RoomAuth.applyIdentity(result.role);
+        // Clear legacy hold state.
         PeerCursor.isGMHold = false;
-        this.isGMMode = false;
-      }
-    } else {
-      $event.preventDefault();
-      this.modalService.open(ConfirmationComponent, {
-        title: '進入 GM 模式', 
-        text: '要進入 GM 模式嗎？\nGM 模式中（含保留中）無法由你發起私人連線或房間連線。',
-        helpHtml: 'GM 模式下可查看全部<b>密語</b>、背面的<b>卡片</b>、未公開的<b>骰子符號</b>、<b>角色</b>位置與<b>游標</b>位置，且你的游標位置不會傳送給其他參加者。\n\n<b><big>—With great power comes great responsibility.</big></b>',
-        type: ConfirmationType.OK_CANCEL,
-        materialIcon: 'person_add',
-        action: () => {
-          PeerCursor.isGMHold = true;
-          this.isGMMode = false;
-          (<HTMLInputElement>$event.target).checked = true;
-          //this.changeDetector.markForCheck();
+        this.chatMessageService.sendOperationLog(`身份轉換：${this.roleLabel(prev)} → ${label}`);
+        EventSystem.trigger('CHANGE_GM_MODE', null);
+        if (prev === 'gm' && result.role !== 'gm' && GameCharacter.isStealthMode) {
           this.modalService.open(ConfirmationComponent, {
-            title: '進入 GM 模式', 
-            text: '目前尚未進入 GM 模式。',
-            helpHtml: '要進入 GM 模式，請在聊天傳送含 <b>GMになる</b> 或 <b>GMになります</b> 的訊息（此為系統觸發關鍵字，請原樣輸入）。',
+            title: '隱身模式',
+            text: '已開啟隱身：其他人看不到你的游標位置。',
+            help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
             type: ConfirmationType.OK,
-            materialIcon: 'person_add'
+            materialIcon: 'disabled_visible'
           });
         }
-      });
+      }
+    });
+  }
+
+  private roleLabel(role: RoomRole): string {
+    switch (role) {
+      case 'gm': return 'GM';
+      case 'guest': return '訪客';
+      default: return '玩家';
     }
   }
 

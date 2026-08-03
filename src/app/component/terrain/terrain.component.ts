@@ -448,6 +448,18 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         }),
       ContextMenuSeparator,
       */
+      (this.terrain.affectsLight !== false
+        ? {
+          name: '☑ 與燈光互動', action: () => {
+            this.terrain.affectsLight = false;
+          },
+          checkBox: 'check'
+        } : {
+          name: '☐ 與燈光互動', action: () => {
+            this.terrain.affectsLight = true;
+          },
+          checkBox: 'check'
+        }),
       (this.isDropShadow
         ? {
           name: '☑ 加上陰影', action: () => {

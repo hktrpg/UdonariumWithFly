@@ -17,6 +17,8 @@ export class GameTableMask extends TabletopObject {
   @SyncVar() isPreview = false;
 
   @SyncVar() borderType = 1; // 0:不顯示 1:僅未鎖定時顯示 2:一律顯示
+  /** When true (default), footprint blocks light and vision. */
+  @SyncVar() affectsLight: boolean = true;
 
   get name(): string { return this.getCommonValue('name', ''); }
   get width(): number { return this.getCommonValue('width', 1); }

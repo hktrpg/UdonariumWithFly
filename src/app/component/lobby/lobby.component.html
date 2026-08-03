@@ -15,14 +15,19 @@
         <tr>
           <td class="room-id">{{room.id}}</td>
           <td class="room-name"><div class="room-name-text">{{displayRoomName(room)}}</div></td>
-          <td *ngIf="room.hasPassword">
+          <td *ngIf="roomHasLock(room)">
             <i class="material-icons" style="vertical-align: middle; font-size:0.9rem;">lock</i>
           </td>
-          <td *ngIf="!room.hasPassword">-</td>
+          <td *ngIf="!roomHasLock(room)">-</td>
           <td>{{room.peers.length}}人</td>
           <td>
-            <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">連線</button>
-            <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" type="submit" (click)="connect(room, true)">訪客</button>
+            <ng-container *ngIf="isRoleAuthRoom(room)">
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room)">選擇身份進入</button>
+            </ng-container>
+            <ng-container *ngIf="!isRoleAuthRoom(room)">
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" type="submit" (click)="connect(room, false)">連線</button>
+              <button [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" type="submit" (click)="connect(room, true)">訪客</button>
+            </ng-container>
           </td>
         </tr>
       </ng-container>

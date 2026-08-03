@@ -1,10 +1,12 @@
 /**
  * HKTRPG guest session (local flags; not encoded into peerId).
- * allowGuest is advertised via a room-name marker so lobby can discover it
- * without changing skyway2023 PeerContext encoding.
+ * allowGuest (legacy) is advertised via a room-name marker.
+ * New rooms use RoomAuth (GM/User/Guest passwords) instead.
  */
 export class GuestSession {
   static readonly ALLOW_GUEST_MARKER = '\u2060G';
+  /** Same marker as RoomAuth.AUTH_MARKER — strip for display. */
+  static readonly AUTH_MARKER = '\u2060A';
 
   /** True when this browser joined / acts as guest. */
   static isGuest: boolean = false;
@@ -25,6 +27,9 @@ export class GuestSession {
 
   static displayRoomName(roomName: string): string {
     if (!roomName) return roomName;
-    return roomName.split(GuestSession.ALLOW_GUEST_MARKER).join('');
+    let name = roomName;
+    const authIdx = name.indexOf(GuestSession.AUTH_MARKER);
+    if (authIdx >= 0) name = name.slice(0, authIdx);
+    return name.split(GuestSession.ALLOW_GUEST_MARKER).join('');
   }
 }

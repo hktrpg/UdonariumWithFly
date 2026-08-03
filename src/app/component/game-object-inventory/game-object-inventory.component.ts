@@ -134,6 +134,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       .on('UPDATE_INVENTORY', event => {
         if (event.isSendFromSelf || event.data) this.changeDetector.markForCheck();
       })
+      .on('UPDATE_GAME_OBJECT', event => {
+        if (ObjectStore.instance.get(event.data.identifier) instanceof GameCharacter) {
+          this.changeDetector.markForCheck();
+        }
+      })
       .on('OPEN_NETWORK', event => {
         this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
         if (!this.inventoryTypes.includes(this.selectTab)) {
@@ -413,6 +418,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       })
     );
     if (gameObject instanceof GameCharacter) {
+      actions.push(this.characterFxMenu.makeMyTokenMenu(gameObject));
       actions.push(this.characterFxMenu.makeAuraMenu(gameObject));
       actions.push(this.characterFxMenu.makeRingMenu(gameObject));
       actions.push(this.characterFxMenu.makeStatusMenu(gameObject));
@@ -700,6 +706,23 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (e instanceof MouseEvent && e.ctrlKey) return;
     if (gameObject.location.name !== 'table' || (!gameObject.isVisible && !this.isGMMode)) return;
     EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x + gameObject.size * 50 / 2, y: gameObject.location.y + gameObject.size * 50 / 2, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
+  }
+
+  /** Personal / common warehouse characters can be dragged onto the table. */
+  canDragToTable(gameObject: GameCharacter): boolean {
+    if (this.GuestMode() || !(gameObject instanceof GameCharacter)) return false;
+    const loc = gameObject.location?.name;
+    return loc === 'common' || loc === Network.peerId;
+  }
+
+  onInventoryDragStart(e: DragEvent, gameObject: GameCharacter) {
+    if (!this.canDragToTable(gameObject) || !e.dataTransfer) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData(GameCharacter.INVENTORY_DRAG_MIME, gameObject.identifier);
+    e.dataTransfer.setData('text/plain', `udonarium-character:${gameObject.identifier}`);
+    e.dataTransfer.effectAllowed = 'move';
   }
 
   private deleteGameObject(gameObject: GameObject) {

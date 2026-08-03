@@ -4,6 +4,7 @@ import { ChatTab } from '@udonarium/chat-tab';
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatLogOutputComponent } from 'component/chat-log-output/chat-log-output.component';
 import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-setting.component';
@@ -27,14 +28,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-is-notice-on-local-storage';
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
 
-  static isNoticeOn = false;
+  /** Default ON: play notice when someone chats. */
+  static isNoticeOn = true;
   static setChatNotice(isNoticeOn: boolean) {
-    if (isNoticeOn) {
-      localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, isNoticeOn).catch(e => console.log(e));
-    } else {
-      localForage.removeItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).catch(e => console.log(e));
-    }
-    ChatWindowComponent.isNoticeOn = isNoticeOn;
+    localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, !!isNoticeOn).catch(e => console.log(e));
+    ChatWindowComponent.isNoticeOn = !!isNoticeOn;
   }
   get isNoticeOn(): boolean {
     return ChatWindowComponent.isNoticeOn;
@@ -48,7 +46,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     if (isLeftOnly) {
       localForage.setItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY, isLeftOnly).catch(e => console.log(e));
     } else {
-      localForage.removeItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).catch(e => console.log(e));;
+      localForage.removeItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     }
     ChatWindowComponent.isLeftOnly = isLeftOnly;
   }
@@ -59,51 +57,63 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.setChatLeftOnly(isLeftOnly);
   }
 
+  /** Default ON = normal chat bubbles. OFF = compact list. */
   private _isCompact = false;
   get isCompact(): boolean {
     return this._isCompact;
   }
   set isCompact(isCompact: boolean) {
     this._isCompact = isCompact;
-    this.chatTabComponemt.onScroll();
+    this.chatTabComponemt?.onScroll();
+  }
+  get isCompactOff(): boolean {
+    return !this._isCompact;
+  }
+  toggleCompact() {
+    this.isCompact = !this._isCompact;
   }
 
-  /** HKTRPG ClarifyMode: hide chat tab bar for a simpler chat UI. */
+  /** Default ON = full toolbar. OFF = clarify (精簡). */
   public static ClarifyMode: boolean = false;
   ClarifyModeActive(): boolean {
     return ChatWindowComponent.ClarifyMode;
+  }
+  get isClarifyOff(): boolean {
+    return !ChatWindowComponent.ClarifyMode;
   }
   toggleClarifyMode() {
     ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
   }
 
-  /** Mute BGM, sound effects, notice, and audition together. */
-  get isFullMute(): boolean {
-    return AudioPlayer.isMute
-      && AudioPlayer.isSoundEffectMute
-      && AudioPlayer.isNoticeMute
-      && AudioPlayer.isAuditionMute;
+  /** Default ON = BGM audible. OFF = mute BGM. */
+  get isMusicOn(): boolean {
+    return !AudioPlayer.isMute;
   }
 
-  toggleFullMute() {
-    const next = !this.isFullMute;
-    AudioPlayer.isMute = next;
-    AudioPlayer.isSoundEffectMute = next;
-    AudioPlayer.isNoticeMute = next;
-    AudioPlayer.isAuditionMute = next;
+  toggleMusic() {
+    this.setMute(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY, 'isMute', !AudioPlayer.isMute);
+  }
 
-    const persistMute = (key: string, muted: boolean) => {
-      if (muted) {
-        localForage.setItem(key, true).catch(e => console.log(e));
-      } else {
-        localForage.removeItem(key).catch(e => console.log(e));
-      }
-    };
-    persistMute(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY, next);
-    persistMute(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY, next);
-    persistMute(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY, next);
-    persistMute(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY, next);
+  /** Default ON = SE audible. OFF = mute sound effects. */
+  get isSoundEffectOn(): boolean {
+    return !AudioPlayer.isSoundEffectMute;
+  }
 
+  toggleSoundEffect() {
+    this.setMute(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY, 'isSoundEffectMute', !AudioPlayer.isSoundEffectMute);
+  }
+
+  private setMute(
+    storageKey: string,
+    prop: 'isMute' | 'isSoundEffectMute',
+    muted: boolean,
+  ) {
+    AudioPlayer[prop] = muted;
+    if (muted) {
+      localForage.setItem(storageKey, true).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(storageKey).catch(e => console.log(e));
+    }
     EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
   }
 
@@ -138,7 +148,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
   ngOnInit() {
-    this.sendFrom = PeerCursor.myCursor.identifier;
+    const preferred = GameCharacter.preferredChatCharacter();
+    this.sendFrom = preferred?.identifier || PeerCursor.myCursor.identifier;
     this._chatTabidentifier = 0 < this.chatMessageService.chatTabs.length ? this.chatMessageService.chatTabs[0].identifier : '';
 
     EventSystem.register(this)

@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, NgZone, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -7,6 +7,7 @@ import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { ResettableTimeout } from '@udonarium/core/system/util/resettable-timeout';
 import { DiceBot } from '@udonarium/dice-bot';
 import { GameCharacter } from '@udonarium/game-character';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TextViewComponent } from 'component/text-view/text-view.component';
 import { BatchService } from 'service/batch.service';
@@ -40,8 +41,11 @@ interface StandGroup {
     styleUrls: ['./chat-input.component.css'],
     standalone: false
 })
-export class ChatInputComponent implements OnInit, OnDestroy {
+export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   @ViewChild('textArea', { static: true }) textAreaElementRef: ElementRef<HTMLTextAreaElement>;
+
+  /** Character whose vision was auto-linked from the chat send-from selector. */
+  private visionLinkedCharacterId = '';
 
   @Input() onlyCharacters: boolean = false;
   @Input() chatTabidentifier: string = '';
@@ -62,7 +66,11 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   @Input('sendFrom') _sendFrom: string = this.myPeer ? this.myPeer.identifier : '';
   @Output() sendFromChange = new EventEmitter<string>();
   get sendFrom(): string { return this._sendFrom };
-  set sendFrom(sendFrom: string) { this._sendFrom = sendFrom; this.sendFromChange.emit(sendFrom); }
+  set sendFrom(sendFrom: string) {
+    this._sendFrom = sendFrom;
+    this.sendFromChange.emit(sendFrom);
+    this.syncChatCharacterVision(sendFrom);
+  }
 
   @Input('sendTo') _sendTo: string = '';
   @Output() sendToChange = new EventEmitter<string>();
@@ -117,6 +125,40 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       return object;
     }
     return null;
+  }
+
+  get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+
+  get isMyClaimedCharacter(): boolean {
+    const ch = this.character;
+    const userId = Network.peer?.userId;
+    return !!ch && !!userId && ch.playerOwner === userId;
+  }
+
+  get isCharacterClaimedByOther(): boolean {
+    const ch = this.character;
+    const userId = Network.peer?.userId;
+    return !!ch && !!ch.playerOwner && ch.playerOwner !== userId;
+  }
+
+  get myCharacterButtonLabel(): string {
+    if (this.isMyClaimedCharacter) return '✓ 我的角色';
+    if (this.isCharacterClaimedByOther) return `已被 ${this.character.playerOwnerName}`;
+    return '作為我的角色';
+  }
+
+  get myCharacterButtonTitle(): string {
+    if (this.isMyClaimedCharacter) return '取消作為我的角色（聊天預設／視野／他人不可拖動）';
+    if (this.isCharacterClaimedByOther) return `此角色已被 ${this.character.playerOwnerName} 選定（唯一）`;
+    return '設為我的角色：開聊天優先選取、視野、他人不可拖動（每人限一個）';
+  }
+
+  toggleMyCharacter() {
+    const ch = this.character;
+    if (!ch || GuestSession.isGuest) return;
+    if (this.isCharacterClaimedByOther && !this.isGMMode) return;
+    GameCharacter.setAsMyToken(ch, !this.isMyClaimedCharacter);
+    EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 
   get hasStand(): boolean {
@@ -301,11 +343,49 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //this.batchService.add(() => this.ngZone.run(() => { }), this);
         this.batchService.requireChangeDetection();
       });
+    this.syncChatCharacterVision(this.sendFrom);
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['_sendFrom'] && !changes['_sendFrom'].firstChange) {
+      this.syncChatCharacterVision(this._sendFrom);
+    }
   }
 
   ngOnDestroy() {
+    this.clearChatCharacterVision();
     EventSystem.unregister(this);
     this.batchService.remove(this);
+  }
+
+  /**
+   * Chat "self" character auto-links as a local vision source (not synced visionOwner).
+   * Closing this window or switching send-from releases only this window's auto link;
+   * manually checked「作為我的視野角色」is untouched.
+   */
+  private syncChatCharacterVision(sendFromId: string) {
+    const userId = Network.peer?.userId;
+    if (!userId) return;
+
+    if (this.visionLinkedCharacterId && this.visionLinkedCharacterId !== sendFromId) {
+      GameCharacter.releaseAutoVision(this.visionLinkedCharacterId, userId);
+      this.visionLinkedCharacterId = '';
+    }
+
+    if (this.visionLinkedCharacterId === sendFromId) return;
+
+    const obj = ObjectStore.instance.get(sendFromId);
+    if (obj instanceof GameCharacter) {
+      GameCharacter.claimAutoVision(obj.identifier, userId);
+      this.visionLinkedCharacterId = obj.identifier;
+    }
+  }
+
+  private clearChatCharacterVision() {
+    const userId = Network.peer?.userId;
+    if (!userId || !this.visionLinkedCharacterId) return;
+    GameCharacter.releaseAutoVision(this.visionLinkedCharacterId, userId);
+    this.visionLinkedCharacterId = '';
   }
 
   private updateWritingPeerNameAndColors() {
@@ -390,6 +470,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   onChangeSendFromList() {
     this.standName = '';
     this.shouldUpdateCharacterList = true;
+    this.syncChatCharacterVision(this.sendFrom);
   }
 
   sendChat(event: Partial<KeyboardEvent>) {

@@ -1,4 +1,5 @@
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { GameCharacter } from '@udonarium/game-character';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
@@ -326,7 +327,9 @@ export class MovableSelectionSynchronizer {
   }
 
   private static isLocked(object: TabletopObject): boolean {
-    return !!(object as any).isLocked || !!(object as any).isLock;
+    if (!!(object as any).isLocked || !!(object as any).isLock) return true;
+    if (object instanceof GameCharacter && object.isLockedByPlayerOwner) return true;
+    return false;
   }
 }
 

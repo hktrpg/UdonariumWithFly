@@ -11,6 +11,7 @@ import { GameTableMask } from './game-table-mask';
 import { RangeArea } from './range';
 import { AuraNameConfig } from './table-fx/aura-name-config';
 import { CombatTracker } from './table-fx/combat-tracker';
+import { SceneToolPermission } from './table-fx/scene-tool-permission';
 import { Terrain } from './terrain';
 import { TextNote } from './text-note';
 
@@ -34,6 +35,7 @@ export class Room extends GameObject implements InnerXml {
     objects = objects.concat(ObjectStore.instance.getObjects(DiceSymbol));
     objects.push(AuraNameConfig.instance);
     objects.push(CombatTracker.instance);
+    objects.push(SceneToolPermission.instance);
     for (let object of objects) {
       xml += object.toXml();
     }

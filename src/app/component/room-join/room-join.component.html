@@ -1,0 +1,21 @@
+<div class="room-join">
+  <div class="roles">
+    <label *ngFor="let r of roles" class="role" [class.disabled]="!isRoleAvailable(r.id)" [class.active]="role === r.id">
+      <input type="radio" name="roomRole" [value]="r.id" [(ngModel)]="role" [disabled]="!isRoleAvailable(r.id)" (ngModelChange)="onRoleChange()">
+      <span class="label">{{ r.label }}</span>
+      <span class="hint">{{ r.hint }}</span>
+      <span class="lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)">🔒</span>
+      <span class="open" *ngIf="isRoleAvailable(r.id) && !needsPasswordFor(r.id)">無密碼</span>
+    </label>
+  </div>
+  <div class="pw" *ngIf="needsPassword()">
+    <label>{{ role === 'gm' ? 'GM' : (role === 'guest' ? '訪客' : '玩家') }}密碼
+      <input type="password" [(ngModel)]="password" (keydown.enter)="submit()" placeholder="輸入密碼" autocomplete="current-password" />
+    </label>
+  </div>
+  <div class="actions">
+    <button type="button" (click)="submit()"><b>{{ submitLabel }}</b></button>
+    <button type="button" class="cancel" (click)="cancel()">取消</button>
+  </div>
+  <div class="help">{{ help }}</div>
+</div>

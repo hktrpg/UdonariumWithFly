@@ -21,8 +21,59 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() isDropShadow: boolean = true;
   @SyncVar() isShowChatBubble: boolean = true;
   @SyncVar() owner: string = '';
+  /**
+   * Peer userId that claims this as their PC token (not stealth).
+   * Used for chat default, FoW vision, combat "my turn", etc.
+   */
+  @SyncVar() playerOwner: string = '';
   @SyncVar() isAllowsChat: boolean = true;
+  /** How far this character can see, in grid squares (FoW). */
   @SyncVar() visionRange: number = 6;
+  /** Emitted bright-light radius in grid squares (0 = none). */
+  @SyncVar() brightLight: number = 0;
+  /** Emitted dim-light radius in grid squares (outer ring; 0 = none). */
+  @SyncVar() dimLight: number = 0;
+  /**
+   * Peer userId that manually claims FoW vision from this character.
+   * Chat-window auto links use {@link claimAutoVision} instead and do not write here.
+   */
+  @SyncVar() visionOwner: string = '';
+  /** When true (default), footprint blocks light and vision. */
+  @SyncVar() affectsLight: boolean = true;
+
+  /** Local preferred chat character (last「作為我的角色」claim). */
+  private static preferredChatCharacterId = '';
+
+  /** HTML5 DnD type for dragging inventory characters onto the table. */
+  static readonly INVENTORY_DRAG_MIME = 'application/x-udonarium-character';
+
+  /** characterId → userId for chat-window auto vision (local session only). */
+  private static autoVisionUser = new Map<string, string>();
+  /** Refcount so multiple chat windows can share the same character. */
+  private static autoVisionRefCount = new Map<string, number>();
+
+  /** Link this character as FoW vision for a chat-window selection (refcounted). */
+  static claimAutoVision(characterId: string, userId: string): void {
+    if (!characterId || !userId) return;
+    GameCharacter.autoVisionUser.set(characterId, userId);
+    GameCharacter.autoVisionRefCount.set(
+      characterId,
+      (GameCharacter.autoVisionRefCount.get(characterId) || 0) + 1
+    );
+  }
+
+  /** Release one chat-window auto vision claim. */
+  static releaseAutoVision(characterId: string, userId: string): void {
+    if (!characterId || !userId) return;
+    if (GameCharacter.autoVisionUser.get(characterId) !== userId) return;
+    const next = (GameCharacter.autoVisionRefCount.get(characterId) || 0) - 1;
+    if (next <= 0) {
+      GameCharacter.autoVisionRefCount.delete(characterId);
+      GameCharacter.autoVisionUser.delete(characterId);
+    } else {
+      GameCharacter.autoVisionRefCount.set(characterId, next);
+    }
+  }
   @SyncVar() statusesJson: string = '[]';
   @SyncVar() floorRing: string = 'none';
   @SyncVar() floorRingColor: string = '';
@@ -65,6 +116,16 @@ export class GameCharacter extends TabletopObject {
     let object = PeerCursor.findByUserId(this.owner);
     return object ? object.color : '#444444';
   }
+
+  get playerOwnerName(): string {
+    const object = PeerCursor.findByUserId(this.playerOwner);
+    return object ? object.name : (this.playerOwner ? '（未知玩家）' : '');
+  }
+
+  get playerOwnerColor(): string {
+    const object = PeerCursor.findByUserId(this.playerOwner);
+    return object ? object.color : '#64748b';
+  }
   
   get standList(): StandList {
     for (let child of this.children) {
@@ -87,6 +148,100 @@ export class GameCharacter extends TabletopObject {
 
   get isHideIn(): boolean { return !!this.owner; }
   get isVisible(): boolean { return !this.owner || Network.peer.userId === this.owner; }
+
+  /** Stealth owner or claimed PC token. */
+  isControlledBy(userId: string): boolean {
+    return !!userId && (this.playerOwner === userId || this.owner === userId);
+  }
+
+  get hasPlayerController(): boolean {
+    return !!this.playerOwner || !!this.owner;
+  }
+
+  /**
+   * Claimed PC tokens cannot be moved/rotated by other non-GM players.
+   * Owner and GM may still manipulate them.
+   */
+  get isLockedByPlayerOwner(): boolean {
+    if (!this.playerOwner) return false;
+    if (PeerCursor.myCursor?.isGMMode) return false;
+    return this.playerOwner !== Network.peer?.userId;
+  }
+
+  /**
+   * Claim / release as the local player's exclusive PC token (chat + vision + control).
+   * Unique: one owner per character; claiming releases this player's previous claim.
+   * Returns false if another player already owns it (GM may take over).
+   */
+  static setAsMyToken(character: GameCharacter, enabled: boolean): boolean {
+    const userId = Network.peer?.userId;
+    if (!character || !userId) return false;
+    if (enabled) {
+      const takenByOther = !!character.playerOwner && character.playerOwner !== userId;
+      if (takenByOther && !PeerCursor.myCursor?.isGMMode) return false;
+
+      // One claimed character per player.
+      for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
+        if (ch === character) continue;
+        if (ch.playerOwner === userId) {
+          ch.playerOwner = '';
+          if (ch.visionOwner === userId) ch.visionOwner = '';
+        }
+      }
+      character.playerOwner = userId;
+      character.visionOwner = userId;
+      GameCharacter.preferredChatCharacterId = character.identifier;
+      return true;
+    }
+
+    if (!character.playerOwner) return true;
+    if (character.playerOwner !== userId && !PeerCursor.myCursor?.isGMMode) return false;
+    const prev = character.playerOwner;
+    character.playerOwner = '';
+    if (character.visionOwner === prev) character.visionOwner = '';
+    if (GameCharacter.preferredChatCharacterId === character.identifier) {
+      GameCharacter.preferredChatCharacterId = '';
+    }
+    return true;
+  }
+
+  /** Preferred character for new chat windows (falls back to any of my tokens). */
+  static preferredChatCharacter(userId: string = Network.peer?.userId): GameCharacter | null {
+    if (!userId) return null;
+    const preferredId = GameCharacter.preferredChatCharacterId;
+    if (preferredId) {
+      const preferred = ObjectStore.instance.get(preferredId);
+      if (preferred instanceof GameCharacter && preferred.playerOwner === userId) {
+        return preferred;
+      }
+    }
+    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
+      if (ch.playerOwner === userId) return ch;
+    }
+    return null;
+  }
+
+  /** Whether this character contributes FoW vision for the given peer userId. */
+  providesVisionTo(userId: string): boolean {
+    if (!userId) return false;
+    if (this.playerOwner === userId) return true;
+    if (this.visionOwner === userId) return true;
+    return GameCharacter.autoVisionUser.get(this.identifier) === userId;
+  }
+
+  /** Emitted bright radius in grid squares (clamped ≥ 0). */
+  get brightLightGrid(): number {
+    return Math.max(0, Number(this.brightLight) || 0);
+  }
+
+  /** Emitted dim radius in grid squares (at least bright). */
+  get dimLightGrid(): number {
+    return Math.max(this.brightLightGrid, Number(this.dimLight) || 0);
+  }
+
+  get visionRangeGrid(): number {
+    return Math.max(0, Number(this.visionRange) || 0);
+  }
 
   static get isStealthMode(): boolean {
     for (const character of ObjectStore.instance.getObjects(GameCharacter)) {

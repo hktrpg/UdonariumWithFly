@@ -18,6 +18,7 @@ import { ImageTagList } from '@udonarium/image-tag-list';
 import { ChatTab } from '@udonarium/chat-tab';
 import { CutInList } from '@udonarium/cut-in-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -37,7 +38,7 @@ export class SaveDataService {
   ) { }
 
   saveRoomAsync(fileName: string = 'fly_房間數據', updateCallback?: UpdateCallback): Promise<void> {
-    this.chatMessageService.sendOperationLog(`房間數據 ${fileName}.zip 已保存`);
+    this.chatMessageService.sendOperationLog(`房間數據 ${fileName}.zip 已下載`);
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(fileName, updateCallback)));
   }
 
@@ -50,6 +51,7 @@ export class SaveDataService {
     let summarySetting = this.convertToXml(DataSummarySetting.instance);
     let auraNameXml = this.convertToXml(AuraNameConfig.instance);
     let combatXml = this.convertToXml(CombatTracker.instance);
+    let scenePermXml = this.convertToXml(SceneToolPermission.instance);
     files.push(new File([roomXml], 'fly_data.xml', { type: 'text/plain' }));
     files.push(new File([chatXml], 'fly_chat.xml', { type: 'text/plain' }));
     files.push(new File([diceRollTableXml], 'fly_rollTable.xml', { type: 'text/plain' }));
@@ -57,6 +59,7 @@ export class SaveDataService {
     files.push(new File([summarySetting], 'summary.xml', { type: 'text/plain' }));
     files.push(new File([auraNameXml], 'fly_auraNames.xml', { type: 'text/plain' }));
     files.push(new File([combatXml], 'fly_combat.xml', { type: 'text/plain' }));
+    files.push(new File([scenePermXml], 'fly_scenePerm.xml', { type: 'text/plain' }));
 
     //files = files.concat(this.searchImageFiles(roomXml));
     //files = files.concat(this.searchImageFiles(chatXml));
@@ -76,7 +79,7 @@ export class SaveDataService {
   }
 
   saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
-    this.chatMessageService.sendOperationLog(`${StringUtil.aliasNameToClassName(gameObject.aliasName)}的數據 ${fileName}.zip 已保存`);
+    this.chatMessageService.sendOperationLog(`${StringUtil.aliasNameToClassName(gameObject.aliasName)}的數據 ${fileName}.zip 已下載`);
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveGameObjectAsync(gameObject, fileName, updateCallback)));
   }
 
@@ -173,7 +176,7 @@ export class SaveDataService {
     const mimeType = (logFormat == 0 ? 'text/plain' : 'text/html');
     const ext = (logFormat == 0 ? '.txt' : '.html');
     const trueFileName = 'fly_' + this.appendTimestamp(fileName) + ext;
-    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName} 已保存`);
+    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName} 已下載`);
     //const xml = ChatTabList.instance.log(logFormat, dateFormat, isWriteOerationLog, chatTabs);
     
     //const files: File[] = [];
@@ -184,7 +187,7 @@ export class SaveDataService {
 
   async saveChatLogAsync(logFormat: number, fileName: string, chatTabs: ChatTab[]=null, dateFormat='HH:mm', isWriteOerationLog=true, updateCallback?: UpdateCallback): Promise<void> {
     const trueFileName = 'fly_' + this.appendTimestamp(fileName);
-    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName}.zip 已保存`);
+    this.chatMessageService.sendOperationLog(`聊天紀錄 ${trueFileName}.zip 已下載`);
     const files: File[] = [];
     const images: ImageFile[] = (chatTabs ? chatTabs : [ChatTabList.instance]).reduce<ImageFile[]>((acm, obj) => acm.concat(this.searchImageFiles(this.convertToXml(obj))), []);
     const imageDict = {};

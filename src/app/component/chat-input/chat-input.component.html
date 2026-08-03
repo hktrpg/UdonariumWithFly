@@ -27,6 +27,14 @@
           <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}（你）</option>
           <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
         </select>
+        <button *ngIf="character" type="button" class="ff-button my-char-btn"
+          [class.is-mine]="isMyClaimedCharacter"
+          [class.is-taken]="isCharacterClaimedByOther"
+          [disabled]="isCharacterClaimedByOther && !isGMMode"
+          [title]="myCharacterButtonTitle"
+          (click)="toggleMyCharacter()">
+          {{ myCharacterButtonLabel }}
+        </button>
         <button *ngIf="character" class="indicate ff-button speech-bubble-indicate" [title]="isUseStandImageOnChatTab ? '將聊天「」內文顯示為💭' : '目前標籤已停用💭'" [ngClass]="{'is-active': isUseChatBalloon}" (click)="isUseChatBalloon = !isUseChatBalloon">        
             <i class="material-icons" style="font-size: 0.8em">{{ isUseChatBalloon && isUseStandImageOnChatTab ? 'textsms' : 'speaker_notes_off'}}</i>
         </button>

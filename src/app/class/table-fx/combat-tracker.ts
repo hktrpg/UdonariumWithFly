@@ -1,6 +1,7 @@
 import { SyncObject, SyncVar } from '../core/synchronize-object/decorator';
 import { GameObject } from '../core/synchronize-object/game-object';
 import { InnerXml } from '../core/synchronize-object/object-serializer';
+import { EventSystem } from '../core/system';
 import { UUID } from '../core/system/util/uuid';
 
 export type InitiativeDice = 'd20' | 'd100';
@@ -151,19 +152,28 @@ export class CombatTracker extends GameObject implements InnerXml {
   }
 
   addCombatant(data: Omit<CombatantData, 'id' | 'initiative'> & { initiative?: number | null }) {
+    this.addCombatants([data]);
+  }
+
+  /** Add many combatants in one commit (avoids dropping all-but-first when looping). */
+  addCombatants(items: Array<Omit<CombatantData, 'id' | 'initiative'> & { initiative?: number | null }>) {
+    if (!items?.length) return;
     this.ensureActiveEncounter();
     this.updateActive(e => {
-      if (e.combatants.some(c => c.characterIdentifier === data.characterIdentifier)) return;
-      e.combatants.push({
-        id: UUID.generateUuid(),
-        characterIdentifier: data.characterIdentifier,
-        name: data.name,
-        initiative: data.initiative ?? null,
-        isNpc: !!data.isNpc,
-        isDefeated: !!data.isDefeated,
-        isHidden: !!data.isHidden,
-        imageIdentifier: data.imageIdentifier || '',
-      });
+      for (const data of items) {
+        if (!data?.characterIdentifier) continue;
+        if (e.combatants.some(c => c.characterIdentifier === data.characterIdentifier)) continue;
+        e.combatants.push({
+          id: UUID.generateUuid(),
+          characterIdentifier: data.characterIdentifier,
+          name: data.name,
+          initiative: data.initiative ?? null,
+          isNpc: !!data.isNpc,
+          isDefeated: !!data.isDefeated,
+          isHidden: !!data.isHidden,
+          imageIdentifier: data.imageIdentifier || '',
+        });
+      }
     });
   }
 
@@ -188,6 +198,8 @@ export class CombatTracker extends GameObject implements InnerXml {
       e.round = 1;
       e.turnIndex = this.firstPlayableIndex(e);
     });
+    this.broadcastOpenTracker();
+    this.broadcastRoundAnnounce('begin');
   }
 
   endCombat() {
@@ -199,6 +211,7 @@ export class CombatTracker extends GameObject implements InnerXml {
   }
 
   nextTurn() {
+    const beforeRound = this.activeEncounter?.round ?? 0;
     this.updateActive(e => {
       if (!e.isStarted || !e.combatants.length) return;
       let i = e.turnIndex;
@@ -211,6 +224,8 @@ export class CombatTracker extends GameObject implements InnerXml {
         }
       }
     });
+    const afterRound = this.activeEncounter?.round ?? 0;
+    if (afterRound > beforeRound) this.broadcastRoundAnnounce('round');
   }
 
   prevTurn() {
@@ -237,6 +252,21 @@ export class CombatTracker extends GameObject implements InnerXml {
       if (!e.isStarted) return;
       e.round += 1;
       e.turnIndex = this.firstPlayableIndex(e);
+    });
+    if (this.activeEncounter?.isStarted) this.broadcastRoundAnnounce('round');
+  }
+
+  private broadcastOpenTracker() {
+    EventSystem.call('OPEN_COMBAT_TRACKER', null);
+  }
+
+  private broadcastRoundAnnounce(kind: 'begin' | 'round') {
+    const e = this.activeEncounter;
+    if (!e?.isStarted || !(e.round > 0)) return;
+    EventSystem.call('COMBAT_ROUND_ANNOUNCE', {
+      round: e.round,
+      name: e.name || '',
+      kind,
     });
   }
 

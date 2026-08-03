@@ -4,8 +4,14 @@
   <div *ngIf="getGameObjects(selectTab).length < 1"><small><b>{{getTabTitle(selectTab)}}</b>倉庫是空的</small></div>
   <div (contextmenu)="onContextMenu($event, $any(gameObject))" *ngFor="let gameObject of getGameObjects(selectTab); let i = index; trackBy: trackByGameObject" class="object-container"
     (click)="selectGameObject(gameObject, $event)" (dblclick)="focusGameObject($any(gameObject), $event)"
-    [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier), 'muluti-selected': checkSelected(gameObject), 'is-hide-in': $any(gameObject).isHideIn, 'is-inventory-no-indicate': !gameObject.isInventoryIndicate}" [@SlideInOut]="i">
+    [attr.draggable]="canDragToTable($any(gameObject)) ? 'true' : null"
+    (dragstart)="onInventoryDragStart($event, $any(gameObject))"
+    [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier), 'muluti-selected': checkSelected(gameObject), 'is-hide-in': $any(gameObject).isHideIn, 'is-inventory-no-indicate': !gameObject.isInventoryIndicate, 'is-draggable': canDragToTable($any(gameObject))}" [@SlideInOut]="i">
     <div *ngIf="$any(gameObject).isHideIn && $any(gameObject).ownerName != null" class="owner-tag" [style.background-color]="$any(gameObject).ownerColor">{{$any(gameObject).ownerName ? $any(gameObject).ownerName : '（無名玩家）'}}</div>
+    <div *ngIf="$any(gameObject).playerOwner" class="player-owner-tag" [style.background-color]="$any(gameObject).playerOwnerColor"
+      [title]="'選定為我的角色：' + $any(gameObject).playerOwnerName">
+      {{ $any(gameObject).playerOwnerName }}
+    </div>
     <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject}"></ng-container>
   </div>
   <div *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">

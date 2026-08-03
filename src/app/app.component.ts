@@ -48,8 +48,10 @@ import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting/dice-roll-table-setting.component';
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
 import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
+import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { CutInService } from 'service/cut-in.service';
@@ -105,6 +107,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
+  get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+  get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -179,6 +183,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     CutInList.instance.initialize();
     AuraNameConfig.instance;
     CombatTracker.instance;
+    SceneToolPermission.instance;
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
     sampleDiceRollTable.initialize();
@@ -215,7 +220,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
-      localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => ChatWindowComponent.isNoticeOn = !!isNoticeOn);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
+        // Default ON when unset; honor explicit boolean from storage.
+        ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
+      });
       localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
     } catch(e) {
       console.log(e);
@@ -467,6 +475,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('DESTORY_STAND_IMAGE_ALL', -1000, event => {
         this.standImageService.destroyAll();
+      })
+      .on('OPEN_COMBAT_TRACKER', -1000, () => {
+        this.ngZone.run(() => {
+          if (!CombatTrackerComponent.isOpen) this.open('CombatTrackerComponent');
+        });
       });
 
     workaroundForMobileSafari();
@@ -594,7 +607,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 420, height: 520, left: 100 };
+        option = { width: 520, height: 640, left: 100 };
+        break;
+      case 'SceneToolsComponent':
+        if (!SceneToolPermission.instance.canOpenPanel) return;
+        component = SceneToolsComponent;
+        option = { width: 380, height: 560, left: 100 };
         break;
     }
     if (component) {
@@ -815,7 +833,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       this.modalService.open(ConfirmationComponent, {
       title: '斷開連線', 
       text: `將切斷與其他參與者的連線${ this.isRoom ? '，並退出房間' : '' }。`,
-      helpHtml: '<b style="color: red">頁面將重新載入。</b>若尚未存檔，請先取消並保存 ZIP。',
+      helpHtml: '<b style="color: red">頁面將重新載入。</b>若尚未存檔，請先取消並下載 ZIP。',
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {

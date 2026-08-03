@@ -215,8 +215,62 @@
   padding: 2px 8px;
   border-radius: 12px;
   position: absolute;
-  top: -26px;
+  /* Anchor above the token so wrapping grows upward, not into the art. */
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 2px;
   transform-origin: center bottom;
+  white-space: normal;
+}
+.name-tag:not(.has-status-icons) {
+  white-space: nowrap;
+}
+.name-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 3px 4px;
+  max-width: 100%;
+}
+.name-tag .name-text {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+.status-icons-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.status-icons-inline .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #111;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+  line-height: 1;
+}
+/* Always visible — override component-wide hover-only material-icons rule. */
+.status-icons-inline .status-badge .material-icons.status-icon {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+}
+.status-icons-inline .status-badge sup {
+  font-size: 9px;
+  font-weight: bold;
+  margin-left: 1px;
+  line-height: 1;
 }
 
 .owner-tag {
@@ -555,39 +609,21 @@ p.is-wisper .face-icon {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 110%;
-  height: 110%;
-  margin-left: -55%;
-  margin-top: -55%;
+  /* Larger than pedestal so the ring reads outside the token base circle */
+  width: 175%;
+  height: 175%;
+  margin-left: -87.5%;
+  margin-top: -87.5%;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
   animation: floor-ring-spin 8s linear infinite;
   transform: translateZ(0.05px);
-  opacity: 0.9;
+  opacity: 0.95;
   z-index: 0;
+  pointer-events: none;
 }
 @keyframes floor-ring-spin {
   from { transform: translateZ(0.05px) rotate(0deg); }
   to { transform: translateZ(0.05px) rotate(360deg); }
-}
-.status-icons {
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  z-index: 5;
-  transform: translateZ(1px);
-}
-.status-badge {
-  background: rgba(0,0,0,0.65);
-  color: #fff;
-  border-radius: 3px;
-  padding: 1px;
-  line-height: 1;
-}
-.status-badge .material-icons {
-  font-size: 12px;
 }

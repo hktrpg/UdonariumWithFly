@@ -1,34 +1,46 @@
 <div *ngIf="!isConnected;else other_content">
-  <div>房間名稱 : <input #input class="input" (input)="calcPeerId(input.value, password)" [(ngModel)]="roomName" required minlength="1" maxlength="128" #roomNameValidation="ngModel"
-      placeholder="需要房間名稱" /></div>
-  <div>密碼: <input #input class="input" (input)="calcPeerId(roomName, input.value)" [(ngModel)]="password" maxlength="12" #passwordValidation="ngModel" placeholder="空白則無密碼"
-    /></div>
-  <div><input type="checkbox" [(ngModel)]="allowGuest" id="guest" name="guest" /><label for="guest">允許訪客</label></div>
+  <div>房間名稱 :
+    <input class="input" [(ngModel)]="roomName" (ngModelChange)="recalcPeerId()" required minlength="1" maxlength="128"
+      #roomNameValidation="ngModel" name="roomName" placeholder="需要房間名稱" />
+  </div>
+  <hr/>
+  <div class="pw-row">
+    <label>GM 密碼</label>
+    <input class="input" type="password" [(ngModel)]="gmPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
+      name="gmPassword" #gmPw="ngModel" placeholder="空白則無密碼" autocomplete="new-password" />
+  </div>
+  <div class="pw-row">
+    <label>玩家密碼</label>
+    <input class="input" type="password" [(ngModel)]="userPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
+      name="userPassword" #userPw="ngModel" placeholder="空白則無密碼" autocomplete="new-password" />
+  </div>
+  <div class="pw-row">
+    <label>訪客密碼</label>
+    <input class="input" type="password" [(ngModel)]="guestPassword" (ngModelChange)="recalcPeerId()" maxlength="12"
+      name="guestPassword" #guestPw="ngModel" placeholder="空白則無密碼" autocomplete="new-password" />
+  </div>
+  <div class="hint">各身份可自訂密碼；留白＝該身份無密碼即可進入。開房者會以 GM 身份進入。</div>
   <hr/>
   <div *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
-    <div [hidden]="!roomNameValidation.errors.required">
-      房間名稱是必填項目。
-    </div>
-    <div [hidden]="!roomNameValidation.errors.minlength">
+    <div [hidden]="!roomNameValidation.errors.required && !roomNameValidation.errors.minlength">
       房間名稱是必填項目。
     </div>
     <div [hidden]="!roomNameValidation.errors.maxlength">
       房間名稱的長度應小於或等於128。
     </div>
   </div>
-  <div *ngIf="passwordValidation.errors && (passwordValidation.dirty || passwordValidation.touched)">
-    <div [hidden]="!passwordValidation.errors.maxlength">
-      密碼長度應小於等於12。
-    </div>
+  <div *ngIf="gmPw.errors?.maxlength || userPw.errors?.maxlength || guestPw.errors?.maxlength">
+    密碼長度應小於等於12。
   </div>
   <div *ngIf="!validateLength">
-    房間名稱和密碼的總和似乎太長。嘗試將兩者之一都縮短一點。
+    房間名稱和密碼資訊似乎太長。請縮短房間名稱。
   </div>
   <div>
-    <button [disabled]="!roomNameValidation.valid || !passwordValidation.valid || !validateLength" (click)="createRoom()">建立新房間</button>
+    <button [disabled]="!roomNameValidation.valid || !gmPw.valid || !userPw.valid || !guestPw.valid || !validateLength"
+      (click)="createRoom()">建立新房間</button>
   </div>
 </div>
-<div><span style="font-size: 12px;">※當房間無人時，新建的房間會被清除。如果您想將房間狀態延續到下一次，請確保「保存」它。</span></div>
+<div><span style="font-size: 12px;">※當房間無人時，新建的房間會被清除。如果您想將房間狀態延續到下一次，請「下載 ZIP」備份。</span></div>
 <ng-template #other_content>
   <span style="font-size: 12px;">與其他參與者建立連線後，您將無法新增房間。<br>如果要連線到另一個房間，請斷開與其他與會者的連線。<br>（※您可以從選單斷開連線。）</span>
 </ng-template>

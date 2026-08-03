@@ -33,7 +33,7 @@
           <button (click)="showLogOutput()"><i class="material-icons small-font">history_edu</i>日誌</button>
           <button [disabled]="isSaveing" (click)="save()">
             <div style="position: relative;">
-              <div [ngClass]="{'is-hidden': isSaveing}">保存</div>
+              <div [ngClass]="{'is-hidden': isSaveing}">下載</div>
               <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
             </div>
           </button>

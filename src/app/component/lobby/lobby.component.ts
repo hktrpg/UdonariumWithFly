@@ -5,8 +5,10 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAuth, RoomJoinResult } from '@udonarium/room-auth';
 
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
+import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
@@ -48,7 +50,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
   private changeTitle() {
     this.modalService.title = this.panelService.title = '大廳';
     if (Network.peer.roomName.length) {
-      this.modalService.title = this.panelService.title = '〈' + Network.peer.roomName + '/' + Network.peer.roomId + '〉'
+      const name = RoomAuth.displayRoomName(Network.peer.roomName);
+      this.modalService.title = this.panelService.title = '〈' + name + '/' + Network.peer.roomId + '〉'
     }
   }
 
@@ -65,18 +68,53 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   displayRoomName(room: IRoomInfo): string {
-    return GuestSession.displayRoomName(room.name);
+    return RoomAuth.displayRoomName(room.name);
+  }
+
+  isRoleAuthRoom(room: IRoomInfo): boolean {
+    return RoomAuth.isRoleAuthRoom(room.name);
+  }
+
+  roomHasLock(room: IRoomInfo): boolean {
+    if (RoomAuth.isRoleAuthRoom(room.name)) return RoomAuth.hasAnyRolePassword(room.name);
+    return room.hasPassword;
   }
 
   isAllowGuest(room: IRoomInfo): boolean {
+    if (RoomAuth.isRoleAuthRoom(room.name)) {
+      return RoomAuth.isRoleAvailable(room.name, 'guest');
+    }
     return GuestSession.isAllowGuestRoomName(room.name);
   }
 
   async connect(room: IRoomInfo, asGuest: boolean = false) {
+    if (RoomAuth.isRoleAuthRoom(room.name)) {
+      await this.connectWithRole(room);
+      return;
+    }
+    await this.connectLegacy(room, asGuest);
+  }
+
+  private async connectWithRole(room: IRoomInfo) {
+    const result = await this.modalService.open<RoomJoinResult>(RoomJoinComponent, {
+      room,
+      width: 420,
+      height: 360,
+    });
+    if (!result) return;
+
+    // Role-auth rooms always use empty skyway password.
+    const targetPeers = room.filterByPassword('');
+    if (targetPeers.length < 1) return;
+
+    RoomAuth.applyIdentity(result.role);
+    this.openAndConnect(room, '', targetPeers);
+  }
+
+  private async connectLegacy(room: IRoomInfo, asGuest: boolean) {
     let password = '';
     const allowGuest = this.isAllowGuest(room);
 
-    // skyway2023 requires the same password digest as room peers; guests are UI-restricted only.
     if (room.hasPassword) {
       password = await this.modalService.open<string>(PasswordCheckComponent, { peers: room.peers, title: `${this.displayRoomName(room)}/${room.id}` });
       if (password == null) password = '';
@@ -86,6 +124,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (targetPeers.length < 1) return;
 
     GuestSession.isGuest = !!(allowGuest && asGuest);
+    if (PeerCursor.myCursor) {
+      PeerCursor.isGMHold = false;
+      PeerCursor.myCursor.isGMMode = false;
+    }
+    this.openAndConnect(room, password, targetPeers);
+  }
+
+  private openAndConnect(room: IRoomInfo, password: string, targetPeers: any[]) {
     let userId = Network.peer.userId;
     Network.open(userId, room.id, room.name, password);
     PeerCursor.myCursor.peerId = Network.peerId;
@@ -128,6 +174,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   private resetNetwork() {
     if (Network.peers.length < 1) {
+      GuestSession.isGuest = false;
+      if (PeerCursor.myCursor) {
+        PeerCursor.isGMHold = false;
+        PeerCursor.myCursor.isGMMode = false;
+      }
       Network.open();
       PeerCursor.myCursor.peerId = Network.peerId;
     }
@@ -138,7 +189,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   async showRoomSetting() {
-    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 400, left: 0, top: 400 });
+    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
     if (isCreate) this.modalService.resolve();
     this.help = '按「更新列表」以顯示可連線的房間。';
   }

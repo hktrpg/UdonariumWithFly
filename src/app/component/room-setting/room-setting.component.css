@@ -22,3 +22,21 @@
 .input {
   width: 100%;
 }
+.pw-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pw-row label {
+  min-width: 5em;
+  flex-shrink: 0;
+}
+.pw-row .input {
+  flex: 1;
+}
+.hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0;
+}

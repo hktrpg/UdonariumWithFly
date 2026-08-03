@@ -16,24 +16,28 @@
         <button type="button" class="tab-setting small-font" (click)="showLogOutput()" *ngIf="!GuestMode()"><i class="material-icons small-font">history_edu</i>日誌</button>
       </div>
       <div class="chat-toolbar-actions">
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="新訊息提示音：有人發言時播放提示音（本機設定）" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
-          <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_off'}}</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="音樂：ON＝播放 BGM／OFF＝靜音（本機設定）" [ngClass]="{'is-active': isMusicOn}" (click)="toggleMusic()">
+          <i class="material-icons" style="font-size: 1em">{{ isMusicOn ? 'music_note' : 'music_off'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 2px" title="訊息靠左：他人訊息也一律靠左顯示，不左右對開（本機設定）" [ngClass]="{'is-active': isLeftOnly}" (click)="isLeftOnly = !isLeftOnly">
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="效果音：ON＝播放音效／OFF＝靜音（本機設定）" [ngClass]="{'is-active': isSoundEffectOn}" (click)="toggleSoundEffect()">
+          <i class="material-icons" style="font-size: 1em">{{ isSoundEffectOn ? 'volume_up' : 'volume_off'}}</i>
+          <sup style="color: red">*</sup>
+        </button>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="提示音：ON＝有人發言時播放／OFF＝不播放（本機設定）" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
+          <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_paused'}}</i>
+          <sup style="color: red">*</sup>
+        </button>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 2px" title="訊息靠左：ON＝一律靠左／OFF＝左右對開（本機設定）" [ngClass]="{'is-active': isLeftOnly}" (click)="isLeftOnly = !isLeftOnly">
           <i class="material-icons" [ngStyle]="{'font-size': isLeftOnly ? '1em' : '1.3em' }">{{ isLeftOnly ? 'arrow_forward' : 'compare_arrows'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="列表模式：訊息改為單行列表，節省空間（本機設定）" [ngClass]="{'is-active': isCompact}" (click)="isCompact = !isCompact">
-          <i class="material-icons" style="font-size: 1em">{{ isCompact ? 'list' : 'forum'}}</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="訊息顯示：ON＝一般氣泡／OFF＝精簡列表（本機設定）" [ngClass]="{'is-active': isCompactOff}" (click)="toggleCompact()">
+          <i class="material-icons" style="font-size: 1em">{{ isCompactOff ? 'forum' : 'list'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="完全靜音：一次關閉 BGM、音效、提示音與試聽（本機設定）" [ngClass]="{'is-active': isFullMute}" (click)="toggleFullMute()">
-          <i class="material-icons" style="font-size: 1em">{{ isFullMute ? 'volume_off' : 'volume_up'}}</i>
-          <sup style="color: red">*</sup>
-        </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="精簡：收起標籤列與工具列，只保留輸入區（本機設定）" (click)="toggleClarifyMode()">
-          <i class="material-icons" style="font-size: 1em">view_day</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="工具列：ON＝完整顯示／OFF＝精簡（只留輸入區）（本機設定）" [ngClass]="{'is-active': isClarifyOff}" (click)="toggleClarifyMode()">
+          <i class="material-icons" style="font-size: 1em">{{ isClarifyOff ? 'view_agenda' : 'view_day'}}</i>
           <sup style="color: red">*</sup>
         </button>
       </div>

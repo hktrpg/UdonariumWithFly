@@ -1,24 +1,180 @@
-<div class="scene-tools" [class.collapsed]="!tools.paletteOpen">
-  <button type="button" class="toggle" (click)="toggle()" title="場景工具">
-    <i class="material-icons">{{ tools.paletteOpen ? 'chevron_left' : 'construction' }}</i>
-  </button>
-  <div class="palette" *ngIf="tools.paletteOpen">
-    <div class="title">場景工具</div>
-    <button type="button" [class.active]="tools.mode === 'select'" (click)="setMode('select')" title="選取">
-      <i class="material-icons">near_me</i><span>選取</span>
-    </button>
-    <button type="button" [class.active]="tools.mode === 'light'" (click)="setMode('light')" [disabled]="isGuest" title="燈光">
-      <i class="material-icons">lightbulb</i><span>燈光</span>
-    </button>
-    <button type="button" [class.active]="tools.mode === 'wall'" (click)="setMode('wall')" [disabled]="isGuest" title="牆壁">
-      <i class="material-icons">fence</i><span>牆壁</span>
-    </button>
-    <div class="sub">繪圖</div>
-    <button type="button" [class.active]="tools.mode === 'draw-rect'" (click)="setMode('draw-rect')" [disabled]="isGuest"><i class="material-icons">crop_square</i><span>矩形</span></button>
-    <button type="button" [class.active]="tools.mode === 'draw-ellipse'" (click)="setMode('draw-ellipse')" [disabled]="isGuest"><i class="material-icons">circle</i><span>圓形</span></button>
-    <button type="button" [class.active]="tools.mode === 'draw-polygon'" (click)="setMode('draw-polygon')" [disabled]="isGuest"><i class="material-icons">hexagon</i><span>多邊形</span></button>
-    <button type="button" [class.active]="tools.mode === 'draw-freehand'" (click)="setMode('draw-freehand')" [disabled]="isGuest"><i class="material-icons">gesture</i><span>手繪</span></button>
-    <button type="button" [class.active]="tools.mode === 'draw-text'" (click)="setMode('draw-text')" [disabled]="isGuest"><i class="material-icons">title</i><span>文字</span></button>
-    <div class="hint">空白處長按 1 秒：紅色平面 Ping<br>Alt+長按：警告 Ping<br>Shift+長按(GM)：紅色立體 Ping（朝天）＋拉視角</div>
+<div class="scene-tools-panel" *ngIf="canOpen; else noAccess">
+  <div class="row modes">
+    <button type="button" [class.active]="tools.mode === 'select'" (click)="setMode('select')"
+      [disabled]="!canModify" title="場景選取：只選繪圖／燈光／牆壁（再按一次關閉）">選取</button>
+    <button type="button" [class.active]="tools.mode === 'light'" (click)="setMode('light')"
+      [disabled]="!canCreateKind('light')" title="放置燈光">燈光</button>
+    <button type="button" [class.active]="tools.mode === 'wall'" (click)="setMode('wall')"
+      [disabled]="!canCreateKind('wall')" title="畫牆壁">牆壁</button>
+  </div>
+  <div class="row modes">
+    <button type="button" [class.active]="tools.mode === 'draw-rect'" (click)="setMode('draw-rect')" [disabled]="!canCreateKind('draw-rect')">矩形</button>
+    <button type="button" [class.active]="tools.mode === 'draw-ellipse'" (click)="setMode('draw-ellipse')" [disabled]="!canCreateKind('draw-ellipse')">圓形</button>
+    <button type="button" [class.active]="tools.mode === 'draw-polygon'" (click)="setMode('draw-polygon')" [disabled]="!canCreateKind('draw-polygon')">多邊形</button>
+    <button type="button" [class.active]="tools.mode === 'draw-freehand'" (click)="setMode('draw-freehand')" [disabled]="!canCreateKind('draw-freehand')">手繪</button>
+    <button type="button" [class.active]="tools.mode === 'draw-text'" (click)="setMode('draw-text')" [disabled]="!canCreateKind('draw-text')">文字</button>
+  </div>
+
+  <div class="row style" *ngIf="tools.isDrawMode || tools.selectedDrawing">
+    <label>顏色 <input type="color" [(ngModel)]="tools.drawStrokeColor" (ngModelChange)="applyStyleToSelected()"></label>
+    <label>線寬
+      <input type="range" min="1" max="32" step="1" [(ngModel)]="tools.drawStrokeWidth" (ngModelChange)="applyStyleToSelected()">
+      <span>{{ tools.drawStrokeWidth }}</span>
+    </label>
+    <label>線不透明
+      <input type="number" min="0" max="1" step="0.05" [(ngModel)]="tools.drawStrokeOpacity" (ngModelChange)="applyStyleToSelected()" style="width:4em">
+    </label>
+    <label *ngIf="tools.mode !== 'draw-freehand' && tools.mode !== 'draw-text'">填色不透明
+      <input type="number" min="0" max="1" step="0.05" [(ngModel)]="tools.drawFillOpacity" (ngModelChange)="applyStyleToSelected()" style="width:4em">
+    </label>
+  </div>
+
+  <ng-container *ngIf="tools.mode === 'draw-freehand'">
+    <div class="hint">按住拖曳手繪，筆跡會即時顯示。Enter 完成，Esc 取消當前筆劃。</div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'draw-rect' || tools.mode === 'draw-ellipse'">
+    <div class="hint">拖曳繪製，放開完成。繪製過程中會顯示預覽。</div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'light'">
+    <div class="hint">在地圖上按住拖曳設定光範圍，放開後放置。可先調整下方預設值。</div>
+    <div class="row style">
+      <label>名稱 <input type="text" [(ngModel)]="tools.lightName" style="width:6em"></label>
+      <label>顏色 <input type="color" [(ngModel)]="tools.lightColor"></label>
+      <label>光度
+        <input type="range" min="0.1" max="1" step="0.05" [(ngModel)]="tools.lightIntensity">
+        {{ tools.lightIntensity | number:'1.0-2' }}
+      </label>
+    </div>
+    <div class="row style">
+      <label>亮光（格）
+        <input type="number" min="0" max="40" step="0.5" [(ngModel)]="lightBrightGrid" style="width:4em">
+      </label>
+      <label>昏暗光（格）
+        <input type="number" min="0.5" max="40" step="0.5" [(ngModel)]="lightDimGrid" style="width:4em">
+      </label>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'wall'">
+    <div class="hint">在地圖上連續點擊加轉折點。Enter／右鍵／雙擊或下方按鈕完成。</div>
+    <div class="row">
+      <span>點數：{{ tools.wallDraftPoints.length }}</span>
+      <button type="button" (click)="undoWallPoint()" [disabled]="!tools.wallDraftPoints.length">撤銷一點</button>
+      <button type="button" (click)="finishWall()" [disabled]="tools.wallDraftPoints.length < 2">完成牆壁</button>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'draw-polygon'">
+    <div class="hint">點擊加頂點，Enter／雙擊或下方按鈕完成。右鍵撤銷一點。</div>
+    <div class="row">
+      <span>頂點：{{ tools.polygonDraftPoints.length }}</span>
+      <button type="button" (click)="finishPolygon()" [disabled]="tools.polygonDraftPoints.length < 3">完成多邊形</button>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'draw-text' || (tools.selectedDrawing?.type === 'text')">
+    <div class="hint" *ngIf="tools.mode === 'draw-text'">在地圖上點一下放置文字（不會跳窗）。</div>
+    <div class="row">
+      <label class="grow">文字
+        <input type="text" [(ngModel)]="tools.draftText" placeholder="註記內容">
+      </label>
+      <label>大小
+        <input type="number" [(ngModel)]="tools.draftFontSize" min="8" max="96" style="width:3.5em">
+      </label>
+    </div>
+    <div class="row" *ngIf="tools.selectedDrawing?.type === 'text'">
+      <button type="button" (click)="applyTextEdit()">套用到選取文字</button>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="tools.mode === 'select'">
+    <div class="hint">場景選取中：只能點選繪圖／燈光／牆壁，不會選到棋子或其他桌面物件。再按「選取」可關閉。</div>
+  </ng-container>
+  <ng-container *ngIf="tools.mode === 'none'">
+    <div class="hint">未啟用工具時可正常操作棋子。需要編輯場景物件時再按「選取」。</div>
+  </ng-container>
+
+  <div class="section" *ngIf="(tools.selectedDrawing && canModifyKind('drawing')) || (tools.selectedLight && canModifyKind('light')) || (tools.selectedWall && canModifyKind('wall'))">
+    <div class="sub">已選取
+      <ng-container *ngIf="tools.selectedDrawing">繪圖（{{ tools.selectedDrawing.type }}）</ng-container>
+      <ng-container *ngIf="tools.selectedLight">燈光</ng-container>
+      <ng-container *ngIf="tools.selectedWall">牆壁</ng-container>
+    </div>
+
+    <ng-container *ngIf="tools.selectedLight as light">
+      <div class="row style">
+        <label>名稱 <input type="text" [(ngModel)]="light.name" (ngModelChange)="applyLightField()" style="width:6em"></label>
+        <label>顏色 <input type="color" [(ngModel)]="light.color" (ngModelChange)="applyLightField()"></label>
+        <label><input type="checkbox" [(ngModel)]="light.enabled" (ngModelChange)="applyLightField()"> 啟用</label>
+      </div>
+      <div class="row style">
+        <label>光度
+          <input type="range" min="0.1" max="1" step="0.05" [(ngModel)]="light.intensity" (ngModelChange)="applyLightField()">
+          {{ light.intensity | number:'1.0-2' }}
+        </label>
+      </div>
+      <div class="row style">
+        <label>亮光（格）
+          <input type="number" min="0" max="40" step="0.5" [(ngModel)]="lightBrightGrid" (ngModelChange)="applyLightField()" style="width:4em">
+        </label>
+        <label>昏暗光（格）
+          <input type="number" min="0.5" max="40" step="0.5" [(ngModel)]="lightDimGrid" (ngModelChange)="applyLightField()" style="width:4em">
+        </label>
+      </div>
+      <div class="row style">
+        <label>黑暗度下限
+          <input type="number" min="0" max="1" step="0.05" [(ngModel)]="light.darknessActivationMin" (ngModelChange)="applyLightField()" style="width:4em">
+        </label>
+        <label>上限
+          <input type="number" min="0" max="1" step="0.05" [(ngModel)]="light.darknessActivationMax" (ngModelChange)="applyLightField()" style="width:4em">
+        </label>
+      </div>
+      <div class="hint">座標：{{ light.x | number:'1.0-0' }}, {{ light.y | number:'1.0-0' }}　（關閉此面板後只保留光照效果，不顯示光點）</div>
+    </ng-container>
+
+    <ng-container *ngIf="tools.selectedWall as wall">
+      <div class="row style">
+        <label>名稱 <input type="text" [(ngModel)]="wall.name" style="width:6em"></label>
+        <label>顏色 <input type="color" [(ngModel)]="wall.color"></label>
+      </div>
+      <div class="row style">
+        <label><input type="checkbox" [(ngModel)]="wall.blocksLight"> 阻擋光線</label>
+        <label><input type="checkbox" [(ngModel)]="wall.blocksVision"> 阻擋視野</label>
+      </div>
+    </ng-container>
+
+    <button type="button" class="danger" (click)="deleteSelected()">刪除選取</button>
+  </div>
+
+  <div class="section" *ngIf="canModify">
+    <ng-container *ngIf="canModifyKind('wall')">
+      <div class="sub">牆壁列表（{{ walls.length }}）</div>
+      <ul class="list" *ngIf="walls.length">
+        <li *ngFor="let w of walls" [class.active]="tools.selectedWall === w" (click)="selectWall(w)">
+          {{ w.name || '牆' }}（{{ w.points.length }} 點）
+        </li>
+      </ul>
+    </ng-container>
+    <ng-container *ngIf="canModifyKind('light')">
+      <div class="sub">燈光列表（{{ lights.length }}）</div>
+      <ul class="list" *ngIf="lights.length">
+        <li *ngFor="let l of lights" [class.active]="tools.selectedLight === l" (click)="selectLight(l)">
+          {{ l.name || '燈' }} @ {{ l.x | number:'1.0-0' }},{{ l.y | number:'1.0-0' }}
+        </li>
+      </ul>
+    </ng-container>
+    <ng-container *ngIf="canModifyKind('drawing')">
+      <div class="sub">繪圖列表（{{ drawings.length }}）</div>
+      <ul class="list" *ngIf="drawings.length">
+        <li *ngFor="let d of drawings" [class.active]="tools.selectedDrawing === d" (click)="selectDrawing(d)">
+          {{ d.type }}<ng-container *ngIf="d.type === 'text'">：{{ d.text }}</ng-container>
+        </li>
+      </ul>
+    </ng-container>
   </div>
 </div>
+<ng-template #noAccess>
+  <div class="hint">目前沒有場景工具權限。請向 GM 於「連線資訊」中開放玩家新增／修改。</div>
+</ng-template>

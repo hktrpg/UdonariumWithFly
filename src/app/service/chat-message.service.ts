@@ -87,8 +87,7 @@ export class ChatMessageService {
       from: Network.peer.userId,
       to: ChatMessageService.findId(sendTo),
       //to: this.findId(sendTo),
-      //name: this.makeMessageName(sendFrom, sendTo),
-      name: this.findObjectName(sendFrom) + (this.GuestMode() ? '(訪客)' : ''),
+      name: this.makeSpeakerDisplayName(sendFrom),
       toName: sendTo ? this.findObjectName(sendTo) : '',
       imageIdentifier: this.findImageIdentifier(sendFrom, isUseFaceIcon),
       toImageIdentifier: sendTo ? this.findImageIdentifier(sendTo) : '',
@@ -160,11 +159,20 @@ export class ChatMessageService {
     return null;
   }
 
-  private makeMessageName(sendFrom: string, sendTo?: string): string {
-    let sendFromName = this.findObjectName(sendFrom);
-    if (this.GuestMode()) {
-      sendFromName += '(訪客)';
+  /** Character name with player nick, e.g. `愛麗絲 (小明)`. */
+  private makeSpeakerDisplayName(sendFrom: string): string {
+    let name = this.findObjectName(sendFrom);
+    if (this.GuestMode()) name += '(訪客)';
+    const object = ObjectStore.instance.get(sendFrom);
+    if (object instanceof GameCharacter) {
+      const nick = PeerCursor.myCursor?.name?.trim();
+      if (nick) name += ` (${nick})`;
     }
+    return name;
+  }
+
+  private makeMessageName(sendFrom: string, sendTo?: string): string {
+    let sendFromName = this.makeSpeakerDisplayName(sendFrom);
     if (sendTo == null || sendTo.length < 1) return sendFromName;
 
     let sendToName = this.findObjectName(sendTo);
