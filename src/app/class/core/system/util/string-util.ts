@@ -1,3 +1,5 @@
+import { translate } from 'i18n';
+
 export interface OperateCommand {
   targetName?: string,
   operator?: string,
@@ -221,34 +223,9 @@ export namespace StringUtil {
   }
 
   export function aliasNameToClassName(aliasName: string) {
-    switch(aliasName) {
-      case 'character':
-        return '角色';
-      case 'cut-in':
-        return '過場';
-      case 'dice-roll-table':
-        return '骰子機器人表';
-      case 'terrain':
-        return '地形';
-      case 'table-mask':
-        return '地圖遮罩';
-      case 'text-note':
-        return '共用筆記';
-      case 'card':
-        return '卡牌';
-      case 'dice-symbol':
-        return '骰子符號';
-      case 'card-stack':
-        return '牌堆';
-      case 'game-table':
-        return '桌面';
-      case 'chat-tab':
-        return '聊天標籤';
-      case 'range':
-        return '射程範圍';
-      default:
-       return aliasName;
-    }
+    const key = `alias.${aliasName}`;
+    const text = translate(key);
+    return text === key ? aliasName : text;
   }
 
   export function textShadowColor(textColor: string, lightColor='#ffffff', darkColor='#333333'): string {

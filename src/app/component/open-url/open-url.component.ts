@@ -3,6 +3,7 @@ import { EventSystem } from '@udonarium/core/system';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'open-url',
@@ -18,7 +19,8 @@ export class OpenUrlComponent implements OnInit, OnDestroy {
 
   constructor(
     private panelService: PanelService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    public i18n: I18nService
   ) {
     this.url = modalService.option.url ? modalService.option.url : '';
     this.title = modalService.option.title ? modalService.option.title : '';
@@ -36,16 +38,18 @@ export class OpenUrlComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    Promise.resolve().then(() => {
-      let titleBar = '打開參考網址';
-      if (this.title) {
-        titleBar += ('〈' + this.title + (this.subTitle ? `：${this.subTitle}` : '') + '〉');
-      } else if (this.subTitle) {
-        titleBar += `〈${this.subTitle}〉`;
-      }
-      this.modalService.title = this.panelService.title = titleBar;
-    });
-    EventSystem.register(this);
+    Promise.resolve().then(() => this.updateTitle());
+    EventSystem.register(this).on('LOCALE_CHANGED', -1000, () => this.updateTitle());
+  }
+
+  private updateTitle() {
+    let titleBar = this.i18n.t('url.title');
+    if (this.title) {
+      titleBar += ('〈' + this.title + (this.subTitle ? `：${this.subTitle}` : '') + '〉');
+    } else if (this.subTitle) {
+      titleBar += `〈${this.subTitle}〉`;
+    }
+    this.modalService.title = this.panelService.title = titleBar;
   }
 
   ngOnDestroy() {

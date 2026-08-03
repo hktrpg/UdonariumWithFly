@@ -4,6 +4,8 @@ import { ImageFile } from './core/file-storage/image-file';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { InnerXml } from './core/synchronize-object/object-serializer';
+import { translate } from 'i18n';
+import { StringUtil } from './core/system/util/string-util';
 
 @SyncObject('chat-tab-list')
 export class ChatTabList extends ObjectNode implements InnerXml {
@@ -73,7 +75,11 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>Udonarium with Fly：聊天紀錄：${ !target ? '所有標籤' : (target[0].name  == '' ? '（無名標籤）' : target[0].name) }${ target && target.length > 1 ? '、其他' : '' }${imageDict ? '（含圖片）' : ''}</title>
+<title>${ StringUtil.escapeHtml(translate('chatLog.htmlTitle', {
+        name: (!target ? translate('chatLog.fileAllTabs') : (target[0].name == '' ? translate('chat.unnamedTab') : target[0].name))
+          + (target && target.length > 1 ? translate('chatLog.fileAndOthers') : ''),
+        images: imageDict ? translate('chatLog.withImages') : ''
+      })) }</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script>
   if (window.chrome) {

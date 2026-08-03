@@ -26,7 +26,8 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -173,7 +174,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     private imageService: ImageService,
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -301,7 +303,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     menuActions = menuActions.concat(this.makeSelectionContextMenu());
     menuActions = menuActions.concat(this.makeContextMenu());
 
-    this.contextMenuService.open(position, menuActions, this.isVisible ? this.name : '卡牌');
+    this.contextMenuService.open(position, menuActions, this.isVisible ? this.name : this.i18n.t('card.noun'));
   }
 
   onMove() {
@@ -327,7 +329,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private createStack() {
     if (this.GuestMode()) return;
-    let cardStack = CardStack.create('牌堆');
+    let cardStack = CardStack.create(this.i18n.t('card.deckDefault'));
     cardStack.location.x = this.card.location.x;
     cardStack.location.y = this.card.location.y;
     cardStack.posZ = this.card.posZ;
@@ -371,43 +373,45 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       y: this.card.location.y + (this.card.size * this.gridSize) / 2,
       z: this.card.posZ
     };
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('card.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedCards = () => this.selectionService.objects.filter(object => object.aliasName === this.card.aliasName) as Card[];
       actions.push(
         {
-          name: '選擇的卡牌', action: null, subActions: [
+          name: this.i18n.t('card.menu.2'), action: null, subActions: [
             {
-              name: '全部翻成正面（公開）', action: () => {
+              name: this.i18n.t('card.menu.3'), action: () => {
                 const counter: Map<string, number> = new Map<string, number>();
                 selectedCards().forEach(card => {
                   if (card.hasOwner || !card.isFront) {
-                    const name = card.name == '' ? '(無名的卡牌)' : card.name;
+                    const name = card.name == '' ? this.i18n.t('card.unnamed') : card.name;
                     let count = counter.get(name) || 0;
                     count += 1;
                     counter.set(name, count);
                   }
                   card.faceUp();
                 });
-                this.chatMessageService.sendOperationLog([...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : ` ×${counter.get(key)}張`)).join('、') + ' 公開了')
+                this.chatMessageService.sendOperationLog(this.i18n.t('card.revealed', {
+                  cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join(this.i18n.t('common.listSep'))
+                }));
                 SoundEffect.play(PresetSound.cardDraw);
               }
             },
             {
-              name: '全部翻成背面', action: () => {
+              name: this.i18n.t('card.menu.4'), action: () => {
                 selectedCards().forEach(card => card.faceDown());
                 SoundEffect.play(PresetSound.cardDraw);
               }
             },
             {
-              name: '全部只有自己看（變成手牌）', action: () => {
+              name: this.i18n.t('card.menu.5'), action: () => {
                 const counter: Map<string, number> = new Map<string, number>();
                 let faceDownCount = 0;
                 selectedCards().forEach(card => {
                   if (!card.isHand) {
                     if (card.isFront) {
-                      const name = card.name == '' ? '(無名的卡牌)' : card.name;
+                      const name = card.name == '' ? this.i18n.t('card.unnamed') : card.name;
                       let count = counter.get(name) || 0;
                       count += 1;
                       counter.set(name, count);
@@ -418,9 +422,9 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
                   card.faceDown();
                   card.owner = Network.peer.userId;
                 });
-                const messages = [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : ` ×${counter.get(key)}張`));
-                if (faceDownCount) messages.push(`(蓋著的卡牌)×${faceDownCount}張`);
-                this.chatMessageService.sendOperationLog(messages.join('、') + ' 只有自己看了');
+                const messages = [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) })));
+                if (faceDownCount) messages.push(this.i18n.t('card.facedownCount', { count: faceDownCount }));
+                this.chatMessageService.sendOperationLog(this.i18n.t('card.selfOnlyMany', { cards: messages.join(this.i18n.t('common.listSep')) }));
                 SoundEffect.play(PresetSound.cardDraw);
               }
             },
@@ -434,53 +438,52 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [];
-    actions.push(this.isLocked
-      ? {
-        name: '☑ 固定', action: () => {
-          this.isLocked = false;
-          SoundEffect.play(PresetSound.unlock);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 固定', action: () => {
-          this.isLocked = true;
-          SoundEffect.play(PresetSound.lock);
-        },
-        checkBox: 'check'
-      });
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isLocked,
+      set: (v) => {
+        this.isLocked = v;
+        SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+      },
+      on: this.i18n.t('card.menu.6'),
+      off: this.i18n.t('card.menu.7'),
+    }));
     actions.push(ContextMenuSeparator);
     actions.push(!this.isVisible || this.isHand
       ? {
-        name: this.isHand ? '正面打出（公開）' : this.ownerIsOnline ? '翻成正面（公開）' : '翻成正面', action: () => {
+        name: this.isHand ? this.i18n.t('card.dynamic.1') : this.ownerIsOnline ? this.i18n.t('card.dynamic.2') : this.i18n.t('card.dynamic.3'), action: () => {
           this.card.faceUp();
-          this.chatMessageService.sendOperationLog((this.card.name == '' ? '(無名的卡牌)' : this.card.name) + ' 公開了');
+          this.chatMessageService.sendOperationLog(this.i18n.t('card.revealedOne', {
+            name: this.card.name == '' ? this.i18n.t('card.unnamed') : this.card.name
+          }));
           SoundEffect.play(PresetSound.cardDraw);
         }, default: !this.isLocked && (!this.ownerIsOnline || this.isHand)
       }
       : {
-        name: '翻成背面', action: () => {
+        name: this.i18n.t('card.menu.8'), action: () => {
           this.card.faceDown();
           SoundEffect.play(PresetSound.cardDraw);
         }, default: !this.card.isLocked && (!this.ownerIsOnline || this.isHand)
       });
     actions.push(this.isHand
       ? {
-        name: '背面打出', action: () => {
+        name: this.i18n.t('card.menu.9'), action: () => {
           this.card.faceDown();
           SoundEffect.play(PresetSound.cardDraw);
         }
       }
       : {
-        name: '只有自己看（變成手牌）', action: () => {
+        name: this.i18n.t('card.menu.10'), action: () => {
           SoundEffect.play(PresetSound.cardDraw);
-          this.chatMessageService.sendOperationLog(`${this.card.isFront ? (this.card.name == '' ? '(無名的卡牌)' : this.card.name)  : '(蓋著的卡牌)'} 只有自己看了`);
+          this.chatMessageService.sendOperationLog(this.i18n.t('card.selfOnlyOne', {
+            name: this.card.isFront ? (this.card.name == '' ? this.i18n.t('card.unnamed') : this.card.name) : this.i18n.t('card.facedown')
+          }));
           this.card.faceDown();
           this.owner = Network.peer.userId;
         }
       });
     actions.push(ContextMenuSeparator);
     actions.push({
-      name: '向右旋轉', action: () => {
+      name: this.i18n.t('card.menu.11'), action: () => {
         this.turnRight();
       },
       materialIcon: 'turn_right',
@@ -488,7 +491,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       disabled: this.isLocked
     }, 
     {
-      name: '向左旋轉', action: () => {
+      name: this.i18n.t('card.menu.12'), action: () => {
         this.turnLeft();
       },
       materialIcon: 'turn_left',
@@ -498,14 +501,14 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     if (this.card.isVisible) {
       actions.push(ContextMenuSeparator,
       {
-        name: '改為正位(0°)', action: () => {
+        name: this.i18n.t('card.menu.13'), action: () => {
           this.vertical();
         },
         hotkey: 'U',
         disabled: !this.card.isVisible || this.isLocked || this.card.rotate == 0 
       }, 
       {
-        name: '改為橫向(90°)', action: () => {
+        name: this.i18n.t('card.menu.14'), action: () => {
           this.horizontal();
         },
         hotkey: 'T',
@@ -514,18 +517,18 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
     actions.push(ContextMenuSeparator);
     actions.push({
-      name: '用重疊的卡牌製作牌堆', action: () => {
+      name: this.i18n.t('card.menu.15'), action: () => {
         this.createStack();
         SoundEffect.play(PresetSound.cardPut);
       },
       disabled: this.isLocked
     });
     actions.push(ContextMenuSeparator);
-    actions.push({ name: '編輯卡牌...', action: () => { this.showDetail(this.card); } });
+    actions.push({ name: this.i18n.t('card.menu.16'), action: () => { this.showDetail(this.card); } });
 
     if (this.isVisible && this.card.getUrls().length > 0) {
       actions.push({
-        name: '打開參考網址', action: null,
+        name: this.i18n.t('card.menu.17'), action: null,
         subActions: this.card.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -538,7 +541,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('common.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         })
@@ -547,7 +550,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
 
     actions.push({
-      name: '建立副本', action: () => {
+      name: this.i18n.t('card.menu.18'), action: () => {
         let cloneObject = this.card.clone();
         cloneObject.location.x += this.gridSize;
         cloneObject.location.y += this.gridSize;
@@ -557,7 +560,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       }
     },
     {
-      name: '刪除', action: () => {
+      name: this.i18n.t('card.menu.19'), action: () => {
         this.card.destroy();
         SoundEffect.play(PresetSound.sweep);
       }
@@ -601,8 +604,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '卡牌設定';
-    if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : '卡牌（背面）');
+    let title = this.i18n.t('card.panelTitle');
+    if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : this.i18n.t('card.back'));
     let option: PanelOption = { title: title, left: coordinate.x - 300, top: coordinate.y - 300, width: 600, height: 490 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;

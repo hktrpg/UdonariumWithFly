@@ -8,6 +8,7 @@ import { Network } from '@udonarium/core/system';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { I18nService } from './i18n.service';
 
 const HOURS = 60 * 60 * 1000;
 
@@ -23,7 +24,7 @@ export class ChatMessageService {
 
   gameType: string = '';
 
-  constructor() { }
+  constructor(private i18n: I18nService) { }
 
   GuestMode() {
     return Network.GuestMode();
@@ -80,15 +81,14 @@ export class ChatMessageService {
     return Math.floor(this.timeOffset + (performance.now() - this.performanceOffset));
   }
 
-  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean): ChatMessage {
+  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean, imageFx?: string): ChatMessage {
     // TODO: 再整理一下
     let effective = !(isUseFaceIcon && this.findFaceIconIdentifier(sendFrom));
     let chatMessage: ChatMessageContext = {
       from: Network.peer.userId,
       to: ChatMessageService.findId(sendTo),
       //to: this.findId(sendTo),
-      //name: this.makeMessageName(sendFrom, sendTo),
-      name: this.findObjectName(sendFrom) + (this.GuestMode() ? '(訪客)' : ''),
+      name: this.makeSpeakerDisplayName(sendFrom),
       toName: sendTo ? this.findObjectName(sendTo) : '',
       imageIdentifier: this.findImageIdentifier(sendFrom, isUseFaceIcon),
       toImageIdentifier: sendTo ? this.findImageIdentifier(sendTo) : '',
@@ -100,6 +100,7 @@ export class ChatMessageService {
       isInverseIcon: effective && isInverseIcon ? 1 : 0,
       isHollowIcon: effective && isHollowIcon ? 1 : 0,
       isBlackPaint: effective && isBlackPaint ? 1 : 0,
+      imageFx: effective && imageFx ? imageFx : '',
       aura: effective ? aura : -1,
       characterIdentifier: characterIdentifier,
       standIdentifier: standIdentifier,
@@ -143,9 +144,9 @@ export class ChatMessageService {
   private findObjectName(identifier: string): string {
     let object = ObjectStore.instance.get(identifier);
     if (object instanceof GameCharacter) {
-      return object.name && object.name.length ? object.name : '（無名角色）';
+      return object.name && object.name.length ? object.name : this.i18n.t('chat.unnamedCharacter');
     } else if (object instanceof PeerCursor) {
-      return object.name && object.name.length ? object.name : '（無名玩家）';
+      return object.name && object.name.length ? object.name : this.i18n.t('chat.unnamedPlayer');
     }
     return identifier;
   }
@@ -160,11 +161,20 @@ export class ChatMessageService {
     return null;
   }
 
-  private makeMessageName(sendFrom: string, sendTo?: string): string {
-    let sendFromName = this.findObjectName(sendFrom);
-    if (this.GuestMode()) {
-      sendFromName += '(訪客)';
+  /** Character name with player nick, e.g. `愛麗絲 (小明)`. */
+  private makeSpeakerDisplayName(sendFrom: string): string {
+    let name = this.findObjectName(sendFrom);
+    if (this.GuestMode()) name += this.i18n.t('chat.guestSuffix');
+    const object = ObjectStore.instance.get(sendFrom);
+    if (object instanceof GameCharacter) {
+      const nick = PeerCursor.myCursor?.name?.trim();
+      if (nick) name += ` (${nick})`;
     }
+    return name;
+  }
+
+  private makeMessageName(sendFrom: string, sendTo?: string): string {
+    let sendFromName = this.makeSpeakerDisplayName(sendFrom);
     if (sendTo == null || sendTo.length < 1) return sendFromName;
 
     let sendToName = this.findObjectName(sendTo);

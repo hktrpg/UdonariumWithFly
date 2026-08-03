@@ -19,6 +19,8 @@ import { Jukebox } from '@udonarium/Jukebox';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { FilterType, WeatherType } from '@udonarium/game-table';
+import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuComponent } from 'component/context-menu/context-menu.component';
@@ -34,12 +36,14 @@ import { TextViewComponent } from 'component/text-view/text-view.component';
 import { UIPanelComponent } from 'component/ui-panel/ui-panel.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
-import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SaveDataService } from 'service/save-data.service';
 import { StandImageService } from 'service/stand-image.service';
+import { I18nService } from 'service/i18n.service';
+import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from '@udonarium/data-element';
 import { StandImageComponent } from 'component/stand-image/stand-image.component';
@@ -47,16 +51,24 @@ import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting/dice-roll-table-setting.component';
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
+import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
+import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
+import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
+import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { CutInService } from 'service/cut-in.service';
 import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { SwUpdate } from '@angular/service-worker';
 
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
+import { RoomInviteService } from 'service/room-invite.service';
 
 @Component({
     selector: 'app-root',
@@ -92,6 +104,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isHorizontal = false;
   isLoggedin = false;
   isUpdateCanceled = false;
+  private inviteHandled = false;
+  private isRefreshPromptOpen = false;
 
   static imageUrl = '';
   get imageUrl(): string {
@@ -102,6 +116,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
+  get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+  get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -136,7 +152,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private ngZone: NgZone,
     private contextMenuService: ContextMenuService,
     private standImageService: StandImageService,
-    private cutInService: CutInService
+    private cutInService: CutInService,
+    private i18n: I18nService,
+    private roomInvite: RoomInviteService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -169,29 +187,32 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let soundEffect: SoundEffect = new SoundEffect('SoundEffect');
     soundEffect.initialize();
 
-    ChatTabList.instance.addChatTab('主要標籤', 'MainTab');
-    let subTab = ChatTabList.instance.addChatTab('閒聊標籤', 'SubTab');
+    ChatTabList.instance.addChatTab(this.i18n.t('sample.mainTab'), 'MainTab');
+    let subTab = ChatTabList.instance.addChatTab(this.i18n.t('sample.subTab'), 'SubTab');
     subTab.recieveOperationLogLevel = 1;
 
     CutInList.instance.initialize();
+    AuraNameConfig.instance;
+    CombatTracker.instance;
+    SceneToolPermission.instance;
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
     sampleDiceRollTable.initialize();
-    sampleDiceRollTable.name = '範例骰子機器人表'
+    sampleDiceRollTable.name = this.i18n.t('sample.diceTable')
     sampleDiceRollTable.command = 'SAMPLE'
     sampleDiceRollTable.dice = '1d6';
-    sampleDiceRollTable.value = "1:這是骰子機器人表的範例\n2:數字與對應結果以一行一個、用:（冒號）分隔\n3:寫成 數字:結果 的形式\n4:\\\\n  \\n 可換行\n5-6:也可以用-（連字號）指定數字範圍";
+    sampleDiceRollTable.value = this.i18n.t('sample.diceTableValue');
     DiceRollTableList.instance.addDiceRollTable(sampleDiceRollTable);
 
     let fileContext = ImageFile.createEmpty('none_icon').toContext();
     fileContext.url = './assets/images/ic_account_circle_black_24dp_2x.png';
     let noneIconImage = ImageStorage.instance.add(fileContext);
-    ImageTag.create(noneIconImage.identifier).tag = '*default 圖示';
+    ImageTag.create(noneIconImage.identifier).tag = this.i18n.t('sample.tagIcon');
 
     fileContext = ImageFile.createEmpty('stand_no_image').toContext();
     fileContext.url = './assets/images/nc96424.png';
     let standNoIconImage = ImageStorage.instance.add(fileContext);
-    ImageTag.create(standNoIconImage.identifier).tag = '*default 立繪';
+    ImageTag.create(standNoIconImage.identifier).tag = this.i18n.t('sample.tagStand');
 
     try {
       localForage.getItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY).then(volume => { 
@@ -210,7 +231,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
-      localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => ChatWindowComponent.isNoticeOn = !!isNoticeOn);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
+        // Default ON when unset; honor explicit boolean from storage.
+        ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
+      });
       localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
     } catch(e) {
       console.log(e);
@@ -236,6 +260,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     PresetSound.surprise = AudioStorage.instance.add('./assets/sounds/otologic/Onmtp-Surprise02-1.mp3').identifier;
     PresetSound.coinToss = AudioStorage.instance.add('./assets/sounds/niconicomons/nc146227.mp3').identifier;
     PresetSound.selectionStart = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/decision50.mp3').identifier;
+    PresetSound.ping = AudioStorage.instance.add('./assets/sounds/otologic/Onmtp-Surprise02-1.mp3').identifier;
 
     AudioStorage.instance.get(PresetSound.dicePick).isHidden = true;
     AudioStorage.instance.get(PresetSound.dicePut).isHidden = true;
@@ -257,6 +282,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     AudioStorage.instance.get(PresetSound.coinToss).isHidden = true;
     AudioStorage.instance.get(PresetSound.sweep).isHidden = true;
     AudioStorage.instance.get(PresetSound.selectionStart).isHidden = true;
+    AudioStorage.instance.get(PresetSound.ping).isHidden = true;
 
     PeerCursor.createMyCursor().then(() => {
       if (PeerCursor.myCursor.name == null || PeerCursor.myCursor.name === '') PeerCursor.myCursor.name = PeerCursor.CHAT_DEFAULT_NAME;
@@ -327,11 +353,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                 let sentinel = tempInfos[0].normalize.substring(0, 1);
                 let group = { index: tempInfos[0].normalize.substring(0, 1), infos: [] };
                 for (let info of tempInfos) {
-                  let index = info.lang == 'Other' ? 'Other' 
-                    : info.lang == 'ChineseTraditional' ? '正體中文'
-                    : info.lang == 'Korean' ? '한국어'
-                    : info.lang == 'English' ? 'English'
-                    : info.lang == 'SimplifiedChinese' ? '简体中文'
+                  let index = info.lang == 'Other' ? this.i18n.t('lang.other')
+                    : info.lang == 'ChineseTraditional' ? this.i18n.t('lang.zhTW')
+                    : info.lang == 'Korean' ? this.i18n.t('lang.ko')
+                    : info.lang == 'English' ? this.i18n.t('lang.en')
+                    : info.lang == 'SimplifiedChinese' ? this.i18n.t('lang.zhCN')
                     : info.normalize.substring(0, 1);
                   if (index !== sentinel) {
                     sentinel = index;
@@ -357,6 +383,22 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
+        if (!this.inviteHandled && !Network.peer.isRoom) {
+          this.inviteHandled = true;
+          this.ngZone.run(() => this.tryConsumeInvite());
+        }
+      })
+      .on('ROOM_REKEY', event => {
+        // GM changed room auth; reopen into the new encoded roomName.
+        if (event.isSendFromSelf) return;
+        const roomId = event.data?.roomId;
+        const roomName = event.data?.roomName;
+        if (!roomId || !roomName) return;
+        if (!Network.peer?.isRoom || Network.peer.roomId !== roomId) return;
+        if (Network.peer.roomName === roomName) return;
+        this.ngZone.run(() => {
+          RoomConnectHelper.rekeyRoom(roomId, roomName).catch(e => console.warn('ROOM_REKEY failed', e));
+        });
       })
       .on('NETWORK_ERROR', event => {
         console.log('NETWORK_ERROR', event.data.peerId);
@@ -371,19 +413,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           let configErrorTypes = ['server-error', 'authentication', 'token-expired'];
 
           if (quietErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: '網路錯誤', text: errorMessage });
+          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
 
           if (configErrorTypes.includes(errorType)) {
             await this.modalService.open(TextViewComponent, {
-              title: '網路錯誤',
-              text: '無法連線到後端（SkyWay 認證權杖伺服器）。\n\n請確認 src/assets/config.yaml 的 backend.url，並在 ACCESS_CONTROL_ALLOW_ORIGIN 中允許本站 Origin（例如: https://localhost:4200），設定自架的 udonarium-backend。\n\n公開示範用 backend 僅能從 nanasunana.github.io 使用。\n重新載入頁面後會再試一次。'
+              title: this.i18n.t('net.errorTitle'),
+              text: this.i18n.t('net.backendHelp')
             });
             this.isLoggedin = false;
             return;
           }
 
           if (!reconnectErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: '網路錯誤', text: '關閉此視窗後將嘗試重新連線。' });
+          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: this.i18n.t('net.reconnectHint') });
           Network.open();
           this.isLoggedin = false;
         });
@@ -393,7 +435,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
-            chatMessageService.sendOperationLog((this.isRoom ? '已連線到 ' + Network.peer.roomName : '已與其他人連線'));
+            chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
           }
         }
         this.lazyNgZoneUpdate(event.isSendFromSelf);
@@ -414,7 +456,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                 const option: { body: string, icon?: string, tag?: string } = { body: message.plainText(), tag: 'chat-message' };
                 const image = message.image;
                 if (image) option.icon = message.image.url;
-                const notification = new Notification(tab.name + ' - ' + message.name + (message.toColor ? (' ➡ ' + message.toName + ' (密語)') : ''), option);
+                const notification = new Notification(tab.name + ' - ' + message.name + (message.toColor ? (' ➡ ' + message.toName + ' ' + this.i18n.t('net.whisper')) : ''), option);
                 document.addEventListener('visibilitychange', () => {
                   if (document.visibilityState === 'visible') notification.close();
                 });
@@ -460,6 +502,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('DESTORY_STAND_IMAGE_ALL', -1000, event => {
         this.standImageService.destroyAll();
+      })
+      .on('OPEN_COMBAT_TRACKER', -1000, () => {
+        this.ngZone.run(() => {
+          if (!CombatTrackerComponent.isOpen) this.open('CombatTrackerComponent');
+        });
+      })
+      .on('OPEN_TOOLBOX', -1000, event => {
+        this.ngZone.run(() => {
+          const data = event.data || {};
+          this.openToolboxAt(
+            { x: data.x ?? 0, y: data.y ?? 0 },
+            Array.isArray(data.extraActions) ? data.extraActions : []
+          );
+        });
       });
 
     workaroundForMobileSafari();
@@ -471,8 +527,78 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     event.returnValue = '';
   };
 
+  private readonly onWindowKeydown = (event: KeyboardEvent) => {
+    const isReload =
+      event.key === 'F5' ||
+      ((event.ctrlKey || event.metaKey) && (event.key === 'r' || event.key === 'R'));
+    if (!isReload) return;
+    if (this.GuestMode()) return;
+    if (this.isRefreshPromptOpen || this.isSaveing) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.ngZone.run(() => this.promptRefreshDownload());
+  };
+
+  private promptRefreshDownload() {
+    if (this.isRefreshPromptOpen || this.GuestMode()) return;
+    this.isRefreshPromptOpen = true;
+    this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('menu.confirm.refresh.title'),
+      text: this.i18n.t('menu.confirm.refresh.text'),
+      help: this.i18n.t('menu.confirm.refresh.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'sd_storage',
+      okLabel: this.i18n.t('menu.downloadZip'),
+      cancelLabel: this.i18n.t('menu.confirm.refresh.reload'),
+      action: () => {
+        void this.saveThenReload();
+      },
+      cancelAction: () => {
+        this.reloadWithoutPrompt();
+      },
+    }).finally(() => {
+      this.isRefreshPromptOpen = false;
+    });
+  }
+
+  private async saveThenReload() {
+    await this.save();
+    this.reloadWithoutPrompt();
+  }
+
+  private reloadWithoutPrompt() {
+    window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
+    document.location.reload();
+  }
+
+  private async tryConsumeInvite() {
+    const payload = this.roomInvite.parseInviteFromLocation();
+    if (!payload) return;
+    this.roomInvite.clearInviteFromLocation();
+
+    // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
+    for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    const result = await this.roomInvite.joinFromInvite(payload);
+    if (result === 'ok') return;
+
+    const errorKey = `invite.error.${result}`;
+    await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('invite.errorTitle'),
+      text: this.i18n.t(errorKey),
+      type: ConfirmationType.OK,
+      materialIcon: 'link_off',
+    });
+  }
+
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
+    window.addEventListener('keydown', this.onWindowKeydown, true);
   }
 
   ngAfterViewInit() {
@@ -491,7 +617,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           Notification.requestPermission().then((permission) => {
             if (permission === 'granted') {
               notification = new Notification('Udonarium with Fly', { 
-                body: '正在下載 Udonarium with Fly 的新版本。',
+                body: this.i18n.t('update.downloading'),
                 icon: 'card.png'
               });
               notification.addEventListener('click', function(e) {
@@ -511,9 +637,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           console.log(`New app version ready for use: ${event.latestVersion.hash}`);
           if (!this.isUpdateCanceled) {
             this.modalService.open(ConfirmationComponent, {
-              title: 'Udonarium with Fly 更新', 
-              text: '已下載 Udonarium with Fly 的新版本。要進行更新嗎？',
-              helpHtml: '<b style="color: red">更新時會重新載入頁面。</b>也可以手動重新載入來完成更新。',
+              title: this.i18n.t('update.title'), 
+              text: this.i18n.t('update.text'),
+              helpHtml: this.i18n.t('update.help'),
               type: ConfirmationType.OK_CANCEL,
               materialIcon: 'browser_updated',
               action: () => {
@@ -542,6 +668,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
+    window.removeEventListener('keydown', this.onWindowKeydown, true);
   }
 
   open(componentName: string) {
@@ -584,6 +711,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
         option = { width: 700, height: 600 };
+        break;
+      case 'CombatTrackerComponent':
+        component = CombatTrackerComponent;
+        option = { width: 520, height: 640, left: 100 };
+        break;
+      case 'SceneToolsComponent':
+        if (!SceneToolPermission.instance.canOpenPanel) return;
+        component = SceneToolsComponent;
+        option = { width: 380, height: 560, left: 100 };
         break;
     }
     if (component) {
@@ -649,35 +785,48 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   toolBox(event: Event) {
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
+    const position = {
+      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
       y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
     };
-    const menu = [];
+    this.openToolboxAt(position);
+  }
+
+  private openToolboxAt(position: { x: number, y: number }, extraActions: ContextMenuAction[] = []) {
+    const menu = this.buildToolboxMenuActions();
+    if (extraActions.length) {
+      menu.push(ContextMenuSeparator);
+      Array.prototype.push.apply(menu, extraActions);
+    }
+    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+  }
+
+  private buildToolboxMenuActions(): ContextMenuAction[] {
+    const menu: ContextMenuAction[] = [];
     const cunIns = CutInList.instance.cutIns;
-    menu.push({ name: '播放過場', materialIcon: 'play_arrow',
+    menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
       action: null, subActions: cunIns.length === 0 ? [
         {
-          name: '(沒有過場)',
+          name: this.i18n.t('toolbox.noCutIn'),
           disabled: true,
           center: true
         }
       ] : cunIns.map(cutIn => {
-        return { 
-          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? '(無名過場)' : cutIn.name}`, 
+        return {
+          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
           subActions: [{
-              name: '全員',
+              name: this.i18n.t('cutin.all'),
               action: () => {
                 EventSystem.call('PLAY_CUT_IN', {
                   identifier: cutIn.identifier,
                   secret: false,
                   sender: PeerCursor.myCursor.peerId
                 });
-                this.chatMessageService.sendOperationLog((cutIn.name == '' ? '(無名過場)' : cutIn.name) + ' 已播放');
+                this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
               }
             }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
             return {
-              name: peer.name + (peer === PeerCursor.myCursor ? ' (你)' : ''),
+              name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
               color: peer.color,
               default: true,
               action: () => {
@@ -700,22 +849,171 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
     });
     menu.push(ContextMenuSeparator);
-    menu.push({ name: '過場設定...', materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
-    menu.push({ name: '骰子機器人表設定...', materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') })
-    this.contextMenuService.open(position, menu, '工具箱');
+    menu.push(this.makeWeatherToolboxMenu());
+    menu.push(this.makeDayNightToolboxMenu());
+    menu.push(ContextMenuSeparator);
+    menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
+    menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
+    menu.push(ContextMenuSeparator);
+    menu.push({
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+      ]
+    });
+    menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
+    menu.push(ContextMenuSeparator);
+    menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
+    menu.push({
+      name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+      materialIcon: 'sd_storage',
+      disabled: this.isSaveing,
+      action: () => this.save()
+    });
+    return menu;
   }
 
-  resetPointOfView(event: Event) {
-    const button = <HTMLElement>event.target;
-    const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+  private makeWeatherToolboxMenu() {
+    const markType = (type: WeatherType) => {
+      const cur = TableSelecter.instance.viewTable?.weatherType || 'none';
+      return `${cur === type ? '◉' : '○'}`;
     };
-    this.contextMenuService.open(position, [
-      { name: '回到最初的視點', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-      { name: '使用正上方視點', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-    ], '視點重置');
+    const setType = (type: WeatherType) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.weatherType = type;
+      if (type !== 'none' && !(table.weatherIntensity > 0)) table.weatherIntensity = 0.5;
+    };
+    const markIntensity = (value: number) => {
+      const cur = TableSelecter.instance.viewTable?.weatherIntensity ?? 0.5;
+      const on = Math.abs(cur - value) < 0.06;
+      return `${on ? '◉' : '○'}`;
+    };
+    const setIntensity = (value: number) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.weatherIntensity = value;
+      if (table.weatherType === 'none') table.weatherType = 'rain';
+    };
+    const typeItem = (type: WeatherType, labelKey: string) => {
+      const label = this.i18n.t(labelKey);
+      return {
+        name: `${markType(type)} ${label}`,
+        nameUpdate: () => `${markType(type)} ${label}`,
+        action: () => setType(type),
+        checkBox: 'radio' as const,
+      };
+    };
+    const intensityItem = (value: number, labelKey: string) => {
+      const label = this.i18n.t(labelKey);
+      return {
+        name: `${markIntensity(value)} ${label}`,
+        nameUpdate: () => `${markIntensity(value)} ${label}`,
+        action: () => setIntensity(value),
+        checkBox: 'radio' as const,
+      };
+    };
+    return {
+      name: this.i18n.t('table.weather'),
+      materialIcon: 'wb_cloudy',
+      subActions: [
+        ...WEATHER_MENU_ORDER.map(type => typeItem(type, WEATHER_LABEL_KEY[type])),
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('table.intensity'),
+          subActions: [
+            intensityItem(0.25, 'table.intensityLow'),
+            intensityItem(0.5, 'table.intensityMid'),
+            intensityItem(0.75, 'table.intensityHigh'),
+            intensityItem(1, 'table.intensityMax'),
+          ],
+        },
+      ],
+    };
+  }
+
+  private makeDayNightToolboxMenu() {
+    const animateDarkness = (target: number) => {
+      const table = TableSelecter.instance.viewTable;
+      if (!table) return;
+      table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
+      const start = table.darkness ?? 0;
+      const t0 = performance.now();
+      const dur = 800;
+      const step = (now: number) => {
+        const p = Math.min(1, (now - t0) / dur);
+        table.darkness = start + (target - start) * p;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const isDay = () => (TableSelecter.instance.viewTable?.darkness ?? 0) < 0.35;
+    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.55;
+    return {
+      name: this.i18n.t('table.dayNight'),
+      materialIcon: 'brightness_6',
+      subActions: [
+        {
+          name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
+          nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
+          action: () => animateDarkness(0),
+          checkBox: 'radio' as const,
+        },
+        {
+          name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
+          nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
+          action: () => animateDarkness(0.85),
+          checkBox: 'radio' as const,
+        },
+      ],
+    };
+  }
+
+  async openZipFileSelect() {
+    if (!this.isRoom) {
+      let loadDirectOpened = false;
+      const choice = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('menu.confirm.loadZip.title'),
+        text: this.i18n.t('menu.confirm.loadZip.text'),
+        help: this.i18n.t('menu.confirm.loadZip.help'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'meeting_room',
+        okLabel: this.i18n.t('menu.confirm.loadZip.createRoom'),
+        cancelLabel: this.i18n.t('menu.confirm.loadZip.loadDirect'),
+        // Open file picker in the click handler so browsers allow it.
+        cancelAction: () => {
+          loadDirectOpened = true;
+          this.pickZipFiles();
+        },
+      });
+      if (choice === true) {
+        await this.modalService.open(RoomSettingComponent, {
+          width: 700,
+          height: 420,
+          left: 0,
+          top: 400,
+          // Keep file picker in the create-button click stack.
+          afterCreate: () => this.pickZipFiles(),
+        });
+        return;
+      }
+      if (loadDirectOpened || choice === false) return;
+      return;
+    }
+
+    this.pickZipFiles();
+  }
+
+  private pickZipFiles() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/xml,text/xml,application/zip';
+    input.onchange = (event: Event) => this.handleFileSelect(event);
+    input.click();
   }
 
   standSetteings(event: Event) {
@@ -725,62 +1023,73 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
       y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
     };
-    const isShowStand = StandImageComponent.isShowStand;
-    const isShowNameTag = StandImageComponent.isShowNameTag;
-    const isCanBeGone = StandImageComponent.isCanBeGone; 
     this.contextMenuService.open(position, [
-      { name: `${ TableSelecter.instance.gridShow ? '☑' : '☐' }一律顯示桌面格線`, 
-        action: () => {
-          TableSelecter.instance.gridShow = !TableSelecter.instance.gridShow;
-          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext()); 
+      contextMenuToggleCheck({
+        get: () => TableSelecter.instance.gridShow,
+        set: (v) => {
+          TableSelecter.instance.gridShow = v;
+          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext());
         },
-        checkBox: 'check'
-      },
-      { name: `${ TableSelecter.instance.gridSnap ? '☑' : '☐' }物件移動時對齊格線`, 
-        action: () => {
-          TableSelecter.instance.gridSnap = !TableSelecter.instance.gridSnap;
-        },
-        checkBox: 'check'
-      },
+        on: `☑${this.i18n.t('menu.settings.showGrid')}`,
+        off: `☐${this.i18n.t('menu.settings.showGrid')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => TableSelecter.instance.gridSnap,
+        set: (v) => { TableSelecter.instance.gridSnap = v; },
+        on: `☑${this.i18n.t('menu.settings.gridSnap')}`,
+        off: `☐${this.i18n.t('menu.settings.gridSnap')}`,
+      }),
       ContextMenuSeparator,
-      { name: `${ ChatWindowComponent.isNoticeOn ? '☑' : '☐' }新訊息提示音`, 
-        action: () => {
-          ChatWindowComponent.setChatNotice(!ChatWindowComponent.isNoticeOn);
-        },
-        checkBox: 'check'
-      },
-      { name: `${ ChatWindowComponent.isLeftOnly ? '☑' : '☐' }訊息一律靠左顯示`, 
-        action: () => {
-          ChatWindowComponent.setChatLeftOnly(!ChatWindowComponent.isLeftOnly);
-        },
-        checkBox: 'check'
-      },
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.isNoticeOn,
+        set: (v) => { ChatWindowComponent.setChatNotice(v); },
+        on: `☑${this.i18n.t('menu.settings.noticeSound')}`,
+        off: `☐${this.i18n.t('menu.settings.noticeSound')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.isLeftOnly,
+        set: (v) => { ChatWindowComponent.setChatLeftOnly(v); },
+        on: `☑${this.i18n.t('menu.settings.leftOnly')}`,
+        off: `☐${this.i18n.t('menu.settings.leftOnly')}`,
+      }),
       ContextMenuSeparator,
-      { name: `${ isShowStand ? '☑' : '☐' }顯示立繪`, 
-        action: () => {
-          StandImageComponent.isShowStand = !isShowStand;
-        },
-        checkBox: 'check'
-      },
-      { name: `${ isShowNameTag ? '☑' : '☐' }顯示名稱標籤`, 
-        action: () => {
-          StandImageComponent.isShowNameTag = !isShowNameTag;
-        },
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isShowStand,
+        set: (v) => { StandImageComponent.isShowStand = v; },
+        on: `☑${this.i18n.t('menu.settings.showStand')}`,
+        off: `☐${this.i18n.t('menu.settings.showStand')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isShowNameTag,
+        set: (v) => { StandImageComponent.isShowNameTag = v; },
+        on: `☑${this.i18n.t('menu.settings.showNameTag')}`,
+        off: `☐${this.i18n.t('menu.settings.showNameTag')}`,
         level: 1,
         disabled: !StandImageComponent.isShowStand,
-        checkBox: 'check'
-      },
-      { name: `${ isCanBeGone ? '☑' : '☐' }立繪淡出並自動退場`, 
-        action: () => {
-          StandImageComponent.isCanBeGone = !isCanBeGone;
-        },
+      }),
+      contextMenuToggleCheck({
+        get: () => StandImageComponent.isCanBeGone,
+        set: (v) => { StandImageComponent.isCanBeGone = v; },
+        on: `☑${this.i18n.t('menu.settings.standAutoExit')}`,
+        off: `☐${this.i18n.t('menu.settings.standAutoExit')}`,
         level: 1,
         disabled: !StandImageComponent.isShowStand,
-        checkBox: 'check'
+      }),
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('lang.label'),
+        materialIcon: 'language',
+        subActions: this.i18n.locales.map(locale => ({
+          name: `${this.i18n.locale === locale.id ? '☑' : '☐'} ${locale.nativeLabel}`,
+          checkBox: 'check',
+          keepOpen: true,
+          action: () => this.i18n.setLocale(locale.id as AppLocale),
+          nameUpdate: () => `${this.i18n.locale === locale.id ? '☑' : '☐'} ${locale.nativeLabel}`,
+        })),
       },
       ContextMenuSeparator,
-      { name: '清除所有顯示中的立繪', action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
-    ], '個人設定');
+      { name: this.i18n.t('menu.settings.clearStands'), action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
+    ], this.i18n.t('menu.settings'));
   }
 /*
   farewellStandAll() {
@@ -789,9 +1098,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 */
   diceAllOpne() {
     this.modalService.open(ConfirmationComponent, {
-      title: '一次公開桌面骰子', 
-      text: '要公開桌面上的骰子、硬幣嗎？',
-      help: '標記為「不一齊公開」的骰子／硬幣不會一起翻開。',
+      title: this.i18n.t('menu.confirm.diceOpen.title'),
+      text: this.i18n.t('menu.confirm.diceOpen.text'),
+      help: this.i18n.t('menu.confirm.diceOpen.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'all_out',
       action: () => {
@@ -802,14 +1111,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   logout() {
       this.modalService.open(ConfirmationComponent, {
-      title: '斷開連線', 
-      text: `將切斷與其他參與者的連線${ this.isRoom ? '，並退出房間' : '' }。`,
-      helpHtml: '<b style="color: red">頁面將重新載入。</b>若尚未存檔，請先取消並保存 ZIP。',
+      title: this.i18n.t('menu.confirm.logout.title'),
+      text: this.i18n.t(this.isRoom ? 'menu.confirm.logout.textRoom' : 'menu.confirm.logout.text'),
+      help: this.i18n.t('menu.confirm.logout.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'logout',
       action: () => {
-        window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
-        document.location.reload();
+        this.reloadWithoutPrompt();
       }
     });
   }

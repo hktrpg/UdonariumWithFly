@@ -10,6 +10,10 @@ import { EventSystem } from '@udonarium/core/system';
 
 import { COMPOSITION_BUFFER_MODE } from '@angular/forms'
 import Autolinker from 'autolinker';
+import { formatDate } from '@angular/common';
+import { I18nService } from 'service/i18n.service';
+import { toIntlLocale } from 'i18n';
+import { imageEffectFilter, imageEffectOpacity, imageEffectTransform, unpackImageFx } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'chat-message',
@@ -71,9 +75,15 @@ export class ChatMessageComponent implements OnInit {
   constructor(
     private modalService: ModalService,
     private changeDetector: ChangeDetectorRef,
+    private i18n: I18nService,
   ) { }
 
   stringUtil = StringUtil;
+
+  formatTimestamp(value: number, format: string): string {
+    if (!value) return '';
+    return formatDate(value, format, toIntlLocale(this.i18n.locale));
+  }
 
   ngOnInit() {
     EventSystem.register(this)
@@ -83,6 +93,9 @@ export class ChatMessageComponent implements OnInit {
       }
     })
     .on('CHANGE_GM_MODE', event => {
+      this.changeDetector.markForCheck();
+    })
+    .on('LOCALE_CHANGED', () => {
       this.changeDetector.markForCheck();
     });
 
@@ -110,6 +123,18 @@ export class ChatMessageComponent implements OnInit {
     return this.leftOnly || this.isMine;
     //return this.compact || this.chatMessage.isOperationLog || this.chatMessage.isDicebot;
   }
+
+  private msgImageEffectSource() {
+    return {
+      isInverse: this.chatMessage.isInverseIcon == 1,
+      isHollow: this.chatMessage.isHollowIcon == 1,
+      isBlackPaint: this.chatMessage.isBlackPaint == 1,
+      ...unpackImageFx(this.chatMessage.imageFx || ''),
+    };
+  }
+  get msgImageFilter(): string | null { return imageEffectFilter(this.msgImageEffectSource()); }
+  get msgImageOpacity(): number | null { return imageEffectOpacity(this.msgImageEffectSource()); }
+  get msgImageTransform(): string | null { return imageEffectTransform(this.msgImageEffectSource()); }
 
   get htmlEscapedFrom():string  {
     return this._htmlEscapeLinking(this.chatMessage.from, true);

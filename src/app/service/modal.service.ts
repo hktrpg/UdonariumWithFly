@@ -1,4 +1,5 @@
 import { ComponentRef, Injectable, Injector, OnChanges, ViewContainerRef } from '@angular/core';
+import { I18nService } from './i18n.service';
 
 class ModalContext {
   constructor(
@@ -22,11 +23,15 @@ export class ModalService {
   private modalContext: ModalContext = null;
   private count = 0;
 
-  title: string = '無名對話框';
+  title: string = 'Untitled dialog';
 
   /* Todo */
   static defaultParentViewContainerRef: ViewContainerRef;
   static ModalComponentClass: { new(...args: any[]): any } = null;
+
+  constructor(private i18n: I18nService) {
+    this.title = this.i18n.t('modal.untitled');
+  }
 
   get option(): any {
     return this.modalContext ? this.modalContext.option : null;
@@ -58,7 +63,7 @@ export class ModalService {
         }
       };
 
-      const childModalService: ModalService = new ModalService();
+      const childModalService: ModalService = new ModalService(this.i18n);
       childModalService.modalContext = new ModalContext(_resolve, _reject, option);
 
       const parentInjector = parentViewContainerRef.injector;

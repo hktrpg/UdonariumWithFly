@@ -3,30 +3,30 @@
     <div *ngIf="isEdit" class="table-cell table-cell_solid">
       <ng-container *ngTemplateOutlet="editButtons"></ng-container>
       <select #select (change)="setElementType(select.value)" [ngModel]="gameDataElement.type ?? ''">
-        <option value="">一般</option>
-        <option value="simpleNumber">數值</option>
-        <option value="numberResource">資源</option>
-        <option value="abilityScore">能力值</option>
-        <option value="checkProperty">勾選</option>
-        <option value="note">筆記</option>
-        <option value="url">參考網址</option>
+        <option value="">{{ 'sheet.data.type.normal' | i18n }}</option>
+        <option value="simpleNumber">{{ 'sheet.data.type.number' | i18n }}</option>
+        <option value="numberResource">{{ 'sheet.data.type.resource' | i18n }}</option>
+        <option value="abilityScore">{{ 'sheet.data.type.ability' | i18n }}</option>
+        <option value="checkProperty">{{ 'sheet.data.type.check' | i18n }}</option>
+        <option value="note">{{ 'sheet.data.type.note' | i18n }}</option>
+        <option value="url">{{ 'sheet.data.type.url' | i18n }}</option>
       </select>
     </div>
     <div class="table-cell table-cell_solid">
       <ng-container *ngIf="isTagLocked">
-        <button *ngIf="!isCommonValue" type="button" title="Send to chat" style="vertical-align: middle; padding: 0 2px;" (click)="sendLogMessage()">
+        <button *ngIf="!isCommonValue" type="button" [attr.title]="'sheet.sendToChat' | i18n" style="vertical-align: middle; padding: 0 2px;" (click)="sendLogMessage()">
           <i class="material-icons" style="font-size: 1rem;">send</i>
         </button>
         <span style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</span>
-        <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">0=依圖片</span></ng-container>
+        <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">{{ 'sheet.data.heightImage' | i18n }}</span></ng-container>
       </ng-container>
       <ng-container *ngIf="!isTagLocked">
-        <button type="button" title="Send to chat" (click)="sendLogMessage()">
+        <button type="button" [attr.title]="'sheet.sendToChat' | i18n" (click)="sendLogMessage()">
           <i class="material-icons icon-size">send</i>
         </button>
         <div class="hidden-spacer" style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</div>
         <input style="width:100%; min-width:10px; font-family: Cambria, Georgia; font-size: 0.9rem;" size="1"
-          [(ngModel)]="name" placeholder="Value" />
+          [(ngModel)]="name" [placeholder]="'sheet.placeholder.value' | i18n" />
       </ng-container>
     </div>
     <div class="table-cell">
@@ -36,7 +36,7 @@
             <input style="width:90%;" [style]="'font-size: 1.0em; min-width: 90px; width: 90%; --min: 0; --max: ' + value + '; --val:' + currentValue +';' | safe: 'style'" 
               [(ngModel)]="currentValue" type="range" title="{{currentValue}}%" min="0" max="100" step="1" />
             <br />
-            <input style="margin-left: 3.5em; width:4em; text-align:right;" type="number" min="0" max="100" step="1" size="1" [(ngModel)]="currentValue" placeholder="Opacity" /><b class="move" style="font-size: small">%</b>
+            <input style="margin-left: 3.5em; width:4em; text-align:right;" type="number" min="0" max="100" step="1" size="1" [(ngModel)]="currentValue" [placeholder]="'sheet.placeholder.opacity' | i18n" /><b class="move" style="font-size: small">%</b>
           </ng-container>
           <ng-container *ngSwitchCase="'color'">
             <ng-container *ngIf="gameDataElement.type === 'colors'">
@@ -51,8 +51,8 @@
             <input style="width:90%;" [style]="'font-size: 1.0em; min-width: 90px; width: 90%; --min: 0; --max: ' + value + '; --val:' + currentValue +';' | safe: 'style'" 
               [(ngModel)]="value" type="range" title="{{value}}" min="{{name === 'altitude' ? -12 : (name === 'fontsize' || name === 'length') ? 1 : 0}}" max="{{name === 'fontsize' ? 128 : 12}}" step="{{name === 'fontsize' ? 1 : 0.5}}" />
             <br />
-            <input style="width:35%; max-width:4em; text-align:right;" type="number" min="{{name === 'altitude' ? -24 : (name === 'fontsize' || name === 'length') ? 1 : 0}}" step="{{name === 'fontsize' ? 1 : 0.1}}" size="1" [(ngModel)]="value" placeholder="Value" />
-            <div *ngIf="descriptionType === 'character' && name === 'height'" style="color: #444; font-family: Cambria, Georgia; font-size: 0.9rem; display: inline-block; margin-left: 3px"><label [style.text-decoration]="currentValue ? 'none' : 'line-through'">× size<input type="checkbox" [(ngModel)]="currentValue" checked="{{currentValue ? 'checked' : ''}}" (change)="currentValue = (currentValue ? name : '')"></label></div>
+            <input style="width:35%; max-width:4em; text-align:right;" type="number" min="{{name === 'altitude' ? -24 : (name === 'fontsize' || name === 'length') ? 1 : 0}}" step="{{name === 'fontsize' ? 1 : 0.1}}" size="1" [(ngModel)]="value" [placeholder]="'sheet.placeholder.value' | i18n" />
+            <div *ngIf="descriptionType === 'character' && name === 'height'" style="color: #444; font-family: Cambria, Georgia; font-size: 0.9rem; display: inline-block; margin-left: 3px"><label [style.text-decoration]="currentValue ? 'none' : 'line-through'">{{ 'sheet.data.heightScale' | i18n }}<input type="checkbox" [(ngModel)]="currentValue" checked="{{currentValue ? 'checked' : ''}}" (change)="currentValue = (currentValue ? name : '')"></label></div>
           </ng-container>
         </ng-container>
       </ng-container>
@@ -61,45 +61,45 @@
           <ng-container *ngSwitchCase="'simpleNumber'">
             <!-- 沒有 size 屬性就無法縮小 -->
             <div class="hidden-spacer" style="font-size: 1.0em; font-family: Cambria, Georgia;">{{value}}</div> 
-            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" type="{{isNum(value) ? 'number' : 'text'}}" style="width:40%; min-width: 3em; max-width:8em; text-align:right" size="1" [(ngModel)]="value" placeholder="Number" />
+            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" type="{{isNum(value) ? 'number' : 'text'}}" style="width:40%; min-width: 3em; max-width:8em; text-align:right" size="1" [(ngModel)]="value" [placeholder]="'sheet.placeholder.number' | i18n" />
           </ng-container>
           <ng-container *ngSwitchCase="'numberResource'">
             <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" [style]="'font-size: 1.0em; min-width: 90px; width: 90%; --min: 0; --max: ' + value + '; --val:' + currentValue +';' | safe: 'style'"
               [(ngModel)]="currentValue" type="range" title="{{currentValue}}" min="0" max="{{!isNum(value) ? 1000 : value}}" />
             <br>
-            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width: 5em; text-align: right;" size="1" type="number" [(ngModel)]="currentValue" placeholder="Value" />
+            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width: 5em; text-align: right;" size="1" type="number" [(ngModel)]="currentValue" [placeholder]="'sheet.placeholder.value' | i18n" />
             /
-            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width: 5em;" size="1" type="number" [(ngModel)]="value" placeholder="Value" />
+            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width: 5em;" size="1" type="number" [(ngModel)]="value" [placeholder]="'sheet.placeholder.value' | i18n" />
           </ng-container>
           <ng-container *ngSwitchCase="'abilityScore'">
-            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width:40%; max-width:5em; text-align:right" type="{{isNum(value) ? 'number' : 'text'}}" size="1" [(ngModel)]="value" placeholder="Value">
+            <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" style="width:40%; max-width:5em; text-align:right" type="{{isNum(value) ? 'number' : 'text'}}" size="1" [(ngModel)]="value" [placeholder]="'sheet.placeholder.value' | i18n">
             <ng-container *ngIf="isEdit">
               <select class="modeifire-type" style="width:40%; max-width:5em" [(ngModel)]="currentValue">
-                <option value="">無</option>
-                <option value="div2">÷2</option>
-                <option value="div3">÷3 SRS,LHZ</option>
-                <option value="div4">÷4</option>
-                <option value="div5">÷5</option>
-                <option value="div6">÷6 SW</option>
-                <option value="div10">÷10</option>
-                <option value="DnD3">D&amp;D 3e～</option>
+                <option value="">{{ 'sheet.data.none' | i18n }}</option>
+                <option value="div2">{{ 'sheet.modifier.div2' | i18n }}</option>
+                <option value="div3">{{ 'sheet.modifier.div3' | i18n }}</option>
+                <option value="div4">{{ 'sheet.modifier.div4' | i18n }}</option>
+                <option value="div5">{{ 'sheet.modifier.div5' | i18n }}</option>
+                <option value="div6">{{ 'sheet.modifier.div6' | i18n }}</option>
+                <option value="div10">{{ 'sheet.modifier.div10' | i18n }}</option>
+                <option value="DnD3">{{ 'sheet.modifier.dnd3e' | i18n }}</option>
               </select>
             </ng-container>
             <ng-container *ngIf="!isEdit && currentValue"><span style="font-size: smaller;">{{'(' + (abilityScore >=0 ? '+' : '') + abilityScore + ')'}}</span></ng-container>
           </ng-container>
           <ng-container *ngSwitchCase="'checkProperty'">
               <input appLogging [logging.name]="tabletopObjectName" [logging.dataElement]="gameDataElement" [logging.disable]="isNoLogging" type="checkbox" [(ngModel)]="value" checked="{{value ? 'checked' : ''}}" (change)="value = (value ? name : '')">
-              <input *ngIf="isEdit" style="width:50%; max-width:4em" type="text" size="1" [(ngModel)]="currentValue" placeholder="Option">
+              <input *ngIf="isEdit" style="width:50%; max-width:4em" type="text" size="1" [(ngModel)]="currentValue" [placeholder]="'sheet.placeholder.option' | i18n">
               <span *ngIf="!isEdit" style="font-size: 1.0em; font-family: Cambria, Georgia; color: #555">{{checkValue}}</span>
             </ng-container>
           <ng-container *ngSwitchCase="'note'">
-            <textarea style="width:100%; height:5em; min-width:50px; resize: bose; font-size: 0.8em;" [(ngModel)]="value" placeholder="Note"></textarea>
+            <textarea style="width:100%; height:5em; min-width:50px; resize: bose; font-size: 0.8em;" [(ngModel)]="value" [placeholder]="'sheet.placeholder.note' | i18n"></textarea>
           </ng-container>
           <ng-container *ngSwitchCase="'url'">
             <!-- 沒有 size 屬性就無法縮小 -->
             <div class="hidden-spacer" style="font-size: 1.0em; font-family: Cambria, Georgia;">{{value}}</div>
             <span style="white-space: nowrap">
-              <input type="url" style="width:calc(100% - 1.6rem); min-width:10px;" size="1" [(ngModel)]="value" placeholder="https://www.example.com" />
+              <input type="url" style="width:calc(100% - 1.6rem); min-width:10px;" size="1" [(ngModel)]="value" [placeholder]="'common.urlExample' | i18n" />
               <button style="width: 1.6rem" [attr.disabled]="!stringUtil.validUrl(value.toString()) ? '' : null" (click)="stringUtil.validUrl(value.toString()) ? openUrl(value) : false"><i class="material-icons" style="font-size: 1.0rem">{{ !stringUtil.validUrl(value.toString()) ? 'link_off' : (stringUtil.sameOrigin(value.toString()) ? 'link' : 'open_in_new') }}</i></button>
             </span>
           </ng-container>
@@ -107,7 +107,7 @@
             <!-- 沒有 size 屬性就無法縮小 -->
             <div class="hidden-spacer" style="font-size: 1.0em; font-family: Cambria, Georgia;">{{value}}</div>
             <input *ngIf="!(isHideText && isTabletopObjectName)" style="width:100%; min-width:10px;" size="1" [(ngModel)]="value" placeholder="" />
-            <span *ngIf="isHideText && isTabletopObjectName" style="color: gray; font-size: 1.0em; font-family: Cambria, Georgia;">卡片（背面）</span>
+            <span *ngIf="isHideText && isTabletopObjectName" style="color: gray; font-size: 1.0em; font-family: Cambria, Georgia;">{{ 'sheet.data.cardBack' | i18n }}</span>
           </ng-container>
         </ng-container>
       </ng-container>
@@ -125,7 +125,7 @@
         </ng-container>
         <ng-container *ngIf="!isTagLocked">
           <input style="width:100%; min-width:10px; font-family: Cambria, Georgia; font-size: 1.0rem; font-weight: bold;"
-            size="1" [(ngModel)]="name" placeholder="Value" />
+            size="1" [(ngModel)]="name" [placeholder]="'sheet.placeholder.value' | i18n" />
         </ng-container>
       </div>
       <div class="table" *ngIf="0 < gameDataElement.children.length">

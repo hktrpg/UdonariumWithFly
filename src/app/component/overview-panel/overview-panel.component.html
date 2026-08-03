@@ -51,8 +51,8 @@
     </div>
     <div class="component-title title-background"
       [ngClass]="{'with-button-marign': hasImage}">
-      <ng-container *ngIf="!(cardState === CardStateBack) && (cardState === CardStateFront || card.isVisible == null || card.isVisible || card.isGMMode)">{{card.name}}</ng-container><ng-container *ngIf="card.aliasName == 'card-stack' && !card.isEmpty"> 的頂部</ng-container>
-      <ng-container *ngIf="!(cardState === CardStateFront) && (cardState === CardStateBack || (card.isVisible != null && !card.isVisible && !card.isGMMode))">卡牌（背面）</ng-container>
+      <ng-container *ngIf="!(cardState === CardStateBack) && (cardState === CardStateFront || card.isVisible == null || card.isVisible || card.isGMMode)">{{card.name}}</ng-container><ng-container *ngIf="card.aliasName == 'card-stack' && !card.isEmpty">{{ i18n.t('overview.top') }}</ng-container>
+      <ng-container *ngIf="!(cardState === CardStateFront) && (cardState === CardStateBack || (card.isVisible != null && !card.isVisible && !card.isGMMode))">{{ i18n.t('overview.cardBack') }}</ng-container>
     </div>
     <div class="component-background">
       <div class="grid-container-root" *ngIf="hasDataElms && (card.isVisible || card.isGMMode)">
@@ -92,15 +92,21 @@
       [ngClass]="{ 'has-icon': isUseIcon,'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
       <ng-container *ngIf="!isUseIcon">
         <div [ngStyle]="{'transform': ('rotate(' + roll + 'deg)') }">
-          <div class="inverser" [ngClass]="{inverse: isInverse, hollow: isHollow}">
+          <div class="inverser"
+            [style.filter]="charOverviewFilter"
+            [style.opacity]="charOverviewOpacity"
+            [style.transform]="charOverviewTransform">
             <span class="aura" [ngClass]="{black: aura == 0, blue: aura == 1, green: aura == 2, cyan: aura == 3, red: aura == 4, magenta: aura == 5, yellow: aura == 6, white: aura == 7}">
-              <img class="character-image" [ngClass]="{'black-paint': isBlackPaint}" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none">
+              <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none">
             </span>
           </div>
         </div>
       </ng-container>
       <ng-container *ngIf="isUseIcon">
-        <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none" />
+        <div class="overview-face-icon-wrap">
+          <img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" style="pointer-events: none" alt="" />
+          <span class="overview-face-icon-badge">{{ i18n.t('overview.icon') }}</span>
+        </div>
       </ng-container>
       <!--<img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" />-->
     </div>
@@ -130,7 +136,7 @@
     </div>
     <div class="title-area component-title"
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
-      <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">???</ng-container>
+      <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">{{ 'dice.hidden' | i18n }}</ng-container>
     </div>
     <div *ngIf="dice.hasOwner && 0 < dice.ownerName.length" class="owner-name-area component-owner"
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
@@ -173,7 +179,7 @@
         <div class="grid-container">
           <ng-container *ngFor="let dataElm of rangeElms">
             <ng-container *ngIf="dataElm.name == 'length' || dataElm.name == 'width'">
-              <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+              <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
               <div class="value">
                 <div style="display: inline-block; width: min-content;">
                   <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
@@ -187,7 +193,7 @@
               </div>
             </ng-container>
             <ng-container *ngIf="dataElm.name == 'opacity'">
-              <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+              <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
               <div class="value">
                 <div style="display: inline-block; width: min-content;">
                   <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
@@ -204,9 +210,12 @@
           <ng-container *ngIf="range.followingCharactor">
             <div class="tag">➡ {{ range.followingCharactor.name }}</div>
             <div class="value" style="margin-top: 3px; pointer-events: none">
-              <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px" [ngClass]="{inverse: range.followingCharactor.isInverse, hollow: range.followingCharactor.isHollow}">
+              <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px"
+                [style.filter]="followImageFilter(range.followingCharactor)"
+                [style.opacity]="followImageOpacity(range.followingCharactor)"
+                [style.transform]="followImageTransform(range.followingCharactor)">
                 <span class="aura-following" [ngClass]="{black: range.followingCharactor.aura == 0, blue: range.followingCharactor.aura == 1, green: range.followingCharactor.aura == 2, cyan: range.followingCharactor.aura == 3, red: range.followingCharactor.aura == 4, magenta: range.followingCharactor.aura == 5, yellow: range.followingCharactor.aura == 6, white: range.followingCharactor.aura == 7}">
-                  <img style="max-width: 32px; max-height: 32px" class="character-image" draggable="false" [ngClass]="{'black-paint': range.followingCharactor.isBlackPaint}" [src]="range.followingCharactor.imageFile.url | safe: 'resourceUrl'" style="pointer-events: none">
+                  <img style="max-width: 32px; max-height: 32px" class="character-image" draggable="false" [src]="range.followingCharactor.imageFile.url | safe: 'resourceUrl'" style="pointer-events: none">
                 </span>
               </div>
             </div>
@@ -285,7 +294,7 @@
             <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
             <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
           </div>
-          <div style="display: inline;"> / {{!+dataElm.value ? '???' : dataElm.value}}</div>
+          <div style="display: inline;"> / {{!+dataElm.value ? ('common.unknown' | i18n) : dataElm.value}}</div>
         </div>
         <div class="section" style="line-height: 1em;">
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" type="range" title="{{dataElm.currentValue}}"
@@ -309,7 +318,7 @@
       </ng-container>
       <ng-container *ngSwitchCase="'url'">
         <div class="tag">
-          <span *ngIf="!stringUtil.validUrl(dataElm.value)" title="網址無效">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
+          <span *ngIf="!stringUtil.validUrl(dataElm.value)" [attr.title]="'common.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
           (click)="stringUtil.validUrl(dataElm.value) ? openUrl(dataElm.value, name, dataElm.name) : false"><span class="url-link">{{dataElm.name}}</span></a>
         </div>
       </ng-container>

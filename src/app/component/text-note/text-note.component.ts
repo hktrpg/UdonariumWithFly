@@ -23,8 +23,10 @@ import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ModalService } from 'service/modal.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { TabletopActionService } from 'service/tabletop-action.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 
 @Component({
@@ -122,7 +124,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    private tabletopActionService: TabletopActionService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -265,93 +269,114 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = { x: this.textNote.location.x, y: this.textNote.location.y, z: this.textNote.posZ };
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('textNote.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
     actions.push(ContextMenuSeparator);
 
     return actions;
   }
 
   private makeContextMenu(): ContextMenuAction[] {
+    let objectPosition = {
+      x: this.textNote.location.x + (this.width * this.gridSize) / 2,
+      y: this.textNote.location.y + (this.height * this.gridSize) / 2,
+      z: this.textNote.posZ
+    };
+
     let actions: ContextMenuAction[] = [
-      (this.isLocked
-        ? {
-          name: '☑ 固定', action: () => {
-            this.isLocked = false;
-            SoundEffect.play(PresetSound.unlock);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 固定', action: () => {
-            this.isLocked = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          checkBox: 'check'
-        }),
-      ContextMenuSeparator,
-      (this.isUpright
-        ? {
-          name: '☑ 直立', action: () => {
-            //this.transition = true;
-            this.isUpright = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 直立', action: () => {
-            //this.transition = true;
-            this.isUpright = true;
-          },
-          checkBox: 'check'
-        }),
-      (this.isShowTitle
-        ? {
-          name: '☑ 顯示標題列', action: () => {
-            this.isShowTitle = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示標題列', action: () => {
-            this.isShowTitle = true;
-          },
-          checkBox: 'check'
-        }),
-      (this.isWhiteOut
-        ? {
-          name: '☑ 背景去色', action: () => {
-            this.isWhiteOut = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 背景去色', action: () => {
-            this.isWhiteOut = true;
-          },
-          checkBox: 'check'
-        }),
-      ContextMenuSeparator,
-      (this.isAltitudeIndicate
-        ? {
-          name: '☑ 顯示高度', action: () => {
-            this.isAltitudeIndicate = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示高度', action: () => {
-            this.isAltitudeIndicate = true;
-          },
-          checkBox: 'check'
-        }),
       {
-        name: '將高度設為0', action: () => {
+        name: this.isLocked ? this.i18n.t('textNote.menu.2') : this.i18n.t('textNote.menu.3'),
+        nameUpdate: () => this.isLocked ? this.i18n.t('textNote.menu.2') : this.i18n.t('textNote.menu.3'),
+        action: () => {
+          this.isLocked = !this.isLocked;
+          SoundEffect.play(this.isLocked ? PresetSound.lock : PresetSound.unlock);
+          this.changeDetector.markForCheck();
+        },
+        checkBox: 'check'
+      },
+      ContextMenuSeparator,
+      {
+        name: this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
+        nameUpdate: () => this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
+        action: () => {
+          this.isUpright = !this.isUpright;
+          this.changeDetector.markForCheck();
+        },
+        checkBox: 'check'
+      },
+      {
+        name: this.isShowTitle ? this.i18n.t('textNote.menu.6') : this.i18n.t('textNote.menu.7'),
+        nameUpdate: () => this.isShowTitle ? this.i18n.t('textNote.menu.6') : this.i18n.t('textNote.menu.7'),
+        action: () => {
+          this.isShowTitle = !this.isShowTitle;
+          this.changeDetector.markForCheck();
+        },
+        checkBox: 'check'
+      },
+      {
+        name: this.isWhiteOut ? this.i18n.t('textNote.menu.8') : this.i18n.t('textNote.menu.9'),
+        nameUpdate: () => this.isWhiteOut ? this.i18n.t('textNote.menu.8') : this.i18n.t('textNote.menu.9'),
+        action: () => {
+          this.isWhiteOut = !this.isWhiteOut;
+          this.changeDetector.markForCheck();
+        },
+        checkBox: 'check'
+      },
+      ContextMenuSeparator,
+      {
+        name: this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
+        nameUpdate: () => this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
+        action: () => {
+          this.isAltitudeIndicate = !this.isAltitudeIndicate;
+          this.changeDetector.markForCheck();
+        },
+        checkBox: 'check'
+      },
+      {
+        name: this.i18n.t('textNote.menu.12'),
+        action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             SoundEffect.play(PresetSound.sweep);
+            this.changeDetector.markForCheck();
           }
         },
         altitudeHande: this.textNote
       },
       ContextMenuSeparator,
-      { name: '編輯筆記...', action: () => { this.showDetail(this.textNote); } },
+      {
+        name: this.i18n.t('note.moveTo'),
+        action: null,
+        subActions: [
+          {
+            name: this.i18n.t('note.moveToCommon'),
+            action: () => {
+              this.textNote.setLocation('common');
+              this.selectionService.remove(this.textNote);
+              SoundEffect.play(PresetSound.cardPut);
+            }
+          },
+          {
+            name: this.i18n.t('note.moveToPersonal'),
+            action: () => {
+              this.textNote.setLocation(Network.peerId);
+              this.selectionService.remove(this.textNote);
+              SoundEffect.play(PresetSound.cardPut);
+            }
+          },
+          {
+            name: this.i18n.t('note.moveToGraveyard'),
+            action: () => {
+              this.textNote.setLocation('graveyard');
+              this.selectionService.remove(this.textNote);
+              SoundEffect.play(PresetSound.sweep);
+            }
+          },
+        ]
+      },
+      ContextMenuSeparator,
+      { name: this.i18n.t('textNote.menu.13'), action: () => { this.showDetail(this.textNote); } },
       (this.textNote.getUrls().length <= 0 ? null : {
-        name: '打開參考網址', action: null,
+        name: this.i18n.t('textNote.menu.14'), action: null,
         subActions: this.textNote.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -361,17 +386,17 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
                 window.open(url.trim(), '_blank', 'noopener');
               } else {
                 this.modalService.open(OpenUrlComponent, { url: url, title: this.textNote.title, subTitle: urlElement.name });
-              } 
+              }
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('common.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         })
       }),
       (this.textNote.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: '建立副本', action: () => {
+        name: this.i18n.t('textNote.menu.15'), action: () => {
           let cloneObject = this.textNote.clone();
           cloneObject.isLocked = false;
           cloneObject.location.x += this.gridSize;
@@ -381,10 +406,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
         }
       },
       {
-        name: '刪除', action: () => {
+        name: this.i18n.t('textNote.menu.16'), action: () => {
           this.textNote.destroy();
           SoundEffect.play(PresetSound.sweep);
         }
+      },
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('textNote.menu.17'),
+        action: null,
+        subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition)
       },
     ];
 
@@ -431,7 +462,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '共用筆記設定';
+    let title = this.i18n.t('textNote.panelTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
     let option: PanelOption = { title: title, left: coordinate.x - 350, top: coordinate.y - 200, width: 560, height: 470 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

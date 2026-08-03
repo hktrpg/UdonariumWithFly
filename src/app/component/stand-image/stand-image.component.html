@@ -17,21 +17,32 @@
         [style.bottom.px]="emoteCssBottom"
         [ngClass]="{'emote-secret': isSecret}">{{ gameCharacter.text }}</div>
       <div style="transform-origin: center 66%" [ngStyle]="{'transform': isApplyRoll ? ('rotate(' + gameCharacter.roll + 'deg)') : ''}">
-        <div class="inverser" [ngClass]="{inverse: isApplyImageEffect && gameCharacter.isInverse}">
+        <div class="inverser"
+          [style.opacity]="isApplyImageEffect ? standImageOpacity : null"
+          [style.transform]="isApplyImageEffect ? standImageTransform : null">
           <div class="aura" [ngClass]="{black: isApplyImageEffect && gameCharacter.aura == 0, blue: isApplyImageEffect && gameCharacter.aura == 1, 
             green: isApplyImageEffect && gameCharacter.aura == 2, cyan: isApplyImageEffect && gameCharacter.aura == 3, red: isApplyImageEffect && gameCharacter.aura == 4,
             magenta: isApplyImageEffect && gameCharacter.aura == 5, yellow: isApplyImageEffect && gameCharacter.aura == 6, white: isApplyImageEffect && gameCharacter.aura == 7}">
-            <div class="color-filter">
+            <div class="color-filter matrix-rain-host">
               <img #standImageElement (load)="onImageLoad()" class="stand-image" draggable="false"
                 [style.display]="!isSpeakable || !isSpeaking ? 'inline-block' : 'none'"
                 [style.height]="height > 0 ? height + 'vh' : 'auto'"
-                [src]="imageUrl | safe: 'resourceUrl'" 
-                [ngClass]="{'black-paint': isApplyImageEffect && gameCharacter.isBlackPaint, 'hollow': isApplyImageEffect && gameCharacter.isHollow}">
+                [style.filter]="isApplyImageEffect ? standImageFilter : null"
+                [src]="imageUrl | safe: 'resourceUrl'">
               <img class="stand-image" draggable="false"
                 [style.display]="isSpeakable && isSpeaking ? 'inline-block' : 'none'"
                 [style.height]="height > 0 ? height + 'vh' : 'auto'"
-                [src]="speakingImageUrl | safe: 'resourceUrl'" 
-                [ngClass]="{'black-paint': isApplyImageEffect && gameCharacter.isBlackPaint, 'hollow': isApplyImageEffect && gameCharacter.isHollow}">
+                [style.filter]="isApplyImageEffect ? standImageFilter : null"
+                [src]="speakingImageUrl | safe: 'resourceUrl'">
+              <div *ngIf="showMatrixRain" class="matrix-rain" aria-hidden="true">
+                <span *ngFor="let col of matrixRainColumns; trackBy: trackByMatrixCol"
+                  class="matrix-rain-col"
+                  [class.up]="col.up"
+                  [style.animation-duration]="col.duration"
+                  [style.animation-delay]="col.delay"
+                  [style.font-size]="col.fontSize"
+                  [style.opacity]="col.opacity">{{ col.text }}</span>
+              </div>
             </div>
           </div>
         </div>

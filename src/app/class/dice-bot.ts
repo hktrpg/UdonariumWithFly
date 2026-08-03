@@ -17,6 +17,7 @@ import { DiceRollTableList } from './dice-roll-table-list';
 
 import { CutInList } from './cut-in-list';
 import { ChatMessageService } from 'service/chat-message.service';
+import { translate } from 'i18n';
 
 export interface DiceBotInfo {
   id: string;
@@ -245,7 +246,7 @@ export class DiceBot extends GameObject {
         modStr = modStr.split(' ')[0];
         if (/^[\+\-]\d+$/.test(modStr)) {
           modifier = +modStr;
-          modStr = ` (修正值${modStr})`;
+          modStr = translate('diceTable.modLabel', { mod: modStr });
         } else if (/^\=\-?\d+$/.test(modStr)) {
           isFixedRef = true;
         } else {
@@ -256,7 +257,7 @@ export class DiceBot extends GameObject {
       if (isDiceRollTableMatch) {
         finalResult.isFailure = false;
         finalResult.isDiceRollTable = true;
-        finalResult.tableName = (diceRollTable.name && diceRollTable.name.length > 0) ? diceRollTable.name : '(無名骰子機器人表)';
+        finalResult.tableName = (diceRollTable.name && diceRollTable.name.length > 0) ? diceRollTable.name : translate('diceTable.unnamed');
         finalResult.isSecret = isSecret || isRepSecret;
         const diceRollTableRows = diceRollTable.parseText();
         for (let i = 0; i < repeat && i < 32; i++) {
@@ -277,10 +278,10 @@ export class DiceBot extends GameObject {
                   if (!isFixedRef) {
                     finalResult.result += (rollResult.result + modStr + (modStr ? ` → ${rollResultNumber + modifier}`: '') + "\n" + StringUtil.cr(diceRollTableRow.result));
                   } else {
-                    finalResult.result += ('指定=' + rollResultNumber + "\n" + StringUtil.cr(diceRollTableRow.result));
+                    finalResult.result += (translate('diceTable.fixedRef') + rollResultNumber + "\n" + StringUtil.cr(diceRollTableRow.result));
                   }
                 } else {
-                  finalResult.result = (isFixedRef ? '指定=' : '') + rollResultNumber + (isFixedRef ? '' : modStr) + ' ＞ ' + diceRollTableRow.result;
+                  finalResult.result = (isFixedRef ? translate('diceTable.fixedRef') : '') + rollResultNumber + (isFixedRef ? '' : modStr) + ' ＞ ' + diceRollTableRow.result;
                 }
                 isRowMatch = true;
                 break;
@@ -290,11 +291,11 @@ export class DiceBot extends GameObject {
           if (!isRowMatch) {
             if (rollResultNumber == null) {
               finalResult.isFailure = true;
-              finalResult.result += ('（錯誤：無法從擲骰結果取得數字）' + "\n" + '(無結果)');
+              finalResult.result += (translate('diceTable.parseError') + "\n" + translate('diceTable.noResult'));
             } else if (!isFixedRef) {
-              finalResult.result += (rollResult.result + modStr + (modStr ? ` → ${rollResultNumber + modifier}`: '') + "\n" + '(無結果)');
+              finalResult.result += (rollResult.result + modStr + (modStr ? ` → ${rollResultNumber + modifier}`: '') + "\n" + translate('diceTable.noResult'));
             } else {
-              finalResult.result += ('指定=' + rollResultNumber + "\n" + '(無結果)');
+              finalResult.result += (translate('diceTable.fixedRef') + rollResultNumber + "\n" + translate('diceTable.noResult'));
             }
           }
           if (1 < repeat) finalResult.result += ` #${i + 1}`;
@@ -432,7 +433,7 @@ export class DiceBot extends GameObject {
       //name: rollResult.isDiceRollTable ?
       //  isSecret ? '<' + rollResult.tableName + ' (Secret)：' + originalMessage.name + '>' : '<' + rollResult.tableName + '：' + originalMessage.name + '>' :
       //  isSecret ? '<Secret-BCDice：' + originalMessage.name + '>' : '<BCDice：' + originalMessage.name + '>' ,
-      name: `${rollResult.isDiceRollTable ? rollResult.tableName : id} : ${originalMessage.name}${isSecret ? ' (Secret)' : ''}`,
+      name: `${rollResult.isDiceRollTable ? rollResult.tableName : id} : ${originalMessage.name}${isSecret ? translate('chat.secretSuffix') : ''}`,
       text: result,
       color: originalMessage.color,
       isUseStandImage: originalMessage.isUseStandImage
@@ -509,10 +510,10 @@ export class DiceBot extends GameObject {
         for (const name of cutInInfo.names) {
           let count = counter.get(name) || 0;
           count += 1;
-          counter.set(name == '' ? '(無名過場)' : name, count);
+          counter.set(name == '' ? translate('cutin.unnamed') : name, count);
         }
-        const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
-        this.chatMessageService.sendOperationLog(text + ' 已啟動');
+        const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join(translate('common.listSep'))}`;
+        this.chatMessageService.sendOperationLog(translate('chat.op.cutinStarted', { text }));
       }
     }
 
@@ -607,11 +608,11 @@ export class DiceBot extends GameObject {
         .then(jsons => {
           return jsons.map(json => {
             if (DiceBot.apiVersion == 1 && json.systeminfo && json.systeminfo.info) {
-              return json.systeminfo.info.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱');
+              return json.systeminfo.info.replace('部屋のシステム名', translate('diceBot.systemNameLocal')).replace('房間的系統名稱', translate('diceBot.systemNameLocal'));
             } else if (json.help_message) {
-              return json.help_message.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱');
+              return json.help_message.replace('部屋のシステム名', translate('diceBot.systemNameLocal')).replace('房間的系統名稱', translate('diceBot.systemNameLocal'));
             } else {
-              return '沒有骰子機器人資訊。';
+              return translate('diceBot.noInfo');
             }
           })
         });
@@ -622,9 +623,9 @@ export class DiceBot extends GameObject {
         if (gameType && gameType != '' && gameType != 'DiceBot') {
           let gameSystem = await DiceBot.loadGameSystemAsync(gameType);
           if (gameSystem && gameSystem.ID != 'DiceBot' && gameSystem.HELP_MESSAGE) {
-            help.push(gameSystem.HELP_MESSAGE.replace('部屋のシステム名', '聊天面板等的系統名稱').replace('房間的系統名稱', '聊天面板等的系統名稱'));
+            help.push(gameSystem.HELP_MESSAGE.replace('部屋のシステム名', translate('diceBot.systemNameLocal')).replace('房間的系統名稱', translate('diceBot.systemNameLocal')));
           } else {
-            help.push('沒有骰子機器人資訊。');
+            help.push(translate('diceBot.noInfo'));
           }
         }
       } catch (e) {
@@ -924,11 +925,11 @@ function initializeDiceBotQueue(): PromiseQueue {
       const lang = /.+\:(.+)/.exec(gameSystemInfo.id);
       let langName;
       if (lang && lang[1]) {
-        langName = (lang[1] == 'ChineseTraditional') ? '正體中文'
-          : (lang[1] == 'English') ? 'English'
-          : (lang[1] == 'Korean') ? '한국어'
-          : (lang[1] == 'SimplifiedChinese') ? '简体中文'
-          : 'Other';
+        langName = (lang[1] == 'ChineseTraditional') ? translate('lang.zhTW')
+          : (lang[1] == 'English') ? translate('lang.en')
+          : (lang[1] == 'Korean') ? translate('lang.ko')
+          : (lang[1] == 'SimplifiedChinese') ? translate('lang.zhCN')
+          : translate('lang.other');
       }
       return {
         id: gameSystemInfo.id,

@@ -7,11 +7,12 @@ import { EventSystem } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
+import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'stand-image',
     templateUrl: './stand-image.component.html',
-    styleUrls: ['./stand-image.component.css'],
+    styleUrls: ['./stand-image.component.css', '../shared/image-effects.css'],
     animations: [
         trigger('standInOut', [
             transition('void => *,:increment,:decrement', [
@@ -433,6 +434,34 @@ export class StandImageComponent implements OnInit, OnDestroy {
     }
     return false;
   }
+
+  get standImageFilter(): string | null {
+    return this.gameCharacter ? imageEffectFilter(this.gameCharacter) : null;
+  }
+  get standImageOpacity(): number | null {
+    return this.gameCharacter ? imageEffectOpacity(this.gameCharacter) : null;
+  }
+  get standImageTransform(): string | null {
+    return this.gameCharacter ? imageEffectTransform(this.gameCharacter) : null;
+  }
+
+  private _matrixRainCacheKey = '';
+  private _matrixRainColumns: MatrixRainColumn[] = [];
+  get showMatrixRain(): boolean {
+    return !!(this.isApplyImageEffect && this.gameCharacter?.isMatrix);
+  }
+  get matrixRainColumns(): MatrixRainColumn[] {
+    if (!this.showMatrixRain || !this.gameCharacter) return [];
+    const w = this.imageWidth || 120;
+    const count = Math.max(6, Math.min(18, Math.round(w / 14)));
+    const key = `${this.gameCharacter.identifier}:stand:${count}`;
+    if (key !== this._matrixRainCacheKey) {
+      this._matrixRainCacheKey = key;
+      this._matrixRainColumns = buildMatrixRainColumns(key, count, 22);
+    }
+    return this._matrixRainColumns;
+  }
+  trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
 
   get isApplyRoll(): boolean {
     if (!this.standElement || !this.gameCharacter) return false;

@@ -6,8 +6,10 @@ import { UUID } from '@udonarium/core/system/util/uuid';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
 import { StandConditionType } from '@udonarium/stand-list';
+import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'stand-element',
@@ -27,7 +29,8 @@ export class StandElementComponent implements OnInit {
   standConditionType = StandConditionType;
 
   constructor(
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService
   ) { }
 
   ngOnInit(): void {
@@ -119,6 +122,16 @@ export class StandElementComponent implements OnInit {
       return true;
     }
     return false;
+  }
+
+  get standImageFilter(): string | null {
+    return this.gameCharacter ? imageEffectFilter(this.gameCharacter) : null;
+  }
+  get standImageOpacity(): number | null {
+    return this.gameCharacter ? imageEffectOpacity(this.gameCharacter) : null;
+  }
+  get standImageTransform(): string | null {
+    return this.gameCharacter ? imageEffectTransform(this.gameCharacter) : null;
   }
 
   get isApplyRoll(): boolean {
@@ -214,7 +227,7 @@ export class StandElementComponent implements OnInit {
     });
     EventSystem.trigger('POPUP_CHAT_BALLOON', { 
       characterIdentifier: this.gameCharacter.identifier, 
-      text: '這是測試，只有你看得到。調整立繪設定時，可從選單的「個人設定」關閉「立繪淡出並自動退場」，會較容易微調。', 
+      text: this.i18n.t('stand.testMessage'),
       color: this.gameCharacter.chatPalette ? this.gameCharacter.chatPalette.color : null,
       dialogTest: true
     });

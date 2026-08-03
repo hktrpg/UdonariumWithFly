@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, HostListener, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ContextMenuAction, ContextMenuService } from 'service/context-menu.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopObject } from '@udonarium/tabletop-object';
@@ -53,7 +53,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     public contextMenuService: ContextMenuService,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private changeDetector: ChangeDetectorRef,
   ) { }
 
   GuestMode() {
@@ -102,8 +103,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
 
-    panel.style.left = this.contextMenuService.position.x + 'px';
-    panel.style.top = this.contextMenuService.position.y + 'px';
+    // Nudge away from the cursor so the menu does not cover the target token.
+    const OFFSET_X = 20;
+    const OFFSET_Y = 4;
+    panel.style.left = (this.contextMenuService.position.x + OFFSET_X) + 'px';
+    panel.style.top = (this.contextMenuService.position.y + OFFSET_Y) + 'px';
 
     let panelBox = panel.getBoundingClientRect();
 
@@ -163,9 +167,56 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   doAction(action: ContextMenuAction) {
     this.showSubMenu(action);
-    if (action.action != null) {
-      action.action();
+    if (action.action == null) return;
+
+    action.action();
+    this.refreshActionVisual(action);
+
+    // Checkbox / radio stay open so users can toggle several options.
+    // Normal one-shot actions close. Explicit keepOpen overrides.
+    const stayOpen = action.keepOpen === true
+      || (action.keepOpen !== false && !!action.checkBox);
+    if (!stayOpen) {
       this.close();
+      return;
+    }
+    this.changeDetector.detectChanges();
+  }
+
+  private refreshActionVisual(action: ContextMenuAction) {
+    const refreshList = (list: ContextMenuAction[]) => {
+      for (const a of list) {
+        if (!a) continue;
+        if (typeof a.nameUpdate === 'function') {
+          a.name = a.nameUpdate() ?? a.name;
+        }
+        if (a.subActions?.length) refreshList(a.subActions);
+      }
+    };
+
+    // Prefer live nameUpdate when present (and refresh siblings / nested menus that also use it).
+    if (typeof action.nameUpdate === 'function') {
+      refreshList(this.actions);
+      if (this.subMenu) refreshList(this.subMenu);
+      return;
+    }
+
+    if (action.checkBox === 'check' && action.name) {
+      if (action.name.startsWith('☑')) action.name = '☐' + action.name.substring(1);
+      else if (action.name.startsWith('☐')) action.name = '☑' + action.name.substring(1);
+      return;
+    }
+    if (action.checkBox === 'radio' && action.name) {
+      const list = this.subMenu && this.subMenu.includes(action) ? this.subMenu : this.actions;
+      for (const a of list) {
+        if (!a || a.checkBox !== 'radio' || !a.name) continue;
+        if (typeof a.nameUpdate === 'function') {
+          a.name = a.nameUpdate() ?? a.name;
+          continue;
+        }
+        if (a === action) a.name = a.name.replace(/^[◉○]/, '◉');
+        else a.name = a.name.replace(/^[◉○]/, '○');
+      }
     }
   }
 

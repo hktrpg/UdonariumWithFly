@@ -24,7 +24,8 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -193,7 +194,8 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     private selectionService: TabletopSelectionService,
     private imageService: ImageService,
     private modalService: ModalService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -222,7 +224,11 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
         if (this.owner && !this.isLock) {
           this.owner = '';
           SoundEffect.play(PresetSound.unlock);
-          this.chatMessageService.sendOperationLog(`${this.diceSymbol.name == '' ? '(無名的' + (this.isCoin ? '硬幣' : '骰子') + ')' : this.diceSymbol.name} 的${this.isCoin ? '正面／背面' : '點數'}公開 → ${this.face}`);
+          this.chatMessageService.sendOperationLog(this.i18n.t('dice.revealLog', {
+            name: this.diceDisplayName(),
+            faceLabel: this.faceLabelOf(this.isCoin),
+            face: this.face
+          }));
         }
       })
       .on<object>('TABLE_VIEW_ROTATE', event => {
@@ -327,17 +333,19 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       y: this.diceSymbol.location.y + (this.diceSymbol.size * this.gridSize) / 2,
       z: this.diceSymbol.posZ
     };
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('dice.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedDiceSymbols = () => this.selectionService.objects.filter(object => object.aliasName === this.diceSymbol.aliasName) as DiceSymbol[];
       const isContainCoin = selectedDiceSymbols().some(diceSymbol => diceSymbol.isCoin);
       const isContainDice = selectedDiceSymbols().some(diceSymbol => !diceSymbol.isCoin);
+      const kinds = [isContainCoin ? this.i18n.t('dice.dynamic.1') : '', isContainDice ? this.i18n.t('dice.dynamic.2') : ''].filter(Boolean).join('／');
+      const actionsLabel = [isContainCoin ? this.i18n.t('dice.dynamic.3') : '', isContainDice ? this.i18n.t('dice.dynamic.4') : ''].filter(Boolean).join('／');
       actions.push(
         {
-          name: `選擇的${isContainCoin ? '硬幣' : ''}${isContainCoin && isContainDice ? '／' : ''}${isContainDice ? '骰子' : ''}`, action: null, subActions: [
+          name: this.i18n.t('dice.selected', { kinds }), action: null, subActions: [
             {
-              name: `全部${isContainCoin ? '投擲' : ''}${isContainCoin && isContainDice ? '／' : ''}${isContainDice ? '擲骰' : ''}`, action: () => {
+              name: this.i18n.t('dice.allAction', { actions: actionsLabel }), action: () => {
                 let needsSound = false;
                 let isContainCoin = false;
                 let isContainDice = false;
@@ -349,12 +357,15 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
                     isContainDice = isContainDice || !diceSymbol.isCoin;
                     EventSystem.call('ROLL_DICE_SYMBOL', { identifier: diceSymbol.identifier });
                     let face = diceSymbol.diceRoll();
-                    let message = `${diceSymbol.name == '' ? '(無名的' + (diceSymbol.isCoin ? '硬幣' : '骰子') + ')' : diceSymbol.name} ${diceSymbol.isCoin ? '投擲了' : '擲了'}`;
+                    let message = this.i18n.t('dice.rolled', {
+                      name: this.diceDisplayName(diceSymbol),
+                      verb: diceSymbol.isCoin ? this.i18n.t('dice.verbCoin') : this.i18n.t('dice.verbDice')
+                    });
                     if (diceSymbol.owner === '') message += ` → ${face}`;
                     messages.push(message);
                   }
                 });
-                if (messages.length) this.chatMessageService.sendOperationLog(messages.join('、'));
+                if (messages.length) this.chatMessageService.sendOperationLog(messages.join(this.i18n.t('common.listSep')));
                 if (needsSound) {
                   if (isContainCoin) SoundEffect.play(PresetSound.coinToss);
                   if (isContainDice) SoundEffect.play(PresetSound.diceRoll1);
@@ -362,29 +373,33 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
               }
             },
             {
-              name: '全部公開', action: () => {
+              name: this.i18n.t('dice.menu.2'), action: () => {
                 const messages: string[] = []; 
                 selectedDiceSymbols().forEach(diceSymbol => {
                   if (diceSymbol.owner != '') {
-                    messages.push(`${diceSymbol.name == '' ? '(無名的' + (diceSymbol.isCoin ? '硬幣' : '骰子') + ')' : diceSymbol.name} 的${diceSymbol.isCoin ? '正面／背面' : '點數'}公開 → ${diceSymbol.face}`);
+                    messages.push(this.i18n.t('dice.revealLog', {
+                      name: this.diceDisplayName(diceSymbol),
+                      faceLabel: this.faceLabelOf(diceSymbol.isCoin),
+                      face: diceSymbol.face
+                    }));
                   }
                   diceSymbol.owner = '';
                 });
-                if (messages.length) this.chatMessageService.sendOperationLog(messages.join('、'));
+                if (messages.length) this.chatMessageService.sendOperationLog(messages.join(this.i18n.t('common.listSep')));
                 SoundEffect.play(PresetSound.unlock);
               },
               disabled: !selectedDiceSymbols().some(diceSymbol => diceSymbol.owner != '')
             },
             {
-              name: '全部只有自己看', action: () => {
+              name: this.i18n.t('dice.menu.3'), action: () => {
                 const names: string[] = []; 
                 selectedDiceSymbols().forEach(diceSymbol => {
                   if (diceSymbol.owner != Network.peer.userId) {
-                    names.push(diceSymbol.name == '' ? '(無名的' + (diceSymbol.isCoin ? '硬幣' : '骰子') + ')' : diceSymbol.name);
+                    names.push(this.diceDisplayName(diceSymbol));
                   }
                   diceSymbol.owner = Network.peer.userId;
                 });
-                if (names.length) this.chatMessageService.sendOperationLog(names.join('、') + ' 只有自己看了');
+                if (names.length) this.chatMessageService.sendOperationLog(this.i18n.t('dice.selfOnlyMany', { names: names.join(this.i18n.t('common.listSep')) }));
                 SoundEffect.play(PresetSound.lock);
               },
               disabled: !selectedDiceSymbols().some(diceSymbol => diceSymbol.owner != Network.peer.userId)
@@ -403,7 +418,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
 
     //if (this.isVisible) {
       actions.push({
-        name: this.isCoin ? '投擲硬幣' : '擲骰', action: () => {
+        name: this.isCoin ? this.i18n.t('dice.dynamic.5') : this.i18n.t('dice.dynamic.6'), action: () => {
           this.diceRoll();
         },
         disabled: !this.isVisible,
@@ -413,38 +428,37 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     actions.push(ContextMenuSeparator);
     if (this.isMine || this.hasOwner) {
       actions.push({
-        name: `公開${this.isCoin ? '硬幣' : '骰子'}`, action: () => {
+        name: this.isCoin ? this.i18n.t('dice.dynamic.7') : this.i18n.t('dice.dynamic.8'), action: () => {
           this.owner = '';
           SoundEffect.play(PresetSound.unlock);
-          this.chatMessageService.sendOperationLog(`${this.diceSymbol.name == '' ? '(無名的' + (this.isCoin ? '硬幣' : '骰子') + ')' : this.diceSymbol.name} 的${this.isCoin ? '正面／背面' : '點數'}公開 → ${this.face}`);
+          const kind = this.isCoin ? this.i18n.t('dice.dynamic.1') : this.i18n.t('dice.dynamic.2');
+          const name = this.diceSymbol.name == '' ? this.i18n.t('dice.unnamed', { kind }) : this.diceSymbol.name;
+          const faceLabel = this.isCoin ? this.i18n.t('dice.dynamic.9') : this.i18n.t('dice.dynamic.11');
+          this.chatMessageService.sendOperationLog(this.i18n.t('dice.revealLog', { name, faceLabel, face: this.face }));
         }
       });
     }
     if (!this.isMine) {
       actions.push({
-        name: '只有自己看', action: () => {
+        name: this.i18n.t('dice.menu.4'), action: () => {
           this.owner = Network.peer.userId;
-          this.chatMessageService.sendOperationLog(`${this.diceSymbol.name == '' ? '(無名的' + (this.isCoin ? '硬幣' : '骰子') + ')' : this.diceSymbol.name} 只有自己看了`);
+          const kind = this.isCoin ? this.i18n.t('dice.dynamic.1') : this.i18n.t('dice.dynamic.2');
+          const name = this.diceSymbol.name == '' ? this.i18n.t('dice.unnamed', { kind }) : this.diceSymbol.name;
+          this.chatMessageService.sendOperationLog(this.i18n.t('dice.selfOnlyLog', { name }));
           SoundEffect.play(PresetSound.lock);
         }
       });
     }
-    actions.push((this.isLock
-      ? {
-        name: '☑ 不要一齊公開', action: () => {
-          this.isLock = false;
-          SoundEffect.play(PresetSound.unlock);
-        },
-        disabled: this.hasOwner && !this.isVisible,
-        checkBox: 'check'
-      } : {
-        name: '☐ 不要一齊公開', action: () => {
-          this.isLock = true;
-          SoundEffect.play(PresetSound.lock);
-        },
-        disabled: this.hasOwner && !this.isVisible,
-        checkBox: 'check'
-      }));
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isLock,
+      set: (v) => {
+        this.isLock = v;
+        SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+      },
+      on: this.i18n.t('dice.menu.5'),
+      off: this.i18n.t('dice.menu.6'),
+      disabled: this.hasOwner && !this.isVisible,
+    }));
     if (this.isVisible) {
       let subActions: ContextMenuAction[] = [];
       let nothingFaces = this.nothingFaces;
@@ -464,35 +478,35 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
         subActions.push({
           name: `${this.face == face ? '◉' : '○'} ${face}　`, action: () => {
             if (this.owner === '') SoundEffect.play(PresetSound.dicePut);
-            if (this.owner === '' && this.face != face) this.chatMessageService.sendOperationLog(`${this.diceSymbol.name == '' ? '(無名的' + (this.isCoin ? '硬幣' : '骰子') + ')' : this.diceSymbol.name} 的${this.isCoin ? '正面／背面' : '點數'}變更 → ${face}`);
+            if (this.owner === '' && this.face != face) {
+              this.chatMessageService.sendOperationLog(this.i18n.t('dice.changeLog', {
+                name: this.diceDisplayName(),
+                faceLabel: this.faceLabelOf(this.isCoin),
+                face
+              }));
+            }
             this.face = face;
           },
           checkBox: 'radio'
         });
       });
-      actions.push({ name: this.isCoin ? '正面／背面' : '骰子點數', action: null, subActions: subActions });
+      actions.push({ name: this.isCoin ? this.i18n.t('dice.dynamic.9') : this.i18n.t('dice.dynamic.10'), action: null, subActions: subActions });
     }
 
     actions.push(ContextMenuSeparator);
 
-    actions.push((this.isDropShadow
-      ? {
-        name: '☑ 顯示陰影', action: () => {
-          this.isDropShadow = false;
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 顯示陰影', action: () => {
-          this.isDropShadow = true;
-        },
-        checkBox: 'check'
-      }));
+    actions.push(contextMenuToggleCheck({
+      get: () => this.isDropShadow,
+      set: (v) => { this.isDropShadow = v; },
+      on: this.i18n.t('dice.menu.7'),
+      off: this.i18n.t('dice.menu.8'),
+    }));
 
     actions.push(ContextMenuSeparator);
-    actions.push({ name: '顯示詳細...', action: () => { this.showDetail(this.diceSymbol); } });
+    actions.push({ name: this.i18n.t('dice.menu.9'), action: () => { this.showDetail(this.diceSymbol); } });
     if (this.diceSymbol.getUrls().length > 0) {
       actions.push({
-        name: '打開參考網址', action: null,
+        name: this.i18n.t('dice.menu.10'), action: null,
         subActions: this.diceSymbol.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -505,7 +519,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
               }
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('common.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
@@ -513,7 +527,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       actions.push(ContextMenuSeparator);
     }
     actions.push({
-      name: '建立副本', action: () => {
+      name: this.i18n.t('dice.menu.11'), action: () => {
         let cloneObject = this.diceSymbol.clone();
         cloneObject.location.x += this.gridSize;
         cloneObject.location.y += this.gridSize;
@@ -522,7 +536,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       }
     });
     actions.push({
-      name: '刪除', action: () => {
+      name: this.i18n.t('dice.menu.12'), action: () => {
         this.diceSymbol.destroy();
         SoundEffect.play(PresetSound.sweep);
       }
@@ -550,17 +564,29 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       }
     //}
     let face = this.diceSymbol.diceRoll();
-    let message = `${this.diceSymbol.name == '' ? '(無名的' + (this.isCoin ? '硬幣' : '骰子') + ')' : this.diceSymbol.name} ${this.isCoin ? '投擲了' : '擲了'}`;
+    let message = this.i18n.t('dice.rolled', {
+      name: this.diceDisplayName(),
+      verb: this.isCoin ? this.i18n.t('dice.verbCoin') : this.i18n.t('dice.verbDice')
+    });
     if (this.owner === '') message += ` → ${face}`;
     this.chatMessageService.sendOperationLog(message);
     return face;
+  }
+
+  private diceDisplayName(diceSymbol: DiceSymbol = this.diceSymbol): string {
+    const kind = diceSymbol.isCoin ? this.i18n.t('dice.dynamic.1') : this.i18n.t('dice.dynamic.2');
+    return diceSymbol.name == '' ? this.i18n.t('dice.unnamed', { kind }) : diceSymbol.name;
+  }
+
+  private faceLabelOf(isCoin: boolean): string {
+    return isCoin ? this.i18n.t('dice.dynamic.9') : this.i18n.t('dice.dynamic.11');
   }
 
   showDetail(gameObject: DiceSymbol) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '骰子圖示設定';
+    let title = this.i18n.t('dice.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 300, top: coordinate.y - 300, width: 600, height: 490 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

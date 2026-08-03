@@ -2,7 +2,11 @@ import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { EventSystem } from './core/system';
 import { GameTableMask } from './game-table-mask';
+import { TableDrawing } from './table-fx/table-drawing';
+import { TableLight } from './table-fx/table-light';
+import { TableWall } from './table-fx/table-wall';
 import { Terrain } from './terrain';
+import { translate } from 'i18n';
 
 export enum GridType {
   NONE = -1,
@@ -17,9 +21,11 @@ export enum FilterType {
   BLACK = 'black',
 }
 
+export type WeatherType = 'none' | 'rain' | 'snow' | 'fog' | 'sandstorm' | 'wind' | 'thunderstorm' | 'rainbow' | 'aurora' | 'burning' | 'sakura' | 'maple';
+
 @SyncObject('game-table')
 export class GameTable extends ObjectNode {
-  @SyncVar() name: string = '桌面';
+  @SyncVar() name: string = translate('alias.game-table');
   @SyncVar() width: number = 20;
   @SyncVar() height: number = 20;
   @SyncVar() gridSize: number = 50;
@@ -31,6 +37,12 @@ export class GameTable extends ObjectNode {
   @SyncVar() gridType: GridType = GridType.SQUARE;
   @SyncVar() gridColor: string = '#000000e6';
   @SyncVar() isShowNumber: boolean = true;
+
+  @SyncVar() darkness: number = 0;
+  @SyncVar() globalIllumination: number = 1;
+  @SyncVar() weatherType: WeatherType = 'none';
+  @SyncVar() weatherIntensity: number = 0.5;
+  @SyncVar() visionEnabled: boolean = false;
 
   gridHeight: number = 0;
   gridClipRect: {top: number, right: number, bottom: number, left: number} = null;
@@ -49,6 +61,18 @@ export class GameTable extends ObjectNode {
       if (object instanceof GameTableMask) masks.push(object);
     });
     return masks;
+  }
+
+  get walls(): TableWall[] {
+    return this.children.filter(object => object instanceof TableWall) as TableWall[];
+  }
+
+  get lights(): TableLight[] {
+    return this.children.filter(object => object instanceof TableLight) as TableLight[];
+  }
+
+  get drawings(): TableDrawing[] {
+    return this.children.filter(object => object instanceof TableDrawing) as TableDrawing[];
   }
 
   // GameObject Lifecycle

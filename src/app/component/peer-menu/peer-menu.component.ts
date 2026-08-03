@@ -4,19 +4,31 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
+import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import { GuestSession } from '@udonarium/guest-session';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
+import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
+import { RoomJoinComponent } from 'component/room-join/room-join.component';
+import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { animate, style, transition, trigger } from '@angular/animations';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { I18nService } from 'service/i18n.service';
+import { RoomInviteService } from 'service/room-invite.service';
+import { AppLocale } from 'i18n';
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { RoomInfo } from '@udonarium/core/system/network/room-info';
+import { RoomJoinResult, RoomRole } from '@udonarium/room-auth';
 
 import * as localForage from 'localforage';
 
@@ -43,7 +55,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   isRoomNameCopied = false;
   isPasswordCopied = false;
   isPasswordOpen = false;
-  isRoomInfoCopied = false
+  isRoomInfoCopied = false;
+  inviteCopiedRole: RoomRole = null;
 
   help: string = '';
 
@@ -51,6 +64,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   private _timeOutId2: NodeJS.Timeout;
   private _timeOutId3: NodeJS.Timeout;
   private _timeOutId4: NodeJS.Timeout;
+  private _timeOutIdInvite: NodeJS.Timeout;
 
   private interval: NodeJS.Timeout;
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
@@ -90,8 +104,71 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
   set isGMMode(isGMMode: boolean) { if (PeerCursor.myCursor) PeerCursor.myCursor.isGMMode = isGMMode; }
 
+  get scenePerm() { return SceneToolPermission.instance; }
+
+  get sceneCanCreateLight(): boolean { return this.scenePerm.playerCanCreateLight; }
+  set sceneCanCreateLight(v: boolean) { this.scenePerm.playerCanCreateLight = !!v; }
+  get sceneCanCreateWall(): boolean { return this.scenePerm.playerCanCreateWall; }
+  set sceneCanCreateWall(v: boolean) { this.scenePerm.playerCanCreateWall = !!v; }
+  get sceneCanCreateRect(): boolean { return this.scenePerm.playerCanCreateRect; }
+  set sceneCanCreateRect(v: boolean) { this.scenePerm.playerCanCreateRect = !!v; }
+  get sceneCanCreateEllipse(): boolean { return this.scenePerm.playerCanCreateEllipse; }
+  set sceneCanCreateEllipse(v: boolean) { this.scenePerm.playerCanCreateEllipse = !!v; }
+  get sceneCanCreatePolygon(): boolean { return this.scenePerm.playerCanCreatePolygon; }
+  set sceneCanCreatePolygon(v: boolean) { this.scenePerm.playerCanCreatePolygon = !!v; }
+  get sceneCanCreateFreehand(): boolean { return this.scenePerm.playerCanCreateFreehand; }
+  set sceneCanCreateFreehand(v: boolean) { this.scenePerm.playerCanCreateFreehand = !!v; }
+  get sceneCanCreateText(): boolean { return this.scenePerm.playerCanCreateText; }
+  set sceneCanCreateText(v: boolean) { this.scenePerm.playerCanCreateText = !!v; }
+
+  get sceneCanModifyLight(): boolean { return this.scenePerm.playerCanModifyLight; }
+  set sceneCanModifyLight(v: boolean) { this.scenePerm.playerCanModifyLight = !!v; }
+  get sceneCanModifyWall(): boolean { return this.scenePerm.playerCanModifyWall; }
+  set sceneCanModifyWall(v: boolean) { this.scenePerm.playerCanModifyWall = !!v; }
+  get sceneCanModifyDrawing(): boolean { return this.scenePerm.playerCanModifyDrawing; }
+  set sceneCanModifyDrawing(v: boolean) { this.scenePerm.playerCanModifyDrawing = !!v; }
+
+  get sceneAllCreate(): boolean {
+    const p = this.scenePerm;
+    return p.playerCanCreateLight && p.playerCanCreateWall
+      && p.playerCanCreateRect && p.playerCanCreateEllipse
+      && p.playerCanCreatePolygon && p.playerCanCreateFreehand
+      && p.playerCanCreateText;
+  }
+  get sceneAllModify(): boolean {
+    const p = this.scenePerm;
+    return p.playerCanModifyLight && p.playerCanModifyWall && p.playerCanModifyDrawing;
+  }
+  setAllSceneCreate(v: boolean) { this.scenePerm.setAllCreate(v); }
+  setAllSceneModify(v: boolean) { this.scenePerm.setAllModify(v); }
+
   get isGMHold(): boolean { return PeerCursor.isGMHold; }
   get isDisableConnect(): boolean { return this.isGMHold || this.isGMMode; }
+
+  get displayRoomName(): string {
+    return RoomAuth.displayRoomName(this.networkService.peer.roomName || '');
+  }
+  get displayRoomLabel(): string {
+    return this.displayRoomName + '/' + this.networkService.peer.roomId;
+  }
+  get isRoleAuthRoom(): boolean {
+    return RoomAuth.isRoleAuthRoom(this.networkService.peer.roomName || '');
+  }
+  get isGuest(): boolean { return GuestSession.isGuest; }
+
+  get currentRole(): RoomRole {
+    if (this.isGuest) return 'guest';
+    if (this.isGMMode || this.isGMHold) return 'gm';
+    return 'user';
+  }
+
+  get currentRoleLabel(): string {
+    switch (this.currentRole) {
+      case 'gm': return this.i18n.t('peer.role.gm');
+      case 'guest': return this.i18n.t('peer.role.guest');
+      default: return this.i18n.t('peer.role.user');
+    }
+  }
 
   get maskedPassword(): string { return '●●●●●●●●' }
   get config(): AppConfig { return AppConfigService.appConfig; }
@@ -102,23 +179,37 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
-    public appConfigService: AppConfigService
+    private roomInvite: RoomInviteService,
+    public appConfigService: AppConfigService,
+    public i18n: I18nService,
   ) { }
 
   GuestMode() {
     return Network.GuestMode();
   }
 
+  onLocaleChange(locale: AppLocale) {
+    this.i18n.setLocale(locale);
+    this.refreshPanelTitle();
+  }
+
+  private refreshPanelTitle() {
+    this.panelService.title = this.i18n.t('peer.title');
+  }
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.panelService.title = '連線資訊'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => {
+      this.refreshPanelTitle();
+      this.panelService.isAbleFullScreenButton = false;
+    });
   }
 
   ngAfterViewInit() {
     EventSystem.register(this)
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => { });
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()));
     this.interval = setInterval(() => { }, 1000);
   }
 
@@ -127,8 +218,60 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     clearTimeout(this._timeOutId2);
     clearTimeout(this._timeOutId3);
     clearTimeout(this._timeOutId4);
+    clearTimeout(this._timeOutIdInvite);
     EventSystem.unregister(this);
     clearInterval(this.interval);
+  }
+
+  isInviteRoleAvailable(role: RoomRole): boolean {
+    if (!this.isRoleAuthRoom) return false;
+    return RoomAuth.isRoleAvailable(this.networkService.peer.roomName || '', role);
+  }
+
+  async copyInvite(role: RoomRole) {
+    if (!navigator.clipboard || !this.networkService.peer.isRoom || !this.isRoleAuthRoom) return;
+    if (!this.isInviteRoleAvailable(role)) return;
+
+    const roomId = this.networkService.peer.roomId;
+    const roomName = this.networkService.peer.roomName || '';
+    let password = '';
+
+    if (RoomAuth.roleNeedsPassword(roomName, role)) {
+      password = this.roomInvite.getRolePassword(role);
+      if (!password) {
+        const entered = await this.modalService.open<string>(RolePasswordPromptComponent, {
+          roomId,
+          roomName,
+          role,
+          width: 420,
+          height: 280,
+        });
+        if (entered == null) return;
+        password = entered;
+        this.roomInvite.setRolePassword(role, password);
+      }
+
+      const confirmed = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('peer.confirm.copyInvite.title'),
+        text: this.i18n.t('peer.confirm.copyInvite.text', { role: this.roleLabel(role) }),
+        helpHtml: this.i18n.t('peer.confirm.copyInvite.help') + '<br>' + this.i18n.t('peer.confirm.passwordShareHelp'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'link',
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      const url = this.roomInvite.buildInviteUrl(role, password || undefined);
+      await navigator.clipboard.writeText(url);
+      this.inviteCopiedRole = role;
+      clearTimeout(this._timeOutIdInvite);
+      this._timeOutIdInvite = setTimeout(() => {
+        this.inviteCopiedRole = null;
+      }, 1000);
+    } catch (e) {
+      console.warn('copyInvite failed', e);
+    }
   }
 
   changeIcon() {
@@ -160,10 +303,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     ObjectStore.instance.clearDeleteHistory();
     Network.connect(peer);
     if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
-      if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('解除 GM 模式');
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
@@ -171,18 +315,64 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   showLobby() {
     if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
       PeerCursor.isGMHold = false;
       this.isGMMode = false;
-      if (this.isGMMode) {
-        this.chatMessageService.sendOperationLog('解除 GM 模式');
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
     }
     this.modalService.open(LobbyComponent, { width: 700, height: 400, left: 0, top: 400 });
   }
 
+  showCreateRoom() {
+    if (PeerCursor.isGMHold || this.isGMMode) {
+      const wasGM = this.isGMMode;
+      PeerCursor.isGMHold = false;
+      this.isGMMode = false;
+      if (wasGM) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.leaveGm'));
+        EventSystem.trigger('CHANGE_GM_MODE', null);
+      }
+    }
+    this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
+  }
+
+  editRoomPasswords() {
+    if (!this.isGMMode || !this.isRoleAuthRoom || !this.networkService.peer.isRoom) return;
+    this.modalService.open(RoomSettingComponent, {
+      editMode: true,
+      width: 700,
+      height: 460,
+      left: 0,
+      top: 400,
+    });
+  }
+
+  loadZip() {
+    if (this.GuestMode() || !this.networkService.peer.isRoom) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/xml,text/xml,application/zip';
+    input.onchange = (event: Event) => {
+      const files = (event.target as HTMLInputElement).files;
+      if (files?.length) FileArchiver.instance.load(files);
+      input.value = '';
+    };
+    input.click();
+  }
+
   stringFromSessionGrade(grade: PeerSessionGrade): string {
     return PeerSessionGrade[grade] ?? PeerSessionGrade[PeerSessionGrade.UNSPECIFIED];
+  }
+
+  candidateLabel(description: string): string {
+    if (!description) return this.i18n.t('peer.candidate.unknown');
+    const key = `peer.candidate.${description}`;
+    const label = this.i18n.t(key);
+    return label === key ? description : label;
   }
 
   findUserId(peerId: string) {
@@ -223,7 +413,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   copyRoomName() {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(this.networkService.peer.roomName + '/' + this.networkService.peer.roomId);
+      navigator.clipboard.writeText(this.displayRoomLabel);
       this.isRoomNameCopied = true;
       clearTimeout(this._timeOutId2);
       this._timeOutId2 = setTimeout(() => {
@@ -235,9 +425,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyPassword() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: '複製密碼', 
-        text: '要將密碼複製到剪貼簿嗎？',
-        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.copyPassword.title'),
+        text: this.i18n.t('peer.confirm.copyPassword.text'),
+        helpHtml: this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
@@ -256,13 +446,16 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   copyRoomInfo() {
     if (navigator.clipboard) {
       this.modalService.open(ConfirmationComponent, {
-        title: '複製房間資訊', 
-        text: '要將房間資訊（房間名稱/房間 ID、密碼）複製到剪貼簿嗎？',
-        helpHtml: '分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.copyRoomInfo.title'),
+        text: this.i18n.t('peer.confirm.copyRoomInfo.text'),
+        helpHtml: this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'content_copy',
         action: () => {
-          navigator.clipboard.writeText('房間名稱：' + this.networkService.peer.roomName + '/' + this.networkService.peer.roomId + '  密碼：' + this.networkService.peer.password);
+          navigator.clipboard.writeText(this.i18n.t('peer.clipboardRoomInfo', {
+            room: this.networkService.peer.roomName + '/' + this.networkService.peer.roomId,
+            password: this.networkService.peer.password,
+          }));
           this.isRoomInfoCopied = true;
           clearTimeout(this._timeOutId4);
           this._timeOutId4 = setTimeout(() => {
@@ -284,9 +477,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示密碼', 
-        text: '要顯示密碼嗎？',
-        helpHtml: '直播時請注意不要讓密碼出現在畫面上。<br>分享密碼時，請勿公開張貼到社群或任何人都能看見的地方。',
+        title: this.i18n.t('peer.confirm.showPassword.title'),
+        text: this.i18n.t('peer.confirm.showPassword.text'),
+        helpHtml: this.i18n.t('peer.confirm.showPassword.help') + '<br>' + this.i18n.t('peer.confirm.passwordShareHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
@@ -298,59 +491,62 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     }
   }
 
-  onGMMode($event: Event) {
-    if (PeerCursor.isGMHold || this.isGMMode) {
-      if (this.isGMMode) {
-        $event.preventDefault();
-        this.modalService.open(ConfirmationComponent, {
-          title: '解除 GM 模式', 
-          text: '要解除 GM 模式嗎？',
-          type: ConfirmationType.OK_CANCEL,
-          materialIcon: 'person_remove',
-          action: () => {
-            PeerCursor.isGMHold = false;
-            this.isGMMode = false;
-            (<HTMLInputElement>$event.target).checked = false;
-            this.chatMessageService.sendOperationLog('解除 GM 模式');
-            EventSystem.trigger('CHANGE_GM_MODE', null);
-            //this.changeDetector.markForCheck();
-            if (GameCharacter.isStealthMode) {
-              this.modalService.open(ConfirmationComponent, {
-                title: '隱身模式', 
-                text: '已開啟隱身：其他人看不到你的游標位置。',
-                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
-                type: ConfirmationType.OK,
-                materialIcon: 'disabled_visible'
-              });
-            }
-          }
-        });
-      } else {
+  async switchIdentity() {
+    const peer = this.networkService.peer;
+    const room = peer.isRoom
+      ? new RoomInfo(peer.roomId, peer.roomName, [peer as any])
+      : new RoomInfo('local', RoomAuth.encode(this.i18n.t('peer.localRoom'), 'local', { gm: '', user: '', guest: '' }), []);
+
+    const result = await this.modalService.open<RoomJoinResult>(RoomJoinComponent, {
+      room,
+      switchMode: true,
+      currentRole: this.currentRole,
+      width: 420,
+      height: 380,
+    });
+    if (!result) return;
+
+    const label = result.role === 'gm'
+      ? this.i18n.t('peer.role.gm')
+      : (result.role === 'guest' ? this.i18n.t('peer.role.guest') : this.i18n.t('peer.role.user'));
+    this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('peer.confirm.switchIdentity.title'),
+      text: this.i18n.t('peer.confirm.switchIdentity.text', { role: label }),
+      helpHtml: result.role === 'gm'
+        ? this.i18n.t('peer.confirm.switchIdentity.helpGm')
+        : (result.role === 'guest'
+          ? this.i18n.t('peer.confirm.switchIdentity.helpGuest')
+          : this.i18n.t('peer.confirm.switchIdentity.helpUser')),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'swap_horiz',
+      action: () => {
+        const prev = this.currentRole;
+        RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
+        // Clear legacy hold state.
         PeerCursor.isGMHold = false;
-        this.isGMMode = false;
-      }
-    } else {
-      $event.preventDefault();
-      this.modalService.open(ConfirmationComponent, {
-        title: '進入 GM 模式', 
-        text: '要進入 GM 模式嗎？\nGM 模式中（含保留中）無法由你發起私人連線或房間連線。',
-        helpHtml: 'GM 模式下可查看全部<b>密語</b>、背面的<b>卡片</b>、未公開的<b>骰子符號</b>、<b>角色</b>位置與<b>游標</b>位置，且你的游標位置不會傳送給其他參加者。\n\n<b><big>—With great power comes great responsibility.</big></b>',
-        type: ConfirmationType.OK_CANCEL,
-        materialIcon: 'person_add',
-        action: () => {
-          PeerCursor.isGMHold = true;
-          this.isGMMode = false;
-          (<HTMLInputElement>$event.target).checked = true;
-          //this.changeDetector.markForCheck();
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {
+          from: this.roleLabel(prev),
+          to: label
+        }));
+        EventSystem.trigger('CHANGE_GM_MODE', null);
+        if (prev === 'gm' && result.role !== 'gm' && GameCharacter.isStealthMode) {
           this.modalService.open(ConfirmationComponent, {
-            title: '進入 GM 模式', 
-            text: '目前尚未進入 GM 模式。',
-            helpHtml: '要進入 GM 模式，請在聊天傳送含 <b>GMになる</b> 或 <b>GMになります</b> 的訊息（此為系統觸發關鍵字，請原樣輸入）。',
+            title: this.i18n.t('peer.confirm.stealth.title'),
+            text: this.i18n.t('peer.confirm.stealth.text'),
+            help: this.i18n.t('peer.confirm.stealth.help'),
             type: ConfirmationType.OK,
-            materialIcon: 'person_add'
+            materialIcon: 'disabled_visible'
           });
         }
-      });
+      }
+    });
+  }
+
+  private roleLabel(role: RoomRole): string {
+    switch (role) {
+      case 'gm': return this.i18n.t('peer.role.gm');
+      case 'guest': return this.i18n.t('peer.role.guest');
+      default: return this.i18n.t('peer.role.user');
     }
   }
 

@@ -1,34 +1,114 @@
-<div *ngIf="!isConnected;else other_content">
-  <div>房間名稱 : <input #input class="input" (input)="calcPeerId(input.value, password)" [(ngModel)]="roomName" required minlength="1" maxlength="128" #roomNameValidation="ngModel"
-      placeholder="需要房間名稱" /></div>
-  <div>密碼: <input #input class="input" (input)="calcPeerId(roomName, input.value)" [(ngModel)]="password" maxlength="12" #passwordValidation="ngModel" placeholder="空白則無密碼"
-    /></div>
-  <div><input type="checkbox" [(ngModel)]="allowGuest" id="guest" name="guest" /><label for="guest">允許訪客</label></div>
-  <hr/>
-  <div *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
-    <div [hidden]="!roomNameValidation.errors.required">
-      房間名稱是必填項目。
+<div class="settings-ui" *ngIf="editMode || !isConnected; else other_content">
+  <section class="card">
+    <header class="card-head"><h3>{{ (editMode ? 'room.editTitle' : 'room.title') | i18n }}</h3></header>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.name' | i18n }}</span>
+        <input
+          type="text"
+          [(ngModel)]="roomName"
+          (ngModelChange)="recalcPeerId()"
+          required
+          minlength="1"
+          maxlength="16"
+          #roomNameValidation="ngModel"
+          name="roomName"
+          [placeholder]="'room.namePlaceholder' | i18n"
+        />
+      </label>
     </div>
-    <div [hidden]="!roomNameValidation.errors.minlength">
-      房間名稱是必填項目。
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.gmPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="gmPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="gmPassword"
+          #gmPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
     </div>
-    <div [hidden]="!roomNameValidation.errors.maxlength">
-      房間名稱的長度應小於或等於128。
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.userPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="userPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="userPassword"
+          #userPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
     </div>
-  </div>
-  <div *ngIf="passwordValidation.errors && (passwordValidation.dirty || passwordValidation.touched)">
-    <div [hidden]="!passwordValidation.errors.maxlength">
-      密碼長度應小於等於12。
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'room.guestPassword' | i18n }}</span>
+        <input
+          type="password"
+          [(ngModel)]="guestPassword"
+          (ngModelChange)="recalcPeerId()"
+          maxlength="12"
+          name="guestPassword"
+          #guestPw="ngModel"
+          [placeholder]="'room.passwordPlaceholder' | i18n"
+          autocomplete="new-password"
+        />
+      </label>
     </div>
-  </div>
-  <div *ngIf="!validateLength">
-    房間名稱和密碼的總和似乎太長。嘗試將兩者之一都縮短一點。
-  </div>
-  <div>
-    <button [disabled]="!roomNameValidation.valid || !passwordValidation.valid || !validateLength" (click)="createRoom()">建立新房間</button>
-  </div>
+    <p class="hint">{{ (editMode ? 'room.editPasswordHint' : 'room.passwordHint') | i18n }}</p>
+    <p class="hint" *ngIf="editMode && isConnected">{{ 'room.editReconnectHint' | i18n }}</p>
+
+    <div class="error-text" *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
+      <div [hidden]="!roomNameValidation.errors.required && !roomNameValidation.errors.minlength">
+        {{ 'room.errorNameRequired' | i18n }}
+      </div>
+      <div [hidden]="!roomNameValidation.errors.maxlength">
+        {{ 'room.errorNameMaxLength' | i18n }}
+      </div>
+    </div>
+    <div class="error-text" *ngIf="gmPw.errors?.maxlength || userPw.errors?.maxlength || guestPw.errors?.maxlength">
+      {{ 'room.errorPasswordMaxLength' | i18n }}
+    </div>
+    <div class="error-text" *ngIf="!validateLength">
+      {{ 'room.errorPeerIdLength' | i18n }}
+    </div>
+    <p class="error-text" *ngIf="help">{{ help }}</p>
+
+    <footer class="actions">
+      <ng-container *ngIf="!editMode">
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="!roomNameValidation.valid || !gmPw.valid || !userPw.valid || !guestPw.valid || !validateLength"
+          (click)="createRoom()"
+        >
+          {{ 'room.create' | i18n }}
+        </button>
+      </ng-container>
+      <ng-container *ngIf="editMode">
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="isSaving || !roomNameValidation.valid || !gmPw.valid || !userPw.valid || !guestPw.valid || !validateLength"
+          (click)="saveRoomPasswords()"
+        >
+          {{ 'room.savePasswords' | i18n }}
+        </button>
+        <button type="button" class="btn" [disabled]="isSaving" (click)="cancel()">
+          {{ 'roomJoin.cancel' | i18n }}
+        </button>
+      </ng-container>
+    </footer>
+  </section>
+  <p class="empty-hint" *ngIf="!editMode">{{ 'room.emptyRoomHint' | i18n }}</p>
 </div>
-<div><span style="font-size: 12px;">※當房間無人時，新建的房間會被清除。如果您想將房間狀態延續到下一次，請確保「保存」它。</span></div>
 <ng-template #other_content>
-  <span style="font-size: 12px;">與其他參與者建立連線後，您將無法新增房間。<br>如果要連線到另一個房間，請斷開與其他與會者的連線。<br>（※您可以從選單斷開連線。）</span>
+  <div class="settings-ui empty-hint" [innerHTML]="'room.connectedHint' | i18n"></div>
 </ng-template>

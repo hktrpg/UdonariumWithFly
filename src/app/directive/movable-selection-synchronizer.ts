@@ -1,4 +1,5 @@
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { GameCharacter } from '@udonarium/game-character';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
@@ -325,8 +326,61 @@ export class MovableSelectionSynchronizer {
     return moved;
   }
 
+  /** Move object centers to (x, y) with optional CSS transition duration. */
+  static moveCentersTo(targets: TabletopObject[], x: number, y: number, durationMs: number = 132): boolean {
+    let moved = false;
+    for (const object of targets) {
+      if (MovableSelectionSynchronizer.isLocked(object)) continue;
+      const movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (movables == null || movables.size < 1) {
+        const size = typeof (object as any).size === 'number' ? (object as any).size : 1;
+        const grid = 50;
+        const half = (size * grid) / 2;
+        object.location.x = x - half;
+        object.location.y = y - half;
+        object.update();
+        moved = true;
+        continue;
+      }
+      for (const movable of movables) {
+        if (movable.isDisable) continue;
+        if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
+        if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
+        movable.setAnimatedTransition(true, durationMs);
+        movable.posX = x - movable.width / 2;
+        movable.posY = y - movable.height / 2;
+        moved = true;
+      }
+    }
+    return moved;
+  }
+
+  /** Animate selected movables through absolute center waypoints. */
+  static async animatePath(
+    targets: TabletopObject[],
+    waypoints: { x: number; y: number }[],
+    stepMs: number = 320
+  ): Promise<boolean> {
+    if (!targets.length || !waypoints.length) return false;
+    let any = false;
+    for (const wp of waypoints) {
+      if (MovableSelectionSynchronizer.moveCentersTo(targets, wp.x, wp.y, stepMs)) any = true;
+      await new Promise<void>(resolve => setTimeout(resolve, stepMs));
+    }
+    for (const object of targets) {
+      MovableSelectionSynchronizer.objectMap.get(object)?.forEach(m => m.setAnimatedTransition(true));
+    }
+    return any;
+  }
+
+  static isObjectLocked(object: TabletopObject): boolean {
+    return MovableSelectionSynchronizer.isLocked(object);
+  }
+
   private static isLocked(object: TabletopObject): boolean {
-    return !!(object as any).isLocked || !!(object as any).isLock;
+    if (!!(object as any).isLocked || !!(object as any).isLock) return true;
+    if (object instanceof GameCharacter && object.isLockedByPlayerOwner) return true;
+    return false;
   }
 }
 

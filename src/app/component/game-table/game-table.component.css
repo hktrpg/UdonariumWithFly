@@ -52,6 +52,7 @@
 .component-content {
   height: 2000px;
   width: 2000px;
+  overflow: visible;
 }
 
 .grid-canvas {
@@ -65,9 +66,191 @@
   backface-visibility: hidden;
 }
 
+.fx-canvas, .weather-canvas, .weather-stack, .drawings-layer, .pings-layer {
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+.weather-stack {
+  position: absolute;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  overflow: visible;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+.weather-stack .weather-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+.table-ping {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  margin-left: -36px;
+  margin-top: -36px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+/* Flat red ping (basic / warning) — on table plane */
+.ping-flat {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.ping-ring,
+.ping-ground-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border: 3px solid #e11d48;
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px #ef4444,
+    0 0 14px rgba(225, 29, 72, 0.75);
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.4) 0%, rgba(225, 29, 72, 0.08) 55%, transparent 70%);
+  transform: translate(-50%, -50%);
+  animation: ping-ring-expand 1.4s ease-out infinite;
+}
+.ping-ring.ring-a,
+.ping-ground-ring.ring-a { width: 28px; height: 28px; animation-delay: 0s; }
+.ping-ring.ring-b,
+.ping-ground-ring.ring-b { width: 28px; height: 28px; animation-delay: 0.35s; border-color: #f87171; }
+.ping-ring.ring-c { width: 28px; height: 28px; animation-delay: 0.7s; border-color: #fecaca; }
+.ping-flat-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fecaca, #e11d48 60%, #991b1b);
+  box-shadow: 0 0 10px #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+}
+/* Shift ping: upright like token (rotateX -90deg → stand on table, bob) */
+.ping-upright {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.ping-token {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 52px;
+  margin-left: -18px;
+  margin-top: -52px;
+  transform-origin: center bottom;
+  transform: rotateX(-90deg) translateY(-50%);
+  transform-style: preserve-3d;
+  animation: ping-token-bob 0.7s ease-in-out infinite alternate;
+}
+.ping-warning-plate {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 34px;
+  height: 48px;
+  margin-left: -17px;
+  border-radius: 6px 6px 4px 4px;
+  background: linear-gradient(160deg, #fecaca 0%, #e11d48 45%, #991b1b 100%);
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px #e11d48, 0 0 18px rgba(239, 68, 68, 0.75);
+  color: #fff;
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 46px;
+  text-align: center;
+  text-shadow: 0 1px 2px #7f1d1d;
+}
+
+@keyframes ping-ring-expand {
+  0% { transform: translate(-50%, -50%) scale(0.55); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+}
+@keyframes ping-token-bob {
+  from { transform: rotateX(-90deg) translateY(-50%) translateZ(0); }
+  to { transform: rotateX(-90deg) translateY(-50%) translateZ(10px); }
+}
+.light-marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe08a, #f59e0b 70%, transparent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.light-marker.selected {
+  box-shadow: 0 0 0 2px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.7);
+}
+.path-waypoints {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.path-waypoints .path-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.path-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: hsl(200, 90%, 48%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.offscreen-pings {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 900;
+}
+.offscreen-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid #e11d48;
+}
+
 .game-table {
   height: 100%;
   width: 100%;
+  overflow: visible;
 }
 
 .table-image {
@@ -77,6 +260,7 @@
   width: 100%;
   background-repeat: no-repeat;
   background-size: 100% 100%;
+  overflow: visible;
 }
 
 .background-image {

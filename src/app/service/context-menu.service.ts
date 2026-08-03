@@ -37,8 +37,46 @@ export interface ContextMenuAction {
   color?: string,
   center?: boolean,
   colorSample?: boolean,
+  /** CSS color for the color-sample swatch (preferred over matching Chinese labels). */
+  sampleColor?: string,
   hotkey?: string,
-  checkBox?: string
+  checkBox?: string,
+  /** Native browser tooltip (HTML title). */
+  tip?: string,
+  /** Override close behavior. Default: stay open for checkBox/radio, close for normal actions. */
+  keepOpen?: boolean,
+  /** Optional: refresh displayed name after action while menu stays open. */
+  nameUpdate?: () => string,
+}
+
+/** Checkbox that toggles live state (safe to click repeatedly while menu stays open). */
+export function contextMenuToggleCheck(options: {
+  get: () => boolean;
+  set: (value: boolean) => void;
+  on: string;
+  off: string;
+  after?: () => void;
+  disabled?: boolean;
+  error?: string;
+  tip?: string;
+  level?: number;
+  selfOnly?: boolean;
+}): ContextMenuAction {
+  const nameUpdate = () => (options.get() ? options.on : options.off);
+  return {
+    name: nameUpdate(),
+    nameUpdate,
+    action: () => {
+      options.set(!options.get());
+      options.after?.();
+    },
+    checkBox: 'check',
+    disabled: options.disabled,
+    error: options.error,
+    tip: options.tip,
+    level: options.level,
+    selfOnly: options.selfOnly,
+  };
 }
 
 @Injectable()

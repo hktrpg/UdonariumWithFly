@@ -19,6 +19,7 @@ import { FileStorageComponent } from 'component/file-storage/file-storage.compon
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { AppComponent } from '../../app.component';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'file-selector',
@@ -105,7 +106,8 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
     private modalService: ModalService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) {
     this.isAllowedEmpty = this.modalService.option && this.modalService.option.isAllowedEmpty ? true : false;
     if (this.modalService.option && this.modalService.option.currentImageIdentifires) {
@@ -114,7 +116,7 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnInit() {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = '圖片庫');
+    Promise.resolve().then(() => this.modalService.title = this.panelService.title = this.i18n.t('file.title'));
     this.searchWords = this.allImagesOwnWords;
     //FileStorageComponent.sortOrder = [null].concat(this.searchWords);
     // 含隱藏項目的數量
@@ -210,13 +212,13 @@ export class FileSelecterComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示已設為隱藏的圖片', 
-        text: '要顯示已設為隱藏的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('file.showHiddenTitle'), 
+        text: this.i18n.t('file.showHiddenText'),
+        help: this.i18n.t('file.showHiddenHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從圖片庫顯示了已設為隱藏的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('file.showHiddenLog'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();

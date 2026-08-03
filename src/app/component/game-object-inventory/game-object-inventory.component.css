@@ -3,24 +3,121 @@
 }
 
 .component {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   overflow-x: hidden;
+}
+
+.tab-card {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 8px 10px;
+}
+
+.settings-card {
+  padding: 8px 10px;
+}
+
+.inv-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inv-tab {
+  cursor: pointer;
+}
+
+.inv-tab input {
+  display: none;
+}
+
+.inv-tab span {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid #c4b29a;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fffdf8;
+  color: #5c4630;
+}
+
+.inv-tab:hover span {
+  background: #efe0c8;
+}
+
+.inv-tab.is-active span {
+  background: #5c4630;
+  border-color: #4a3826;
+  color: #fffaf2;
+}
+
+.inv-tab.is-drop-target span {
+  background: #4a7c59;
+  border-color: #3d6849;
+  color: #fff;
+  outline: 2px dashed #cfe8d5;
+  outline-offset: 1px;
+}
+
+.view-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.summary-label {
+  font-weight: 700;
+  color: #5c4630;
+}
+
+.summary-value {
+  color: #3a2f24;
+}
+
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.multi-hint {
+  font-size: 11px;
+  color: #7a6a58;
+}
+
+.multi-hint kbd {
+  border-radius: 3px;
+  border: 1px solid #c4b29a;
+  padding: 1px 4px;
+  background: #fffdf8;
+  color: #5c4630;
 }
 
 .box {
   border: transparent 2px solid;
   border-left: transparent 6px solid;
-  margin-top: 2px;
-  padding: 2px;
-  padding-bottom: 3px;
+  margin-top: 0;
+  padding: 4px 6px;
   box-sizing: border-box;
-
-  border-bottom: 1px dotted #666;
+  border-radius: 4px;
+  border-bottom: 1px dotted #c4b29a;
+  background: linear-gradient(180deg, #fffdf8 0%, #faf3e8 100%);
 }
 .selected {
-  padding: 2px;
-  border: 2px dotted #666;
+  padding: 4px 6px;
+  border: 2px dotted #8a7358;
   border-left: 6px solid #EFBC70;
+  background: #fffaf2;
 }
 
 .selected.is-inventory-no-indicate {
@@ -164,103 +261,6 @@ input[type='range']::-ms-tooltip {
   display: none;
 }
 
-.tab {
-  padding : 5px;
-  user-select: none;
-}
-
-.tab {
-  padding : 0px;
-  border: solid 1px #555;
-  border-radius: 0.3em;
-  overflow: hidden;
-
-  display: flex;
-  flex-flow:  row nowrap;
-  justify-content: space-around;
-  align-items: stretch;
-
-  text-align: center;
-
-  margin: 0px; 
-  max-width: 500px;
-
-  background-color: rgba(240,218,189, 0.9);
-}
-
-.tab label {
-  display: inline-block;
-  flex: 1 0 auto;
-  flex-grow: 1;
-}
-
-.tab label:hover {
-  background-color: #888;
-  color: #eee;
-  border-color: #555;
-}
-
-.tab label:checked {
-  background: #555;
-  color: #CCC;
-}
-
-.tab input[type="radio"] {
-  display: none;
-}
-
-.tab input[type="radio"] + div {
-  vertical-align: middle;
-  outline: 0;
-  font-size: 0.6em;
-  background-color: transparent;
-  color: #444; 
-  
-  box-sizing: border-box;
-
-  margin: 0px; 
-  padding: 2px 8px;
-
-  cursor: pointer;
-}
-
-.tab input[type="radio"] + div:hover {
-  background-color: #888;
-  color: #eee;
-  border-color: #555;
-}
-
-.tab input[type="radio"]:checked + div {
-  background: #555;
-  color: #CCC;
-}
-
-.is-sticky-top {
-  position: sticky;
-  top : 0;
-  z-index: 10000;
-}
-
-.tab-setting {
-  background-color: transparent;
-  color: #444; 
-  border: solid 1px #555;
-  padding: 2px 8px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.tab-setting:hover {
-  background-color: #888;
-  color: #eee;
-  border: solid 1px #555;
-}
-
-.small-font {
-  font-size: 12px;
-  vertical-align: middle;
-}
-
 .material-icons {
   vertical-align: middle;
   font-size: 1.0rem;
@@ -276,6 +276,19 @@ input[type='range']::-ms-tooltip {
   height: 32px;
   display: table-cell;
   vertical-align: top;
+}
+
+.matrix-rain-host {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.matrix-rain-host .matrix-rain-col {
+  font-size: 5px !important;
 }
 
 .image-box img{
@@ -512,6 +525,12 @@ button.link {
     */
 }
 
+/* Claim / stealth tags sit above the row so they don't cover the token name. */
+.object-container:has(.player-owner-tag),
+.object-container:has(.owner-tag) {
+  padding-top: 16px;
+}
+
 @keyframes fadeIn {
   0% {
     opacity: 0;
@@ -540,16 +559,43 @@ button.link {
   pointer-events: none;
 }
 
+.player-owner-tag {
+  position: absolute;
+  font-size: 8px;
+  width: min-content;
+  max-width: calc(50% - 4px);
+  overflow: hidden;
+  color: whitesmoke;
+  background-color: #2563eb;
+  box-sizing: border-box;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.95;
+  top: 1px;
+  left: 1px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.object-container.is-draggable {
+  cursor: grab;
+}
+.object-container.is-draggable:active {
+  cursor: grabbing;
+}
+
 .url-link {
   cursor: inherit;
 }
 
 .muluti-selected {
-  border-top: 2px dotted #666;
-  border-bottom: 2px dotted #666;
+  border-top: 2px dotted #8a7358;
+  border-bottom: 2px dotted #8a7358;
   border-right: 5px solid hsla(200, 100%, 75%, 0.6);
 }
 .muluti-selected:not(.selected) {
   padding-left: 6px;
-  border-left: 2px dotted #666;
+  border-left: 2px dotted #8a7358;
 }

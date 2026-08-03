@@ -8,6 +8,7 @@ import { IRoomInfo, RoomInfo } from '../room-info';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
+import { translate } from 'i18n';
 
 type PeerId = string;
 
@@ -72,7 +73,7 @@ export class SkyWayConnection implements Connection {
     if (!this.peer.isRoom) {
       console.warn('connect() is Fail. Room connection only');
       let errorType = 'udonarium-unsupported';
-      let errorMessage = '在目前的 Udonarium 使用 SkyWay(2023) 時，無法使用私人連線。請改用房間連線功能。';
+      let errorMessage = translate('skyway.privateUnsupported');
       if (this.callback.onError) this.callback.onError(this.peer, errorType, errorMessage, {});
       return false;
     }

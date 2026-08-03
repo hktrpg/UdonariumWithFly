@@ -1,3 +1,4 @@
+import { GameCharacter } from '@udonarium/game-character';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 
@@ -99,6 +100,7 @@ export class RotableSelectionSynchronizer {
       if (rotables == null || rotables.size < 1) {
         if (!('rotate' in object)) continue;
         if ((object as any).isLocked || (object as any).isLock) continue;
+        if (object instanceof GameCharacter && object.isLockedByPlayerOwner) continue;
         (object as any).rotate = nextAngle(+(object as any).rotate || 0);
         rotated = true;
         continue;

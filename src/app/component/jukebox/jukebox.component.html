@@ -1,63 +1,143 @@
-<div style="margin-bottom: 2px; min-height: 4em">
-  <div *ngFor="let audio of audios; last as last" class="box" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden" [ngClass]="{last: last}">
-    <button *ngIf="audio !== auditionPlayer?.audio || auditionPlayer?.paused" (click)="play(audio)" [disabled]="!audio.isReady"><i class="material-icons">play_arrow</i>試聽<sup style="font-size: larger" class="self-only">*</sup></button>
-    <button *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused" (click)="stop()" [disabled]="!audio.isReady"><i class="material-icons">stop</i>試聽<sup style="font-size: larger" class="self-only">*</sup></button>
-    <button *ngIf="audio !== jukebox?.audio" (click)="playBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">loop</i>ＢＧＭ</button>
-    <button *ngIf="audio === jukebox?.audio" (click)="stopBGM(audio)" [disabled]="!audio.isReady"><i class="material-icons">stop</i>ＢＧＭ</button>
-    <span *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused && audio != jukebox?.audio" style="padding-left: 2px"><b>【試聽中】</b></span>
-    <ng-container *ngIf="audio === jukebox?.audio">
-      <span *ngIf="audio != auditionPlayer?.audio || (audio == auditionPlayer?.audio && auditionPlayer?.paused)" style="padding-left: 2px"><i class="material-icons" style="font-size: 16px; vertical-align: middle">volume_up</i></span>
-      <span *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused" style="padding-left: 2px"><i class="material-icons" style="font-size: 16px; vertical-align: middle">volume_up</i><b>【試聽中】</b></span>
-    </ng-container>
-    <span style="font-size: smaller" style="padding-left: 2px" [style.font-weight]="audio === jukebox?.audio ? 'bolder': 'normal'">{{audio.name}}</span>
-  </div>
-  <div *ngIf="audios.length < 1" style="padding: 1em 0px; text-align: center"><small><b>上傳的音樂檔案會顯示在這裡。</b></small></div>
-</div>
+<div class="settings-ui jukebox">
+  <section class="card">
+    <header class="card-head"><h3>{{ 'jukebox.title' | i18n }}</h3></header>
 
-<label *ngIf="!GuestMode()">
-  <span class="drop-zone">
-    <span>
-      <i class="material-icons large-font">playlist_add</i>
-    </span>
-    <span>將音樂拖放到這裡</span>
-    <span class="small-font">或點擊這裡選擇</span>
-    <input type="file" style="display: none;" (change)="handleFileSelect($event)" multiple accept="audio/*"/>
-    <span class="small-font">
-      <br>每個檔案最大 10MB</span>
-  </span>
-</label>
-<div style="font-size: 12px; margin-top: 3px">※ <b>試聽<sup class="self-only">*</sup></b>、<b>SE測試<sup class="self-only">*</sup></b> 會在自己的環境播放一次音樂。</div>
-<div style="font-size: 12px">※ <b>BGM</b> 會在房間內全員循環播放同一首音樂。</div>
-<div style="font-size: 12px; margin-bottom: 8px">※現行版本的存檔資料（zip）不包含音樂檔案。（每次都需要重新上傳）</div>
+    <div class="audio-list" *ngIf="audios.length > 0">
+      <div *ngFor="let audio of audios" class="list-item">
+        <span class="btn-group">
+          <button
+            *ngIf="audio !== auditionPlayer?.audio || auditionPlayer?.paused"
+            type="button"
+            class="btn btn-sm"
+            (click)="play(audio)"
+            [disabled]="!audio.isReady"
+          >
+            <i class="material-icons">play_arrow</i>{{ 'jukebox.audition' | i18n }}<sup class="self-only">*</sup>
+          </button>
+          <button
+            *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused"
+            type="button"
+            class="btn btn-sm btn-primary"
+            (click)="stop()"
+            [disabled]="!audio.isReady"
+          >
+            <i class="material-icons">stop</i>{{ 'jukebox.audition' | i18n }}<sup class="self-only">*</sup>
+          </button>
+          <button
+            *ngIf="audio !== jukebox?.audio"
+            type="button"
+            class="btn btn-sm"
+            (click)="playBGM(audio)"
+            [disabled]="!audio.isReady"
+          >
+            <i class="material-icons">loop</i>{{ 'jukebox.bgm' | i18n }}
+          </button>
+          <button
+            *ngIf="audio === jukebox?.audio"
+            type="button"
+            class="btn btn-sm btn-primary"
+            (click)="stopBGM(audio)"
+            [disabled]="!audio.isReady"
+          >
+            <i class="material-icons">stop</i>{{ 'jukebox.bgm' | i18n }}
+          </button>
+        </span>
+        <span class="list-status" *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused && audio != jukebox?.audio">
+          {{ 'jukebox.auditionPlaying' | i18n }}
+        </span>
+        <ng-container *ngIf="audio === jukebox?.audio">
+          <span class="list-status" *ngIf="audio != auditionPlayer?.audio || (audio == auditionPlayer?.audio && auditionPlayer?.paused)">
+            <i class="material-icons">volume_up</i>
+          </span>
+          <span class="list-status" *ngIf="audio === auditionPlayer?.audio && !auditionPlayer?.paused">
+            <i class="material-icons">volume_up</i>{{ 'jukebox.auditionPlaying' | i18n }}
+          </span>
+        </ng-container>
+        <span class="list-item-name" [class.is-active]="audio === jukebox?.audio">{{ audio.name }}</span>
+      </div>
+    </div>
+    <p class="empty-hint" *ngIf="audios.length < 1">{{ 'jukebox.empty' | i18n }}</p>
 
-<div class="footer" style="position: sticky; bottom: 0px; padding: 2px 0px 0px 3px">
-  <div style="display: flex">
-    <div style="flex-basis: auto"><b style="white-space: nowrap">試聽音量<sup class="self-only">*</sup>：</b></div>
-    <div style="flex-basis: auto"><button class="button-mute" (click)="isAuditionMute = !isAuditionMute" [title]="isAuditionMute ? '解除靜音' : '靜音'"><i class="material-icons" style="font-size: 22px">{{ isAuditionMute ? 'volume_off' : auditionVolume == 0 ? 'volume_mute' : auditionVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i></button></div>
-    <div style="flex-basis: 100%; max-width: 250px"><input [(ngModel)]="auditionVolume" type="range" [title]="isAuditionMute ? '' : percentAuditionVolume + '%'" min="0" max="1" step="0.01" style="width: 100%" /></div>
-    <div style="flex-basis: auto; padding-right: 1em"><span style="white-space: nowrap; padding-left: 4px"><input type="number" min="0" max="100" step="1" style="width: 3.2em" [(ngModel)]="percentAuditionVolume"><b style="font-size: smaller; padding-left: 3px;">%</b></span></div>
-  </div>
-  <div style="display: flex">
-    <div style="flex-basis: auto"><b style="white-space: nowrap">播放音量<sup class="self-only">*</sup>：</b></div>
-    <div style="flex-basis: auto"><button class="button-mute" (click)="isMute = !isMute" [title]="isMute ? '解除靜音' : '靜音'"><i class="material-icons" style="font-size: 22px">{{ isMute ? 'volume_off' : volume == 0 ? 'volume_mute' : volume <= 0.5 ? 'volume_down' : 'volume_up' }}</i></button></div>
-    <div style="flex-basis: 100%; max-width: 250px"><input [(ngModel)]="volume" type="range" min="0" [title]="isMute ? '' : percentVolume + '%'" max="1" step="0.01" style="width: 100%" /></div>
-    <div style="flex-basis: auto; padding-right: 1em"><span style="white-space: nowrap; padding-left: 4px"><input type="number" min="0" max="100" step="1" style="width: 3.2em" [(ngModel)]="percentVolume"><b style="font-size: smaller; padding-left: 3px;">%</b></span></div>
-  </div>
-  <hr />
-  <div style="display: flex">
-    <div style="flex-basis: auto"><b style="white-space: nowrap">通知音量<sup class="self-only">*</sup>：</b></div>
-    <div style="flex-basis: auto"><button class="button-mute" (click)="isNoticeMute = !isNoticeMute" [title]="isNoticeMute ? '解除靜音' : '靜音'"><i class="material-icons" style="font-size: 22px">{{ isNoticeMute ? 'volume_off' : noticeVolume == 0 ? 'volume_mute' : noticeVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i></button></div>
-    <div style="flex-basis: 100%; max-width: 250px"><input [(ngModel)]="noticeVolume" (change)="noticeTest()" type="range" min="0" [title]="isNoticeMute ? '' : percentNoticeVolume + '%'" max="1" step="0.01" style="width: 100%" /></div>
-    <div style="flex-basis: auto; padding-right: 1em"><span style="white-space: nowrap; padding-left: 4px"><input (change)="noticeTest()" type="number" min="0" max="100" step="1" style="width: 3.2em" [(ngModel)]="percentNoticeVolume"><b style="font-size: smaller; padding-left: 3px;">%</b></span></div>
-  </div>
-  <div style="display: flex">
-    <div style="flex-basis: auto"><b style="white-space: nowrap">ＳＥ音量<sup class="self-only">*</sup>：</b></div>
-    <div style="flex-basis: auto"><button class="button-mute" (click)="isSoundEffectMute = !isSoundEffectMute" [title]="isSoundEffectMute ? '解除靜音' : '靜音'"><i class="material-icons" style="font-size: 22px">{{ isSoundEffectMute ? 'volume_off' : soundEffectVolume == 0 ? 'volume_mute' : soundEffectVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i></button></div>
-    <div style="flex-basis: 100%; max-width: 250px"><input [(ngModel)]="soundEffectVolume" type="range" min="0" [title]="isSoundEffectMute ? '' : percentSoundEffectVolume + '%'" max="1" step="0.01" style="width: 100%" /></div>
-    <div style="flex-basis: auto; padding-right: 1em"><span style="white-space: nowrap; padding-left: 4px"><input type="number" min="0" max="100" step="1" style="width: 3.2em" [(ngModel)]="percentSoundEffectVolume"><b style="font-size: smaller; padding-left: 3px;">%</b></span></div>
-  </div>
-  <div style="display: flex; justify-content: space-between; padding-bottom: 2px">
-    <div><small>※設定的音量會儲存在瀏覽器中。</small></div>
-    <div><button style="font-size: xx-small; font-weight: bolder; margin-right: 2em; white-space: nowrap" (click)="soundTest($event)">ＳＥ測試<sup style="font-size: larger" class="self-only">*</sup></button></div>
-  </div>
+    <label *ngIf="!GuestMode()" class="drop-zone-wrap">
+      <span class="drop-zone">
+        <i class="material-icons">playlist_add</i>
+        <span class="drop-zone-title">{{ 'jukebox.dropMusic' | i18n }}</span>
+        <span class="drop-zone-sub">{{ 'jukebox.orClick' | i18n }}</span>
+        <span class="drop-zone-sub">{{ 'jukebox.maxFileSize' | i18n }}</span>
+        <input type="file" hidden (change)="handleFileSelect($event)" multiple accept="audio/*" />
+      </span>
+    </label>
+
+    <p class="hint" [innerHTML]="'jukebox.hintAudition' | i18n"></p>
+    <p class="hint" [innerHTML]="'jukebox.hintBgm' | i18n"></p>
+    <p class="hint">{{ 'jukebox.hintZip' | i18n }}</p>
+  </section>
+
+  <section class="card volume-card">
+    <header class="card-head"><h3>{{ 'jukebox.playbackVolume' | i18n }}</h3></header>
+    <div class="volume-row">
+      <span class="slider-label">{{ 'jukebox.auditionVolume' | i18n }}<sup class="self-only">*</sup></span>
+      <button
+        type="button"
+        class="btn-mute"
+        (click)="isAuditionMute = !isAuditionMute"
+        [title]="isAuditionMute ? ('jukebox.unmute' | i18n) : ('jukebox.mute' | i18n)"
+      >
+        <i class="material-icons">{{ isAuditionMute ? 'volume_off' : auditionVolume == 0 ? 'volume_mute' : auditionVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i>
+      </button>
+      <input [(ngModel)]="auditionVolume" type="range" [title]="isAuditionMute ? '' : percentAuditionVolume + '%'" min="0" max="1" step="0.01" />
+      <input type="number" class="num" min="0" max="100" step="1" [(ngModel)]="percentAuditionVolume" />
+      <span class="val">%</span>
+    </div>
+    <div class="volume-row">
+      <span class="slider-label">{{ 'jukebox.playbackVolume' | i18n }}<sup class="self-only">*</sup></span>
+      <button
+        type="button"
+        class="btn-mute"
+        (click)="isMute = !isMute"
+        [title]="isMute ? ('jukebox.unmute' | i18n) : ('jukebox.mute' | i18n)"
+      >
+        <i class="material-icons">{{ isMute ? 'volume_off' : volume == 0 ? 'volume_mute' : volume <= 0.5 ? 'volume_down' : 'volume_up' }}</i>
+      </button>
+      <input [(ngModel)]="volume" type="range" min="0" [title]="isMute ? '' : percentVolume + '%'" max="1" step="0.01" />
+      <input type="number" class="num" min="0" max="100" step="1" [(ngModel)]="percentVolume" />
+      <span class="val">%</span>
+    </div>
+    <div class="volume-row">
+      <span class="slider-label">{{ 'jukebox.noticeVolume' | i18n }}<sup class="self-only">*</sup></span>
+      <button
+        type="button"
+        class="btn-mute"
+        (click)="isNoticeMute = !isNoticeMute"
+        [title]="isNoticeMute ? ('jukebox.unmute' | i18n) : ('jukebox.mute' | i18n)"
+      >
+        <i class="material-icons">{{ isNoticeMute ? 'volume_off' : noticeVolume == 0 ? 'volume_mute' : noticeVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i>
+      </button>
+      <input [(ngModel)]="noticeVolume" (change)="noticeTest()" type="range" min="0" [title]="isNoticeMute ? '' : percentNoticeVolume + '%'" max="1" step="0.01" />
+      <input (change)="noticeTest()" type="number" class="num" min="0" max="100" step="1" [(ngModel)]="percentNoticeVolume" />
+      <span class="val">%</span>
+    </div>
+    <div class="volume-row">
+      <span class="slider-label">{{ 'jukebox.sfxVolume' | i18n }}<sup class="self-only">*</sup></span>
+      <button
+        type="button"
+        class="btn-mute"
+        (click)="isSoundEffectMute = !isSoundEffectMute"
+        [title]="isSoundEffectMute ? ('jukebox.unmute' | i18n) : ('jukebox.mute' | i18n)"
+      >
+        <i class="material-icons">{{ isSoundEffectMute ? 'volume_off' : soundEffectVolume == 0 ? 'volume_mute' : soundEffectVolume <= 0.5 ? 'volume_down' : 'volume_up' }}</i>
+      </button>
+      <input [(ngModel)]="soundEffectVolume" type="range" min="0" [title]="isSoundEffectMute ? '' : percentSoundEffectVolume + '%'" max="1" step="0.01" />
+      <input type="number" class="num" min="0" max="100" step="1" [(ngModel)]="percentSoundEffectVolume" />
+      <span class="val">%</span>
+    </div>
+    <footer class="actions">
+      <span class="hint" style="margin:0">{{ 'jukebox.volumeSaved' | i18n }}</span>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm" (click)="soundTest($event)">
+          {{ 'jukebox.sfxTest' | i18n }}<sup class="self-only">*</sup>
+        </button>
+      </span>
+    </footer>
+  </section>
 </div>

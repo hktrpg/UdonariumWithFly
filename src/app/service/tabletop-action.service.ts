@@ -14,6 +14,7 @@ import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
 import { ContextMenuAction } from './context-menu.service';
+import { I18nService } from './i18n.service';
 import { PointerCoordinate } from './pointer-device.service';
 
 import { ImageTag } from '@udonarium/image-tag';
@@ -24,7 +25,7 @@ import { RangeArea } from '@udonarium/range';
 })
 export class TabletopActionService {
 
-  constructor() { }
+  constructor(private i18n: I18nService) { }
 
   GuestMode() {
     return Network.GuestMode();
@@ -32,7 +33,7 @@ export class TabletopActionService {
 
   createGameCharacter(position: PointerCoordinate): GameCharacter {
     if (this.GuestMode()) return;
-    let character = GameCharacter.create('新角色', 1, '');
+    let character = GameCharacter.create(this.i18n.t('action.newCharacter'), 1, '');
     character.location.x = position.x - 25;
     character.location.y = position.y - 25;
     character.posZ = position.z;
@@ -44,7 +45,7 @@ export class TabletopActionService {
     let viewTable = this.getViewTable();
     if (!viewTable) return;
 
-    let tableMask = GameTableMask.create('地圖遮罩', 5, 5, 100);
+    let tableMask = GameTableMask.create(this.i18n.t('action.mapMaskName'), 5, 5, 100);
     tableMask.location.x = position.x - 25;
     tableMask.location.y = position.y - 25;
     tableMask.posZ = position.z;
@@ -60,13 +61,13 @@ export class TabletopActionService {
     //if (!image) image = ImageStorage.instance.add(url);
     if (!image) {
       image = ImageStorage.instance.add(url);
-      ImageTag.create(image.identifier).tag = '*default 地形';
+      ImageTag.create(image.identifier).tag = '*default ' + this.i18n.t('action.terrainName');
     }
 
     let viewTable = this.getViewTable();
     if (!viewTable) return;
 
-    let terrain = Terrain.create('地形', 2, 2, 2, image.identifier, image.identifier);
+    let terrain = Terrain.create(this.i18n.t('action.terrainName'), 2, 2, 2, image.identifier, image.identifier);
     terrain.location.x = position.x - 50;
     terrain.location.y = position.y - 50;
     terrain.posZ = position.z;
@@ -77,7 +78,7 @@ export class TabletopActionService {
 
   createTextNote(position: PointerCoordinate): TextNote {
     if (this.GuestMode()) return;
-    let textNote = TextNote.create('共用筆記', '請輸入文字', 5, 4, 3);
+    let textNote = TextNote.create(this.i18n.t('action.noteName'), this.i18n.t('action.noteBody'), 5, 4, 3);
     textNote.location.x = position.x;
     textNote.location.y = position.y;
     textNote.posZ = position.z;
@@ -95,7 +96,7 @@ export class TabletopActionService {
       //if (!image) { image = ImageStorage.instance.add(url); }
       if (!image) {
         image = ImageStorage.instance.add(url);
-        ImageTag.create(image.identifier).tag = `*default ${ diceType === DiceType.D2 ? '硬幣' : '骰子'}`;
+        ImageTag.create(image.identifier).tag = `*default ${ diceType === DiceType.D2 ? this.i18n.t('action.coinName') : this.i18n.t('action.diceName')}`;
       }
       diceSymbol.imageDataElement.getFirstElementByName(face).value = image.identifier;
     });
@@ -106,7 +107,7 @@ export class TabletopActionService {
       //if (!image) { image = ImageStorage.instance.add(url); }
       if (!image) {
         image = ImageStorage.instance.add(url);
-        ImageTag.create(image.identifier).tag = `*default ${ diceType === DiceType.D2 ? '硬幣' : '骰子'}`;
+        ImageTag.create(image.identifier).tag = `*default ${ diceType === DiceType.D2 ? this.i18n.t('action.coinName') : this.i18n.t('action.diceName')}`;
       }
       diceSymbol.imageDataElement.getFirstElementByName(face).value = image.identifier;
     });
@@ -127,14 +128,14 @@ export class TabletopActionService {
     frontImage = ImageStorage.instance.get(frontUrl);
     if (!frontImage) {
       frontImage = ImageStorage.instance.add(frontUrl);
-      ImageTag.create(frontImage.identifier).tag = '*default 卡牌';
+      ImageTag.create(frontImage.identifier).tag = '*default ' + this.i18n.t('action.cardName');
     }
     backImage = ImageStorage.instance.get(backUrl);
     if (!backImage) {
       backImage = ImageStorage.instance.add(backUrl);
-      ImageTag.create(backImage.identifier).tag = '*default 卡牌';
+      ImageTag.create(backImage.identifier).tag = '*default ' + this.i18n.t('action.cardName');
     }
-    let card = Card.create('卡牌', frontImage.identifier, backImage.identifier);
+    let card = Card.create(this.i18n.t('action.cardName'), frontImage.identifier, backImage.identifier);
     card.location.x = position.x - 25;
     card.location.y = position.y - 25;
     card.posZ = position.z;
@@ -148,32 +149,32 @@ export class TabletopActionService {
     const jqk = ['J', 'Q', 'K']
     switch(suit) {
       case 'c':
-        ret = '梅花'
+        ret = this.i18n.t('action.suit.club')
         break;
       case 'd':
-        ret = '方塊'
+        ret = this.i18n.t('action.suit.diamond')
         break;
       case 'h':
-        ret = '紅心'
+        ret = this.i18n.t('action.suit.heart')
         break;
       case 's':
-        ret = '黑桃'
+        ret = this.i18n.t('action.suit.spade')
         break;
       case 'x':
-        ret = '鬼牌'
+        ret = this.i18n.t('action.suit.joker')
         break;
     }
     if (suit == 'x') {
-      ret += `（${(number == 1) ? '紅' : '黑' }）`;
+      ret += `（${(number == 1) ? this.i18n.t('action.suit.red') : this.i18n.t('action.suit.black') }）`;
     } else {
-      ret += `的${number == 1 ? 'A' : number >= 11 ? jqk[number - 11] : number }`
+      ret += `${this.i18n.t('action.suit.of')}${number == 1 ? 'A' : number >= 11 ? jqk[number - 11] : number }`
     }
     return ret;
   }
 
   createTrump(position: PointerCoordinate): CardStack {
     if (this.GuestMode()) return;
-    let cardStack = CardStack.create('撲克牌牌堆');
+    let cardStack = CardStack.create(this.i18n.t('action.pokerDeck'));
     cardStack.location.x = position.x - 25;
     cardStack.location.y = position.y - 25;
     cardStack.posZ = position.z;
@@ -182,7 +183,7 @@ export class TabletopActionService {
     if (!ImageStorage.instance.get(back)) {
       //ImageStorage.instance.add(back);
       const image = ImageStorage.instance.add(back);
-      ImageTag.create(image.identifier).tag = '*default 卡牌';
+      ImageTag.create(image.identifier).tag = '*default ' + this.i18n.t('action.cardName');
     }
 
     let suits: string[] = ['c', 'd', 'h', 's'];
@@ -202,7 +203,7 @@ export class TabletopActionService {
       if (!ImageStorage.instance.get(url)) {
         //ImageStorage.instance.add(url);
         const image = ImageStorage.instance.add(url);
-        ImageTag.create(image.identifier).tag = '*default 卡牌';
+        ImageTag.create(image.identifier).tag = '*default ' + this.i18n.t('action.cardName');
       }
       let card = Card.create(this.cardName(trump), url, back);
       //let card = Card.create('卡牌', url, back);
@@ -215,20 +216,20 @@ export class TabletopActionService {
     let range;
     switch (typeName) {
       case 'LINE':
-        range = RangeArea.create('射程範圍 (直線)', 1, 6, 100);
+        range = RangeArea.create(this.i18n.t('action.rangeLineName'), 1, 6, 100);
         break;
       case 'CIRCLE':
-        range = RangeArea.create('射程範圍 (圓形)', 3, 3, 100);
+        range = RangeArea.create(this.i18n.t('action.rangeCircleName'), 3, 3, 100);
         break;
       case 'SQUARE':
-        range = RangeArea.create('射程範圍 (正方形)', 3, 3, 100);
+        range = RangeArea.create(this.i18n.t('action.rangeSquareName'), 3, 3, 100);
         break;
       case 'DIAMOND':
-        range = RangeArea.create('射程範圍 (菱形)', 3, 3, 100);
+        range = RangeArea.create(this.i18n.t('action.rangeDiamondName'), 3, 3, 100);
         break;
       case 'CORN':
       default:
-        range = RangeArea.create('射程範圍 (錐形)', 6, 6, 100);
+        range = RangeArea.create(this.i18n.t('action.rangeConeName'), 6, 6, 100);
         break;
     }
 
@@ -248,8 +249,8 @@ export class TabletopActionService {
     let bgFileContext = ImageFile.createEmpty('testTableBackgroundImage_image').toContext();
     bgFileContext.url = './assets/images/BG10a_80.jpg';
     testBgFile = ImageStorage.instance.add(bgFileContext);
-    ImageTag.create(testBgFile.identifier).tag = '*default 桌面';
-    gameTable.name = '最初的桌面';
+    ImageTag.create(testBgFile.identifier).tag = '*default ' + this.i18n.t('char.table');
+    gameTable.name = this.i18n.t('action.firstTable');
     gameTable.imageIdentifier = testBgFile.identifier;
     gameTable.width = 20;
     gameTable.height = 15;
@@ -267,59 +268,59 @@ export class TabletopActionService {
     fileContext = ImageFile.createEmpty('testCharacter_1_image').toContext();
     fileContext.url = './assets/images/mon_052.gif';
     testFile = ImageStorage.instance.add(fileContext);
-    ImageTag.create(testFile.identifier).tag = '*default 角色';
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
     testCharacter.location.x = 5 * 50;
     testCharacter.location.y = 9 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('怪物A', 1, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterA'), 1, testFile.identifier);
 
     testCharacter = new GameCharacter('testCharacter_2');
     testCharacter.location.x = 8 * 50;
     testCharacter.location.y = 8 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('怪物B', 1, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterB'), 1, testFile.identifier);
 
     testCharacter = new GameCharacter('testCharacter_3');
     fileContext = ImageFile.createEmpty('testCharacter_3_image').toContext();
     fileContext.url = './assets/images/mon_128.gif';
     testFile = ImageStorage.instance.add(fileContext);
-    ImageTag.create(testFile.identifier).tag = '*default 角色';
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
     testCharacter.location.x = 4 * 50;
     testCharacter.location.y = 2 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('怪物C', 3, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterC'), 3, testFile.identifier);
 
     testCharacter = new GameCharacter('testCharacter_4');
     fileContext = ImageFile.createEmpty('testCharacter_4_image').toContext();
     fileContext.url = './assets/images/mon_150.gif';
     testFile = ImageStorage.instance.add(fileContext);
-    ImageTag.create(testFile.identifier).tag = '*default 角色';
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
     testCharacter.location.x = 6 * 50;
     testCharacter.location.y = 11 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('角色A', 1, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.characterA'), 1, testFile.identifier);
 
     testCharacter = new GameCharacter('testCharacter_5');
     fileContext = ImageFile.createEmpty('testCharacter_5_image').toContext();
     fileContext.url = './assets/images/mon_211.gif';
     testFile = ImageStorage.instance.add(fileContext);
-    ImageTag.create(testFile.identifier).tag = '*default 角色';
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
     testCharacter.location.x = 12 * 50;
     testCharacter.location.y = 12 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('角色B', 1, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.characterB'), 1, testFile.identifier);
 
     testCharacter = new GameCharacter('testCharacter_6');
     fileContext = ImageFile.createEmpty('testCharacter_6_image').toContext();
     fileContext.url = './assets/images/mon_135.gif';
     testFile = ImageStorage.instance.add(fileContext);
 
-    ImageTag.create(testFile.identifier).tag = '*default 角色';
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
     testCharacter.initialize();
     testCharacter.location.x = 5 * 50;
     testCharacter.location.y = 13 * 50;
     testCharacter.initialize();
-    testCharacter.createTestGameDataElement('角色C', 1, testFile.identifier);
+    testCharacter.createTestGameDataElement(this.i18n.t('sample.characterC'), 1, testFile.identifier);
   }
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {
@@ -338,7 +339,7 @@ export class TabletopActionService {
 
   private getCreateCharacterMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增角色', action: () => {
+      name: this.i18n.t('action.addCharacter'), action: () => {
         let character = this.createGameCharacter(position);
         EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: character.identifier, className: character.aliasName });
         SoundEffect.play(PresetSound.piecePut);
@@ -348,7 +349,7 @@ export class TabletopActionService {
 
   private getCreateTableMaskMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增地圖遮罩', action: () => {
+      name: this.i18n.t('action.addMapMask'), action: () => {
         this.createGameTableMask(position);
         SoundEffect.play(PresetSound.cardPut);
       }
@@ -357,7 +358,7 @@ export class TabletopActionService {
 
   private getCreateTerrainMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增地形', action: () => {
+      name: this.i18n.t('action.addTerrain'), action: () => {
         this.createTerrain(position);
         SoundEffect.play(PresetSound.blockPut);
       }
@@ -366,7 +367,7 @@ export class TabletopActionService {
 
   private getCreateTextNoteMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增共用筆記', action: () => {
+      name: this.i18n.t('action.addSharedNote'), action: () => {
         this.createTextNote(position);
         SoundEffect.play(PresetSound.cardPut);
       }
@@ -375,7 +376,7 @@ export class TabletopActionService {
 
   private getCreateBlankCardMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增空白卡牌', action: () => {
+      name: this.i18n.t('action.addBlankCard'), action: () => {
         this.createBlankCard(position);
         SoundEffect.play(PresetSound.cardPut);
       }
@@ -384,7 +385,7 @@ export class TabletopActionService {
 
   private getCreateTrumpMenu(position: PointerCoordinate): ContextMenuAction {
     return {
-      name: '新增撲克牌牌堆', action: () => {
+      name: this.i18n.t('action.addCardStack'), action: () => {
         this.createTrump(position);
         SoundEffect.play(PresetSound.cardPut);
       }
@@ -393,7 +394,7 @@ export class TabletopActionService {
 
   private getCreateDiceSymbolMenu(position: PointerCoordinate): ContextMenuAction {
     let dices: { menuName: string, diceName: string, type: DiceType, imagePathPrefix: string }[] = [
-      { menuName: '硬幣 (正面/背面)', diceName: '硬幣', type: DiceType.D2, imagePathPrefix: '2_coin' },
+      { menuName: this.i18n.t('action.coin'), diceName: this.i18n.t('action.coinName'), type: DiceType.D2, imagePathPrefix: '2_coin' },
       { menuName: 'D4', diceName: 'D4', type: DiceType.D4, imagePathPrefix: '4_dice' },
       { menuName: 'D6', diceName: 'D6', type: DiceType.D6, imagePathPrefix: '6_dice' },
       { menuName: 'D6 (Black)', diceName: 'D6', type: DiceType.D6, imagePathPrefix: '6_dice_black' },
@@ -413,16 +414,16 @@ export class TabletopActionService {
         }
       });
     });
-    return { name: '新增硬幣／骰子', action: null, subActions: subMenus };
+    return { name: this.i18n.t('action.addDice'), action: null, subActions: subMenus };
   }
 
   private getCreateRangeMenu(position: PointerCoordinate): ContextMenuAction {
     let dices: { menuName: string, typeName: string }[] = [
-      { menuName: '錐形', typeName: 'CORN'},
-      { menuName: '直線', typeName: 'LINE'},
-      { menuName: '圓形', typeName: 'CIRCLE'},
-      { menuName: '正方形', typeName: 'SQUARE'},
-      { menuName: '菱形', typeName: 'DIAMOND'},
+      { menuName: this.i18n.t('action.rangeCone'), typeName: 'CORN'},
+      { menuName: this.i18n.t('action.rangeLine'), typeName: 'LINE'},
+      { menuName: this.i18n.t('action.rangeCircle'), typeName: 'CIRCLE'},
+      { menuName: this.i18n.t('action.rangeSquare'), typeName: 'SQUARE'},
+      { menuName: this.i18n.t('action.rangeDiamond'), typeName: 'DIAMOND'},
     ];
     let subMenus: ContextMenuAction[] = [];
 
@@ -434,7 +435,7 @@ export class TabletopActionService {
         }
       });
     });
-    return { name: '新增射程範圍', action: null, subActions: subMenus };
+    return { name: this.i18n.t('action.addRange'), action: null, subActions: subMenus };
   }
 
   private getViewTable(): GameTable {

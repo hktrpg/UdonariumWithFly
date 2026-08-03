@@ -2,7 +2,6 @@
 <div class="component">
 <div class="log">
   <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" [leftOnly]="isLeftOnly" (onAddMessage)="scrollToBottom()"></chat-tab>
-  <div *ngIf="!chatTab">※聊天標籤的內容已更新。請重新選擇聊天標籤，或重新開啟此聊天視窗。</div>
 </div>
 <div class="sticky-bottom" [ngClass]="{'is-clarify': ClarifyModeActive()}">
   <form *ngIf="!ClarifyModeActive()">
@@ -10,37 +9,41 @@
       <div class="chat-tab">
         <label *ngFor="let chatTab of chatMessageService.chatTabs; trackBy: trackByChatTab" class="tab">
           <input name="chat-tab" type="radio" value="{{chatTab.identifier}}" ng-control="options" [(ngModel)]="chatTabidentifier">
-          <div><span [style.cursor]="chatTabidentifier != chatTab.identifier ? 'pointer' : ''" [style.color]="chatTab.name == '' && chatTabidentifier != chatTab.identifier ? 'gray' : ''">{{chatTab.name == '' ? '(未命名標籤)' : chatTab.name}}</span><i *ngIf="chatTab.isUseStandImage" class="material-icons small-font">how_to_reg</i><i *ngIf="chatTab.recieveOperationLogLevel > 0" class="material-icons small-font">history_edu</i><badge *ngIf="chatTab.hasUnread" class="badge" [count]="chatTab.unreadLength"></badge></div>
+          <div><span [style.cursor]="chatTabidentifier != chatTab.identifier ? 'pointer' : ''" [style.color]="chatTab.name == '' && chatTabidentifier != chatTab.identifier ? 'gray' : ''">{{chatTab.name == '' ? ('chat.unnamedTab' | i18n) : chatTab.name}}</span><i *ngIf="chatTab.isUseStandImage" class="material-icons small-font">how_to_reg</i><i *ngIf="chatTab.recieveOperationLogLevel > 0" class="material-icons small-font">history_edu</i><badge *ngIf="chatTab.hasUnread" class="badge" [count]="chatTab.unreadLength"></badge></div>
         </label>
-        <button type="button" class="tab-setting small-font" (click)="showTabSetting()" *ngIf="!GuestMode()"><i class="material-icons small-font">settings</i>標籤</button>
-        <button type="button" class="tab-setting small-font" (click)="showLogOutput()" *ngIf="!GuestMode()"><i class="material-icons small-font">history_edu</i>日誌</button>
+        <button type="button" class="tab-setting small-font" (click)="showTabSetting()" *ngIf="!GuestMode()"><i class="material-icons small-font">settings</i>{{ 'chat.tabsButton' | i18n }}</button>
+        <button type="button" class="tab-setting small-font" (click)="showLogOutput()" *ngIf="!GuestMode()"><i class="material-icons small-font">history_edu</i>{{ 'chat.logButton' | i18n }}</button>
       </div>
       <div class="chat-toolbar-actions">
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="新訊息提示音：有人發言時播放提示音（本機設定）" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
-          <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_off'}}</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.musicTitle' | i18n" [ngClass]="{'is-active': isMusicOn}" (click)="toggleMusic()">
+          <i class="material-icons" style="font-size: 1em">{{ isMusicOn ? 'music_note' : 'music_off'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 2px" title="訊息靠左：他人訊息也一律靠左顯示，不左右對開（本機設定）" [ngClass]="{'is-active': isLeftOnly}" (click)="isLeftOnly = !isLeftOnly">
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.soundEffectTitle' | i18n" [ngClass]="{'is-active': isSoundEffectOn}" (click)="toggleSoundEffect()">
+          <i class="material-icons" style="font-size: 1em">{{ isSoundEffectOn ? 'volume_up' : 'volume_off'}}</i>
+          <sup style="color: red">*</sup>
+        </button>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.noticeTitle' | i18n" [ngClass]="{'is-active': isNoticeOn}" (click)="isNoticeOn = !isNoticeOn">
+          <i class="material-icons" style="font-size: 1em">{{ isNoticeOn ? 'notifications_active' : 'notifications_paused'}}</i>
+          <sup style="color: red">*</sup>
+        </button>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 2px" [title]="'chat.leftOnlyTitle' | i18n" [ngClass]="{'is-active': isLeftOnly}" (click)="isLeftOnly = !isLeftOnly">
           <i class="material-icons" [ngStyle]="{'font-size': isLeftOnly ? '1em' : '1.3em' }">{{ isLeftOnly ? 'arrow_forward' : 'compare_arrows'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="列表模式：訊息改為單行列表，節省空間（本機設定）" [ngClass]="{'is-active': isCompact}" (click)="isCompact = !isCompact">
-          <i class="material-icons" style="font-size: 1em">{{ isCompact ? 'list' : 'forum'}}</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.compactTitle' | i18n" [ngClass]="{'is-active': isCompactOff}" (click)="toggleCompact()">
+          <i class="material-icons" style="font-size: 1em">{{ isCompactOff ? 'forum' : 'list'}}</i>
           <sup style="color: red">*</sup>
         </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="完全靜音：一次關閉 BGM、音效、提示音與試聽（本機設定）" [ngClass]="{'is-active': isFullMute}" (click)="toggleFullMute()">
-          <i class="material-icons" style="font-size: 1em">{{ isFullMute ? 'volume_off' : 'volume_up'}}</i>
-          <sup style="color: red">*</sup>
-        </button>
-        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" title="精簡：收起標籤列與工具列，只保留輸入區（本機設定）" (click)="toggleClarifyMode()">
-          <i class="material-icons" style="font-size: 1em">view_day</i>
+        <button type="button" class="indicate" style="font-size: 0.8em; padding: 2px 5px" [title]="'chat.clarifyTitle' | i18n" [ngClass]="{'is-active': isClarifyOff}" (click)="toggleClarifyMode()">
+          <i class="material-icons" style="font-size: 1em">{{ isClarifyOff ? 'view_agenda' : 'view_day'}}</i>
           <sup style="color: red">*</sup>
         </button>
       </div>
     </div>
   </form>
   <chat-input [chatTabidentifier]="chatTabidentifier" [(gameType)]="gameType" [(sendFrom)]="sendFrom" (chat)="sendChat($event)"></chat-input>
-  <button *ngIf="ClarifyModeActive()" type="button" class="clarify-restore" title="結束精簡：顯示標籤列與工具列" (click)="toggleClarifyMode()">
+  <button *ngIf="ClarifyModeActive()" type="button" class="clarify-restore" [title]="'chat.clarifyRestoreTitle' | i18n" (click)="toggleClarifyMode()">
     <i class="material-icons">view_agenda</i>
   </button>
 </div>

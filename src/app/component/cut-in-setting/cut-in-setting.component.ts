@@ -22,12 +22,13 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { CutInComponent } from 'component/cut-in/cut-in.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 
 
 @Component({
     selector: 'app-cut-in-setting',
     templateUrl: './cut-in-setting.component.html',
-    styleUrls: ['./cut-in-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './cut-in-setting.component.css'],
     standalone: false
 })
 export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -173,12 +174,14 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     private modalService: ModalService,
     private panelService: PanelService,
     private saveDataService: SaveDataService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    public i18n: I18nService
   ) { }
 
   ngOnInit(): void {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = 'CutIn 設定');
+    Promise.resolve().then(() => this.updateTitle());
     EventSystem.register(this)
+      .on('LOCALE_CHANGED', -1000, () => this.updateTitle())
       .on('SYNCHRONIZE_AUDIO_LIST', -1000, event => {
         this.onAudioFileChange();
       });
@@ -196,6 +199,10 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private updateTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('cutin.title');
   }
 
   onChangeCutIn(identifier: string) {
@@ -298,13 +305,13 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示隱藏設定的圖片', 
-        text: '要顯示隱藏設定的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('cutin.showHiddenTitle'), 
+        text: this.i18n.t('cutin.showHiddenText'),
+        help: this.i18n.t('cutin.showHiddenHelp'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從 CutIn 設定顯示了隱藏設定的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('cutin.showHiddenLog'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();
@@ -329,7 +336,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     } else {
       EventSystem.call('PLAY_CUT_IN', sendObj);
-      this.chatMessageService.sendOperationLog('播放了 ' + (cutIn.name == '' ? '(無名的 CutIn)' : cutIn.name));
+      this.chatMessageService.sendOperationLog(this.i18n.t('cutin.playedLog', { name: cutIn.name == '' ? this.i18n.t('cutin.unnamed') : cutIn.name }));
     }
   }
 
@@ -372,7 +379,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openYouTubeTerms() {
-    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: 'YouTube 服務條款' });
+    this.modalService.open(OpenUrlComponent, { url: 'https://www.youtube.com/terms', title: this.i18n.t('cutin.youtubeTerms') });
     return false;
   }
 
@@ -380,26 +387,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
     let textView = this.panelService.open(TextViewComponent, option);
-    textView.title = 'CutIn 說明';
-    textView.text = 
-`　可設定 CutIn 的名稱、顯示時間、位置與寬高（皆為相對畫面尺寸）、以及發送聊天時顯示 CutIn 的條件。另外，播放影片時以及勾選「防止超出畫面」時，會調整位置與尺寸以收進畫面內。
-
-　判定聊天末尾是否符合時，不區分全形半形、英文字母大小寫。另外為了與其他使用 BCDice 的線上團工具相容，判定時會將兩側有空白的「 ＞ 」與「 → 」視為相同。
-　
-　橫位置（PosX）與縱位置（PosY）是從畫面左上角到 CutIn 中心的距離。尺寸的寬（Width）與高（Height）任一為 0 時，會維持原圖片長寬比縮放（不過 CutIn 的最小寬高為 ${CutInComponent.MIN_SIZE} 像素）。
-　
-　播放影片的 CutIn 一定在最前面，其他則是後顯示的 CutIn 圖片會更前面，但可透過重疊順序（Z-Index）控制。播放相同 CutIn、播放影片的 CutIn、或相同標籤的 CutIn 時，先前的會停止。另外，若符合聊天末尾條件的 CutIn 有多個：
-
-　　- 未設定標籤的全部播放
-　　- 有設定標籤的，從相同標籤之中隨機選 1 個
-　　- 播放影片的 CutIn 從上述之中再隨機選 1 個
-
-　CutIn 可用拖曳移動（播放影片的 CutIn 請拖邊緣）。另可雙擊關閉（僅自己停止）、右鍵從選單操作（可「關閉」「顯示在視窗後方」「最小化」；播放影片的 CutIn 請在邊緣操作）。
-
-　可將上傳的音樂檔案設為 CutIn 顯示時的音效。音量依「音樂播放器」設定（「測試（僅本人看見）」時使用試聽音量）。CutIn 與房間存檔（zip）不含音樂檔，需要時請另外上傳（連結依檔案內容判定，即使檔名相同也不會自動重新連結）。
-
-　因顯示時間（Duration）或手動操作而停止 CutIn 時，即使尚未播完，影片／音效也會結束。另外，若音效／影片結束時設為「停止 CutIn」，會優先於顯示時間而停止。
-
-　CutIn 使用影片時，目前僅支援 YouTube 網址。使用影片時請參照並遵守權利人與 YouTube 訂定的服務條款。`;
+    textView.title = this.i18n.t('cutin.help');
+    textView.text = this.i18n.t('cutin.helpText', { minSize: CutInComponent.MIN_SIZE });
   }
 }

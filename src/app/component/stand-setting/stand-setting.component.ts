@@ -12,11 +12,12 @@ import { TextViewComponent } from 'component/text-view/text-view.component';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ModalService } from 'service/modal.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'app-stand-setting',
     templateUrl: './stand-setting.component.html',
-    styleUrls: ['./stand-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './stand-setting.component.css'],
     standalone: false
 })
 export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -32,7 +33,8 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private i18n: I18nService
   ) { }
 
   get standElements(): DataElement[] {
@@ -103,7 +105,8 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
         if (this.character && this.character.identifier === event.data.identifier) {
           this.panelService.close();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.updatePanelTitle());
     this.panelId = UUID.generateUuid();
   }
 
@@ -122,7 +125,7 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updatePanelTitle() {
-    this.panelService.title = this.character.name + ' 的立繪設定';
+    this.panelService.title = this.i18n.t('stand.title', { name: this.character.name });
   }
 
   add() {
@@ -137,8 +140,8 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     });
     if (!this.character || !this.character.standList) return;
     this.modalService.open(ConfirmationComponent, {
-      title: '刪除立繪設定', 
-      text: '要刪除立繪設定嗎？',
+      title: this.i18n.t('stand.deleteTitle'),
+      text: this.i18n.t('stand.deleteText'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'person_off',
       action: () => {
@@ -196,29 +199,8 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 600, height: 620 };
     let textView = this.panelService.open(TextViewComponent, option);
-    textView.title = '立繪設定說明';
-    textView.text = 
-`　可設定角色立繪的名稱、位置與圖片高度（皆為相對畫面尺寸）、以及發送聊天時顯示立繪的條件。
-
-　若為立繪設定名稱，會顯示在聊天視窗、聊天面板的清單中並可選擇。另外若設定了標籤，即使是相同角色，不同標籤也會播放登場、退場動畫。
-
-　圖片的位置與高度也可個別指定；位置未勾選個別指定、高度為 0 時會使用整體設定。垂直位置調整（AdjY）是相對立繪圖片高度的指定（例如設為 -50% 時，圖片下半部會藏到畫面下緣之外）。
-
-　條件的「指定圖片」是發送聊天時的角色圖片或臉部 IC。另外作為特殊條件，當聊天文字末尾為「@退場」或「@farewell」時，一律會讓該角色的立繪退場。
-
-　優先順序由高到低為：
-
-　　1. 以「@退場」、「@farewell」退場
-　　2. 在聊天視窗、聊天面板清單中選擇的名稱
-　　3. 「指定圖片 且 聊天末尾」
-　　4. 「指定圖片 或 聊天末尾」
-　　5. 「聊天末尾」
-　　6. 「指定圖片」
-
-　若都不符合則使用「預設」；相同優先順序有多個條件時，會隨機選擇其中一個。
-
-　判定聊天末尾是否符合時，不區分全形半形、英文字母大小寫。另外為了與其他使用 BCDice 的線上團工具相容，判定時會將兩側有空白的「 ＞ 」與「 → 」視為相同。
-　此外，以「@退場」、「@farewell」退場時，或設定了如「@笑」這類以「@」開頭的條件時，（無論立繪是否啟用、條件是否符合）以該角色發送時，符合條件的聊天文字末尾的 @ 之後都會被截掉。`;
+    textView.title = this.i18n.t('stand.helpTitle');
+    textView.text = this.i18n.t('stand.help');
   }
 
   private imageElementToFile(dataElm: DataElement): ImageFile {

@@ -1,0 +1,255 @@
+<div class="settings-ui scene-tools" *ngIf="canOpen; else noAccess">
+  <section class="card">
+    <header class="card-head"><h3>{{ 'scene.title' | i18n }}</h3></header>
+    <div class="mode-grid">
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'select'" (click)="setMode('select')"
+        [disabled]="!canModify" [title]="'scene.selectTitle' | i18n">{{ 'scene.select' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'light'" (click)="setMode('light')"
+        [disabled]="!canCreateKind('light')" [title]="'scene.lightTitle' | i18n">{{ 'scene.light' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'wall'" (click)="setMode('wall')"
+        [disabled]="!canCreateKind('wall')" [title]="'scene.wallTitle' | i18n">{{ 'scene.wall' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'draw-rect'" (click)="setMode('draw-rect')" [disabled]="!canCreateKind('draw-rect')">{{ 'scene.rect' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'draw-ellipse'" (click)="setMode('draw-ellipse')" [disabled]="!canCreateKind('draw-ellipse')">{{ 'scene.ellipse' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'draw-polygon'" (click)="setMode('draw-polygon')" [disabled]="!canCreateKind('draw-polygon')">{{ 'scene.polygon' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'draw-freehand'" (click)="setMode('draw-freehand')" [disabled]="!canCreateKind('draw-freehand')">{{ 'scene.freehand' | i18n }}</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="tools.mode === 'draw-text'" (click)="setMode('draw-text')" [disabled]="!canCreateKind('draw-text')">{{ 'scene.text' | i18n }}</button>
+    </div>
+    <p class="hint" *ngIf="tools.mode === 'select'">{{ 'scene.hint.select' | i18n }}</p>
+    <p class="hint" *ngIf="tools.mode === 'none'">{{ 'scene.hint.idle' | i18n }}</p>
+  </section>
+
+  <section class="card" *ngIf="tools.isDrawMode || tools.selectedDrawing">
+    <header class="card-head"><h3>{{ 'scene.color' | i18n }}</h3></header>
+    <div class="field-row wrap">
+      <label class="field">
+        <span>{{ 'scene.color' | i18n }}</span>
+        <input type="color" [(ngModel)]="tools.drawStrokeColor" (ngModelChange)="applyStyleToSelected()">
+      </label>
+      <label class="field grow">
+        <span>{{ 'scene.strokeWidth' | i18n }}</span>
+        <input type="range" min="1" max="32" step="1" [(ngModel)]="tools.drawStrokeWidth" (ngModelChange)="applyStyleToSelected()">
+      </label>
+      <span class="val">{{ tools.drawStrokeWidth }}</span>
+    </div>
+    <div class="field-row wrap">
+      <label class="field">
+        <span>{{ 'scene.strokeOpacity' | i18n }}</span>
+        <input type="number" min="0" max="1" step="0.05" [(ngModel)]="tools.drawStrokeOpacity" (ngModelChange)="applyStyleToSelected()">
+      </label>
+      <label class="field" *ngIf="tools.mode !== 'draw-freehand' && tools.mode !== 'draw-text'">
+        <span>{{ 'scene.fillOpacity' | i18n }}</span>
+        <input type="number" min="0" max="1" step="0.05" [(ngModel)]="tools.drawFillOpacity" (ngModelChange)="applyStyleToSelected()">
+      </label>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'draw-freehand'">
+    <p class="hint" style="margin:0">{{ 'scene.hint.freehand' | i18n }}</p>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'draw-rect' || tools.mode === 'draw-ellipse'">
+    <p class="hint" style="margin:0">{{ 'scene.hint.shape' | i18n }}</p>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'light'">
+    <header class="card-head"><h3>{{ 'scene.light' | i18n }}</h3></header>
+    <p class="hint">{{ 'scene.hint.light' | i18n }}</p>
+    <div class="field-row wrap">
+      <label class="field grow">
+        <span>{{ 'scene.name' | i18n }}</span>
+        <input type="text" [(ngModel)]="tools.lightName">
+      </label>
+      <label class="field">
+        <span>{{ 'scene.color' | i18n }}</span>
+        <input type="color" [(ngModel)]="tools.lightColor">
+      </label>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">{{ 'scene.intensity' | i18n }}</span>
+      <input type="range" min="0.1" max="1" step="0.05" [(ngModel)]="tools.lightIntensity">
+      <span class="val">{{ tools.lightIntensity | number:'1.0-2' }}</span>
+    </div>
+    <div class="field-row wrap">
+      <label class="field">
+        <span>{{ 'scene.brightGrid' | i18n }}</span>
+        <input type="number" min="0" max="40" step="0.5" [(ngModel)]="lightBrightGrid">
+      </label>
+      <label class="field">
+        <span>{{ 'scene.dimGrid' | i18n }}</span>
+        <input type="number" min="0.5" max="40" step="0.5" [(ngModel)]="lightDimGrid">
+      </label>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'wall'">
+    <header class="card-head"><h3>{{ 'scene.wall' | i18n }}</h3></header>
+    <p class="hint">{{ 'scene.hint.wall' | i18n }}</p>
+    <div class="actions">
+      <span class="hint" style="margin:0">{{ 'scene.pointCount' | i18n:{ count: tools.wallDraftPoints.length } }}</span>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm" (click)="undoWallPoint()" [disabled]="!tools.wallDraftPoints.length">{{ 'scene.undoPoint' | i18n }}</button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="finishWall()" [disabled]="tools.wallDraftPoints.length < 2">{{ 'scene.finishWall' | i18n }}</button>
+      </span>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'draw-polygon'">
+    <header class="card-head"><h3>{{ 'scene.polygon' | i18n }}</h3></header>
+    <p class="hint">{{ 'scene.hint.polygon' | i18n }}</p>
+    <div class="actions">
+      <span class="hint" style="margin:0">{{ 'scene.vertexCount' | i18n:{ count: tools.polygonDraftPoints.length } }}</span>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm btn-primary" (click)="finishPolygon()" [disabled]="tools.polygonDraftPoints.length < 3">{{ 'scene.finishPolygon' | i18n }}</button>
+      </span>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="tools.mode === 'draw-text' || (tools.selectedDrawing?.type === 'text')">
+    <header class="card-head"><h3>{{ 'scene.text' | i18n }}</h3></header>
+    <p class="hint" *ngIf="tools.mode === 'draw-text'">{{ 'scene.hint.text' | i18n }}</p>
+    <div class="field-row wrap">
+      <label class="field grow">
+        <span>{{ 'scene.textLabel' | i18n }}</span>
+        <input type="text" [(ngModel)]="tools.draftText" [placeholder]="'scene.textPlaceholder' | i18n">
+      </label>
+      <label class="field">
+        <span>{{ 'scene.fontSize' | i18n }}</span>
+        <input type="number" [(ngModel)]="tools.draftFontSize" min="8" max="96">
+      </label>
+    </div>
+    <div class="actions" *ngIf="tools.selectedDrawing?.type === 'text'">
+      <button type="button" class="btn btn-primary" (click)="applyTextEdit()">{{ 'scene.applyText' | i18n }}</button>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="tools.selectionCount > 0 && canModify">
+    <header class="card-head">
+      <h3>
+        {{ 'scene.selectedCount' | i18n:{ count: tools.selectionCount } }}
+        <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedDrawing">{{ 'scene.selectedDrawing' | i18n:{ type: drawingTypeLabel(tools.selectedDrawing.type) } }}</ng-container>
+        <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedLight">{{ 'scene.selectedLight' | i18n }}</ng-container>
+        <ng-container *ngIf="tools.selectionCount === 1 && tools.selectedWall">{{ 'scene.selectedWall' | i18n }}</ng-container>
+      </h3>
+    </header>
+
+    <ng-container *ngIf="tools.selectedLight as light">
+      <div class="field-row wrap">
+        <label class="field grow">
+          <span>{{ 'scene.name' | i18n }}</span>
+          <input type="text" [(ngModel)]="light.name" (ngModelChange)="applyLightField()">
+        </label>
+        <label class="field">
+          <span>{{ 'scene.color' | i18n }}</span>
+          <input type="color" [(ngModel)]="light.color" (ngModelChange)="applyLightField()">
+        </label>
+      </div>
+      <div class="check-row">
+        <label>
+          <input type="checkbox" [(ngModel)]="light.enabled" (ngModelChange)="applyLightField()">
+          {{ 'scene.enabled' | i18n }}
+        </label>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">{{ 'scene.intensity' | i18n }}</span>
+        <input type="range" min="0.1" max="1" step="0.05" [(ngModel)]="light.intensity" (ngModelChange)="applyLightField()">
+        <span class="val">{{ light.intensity | number:'1.0-2' }}</span>
+      </div>
+      <div class="field-row wrap">
+        <label class="field">
+          <span>{{ 'scene.brightGrid' | i18n }}</span>
+          <input type="number" min="0" max="40" step="0.5" [(ngModel)]="lightBrightGrid" (ngModelChange)="applyLightField()">
+        </label>
+        <label class="field">
+          <span>{{ 'scene.dimGrid' | i18n }}</span>
+          <input type="number" min="0.5" max="40" step="0.5" [(ngModel)]="lightDimGrid" (ngModelChange)="applyLightField()">
+        </label>
+      </div>
+      <div class="field-row wrap">
+        <label class="field">
+          <span>{{ 'scene.darknessMin' | i18n }}</span>
+          <input type="number" min="0" max="1" step="0.05" [(ngModel)]="light.darknessActivationMin" (ngModelChange)="applyLightField()">
+        </label>
+        <label class="field">
+          <span>{{ 'scene.darknessMax' | i18n }}</span>
+          <input type="number" min="0" max="1" step="0.05" [(ngModel)]="light.darknessActivationMax" (ngModelChange)="applyLightField()">
+        </label>
+      </div>
+      <p class="hint">{{ 'scene.coords' | i18n:{ x: light.x, y: light.y } }}</p>
+    </ng-container>
+
+    <ng-container *ngIf="tools.selectedWall as wall">
+      <div class="field-row wrap">
+        <label class="field grow">
+          <span>{{ 'scene.name' | i18n }}</span>
+          <input type="text" [(ngModel)]="wall.name">
+        </label>
+        <label class="field">
+          <span>{{ 'scene.color' | i18n }}</span>
+          <input type="color" [(ngModel)]="wall.color">
+        </label>
+      </div>
+      <div class="check-row">
+        <label>
+          <input type="checkbox" [(ngModel)]="wall.blocksLight">
+          {{ 'scene.blocksLight' | i18n }}
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="wall.blocksVision">
+          {{ 'scene.blocksVision' | i18n }}
+        </label>
+      </div>
+    </ng-container>
+
+    <footer class="actions">
+      <button type="button" class="btn btn-danger" (click)="deleteSelected()">{{ 'scene.deleteSelected' | i18n }}</button>
+    </footer>
+  </section>
+
+  <section class="card" *ngIf="canModifyKind('wall') && canModify">
+    <header class="card-head"><h3>{{ 'scene.wallList' | i18n:{ count: walls.length } }}</h3></header>
+    <div class="object-list" *ngIf="walls.length">
+      <button
+        type="button"
+        class="list-pick"
+        *ngFor="let w of walls"
+        [class.is-active]="tools.isWallSelected(w)"
+        (click)="selectWall(w)"
+      >
+        {{ w.name || ('scene.wallDefault' | i18n) }}{{ 'scene.wallPoints' | i18n:{ count: w.points.length } }}
+      </button>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="canModifyKind('light') && canModify">
+    <header class="card-head"><h3>{{ 'scene.lightList' | i18n:{ count: lights.length } }}</h3></header>
+    <div class="object-list" *ngIf="lights.length">
+      <button
+        type="button"
+        class="list-pick"
+        *ngFor="let l of lights"
+        [class.is-active]="tools.isLightSelected(l)"
+        (click)="selectLight(l)"
+      >
+        {{ l.name || ('scene.lightDefault' | i18n) }} @ {{ l.x | number:'1.0-0' }},{{ l.y | number:'1.0-0' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="card" *ngIf="canModifyKind('drawing') && canModify">
+    <header class="card-head"><h3>{{ 'scene.drawingList' | i18n:{ count: drawings.length } }}</h3></header>
+    <div class="object-list" *ngIf="drawings.length">
+      <button
+        type="button"
+        class="list-pick"
+        *ngFor="let d of drawings"
+        [class.is-active]="tools.isDrawingSelected(d)"
+        (click)="selectDrawing(d)"
+      >
+        {{ drawingTypeLabel(d.type) }}<ng-container *ngIf="d.type === 'text'">：{{ d.text }}</ng-container>
+      </button>
+    </div>
+  </section>
+</div>
+<ng-template #noAccess>
+  <div class="settings-ui empty-hint">{{ 'scene.hint.noAccess' | i18n }}</div>
+</ng-template>

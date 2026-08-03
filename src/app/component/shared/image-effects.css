@@ -1,0 +1,144 @@
+/* Shared image-effect classes (chat icons, inventory thumbs, etc.) */
+
+.inverse {
+  transform: scaleX(-1);
+}
+.flip-vertical {
+  transform: scaleY(-1);
+}
+.inverse.flip-vertical {
+  transform: scale(-1, -1);
+}
+
+.hollow {
+  opacity: 0.6;
+}
+
+.grayscale {
+  filter: grayscale(1);
+}
+.sepia {
+  filter: sepia(1);
+}
+.matrix {
+  filter: grayscale(1) contrast(1.4) brightness(0.72) sepia(1) hue-rotate(85deg) saturate(5.5);
+}
+
+/* Digital-rain overlay (token / stand / inventory) */
+.matrix-rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: stretch;
+  z-index: 2;
+  mix-blend-mode: screen;
+}
+.matrix-rain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 24, 0, 0.18) 2px,
+    rgba(0, 24, 0, 0.18) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+.matrix-rain-col {
+  flex: 0 0 auto;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-family: "Courier New", Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.05;
+  color: #7dff7d;
+  text-shadow:
+    0 0 2px #0f0,
+    0 0 6px #3f3,
+    0 0 10px rgba(0, 255, 80, 0.55);
+  white-space: nowrap;
+  user-select: none;
+  animation-name: matrix-rain-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+.matrix-rain-col.up {
+  animation-name: matrix-rain-rise;
+  color: #b8ffb8;
+}
+@keyframes matrix-rain-fall {
+  from { transform: translate3d(0, -110%, 0); }
+  to   { transform: translate3d(0, 110%, 0); }
+}
+@keyframes matrix-rain-rise {
+  from { transform: translate3d(0, 110%, 0); }
+  to   { transform: translate3d(0, -110%, 0); }
+}
+.contrast-fx {
+  filter: contrast(1.7) brightness(1.15);
+}
+.black-paint {
+  filter: brightness(0);
+}
+.white-paint {
+  filter: brightness(0) invert(1);
+}
+
+/* Combined filters (last-wins avoided for common pairs) */
+.grayscale.sepia {
+  filter: grayscale(1) sepia(1);
+}
+.grayscale.contrast-fx {
+  filter: grayscale(1) contrast(1.7) brightness(1.15);
+}
+.sepia.contrast-fx {
+  filter: sepia(1) contrast(1.7) brightness(1.15);
+}
+.matrix.contrast-fx {
+  filter: grayscale(1) contrast(1.7) brightness(0.85) sepia(1) hue-rotate(85deg) saturate(5.5);
+}
+.grayscale.black-paint,
+.sepia.black-paint,
+.matrix.black-paint,
+.contrast-fx.black-paint {
+  filter: brightness(0);
+}
+.grayscale.white-paint,
+.sepia.white-paint,
+.matrix.white-paint,
+.contrast-fx.white-paint {
+  filter: brightness(0) invert(1);
+}
+.hollow.black-paint {
+  opacity: 0.6;
+  filter: brightness(0) blur(1px);
+}
+.hollow.white-paint {
+  opacity: 0.6;
+  filter: brightness(0) invert(1) blur(1px);
+}
+.hollow.grayscale {
+  opacity: 0.6;
+  filter: grayscale(1) blur(1px);
+}
+.hollow.sepia {
+  opacity: 0.6;
+  filter: sepia(1) blur(1px);
+}
+.hollow.matrix {
+  opacity: 0.6;
+  filter: grayscale(1) contrast(1.4) brightness(0.72) sepia(1) hue-rotate(85deg) saturate(5.5) blur(1px);
+}
+.hollow.contrast-fx {
+  opacity: 0.6;
+  filter: contrast(1.7) brightness(1.15) blur(1px);
+}

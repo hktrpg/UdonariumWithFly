@@ -33,6 +33,8 @@ import { OverviewPanelComponent } from 'component/overview-panel/overview-panel.
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
 import { PeerCursorComponent } from 'component/peer-cursor/peer-cursor.component';
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
+import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
+import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { TerrainComponent } from 'component/terrain/terrain.component';
 import { TextNoteComponent } from 'component/text-note/text-note.component';
@@ -44,6 +46,7 @@ import { ResizableDirective } from 'directive/resizable.directive';
 import { RotableDirective } from 'directive/rotable.directive';
 import { TooltipDirective } from 'directive/tooltip.directive';
 import { SafePipe } from 'pipe/safe.pipe';
+import { I18nPipe } from 'pipe/i18n.pipe';
 
 import { AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
@@ -75,6 +78,16 @@ import { CardListImageComponent } from './component/card-list-image/card-list-im
 import { LoggingInputDirective } from './directive/logging-input.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
 import { RangeComponent } from './component/range/range.component';
+import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
+import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
+import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
+
+// Ensure SyncObject registration for table FX
+import '@udonarium/table-fx/table-wall';
+import '@udonarium/table-fx/table-light';
+import '@udonarium/table-fx/table-drawing';
+import '@udonarium/table-fx/aura-name-config';
+import '@udonarium/table-fx/combat-tracker';
 
 @NgModule({
   declarations: [
@@ -105,9 +118,12 @@ import { RangeComponent } from './component/range/range.component';
     OverviewPanelComponent,
     PasswordCheckComponent,
     PeerMenuComponent,
+    RolePasswordPromptComponent,
+    RoomJoinComponent,
     RoomSettingComponent,
     UIPanelComponent,
     SafePipe,
+    I18nPipe,
     ChatPaletteComponent,
     TextViewComponent,
     TerrainComponent,
@@ -132,7 +148,10 @@ import { RangeComponent } from './component/range/range.component';
     CardListImageComponent,
     LoggingInputDirective,
     ConfirmationComponent,
-    RangeComponent
+    RangeComponent,
+    SceneToolsComponent,
+    CombatTrackerComponent,
+    CombatAnnounceComponent
   ],
   imports: [
     BrowserModule,

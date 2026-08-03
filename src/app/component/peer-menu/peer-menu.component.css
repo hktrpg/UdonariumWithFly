@@ -2,6 +2,52 @@
   display: block;
 }
 
+.lang-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+.lang-label {
+  font-weight: bold;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lang-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 14em;
+  font-size: 13px;
+}
+
+.scene-perm-group {
+  margin: 4px 0 8px;
+}
+.scene-perm-row {
+  margin: 2px 0;
+  font-size: 13px;
+}
+.scene-perm-row label,
+.scene-perm-sub label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.scene-perm-head {
+  margin-bottom: 2px;
+}
+.scene-perm-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 2px 0 0 1.4em;
+  font-size: 12px;
+}
+
 .image {
   padding: 0px;
   width: 64px;
@@ -148,6 +194,17 @@
   0px 0px 2px crimson; 
 }
 
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.identity-label {
+  font-size: smaller;
+}
+
 .peer-info {
   position: relative;
 }
@@ -186,4 +243,35 @@
 .show-hides {
   vertical-align: text-bottom;
   margin-bottom: 1px;
+}
+
+.invite-block {
+  margin-top: 6px;
+}
+.invite-label {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.invite-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.invite-row button {
+  font-size: 12px;
+}
+.room-zip-row {
+  margin-top: 8px;
+}
+.room-zip-row button {
+  font-size: 12px;
+}
+
+.room-pw-edit-row {
+  margin: 6px 0 4px;
+}
+.room-pw-edit-row button {
+  font-size: 12px;
 }

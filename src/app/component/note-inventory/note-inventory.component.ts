@@ -12,13 +12,14 @@ import { GameCharacterSheetComponent } from 'component/game-character-sheet/game
 import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { I18nService } from 'service/i18n.service';
 
 type NoteFilterId = 'all' | 'table' | 'other';
 
 @Component({
   selector: 'note-inventory',
   templateUrl: './note-inventory.component.html',
-  styleUrls: ['./note-inventory.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './note-inventory.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: false
 })
@@ -28,9 +29,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   expandedId: string = '';
 
   readonly filters: { id: NoteFilterId, label: string }[] = [
-    { id: 'all', label: '全部' },
-    { id: 'table', label: '桌面' },
-    { id: 'other', label: '其他' },
+    { id: 'all', label: '' },
+    { id: 'table', label: '' },
+    { id: 'other', label: '' },
   ];
 
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote));
@@ -41,6 +42,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
@@ -48,7 +50,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.panelService.title = '筆記倉庫';
+    this.refreshLabels();
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', -1000, event => {
         let object = ObjectStore.instance.get(event.data.identifier);
@@ -64,6 +66,10 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         this.refresh();
       })
       .on('DISCONNECT_PEER', event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('LOCALE_CHANGED', () => {
+        this.refreshLabels();
         this.changeDetector.markForCheck();
       });
   }
@@ -109,10 +115,10 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   locationLabel(note: TextNote): string {
     const name = note.location?.name || '';
-    if (name === 'table') return '桌面';
-    if (name === 'graveyard') return '回收區';
-    if (name === 'common' || !name) return '公用';
-    return '個人';
+    if (name === 'table') return this.i18n.t('note.location.table');
+    if (name === 'graveyard') return this.i18n.t('note.location.graveyard');
+    if (name === 'common' || !name) return this.i18n.t('note.location.common');
+    return this.i18n.t('note.location.personal');
   }
 
   settotable(gameObject: TextNote) {
@@ -122,7 +128,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   showgameObject(gameObject: TextNote) {
-    return gameObject.title || '(無標題筆記)';
+    return gameObject.title || this.i18n.t('note.untitled');
   }
 
   isittable(note: TextNote) {
@@ -163,7 +169,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const location = gameObject.location?.name || '';
     const actions: ContextMenuAction[] = [
       {
-        name: '移到桌面',
+        name: this.i18n.t('note.moveToTable'),
         action: () => {
           gameObject.setLocation('table');
           this.refresh();
@@ -171,7 +177,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         disabled: location === 'table'
       },
       {
-        name: '移至公用區',
+        name: this.i18n.t('note.moveToCommon'),
         action: () => {
           gameObject.setLocation('common');
           this.refresh();
@@ -179,7 +185,15 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         disabled: location === 'common' || !location
       },
       {
-        name: '移至回收區',
+        name: this.i18n.t('note.moveToPersonal'),
+        action: () => {
+          gameObject.setLocation(Network.peerId);
+          this.refresh();
+        },
+        disabled: location === Network.peerId
+      },
+      {
+        name: this.i18n.t('note.moveToGraveyard'),
         action: () => {
           gameObject.setLocation('graveyard');
           this.refresh();
@@ -187,9 +201,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         disabled: location === 'graveyard'
       },
       ContextMenuSeparator,
-      { name: '編輯筆記...', action: () => { this.showDetail(gameObject); } },
+      { name: this.i18n.t('note.edit'), action: () => { this.showDetail(gameObject); } },
       {
-        name: '建立副本',
+        name: this.i18n.t('note.clone'),
         action: () => {
           const cloneObject = gameObject.clone();
           cloneObject.isLocked = false;
@@ -199,7 +213,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
       },
       ContextMenuSeparator,
       {
-        name: '刪除',
+        name: this.i18n.t('note.delete'),
         action: () => {
           gameObject.destroy();
           SoundEffect.play(PresetSound.sweep);
@@ -215,7 +229,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     const coordinate = this.pointerDeviceService.pointers[0];
-    let title = '共用筆記設定';
+    let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
     const option: PanelOption = { title: title, left: coordinate.x - 350, top: coordinate.y - 200, width: 560, height: 470 };
     const component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
@@ -224,6 +238,13 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   trackByGameObject(index: number, gameObject: TextNote) {
     return gameObject ? gameObject.identifier : index;
+  }
+
+  private refreshLabels() {
+    this.panelService.title = this.i18n.t('note.title');
+    this.filters[0].label = this.i18n.t('note.filter.all');
+    this.filters[1].label = this.i18n.t('note.filter.table');
+    this.filters[2].label = this.i18n.t('note.filter.other');
   }
 }
 

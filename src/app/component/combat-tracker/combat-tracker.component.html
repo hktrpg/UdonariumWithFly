@@ -1,0 +1,149 @@
+<div class="settings-ui combat-tracker" *ngIf="encounter">
+  <section class="card">
+    <header class="card-head"><h3>{{ 'combat.name' | i18n }}</h3></header>
+    <div class="actions enc-nav">
+      <button type="button" class="btn btn-sm" (click)="tracker.prevEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">◀</button>
+      <input
+        class="enc-name"
+        [ngModel]="encounter.name"
+        (ngModelChange)="renameEncounter($event)"
+        [ngModelOptions]="{updateOn: 'blur'}"
+        [disabled]="isGuest"
+        [title]="'combat.name' | i18n"
+      >
+      <button type="button" class="btn btn-sm" (click)="tracker.nextEncounter()" [disabled]="isGuest || tracker.encounters.length < 2">▶</button>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm btn-primary" (click)="createEncounter()" [disabled]="isGuest" [title]="'combat.add' | i18n">
+          <i class="material-icons">add</i>
+        </button>
+        <button type="button" class="btn btn-sm btn-danger" (click)="deleteEncounter()" [disabled]="isGuest" [title]="'combat.delete' | i18n">{{ 'combat.deleteShort' | i18n }}</button>
+      </span>
+    </div>
+
+    <div class="field-row wrap">
+      <label class="field">
+        <span>{{ 'combat.initiativeDice' | i18n }}</span>
+        <select [ngModel]="encounter.initiativeDice" (ngModelChange)="setDice($event)" [disabled]="isGuest">
+          <option value="d20">d20</option>
+          <option value="d100">d100</option>
+        </select>
+      </label>
+      <label class="field grow">
+        <span>{{ 'combat.trackResource' | i18n }}</span>
+        <select [ngModel]="encounter.trackedResourceName || ''" (ngModelChange)="setTrackedResource($event)" [disabled]="isGuest">
+          <option value="">{{ 'combat.none' | i18n }}</option>
+          <option *ngFor="let n of resourceNameOptions()" [value]="n">{{ n }}</option>
+        </select>
+      </label>
+    </div>
+    <div class="check-row">
+      <label [class.disabled]="isGuest">
+        <input type="checkbox" [ngModel]="encounter.skipDefeated" (ngModelChange)="setSkipDefeated($event)" [disabled]="isGuest">
+        {{ 'combat.skipDefeated' | i18n }}
+      </label>
+    </div>
+
+    <div class="actions tool-actions">
+      <button type="button" class="btn btn-sm" (click)="addSelected()" [disabled]="isGuest || selectedCharacterCount < 1"
+        [title]="'combat.addSelectedTitle' | i18n">
+        {{ selectedCharacterCount > 0 ? ('combat.addSelectedN' | i18n:{ n: selectedCharacterCount }) : ('combat.addSelected' | i18n) }}
+      </button>
+      <button type="button" class="btn btn-sm" (click)="addAllOnTable()" [disabled]="isGuest" [title]="'combat.addAllTitle' | i18n">{{ 'combat.addAll' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="rollAll(false)" [disabled]="isGuest">{{ 'combat.rollAll' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="rollAll(true)" [disabled]="isGuest">{{ 'combat.rollNpc' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="applyResourceInitiative()"
+        [disabled]="isGuest || !encounter.trackedResourceName"
+        [title]="'combat.applyResourceInitiativeTitle' | i18n">
+        {{ 'combat.applyResourceInitiative' | i18n }}
+      </button>
+      <button type="button" class="btn btn-sm" (click)="resetInitiative()" [disabled]="isGuest">{{ 'combat.resetInitiative' | i18n }}</button>
+    </div>
+  </section>
+
+  <section class="card current-card" *ngIf="encounter.isStarted && currentCombatant() as cur">
+    <div class="current-body">
+      <div class="portrait lg" [class.empty]="!portraitUrl(cur)" (click)="focusCombatant(cur)" [title]="'combat.focusCombatant' | i18n">
+        <img *ngIf="portraitUrl(cur)" [src]="portraitUrl(cur) | safe: 'resourceUrl'" alt="">
+        <i *ngIf="!portraitUrl(cur)" class="material-icons">person</i>
+      </div>
+      <div class="current-meta">
+        <div class="round-line">{{ 'combat.roundTurnN' | i18n:{ round: encounter.round, turn: encounter.turnIndex + 1, total: encounter.combatants.length } }}</div>
+        <div class="current-name">{{ displayName(cur) }}</div>
+        <div class="current-sub">
+          <span class="badge" [class.npc]="cur.isNpc">{{ ownerLabel(cur) }}</span>
+          <span class="init-label">{{ 'combat.initiativeValue' | i18n:{ n: cur.initiative != null ? cur.initiative : '—' } }}</span>
+          <span *ngIf="encounter.trackedResourceName" class="res-label">{{ encounter.trackedResourceName }} {{ resourceDisplay(cur) }}</span>
+        </div>
+        <div class="status-row" *ngIf="statusesOf(cur).length">
+          <span *ngFor="let s of statusesOf(cur); trackBy: trackStatus" class="status-chip" [title]="statusTitle(s)">
+            <i class="material-icons">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="empty-hint" *ngIf="!encounter.isStarted">
+    {{ 'combat.notStartedParticipantsN' | i18n:{ n: encounter.combatants.length } }}
+  </p>
+
+  <section class="card combatant-card">
+    <ul class="combatant-list">
+      <li *ngFor="let c of visibleCombatants(); trackBy: trackCombatant"
+        [class.current]="isCurrent(c)" [class.defeated]="c.isDefeated" [class.hidden-row]="c.isHidden"
+        (dblclick)="focusCombatant(c)">
+        <span class="order" [class.on]="isCurrent(c)">{{ turnOrder(c) }}</span>
+        <div class="portrait" [class.empty]="!portraitUrl(c)" (click)="focusCombatant(c); $event.stopPropagation()" [title]="'combat.focusOrSelectCombatant' | i18n">
+          <img *ngIf="portraitUrl(c)" [src]="portraitUrl(c) | safe: 'resourceUrl'" alt="">
+          <i *ngIf="!portraitUrl(c)" class="material-icons">person</i>
+        </div>
+        <div class="info">
+          <div class="name-line">
+            <span class="name" [title]="displayName(c)">{{ displayName(c) }}</span>
+            <span class="badge tiny" [class.npc]="c.isNpc || !characterOf(c)?.hasPlayerController">{{ c.isNpc || !characterOf(c)?.hasPlayerController ? ('combat.npc' | i18n) : ('combat.pc' | i18n) }}</span>
+            <span class="hidden-mark" *ngIf="c.isHidden" [title]="'combat.hiddenFromPlayers' | i18n">{{ 'combat.hiddenShort' | i18n }}</span>
+          </div>
+          <div class="status-row" *ngIf="statusesOf(c).length">
+            <span *ngFor="let s of statusesOf(c); trackBy: trackStatus" class="status-chip" [title]="statusTitle(s)">
+              <i class="material-icons">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
+            </span>
+          </div>
+          <div class="hp-bar" *ngIf="hpBar(c) as hp" [title]="'combat.hp' | i18n:{ current: hp.cur, max: hp.max }">
+            <div class="hp-fill" [style.width.%]="hp.pct" [class.low]="hp.pct <= 25" [class.mid]="hp.pct > 25 && hp.pct <= 50"></div>
+            <span class="hp-text">{{ hp.cur }}/{{ hp.max }}</span>
+          </div>
+        </div>
+        <div class="cols">
+          <label class="col field">
+            <span class="col-label">{{ 'combat.initiative' | i18n }}</span>
+            <input class="init num" type="number" [ngModel]="c.initiative" (ngModelChange)="setInitiative(c, $event)" [ngModelOptions]="{updateOn: 'blur'}" [disabled]="isGuest" placeholder="-">
+          </label>
+          <div class="col resource" *ngIf="encounter.trackedResourceName" [title]="encounter.trackedResourceName">
+            <span class="col-label">{{ encounter.trackedResourceName }}</span>
+            <span class="res-val">{{ resourceDisplay(c) }}</span>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="btn btn-sm" (click)="rollOne(c)" [disabled]="isGuest" [title]="'combat.rollInitiative' | i18n">🎲</button>
+          <button *ngIf="isGM" type="button" class="btn btn-sm" (click)="toggleHidden(c)" [title]="(c.isHidden ? 'combat.show' : 'combat.hide') | i18n">{{ (c.isHidden ? 'combat.hiddenShort' : 'combat.visibleShort') | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="toggleDefeated(c)" [disabled]="isGuest" [title]="(c.isDefeated ? 'combat.undoDefeated' : 'combat.markDefeated') | i18n">{{ (c.isDefeated ? 'combat.defeatedShort' : 'combat.aliveShort') | i18n }}</button>
+          <button type="button" class="btn btn-sm btn-danger" (click)="remove(c)" [disabled]="isGuest" [title]="'combat.remove' | i18n">×</button>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <footer class="actions controls">
+    <ng-container *ngIf="!encounter.isStarted">
+      <button type="button" class="btn btn-primary" (click)="begin()" [disabled]="isGuest || !encounter.combatants.length">{{ 'combat.start' | i18n }}</button>
+    </ng-container>
+    <ng-container *ngIf="encounter.isStarted">
+      <button type="button" class="btn btn-sm" (click)="prevRound()" [disabled]="isGuest">{{ 'combat.prevRound' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="prevTurn()" [disabled]="isGuest">{{ 'combat.prevTurn' | i18n }}</button>
+      <button type="button" class="btn btn-sm btn-primary" (click)="nextTurn()" [disabled]="isGuest">{{ 'combat.nextTurn' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="nextRound()" [disabled]="isGuest">{{ 'combat.nextRound' | i18n }}</button>
+      <button type="button" class="btn btn-sm btn-primary" *ngIf="isMyCombatTurn()" (click)="endMyTurn()">{{ 'combat.endMyTurn' | i18n }}</button>
+      <button type="button" class="btn btn-sm btn-danger" (click)="end()" [disabled]="isGuest">{{ 'combat.end' | i18n }}</button>
+    </ng-container>
+  </footer>
+</div>

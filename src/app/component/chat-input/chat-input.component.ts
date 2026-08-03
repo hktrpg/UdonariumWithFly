@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, NgZone, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -7,14 +7,16 @@ import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { ResettableTimeout } from '@udonarium/core/system/util/resettable-timeout';
 import { DiceBot } from '@udonarium/dice-bot';
 import { GameCharacter } from '@udonarium/game-character';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TextViewComponent } from 'component/text-view/text-view.component';
 import { BatchService } from 'service/batch.service';
 import { ChatMessageService } from 'service/chat-message.service';
+import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
-import { ContextMenuSeparator, ContextMenuService, ContextMenuAction } from 'service/context-menu.service';
+import { ContextMenuSeparator, ContextMenuService, ContextMenuAction, contextMenuToggleCheck } from 'service/context-menu.service';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 
@@ -28,6 +30,8 @@ import { ChatTab } from '@udonarium/chat-tab';
 import { CutInList } from '@udonarium/cut-in-list';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DataElement } from '@udonarium/data-element';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
+import { anyImageEffect, clearImageEffects, imageEffectFilter, imageEffectOpacity, imageEffectTransform, packImageFx } from '@udonarium/table-fx/image-effect';
 
 interface StandGroup {
   name: string,
@@ -40,8 +44,11 @@ interface StandGroup {
     styleUrls: ['./chat-input.component.css'],
     standalone: false
 })
-export class ChatInputComponent implements OnInit, OnDestroy {
+export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   @ViewChild('textArea', { static: true }) textAreaElementRef: ElementRef<HTMLTextAreaElement>;
+
+  /** Character whose vision was auto-linked from the chat send-from selector. */
+  private visionLinkedCharacterId = '';
 
   @Input() onlyCharacters: boolean = false;
   @Input() chatTabidentifier: string = '';
@@ -62,7 +69,11 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   @Input('sendFrom') _sendFrom: string = this.myPeer ? this.myPeer.identifier : '';
   @Output() sendFromChange = new EventEmitter<string>();
   get sendFrom(): string { return this._sendFrom };
-  set sendFrom(sendFrom: string) { this._sendFrom = sendFrom; this.sendFromChange.emit(sendFrom); }
+  set sendFrom(sendFrom: string) {
+    this._sendFrom = sendFrom;
+    this.sendFromChange.emit(sendFrom);
+    this.syncChatCharacterVision(sendFrom);
+  }
 
   @Input('sendTo') _sendTo: string = '';
   @Output() sendToChange = new EventEmitter<string>();
@@ -91,7 +102,8 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     color?: string, 
     isInverse?:boolean, 
     isHollow?: boolean, 
-    isBlackPaint?: boolean, 
+    isBlackPaint?: boolean,
+    imageFx?: string,
     aura?: number, 
     isUseFaceIcon?: boolean, 
     characterIdentifier?: string, 
@@ -117,6 +129,40 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       return object;
     }
     return null;
+  }
+
+  get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+
+  get isMyClaimedCharacter(): boolean {
+    const ch = this.character;
+    const userId = Network.peer?.userId;
+    return !!ch && !!userId && ch.playerOwner === userId;
+  }
+
+  get isCharacterClaimedByOther(): boolean {
+    const ch = this.character;
+    const userId = Network.peer?.userId;
+    return !!ch && !!ch.playerOwner && ch.playerOwner !== userId;
+  }
+
+  get myCharacterButtonLabel(): string {
+    if (this.isMyClaimedCharacter) return this.i18n.t('chat.myCharacter');
+    if (this.isCharacterClaimedByOther) return this.i18n.t('chat.claimedBy', { name: this.character.playerOwnerName });
+    return this.i18n.t('chat.claimCharacter');
+  }
+
+  get myCharacterButtonTitle(): string {
+    if (this.isMyClaimedCharacter) return this.i18n.t('chat.myCharacterTitle.claimed');
+    if (this.isCharacterClaimedByOther) return this.i18n.t('chat.myCharacterTitle.taken', { name: this.character.playerOwnerName });
+    return this.i18n.t('chat.myCharacterTitle.claim');
+  }
+
+  toggleMyCharacter() {
+    const ch = this.character;
+    if (!ch || GuestSession.isGuest) return;
+    if (this.isCharacterClaimedByOther && !this.isGMMode) return;
+    GameCharacter.setAsMyToken(ch, !this.isMyClaimedCharacter);
+    EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 
   get hasStand(): boolean {
@@ -237,13 +283,25 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     return !this.character || this.allowsChat(this.character);
   }
 
+  get charImageFilter(): string | null {
+    return this.character ? imageEffectFilter(this.character) : null;
+  }
+  get charImageOpacity(): number | null {
+    return this.character ? imageEffectOpacity(this.character) : null;
+  }
+  get charImageTransform(): string | null {
+    return this.character ? imageEffectTransform(this.character) : null;
+  }
+
   constructor(
     private ngZone: NgZone,
     public chatMessageService: ChatMessageService,
     private batchService: BatchService,
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
-    private contextMenuService: ContextMenuService
+    private contextMenuService: ContextMenuService,
+    private characterFxMenu: CharacterFxMenuService,
+    private i18n: I18nService,
   ) { }
 
   ngOnInit(): void {
@@ -301,11 +359,51 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //this.batchService.add(() => this.ngZone.run(() => { }), this);
         this.batchService.requireChangeDetection();
       });
+    this.syncChatCharacterVision(this.sendFrom);
+    this.ensureCharacterDialogQuotes();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['_sendFrom'] && !changes['_sendFrom'].firstChange) {
+      this.syncChatCharacterVision(this._sendFrom);
+      this.ensureCharacterDialogQuotes();
+    }
   }
 
   ngOnDestroy() {
+    this.clearChatCharacterVision();
     EventSystem.unregister(this);
     this.batchService.remove(this);
+  }
+
+  /**
+   * Chat "self" character auto-links as a local vision source (not synced visionOwner).
+   * Closing this window or switching send-from releases only this window's auto link;
+   * manually checked「作為我的視野角色」is untouched.
+   */
+  private syncChatCharacterVision(sendFromId: string) {
+    const userId = Network.peer?.userId;
+    if (!userId) return;
+
+    if (this.visionLinkedCharacterId && this.visionLinkedCharacterId !== sendFromId) {
+      GameCharacter.releaseAutoVision(this.visionLinkedCharacterId, userId);
+      this.visionLinkedCharacterId = '';
+    }
+
+    if (this.visionLinkedCharacterId === sendFromId) return;
+
+    const obj = ObjectStore.instance.get(sendFromId);
+    if (obj instanceof GameCharacter) {
+      GameCharacter.claimAutoVision(obj.identifier, userId);
+      this.visionLinkedCharacterId = obj.identifier;
+    }
+  }
+
+  private clearChatCharacterVision() {
+    const userId = Network.peer?.userId;
+    if (!userId || !this.visionLinkedCharacterId) return;
+    GameCharacter.releaseAutoVision(this.visionLinkedCharacterId, userId);
+    this.visionLinkedCharacterId = '';
   }
 
   private updateWritingPeerNameAndColors() {
@@ -390,6 +488,35 @@ export class ChatInputComponent implements OnInit, OnDestroy {
   onChangeSendFromList() {
     this.standName = '';
     this.shouldUpdateCharacterList = true;
+    this.syncChatCharacterVision(this.sendFrom);
+    this.ensureCharacterDialogQuotes();
+  }
+
+  /** When speaking as a character token, keep empty dialog quotes 「」 ready for chat balloons. */
+  private ensureCharacterDialogQuotes() {
+    const textArea = this.textAreaElementRef?.nativeElement;
+    const blankOrEmptyQuotes = !this.text.trim() || this.text === '「」';
+
+    if (this.character) {
+      if (!blankOrEmptyQuotes) return;
+      this.text = '「」';
+      this.previousWritingLength = this.text.length;
+      if (textArea) {
+        textArea.value = this.text;
+        textArea.setSelectionRange(1, 1);
+        this.calcFitHeight();
+      }
+      return;
+    }
+
+    if (this.text === '「」') {
+      this.text = '';
+      this.previousWritingLength = 0;
+      if (textArea) {
+        textArea.value = '';
+        this.calcFitHeight();
+      }
+    }
   }
 
   sendChat(event: Partial<KeyboardEvent>) {
@@ -425,6 +552,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     const textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
     if (textArea) textArea.value = '';
     this.calcFitHeight();
+    this.ensureCharacterDialogQuotes();
     EventSystem.trigger('MESSAGE_EDITING_START', null);
 
     (async () => {  
@@ -437,20 +565,21 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         text = text.replace(/[\\￥]([:：])/, '$1');
       } else if (text != '' && StringUtil.toHalfWidth(text).startsWith(':')) {
         if (!targetCharacter) {
-          this.chatMessageService.sendOperationLog('指令錯誤：對象不是角色');
+          this.chatMessageService.sendOperationLog(this.i18n.t('chat.op.notCharacter'));
         } else {
           const commandsInfo = StringUtil.parseCommands(targetCharacter.chatPalette.evaluate(text.substring(1), targetCharacter.rootDataElement));
           text = commandsInfo.endString;
           if (commandsInfo.commands.length) {
             //await (async () => {
-              const loggingTexts: string[] = [`${targetCharacter.name == '' ? '(未命名角色)' : targetCharacter.name} 的指令：${commandsInfo.commandString}`];
+              const charLabel = targetCharacter.name == '' ? this.i18n.t('chat.op.unnamedCharacter') : targetCharacter.name;
+              const loggingTexts: string[] = [this.i18n.t('chat.op.commandOf', { name: charLabel, cmd: commandsInfo.commandString })];
               let isDiceRoll = false;
               for (let i = 0; i < commandsInfo.commands.length; i++) {
                 let rollResult = null;
                 // 僅狀態操作
                   try {
                   const command = commandsInfo.commands[i];
-                  if (command.isIncomplete) throw '→ 指令錯誤：指令不完整：' + command.targetName;
+                  if (command.isIncomplete) throw this.i18n.t('chat.op.incomplete', { name: command.targetName });
 
                   const targetName = targetCharacter.chatPalette.evaluate(command.targetName, targetCharacter.rootDataElement, delayRefs);
                   const operator = StringUtil.toHalfWidth(command.operator);
@@ -484,7 +613,10 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                     }
                   }
                   
-                  if (!target) throw `→ 指令錯誤：${(StringUtil.cr(targetName).trim() == '') ? '(未命名變數)' : StringUtil.cr(targetName).trim()} 找不到`;
+                  if (!target) {
+                    const missing = StringUtil.cr(targetName).trim() == '' ? this.i18n.t('chat.op.unnamedVar') : StringUtil.cr(targetName).trim();
+                    throw this.i18n.t('chat.op.notFound', { name: missing });
+                  }
 
                   oldValue = target.loggingValue;
                   let value = null;
@@ -525,9 +657,11 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                   if (value == null 
                     || (rollResult && rollResult.isDiceRollTable && rollResult.isFailure) 
                     || (isOperateNumber && value !== '' && isNaN(value))) {
-                    throw `→ ${target.name == '' ? '(未命名變數)' : target.name} 操作 → 指令錯誤：` + command.operator + command.value;
+                    const varName = target.name == '' ? this.i18n.t('chat.op.unnamedVar') : target.name;
+                    throw this.i18n.t('chat.op.errorOp', { name: varName, detail: command.operator + command.value });
                   } else if (target.isUrl && !StringUtil.validUrl(StringUtil.cr(value))) {
-                    throw `→ ${target.name == '' ? '(未命名變數)' : target.name} 操作 → URL 不正確：` + command.value;
+                    const varName = target.name == '' ? this.i18n.t('chat.op.unnamedVar') : target.name;
+                    throw this.i18n.t('chat.op.badUrl', { name: varName, value: command.value });
                   }
                   //console.log(value)
                   if (operator === '>') {
@@ -592,22 +726,25 @@ export class ChatInputComponent implements OnInit, OnDestroy {
                       target.value = (isNaN(value) || value === '') ? StringUtil.cr(value).replace(/(:?\r\n|\r|\n)/g, ' ') : parseInt(value);
                     }
                   } else {
-                    throw `→ ${target.name === '' ? '(未命名變數)' : target.name} 操作 → 指令錯誤：` + command.operator + command.value;
+                    const varName = target.name === '' ? this.i18n.t('chat.op.unnamedVar') : target.name;
+                    throw this.i18n.t('chat.op.errorOp', { name: varName, detail: command.operator + command.value });
                   }
                   const newValue = target.loggingValue;
-                  let loggingText = `→ ${target.name === '' ? '(未命名變數)' : target.name} 操作`;
+                  const varLabel = target.name === '' ? this.i18n.t('chat.op.unnamedVar') : target.name;
+                  const noChange = this.i18n.t('chat.op.noChange');
+                  let loggingText = this.i18n.t('chat.op.action', { name: varLabel });
                   if (isOperateNumber) {
-                    loggingText += ` ${oldValue} → ${oldValue === newValue ? '無變更' : newValue}`;
+                    loggingText += ` ${oldValue} → ${oldValue === newValue ? noChange : newValue}`;
                   } else if (target.isCheckProperty) {
-                    loggingText += `${oldValue === newValue ? ' 無變更' : newValue}`
+                    loggingText += `${oldValue === newValue ? ' ' + noChange : newValue}`
                   } else {
-                    loggingText += ` "${oldValue}" → ${oldValue === newValue ? '無變更' : '"' + newValue + '"'}`;
+                    loggingText += ` "${oldValue}" → ${oldValue === newValue ? noChange : '"' + newValue + '"'}`;
                   }
                   if (rollResult) {
                     if (rollResult.isDiceRollTable) {
                       loggingText += ` (${rollResult.tableName}：${rollResult.isEmptyDice ? '' : '🎲'}${rollResult.result.split(/\s＞\s/)[0]})`;
                     } else {
-                      loggingText += ` (${ rollResult.result.split(/\s＞\s/g).map((str, j) => (j == 0 ? (rollResult.isEmptyDice ? '計算結果' : '🎲' + gameType + '：' + str.replace(/^c?\(/i, '').replace(/\)$/, '')) : str)).join(' → ') })`;
+                      loggingText += ` (${ rollResult.result.split(/\s＞\s/g).map((str, j) => (j == 0 ? (rollResult.isEmptyDice ? this.i18n.t('chat.op.calcResult') : '🎲' + gameType + this.i18n.t('common.colon') + str.replace(/^c?\(/i, '').replace(/\)$/, '')) : str)).join(' → ') })`;
                     }
                     if (!rollResult.isEmptyDice) isDiceRoll = true;
                   }
@@ -699,10 +836,10 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           for (const name of cutInInfo.names) {
             let count = counter.get(name) || 0;
             count += 1;
-            counter.set(name == '' ? '(未命名過場)' : name, count);
+            counter.set(name == '' ? this.i18n.t('chat.op.unnamedCutin') : name, count);
           }
-          const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join('、')}`;
-          this.chatMessageService.sendOperationLog(text + ' 已啟動');
+          const text = `${[...counter.keys()].map(key => counter.get(key) > 1 ? `${key}×${counter.get(key)}` : key).join(this.i18n.t('common.listSep'))}`;
+          this.chatMessageService.sendOperationLog(this.i18n.t('chat.op.cutinStarted', { text }));
         }
       }
       // 裁切
@@ -742,12 +879,14 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           //const gameCharacter = this.character;
           //const color = this.color;
           
+          const stamp = Date.now();
           const dialogObj = {
             characterIdentifier: targetCharacter.identifier, 
             text: dialog.join("\n\n"),
             faceIconIdentifier: (isUseFaceIcon && targetCharacter.faceIcon) ? targetCharacter.faceIcon.identifier : null,
             color: color,
-            secret: sendTo ? true : false
+            secret: sendTo ? true : false,
+            stamp,
           };
           if (dialogObj.secret) {
             const targetPeer = ObjectStore.instance.get<PeerCursor>(sendTo);
@@ -756,16 +895,25 @@ export class ChatInputComponent implements OnInit, OnDestroy {
               EventSystem.call('POPUP_CHAT_BALLOON', dialogObj, PeerCursor.myCursor.peerId);
             }
           } else {
+            // SyncVar reaches all peers reliably (same path as HP / position).
+            targetCharacter.openChatDialog({
+              text: dialogObj.text,
+              color: dialogObj.color,
+              faceIconIdentifier: dialogObj.faceIconIdentifier || '',
+              isEmote: StringUtil.isEmote(dialogObj.text),
+              stamp,
+            });
             EventSystem.call('POPUP_CHAT_BALLOON', dialogObj);
           }
-        } else if (StringUtil.cr(text).trim() && targetCharacter.text) {
+        } else if (StringUtil.cr(text).trim() && (targetCharacter.text || targetCharacter.chatDialogStamp)) {
+          targetCharacter.clearChatDialog();
           EventSystem.call('FAREWELL_CHAT_BALLOON', { characterIdentifier: targetCharacter.identifier });
         }
       }
 
       if (PeerCursor.isGMHold && !sendTo && !PeerCursor.myCursor.isGMMode && /GM(?:モード)?にな(?:ります|る)/i.test(StringUtil.toHalfWidth(text))) {
         PeerCursor.myCursor.isGMMode = true;
-        this.chatMessageService.sendOperationLog('已進入 GM 模式');
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.enterGm'));
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
 
@@ -779,6 +927,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           isInverse: targetCharacter ? targetCharacter.isInverse : false,
           isHollow: targetCharacter? targetCharacter.isHollow : false,
           isBlackPaint: targetCharacter ? targetCharacter.isBlackPaint : false,
+          imageFx: targetCharacter ? packImageFx(targetCharacter) : '',
           aura: targetCharacter ? targetCharacter.aura : -1,
           isUseFaceIcon: isUseFaceIcon,
           characterIdentifier: targetCharacter ? targetCharacter.identifier : null,
@@ -809,13 +958,12 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     DiceBot.getHelpMessage(this.gameType).then(help => {
       this.gameHelp = help;
 
-      let gameName: string = '骰子機械人';
+      let gameName = this.i18n.t('chat.diceBotHelpTitle', { game: this.i18n.t('chat.diceBotGeneric') });
       for (let diceBotInfo of DiceBot.diceBotInfos) {
         if (diceBotInfo.id === this.gameType) {
-          gameName = '骰子機器人〈' + diceBotInfo.game + '〉'
+          gameName = this.i18n.t('chat.diceBotHelpTitle', { game: diceBotInfo.game });
         }
       }
-      gameName += '使用法';
 
       let coordinate = this.pointerDeviceService.pointers[0];
       let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 600, height: 500 };
@@ -836,7 +984,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
       this.contextMenuService.open(
         position, 
         [
-          { name: '連線資訊...', action: () => {
+          { name: this.i18n.t('chat.ctx.connection'), action: () => {
             this.panelService.open(PeerMenuComponent, { width: 520, height: 600, top: position.y - 100, left: position.x - 100 });
           } }
         ],
@@ -849,7 +997,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
     }
     
     let contextMenuActions: ContextMenuAction[] = [
-      { name: '輸入「」', 
+      { name: this.i18n.t('chat.ctx.quote'),
         action: () => {
           let textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
           let text = this.text.trim();
@@ -868,7 +1016,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         if (this.character.imageFiles.length > 1) {
           contextMenuActions.push(ContextMenuSeparator);
           contextMenuActions.push({
-            name: '圖片切換',
+            name: this.i18n.t('chat.ctx.imageSwitch'),
             action: null,
             subActions: this.character.imageFiles.map((image, i) => {
               return { 
@@ -886,63 +1034,26 @@ export class ChatInputComponent implements OnInit, OnDestroy {
           });
         }
         contextMenuActions.push(ContextMenuSeparator);
-        contextMenuActions.push(
-          { name: '圖片效果', action: null, subActions: [
-            (this.character.isInverse
-              ? {
-                name: '☑ 反轉', action: () => {
-                  this.character.isInverse = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: '☐ 反轉', action: () => {
-                  this.character.isInverse = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
-            (this.character.isHollow
-              ? {
-                name: '☑ 模糊', action: () => {
-                  this.character.isHollow = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: '☐ 模糊', action: () => {
-                  this.character.isHollow = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
-            (this.character.isBlackPaint
-              ? {
-                name: '☑ 設為黑色剪影', action: () => {
-                  this.character.isBlackPaint = false;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              } : {
-                name: '☐ 設為黑色剪影', action: () => {
-                  this.character.isBlackPaint = true;
-                  EventSystem.trigger('UPDATE_INVENTORY', null);
-                },
-                checkBox: 'check'
-              }),
-              { name: '光環', action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} 無`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑', '藍', '綠', '青', '紅', '洋紅', '黃', '白'].map((color, i) => {  
-                return { name: `${this.character.aura == i ? '◉' : '○'} ${color}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
-              })) },
+        const fxSubs = this.characterFxMenu.makeImageEffectMenu(this.character).subActions || [];
+        const fxWithoutReset = fxSubs.slice(0, -1);
+        contextMenuActions.push({
+          name: this.i18n.t('chat.ctx.imageEffect'),
+          action: null,
+          subActions: [
+            ...fxWithoutReset,
+            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
+              const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
+              return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
+            })) },
             ContextMenuSeparator,
             {
-              name: '重置', action: () => {
-                this.character.isInverse = false;
-                this.character.isHollow = false;
-                this.character.isBlackPaint = false;
+              name: this.i18n.t('chat.ctx.reset'),
+              action: () => {
+                clearImageEffects(this.character);
                 this.character.aura = -1;
                 EventSystem.trigger('UPDATE_INVENTORY', null);
               },
-              disabled: !this.character.isInverse && !this.character.isHollow && !this.character.isBlackPaint && this.character.aura == -1
+              disabled: !anyImageEffect(this.character) && this.character.aura == -1
             }
           ]
         });
@@ -950,7 +1061,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //if (this.character.faceIcons.length > 1) {
           contextMenuActions.push(ContextMenuSeparator);
           contextMenuActions.push({
-            name: '改變大頭貼',
+            name: this.i18n.t('chat.ctx.changeFace'),
             action: null,
             subActions: this.character.faceIcons.map((faceIconImage, i) => {
               return { 
@@ -970,11 +1081,11 @@ export class ChatInputComponent implements OnInit, OnDestroy {
         //}
       }
       contextMenuActions.push(ContextMenuSeparator);
-      contextMenuActions.push({ name: '顯示詳情...', action: () => { this.showDetail(this.character); } });
+      contextMenuActions.push({ name: this.i18n.t('chat.ctx.showDetail'), action: () => { this.showDetail(this.character); } });
       if (!this.onlyCharacters) {
-        contextMenuActions.push({ name: '顯示聊天面板...', action: () => { this.showChatPalette(this.character) } });
+        contextMenuActions.push({ name: this.i18n.t('chat.ctx.showPalette'), action: () => { this.showChatPalette(this.character) } });
       }
-      contextMenuActions.push({ name: '立繪設定...', action: () => { this.showStandSetting(this.character) } });
+      contextMenuActions.push({ name: this.i18n.t('chat.ctx.standSetting'), action: () => { this.showStandSetting(this.character) } });
     }
     this.contextMenuService.open(position, contextMenuActions, this.character.name);
   }
@@ -999,7 +1110,7 @@ export class ChatInputComponent implements OnInit, OnDestroy {
 
   private showDetail(gameObject: GameCharacter) {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '角色卡';
+    let title = this.i18n.t('chat.characterSheet');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

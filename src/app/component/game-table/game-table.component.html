@@ -6,6 +6,73 @@
   <div class="component-content is-fill is-3d" #gameTable>
     <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'" #gameObjects>
       <canvas class="grid-canvas is-fill is-pointer-events-none" #gridCanvas [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.1) + 'px)', 'clip': clipCss}"></canvas>
+      <svg class="drawings-layer is-fill is-pointer-events-none" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.2) + 'px)'}">
+        <!-- Walls / light guides: only while scene-tools panel is open -->
+        <g *ngIf="showSceneEditOverlay" class="walls-layer">
+          <polyline *ngFor="let w of walls; trackBy: trackByGameObject"
+            [attr.points]="wallPointsAttr(w)"
+            fill="none" [attr.stroke]="isWallSelected(w) ? '#38bdf8' : (w.color || '#ffcc00')"
+            [attr.stroke-width]="isWallSelected(w) ? 5 : 3" stroke-linecap="round" stroke-linejoin="round"
+            [attr.stroke-dasharray]="w.blocksLight ? null : '6 4'" />
+          <polyline *ngIf="wallDraftPoints.length" [attr.points]="draftPointsAttr(wallDraftPoints)"
+            fill="none" stroke="#facc15" stroke-width="3" stroke-dasharray="4 3" stroke-linecap="round" />
+          <circle *ngFor="let p of wallDraftPoints" [attr.cx]="p.x" [attr.cy]="p.y" r="4" fill="#facc15" />
+          <ng-container *ngIf="selectedLightGuide as lg">
+            <circle [attr.cx]="lg.x" [attr.cy]="lg.y" [attr.r]="lg.dim" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.85" />
+            <circle [attr.cx]="lg.x" [attr.cy]="lg.y" [attr.r]="lg.bright" fill="none" stroke="#fde68a" stroke-width="1.5" opacity="0.9" />
+          </ng-container>
+          <ng-container *ngIf="lightDraft as ld">
+            <circle [attr.cx]="ld.x" [attr.cy]="ld.y" [attr.r]="ld.dim" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6 4" />
+            <circle [attr.cx]="ld.x" [attr.cy]="ld.y" [attr.r]="ld.bright" fill="rgba(253,230,138,0.12)" stroke="#fde68a" stroke-width="2" />
+            <circle [attr.cx]="ld.x" [attr.cy]="ld.y" r="5" fill="#f59e0b" />
+          </ng-container>
+        </g>
+        <g *ngFor="let d of drawings; trackBy: trackByGameObject">
+          <rect *ngIf="d.type === 'rect'" [attr.x]="d.x" [attr.y]="d.y" [attr.width]="d.width" [attr.height]="d.height"
+            [attr.stroke]="isDrawingSelected(d) ? '#38bdf8' : d.strokeColor" [attr.stroke-width]="isDrawingSelected(d) ? d.strokeWidth + 2 : d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.fillColor" [attr.fill-opacity]="d.fillOpacity" stroke-linecap="round" stroke-linejoin="round" />
+          <ellipse *ngIf="d.type === 'ellipse'" [attr.cx]="d.x + d.width/2" [attr.cy]="d.y + d.height/2"
+            [attr.rx]="Math.abs(d.width/2)" [attr.ry]="Math.abs(d.height/2)"
+            [attr.stroke]="isDrawingSelected(d) ? '#38bdf8' : d.strokeColor" [attr.stroke-width]="isDrawingSelected(d) ? d.strokeWidth + 2 : d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.fillColor" [attr.fill-opacity]="d.fillOpacity" />
+          <polyline *ngIf="d.type === 'polygon' || d.type === 'freehand'"
+            [attr.points]="polylinePoints(d)"
+            [attr.stroke]="isDrawingSelected(d) ? '#38bdf8' : d.strokeColor" [attr.stroke-width]="isDrawingSelected(d) ? d.strokeWidth + 2 : d.strokeWidth" [attr.stroke-opacity]="d.strokeOpacity"
+            [attr.fill]="d.type === 'polygon' ? d.fillColor : 'none'" [attr.fill-opacity]="d.fillOpacity"
+            stroke-linecap="round" stroke-linejoin="round" />
+          <text *ngIf="d.type === 'text'" [attr.x]="d.x" [attr.y]="d.y + d.fontSize"
+            [attr.fill]="isDrawingSelected(d) ? '#38bdf8' : d.strokeColor" [attr.font-size]="d.fontSize" [attr.opacity]="d.strokeOpacity"
+            [attr.font-weight]="isDrawingSelected(d) ? 'bold' : 'normal'">{{ d.text }}</text>
+        </g>
+        <!-- Live draw drafts (local only; commit on pointerup) -->
+        <g *ngIf="drawDraftTick >= 0 && (canCreateScene || canModifyScene)" class="draw-draft-layer">
+          <polyline *ngIf="freehandDraftPoints.length > 1" [attr.points]="draftPointsAttr(freehandDraftPoints)"
+            fill="none" [attr.stroke]="drawStrokeColor" [attr.stroke-width]="drawStrokeWidth"
+            [attr.stroke-opacity]="drawStrokeOpacity" stroke-linecap="round" stroke-linejoin="round" />
+          <circle *ngIf="freehandDraftPoints.length" [attr.cx]="freehandDraftPoints[freehandDraftPoints.length - 1].x"
+            [attr.cy]="freehandDraftPoints[freehandDraftPoints.length - 1].y" [attr.r]="drawStrokeWidth / 2 + 1"
+            [attr.fill]="drawStrokeColor" [attr.fill-opacity]="drawStrokeOpacity" />
+          <rect *ngIf="shapeDraft && shapeDraft.kind === 'rect'"
+            [attr.x]="shapeDraft.x" [attr.y]="shapeDraft.y" [attr.width]="shapeDraft.width" [attr.height]="shapeDraft.height"
+            [attr.stroke]="drawStrokeColor" [attr.stroke-width]="drawStrokeWidth" [attr.stroke-opacity]="drawStrokeOpacity"
+            [attr.fill]="drawStrokeColor" [attr.fill-opacity]="drawFillOpacity" stroke-dasharray="6 4" />
+          <ellipse *ngIf="shapeDraft && shapeDraft.kind === 'ellipse'"
+            [attr.cx]="shapeDraft.x + shapeDraft.width / 2" [attr.cy]="shapeDraft.y + shapeDraft.height / 2"
+            [attr.rx]="Math.abs(shapeDraft.width / 2)" [attr.ry]="Math.abs(shapeDraft.height / 2)"
+            [attr.stroke]="drawStrokeColor" [attr.stroke-width]="drawStrokeWidth" [attr.stroke-opacity]="drawStrokeOpacity"
+            [attr.fill]="drawStrokeColor" [attr.fill-opacity]="drawFillOpacity" stroke-dasharray="6 4" />
+          <polyline *ngIf="polygonDraftPoints.length" [attr.points]="draftPointsAttr(polygonRubberPoints)"
+            fill="none" [attr.stroke]="drawStrokeColor" [attr.stroke-width]="drawStrokeWidth"
+            [attr.stroke-opacity]="drawStrokeOpacity" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" />
+          <circle *ngFor="let p of polygonDraftPoints" [attr.cx]="p.x" [attr.cy]="p.y" r="4"
+            [attr.fill]="drawStrokeColor" />
+        </g>
+        <rect *ngIf="sceneMarquee as mq"
+          [attr.x]="mq.x" [attr.y]="mq.y" [attr.width]="mq.width" [attr.height]="mq.height"
+          fill="hsla(200, 100%, 60%, 0.12)" stroke="hsl(200, 100%, 50%)" stroke-width="1.5"
+          stroke-dasharray="5 4" />
+      </svg>
       <div class="is-fill is-3d is-pointer-events-none">
         <ng-container *ngFor="let terrain of terrains; trackBy: trackByGameObject; index as z">
           <ng-container *ngIf="terrain.detailDataElement && 0 < terrain.detailDataElement.children.length"><terrain class="is-3d" [style.z-index]="z + (terrain.height > 0 ? 0 : 10000)" [terrain]="terrain" [appTooltip]="terrain"></terrain></ng-container>
@@ -28,6 +95,54 @@
       <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
       <ng-container *ngFor="let character of characters; trackBy: trackByGameObject"><ng-container *ngIf="character && (character.isVisible || isGMMode)"><game-character class="is-3d" [style.display]="character.isLoaded ? '' : 'none'" [gameCharacter]="character" [appTooltip]="character"></game-character></ng-container></ng-container>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
+      <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
+      <div class="weather-stack is-pointer-events-none is-3d" aria-hidden="true"
+        [style.width.px]="weatherPixelWidth"
+        [style.height.px]="weatherPixelHeight"
+        [style.left.px]="-weatherPad"
+        [style.top.px]="-weatherPad">
+        <canvas class="weather-canvas" #weatherCanvasLow
+          [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(0) + 'px)'}"></canvas>
+        <canvas class="weather-canvas" #weatherCanvasMid
+          [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(1) + 'px)'}"></canvas>
+        <canvas class="weather-canvas" #weatherCanvasHigh
+          [ngStyle]="{'transform': 'translateZ(' + weatherLayerZ(2) + 'px)'}"></canvas>
+      </div>
+      <div class="pings-layer is-fill is-pointer-events-none is-3d" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.2) + 'px)'}">
+        <div *ngFor="let ping of pings" class="table-ping is-3d" [ngClass]="ping.type"
+          [style.left.px]="ping.x" [style.top.px]="ping.y">
+          <!-- basic: flat red rings on table -->
+          <div class="ping-flat" *ngIf="ping.type === 'basic'">
+            <div class="ping-ring ring-a"></div>
+            <div class="ping-ring ring-b"></div>
+            <div class="ping-ring ring-c"></div>
+            <div class="ping-flat-core"></div>
+          </div>
+          <!-- Shift: upright 3D warning ! (token-like, bobbing) -->
+          <div class="ping-upright is-3d" *ngIf="ping.type === 'warning'">
+            <div class="ping-ground-ring ring-a"></div>
+            <div class="ping-ground-ring ring-b"></div>
+            <div class="ping-token is-3d">
+              <div class="ping-warning-plate">!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="showSceneEditOverlay" class="edit-markers is-pointer-events-none" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.5) + 'px)'}">
+        <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
+          [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
+      </div>
+      <div *ngIf="pathWaypoints.length" class="path-waypoints is-pointer-events-none is-3d"
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.3) + 'px)'}">
+        <svg class="path-line is-fill" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight">
+          <polyline *ngIf="pathWaypoints.length > 1" [attr.points]="pathPointsAttr"
+            fill="none" stroke="hsla(200, 90%, 55%, 0.85)" stroke-width="2" stroke-dasharray="6 4"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div *ngFor="let p of pathWaypoints; let i = index" class="path-dot"
+          [style.left.px]="p.x" [style.top.px]="p.y">{{ i + 1 }}</div>
+      </div>
     </div>
   </div>
 </div>
@@ -36,4 +151,8 @@
   <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
     <circle cx="50" cy="50" r="15" />
   </svg>
+</div>
+<div class="offscreen-pings">
+  <div *ngFor="let arrow of offscreenArrows" class="offscreen-arrow" [style.transform]="'translate(' + arrow.x + 'px,' + arrow.y + 'px) rotate(' + arrow.deg + 'deg)'"
+    [style.border-bottom-color]="arrow.color"></div>
 </div>

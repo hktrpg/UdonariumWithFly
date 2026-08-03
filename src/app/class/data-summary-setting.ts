@@ -1,6 +1,7 @@
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
 import { InnerXml } from './core/synchronize-object/object-serializer';
+import { translate } from 'i18n';
 
 export enum SortOrder {
   ASC = 'ASC',
@@ -21,7 +22,7 @@ export class DataSummarySetting extends GameObject implements InnerXml {
 
   @SyncVar() sortTag: string = 'name';
   @SyncVar() sortOrder: SortOrder = SortOrder.ASC;
-  @SyncVar() dataTag: string = 'HP MP 敏捷 生命力 精神力';
+  @SyncVar() dataTag: string = translate('summary.dataTag');
 
   private _dataTag: string;
   private _dataTags: string[];

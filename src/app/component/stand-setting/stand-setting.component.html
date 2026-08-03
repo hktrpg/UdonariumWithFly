@@ -1,41 +1,87 @@
-<div style="margin-bottom: 4px;">
-  <button style="float: right; cursor: help" (click)="helpStandSeteing()">?</button>
-  <div class="position-indicate">
-    <b>Pos: </b>
-    <input style="width: 350px" type="range" [title]="position + '%'" min="0" max="100" [(ngModel)]="position">
-    <input style="width: 3em; text-align: right; margin-right: 3px;" type="number" min="0" max="100" [(ngModel)]="position"><b sytle="margin-left: 3px; margin-right: 1em ">％　</b>
-    <label style="margin-left: 1em; white-space: nowrap">
-      <input type="checkbox" [(ngModel)]="isSortNameList" checked="{{isSortNameList ? 'checked' : ''}}" (change)="isSortNameList = (isSortNameList ? true : false)" />
-      <b style="font-size: smaller">聊天輸入時排序名稱</b>
+<div class="settings-ui">
+  <section class="card">
+    <header class="card-head">
+      <h3></h3>
+      <button type="button" class="btn btn-sm" (click)="helpStandSeteing()">?</button>
+    </header>
+    <div class="slider-row">
+      <span class="slider-label">{{ 'stand.posLabel' | i18n }}</span>
+      <input type="range" [title]="position + '%'" min="0" max="100" [(ngModel)]="position">
+      <input type="number" class="num" min="0" max="100" [(ngModel)]="position">
+      <span class="val">%</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">{{ 'stand.heightGlobal' | i18n }}</span>
+      <input
+        type="range"
+        [title]="height ? height + '%' : ('stand.keepOriginalImage' | i18n)"
+        min="0"
+        max="100"
+        [(ngModel)]="height"
+      >
+      <input type="number" class="num" min="0" max="200" [(ngModel)]="height">
+      <span class="val">%</span>
+    </div>
+    <div class="check-row">
+      <label>
+        <input
+          type="checkbox"
+          [(ngModel)]="isSortNameList"
+        />
+        {{ 'stand.sortNameList' | i18n }}
+      </label>
+    </div>
+  </section>
+
+  <section
+    class="card overview-card"
+    [class.is-selected]="overviewIndex == -1"
+  >
+    <label class="overview-option">
+      <input
+        type="radio"
+        name="{{panelId}}_overviewIndex"
+        value="-1"
+        [checked]="overviewIndex == -1"
+        (click)="overviewIndex = -1"
+      >
+      {{ 'stand.noOverview' | i18n }}
     </label>
-  </div>
-  <div class="position-indicate">
-    <b>Height (0=維持原圖片): </b> 
-    <input style="width: 350px" type="range" [title]="height ? height + '%' : '維持原圖片'" min="0" max="100" [(ngModel)]="height">
-    <input style="width: 3em; text-align: right; margin-right: 3px;" type="number" min="0" max="200" [(ngModel)]="height"><b sytle="margin-left: 3px; margin-right: 1em ">％</b>
-  </div>
-</div>
-<div class="overview-selecter" [style.border-color]="overviewIndex == -1 ? 'red' : 'transparent'" style="padding: 0px; width: 695px;">
-  <label style="font-size: smaller; font-weight: bolder;"><input type="radio" style="cursor: pointer" name="{{panelId}}_overviewIndex" value="-1" [checked]="overviewIndex == -1" (click)="overviewIndex = -1"> 總覽不使用立繪圖片</label>
-</div>
-<hr>
-<div style="display: flex; flex-direction: row; flex-wrap: wrap">
-  <div *ngFor="let standElement of standElements; let i = index" style="width: 700px">
-    <div style="display: flex; flex-direction: row; justify-content: space-between;" [style.border-color]="overviewIndex == i ? 'red' : 'transparent'" class="overview-selecter">
-      <div style="display: flex; align-items: center; justify-content: center;">
-        <input style="z-index: 10;" type="radio" style="cursor: pointer" name="{{panelId}}_overviewIndex" value="{{ i }}" [checked]="overviewIndex == i" (click)="overviewIndex = i">
+  </section>
+
+  <section
+    *ngFor="let standElement of standElements; let i = index"
+    class="card stand-entry"
+    [class.is-selected]="overviewIndex == i"
+  >
+    <div class="stand-entry-row">
+      <label class="stand-radio">
+        <input
+          type="radio"
+          name="{{panelId}}_overviewIndex"
+          [value]="i"
+          [checked]="overviewIndex == i"
+          (click)="overviewIndex = i"
+        >
+      </label>
+      <div class="stand-element-wrap">
+        <stand-element
+          #standElementComponent
+          [standElement]="standElement"
+          [imageList]="imageList"
+          [gameCharacter]="character"
+        ></stand-element>
       </div>
-      <div style="margin-left: -1em; margin-right: -1em;">
-        <stand-element #standElementComponent [standElement]="standElement" [imageList]="imageList" [gameCharacter]="character"></stand-element>
-      </div>
-      <div style="text-align: right; width: 3em;">
-        <button class="remove-button danger" (click)="delele(standElement, i)">×</button>
-        <button class="remove-button" style="margin-top: 5px" (click)="upStandIndex(standElement)">↑</button>
-        <button class="remove-button" style="margin-top: 2px" (click)="downStandIndex(standElement)">↓</button>
+      <div class="stand-entry-actions">
+        <button type="button" class="btn btn-danger btn-sm" (click)="delele(standElement, i)">×</button>
+        <button type="button" class="btn btn-sm" (click)="upStandIndex(standElement)">↑</button>
+        <button type="button" class="btn btn-sm" (click)="downStandIndex(standElement)">↓</button>
       </div>
     </div>
-    <hr>
-  </div>
+  </section>
+
+  <footer class="actions">
+    <button type="button" class="btn btn-primary" (click)="add()">{{ 'stand.add' | i18n }}</button>
+    <button *ngIf="standSettingXML" type="button" class="btn" (click)="restore()">{{ 'stand.restore' | i18n }}</button>
+  </footer>
 </div>
-<button (click)="add()">新增立繪設定</button>
-<button *ngIf="standSettingXML" (click)="restore()">還原剛刪除的立繪設定</button>

@@ -12,11 +12,12 @@ import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SaveDataService } from 'service/save-data.service';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'app-chat-tab-setting',
     templateUrl: './chat-tab-setting.component.html',
-    styleUrls: ['./chat-tab-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './chat-tab-setting.component.css'],
     standalone: false
 })
 export class ChatTabSettingComponent implements OnInit, OnDestroy {
@@ -40,7 +41,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   get roomName():string {
     let roomName = Network.peer && 0 < Network.peer.roomName.length
       ? Network.peer.roomName
-      : '房間資料';
+      : this.i18n.t('room.dataFallback');
     return roomName;
   }
   
@@ -52,7 +53,8 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
     private saveDataService: SaveDataService,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -61,7 +63,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '聊天標籤設定'; this.panelService.isAbleFullScreenButton = false });
+    Promise.resolve().then(() => { this.refreshPanelTitle(); this.panelService.isAbleFullScreenButton = false });
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 2000, event => {
         if (!this.selectedTab || event.data.identifier !== this.selectedTab.identifier) return;
@@ -69,7 +71,8 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
         if (object !== null) {
           this.selectedTabXml = object.toXml();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
@@ -83,7 +86,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
 
   create() {
     if (this.GuestMode()) return;
-    ChatTabList.instance.addChatTab('標籤');
+    ChatTabList.instance.addChatTab(this.i18n.t('chatTab.defaultName'));
   }
 
   async save() {
@@ -149,5 +152,9 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     let component = this.panelService.open<ChatLogOutputComponent>(ChatLogOutputComponent, option);
     component.selectedTabs = [this.selectedTab];
     component.selectTabsApplay();
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('chatTab.title');
   }
 }

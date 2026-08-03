@@ -21,7 +21,8 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { ModalService } from 'service/modal.service';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -249,7 +250,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
     private coordinateService: CoordinateService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService
   ) { }
 
   GuestMode() {
@@ -446,7 +448,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     this._scratchingGridX = -1;
     this._scratchingGridY = -1;
     SoundEffect.play(PresetSound.cardPut);
-    this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除已結束`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('mask.scratchEnded', { name: this.maskDisplayName() }));
     return false;
   }
 
@@ -464,7 +466,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     this._scratchingGridX = -1;
     this._scratchingGridY = -1;
     SoundEffect.play(PresetSound.unlock);
-    this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除已結束`);
+    this.chatMessageService.sendOperationLog(this.i18n.t('mask.scratchEnded', { name: this.maskDisplayName() }));
     return false;
   }
 
@@ -479,21 +481,21 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('mask.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedGameTableMasks = () => this.selectionService.objects.filter(object => object.aliasName === this.gameTableMask.aliasName) as GameTableMask[];
       actions.push(
         {
-          name: '已選擇的地圖遮罩', action: null, subActions: [
+          name: this.i18n.t('mask.menu.2'), action: null, subActions: [
             {
-              name: '全部固定', action: () => {
+              name: this.i18n.t('mask.menu.3'), action: () => {
                 selectedGameTableMasks().forEach(gameTableMask => gameTableMask.isLock = true);
                 SoundEffect.play(PresetSound.lock);
               }
             },
             {
-              name: '全部建立副本', action: () => {
+              name: this.i18n.t('mask.menu.4'), action: () => {
                 selectedGameTableMasks().forEach(gameTableMask => {
                   let cloneObject = gameTableMask.clone();
                   cloneObject.location.x += this.gridSize;
@@ -516,56 +518,41 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     let actions: ContextMenuAction[] = [
       (this.isGMMode ?
-        this.gameTableMask.isTransparentOnGMMode ? {
-          name: '☑ GM時透過顯示', action: () => {
-            this.gameTableMask.isTransparentOnGMMode = false;
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: '☐ GM時透過顯示', action: () => {
-            this.gameTableMask.isTransparentOnGMMode = true;
-          },
-          checkBox: 'check'
-        }
+        contextMenuToggleCheck({
+          get: () => this.gameTableMask.isTransparentOnGMMode,
+          set: (v) => { this.gameTableMask.isTransparentOnGMMode = v; },
+          on: this.i18n.t('mask.menu.5'),
+          off: this.i18n.t('mask.menu.6'),
+        })
       : null),
       (this.isGMMode ?
-        this.gameTableMask.isScratchPreviewOnGMMode ? {
-          name: '☑ GM時刮除預覽', action: () => {
-            this.gameTableMask.isScratchPreviewOnGMMode = false;
-          },
-          checkBox: 'check'
-        }
-        : {
-          name: '☐ GM時刮除預覽', action: () => {
-            this.gameTableMask.isScratchPreviewOnGMMode = true;
-          },
-          checkBox: 'check'
-        }
+        contextMenuToggleCheck({
+          get: () => this.gameTableMask.isScratchPreviewOnGMMode,
+          set: (v) => { this.gameTableMask.isScratchPreviewOnGMMode = v; },
+          on: this.i18n.t('mask.menu.7'),
+          off: this.i18n.t('mask.menu.8'),
+        })
       : null),
       (this.isGMMode ? ContextMenuSeparator : null),
-      (this.isLock
-        ? {
-          name: '☑ 固定', action: () => {
-            this.isLock = false;
-            //this.chatMessageService.sendOperationLog(`${this.gameTableMask.name} 已解除固定`);
-            SoundEffect.play(PresetSound.unlock);
-          },
-          disabled: this.isScratching,
-          checkBox: 'check'
-        }
-        : {
-          name: '☐ 固定', action: () => {
-            this.isLock = true;
-            SoundEffect.play(PresetSound.lock);
-          },
-          disabled: this.isScratching,
-          checkBox: 'check'
-        }
-      ),
-      (this.isLock ? null : { name: '重疊順序', action: null, subActions: [
+      contextMenuToggleCheck({
+        get: () => this.gameTableMask.affectsLight !== false,
+        set: (v) => { this.gameTableMask.affectsLight = v; },
+        on: this.i18n.t('mask.menu.9'),
+        off: this.i18n.t('mask.menu.10'),
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isLock,
+        set: (v) => {
+          this.isLock = v;
+          SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
+        },
+        on: this.i18n.t('mask.menu.11'),
+        off: this.i18n.t('mask.menu.12'),
+        disabled: this.isScratching,
+      }),
+      (this.isLock ? null : { name: this.i18n.t('mask.menu.13'), action: null, subActions: [
         {
-          name: '移到地圖遮罩最上層', action: () => {
+          name: this.i18n.t('mask.menu.14'), action: () => {
             if (!this.isLock) {
               const parent = this.gameTableMask.parent;
               if (parent) parent.appendChild(this.gameTableMask);
@@ -574,7 +561,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
           disabled: this.isLock
         },
         {
-          name: '移到地圖遮罩最下層', action: () => {
+          name: this.i18n.t('mask.menu.15'), action: () => {
             if (!this.isLock) {
               const parent = this.gameTableMask.parent;
               if (parent) parent.prependChild(this.gameTableMask);
@@ -587,7 +574,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       ContextMenuSeparator,
       (!this.gameTableMask.isMine ?
         {
-          name: '開始刮除', action: () => { 
+          name: this.i18n.t('mask.menu.16'), action: () => { 
             let isHandover = false;
             if (this.gameTableMask.owner != '') {
               this.isPreview = false;
@@ -595,7 +582,10 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
               this._currentScratchingSet = null;
               const owner = PeerCursor.findByUserId(this.gameTableMask.owner);
               if (owner) {
-                this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除從 ${ owner.name == '' ? '(無名玩家)' : owner.name } 接手`);
+                this.chatMessageService.sendOperationLog(this.i18n.t('mask.scratchHandover', {
+                  name: this.maskDisplayName(),
+                  owner: owner.name == '' ? this.i18n.t('mask.unnamedPlayer') : owner.name
+                }));
                 isHandover = true;
               }
             }
@@ -603,21 +593,21 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
             this._scratchingGridX = -1;
             this._scratchingGridY = -1;
             SoundEffect.play(PresetSound.lock);
-            if (!isHandover) this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除已開始`);
+            if (!isHandover) this.chatMessageService.sendOperationLog(this.i18n.t('mask.scratchStarted', { name: this.maskDisplayName() }));
           },
         } : {
-          name: `刮除${ this.isNonScratching ? '結束' : '確定' }`, action: () => { this.scratchDone(); },
+          name: this.isNonScratching ? this.i18n.t('mask.scratchEnd') : this.i18n.t('mask.scratchConfirm'), action: () => { this.scratchDone(); },
         }
       ),
       {
-        name: '取消刮除', action: () => { this.scratchCancel(); },
+        name: this.i18n.t('mask.menu.17'), action: () => { this.scratchCancel(); },
         disabled: !this.isScratching || (!this.gameTableMask.isMine && this.ownerIsOnline)
       },
       {
-        name: '刮除操作',
+        name: this.i18n.t('mask.menu.18'),
         subActions: [
           { 
-            name: '套用並繼續', action: () => {
+            name: this.i18n.t('mask.menu.19'), action: () => {
               if (!this.gameTableMask.isMine) return;
               this.ngZone.run(() => {
                 this.scratched();
@@ -630,7 +620,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
             disabled: !this.gameTableMask.isMine || this.isNonScratching
           },
           { 
-            name: '捨棄並繼續' , action: () => {
+            name: this.i18n.t('mask.menu.20') , action: () => {
               if (!this.gameTableMask.isMine) return;
               this.ngZone.run(() => {
                 this.scratchingGrids = '';
@@ -646,7 +636,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
           ContextMenuSeparator,
           (this.isPreview
             ? {
-              name: '解除預覽模式', action: () => {
+              name: this.i18n.t('mask.menu.21'), action: () => {
                 if (!this.gameTableMask.isMine) return;
                 this.ngZone.run(() => {
                   this.isPreview = false;
@@ -657,12 +647,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
               disabled: !this.gameTableMask.isMine
             }
             : {
-              name: '開始預覽模式', action: () => {
+              name: this.i18n.t('mask.menu.22'), action: () => {
                 if (!this.gameTableMask.isMine) return;
                 this.modalService.open(ConfirmationComponent, {
-                  title: '刮除預覽模式', 
-                  text: '要在刮除中顯示套用後的狀態嗎？',
-                  helpHtml: '僅自己可見，<b>直到此刮除確定/取消為止</b>地圖遮罩會以透過顯示，並顯示刮除套用後的狀態。',
+                  title: this.i18n.t('mask.previewTitle'), 
+                  text: this.i18n.t('mask.previewText'),
+                  helpHtml: this.i18n.t('mask.previewHelp'),
                   type: ConfirmationType.OK_CANCEL,
                   materialIcon: 'visibility',
                   action: () => {
@@ -670,7 +660,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
                       this.isPreview = true;
                     });
                     SoundEffect.play(PresetSound.unlock);
-                    this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除已設為預覽模式`);
+                    this.chatMessageService.sendOperationLog(this.i18n.t('mask.previewLog', { name: this.maskDisplayName() }));
                   }
                 });
               }, 
@@ -679,12 +669,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
             }
           ),
           { 
-            name: '初始化刮除' , action: () => {
+            name: this.i18n.t('mask.menu.23') , action: () => {
               if (!this.gameTableMask.isMine) return;
               this.modalService.open(ConfirmationComponent, {
-                title: '初始化刮除', 
-                text: '要初始化刮除嗎？',
-                help: '地圖遮罩會回到未刮除狀態，並結束操作。',
+                title: this.i18n.t('mask.initTitle'), 
+                text: this.i18n.t('mask.initText'),
+                help: this.i18n.t('mask.initHelp'),
                 type: ConfirmationType.OK_CANCEL,
                 materialIcon: 'draw',
                 action: () => {
@@ -698,7 +688,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
                   this._scratchingGridX = -1;
                   this._scratchingGridY = -1;
                   SoundEffect.play(PresetSound.sweep);
-                  this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 的刮除已初始化`);
+                  this.chatMessageService.sendOperationLog(this.i18n.t('mask.initLog', { name: this.maskDisplayName() }));
                 }
               });
             },
@@ -709,40 +699,34 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       },
       ContextMenuSeparator,
       {
-        name: '顯示邊框線',
+        name: this.i18n.t('mask.menu.24'),
         subActions: [
-          { name: `${this.borderType == 0 ? '◉' : '○'} 僅操作時顯示`,  action: () => { this.borderType = 0 }, checkBox: 'radio' },
-          { name: `${this.borderType == 1 ? '◉' : '○'} 操作時、未固定時`,  action: () => { this.borderType = 1 }, checkBox: 'radio' },
-          { name: `${this.borderType == 2 ? '◉' : '○'} 始終顯示`,  action: () => { this.borderType = 2 }, checkBox: 'radio' },
+          { name: `${this.borderType == 0 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.1')}`,  action: () => { this.borderType = 0 }, checkBox: 'radio' },
+          { name: `${this.borderType == 1 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.2')}`,  action: () => { this.borderType = 1 }, checkBox: 'radio' },
+          { name: `${this.borderType == 2 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.3')}`,  action: () => { this.borderType = 2 }, checkBox: 'radio' },
         ],
         disabled: this.isScratching
       },
       {
-        name: '圖片與顏色顯示',
+        name: this.i18n.t('mask.menu.25'),
         subActions: [
-          { name: `${this.blendType == 0 ? '◉' : '○'} 僅圖片`,  action: () => { this.blendType = 0; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
-          { name: `${this.blendType == 1 ? '◉' : '○'} 與背景色重疊`,  action: () => { this.blendType = 1; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
-          { name: `${this.blendType == 2 ? '◉' : '○'} 與背景色混合`,  action: () => { this.blendType = 2; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
+          { name: `${this.blendType == 0 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.4')}`,  action: () => { this.blendType = 0; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
+          { name: `${this.blendType == 1 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.5')}`,  action: () => { this.blendType = 1; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
+          { name: `${this.blendType == 2 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.6')}`,  action: () => { this.blendType = 2; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
           ContextMenuSeparator,
-          { name: '初始化顏色', action: () => { this.color = '#555555'; this.bgcolor = '#0a0a0a'; SoundEffect.play(PresetSound.cardDraw) } }
+          { name: this.i18n.t('mask.menu.26'), action: () => { this.color = '#555555'; this.bgcolor = '#0a0a0a'; SoundEffect.play(PresetSound.cardDraw) } }
         ],
         disabled: this.isScratching
       },
       ContextMenuSeparator,
-      (this.isAltitudeIndicate
-        ? {
-          name: '☑ 顯示高度', action: () => {
-            this.isAltitudeIndicate = false;
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示高度', action: () => {
-            this.isAltitudeIndicate = true;
-          },
-          checkBox: 'check'
-        }),
+      contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('mask.menu.27'),
+        off: this.i18n.t('mask.menu.28'),
+      }),
       {
-        name: '將高度設為0', action: () => {
+        name: this.i18n.t('mask.menu.29'), action: () => {
           if (this.altitude != 0) {
             this.altitude = 0;
             SoundEffect.play(PresetSound.sweep);
@@ -753,9 +737,9 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         altitudeDisabled: this.isScratching
       },
       ContextMenuSeparator,
-      { name: '編輯地圖遮罩...', action: () => { this.showDetail(this.gameTableMask); } },
+      { name: this.i18n.t('mask.menu.30'), action: () => { this.showDetail(this.gameTableMask); } },
       (this.gameTableMask.getUrls().length <= 0 ? null : {
-        name: '開啟參考網址', action: null,
+        name: this.i18n.t('mask.menu.31'), action: null,
         subActions: this.gameTableMask.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
@@ -768,14 +752,14 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
               } 
             },
             disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
+            error: !StringUtil.validUrl(url) ? this.i18n.t('common.invalidUrl') : null,
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         })
       }),
       (this.gameTableMask.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: '建立副本', action: () => {
+        name: this.i18n.t('mask.menu.32'), action: () => {
           let cloneObject = this.gameTableMask.clone();
           console.log('複製', cloneObject);
           cloneObject.location.x += this.gridSize;
@@ -787,17 +771,21 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         }
       },
       {
-        name: '刪除', action: () => {
-          this.chatMessageService.sendOperationLog(`${ this.gameTableMask.name == '' ? '(無名地圖遮罩)' : this.gameTableMask.name } 已刪除`);
+        name: this.i18n.t('mask.menu.33'), action: () => {
+          this.chatMessageService.sendOperationLog(this.i18n.t('mask.deleted', { name: this.maskDisplayName() }));
           this.gameTableMask.destroy();
           SoundEffect.play(PresetSound.sweep);
         }
       },
       ContextMenuSeparator,
-      { name: '建立物件', action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
+      { name: this.i18n.t('mask.menu.34'), action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }
     ];
     
     return actions;
+  }
+
+  private maskDisplayName(): string {
+    return this.gameTableMask.name == '' ? this.i18n.t('mask.unnamed') : this.gameTableMask.name;
   }
 
   onDoubleClick(e: Event) {
@@ -808,7 +796,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   private showDetail(gameObject: GameTableMask) {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '地圖遮罩設定';
+    let title = this.i18n.t('mask.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 200, top: coordinate.y - 150, width: 400, height: 530 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

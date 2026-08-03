@@ -1,36 +1,58 @@
-import { AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { FilterType, GameTable, GridType } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TableDrawing } from '@udonarium/table-fx/table-drawing';
+import { TableLight } from '@udonarium/table-fx/table-light';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
+import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
 import { ModalService } from 'service/modal.service';
-import { PointerDeviceService } from 'service/pointer-device.service';
+import { PanelService } from 'service/panel.service';
+import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
+import { SceneToolService } from 'service/scene-tool.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopKeyboardService } from 'service/tabletop-keyboard.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
+import { TokenPathMoveService } from 'service/token-path-move.service';
+import { I18nService } from 'service/i18n.service';
 
 import { GridLineRender } from './grid-line-render';
+import { LightOccluder, LightingRender } from './lighting-render';
 import { TableMouseGesture } from './table-mouse-gesture';
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
+import { WeatherRender } from './weather-render';
+
+interface TablePingView {
+  id: string;
+  x: number;
+  y: number;
+  type: 'basic' | 'warning';
+  color: string;
+  expire: number;
+}
 
 @Component({
     selector: 'game-table',
@@ -43,12 +65,123 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('gameTable', { static: true }) gameTable: ElementRef<HTMLElement>;
   @ViewChild('gameObjects', { static: true }) gameObjects: ElementRef<HTMLElement>;
   @ViewChild('gridCanvas', { static: true }) gridCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('fxCanvas', { static: true }) fxCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasLow', { static: true }) weatherCanvasLow: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasMid', { static: true }) weatherCanvasMid: ElementRef<HTMLCanvasElement>;
+  @ViewChild('weatherCanvasHigh', { static: true }) weatherCanvasHigh: ElementRef<HTMLCanvasElement>;
   @ViewChild('pickArea', { static: true }) pickArea: ElementRef<HTMLElement>;
   @ViewChild('pickCursor', { static: true }) pickCursor: ElementRef<HTMLElement>;
+
+  readonly Math = Math;
+  pings: TablePingView[] = [];
+  offscreenArrows: { x: number; y: number; deg: number; color: string }[] = [];
+
+  private lightingRender: LightingRender = null;
+  private weatherRender: WeatherRender = null;
+  private fxTimer: any = null;
+  private pingHoldTimer: any = null;
+  private pingHoldOrigin: { x: number; y: number } = null;
+  private pingHoldLast: { x: number; y: number } = null;
+  private pingHoldShift = false;
+  private static readonly PING_MOVE_THRESHOLD_SQ = 8 * 8;
+  private drawDragStart: { x: number; y: number } = null;
+  private drawDragCurrent: { x: number; y: number } = null;
+  private freehandPoints: { x: number; y: number }[] = [];
+  private drawDraftRaf: number = 0;
+  /** Bumps so live draft SVG rebinds while drawing. */
+  drawDraftTick = 0;
+  private static readonly FREEHAND_MIN_DIST_SQ = 2.5 * 2.5;
+  private static readonly FREEHAND_MAX_POINTS = 1200;
+  private static readonly SCENE_MARQUEE_MIN_SQ = 6 * 6;
+  private static readonly PATH_CLICK_MOVE_SQ = 8 * 8;
+  /** Scene-select marquee in tabletop coordinates. */
+  private sceneMarqueeStart: { x: number; y: number } = null;
+  private sceneMarqueeCurrent: { x: number; y: number } = null;
+  /** True once drag exceeds threshold — commit as box select instead of click. */
+  private sceneMarqueeActive = false;
+  /** Shift+click candidate for token path waypoint. */
+  private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number } = null;
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
+
+  /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
+  weatherLayerZ(layer: number): number {
+    const gh = this.gridHeight;
+    const g = this.currentTable?.gridSize || 50;
+    const lifts = [g * 0.12, g * 1.6, g * 3.6];
+    return gh + (lifts[Math.max(0, Math.min(2, layer | 0))] || lifts[0]);
+  }
+
+  /** Weather canvas extends past the map so rain/snow/fog spill outside. */
+  get weatherPad(): number {
+    return WeatherRender.marginFor(this.tablePixelWidth, this.tablePixelHeight);
+  }
+  get weatherPixelWidth(): number { return this.tablePixelWidth + this.weatherPad * 2; }
+  get weatherPixelHeight(): number { return this.tablePixelHeight + this.weatherPad * 2; }
+  get tablePixelWidth(): number { return this.currentTable.width * this.currentTable.gridSize; }
+  get tablePixelHeight(): number { return this.currentTable.height * this.currentTable.gridSize; }
+  get drawings(): TableDrawing[] { return this.currentTable?.drawings || []; }
+  get lights(): TableLight[] { return this.currentTable?.lights || []; }
+  get walls(): TableWall[] { return this.currentTable?.walls || []; }
+  get wallDraftPoints(): { x: number; y: number }[] { return this.sceneTools.wallDraftPoints; }
+  get polygonDraftPoints(): { x: number; y: number }[] { return this.sceneTools.polygonDraftPoints; }
+  get freehandDraftPoints(): { x: number; y: number }[] { return this.freehandPoints; }
+  get drawStrokeColor(): string { return this.sceneTools.drawStrokeColor; }
+  get drawStrokeWidth(): number { return this.sceneTools.drawStrokeWidth; }
+  get drawStrokeOpacity(): number { return this.sceneTools.drawStrokeOpacity; }
+  get drawFillOpacity(): number { return this.sceneTools.drawFillOpacity; }
+  get showSceneEditOverlay(): boolean { return this.sceneTools.showEditOverlay; }
+
+  get lightDraft(): { x: number; y: number; bright: number; dim: number } | null {
+    if (this.sceneTools.mode !== 'light' || !this.drawDragStart || !this.drawDragCurrent) return null;
+    const dim = Math.max(8, Math.hypot(this.drawDragCurrent.x - this.drawDragStart.x, this.drawDragCurrent.y - this.drawDragStart.y));
+    const ratio = this.sceneTools.lightDimGrid > 0
+      ? Math.min(1, this.sceneTools.lightBrightGrid / this.sceneTools.lightDimGrid)
+      : 0.5;
+    return {
+      x: this.drawDragStart.x,
+      y: this.drawDragStart.y,
+      dim,
+      bright: Math.max(0, dim * ratio),
+    };
+  }
+
+  get selectedLightGuide(): { x: number; y: number; bright: number; dim: number } | null {
+    const l = this.sceneTools.selectedLight;
+    if (!l || !this.showSceneEditOverlay) return null;
+    return { x: l.x, y: l.y, bright: Math.max(0, l.brightRadius), dim: Math.max(1, l.dimRadius) };
+  }
+
+  get shapeDraft(): { kind: 'rect' | 'ellipse'; x: number; y: number; width: number; height: number } | null {
+    if (!this.drawDragStart || !this.drawDragCurrent) return null;
+    if (this.sceneTools.mode !== 'draw-rect' && this.sceneTools.mode !== 'draw-ellipse') return null;
+    const x = Math.min(this.drawDragStart.x, this.drawDragCurrent.x);
+    const y = Math.min(this.drawDragStart.y, this.drawDragCurrent.y);
+    const width = Math.max(1, Math.abs(this.drawDragCurrent.x - this.drawDragStart.x));
+    const height = Math.max(1, Math.abs(this.drawDragCurrent.y - this.drawDragStart.y));
+    return {
+      kind: this.sceneTools.mode === 'draw-rect' ? 'rect' : 'ellipse',
+      x, y, width, height,
+    };
+  }
+
+  get sceneMarquee(): { x: number; y: number; width: number; height: number } | null {
+    if (!this.sceneMarqueeActive || !this.sceneMarqueeStart || !this.sceneMarqueeCurrent) return null;
+    const x = Math.min(this.sceneMarqueeStart.x, this.sceneMarqueeCurrent.x);
+    const y = Math.min(this.sceneMarqueeStart.y, this.sceneMarqueeCurrent.y);
+    const width = Math.abs(this.sceneMarqueeCurrent.x - this.sceneMarqueeStart.x);
+    const height = Math.abs(this.sceneMarqueeCurrent.y - this.sceneMarqueeStart.y);
+    return { x, y, width: Math.max(1, width), height: Math.max(1, height) };
+  }
+
+  get polygonRubberPoints(): { x: number; y: number }[] {
+    const pts = this.polygonDraftPoints;
+    if (!pts.length) return pts;
+    if (this.drawDragCurrent) return pts.concat([this.drawDragCurrent]);
+    return pts;
+  }
 
   get tableImage(): ImageFile { return this.imageService.getSkeletonOr(this.currentTable.imageIdentifier); }
   get backgroundImage(): ImageFile { return this.imageService.getEmptyOr(this.currentTable.backgroundImageIdentifier); }
@@ -84,6 +217,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get isStealthMode(): boolean { return GameCharacter.isStealthMode; }
   get isGMMode(): boolean { return PeerCursor.myCursor && PeerCursor.myCursor.isGMMode; }
+  get canCreateScene(): boolean { return SceneToolPermission.instance.canCreate; }
+  get canModifyScene(): boolean { return SceneToolPermission.instance.canModify; }
+  get canUseSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
+  get canCreateCurrentMode(): boolean {
+    return SceneToolPermission.instance.canUseCreateMode(this.sceneTools.mode);
+  }
 
   get clipCss(): string {
     const rect = this.currentTable.gridClipRect;
@@ -166,6 +305,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(
     private ngZone: NgZone,
+    private changeDetector: ChangeDetectorRef,
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
     private coordinateService: CoordinateService,
@@ -175,7 +315,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private selectionService: TabletopSelectionService,
     private tabletopKeyboardService: TabletopKeyboardService,
     private modalService: ModalService,
+    private panelService: PanelService,
+    private sceneTools: SceneToolService,
+    private tokenPath: TokenPathMoveService,
+    private i18n: I18nService,
   ) { }
+
+  get pathWaypoints() { return this.tokenPath.waypoints; }
+  get pathPointsAttr(): string {
+    return this.tokenPath.waypoints.map(p => `${p.x},${p.y}`).join(' ');
+  }
 
   ngOnInit() {
     EventSystem.register(this)
@@ -184,6 +333,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         console.log('UPDATE_GAME_OBJECT GameTableComponent ' + this.currentTable.identifier);
 
         this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor, this.currentTable.isShowNumber);
+        this.refreshFx();
+      })
+      .on('TABLE_PING', event => {
+        this.ngZone.run(() => this.spawnPing(event.data));
+      })
+      .on('SCENE_TOOL_COMMIT_POLYGON', () => {
+        this.ngZone.run(() => this.commitPolygon(false));
+      })
+      .on('SCENE_TOOLS_PANEL', () => {
+        this.ngZone.run(() => this.changeDetector.markForCheck());
       })
       .on('DRAG_LOCKED_OBJECT', event => {
         this.isTableTransformMode = true;
@@ -272,6 +431,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor);
     this.setTransform(0, 0, 0, 0, 0, 0);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
+    this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
+    this.weatherRender = new WeatherRender([
+      this.weatherCanvasLow.nativeElement,
+      this.weatherCanvasMid.nativeElement,
+      this.weatherCanvasHigh.nativeElement,
+    ]);
+    this.refreshFx();
+    this.fxTimer = setInterval(() => this.refreshFx(), 200);
   }
 
   ngOnDestroy() {
@@ -280,6 +447,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchGesture.destroy();
     this.pickGesture.destroy();
     this.tabletopKeyboardService.destroy();
+    if (this.fxTimer) clearInterval(this.fxTimer);
+    if (this.weatherRender) this.weatherRender.destroy();
+    this.clearPingHold();
+    this.clearDrawDragState();
     if (this._currentTableImageUrl) URL.revokeObjectURL(this._currentTableImageUrl);
     if (this._currentBackgroundImageUrl) URL.revokeObjectURL(this._currentBackgroundImageUrl);
     if (this._currentBackgroundImageUrl2) URL.revokeObjectURL(this._currentBackgroundImageUrl2);
@@ -350,9 +521,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableMouseStart(e: any) {
-    // Shift+left = pan map (swapped with former bare-left pan).
-    // Bare left on empty table = region select (handled by TablePickGesture).
-    if (e.button === 0 && e.shiftKey) {
+    // Shift+left with a selected token = path waypoints (not pan).
+    // Shift+right with draft path = commit (handled in contextmenu).
+    if (e.button === 2 && this.tokenPath.hasDraft && e.shiftKey) {
+      this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = false;
+    } else if (e.button === 0 && e.shiftKey && this.tokenPath.canDraft()) {
+      this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = false;
+    } else if (e.button === 0 && e.shiftKey) {
+      // Shift+left = pan map when no path draft applies.
       this.isTableTransformMode = true;
       this.pointerDeviceService.isDragging = false;
     } else if (e.button === 1 || e.button === 2) {
@@ -422,6 +600,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTablePickCancelIfNeeded(): boolean {
+    // Scene tools take pointer while a tool is active — don't steal picks.
+    if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return true;
     return this.isTableTransformMode;
   }
 
@@ -445,6 +625,31 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
+    // Shift+right commits token path while draft waypoints exist.
+    if (this.tokenPath.hasDraft && e.shiftKey && !this.tokenPath.isAnimating) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.ngZone.run(async () => {
+        await this.tokenPath.commit();
+        this.changeDetector.detectChanges();
+      });
+      return;
+    }
+    if (this.canCreateCurrentMode && this.sceneTools.mode === 'wall' && this.sceneTools.wallDraftPoints.length >= 2) {
+      e.preventDefault();
+      const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
+      this.currentTable.appendChild(wall);
+      this.sceneTools.resetDrafts();
+      this.sceneTools.selectWall(wall);
+      this.refreshFx();
+      return;
+    }
+    if (this.sceneTools.mode === 'draw-polygon' && this.sceneTools.polygonDraftPoints.length) {
+      e.preventDefault();
+      this.sceneTools.polygonDraftPoints.pop();
+      return;
+    }
+
     if (!document.activeElement.contains(this.gameObjects.nativeElement)) return;
     e.preventDefault();
 
@@ -453,26 +658,138 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    let menuActions: ContextMenuAction[] = [];
+    let extraActions: ContextMenuAction[] = [];
 
     if (0 < this.selectionService.size) {
-      menuActions.push({
-        name: '集中到這裡', action: () => {
+      extraActions.push({
+        name: this.i18n.t('gt.congregate'),
+        action: () => {
           this.selectionService.congregate(objectPosition);
         },
-        //enabled: 0 < this.selectionService.size
-        disabled: 0 < this.selectionService.size
       });
-      menuActions.push(ContextMenuSeparator);
+      extraActions.push(ContextMenuSeparator);
     }
-    Array.prototype.push.apply(menuActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
-    menuActions.push(ContextMenuSeparator);
-    menuActions.push({
-      name: '地圖設定...', action: () => {
+    Array.prototype.push.apply(extraActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
+    const sceneCreates = this.makeSceneCreateMenuActions(objectPosition);
+    if (sceneCreates.length) {
+      extraActions.push(ContextMenuSeparator);
+      Array.prototype.push.apply(extraActions, sceneCreates);
+    }
+    extraActions.push(ContextMenuSeparator);
+    extraActions.push({
+      name: this.i18n.t('gt.mapSettings'), action: () => {
         this.modalService.open(GameTableSettingComponent);
       }
     });
-    this.contextMenuService.open(menuPosition, menuActions, this.currentTable.name);
+    EventSystem.trigger('OPEN_TOOLBOX', {
+      x: menuPosition.x,
+      y: menuPosition.y,
+      extraActions
+    });
+  }
+
+  private makeSceneCreateMenuActions(position: PointerCoordinate): ContextMenuAction[] {
+    const perm = SceneToolPermission.instance;
+    if (!perm.canOpenPanel) return [];
+    const actions: ContextMenuAction[] = [];
+    if (perm.canCreateKind('light')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addLight'),
+        action: () => this.createSceneLightAt(position),
+      });
+    }
+    if (perm.canCreateKind('wall')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addWall'),
+        action: () => this.beginSceneWallAt(position),
+      });
+    }
+    if (perm.canCreateKind('draw-freehand')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addFreehand'),
+        action: () => this.beginSceneFreehand(),
+      });
+    }
+    if (perm.canCreateKind('draw-text')) {
+      actions.push({
+        name: this.i18n.t('scene.ctx.addText'),
+        action: () => this.createSceneTextAt(position),
+      });
+    }
+    return actions;
+  }
+
+  private ensureSceneToolsPanel() {
+    if (this.sceneTools.isPanelOpen) return;
+    this.panelService.open(SceneToolsComponent, { width: 380, height: 560, left: 100 });
+  }
+
+  /** Scene-tools panel idles on open; run after that microtask. */
+  private runAfterSceneToolsReady(fn: () => void) {
+    const alreadyOpen = this.sceneTools.isPanelOpen;
+    this.ensureSceneToolsPanel();
+    if (alreadyOpen) {
+      fn();
+      return;
+    }
+    setTimeout(fn, 0);
+  }
+
+  private createSceneLightAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('light') || !this.currentTable) return;
+    this.runAfterSceneToolsReady(() => {
+      const grid = this.currentTable.gridSize || 50;
+      const dim = Math.max(grid * 0.5, this.sceneTools.lightDimGrid * grid);
+      const ratio = this.sceneTools.lightDimGrid > 0
+        ? Math.min(1, this.sceneTools.lightBrightGrid / this.sceneTools.lightDimGrid)
+        : 0.5;
+      const light = TableLight.create(position.x, position.y, dim);
+      light.brightRadius = Math.max(0, dim * ratio);
+      light.color = this.sceneTools.lightColor;
+      light.intensity = this.sceneTools.lightIntensity;
+      light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
+      this.currentTable.appendChild(light);
+      this.sceneTools.selectLight(light);
+      this.sceneTools.enterSelect();
+      this.refreshFx();
+      SoundEffect.play(PresetSound.piecePut);
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private createSceneTextAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('draw-text') || !this.currentTable) return;
+    this.runAfterSceneToolsReady(() => {
+      const d = TableDrawing.create('text', Network.peer?.userId || '');
+      d.x = position.x;
+      d.y = position.y;
+      d.text = this.sceneTools.draftText || this.i18n.t('scene.defaultNote');
+      d.fontSize = this.sceneTools.draftFontSize || 18;
+      this.applyDrawStyle(d, false);
+      this.currentTable.appendChild(d);
+      this.sceneTools.selectDrawing(d);
+      this.sceneTools.enterSelect();
+      SoundEffect.play(PresetSound.piecePut);
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private beginSceneWallAt(position: PointerCoordinate) {
+    if (!SceneToolPermission.instance.canCreateKind('wall')) return;
+    this.runAfterSceneToolsReady(() => {
+      this.sceneTools.setMode('wall');
+      this.sceneTools.wallDraftPoints = [{ x: position.x, y: position.y }];
+      this.scheduleDrawDraftRefresh();
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private beginSceneFreehand() {
+    if (!SceneToolPermission.instance.canCreateKind('draw-freehand')) return;
+    this.runAfterSceneToolsReady(() => {
+      this.sceneTools.setMode('draw-freehand');
+      this.changeDetector.detectChanges();
+    });
   }
 
   @HostListener('document:mousedown', ['$event'])
@@ -554,5 +871,815 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (character.isHideIn && character.location.name === 'table' && character.owner === cursor.userId) return true;
     }
     return false;
+  }
+
+  polylinePoints(d: TableDrawing): string {
+    const pts = d.geom?.points || [];
+    return pts.map((p: any) => `${p.x},${p.y}`).join(' ');
+  }
+
+  wallPointsAttr(w: TableWall): string {
+    return (w.points || []).map(p => `${p.x},${p.y}`).join(' ');
+  }
+
+  draftPointsAttr(pts: { x: number; y: number }[]): string {
+    return (pts || []).map(p => `${p.x},${p.y}`).join(' ');
+  }
+
+  isDrawingSelected(d: TableDrawing): boolean {
+    return this.sceneTools.isDrawingSelected(d);
+  }
+
+  isWallSelected(w: TableWall): boolean {
+    return this.sceneTools.isWallSelected(w);
+  }
+
+  isLightSelected(l: TableLight): boolean {
+    return this.sceneTools.isLightSelected(l);
+  }
+
+  private refreshFx() {
+    if (!this.lightingRender || !this.currentTable) return;
+    const onTable = this.characters.filter(c => c.location?.name === 'table');
+    const userId = Network.peer?.userId || '';
+    const visionChars = onTable.filter(c => c.providesVisionTo(userId));
+    this.lightingRender.render(
+      this.currentTable,
+      visionChars,
+      onTable,
+      this.collectLightOccluders(),
+      this.isGMMode,
+    );
+    this.weatherRender?.sync(this.currentTable);
+    this.updateOffscreenArrows();
+    this.changeDetector.markForCheck();
+  }
+
+  /** Characters / masks / terrains that cast shadows into lights & vision (default on). */
+  private collectLightOccluders(): LightOccluder[] {
+    const table = this.currentTable;
+    if (!table) return [];
+    const grid = table.gridSize || 50;
+    const out: LightOccluder[] = [];
+
+    for (const ch of this.characters) {
+      if (ch.location?.name !== 'table') continue;
+      const s = Math.max(grid * 0.35, (ch.size || 1) * grid);
+      out.push({ id: ch.identifier, points: this.rectOccluder(ch.location.x, ch.location.y, s, s) });
+    }
+    for (const mask of this.tableMasks) {
+      if (mask.location?.name !== 'table') continue;
+      if (mask.affectsLight === false) continue;
+      const w = Math.max(1, (mask.width || 1) * grid);
+      const h = Math.max(1, (mask.height || 1) * grid);
+      out.push({ id: mask.identifier, points: this.rectOccluder(mask.location.x, mask.location.y, w, h) });
+    }
+    for (const terrain of this.terrains) {
+      if (terrain.location?.name !== 'table') continue;
+      if (terrain.affectsLight === false) continue;
+      const w = Math.max(1, (terrain.width || 1) * grid);
+      const d = Math.max(1, (terrain.depth || 1) * grid);
+      out.push({
+        id: terrain.identifier,
+        points: this.rectOccluder(terrain.location.x, terrain.location.y, w, d, terrain.rotate || 0),
+      });
+    }
+    return out;
+  }
+
+  private rectOccluder(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    rotateDeg: number = 0,
+  ): { x: number; y: number }[] {
+    const corners = [
+      { x: x, y: y },
+      { x: x + w, y: y },
+      { x: x + w, y: y + h },
+      { x: x, y: y + h },
+    ];
+    if (!rotateDeg) return corners;
+    const rad = rotateDeg * Math.PI / 180;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return corners.map(p => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+    });
+  }
+
+  @HostListener('pointerdown', ['$event'])
+  onPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    // clearPingHold must run before setting origin (it nulls origin/timer).
+    this.clearPingHold();
+
+    // Shift+left on map with selected token(s): place path waypoint on click (not drag).
+    if (e.shiftKey && this.tokenPath.canDraft()) {
+      this.pathClickOrigin = { clientX: e.clientX, clientY: e.clientY, x: pos.x, y: pos.y };
+      return;
+    }
+
+    this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
+    this.pingHoldLast = { x: e.clientX, y: e.clientY };
+    this.pingHoldShift = e.shiftKey;
+    this.pingHoldTimer = setTimeout(() => {
+      if (!this.pingHoldOrigin || !this.pingHoldLast) return;
+      const dx = this.pingHoldLast.x - this.pingHoldOrigin.x;
+      const dy = this.pingHoldLast.y - this.pingHoldOrigin.y;
+      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) return;
+      if (this.pointerDeviceService.isDragging) return;
+      // Don't ping while placing scene tools.
+      if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return;
+      this.broadcastPing(pos.x, pos.y, this.pingHoldShift ? 'warning' : 'basic');
+      this.clearPingHold();
+    }, 1000);
+
+    if (!this.canUseSceneTools) return;
+
+    // Scene select: drag a marquee to multi-select; short click hits one object.
+    if (this.sceneTools.isSceneSelectMode) {
+      if (!this.canModifyScene) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectionService.clear();
+      this.clearSceneMarquee();
+      this.pickGesture?.cancel();
+      const tablePos = this.tablePosFromClient(e.pageX, e.pageY);
+      this.sceneMarqueeStart = { x: tablePos.x, y: tablePos.y };
+      this.sceneMarqueeCurrent = { x: tablePos.x, y: tablePos.y };
+      this.sceneMarqueeActive = false;
+      this.scheduleDrawDraftRefresh();
+      return;
+    }
+
+    // Idle scene tools: do not intercept tabletop interaction.
+    if (!this.sceneTools.isBlockingPick) return;
+    if (!this.canCreateCurrentMode) return;
+
+    if (this.sceneTools.mode === 'light') {
+      this.drawDragStart = { x: pos.x, y: pos.y };
+      this.drawDragCurrent = { x: pos.x, y: pos.y };
+      this.scheduleDrawDraftRefresh();
+      return;
+    }
+    if (this.sceneTools.mode === 'wall') {
+      this.sceneTools.wallDraftPoints.push({ x: pos.x, y: pos.y });
+      // Double-click finishes wall (also available via panel button / right-click).
+      if (this.sceneTools.wallDraftPoints.length >= 2 && e.detail >= 2) {
+        const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
+        this.currentTable.appendChild(wall);
+        this.sceneTools.resetDrafts();
+        this.sceneTools.selectWall(wall);
+        this.refreshFx();
+      }
+      return;
+    }
+    if (this.sceneTools.isDrawMode) {
+      if (this.sceneTools.mode === 'draw-text') {
+        const d = TableDrawing.create('text', Network.peer?.userId || '');
+        d.x = pos.x;
+        d.y = pos.y;
+        d.text = this.sceneTools.draftText || this.i18n.t('scene.defaultNote');
+        d.fontSize = this.sceneTools.draftFontSize || 18;
+        this.applyDrawStyle(d, false);
+        this.currentTable.appendChild(d);
+        this.sceneTools.selectDrawing(d);
+        return;
+      }
+      if (this.sceneTools.mode === 'draw-polygon') {
+        this.sceneTools.polygonDraftPoints.push({ x: pos.x, y: pos.y });
+        this.drawDragCurrent = { x: pos.x, y: pos.y };
+        this.scheduleDrawDraftRefresh();
+        if (e.detail >= 2 && this.sceneTools.polygonDraftPoints.length >= 3) {
+          this.commitPolygon(false);
+        }
+        return;
+      }
+      this.drawDragStart = { x: pos.x, y: pos.y };
+      this.drawDragCurrent = { x: pos.x, y: pos.y };
+      if (this.sceneTools.mode === 'draw-freehand') {
+        this.freehandPoints = [{ x: pos.x, y: pos.y }];
+      }
+      this.scheduleDrawDraftRefresh();
+    }
+  }
+
+  @HostListener('pointermove', ['$event'])
+  onPointerMove(e: PointerEvent) {
+    if (this.pingHoldOrigin) {
+      this.pingHoldLast = { x: e.clientX, y: e.clientY };
+      const dx = e.clientX - this.pingHoldOrigin.x;
+      const dy = e.clientY - this.pingHoldOrigin.y;
+      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
+    }
+    this.updateSceneMarqueeFromEvent(e);
+    this.updateDrawDraftFromPointer();
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  onDocumentPointerMove(e: PointerEvent) {
+    if (this.sceneMarqueeStart) {
+      this.updateSceneMarqueeFromEvent(e);
+      return;
+    }
+    if (!this.drawDragStart && this.sceneTools.mode !== 'draw-polygon' && this.sceneTools.mode !== 'light') return;
+    this.updateDrawDraftFromPointer();
+  }
+
+  @HostListener('pointerup', ['$event'])
+  onPointerUp(e: PointerEvent) {
+    this.clearPingHold();
+    if (this.finishPathClick(e)) return;
+    if (this.sceneMarqueeStart) {
+      this.commitSceneMarquee();
+      return;
+    }
+    this.commitDrawDrag();
+  }
+
+  @HostListener('document:pointerup', ['$event'])
+  onDocumentPointerUp(e: PointerEvent) {
+    if (this.finishPathClick(e)) {
+      this.clearPingHold();
+      return;
+    }
+    if (this.sceneMarqueeStart) {
+      this.clearPingHold();
+      this.commitSceneMarquee();
+      return;
+    }
+    if (!this.drawDragStart) return;
+    this.clearPingHold();
+    this.commitDrawDrag();
+  }
+
+  @HostListener('document:keyup', ['$event'])
+  onDocumentKeyup(e: KeyboardEvent) {
+    if (e.key !== 'Shift') return;
+    if (this.tokenPath.isAnimating) return;
+    if (!this.tokenPath.hasDraft && !this.pathClickOrigin) return;
+    this.pathClickOrigin = null;
+    this.tokenPath.cancelDraft();
+    this.changeDetector.detectChanges();
+  }
+
+  /** Resolve Shift+click waypoint; returns true if this pointerup was a path gesture. */
+  private finishPathClick(e: PointerEvent): boolean {
+    if (!this.pathClickOrigin) return false;
+    const origin = this.pathClickOrigin;
+    this.pathClickOrigin = null;
+    if (!e.shiftKey) {
+      this.tokenPath.cancelDraft();
+      this.changeDetector.detectChanges();
+      return true;
+    }
+    const dx = e.clientX - origin.clientX;
+    const dy = e.clientY - origin.clientY;
+    if (dx * dx + dy * dy > GameTableComponent.PATH_CLICK_MOVE_SQ) return true;
+    if (this.tokenPath.addWaypoint(origin.x, origin.y)) {
+      this.changeDetector.detectChanges();
+    }
+    return true;
+  }
+
+  @HostListener('dragover', ['$event'])
+  onInventoryCharacterDragOver(e: DragEvent) {
+    if (!this.readInventoryCharacterDragId(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
+  @HostListener('drop', ['$event'])
+  onInventoryCharacterDrop(e: DragEvent) {
+    const id = this.readInventoryCharacterDragId(e);
+    if (!id || id === '__pending__') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (GuestSession.isGuest) return;
+    const ch = ObjectStore.instance.get(id);
+    if (!(ch instanceof GameCharacter)) return;
+    if (!ch.isVisible && !this.isGMMode) return;
+
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: e.clientX, y: e.clientY, z: 0 },
+      this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
+    );
+    const grid = this.currentTable?.gridSize || 50;
+    ch.location.x = pos.x - (ch.size * grid) / 2;
+    ch.location.y = pos.y - (ch.size * grid) / 2;
+    EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
+    ch.setLocation('table');
+    SoundEffect.play(PresetSound.piecePut);
+    EventSystem.call('UPDATE_INVENTORY', true);
+  }
+
+  private readInventoryCharacterDragId(e: DragEvent): string {
+    if (!e.dataTransfer) return '';
+    const typed = e.dataTransfer.getData(GameCharacter.INVENTORY_DRAG_MIME);
+    if (typed) return typed;
+    // During dragover some browsers only expose types, not data.
+    if (e.type === 'dragover') {
+      const types = Array.from(e.dataTransfer.types || []);
+      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return '__pending__';
+      const plainHint = types.includes('text/plain');
+      return plainHint ? '__pending__' : '';
+    }
+    const plain = e.dataTransfer.getData('text/plain') || '';
+    const m = /^udonarium-character:(.+)$/.exec(plain);
+    return m ? m[1] : '';
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(e: KeyboardEvent) {
+    if (!this.canUseSceneTools) return;
+    if (this.isTypingTarget(e.target)) return;
+
+    if (e.key === 'Escape') {
+      if (this.sceneMarqueeStart) {
+        e.preventDefault();
+        this.clearSceneMarquee();
+        this.scheduleDrawDraftRefresh();
+        return;
+      }
+      if (
+        this.drawDragStart
+        || this.freehandPoints.length
+        || this.sceneTools.polygonDraftPoints.length
+        || this.sceneTools.wallDraftPoints.length
+      ) {
+        e.preventDefault();
+        this.cancelDrawDraft();
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (!this.canCreateCurrentMode) return;
+      if (this.tryCommitSceneDraft()) e.preventDefault();
+    }
+  }
+
+  private isTypingTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    return !!el.isContentEditable;
+  }
+
+  /** Finish in-progress wall / polygon / freehand / shape / light draft. */
+  private tryCommitSceneDraft(): boolean {
+    if (this.sceneTools.mode === 'wall' && this.sceneTools.wallDraftPoints.length >= 2) {
+      const wall = TableWall.create(this.sceneTools.wallDraftPoints.slice());
+      this.currentTable.appendChild(wall);
+      this.sceneTools.resetDrafts();
+      this.sceneTools.selectWall(wall);
+      this.refreshFx();
+      return true;
+    }
+    if (this.sceneTools.mode === 'draw-polygon' && this.sceneTools.polygonDraftPoints.length >= 3) {
+      this.commitPolygon(false);
+      return true;
+    }
+    if (
+      (this.sceneTools.mode === 'draw-freehand' && this.freehandPoints.length > 1)
+      || ((this.sceneTools.mode === 'draw-rect' || this.sceneTools.mode === 'draw-ellipse' || this.sceneTools.mode === 'light')
+        && this.drawDragStart)
+    ) {
+      this.commitDrawDrag();
+      return true;
+    }
+    return false;
+  }
+
+  private updateDrawDraftFromPointer() {
+    if (!this.canCreateCurrentMode) return;
+    const mode = this.sceneTools.mode;
+    if (mode === 'draw-freehand' && this.drawDragStart) {
+      const pos = this.coordinateService.calcTabletopLocalCoordinate();
+      const before = this.freehandPoints.length;
+      this.appendFreehandPoint(pos.x, pos.y);
+      if (this.freehandPoints.length !== before) this.scheduleDrawDraftRefresh();
+      return;
+    }
+    if ((mode === 'draw-rect' || mode === 'draw-ellipse' || mode === 'light') && this.drawDragStart) {
+      const pos = this.coordinateService.calcTabletopLocalCoordinate();
+      if (this.drawDragCurrent?.x === pos.x && this.drawDragCurrent?.y === pos.y) return;
+      this.drawDragCurrent = { x: pos.x, y: pos.y };
+      this.scheduleDrawDraftRefresh();
+      return;
+    }
+    if (mode === 'draw-polygon' && this.sceneTools.polygonDraftPoints.length) {
+      const pos = this.coordinateService.calcTabletopLocalCoordinate();
+      if (this.drawDragCurrent?.x === pos.x && this.drawDragCurrent?.y === pos.y) return;
+      this.drawDragCurrent = { x: pos.x, y: pos.y };
+      this.scheduleDrawDraftRefresh();
+    }
+  }
+
+  private appendFreehandPoint(x: number, y: number) {
+    const last = this.freehandPoints[this.freehandPoints.length - 1];
+    if (last) {
+      const dx = x - last.x;
+      const dy = y - last.y;
+      if (dx * dx + dy * dy < GameTableComponent.FREEHAND_MIN_DIST_SQ) return;
+    }
+    this.freehandPoints.push({ x, y });
+    if (this.freehandPoints.length > GameTableComponent.FREEHAND_MAX_POINTS) {
+      this.freehandPoints = this.thinPolyline(this.freehandPoints, Math.floor(GameTableComponent.FREEHAND_MAX_POINTS * 0.7));
+    }
+  }
+
+  private thinPolyline(pts: { x: number; y: number }[], target: number): { x: number; y: number }[] {
+    if (pts.length <= target) return pts;
+    const stride = Math.ceil(pts.length / target);
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i < pts.length; i += stride) out.push(pts[i]);
+    const last = pts[pts.length - 1];
+    if (out[out.length - 1] !== last) out.push(last);
+    return out;
+  }
+
+  private simplifyPolyline(pts: { x: number; y: number }[], minDist: number): { x: number; y: number }[] {
+    if (pts.length <= 2) return pts.slice();
+    const minSq = minDist * minDist;
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const prev = out[out.length - 1];
+      const dx = pts[i].x - prev.x;
+      const dy = pts[i].y - prev.y;
+      if (dx * dx + dy * dy >= minSq) out.push(pts[i]);
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  private scheduleDrawDraftRefresh() {
+    if (this.drawDraftRaf) return;
+    this.drawDraftRaf = requestAnimationFrame(() => {
+      this.drawDraftRaf = 0;
+      this.drawDraftTick++;
+      this.changeDetector.detectChanges();
+    });
+  }
+
+  private applyDrawStyle(d: TableDrawing, withFill: boolean) {
+    d.strokeColor = this.sceneTools.drawStrokeColor;
+    d.strokeWidth = this.sceneTools.drawStrokeWidth;
+    d.strokeOpacity = this.sceneTools.drawStrokeOpacity;
+    if (withFill) {
+      d.fillColor = this.sceneTools.drawStrokeColor;
+      d.fillOpacity = this.sceneTools.drawFillOpacity;
+    } else {
+      d.fillOpacity = 0;
+    }
+  }
+
+  private commitDrawDrag() {
+    if (!this.drawDragStart) return;
+    if (!this.canCreateCurrentMode) {
+      this.clearDrawDragState();
+      return;
+    }
+    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    if (this.sceneTools.mode === 'light') {
+      const dragged = Math.hypot(pos.x - this.drawDragStart.x, pos.y - this.drawDragStart.y);
+      // Short click uses panel defaults; drag sets dim radius by distance.
+      const dim = dragged < 8
+        ? Math.max(this.currentTable.gridSize * 0.5, this.sceneTools.lightDimGrid * this.currentTable.gridSize)
+        : Math.max(this.currentTable.gridSize * 0.5, dragged);
+      const ratio = this.sceneTools.lightDimGrid > 0
+        ? Math.min(1, this.sceneTools.lightBrightGrid / this.sceneTools.lightDimGrid)
+        : 0.5;
+      const light = TableLight.create(this.drawDragStart.x, this.drawDragStart.y, dim);
+      light.brightRadius = Math.max(0, dim * ratio);
+      light.color = this.sceneTools.lightColor;
+      light.intensity = this.sceneTools.lightIntensity;
+      light.name = this.sceneTools.lightName || this.i18n.t('scene.defaultLightName');
+      this.currentTable.appendChild(light);
+      this.sceneTools.selectLight(light);
+      this.refreshFx();
+    } else if (this.sceneTools.mode === 'draw-rect' || this.sceneTools.mode === 'draw-ellipse') {
+      const width = Math.abs(pos.x - this.drawDragStart.x);
+      const height = Math.abs(pos.y - this.drawDragStart.y);
+      if (width >= 4 || height >= 4) {
+        const d = TableDrawing.create(this.sceneTools.mode === 'draw-rect' ? 'rect' : 'ellipse', Network.peer?.userId || '');
+        d.x = Math.min(this.drawDragStart.x, pos.x);
+        d.y = Math.min(this.drawDragStart.y, pos.y);
+        d.width = Math.max(8, width);
+        d.height = Math.max(8, height);
+        this.applyDrawStyle(d, true);
+        this.currentTable.appendChild(d);
+        this.sceneTools.selectDrawing(d);
+      }
+    } else if (this.sceneTools.mode === 'draw-freehand' && this.freehandPoints.length > 1) {
+      const points = this.simplifyPolyline(this.freehandPoints, 2);
+      const d = TableDrawing.create('freehand', Network.peer?.userId || '');
+      d.geom = { points };
+      this.applyDrawStyle(d, false);
+      // Bound freehand for hit-test / list
+      let minX = points[0].x, minY = points[0].y, maxX = points[0].x, maxY = points[0].y;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      d.x = minX;
+      d.y = minY;
+      d.width = Math.max(1, maxX - minX);
+      d.height = Math.max(1, maxY - minY);
+      this.currentTable.appendChild(d);
+      this.sceneTools.selectDrawing(d);
+    }
+    this.clearDrawDragState();
+  }
+
+  private cancelDrawDraft() {
+    this.clearDrawDragState();
+    this.sceneTools.resetDrafts();
+    this.scheduleDrawDraftRefresh();
+  }
+
+  private clearDrawDragState() {
+    this.drawDragStart = null;
+    this.drawDragCurrent = null;
+    this.freehandPoints = [];
+    if (this.drawDraftRaf) {
+      cancelAnimationFrame(this.drawDraftRaf);
+      this.drawDraftRaf = 0;
+    }
+    this.drawDraftTick++;
+  }
+
+  private commitPolygon(switchToSelect: boolean) {
+    if (this.sceneTools.polygonDraftPoints.length < 3) return;
+    const d = TableDrawing.create('polygon', Network.peer?.userId || '');
+    d.geom = { points: this.sceneTools.polygonDraftPoints.slice() };
+    this.applyDrawStyle(d, true);
+    this.currentTable.appendChild(d);
+    this.sceneTools.resetDrafts();
+    this.drawDragCurrent = null;
+    this.sceneTools.selectDrawing(d);
+    if (switchToSelect) this.sceneTools.idle();
+    this.scheduleDrawDraftRefresh();
+  }
+
+  /** Hit-test scene objects under cursor (select mode). */
+  private trySelectSceneObject(x: number, y: number): boolean {
+    const pad = 12;
+    const perm = SceneToolPermission.instance;
+    // Drawings (top-most last)
+    if (perm.canModifyKind('drawing')) {
+      for (let i = this.drawings.length - 1; i >= 0; i--) {
+        const d = this.drawings[i];
+        if (this.hitDrawing(d, x, y, pad)) {
+          this.sceneTools.selectDrawing(d);
+          return true;
+        }
+      }
+    }
+    if (perm.canModifyKind('light')) {
+      for (let i = this.lights.length - 1; i >= 0; i--) {
+        const l = this.lights[i];
+        const dx = l.x - x, dy = l.y - y;
+        if (dx * dx + dy * dy <= 16 * 16) {
+          this.sceneTools.selectLight(l);
+          return true;
+        }
+      }
+    }
+    if (perm.canModifyKind('wall')) {
+      for (let i = this.walls.length - 1; i >= 0; i--) {
+        const w = this.walls[i];
+        if (this.hitWall(w, x, y, pad)) {
+          this.sceneTools.selectWall(w);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Map page coords → tabletop local (always via origin; ignore hover target). */
+  private tablePosFromClient(pageX: number, pageY: number): { x: number; y: number } {
+    const origin = this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement;
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: pageX, y: pageY, z: 0 },
+      origin
+    );
+    return { x: pos.x, y: pos.y };
+  }
+
+  private updateSceneMarqueeFromEvent(e: PointerEvent) {
+    if (!this.sceneMarqueeStart || !this.sceneTools.isSceneSelectMode) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    if (this.sceneMarqueeCurrent?.x === pos.x && this.sceneMarqueeCurrent?.y === pos.y) return;
+    this.sceneMarqueeCurrent = { x: pos.x, y: pos.y };
+    if (!this.sceneMarqueeActive) {
+      const dx = pos.x - this.sceneMarqueeStart.x;
+      const dy = pos.y - this.sceneMarqueeStart.y;
+      if (dx * dx + dy * dy >= GameTableComponent.SCENE_MARQUEE_MIN_SQ) {
+        this.sceneMarqueeActive = true;
+      }
+    }
+    this.scheduleDrawDraftRefresh();
+  }
+
+  private commitSceneMarquee() {
+    const start = this.sceneMarqueeStart;
+    const current = this.sceneMarqueeCurrent;
+    const wasActive = this.sceneMarqueeActive;
+    this.clearSceneMarquee();
+    if (!start || !current || !this.sceneTools.isSceneSelectMode || !this.canModifyScene) {
+      this.scheduleDrawDraftRefresh();
+      return;
+    }
+    if (wasActive) {
+      const rect = {
+        x: Math.min(start.x, current.x),
+        y: Math.min(start.y, current.y),
+        width: Math.abs(current.x - start.x),
+        height: Math.abs(current.y - start.y),
+      };
+      this.selectSceneObjectsInRect(rect);
+    } else {
+      // Short click: pick one scene object or clear selection.
+      if (!this.trySelectSceneObject(start.x, start.y)) {
+        this.sceneTools.clearSelection();
+      }
+    }
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private clearSceneMarquee() {
+    this.sceneMarqueeStart = null;
+    this.sceneMarqueeCurrent = null;
+    this.sceneMarqueeActive = false;
+  }
+
+  private selectSceneObjectsInRect(rect: { x: number; y: number; width: number; height: number }) {
+    const perm = SceneToolPermission.instance;
+    const drawings: TableDrawing[] = [];
+    const lights: TableLight[] = [];
+    const walls: TableWall[] = [];
+    if (perm.canModifyKind('drawing')) {
+      for (const d of this.drawings) {
+        if (this.boundsIntersects(rect, this.drawingBounds(d))) drawings.push(d);
+      }
+    }
+    if (perm.canModifyKind('light')) {
+      for (const l of this.lights) {
+        if (this.pointInRect(l.x, l.y, rect, 8)) lights.push(l);
+      }
+    }
+    if (perm.canModifyKind('wall')) {
+      for (const w of this.walls) {
+        if (this.boundsIntersects(rect, this.pointsBounds(w.points || []))) walls.push(w);
+      }
+    }
+    this.sceneTools.setMultiSelection(drawings, lights, walls);
+    if (this.sceneTools.selectionCount > 0) {
+      SoundEffect.playLocal(PresetSound.selectionStart);
+    }
+  }
+
+  private drawingBounds(d: TableDrawing): { x: number; y: number; width: number; height: number } {
+    if (d.type === 'text') {
+      const w = Math.max(40, (d.text?.length || 1) * (d.fontSize || 18) * 0.6);
+      const h = (d.fontSize || 18) + 8;
+      return { x: d.x, y: d.y, width: w, height: h };
+    }
+    if (d.type === 'rect' || d.type === 'ellipse') {
+      return { x: d.x, y: d.y, width: Math.abs(d.width || 0), height: Math.abs(d.height || 0) };
+    }
+    const pts = d.geom?.points || [];
+    if (pts.length) return this.pointsBounds(pts);
+    return { x: d.x || 0, y: d.y || 0, width: Math.abs(d.width || 0), height: Math.abs(d.height || 0) };
+  }
+
+  private pointsBounds(pts: { x: number; y: number }[]): { x: number; y: number; width: number; height: number } {
+    if (!pts.length) return { x: 0, y: 0, width: 0, height: 0 };
+    let minX = pts[0].x, minY = pts[0].y, maxX = pts[0].x, maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+  }
+
+  private boundsIntersects(
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number }
+  ): boolean {
+    return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
+  }
+
+  private pointInRect(
+    x: number, y: number,
+    rect: { x: number; y: number; width: number; height: number },
+    pad = 0
+  ): boolean {
+    return x >= rect.x - pad && x <= rect.x + rect.width + pad
+      && y >= rect.y - pad && y <= rect.y + rect.height + pad;
+  }
+
+  private hitDrawing(d: TableDrawing, x: number, y: number, pad: number): boolean {
+    if (d.type === 'text') {
+      const w = Math.max(40, (d.text?.length || 1) * (d.fontSize || 18) * 0.6);
+      const h = (d.fontSize || 18) + 8;
+      return x >= d.x - pad && x <= d.x + w + pad && y >= d.y - pad && y <= d.y + h + pad;
+    }
+    if (d.type === 'rect' || d.type === 'ellipse') {
+      return x >= d.x - pad && x <= d.x + d.width + pad && y >= d.y - pad && y <= d.y + d.height + pad;
+    }
+    const pts: { x: number; y: number }[] = d.geom?.points || [];
+    for (let i = 1; i < pts.length; i++) {
+      if (this.distToSegment(x, y, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y) <= pad) return true;
+    }
+    return false;
+  }
+
+  private hitWall(w: TableWall, x: number, y: number, pad: number): boolean {
+    const pts = w.points || [];
+    for (let i = 1; i < pts.length; i++) {
+      if (this.distToSegment(x, y, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y) <= pad) return true;
+    }
+    return false;
+  }
+
+  private distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    if (len2 <= 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  private clearPingHold() {
+    if (this.pingHoldTimer) clearTimeout(this.pingHoldTimer);
+    this.pingHoldTimer = null;
+    this.pingHoldOrigin = null;
+    this.pingHoldLast = null;
+    this.pingHoldShift = false;
+  }
+
+  private broadcastPing(x: number, y: number, type: 'basic' | 'warning') {
+    const data = {
+      x, y, type,
+      color: '#e11d48',
+      peerId: Network.peerId,
+      name: PeerCursor.myCursor?.name || ''
+    };
+    EventSystem.call('TABLE_PING', data);
+    this.spawnPing(data);
+    if (PresetSound.ping) SoundEffect.play(PresetSound.ping);
+  }
+
+  private spawnPing(data: any) {
+    const rawType = data.type === 'warning' || data.type === 'drag' ? 'warning' : 'basic';
+    const ping: TablePingView = {
+      id: `${Date.now()}_${Math.random()}`,
+      x: data.x,
+      y: data.y,
+      type: rawType,
+      color: '#e11d48',
+      expire: Date.now() + 2800,
+    };
+    this.pings = [...this.pings, ping];
+    setTimeout(() => {
+      this.pings = this.pings.filter(p => p.id !== ping.id);
+      this.updateOffscreenArrows();
+    }, 2800);
+    this.updateOffscreenArrows();
+  }
+
+  private updateOffscreenArrows() {
+    const root = this.rootElementRef?.nativeElement;
+    if (!root) { this.offscreenArrows = []; return; }
+    const rect = root.getBoundingClientRect();
+    const arrows = [];
+    for (const ping of this.pings) {
+      // Approximate: if ping table coords far from view center, show edge arrow
+      const sx = rect.left + rect.width / 2 + (ping.x - this.tablePixelWidth / 2) * 0.2 + this.viewPotisonX * 0.1;
+      const sy = rect.top + rect.height / 2 + (ping.y - this.tablePixelHeight / 2) * 0.15 + this.viewPotisonY * 0.1;
+      if (sx > rect.left + 20 && sx < rect.right - 20 && sy > rect.top + 20 && sy < rect.bottom - 20) continue;
+      const cx = Math.min(rect.right - 24, Math.max(rect.left + 24, sx));
+      const cy = Math.min(rect.bottom - 24, Math.max(rect.top + 24, sy));
+      const deg = Math.atan2(sy - (rect.top + rect.height / 2), sx - (rect.left + rect.width / 2)) * 180 / Math.PI + 90;
+      arrows.push({ x: cx - rect.left, y: cy - rect.top, deg, color: ping.color });
+    }
+    this.offscreenArrows = arrows;
   }
 }

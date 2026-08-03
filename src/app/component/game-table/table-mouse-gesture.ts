@@ -98,18 +98,25 @@ export class TableMouseGesture {
   }
 
   onWheel(ev: WheelEvent) {
-    let pixelDeltaY = 0;
+    // Object rotation shortcuts are handled elsewhere.
+    if (ev.altKey) return;
+    if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) return;
+
+    // Prefer dominant axis (Shift+wheel often becomes deltaX on OS/browser).
+    const rawDelta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+    let pixelDelta = 0;
     switch (ev.deltaMode) {
       case WheelEvent.DOM_DELTA_LINE:
-        pixelDeltaY = ev.deltaY * 16;
+        pixelDelta = rawDelta * 16;
         break;
       case WheelEvent.DOM_DELTA_PAGE:
-        pixelDeltaY = ev.deltaY * window.innerHeight;
+        pixelDelta = rawDelta * window.innerHeight;
         break;
       default:
-        pixelDeltaY = ev.deltaY;
+        pixelDelta = rawDelta;
         break;
     }
+    if (pixelDelta === 0) return;
 
     let transformX = 0;
     let transformY = 0;
@@ -119,10 +126,24 @@ export class TableMouseGesture {
     let rotateY = 0;
     let rotateZ = 0;
 
-    transformZ = pixelDeltaY * -1.5;
-    if (300 ** 2 < transformZ ** 2) transformZ = Math.min(Math.max(transformZ, -300), 300);
+    let event = TableMouseGestureEvent.ZOOM;
 
-    if (this.ontransform) this.ontransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ, TableMouseGestureEvent.ZOOM, ev);
+    if (ev.shiftKey) {
+      // Shift + wheel → pan left / right
+      transformX = -pixelDelta;
+      event = TableMouseGestureEvent.DRAG;
+      if (ev.cancelable) ev.preventDefault();
+    } else if (ev.ctrlKey || ev.metaKey) {
+      // Ctrl + wheel → pan up / down
+      transformY = -pixelDelta;
+      event = TableMouseGestureEvent.DRAG;
+      if (ev.cancelable) ev.preventDefault();
+    } else {
+      transformZ = pixelDelta * -1.5;
+      if (300 ** 2 < transformZ ** 2) transformZ = Math.min(Math.max(transformZ, -300), 300);
+    }
+
+    if (this.ontransform) this.ontransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ, event, ev);
   }
 
   onKeydown(ev: KeyboardEvent) {
@@ -185,12 +206,12 @@ export class TableMouseGesture {
   }
 
   private addEventListeners() {
-    this.targetElement.addEventListener('wheel', this.callbackOnWheel, false);
+    this.targetElement.addEventListener('wheel', this.callbackOnWheel, { passive: false });
     document.body.addEventListener('keydown', this.callbackOnKeydown, false);
   }
 
   private removeEventListeners() {
-    this.targetElement.removeEventListener('wheel', this.callbackOnWheel, false);
+    this.targetElement.removeEventListener('wheel', this.callbackOnWheel);
     document.body.removeEventListener('keydown', this.callbackOnKeydown, false);
   }
 }

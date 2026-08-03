@@ -1,100 +1,147 @@
-<div class="component" (input)="onInput()" *ngIf="!GuestMode()">
+<div class="settings-ui component" (input)="onInput()" *ngIf="!GuestMode()">
   <ng-container *ngTemplateOutlet="inventoryTab"></ng-container>
-  <ng-container *ngTemplateOutlet="inventoryViewSetting"></ng-container>
-  <div *ngIf="getGameObjects(selectTab).length < 1"><small><b>{{getTabTitle(selectTab)}}</b>倉庫是空的</small></div>
+  <section class="card settings-card">
+    <ng-container *ngTemplateOutlet="inventoryViewSetting"></ng-container>
+  </section>
+  <p class="empty-hint" *ngIf="getGameObjects(selectTab).length < 1"><b>{{getTabTitle(selectTab)}}</b>{{ 'inv.emptySuffix' | i18n }}</p>
   <div (contextmenu)="onContextMenu($event, $any(gameObject))" *ngFor="let gameObject of getGameObjects(selectTab); let i = index; trackBy: trackByGameObject" class="object-container"
     (click)="selectGameObject(gameObject, $event)" (dblclick)="focusGameObject($any(gameObject), $event)"
-    [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier), 'muluti-selected': checkSelected(gameObject), 'is-hide-in': $any(gameObject).isHideIn, 'is-inventory-no-indicate': !gameObject.isInventoryIndicate}" [@SlideInOut]="i">
-    <div *ngIf="$any(gameObject).isHideIn && $any(gameObject).ownerName != null" class="owner-tag" [style.background-color]="$any(gameObject).ownerColor">{{$any(gameObject).ownerName ? $any(gameObject).ownerName : '（無名玩家）'}}</div>
+    [attr.draggable]="canDragInventory($any(gameObject)) ? 'true' : null"
+    (pointerdown)="onInventoryDragGestureStart($event, $any(gameObject))"
+    (mousedown)="onInventoryDragGestureStart($event, $any(gameObject))"
+    (dragstart)="onInventoryDragStart($event, $any(gameObject))"
+    (dragend)="onInventoryDragEnd()"
+    [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier), 'muluti-selected': checkSelected(gameObject), 'is-hide-in': $any(gameObject).isHideIn, 'is-inventory-no-indicate': !gameObject.isInventoryIndicate, 'is-draggable': canDragInventory($any(gameObject))}" [@SlideInOut]="i">
+    <div *ngIf="$any(gameObject).isHideIn && $any(gameObject).ownerName != null" class="owner-tag" [style.background-color]="$any(gameObject).ownerColor">{{$any(gameObject).ownerName ? $any(gameObject).ownerName : ('char.unnamedPlayer' | i18n)}}</div>
+    <div *ngIf="$any(gameObject).playerOwner" class="player-owner-tag" [style.background-color]="$any(gameObject).playerOwnerColor"
+      [title]="('char.selectAsMine' | i18n:{ name: $any(gameObject).playerOwnerName })">
+      {{ $any(gameObject).playerOwnerName }}
+    </div>
     <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject}"></ng-container>
   </div>
-  <div *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
-    <button class="danger" (click)="cleanInventory()" [attr.disabled]="getGameObjects(selectTab).length < 1 ? '' : null">清空回收區</button>
+  <div class="actions" *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
+    <button type="button" class="btn btn-danger" (click)="cleanInventory()" [disabled]="getGameObjects(selectTab).length < 1">{{ 'inv.emptyGraveyard' | i18n }}</button>
   </div>
   <datalist id="{{panelId}}_suggest">
-    <option *ngFor="let word of suggestWords()" value="{{word}}">{{word}}</option>
+    <option *ngFor="let word of suggestWords()" [value]="word">{{word}}</option>
   </datalist>
 </div>
 <ng-template #inventoryTab>
-  <form class="is-sticky-top">
-    <div class="tab">
-      <label *ngFor="let inventoryType of inventoryTypes">
-        <input name="tab" type="radio" value="{{inventoryType}}" ng-control="options" [(ngModel)]="selectTab">
-        <div>{{getTabTitle(inventoryType)}} ({{ getGameObjects(inventoryType).length }})</div>
+  <form class="is-sticky-top card tab-card">
+    <div class="inv-tabs">
+      <label *ngFor="let inventoryType of inventoryTypes" class="inv-tab" [class.is-active]="selectTab === inventoryType"
+        (dragover)="onInventoryTabDragOver($event, inventoryType)"
+        (dragleave)="onInventoryTabDragLeave($event, inventoryType)"
+        (drop)="onInventoryTabDrop($event, inventoryType)"
+        [class.is-drop-target]="dropTargetTab === inventoryType">
+        <input name="tab" type="radio" [value]="inventoryType" ng-control="options" [(ngModel)]="selectTab">
+        <span>{{getTabTitle(inventoryType)}} ({{ getGameObjects(inventoryType).length }})</span>
       </label>
     </div>
   </form>
 </ng-template>
 <ng-template #inventoryViewSetting>
   <ng-container *ngIf="isEdit">
-    <div>
-      <div style="font-size: 12px;"><b>排序: </b></div>
-      <input [(ngModel)]="sortTag" placeholder="標籤名" class="order-control" attr.list="{{panelId}}_suggest" />
-      <select [(ngModel)]="sortOrder" class="order-control">
-        <option value="ASC">由小到大</option>
-        <option value="DESC">由大到小</option>
-      </select>
+    <header class="card-head"><h3>{{ 'inv.settings' | i18n }}</h3></header>
+    <div class="field-row wrap">
+      <label class="field grow">
+        <span>{{ 'inv.sort' | i18n }}</span>
+        <input [(ngModel)]="sortTag" [placeholder]="'inv.tagName' | i18n" class="order-control" attr.list="{{panelId}}_suggest" />
+      </label>
+      <label class="field">
+        <span>&nbsp;</span>
+        <select [(ngModel)]="sortOrder" class="order-control">
+          <option value="ASC">{{ 'inv.sortAsc' | i18n }}</option>
+          <option value="DESC">{{ 'inv.sortDesc' | i18n }}</option>
+        </select>
+      </label>
     </div>
-    <div style="font-size: 12px; padding-top: 6px;"><b>顯示項目: </b></div>
-    <input style="width: 100%; box-sizing: border-box;" [(ngModel)]="dataTag" placeholder="以空格分隔標籤名，斜線換行 例：「HP MP / 筆記」" />
-    <div style="padding-top: 6px;">
-      <button class="tab-setting small-font" (click)="toggleEdit()"><i class="material-icons small-font">settings</i>完成</button>
+    <div class="field-row">
+      <label class="field grow">
+        <span>{{ 'inv.displayItems' | i18n }}</span>
+        <input [(ngModel)]="dataTag" [placeholder]="'inv.displayItemsPlaceholder' | i18n" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-sm btn-primary" (click)="toggleEdit()"><i class="material-icons">settings</i>{{ 'inv.done' | i18n }}</button>
     </div>
   </ng-container>
   <ng-container *ngIf="!isEdit">
-    <table style="font-size: 0.8em;">
-      <tr>
-        <th style="vertical-align:middle" nowrap>排序:</th>
-        <td style="vertical-align:middle" nowrap>
-          <ng-container *ngIf="0 < sortTag.length"><span>{{sortTag}} ({{sortOrderName}})</span></ng-container>
-          <ng-container *ngIf="sortTag.length < 1">-</ng-container>
-        </td>
-        <td style="vertical-align:middle" width="100%" nowrap>
-          <button class="tab-setting small-font" (click)="toggleEdit()"><i class="material-icons small-font">settings</i>設定</button>
-          <label *ngIf="selectTab === 'table'" style="float: right; font-size: smaller"><input type="checkbox" [(ngModel)]="indicateAll" /><b>全部顯示<sup class="self_only">*</sup></b></label>
-          <span style="float: right; margin: 2px"><small><kbd style="border-radius: 3px; border: 1px outset #ccc; padding: 1px; background-color: #eee">Ctrl</kbd>+點擊可複選</small></span>
-        </td>
-      </tr>
-    </table>
+    <div class="view-summary">
+      <span class="summary-label">{{ 'inv.sort' | i18n }}</span>
+      <span class="summary-value">
+        <ng-container *ngIf="0 < sortTag.length">{{sortTag}} ({{sortOrderName}})</ng-container>
+        <ng-container *ngIf="sortTag.length < 1">-</ng-container>
+      </span>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm" (click)="toggleEdit()"><i class="material-icons">settings</i>{{ 'inv.settings' | i18n }}</button>
+        <label *ngIf="selectTab === 'table'" class="check-inline">
+          <input type="checkbox" [(ngModel)]="indicateAll" />
+          {{ 'inv.showAll' | i18n }}<sup class="self_only">*</sup>
+        </label>
+        <span class="multi-hint"><kbd>{{ 'common.keyCtrl' | i18n }}</kbd>{{ 'inv.multiSelectHint' | i18n }}</span>
+      </span>
+    </div>
   </ng-container>
 </ng-template>
 <ng-template #gameObjectTags let-gameObject="gameObject">
   <div class="inventory-object">
     <div class="object-name">
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 1px 0px; width: 24px; height: 16px; margin-bottom: 1px" title="總覽顯示大頭貼" [ngClass]="{'is-active': gameObject.isUseIconToOverviewImage}" (click)="gameObject.isUseIconToOverviewImage = !gameObject.isUseIconToOverviewImage">
-        <i *ngIf="gameObject.faceIcon && 0 < gameObject.faceIcon?.url.length; else altImage" class="face-icon"><img [src]="gameObject.faceIcon.url | safe: 'resourceUrl'" alt=""></i>
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier || !hasOverviewFaceIcon(gameObject)"
+        style="font-size: 0.8em; padding: 1px 0px; width: 24px; height: 16px; margin-bottom: 1px"
+        [title]="overviewFaceIconTitle(gameObject)"
+        [ngClass]="{'is-active': gameObject.isUseIconToOverviewImage && hasOverviewFaceIcon(gameObject)}"
+        (click)="toggleOverviewFaceIcon(gameObject)">
+        <i *ngIf="hasOverviewFaceIcon(gameObject); else altImage" class="face-icon"><img [src]="gameObject.faceIcon.url | safe: 'resourceUrl'" alt=""></i>
         <ng-template #altImage>
           <i class="material-icons" style="font-size: 1em;">emoji_emotions</i>
         </ng-template>
       </button>
       <span class="game-object-name" style="margin-left: 3px; margin-right: 3px">{{gameObject.name}}</span>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 2px" title="顯示💭" [ngClass]="{'is-active': gameObject.isShowChatBubble}" (click)="gameObject.isShowChatBubble = !gameObject.isShowChatBubble">
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 2px" [title]="('inv.showChatBubble' | i18n) + ' — ' + ('inv.showChatBubbleTip' | i18n)" [ngClass]="{'is-active': gameObject.isShowChatBubble}" (click)="gameObject.isShowChatBubble = !gameObject.isShowChatBubble">
         <i class="material-icons" style="font-size: 1em;">{{ gameObject.isShowChatBubble ? 'textsms' : 'speaker_notes_off'}}</i>
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px; width: 22px; height: 18px; margin: 0px 2px 1px 0px" title="顯示陰影" [ngClass]="{'is-active': gameObject.isDropShadow}" (click)="gameObject.isDropShadow = !gameObject.isDropShadow">
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px; width: 22px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.shadowOn' | i18n" [ngClass]="{'is-active': gameObject.isDropShadow}" (click)="gameObject.isDropShadow = !gameObject.isDropShadow">
         <i *ngIf="gameObject.shadowImageFile && 0 < gameObject.shadowImageFile.url.length; else altShadow" class="face-icon"><img style="filter: brightness(0);" [ngStyle]="{'opacity': gameObject.isDropShadow ? 0.7 : 0.3}" [src]="gameObject.shadowImageFile.url | safe: 'resourceUrl'" alt=""></i>
         <ng-template #altShadow>
           <i class="material-icons" style="font-size: 1em;">{{ gameObject.isDropShadow ? 'star_half' : 'star_border'}}</i>
         </ng-template>      
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" title="可疊在其他角色上" [ngClass]="{'is-active': !gameObject.isNotRide}" (click)="gameObject.isNotRide = !gameObject.isNotRide">
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.stackOn' | i18n" [ngClass]="{'is-active': !gameObject.isNotRide}" (click)="gameObject.isNotRide = !gameObject.isNotRide">
         <i class="material-icons" style="font-size: 1em;">{{ !gameObject.isNotRide ? 'directions_bike' : 'directions_run'}}</i>
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" title="顯示高度" [ngClass]="{'is-active': gameObject.isAltitudeIndicate}" (click)="gameObject.isAltitudeIndicate = !gameObject.isAltitudeIndicate">
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.altitudeOn' | i18n" [ngClass]="{'is-active': gameObject.isAltitudeIndicate}" (click)="gameObject.isAltitudeIndicate = !gameObject.isAltitudeIndicate">
         <i class="material-icons rotate" style="font-size: 1em;">straighten</i><span style="display: inline-block; text-align: center; font-size: xx-small; color: gray; min-width: 2em;">{{ gameObject.altitude }}</span>
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 1px 1px 0px" title="在桌面倉庫中顯示" [ngClass]="{'is-active': gameObject.isInventoryIndicate}" (click)="gameObject.isInventoryIndicate = !gameObject.isInventoryIndicate">
-        <i class="material-icons" style="font-size: 1em;">all_inbox</i>
+      <button class="indicate inventory-indicate-btn" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.75em; padding: 1px 5px; height: 18px; margin: 0px 1px 1px 0px; white-space: nowrap"
+        [title]="gameObject.isInventoryIndicate ? ('char.inventoryHide' | i18n) : ('char.inventoryShow' | i18n)"
+        [ngClass]="{'is-active': gameObject.isInventoryIndicate}"
+        (click)="gameObject.isInventoryIndicate = !gameObject.isInventoryIndicate">
+        {{ gameObject.isInventoryIndicate ? ('char.inventoryHide' | i18n) : ('char.inventoryShow' | i18n) }}
       </button>
-      <button *ngIf="selectedIdentifier === gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px;" title="選單" (click)="onContextMenu($event, gameObject)">
+      <button *ngIf="selectedIdentifier === gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px;" [title]="'inv.menu' | i18n" (click)="onContextMenu($event, gameObject)">
         <i class="material-icons" style="font-size: 1em; pointer-events: none">settings</i>
       </button>
     </div>
     <div class="object-tags-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
       <div class="table-cell image-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
         <span *ngIf="!gameObject.isAllowsChat" style="margin-top:-2px; margin-left: -2px; position: absolute; pointer-events: none; font-size: 16px; filter: grayscale(100%); opacity: 0.8">🤐</span>
-        <span class="aura" [ngClass]="{black: gameObject.aura == 0, blue: gameObject.aura == 1, green: gameObject.aura == 2, cyan: gameObject.aura == 3, red: gameObject.aura == 4, magenta: gameObject.aura == 5, yellow: gameObject.aura == 6, white: gameObject.aura == 7}">
-          <img *ngIf="gameObject.imageFile.url" class="inverser" [src]="gameObject.imageFile.url | safe: 'resourceUrl'" [ngClass]="{inverse: gameObject.isInverse, hollow: gameObject.isHollow, 'is-hide-in': gameObject.isHideIn, 'black-paint': gameObject.isBlackPaint}" draggable="false" />
+        <span class="aura matrix-rain-host" [ngClass]="{black: gameObject.aura == 0, blue: gameObject.aura == 1, green: gameObject.aura == 2, cyan: gameObject.aura == 3, red: gameObject.aura == 4, magenta: gameObject.aura == 5, yellow: gameObject.aura == 6, white: gameObject.aura == 7}">
+          <img *ngIf="gameObject.imageFile.url" class="inverser" [src]="gameObject.imageFile.url | safe: 'resourceUrl'"
+            [style.filter]="invImageFilter(gameObject)"
+            [style.opacity]="invImageOpacity(gameObject)"
+            [style.transform]="invImageTransform(gameObject)"
+            [ngClass]="{'is-hide-in': gameObject.isHideIn}"
+            draggable="false" />
+          <div *ngIf="gameObject.isMatrix" class="matrix-rain" aria-hidden="true">
+            <span *ngFor="let col of invMatrixRainColumns(gameObject); trackBy: trackByMatrixCol"
+              class="matrix-rain-col"
+              [class.up]="col.up"
+              [style.animation-duration]="col.duration"
+              [style.animation-delay]="col.delay"
+              [style.font-size]="col.fontSize"
+              [style.opacity]="col.opacity">{{ col.text }}</span>
+          </div>
         </span>
       </div>
       <div class="table-cell">
@@ -125,7 +172,7 @@
       <ng-container *ngSwitchCase="'numberResource'">
         <div class="resource-tag">
           <div style="font-size: 0.8em; display: inline-block; margin-right: 0.5em;"><span>{{dataElm.name}}</span></div>
-          <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" class="input resource-value" type="number" size="1" [(ngModel)]="dataElm.currentValue" placeholder="Value" attr.data-init-value="{{ dataElm.currentValue }}" />
+          <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" class="input resource-value" type="number" size="1" [(ngModel)]="dataElm.currentValue" [placeholder]="'inv.resourcePlaceholder' | i18n" attr.data-init-value="{{ dataElm.currentValue }}" />
         </div>
         <div class="resource-tag">
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" type="range" title="{{dataElm.currentValue}}" [style]="'font-size: 0.8em; min-width: 1em; width:' + (dataElm.name.length + 4.5) + 'em; --min: 0; --max: ' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
@@ -155,7 +202,7 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'url'">
-        <div class="tag-name"><span *ngIf="!stringUtil.validUrl(dataElm.value)" title="網址無效">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
+        <div class="tag-name"><span *ngIf="!stringUtil.validUrl(dataElm.value)" [title]="'char.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
           (click)="stringUtil.validUrl(dataElm.value) ? openUrl(dataElm.value, name, dataElm.name) : false"><span class="url-link">{{dataElm.name}}</span></a></div>
       </ng-container>
       <ng-container *ngSwitchCase="'colors'"></ng-container>

@@ -12,13 +12,14 @@ import { ContextMenuAction, ContextMenuService } from 'service/context-menu.serv
 
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
+import { I18nService } from 'service/i18n.service';
 
 import * as localForage from 'localforage';
 
 @Component({
     selector: 'app-jukebox',
     templateUrl: './jukebox.component.html',
-    styleUrls: ['./jukebox.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './jukebox.component.css'],
     standalone: false
 })
 export class JukeboxComponent implements OnInit, OnDestroy {
@@ -134,7 +135,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private ngZone: NgZone,
-    private contextMenuService: ContextMenuService
+    private contextMenuService: ContextMenuService,
+    private i18n: I18nService
   ) {
     this.soundTestPlayer.volumeType = VolumeType.SOUND_EFFECT;
     this.noticeTestPlayer.volumeType = VolumeType.NOTICE;
@@ -146,12 +148,13 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => this.modalService.title = this.panelService.title = '音樂播放器');
+    Promise.resolve().then(() => this.refreshPanelTitle());
     this.auditionPlayer.volumeType = VolumeType.AUDITION;
     EventSystem.register(this)
       .on('*', event => {
         if (event.eventName.startsWith('FILE_')) this.lazyNgZoneUpdate();
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
@@ -198,33 +201,34 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = { x: window.pageXOffset + clientRect.left + button.clientWidth, y: window.pageYOffset + clientRect.top };
+    const t = (key: string) => this.i18n.t(key);
     const menu: ContextMenuAction[] = [
-      { name: '角色／地形', subActions: [
-        { name: '角色開始移動', action: () => { this.playSETest(PresetSound.piecePick); }},
-        { name: '放置角色', action: () => { this.playSETest(PresetSound.piecePut); }},
-        { name: '地形開始／結束移動', action: () => { this.playSETest(PresetSound.blockPick); }},
+      { name: t('jukebox.se.characterTerrain'), subActions: [
+        { name: t('jukebox.se.charMoveStart'), action: () => { this.playSETest(PresetSound.piecePick); }},
+        { name: t('jukebox.se.charPut'), action: () => { this.playSETest(PresetSound.piecePut); }},
+        { name: t('jukebox.se.terrainMove'), action: () => { this.playSETest(PresetSound.blockPick); }},
       ]},
-      { name: '骰子／硬幣', subActions: [
-        { name: '拿起骰子符號', action: () => { this.playSETest(PresetSound.dicePick); }},
-        { name: '放置骰子符號', action: () => { this.playSETest(PresetSound.dicePut); }},
-        { name: '擲骰１', action: () => { this.playSETest(PresetSound.diceRoll1); }},
-        { name: '擲骰２', action: () => { this.playSETest(PresetSound.diceRoll2); }},
-        { name: '擲硬幣', action: () => { this.playSETest(PresetSound.coinToss); }},
+      { name: t('jukebox.se.diceCoin'), subActions: [
+        { name: t('jukebox.se.dicePick'), action: () => { this.playSETest(PresetSound.dicePick); }},
+        { name: t('jukebox.se.dicePut'), action: () => { this.playSETest(PresetSound.dicePut); }},
+        { name: t('jukebox.se.diceRoll1'), action: () => { this.playSETest(PresetSound.diceRoll1); }},
+        { name: t('jukebox.se.diceRoll2'), action: () => { this.playSETest(PresetSound.diceRoll2); }},
+        { name: t('jukebox.se.coinToss'), action: () => { this.playSETest(PresetSound.coinToss); }},
       ]},
-      { name: '卡牌／牌堆', subActions: [
-        { name: '抽牌／翻面', action: () => { this.playSETest(PresetSound.cardDraw); }},
-        { name: '拿起卡牌／牌堆', action: () => { this.playSETest(PresetSound.cardPick); }},
-        { name: '放置卡牌／牌堆', action: () => { this.playSETest(PresetSound.cardPut); }},
-        { name: '洗牌', action: () => { this.playSETest(PresetSound.cardShuffle); }},
+      { name: t('jukebox.se.cardStack'), subActions: [
+        { name: t('jukebox.se.cardDraw'), action: () => { this.playSETest(PresetSound.cardDraw); }},
+        { name: t('jukebox.se.cardPick'), action: () => { this.playSETest(PresetSound.cardPick); }},
+        { name: t('jukebox.se.cardPut'), action: () => { this.playSETest(PresetSound.cardPut); }},
+        { name: t('jukebox.se.shuffle'), action: () => { this.playSETest(PresetSound.cardShuffle); }},
       ]},
-      { name: '其他', subActions: [
-        { name: '固定／鎖定／解除', action: () => { this.playSETest(PresetSound.lock); }},
-        { name: '落下／移除／刪除', action: () => { this.playSETest(PresetSound.sweep); }},
-        { name: '選擇物件', action: () => { this.playSETest(PresetSound.selectionStart); }},
-        { name: '變身！', action: () => { this.playSETest(PresetSound.surprise); }}
+      { name: t('jukebox.se.other'), subActions: [
+        { name: t('jukebox.se.lock'), action: () => { this.playSETest(PresetSound.lock); }},
+        { name: t('jukebox.se.sweep'), action: () => { this.playSETest(PresetSound.sweep); }},
+        { name: t('jukebox.se.select'), action: () => { this.playSETest(PresetSound.selectionStart); }},
+        { name: t('jukebox.se.surprise'), action: () => { this.playSETest(PresetSound.surprise); }}
       ]}
     ];
-    this.contextMenuService.open(position, menu, 'SE測試');
+    this.contextMenuService.open(position, menu, t('jukebox.seTestTitle'));
   }
 
   private playSETest(audioIdentifier) {
@@ -246,5 +250,9 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       this.lazyUpdateTimer = null;
       this.ngZone.run(() => { });
     }, 100);
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('jukebox.title');
   }
 }

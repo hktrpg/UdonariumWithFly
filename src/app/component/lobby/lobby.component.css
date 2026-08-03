@@ -1,23 +1,8 @@
-:host {
-  display: block;
-}
+/* Lobby-specific; shared UI lives in ../shared/settings-ui.css */
 
-.box {
-  border-bottom: 1px dotted #888;
-}
-
-.image {
-  padding: 0px;
-  width: 64px;
-  height: 64px;
-  display: inline-block;
-  vertical-align: top;
-}
-
-.contain {
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-size: contain;
+.room-table-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
 }
 
 .room-list {
@@ -28,11 +13,19 @@
   width: 100%;
   max-width: 100%;
   white-space: nowrap;
+  color: #3a2f24;
 }
 
-.room-list>tr>* {
-  padding: 1px 1em;
+.room-list > tr > * {
+  padding: 6px 8px;
   text-align: center;
+  border-bottom: 1px solid #e2d3bf;
+}
+
+.room-list th {
+  font-weight: 700;
+  color: #5c4630;
+  background: #f7efe3;
 }
 
 .room-id {
@@ -45,6 +38,7 @@
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: normal;
+  text-align: left !important;
 }
 
 .room-name-text {
@@ -52,6 +46,14 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
+}
+
+.room-actions {
+  white-space: nowrap;
+}
+
+.room-actions .btn + .btn {
+  margin-left: 4px;
 }
 
 .is-small-font {
@@ -62,7 +64,8 @@
   width: 0;
 }
 
-.material-icons {
-  font-size: 18px;
-  vertical-align: bottom;
+.lock-icon {
+  font-size: 0.9rem;
+  vertical-align: middle;
+  color: #5c4630;
 }

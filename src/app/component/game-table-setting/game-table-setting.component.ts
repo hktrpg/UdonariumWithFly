@@ -4,7 +4,7 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { FilterType, GameTable, GridType } from '@udonarium/game-table';
+import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -12,6 +12,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ImageService } from 'service/image.service';
+import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
@@ -19,7 +20,7 @@ import { SaveDataService } from 'service/save-data.service';
 @Component({
     selector: 'game-table-setting',
     templateUrl: './game-table-setting.component.html',
-    styleUrls: ['./game-table-setting.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './game-table-setting.component.css'],
     standalone: false
 })
 export class GameTableSettingComponent implements OnInit, OnDestroy {
@@ -75,6 +76,40 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   get tableDistanceviewFilter(): FilterType { return this.selectedTable.backgroundFilterType; }
   set tableDistanceviewFilter(filterType: FilterType) { if (this.isEditable) this.selectedTable.backgroundFilterType = filterType; }
 
+  get tableDarkness(): number { return this.selectedTable?.darkness ?? 0; }
+  set tableDarkness(v: number) { if (this.isEditable) this.selectedTable.darkness = Number(v); }
+  get tableGlobalIllumination(): number { return this.selectedTable?.globalIllumination ?? 1; }
+  set tableGlobalIllumination(v: number) { if (this.isEditable) this.selectedTable.globalIllumination = Number(v); }
+  get tableWeatherType(): WeatherType { return this.selectedTable?.weatherType || 'none'; }
+  set tableWeatherType(v: WeatherType) { if (this.isEditable) this.selectedTable.weatherType = v; }
+  get tableWeatherIntensity(): number { return this.selectedTable?.weatherIntensity ?? 0.5; }
+  set tableWeatherIntensity(v: number) { if (this.isEditable) this.selectedTable.weatherIntensity = Number(v); }
+  get tableVisionEnabled(): boolean { return !!this.selectedTable?.visionEnabled; }
+  set tableVisionEnabled(v: boolean) { if (this.isEditable) this.selectedTable.visionEnabled = !!v; }
+
+  transitionDay() {
+    if (!this.isEditable) return;
+    this.animateDarkness(0);
+  }
+  transitionNight() {
+    if (!this.isEditable) return;
+    this.animateDarkness(0.85);
+  }
+  private animateDarkness(target: number) {
+    const table = this.selectedTable;
+    if (!table) return;
+    table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
+    const start = table.darkness;
+    const t0 = performance.now();
+    const dur = 800;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur);
+      table.darkness = start + (target - start) * p;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   get tableSelecter(): TableSelecter { return TableSelecter.instance; }
 
   selectedTable: GameTable = null;
@@ -98,7 +133,8 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private saveDataService: SaveDataService,
     private imageService: ImageService,
     private panelService: PanelService,
-    private chatMessageService: ChatMessageService
+    private chatMessageService: ChatMessageService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
@@ -107,7 +143,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => { this.modalService.title = this.panelService.title = '地圖設定' });
+    Promise.resolve().then(() => this.refreshPanelTitle());
     this.selectedTable = this.tableSelecter.viewTable;
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 2000, event => {
@@ -116,11 +152,16 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
         if (object !== null) {
           this.selectedTableXml = object.toXml();
         }
-      });
+      })
+      .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  private refreshPanelTitle() {
+    this.modalService.title = this.panelService.title = this.i18n.t('table.title');
   }
 
   selectGameTable(identifier: string) {
@@ -137,10 +178,14 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   createGameTable() {
     if (this.GuestMode()) return;
     let gameTable = new GameTable();
-    gameTable.name = '空白地圖';
+    gameTable.name = this.i18n.t('table.defaultName');
     gameTable.imageIdentifier = 'testTableBackgroundImage_image';
     gameTable.initialize();
     this.selectGameTable(gameTable.identifier);
+  }
+
+  confirm() {
+    this.panelService.close();
   }
 
   async save() {
@@ -221,13 +266,13 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     } else {
       $event.preventDefault();
       this.modalService.open(ConfirmationComponent, {
-        title: '顯示隱藏設定的圖片', 
-        text: '要顯示設為隱藏的圖片嗎？',
-        help: '請注意劇透等內容。',
+        title: this.i18n.t('table.confirmShowHidden.title'),
+        text: this.i18n.t('table.confirmShowHidden.text'),
+        help: this.i18n.t('table.confirmShowHidden.help'),
         type: ConfirmationType.OK_CANCEL,
         materialIcon: 'visibility',
         action: () => {
-          this.chatMessageService.sendOperationLog('從地圖設定顯示了隱藏設定的圖片');
+          this.chatMessageService.sendOperationLog(this.i18n.t('table.operationShowHidden'));
           this.isShowHideImages = true;
           (<HTMLInputElement>$event.target).checked = true;
           this.changeDetector.markForCheck();

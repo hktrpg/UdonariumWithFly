@@ -18,17 +18,21 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
-import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuService, ContextMenuSeparator, contextMenuToggleCheck } from 'service/context-menu.service';
 import { GameObjectInventoryService } from 'service/game-object-inventory.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
+import { I18nService } from 'service/i18n.service';
+import { hasStatus } from '@udonarium/table-fx/character-status';
+import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 
 @Component({
     selector: 'game-object-inventory',
     templateUrl: './game-object-inventory.component.html',
-    styleUrls: ['./game-object-inventory.component.css'],
+    styleUrls: ['../shared/settings-ui.css', '../shared/image-effects.css', './game-object-inventory.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('SlideInOut', [
@@ -72,6 +76,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     this.selectionService.clear();
   };
   selectedIdentifier: string = '';
+  dropTargetTab: string = '';
 
   panelId;
 
@@ -91,7 +96,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   get indicateAll(): boolean { return this.inventoryService.indicateAll; }
   set indicateAll(indicateAll: boolean) { this.inventoryService.indicateAll = indicateAll; }
 
-  get sortOrderName(): string { return this.sortOrder === SortOrder.ASC ? '由小到大' : '由大到小'; }
+  get sortOrderName(): string { return this.sortOrder === SortOrder.ASC ? this.i18n.t('inv.sortAsc') : this.i18n.t('inv.sortDesc'); }
 
   //get newLineStrings(): string { return this.inventoryService.newLineStrings; }
 
@@ -109,7 +114,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    private characterFxMenu: CharacterFxMenuService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
@@ -118,7 +125,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    Promise.resolve().then(() => this.panelService.title = '倉庫');
+    Promise.resolve().then(() => this.refreshPanelTitle());
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', event => {
         if (ObjectStore.instance.get(event.data.identifier) instanceof TabletopObject) {
@@ -132,11 +139,20 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       .on('UPDATE_INVENTORY', event => {
         if (event.isSendFromSelf || event.data) this.changeDetector.markForCheck();
       })
+      .on('UPDATE_GAME_OBJECT', event => {
+        if (ObjectStore.instance.get(event.data.identifier) instanceof GameCharacter) {
+          this.changeDetector.markForCheck();
+        }
+      })
       .on('OPEN_NETWORK', event => {
         this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
         if (!this.inventoryTypes.includes(this.selectTab)) {
           this.selectTab = Network.peerId;
         }
+      })
+      .on('LOCALE_CHANGED', () => {
+        this.refreshPanelTitle();
+        this.changeDetector.markForCheck();
       });
     this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
     this.panelId = UUID.generateUuid();
@@ -151,13 +167,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (this.GuestMode()) return;
     switch (inventoryType) {
       case 'table':
-        return '桌面';
+        return this.i18n.t('inv.tab.table');
       case Network.peerId:
-        return '個人';
+        return this.i18n.t('inv.tab.personal');
       case 'graveyard':
-        return '回收區';
+        return this.i18n.t('inv.tab.graveyard');
       default:
-        return '公用';
+        return this.i18n.t('inv.tab.common');
     }
   }
 
@@ -217,7 +233,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       let subActions: ContextMenuAction[] = [];
       if (this.selectTab != 'table') {
         subActions.push({
-          name: '全部移至桌面', action: () => {
+          name: this.i18n.t('char.moveAllToTable'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
               EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
               let isStealthMode = GameCharacter.isStealthMode;
@@ -225,9 +241,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               this.selectionService.remove(gameCharacter);
               if (gameCharacter.isHideIn && gameCharacter.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
                 this.modalService.open(ConfirmationComponent, {
-                  title: '隱身模式',
-                  text: '已開啟隱身：其他人看不到你的游標位置。',
-                  help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+                  title: this.i18n.t('char.stealthTitle'),
+                  text: this.i18n.t('char.stealthText'),
+                  help: this.i18n.t('char.stealthHelp'),
                   type: ConfirmationType.OK,
                   materialIcon: 'disabled_visible'
                 });
@@ -240,7 +256,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab != 'common') {
         subActions.push({
-          name: '全部移至公用倉庫', action: () => {
+          name: this.i18n.t('char.moveAllToCommon'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation('common');
               this.selectionService.remove(gameCharacter);
@@ -252,7 +268,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab === 'table' || this.selectTab === 'common' || this.selectTab === 'graveyard') {
         subActions.push({
-          name: '全部移至個人倉庫', action: () => {
+          name: this.i18n.t('char.moveAllToPersonal'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation(Network.peerId);
               this.selectionService.remove(gameCharacter);
@@ -264,7 +280,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }
       if (this.selectTab != 'graveyard') {
         subActions.push({
-          name: '全部移至回收區', action: () => {
+          name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
               gameCharacter.setLocation('graveyard');
               this.selectionService.remove(gameCharacter);
@@ -275,27 +291,33 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         });
       }
       actions.push({
-        name: '已選擇的角色',
+        name: this.i18n.t('char.selectedCharacters'),
         action: null,
         subActions: subActions
       });
       actions.push(ContextMenuSeparator);
     }
 
-    if (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) {
-      actions.push({
-        name: '在桌面上尋找',
+    const afterInv = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const hasMultiImage = gameObject.imageFiles.length > 1;
+    const hasFace = this.hasOverviewFaceIcon(gameObject);
+    if (!hasFace && gameObject.isUseIconToOverviewImage) {
+      gameObject.isUseIconToOverviewImage = false;
+    }
+    const inGraveyard = gameObject.location.name === 'graveyard';
+
+    const identity: (ContextMenuAction | null)[] = [
+      (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) ? {
+        name: this.i18n.t('char.findOnTable'),
         action: () => {
           if (gameObject.location.name === 'table') EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
         },
         default: gameObject.location.name === 'table',
         disabled: gameObject.location.name !== 'table',
         selfOnly: true
-      });
-    }
-    if (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) {
-      actions.push({
-        name: '移至桌面',
+      } : null,
+      (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
+        name: this.i18n.t('char.moveToTable'),
         action: () => {
           let isStealthMode = GameCharacter.isStealthMode;
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
@@ -303,9 +325,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           this.selectionService.remove(gameObject);
           if (gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
-              title: '隱身模式',
-              text: '已開啟隱身：其他人看不到你的游標位置。',
-              help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+              title: this.i18n.t('char.stealthTitle'),
+              text: this.i18n.t('char.stealthText'),
+              help: this.i18n.t('char.stealthHelp'),
               type: ConfirmationType.OK,
               materialIcon: 'disabled_visible'
             });
@@ -313,28 +335,23 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
-      });
-    }
-
-    if (gameObject.isHideIn) {
-      actions.push({
-        name: '公開位置',
+      } : null,
+      gameObject.isHideIn ? {
+        name: this.i18n.t('char.revealPosition'),
         action: () => {
           gameObject.owner = '';
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.trigger('UPDATE_INVENTORY', null);
         }
-      });
-    }
-    if (!gameObject.isHideIn || !gameObject.isVisible) {
-      actions.push({
-        name: '僅自己可見（隱身）',
+      } : null,
+      (!gameObject.isHideIn || !gameObject.isVisible) ? {
+        name: this.i18n.t('char.selfOnlyStealth'),
         action: () => {
           if (gameObject.location.name === 'table' && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
-              title: '隱身模式',
-              text: '已開啟隱身：其他人看不到你的游標位置。',
-              help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+              title: this.i18n.t('char.stealthTitle'),
+              text: this.i18n.t('char.stealthText'),
+              help: this.i18n.t('char.stealthHelp'),
               type: ConfirmationType.OK,
               materialIcon: 'disabled_visible'
             });
@@ -343,246 +360,146 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.sweep);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
-      });
-    }
-    actions.push(ContextMenuSeparator);
-    if (gameObject.imageFiles.length > 1) {
-      actions.push({
-        name: '圖片切換',
+      } : null,
+      this.characterFxMenu.makeMyTokenMenu(gameObject),
+      this.characterFxMenu.makeCombatMenu(gameObject),
+    ];
+
+    const appearance: (ContextMenuAction | null)[] = [
+      hasMultiImage ? {
+        name: this.i18n.t('char.imageSwitch'),
         action: null,
-        subActions: gameObject.imageFiles.map((image, i) => {
+        subActions: gameObject.imageFiles.map((image, i) => ({
+          name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+          action: () => {
+            gameObject.currntImageIndex = i;
+            if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
+            EventSystem.trigger('UPDATE_INVENTORY', null);
+          },
+          default: gameObject.currntImageIndex == i,
+          icon: image,
+          checkBox: 'radio' as const
+        })),
+      } : null,
+      contextMenuToggleCheck({
+        get: () => hasFace && gameObject.isUseIconToOverviewImage,
+        set: (v) => {
+          if (!this.hasOverviewFaceIcon(gameObject)) return;
+          gameObject.isUseIconToOverviewImage = v;
+        },
+        on: this.i18n.t('char.overviewFaceOn'),
+        off: this.i18n.t('char.overviewFaceOff'),
+        after: afterInv,
+        disabled: !hasFace,
+        error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isDropShadow,
+        set: (v) => { gameObject.isDropShadow = v; },
+        on: this.i18n.t('char.shadowOn'),
+        off: this.i18n.t('char.shadowOff'),
+        after: afterInv,
+      }),
+      this.characterFxMenu.makeImageEffectMenu(gameObject),
+    ];
+
+    const fx: ContextMenuAction[] = [
+      this.characterFxMenu.makeAuraMenu(gameObject),
+      this.characterFxMenu.makeRingMenu(gameObject),
+      this.characterFxMenu.makeStatusMenu(gameObject),
+    ];
+
+    const pose: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => !gameObject.isNotRide,
+        set: (v) => { gameObject.isNotRide = !v; },
+        on: this.i18n.t('char.stackOn'),
+        off: this.i18n.t('char.stackOff'),
+        after: afterInv,
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isAltitudeIndicate,
+        set: (v) => { gameObject.isAltitudeIndicate = v; },
+        on: this.i18n.t('char.altitudeOn'),
+        off: this.i18n.t('char.altitudeOff'),
+        after: afterInv,
+      }),
+      {
+        name: this.i18n.t('char.resetAltitude'),
+        action: () => {
+          if (gameObject.altitude != 0) {
+            gameObject.altitude = 0;
+            if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
+          }
+        },
+        altitudeHande: gameObject
+      },
+    ];
+
+    const chatPanels: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => gameObject.isShowChatBubble,
+        set: (v) => { gameObject.isShowChatBubble = v; },
+        on: this.i18n.t('char.chatBubbleOn'),
+        off: this.i18n.t('char.chatBubbleOff'),
+        tip: this.i18n.t('char.chatBubbleTip'),
+        after: afterInv,
+      }),
+      contextMenuToggleCheck({
+        get: () => gameObject.isAllowsChat,
+        set: (v) => { gameObject.isAllowsChat = v; },
+        on: this.i18n.t('char.chatOn'),
+        off: this.i18n.t('char.chatOff'),
+        after: afterInv,
+        disabled: inGraveyard,
+      }),
+      { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(gameObject); } },
+      { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+      { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+      {
+        name: this.i18n.t('char.openReferenceUrl'),
+        action: null,
+        subActions: gameObject.getUrls().map((urlElement) => {
+          const url = urlElement.value.toString();
           return {
-            name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+            name: urlElement.name ? urlElement.name : url,
             action: () => {
-              gameObject.currntImageIndex = i;
-              if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
-              EventSystem.trigger('UPDATE_INVENTORY', null);
+              if (StringUtil.sameOrigin(url)) {
+                window.open(url.trim(), '_blank', 'noopener');
+              } else {
+                this.modalService.open(OpenUrlComponent, { url: url, title: gameObject.name, subTitle: urlElement.name });
+              }
             },
-            default: gameObject.currntImageIndex == i,
-            icon: image,
-            checkBox: 'radio'
+            disabled: !StringUtil.validUrl(url),
+            error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
+            isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
-      });
-      actions.push(ContextMenuSeparator);
-    }
-    actions.push((gameObject.isUseIconToOverviewImage
-      ? {
-        name: '☑ 總覽顯示大頭貼', action: () => {
-          gameObject.isUseIconToOverviewImage = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 總覽顯示大頭貼', action: () => {
-          gameObject.isUseIconToOverviewImage = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      }));
-    actions.push((gameObject.isShowChatBubble
-      ? {
-        name: '☑ 顯示💭', action: () => {
-          gameObject.isShowChatBubble = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 顯示💭', action: () => {
-          gameObject.isShowChatBubble = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      }));
-    actions.push(
-      (gameObject.isDropShadow
-      ? {
-        name: '☑ 顯示陰影', action: () => {
-          gameObject.isDropShadow = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 顯示陰影', action: () => {
-          gameObject.isDropShadow = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      })
-    );
-    actions.push({ name: '圖片效果', action: null,
-      subActions: [
-      (gameObject.isInverse
-        ? {
-          name: '☑ 反轉', action: () => {
-            gameObject.isInverse = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 反轉', action: () => {
-            gameObject.isInverse = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (gameObject.isHollow
-        ? {
-          name: '☑ 模糊', action: () => {
-            gameObject.isHollow = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 模糊', action: () => {
-            gameObject.isHollow = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (gameObject.isBlackPaint
-        ? {
-          name: '☑ 設為黑色剪影', action: () => {
-            gameObject.isBlackPaint = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 設為黑色剪影', action: () => {
-            gameObject.isBlackPaint = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-        { name: '光環', action: null, subActions: [ { name: `${gameObject.aura == -1 ? '◉' : '○'} 無`, action: () => { gameObject.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {
-          return { name: `${gameObject.aura == i ? '◉' : '○'} ${color}`, action: () => { gameObject.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, checkBox: 'radio' };
-        })) },
-        ContextMenuSeparator,
-        {
-          name: '重置', action: () => {
-            gameObject.isInverse = false;
-            gameObject.isHollow = false;
-            gameObject.isBlackPaint = false;
-            gameObject.aura = -1;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          disabled: !gameObject.isInverse && !gameObject.isHollow && !gameObject.isBlackPaint && gameObject.aura == -1
-        }
-      ]
-    });
-    actions.push(ContextMenuSeparator);
-    actions.push((!gameObject.isNotRide
-      ? {
-        name: '☑ 可疊在其他角色上', action: () => {
-          gameObject.isNotRide = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 可疊在其他角色上', action: () => {
-          gameObject.isNotRide = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      }));
-    actions.push(
-      (gameObject.isAltitudeIndicate
-      ? {
-        name: '☑ 顯示高度', action: () => {
-          gameObject.isAltitudeIndicate = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 顯示高度', action: () => {
-          gameObject.isAltitudeIndicate = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      })
-    );
-    actions.push(
-    {
-      name: '將高度設為0', action: () => {
-        if (gameObject.altitude != 0) {
-          gameObject.altitude = 0;
-          if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
-        }
+        disabled: gameObject.getUrls().length <= 0
       },
-      altitudeHande: gameObject
-    });
-    actions.push(ContextMenuSeparator);
-    actions.push({ name: '顯示詳情...', action: () => { this.showDetail(gameObject); } });
-    actions.push(gameObject.isAllowsChat
-      ? {
-        name: '☑ 可進行聊天', action: () => {
-          gameObject.isAllowsChat = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        disabled: gameObject.location.name === 'graveyard',
-        checkBox: 'check'
-      } : {
-        name: '☐ 可進行聊天', action: () => {
-          gameObject.isAllowsChat = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        disabled: gameObject.location.name === 'graveyard',
-        checkBox: 'check'
-      });
-    //if (gameObject.location.name !== 'graveyard') {
-      actions.push({ name: '顯示聊天面板...', action: () => { this.showChatPalette(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
-    //}
-    actions.push({ name: '立繪設定...', action: () => { this.showStandSetting(gameObject) }, disabled: !gameObject.isAllowsChat || gameObject.location.name === 'graveyard' });
-    actions.push(ContextMenuSeparator);
-    actions.push({
-      name: '開啟參考網址', action: null,
-      subActions: gameObject.getUrls().map((urlElement) => {
-        const url = urlElement.value.toString();
-        return {
-          name: urlElement.name ? urlElement.name : url,
-          action: () => {
-            if (StringUtil.sameOrigin(url)) {
-              window.open(url.trim(), '_blank', 'noopener');
-            } else {
-              this.modalService.open(OpenUrlComponent, { url: url, title: gameObject.name, subTitle: urlElement.name });
-            }
-          },
-          disabled: !StringUtil.validUrl(url),
-          error: !StringUtil.validUrl(url) ? '網址無效' : null,
-          isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
-        };
-      }),
-      disabled: gameObject.getUrls().length <= 0
-    });
-    actions.push(ContextMenuSeparator);
-    actions.push(gameObject.isInventoryIndicate
-      ? {
-        name: '☑ 在桌面倉庫中顯示', action: () => {
-          gameObject.isInventoryIndicate = false;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      } : {
-        name: '☐ 在桌面倉庫中顯示', action: () => {
-          gameObject.isInventoryIndicate = true;
-          EventSystem.trigger('UPDATE_INVENTORY', null);
-        },
-        checkBox: 'check'
-      });
-    let locations = [
-      { name: 'table', alias: '桌面' },
-      { name: 'common', alias: '公用倉庫' },
-      { name: Network.peerId, alias: '個人倉庫' },
-      { name: 'graveyard', alias: '回收區' }
     ];
-    actions.push({
-      name: `從${ (locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).alias }移動`,
-      action: null,
-      subActions: locations
-        .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
-        .map((location) => {
-          return {
-            name: `${location.alias}`,
+
+    const locations = [
+      { name: 'table', aliasKey: 'char.table' },
+      { name: 'common', aliasKey: 'char.commonInventory' },
+      { name: Network.peerId, aliasKey: 'char.personalInventory' },
+      { name: 'graveyard', aliasKey: 'char.graveyard' }
+    ];
+    const locationGroup: ContextMenuAction[] = [
+      contextMenuToggleCheck({
+        get: () => gameObject.isInventoryIndicate,
+        set: (v) => { gameObject.isInventoryIndicate = v; },
+        on: this.i18n.t('char.inventoryOn'),
+        off: this.i18n.t('char.inventoryOff'),
+        after: afterInv,
+      }),
+      {
+        name: this.i18n.t('char.moveFrom', { from: this.i18n.t((locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).aliasKey) }),
+        action: null,
+        subActions: locations
+          .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
+          .map((location) => ({
+            name: this.i18n.t(location.aliasKey),
             action: () => {
               let isStealthMode = GameCharacter.isStealthMode;
               EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
@@ -590,9 +507,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               this.selectionService.remove(gameObject);
               if (location.name === 'table' && gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
                 this.modalService.open(ConfirmationComponent, {
-                  title: '隱身模式',
-                  text: '已開啟隱身：其他人看不到你的游標位置。',
-                  help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
+                  title: this.i18n.t('char.stealthTitle'),
+                  text: this.i18n.t('char.stealthText'),
+                  help: this.i18n.t('char.stealthHelp'),
                   type: ConfirmationType.OK,
                   materialIcon: 'disabled_visible'
                 });
@@ -604,72 +521,83 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
               }
               EventSystem.call('UPDATE_INVENTORY', true);
             }
-          }
-        }),
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    /*
-    for (let location of locations) {
-      if (gameObject.location.name === location.name) continue;
-      actions.push({
-        name: location.alias, action: () => {
-          gameObject.setLocation(location.name);
+          })),
+        disabled: !gameObject.isVisible && !this.isGMMode
+      },
+    ];
+
+    const cloneDelete: ContextMenuAction[] = [
+      {
+        name: this.i18n.t('char.clone'),
+        action: () => {
+          this.cloneGameObject(gameObject);
           SoundEffect.play(PresetSound.piecePut);
-        }
-      });
-    }
-    */
-    actions.push(ContextMenuSeparator);
-    actions.push({
-      name: '建立副本', action: () => {
-        this.cloneGameObject(gameObject);
-        SoundEffect.play(PresetSound.piecePut);
+        },
+        disabled: !gameObject.isVisible && !this.isGMMode
       },
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    actions.push({
-      name: '建立副本（自動編號）', action: () => {
-        const cloneObject = gameObject.clone();
-        const tmp = cloneObject.name.split('_');
-        let baseName;
-        if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-          baseName = tmp.slice(0, tmp.length - 1).join('_');
-        } else {
-          baseName = tmp.join('_');
-        }
-        let maxIndex = 0;
-        for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-          if(!character.name.startsWith(baseName)) continue;
-          let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-          if (index > maxIndex) maxIndex = index;
-        }
-        cloneObject.name = baseName + '_' + (maxIndex + 1);
-        cloneObject.update();
-        SoundEffect.play(PresetSound.piecePut);
+      {
+        name: this.i18n.t('char.cloneNumbered'),
+        action: () => {
+          const cloneObject = gameObject.clone();
+          const tmp = cloneObject.name.split('_');
+          let baseName;
+          if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
+            baseName = tmp.slice(0, tmp.length - 1).join('_');
+          } else {
+            baseName = tmp.join('_');
+          }
+          let maxIndex = 0;
+          for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
+            if (!character.name.startsWith(baseName)) continue;
+            let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
+            if (index > maxIndex) maxIndex = index;
+          }
+          cloneObject.name = baseName + '_' + (maxIndex + 1);
+          cloneObject.update();
+          SoundEffect.play(PresetSound.piecePut);
+        },
+        disabled: !gameObject.isVisible && !this.isGMMode
       },
-      disabled: !gameObject.isVisible && !this.isGMMode
-    });
-    if (gameObject.location.name === 'graveyard') {
-      actions.push(ContextMenuSeparator);
-      actions.push({
-        name: '刪除（完全刪除）', action: () => {
+      inGraveyard ? {
+        name: this.i18n.t('char.deleteForever'),
+        action: () => {
           this.selectionService.remove(gameObject);
           this.deleteGameObject(gameObject);
           SoundEffect.play(PresetSound.sweep);
         }
-      });
-    } else {
-      actions.push(ContextMenuSeparator);
-      actions.push({
-        name: '刪除（移至回收區）', action: () => {
+      } : {
+        name: this.i18n.t('char.deleteToGraveyard'),
+        action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
           this.selectionService.remove(gameObject);
           gameObject.setLocation('graveyard');
           SoundEffect.play(PresetSound.sweep);
         }
-      });
-    }
+      },
+    ];
+
+    actions = actions.concat(this.joinContextMenuGroups([
+      identity,
+      appearance,
+      fx,
+      pose,
+      chatPanels,
+      locationGroup,
+      cloneDelete,
+    ]));
     this.contextMenuService.open(position, actions, gameObject.name);
+  }
+
+  /** Flatten menu groups with a single separator between non-empty groups. */
+  private joinContextMenuGroups(groups: (ContextMenuAction | null)[][]): ContextMenuAction[] {
+    const out: ContextMenuAction[] = [];
+    for (const group of groups) {
+      const items = group.filter((a): a is ContextMenuAction => !!a);
+      if (!items.length) continue;
+      if (out.length) out.push(ContextMenuSeparator);
+      out.push(...items);
+    }
+    return out;
   }
 
   toggleEdit() {
@@ -681,9 +609,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     let tabTitle = this.getTabTitle(this.selectTab);
     let gameObjects = this.getGameObjects(this.selectTab);
     this.modalService.open(ConfirmationComponent, {
-      title: '清空回收區',
-      text: '要完全刪除角色嗎？',
-      helpHtml: `<b>${ StringUtil.escapeHtml(tabTitle) }</b>中存在的 <b>${ gameObjects.length }</b> 個角色將被完全刪除。`,
+      title: this.i18n.t('char.emptyGraveyardTitle'),
+      text: this.i18n.t('char.emptyGraveyardText'),
+      helpHtml: this.i18n.t('char.emptyGraveyardHelp', { tab: StringUtil.escapeHtml(tabTitle), count: gameObjects.length }),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'delete_forever',
       action: () => {
@@ -704,7 +632,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '角色卡';
+    let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 800, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
@@ -746,6 +674,149 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x + gameObject.size * 50 / 2, y: gameObject.location.y + gameObject.size * 50 / 2, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
   }
 
+  invImageFilter(gameObject: GameCharacter): string | null {
+    return imageEffectFilter({
+      ...gameObject,
+      isDead: hasStatus(gameObject.statusesJson, 'dead'),
+    });
+  }
+  invImageOpacity(gameObject: GameCharacter): number | null {
+    return imageEffectOpacity(gameObject);
+  }
+  invImageTransform(gameObject: GameCharacter): string | null {
+    return imageEffectTransform(gameObject);
+  }
+
+  private _invMatrixRain = new Map<string, MatrixRainColumn[]>();
+  invMatrixRainColumns(gameObject: GameCharacter): MatrixRainColumn[] {
+    if (!gameObject?.isMatrix) return [];
+    const key = gameObject.identifier;
+    let cols = this._invMatrixRain.get(key);
+    if (!cols) {
+      cols = buildMatrixRainColumns(`inv:${key}`, 5, 10);
+      this._invMatrixRain.set(key, cols);
+    }
+    return cols;
+  }
+  trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
+
+  hasOverviewFaceIcon(gameObject: TabletopObject): boolean {
+    return !!(gameObject?.faceIcon && 0 < gameObject.faceIcon.url.length);
+  }
+
+  overviewFaceIconTitle(gameObject: TabletopObject): string {
+    if (!this.hasOverviewFaceIcon(gameObject)) return this.i18n.t('char.overviewFaceHintNeed');
+    return this.i18n.t('char.overviewFaceHint');
+  }
+
+  toggleOverviewFaceIcon(gameObject: TabletopObject) {
+    if (!this.hasOverviewFaceIcon(gameObject)) {
+      gameObject.isUseIconToOverviewImage = false;
+      return;
+    }
+    gameObject.isUseIconToOverviewImage = !gameObject.isUseIconToOverviewImage;
+  }
+
+  /** Characters can be dragged to table / common / personal / graveyard. */
+  canDragInventory(gameObject: GameCharacter): boolean {
+    if (this.GuestMode() || !(gameObject instanceof GameCharacter)) return false;
+    return gameObject.isVisible || this.isGMMode;
+  }
+
+  /** Stop panel appDraggable from treating this as a window move. */
+  onInventoryDragGestureStart(e: Event, gameObject: GameCharacter) {
+    if (!this.canDragInventory(gameObject)) return;
+    e.stopPropagation();
+  }
+
+  onInventoryDragStart(e: DragEvent, gameObject: GameCharacter) {
+    if (!this.canDragInventory(gameObject) || !e.dataTransfer) {
+      e.preventDefault();
+      return;
+    }
+    e.stopPropagation();
+    e.dataTransfer.setData(GameCharacter.INVENTORY_DRAG_MIME, gameObject.identifier);
+    e.dataTransfer.setData('text/plain', `udonarium-character:${gameObject.identifier}`);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  onInventoryDragEnd() {
+    this.dropTargetTab = '';
+    this.changeDetector.markForCheck();
+  }
+
+  onInventoryTabDragOver(e: DragEvent, inventoryType: string) {
+    if (!this.readInventoryDragId(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (this.dropTargetTab !== inventoryType) {
+      this.dropTargetTab = inventoryType;
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  onInventoryTabDragLeave(e: DragEvent, inventoryType: string) {
+    const related = e.relatedTarget as Node | null;
+    const current = e.currentTarget as Node | null;
+    if (related && current && current.contains(related)) return;
+    if (this.dropTargetTab === inventoryType) {
+      this.dropTargetTab = '';
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  onInventoryTabDrop(e: DragEvent, inventoryType: string) {
+    const id = this.readInventoryDragId(e);
+    this.dropTargetTab = '';
+    if (!id || id === '__pending__') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (this.GuestMode()) return;
+    const ch = ObjectStore.instance.get(id);
+    if (!(ch instanceof GameCharacter)) return;
+    if (!ch.isVisible && !this.isGMMode) return;
+    if (ch.location?.name === inventoryType) {
+      this.changeDetector.markForCheck();
+      return;
+    }
+    this.moveCharacterToLocation(ch, inventoryType);
+    if (this.selectTab !== inventoryType) this.selectTab = inventoryType;
+    this.changeDetector.markForCheck();
+  }
+
+  private moveCharacterToLocation(gameObject: GameCharacter, location: string) {
+    const isStealthMode = GameCharacter.isStealthMode;
+    EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
+    gameObject.setLocation(location);
+    this.selectionService.remove(gameObject);
+    if (location === 'table' && gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
+      this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('char.stealthTitle'),
+        text: this.i18n.t('char.stealthText'),
+        help: this.i18n.t('char.stealthHelp'),
+        type: ConfirmationType.OK,
+        materialIcon: 'disabled_visible'
+      });
+    }
+    SoundEffect.play(location === 'graveyard' ? PresetSound.sweep : PresetSound.piecePut);
+    EventSystem.call('UPDATE_INVENTORY', true);
+  }
+
+  private readInventoryDragId(e: DragEvent): string {
+    if (!e.dataTransfer) return '';
+    const typed = e.dataTransfer.getData(GameCharacter.INVENTORY_DRAG_MIME);
+    if (typed) return typed;
+    if (e.type === 'dragover') {
+      const types = Array.from(e.dataTransfer.types || []);
+      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return '__pending__';
+      return types.includes('text/plain') ? '__pending__' : '';
+    }
+    const plain = e.dataTransfer.getData('text/plain') || '';
+    const m = /^udonarium-character:(.+)$/.exec(plain);
+    return m ? m[1] : '';
+  }
+
   private deleteGameObject(gameObject: GameObject) {
     if (this.GuestMode()) return;
     gameObject.destroy();
@@ -779,6 +850,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     this.sortStopTimerId = setTimeout(() => {
       this.inventoryService.sortStop = false;
     }, 666);
+  }
+
+  private refreshPanelTitle() {
+    this.panelService.title = this.i18n.t('inv.title');
   }
 
   suggestWords(): string[] {

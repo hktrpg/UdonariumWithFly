@@ -52,8 +52,8 @@ export class TabletopService {
     let viewTable = this.tableSelecter.viewTable;
     return viewTable ? viewTable.terrains : [];
   });
-  private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote));
-  private diceSymbolCache = new TabletopCache<DiceSymbol>(() => ObjectStore.instance.getObjects(DiceSymbol));
+  private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote).filter(obj => obj.isVisibleOnTable));
+  private diceSymbolCache = new TabletopCache<DiceSymbol>(() => ObjectStore.instance.getObjects(DiceSymbol).filter(obj => obj.isVisibleOnTable));
 
   get characters(): GameCharacter[] { return this.characterCache.objects; }
   get cards(): Card[] { return this.cardCache.objects; }

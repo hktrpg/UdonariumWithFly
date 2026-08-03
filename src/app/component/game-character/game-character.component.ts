@@ -19,7 +19,7 @@ import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.compon
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -31,11 +31,15 @@ import { StandSettingComponent } from 'component/stand-setting/stand-setting.com
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
+import { getStatusDef } from '@udonarium/table-fx/character-status';
+import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
+import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-character',
     templateUrl: './game-character.component.html',
-    styleUrls: ['./game-character.component.css'],
+    styleUrls: ['./game-character.component.css', '../shared/image-effects.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('switchImage', [
@@ -119,19 +123,74 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   set isHollow(isHollow: boolean) { this.gameCharacter.isHollow = isHollow; }
   get isBlackPaint(): boolean { return this.gameCharacter.isBlackPaint; }
   set isBlackPaint(isBlackPaint: boolean) { this.gameCharacter.isBlackPaint = isBlackPaint; }
+
+  private imageEffectSource() {
+    return {
+      isInverse: this.gameCharacter.isInverse,
+      isHollow: this.gameCharacter.isHollow,
+      isBlackPaint: this.gameCharacter.isBlackPaint,
+      isGrayscale: this.gameCharacter.isGrayscale,
+      isSepia: this.gameCharacter.isSepia,
+      isWhitePaint: this.gameCharacter.isWhitePaint,
+      isMatrix: this.gameCharacter.isMatrix,
+      isFlipVertical: this.gameCharacter.isFlipVertical,
+      isContrast: this.gameCharacter.isContrast,
+      isDead: this.hasDeadStatus,
+    };
+  }
+  get imageEffectFilter(): string | null { return imageEffectFilter(this.imageEffectSource()); }
+  get imageEffectTransform(): string | null { return imageEffectTransform(this.imageEffectSource()); }
+  get imageEffectOpacity(): number | null { return imageEffectOpacity(this.imageEffectSource()); }
+
+  private _matrixRainCacheKey = '';
+  private _matrixRainColumns: MatrixRainColumn[] = [];
+  get matrixRainColumns(): MatrixRainColumn[] {
+    if (!this.gameCharacter?.isMatrix) return [];
+    const w = this.characterImageWidth || this.size * this.gridSize;
+    const count = Math.max(4, Math.min(16, Math.round(w / 9)));
+    const key = `${this.gameCharacter.identifier}:${count}`;
+    if (key !== this._matrixRainCacheKey) {
+      this._matrixRainCacheKey = key;
+      this._matrixRainColumns = buildMatrixRainColumns(key, count);
+    }
+    return this._matrixRainColumns;
+  }
+  trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
+
   get aura(): number { return this.gameCharacter.aura; }
   set aura(aura: number) { this.gameCharacter.aura = aura; }
+  get floorRing(): string { return this.gameCharacter.floorRing || 'none'; }
+  get floorRingUrl(): string { return this.characterFxMenu.ringAsset(this.floorRing); }
+  get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
+  get floorRingColor(): string { return this.gameCharacter.floorRingColor || ''; }
+  get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
+  /** Cap name-tag / status icon strip to roughly the token footprint. */
+  get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
+  get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
+  get hasDeadStatus(): boolean { return this.statusEntries.some(s => s.id === 'dead'); }
+  statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }
+  statusName(id: string): string {
+    const name = this.i18n.t(`fx.status.${id}`);
+    const entry = this.statusEntries.find(s => s.id === id);
+    return entry?.level ? `${name} ${entry.level}` : name;
+  }
 
   get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
   set isNotRide(isNotRide: boolean) { this.gameCharacter.isNotRide = isNotRide; }
   get isUseIconToOverviewImage(): boolean { return this.gameCharacter.isUseIconToOverviewImage; }
   set isUseIconToOverviewImage(isUseIconToOverviewImage: boolean) { this.gameCharacter.isUseIconToOverviewImage = isUseIconToOverviewImage; }
 
+  hasOverviewFaceIcon(): boolean {
+    return !!(this.faceIcon && 0 < this.faceIcon.url.length);
+  }
+
   get ownerName(): string { return this.gameCharacter.ownerName; }
   get ownerColor(): string { return this.gameCharacter.ownerColor; }
   get isHideIn(): boolean { return !!this.gameCharacter.owner; }
   get isVisible(): boolean { return this.gameCharacter.isVisible; }
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
+  /** Other players cannot drag a token claimed as someone's PC. */
+  get isMoveLocked(): boolean { return this.gameCharacter.isLockedByPlayerOwner; }
 
   get faceIcon(): ImageFile { return this.gameCharacter.faceIcon; }
   
@@ -158,8 +217,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   heightWidthRatio = 1.5;
 
   set dialog(dialog) {
-    if (this.GuestMode()) return;
-    if (!this.gameCharacter || this.gameCharacter.isHideIn) return;
+    if (!dialog || !dialog.text) return;
+    // Guests may view speech balloons; only block when this peer cannot see the token.
+    if (!this.gameCharacter) return;
+    if (!this.gameCharacter.isVisible && !this.isGMMode) return;
     clearTimeout(this.dialogTimeOutId);
     clearInterval(this.chatIntervalId);
     let text = StringUtil.cr(dialog.text);
@@ -183,9 +244,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     let speechDelay = 1000 / Array.from(text).length > 36 ? 1000 / Array.from(text).length : 36;
     if (speechDelay > 200) speechDelay = 200;
     this.dialogTimeOutId = setTimeout(() => {
-      this.gameCharacter.dialog = null;
-      this.gameCharacter.text = '';
-      this.gameCharacter.isEmote = false; 
+      const stamp = dialog.stamp || this.lastChatDialogStamp;
+      this.clearChatDialogLocal();
+      if (stamp && this.gameCharacter.chatDialogStamp === stamp) {
+        this.gameCharacter.clearChatDialog();
+      }
       this.changeDetector.markForCheck();
     }, Array.from(text).length * speechDelay + 6000);
 
@@ -260,6 +323,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   selected = false;
   private dialogTimeOutId = null;
   private chatIntervalId = null;
+  private lastChatDialogStamp = 0;
 
   get chatBubbleXDeg(): number {
     //console.log(this.viewRotateX)
@@ -403,11 +467,49 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private pointerDeviceService: PointerDeviceService,
     private ngZone: NgZone,
     private modalService: ModalService,
-    private selectionService: TabletopSelectionService
+    private selectionService: TabletopSelectionService,
+    private characterFxMenu: CharacterFxMenuService,
+    private i18n: I18nService,
   ) { }
 
   GuestMode() {
     return Network.GuestMode();
+  }
+
+  private applySyncedChatDialog() {
+    if (!this.gameCharacter) return;
+    const stamp = this.gameCharacter.chatDialogStamp || 0;
+    if (!stamp) {
+      if (this.lastChatDialogStamp) this.clearChatDialogLocal();
+      return;
+    }
+    if (stamp === this.lastChatDialogStamp) return;
+    this.applyChatDialogPayload({
+      characterIdentifier: this.gameCharacter.identifier,
+      text: this.gameCharacter.chatDialogText,
+      color: this.gameCharacter.chatDialogColor,
+      faceIconIdentifier: this.gameCharacter.chatDialogFaceIconIdentifier || null,
+      secret: false,
+      stamp,
+      isEmote: this.gameCharacter.chatDialogIsEmote,
+    });
+  }
+
+  private applyChatDialogPayload(data: any) {
+    if (!data || !data.text) return;
+    const stamp = data.stamp || 0;
+    if (stamp && stamp === this.lastChatDialogStamp) return;
+    if (stamp) this.lastChatDialogStamp = stamp;
+    this.dialog = data;
+  }
+
+  private clearChatDialogLocal() {
+    this.lastChatDialogStamp = 0;
+    this.gameCharacter.dialog = null;
+    this.gameCharacter.text = '';
+    this.gameCharacter.isEmote = false;
+    clearTimeout(this.dialogTimeOutId);
+    clearInterval(this.chatIntervalId);
   }
 
   
@@ -438,6 +540,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.naturalImageWidth = 0;
           this.naturaHeightWidthRatio = 1;
         }
+        this.applySyncedChatDialog();
         this.changeDetector.markForCheck();
       })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameCharacter?.identifier}`, event => {
@@ -478,7 +581,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       .on('POPUP_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
           this.ngZone.run(() => {
-            this.dialog = event.data;
+            this.applyChatDialogPayload(event.data);
             this.changeDetector.markForCheck();
           });
         }
@@ -486,18 +589,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       .on('FAREWELL_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
           this.ngZone.run(() => {
-            this.gameCharacter.dialog = null;
-            this.gameCharacter.text = '';
-            this.gameCharacter.isEmote = false;
+            this.clearChatDialogLocal();
             this.changeDetector.markForCheck();
           });
-          clearTimeout(this.dialogTimeOutId);
-          clearInterval(this.chatIntervalId);
         }
       })
       .on(`UPDATE_SELECTION/identifier/${this.gameCharacter?.identifier}`, event => {
         this.changeDetector.markForCheck();
       });
+    this.applySyncedChatDialog();
     this.movableOption = {
       tabletopObject: this.gameCharacter,
       transformCssOffset: 'translateZ(1.0px)',
@@ -519,12 +619,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   ngOnDestroy() {
-    clearTimeout(this.dialogTimeOutId);
-    clearInterval(this.chatIntervalId);
-    if (this.gameCharacter) {
-      this.gameCharacter.text = '';
-      this.gameCharacter.isEmote = false;
-    }
+    this.clearChatDialogLocal();
     EventSystem.unregister(this);
   }
 
@@ -582,15 +677,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
       z: this.gameCharacter.posZ
     };
-    actions.push({ name: '集中到這裡', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isSelected) {
       let selectedCharacter = () => this.selectionService.objects.filter(object => object.aliasName === this.gameCharacter.aliasName) as GameCharacter[];
       actions.push(
         {
-          name: '已選擇的角色', action: null, subActions: [
+          name: this.i18n.t('char.selectedCharacters'), action: null, subActions: [
             {
-              name: '全部移至公用倉庫', action: () => {
+              name: this.i18n.t('char.moveAllToCommon'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('common')
                   this.selectionService.remove(gameCharacter);
@@ -599,7 +694,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: '全部移至個人倉庫', action: () => {
+              name: this.i18n.t('char.moveAllToPersonal'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation(Network.peerId);
                   this.selectionService.remove(gameCharacter);
@@ -608,7 +703,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: '全部移至回收區', action: () => {
+              name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
                 selectedCharacter().forEach(gameCharacter => {
                   gameCharacter.setLocation('graveyard');
                   this.selectionService.remove(gameCharacter);
@@ -625,313 +720,260 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   private makeContextMenu(): ContextMenuAction[] {
-    let actions: ContextMenuAction[] = [
-      { 
-        name: this.isHideIn ? '公開位置' : '僅自己可見（隱身）',
-        action: () => {
-          if (this.isHideIn) {
-            this.gameCharacter.owner = '';
-            SoundEffect.play(PresetSound.piecePut);
-          } else {
-            if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
-              this.modalService.open(ConfirmationComponent, {
-                title: '隱身模式', 
-                text: '已開啟隱身：其他人看不到你的游標位置。',
-                help: '只要桌面上有「僅自己可見」的角色，其他人就看不到你的游標位置。',
-                type: ConfirmationType.OK,
-                materialIcon: 'disabled_visible'
-              });
+    const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const hasMultiImage = this.gameCharacter.imageFiles.length > 1;
+    const hasFace = this.hasOverviewFaceIcon();
+    if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
+
+    return this.joinContextMenuGroups([
+      // Identity / claim
+      [
+        {
+          name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
+          action: () => {
+            if (this.isHideIn) {
+              this.gameCharacter.owner = '';
+              SoundEffect.play(PresetSound.piecePut);
+            } else {
+              if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
+                this.modalService.open(ConfirmationComponent, {
+                  title: this.i18n.t('char.stealthTitle'),
+                  text: this.i18n.t('char.stealthText'),
+                  help: this.i18n.t('char.stealthHelp'),
+                  type: ConfirmationType.OK,
+                  materialIcon: 'disabled_visible'
+                });
+              }
+              this.gameCharacter.owner = Network.peer.userId;
+              if (!this.gameCharacter.visionOwner) {
+                this.gameCharacter.visionOwner = Network.peer.userId;
+              }
+              SoundEffect.play(PresetSound.sweep);
+              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             }
-            this.gameCharacter.owner = Network.peer.userId;
-            SoundEffect.play(PresetSound.sweep);
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-          }
-          EventSystem.call('UPDATE_INVENTORY', true);
+            EventSystem.call('UPDATE_INVENTORY', true);
+          },
         },
-      },
-      ContextMenuSeparator,
-      (this.gameCharacter.imageFiles.length <= 1 ? null : {
-        name: '圖片切換',
-        action: null,
-        subActions: this.gameCharacter.imageFiles.map((image, i) => {
-          return { 
-            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`, 
-            action: () => { this.changeImage(i); }, 
+        this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
+        this.characterFxMenu.makeCombatMenu(this.gameCharacter),
+      ],
+      // Image / appearance
+      [
+        hasMultiImage ? {
+          name: this.i18n.t('char.imageSwitch'),
+          action: null,
+          subActions: this.gameCharacter.imageFiles.map((image, i) => ({
+            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`,
+            action: () => { this.changeImage(i); },
             default: this.gameCharacter.currntImageIndex == i,
             icon: image,
-            checkBox: 'radio'
-          };
-        })
-      }),
-      (this.gameCharacter.imageFiles.length <= 1 ? null : ContextMenuSeparator),
-      (this.isUseIconToOverviewImage
-        ? {
-          name: '☑ 總覽顯示大頭貼', action: () => {
-            this.isUseIconToOverviewImage = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 總覽顯示大頭貼', action: () => {
-            this.isUseIconToOverviewImage = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (this.gameCharacter.isShowChatBubble
-        ? {
-          name: '☑ 顯示💭', action: () => {
-            this.gameCharacter.isShowChatBubble = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示💭', action: () => {
-            this.gameCharacter.isShowChatBubble = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (this.isDropShadow
-        ? {
-          name: '☑ 顯示陰影', action: () => {
-            this.isDropShadow = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示陰影', action: () => {
-            this.isDropShadow = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      { name: '圖片效果', action: null, subActions: [
-        (this.isInverse
-          ? {
-            name: '☑ 反轉', action: () => {
-              this.isInverse = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 反轉', action: () => {
-              this.isInverse = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-        (this.isHollow
-          ? {
-            name: '☑ 模糊', action: () => {
-              this.isHollow = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 模糊', action: () => {
-              this.isHollow = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-        (this.isBlackPaint
-          ? {
-            name: '☑ 設為黑色剪影', action: () => {
-              this.isBlackPaint = false;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          } : {
-            name: '☐ 設為黑色剪影', action: () => {
-              this.isBlackPaint = true;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            checkBox: 'check'
-          }),
-          { name: '光環', action: null, subActions: [{ name: `${this.aura == -1 ? '◉' : '○'} 無`, action: () => { this.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['黑色', '藍色', '綠色', '青色', '紅色', '洋紅', '黃色', '白色'].map((color, i) => {  
-            return { name: `${this.aura == i ? '◉' : '○'} ${color}`, colorSample: true, action: () => { this.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' };
-          })) },
-          ContextMenuSeparator,
-          {
-            name: '重置', action: () => {
-              this.isInverse = false;
-              this.isHollow = false;
-              this.isBlackPaint = false;
-              this.aura = -1;
-              EventSystem.trigger('UPDATE_INVENTORY', null);
-            },
-            disabled: !this.isInverse && !this.isHollow && !this.isBlackPaint && this.aura == -1
-          }
-        ]
-      },
-      ContextMenuSeparator,
-      (!this.isNotRide
-        ? {
-          name: '☑ 可疊在其他角色上', action: () => {
-            this.isNotRide = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 可疊在其他角色上', action: () => {
-            this.isNotRide = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      (this.isAltitudeIndicate
-        ? {
-          name: '☑ 顯示高度', action: () => {
-            this.isAltitudeIndicate = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 顯示高度', action: () => {
-            this.isAltitudeIndicate = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      {
-        name: '將高度設為0', action: () => {
-          if (this.altitude != 0) {
-            this.altitude = 0;
-            if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
-          }
-        },
-        altitudeHande: this.gameCharacter
-      },
-      ContextMenuSeparator,
-      { name: '顯示詳情...', action: () => { this.showDetail(this.gameCharacter); } },
-      {
-        name: '切換下一張圖像', action: () => { this.nextImage(); },
-        disabled: this.gameCharacter.imageFiles.length <= 1
-      },
-      (this.gameCharacter.isAllowsChat
-        ? {
-          name: '☑ 可進行聊天', action: () => {
-            this.gameCharacter.isAllowsChat = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 可進行聊天', action: () => {
-            this.gameCharacter.isAllowsChat = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      { name: '顯示聊天面板...', action: () => { this.showChatPalette(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      { name: '立繪設定...', action: () => { this.showStandSetting(this.gameCharacter) }, disabled: !this.gameCharacter.isAllowsChat },
-      ContextMenuSeparator,
-      {
-        name: '開啟參考網址', action: null,
-        subActions: this.gameCharacter.getUrls().map((urlElement) => {
-          const url = urlElement.value.toString();
-          return {
-            name: urlElement.name ? urlElement.name : url,
-            action: () => {
-              if (StringUtil.sameOrigin(url)) {
-                window.open(url.trim(), '_blank', 'noopener');
-              } else {
-                this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
-              } 
-            },
-            disabled: !StringUtil.validUrl(url),
-            error: !StringUtil.validUrl(url) ? '網址無效' : null,
-            isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
-          };
-        }),
-        disabled: this.gameCharacter.getUrls().length <= 0
-      },
-      ContextMenuSeparator,
-      (this.gameCharacter.isInventoryIndicate
-        ? {
-          name: '☑ 在桌面倉庫中顯示', action: () => {
-            this.gameCharacter.isInventoryIndicate = false;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        } : {
-          name: '☐ 在桌面倉庫中顯示', action: () => {
-            this.gameCharacter.isInventoryIndicate = true;
-            EventSystem.trigger('UPDATE_INVENTORY', null);
-          },
-          checkBox: 'check'
-        }),
-      { name: '移動位置', action: null, subActions: [
+            checkBox: 'radio' as const
+          }))
+        } : null,
         {
-          name: '公用倉庫', action: () => {
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation('common');
-            this.selectionService.remove(this.gameCharacter);
+          name: this.i18n.t('char.nextImage'),
+          action: () => { this.nextImage(); },
+          disabled: !hasMultiImage
+        },
+        contextMenuToggleCheck({
+          get: () => hasFace && this.isUseIconToOverviewImage,
+          set: (v) => {
+            if (!this.hasOverviewFaceIcon()) return;
+            this.isUseIconToOverviewImage = v;
+          },
+          on: this.i18n.t('char.overviewFaceOn'),
+          off: this.i18n.t('char.overviewFaceOff'),
+          after,
+          disabled: !hasFace,
+          error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+        }),
+        contextMenuToggleCheck({
+          get: () => this.isDropShadow,
+          set: (v) => { this.isDropShadow = v; },
+          on: this.i18n.t('char.shadowOn'),
+          off: this.i18n.t('char.shadowOff'),
+          after,
+        }),
+        this.characterFxMenu.makeImageEffectMenu(this.gameCharacter),
+      ],
+      // FX / lighting / status
+      [
+        this.characterFxMenu.makeAuraMenu(this.gameCharacter),
+        this.characterFxMenu.makeRingMenu(this.gameCharacter),
+        this.characterFxMenu.makeVisionMenu(this.gameCharacter),
+        this.characterFxMenu.makeStatusMenu(this.gameCharacter),
+      ],
+      // Pose
+      [
+        contextMenuToggleCheck({
+          get: () => !this.isNotRide,
+          set: (v) => { this.isNotRide = !v; },
+          on: this.i18n.t('char.stackOn'),
+          off: this.i18n.t('char.stackOff'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('char.altitudeOn'),
+          off: this.i18n.t('char.altitudeOff'),
+          after,
+        }),
+        {
+          name: this.i18n.t('char.resetAltitude'),
+          action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
+            }
+          },
+          altitudeHande: this.gameCharacter
+        },
+      ],
+      // Chat / panels
+      [
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isShowChatBubble,
+          set: (v) => { this.gameCharacter.isShowChatBubble = v; },
+          on: this.i18n.t('char.chatBubbleOn'),
+          off: this.i18n.t('char.chatBubbleOff'),
+          tip: this.i18n.t('char.chatBubbleTip'),
+          after,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isAllowsChat,
+          set: (v) => { this.gameCharacter.isAllowsChat = v; },
+          on: this.i18n.t('char.chatOn'),
+          off: this.i18n.t('char.chatOff'),
+          after,
+        }),
+        { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
+        { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        {
+          name: this.i18n.t('char.openReferenceUrl'),
+          action: null,
+          subActions: this.gameCharacter.getUrls().map((urlElement) => {
+            const url = urlElement.value.toString();
+            return {
+              name: urlElement.name ? urlElement.name : url,
+              action: () => {
+                if (StringUtil.sameOrigin(url)) {
+                  window.open(url.trim(), '_blank', 'noopener');
+                } else {
+                  this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
+                }
+              },
+              disabled: !StringUtil.validUrl(url),
+              error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
+              isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
+            };
+          }),
+          disabled: this.gameCharacter.getUrls().length <= 0
+        },
+      ],
+      // Inventory / location
+      [
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isInventoryIndicate,
+          set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
+          on: this.i18n.t('char.inventoryOn'),
+          off: this.i18n.t('char.inventoryOff'),
+          after,
+        }),
+        {
+          name: this.i18n.t('char.moveTo'),
+          action: null,
+          subActions: [
+            {
+              name: this.i18n.t('char.commonInventory'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation('common');
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.personalInventory'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation(Network.peerId);
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.graveyard'),
+              action: () => {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+                this.gameCharacter.setLocation('graveyard');
+                this.selectionService.remove(this.gameCharacter);
+                SoundEffect.play(PresetSound.sweep);
+              }
+            },
+          ]
+        },
+      ],
+      // Clone / delete
+      [
+        {
+          name: this.i18n.t('char.clone'),
+          action: () => {
+            let cloneObject = this.gameCharacter.clone();
+            cloneObject.location.x += this.gridSize;
+            cloneObject.location.y += this.gridSize;
+            cloneObject.update();
             SoundEffect.play(PresetSound.piecePut);
           }
         },
         {
-          name: '個人倉庫', action: () => {
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation(Network.peerId);
-            this.selectionService.remove(this.gameCharacter);
+          name: this.i18n.t('char.cloneNumbered'),
+          action: () => {
+            const cloneObject = this.gameCharacter.clone();
+            const tmp = cloneObject.name.split('_');
+            let baseName;
+            if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
+              baseName = tmp.slice(0, tmp.length - 1).join('_');
+            } else {
+              baseName = tmp.join('_');
+            }
+            let maxIndex = 0;
+            for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
+              if (!character.name.startsWith(baseName)) continue;
+              let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
+              if (index > maxIndex) maxIndex = index;
+            }
+            cloneObject.name = baseName + '_' + (maxIndex + 1);
+            cloneObject.location.x += this.gridSize;
+            cloneObject.location.y += this.gridSize;
+            cloneObject.update();
             SoundEffect.play(PresetSound.piecePut);
           }
         },
         {
-          name: '回收區', action: () => {
+          name: this.i18n.t('char.deleteToGraveyard'),
+          action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
             SoundEffect.play(PresetSound.sweep);
           }
         },
-      ]},
-      ContextMenuSeparator,
-      {
-        name: '建立副本', action: () => {
-          let cloneObject = this.gameCharacter.clone();
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.update();
-          SoundEffect.play(PresetSound.piecePut);
-        }
-      },
-      {
-        name: '建立副本（自動編號）', action: () => {
-          const cloneObject = this.gameCharacter.clone();
-          const tmp = cloneObject.name.split('_');
-          let baseName;
-          if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-            baseName = tmp.slice(0, tmp.length - 1).join('_');
-          } else {
-            baseName = tmp.join('_');
-          }
-          let maxIndex = 0;
-          for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-            if(!character.name.startsWith(baseName)) continue;
-            let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-            if (index > maxIndex) maxIndex = index;
-          }
-          cloneObject.name = baseName + '_' + (maxIndex + 1);
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.update();
-          SoundEffect.play(PresetSound.piecePut);
-        }
-      },
-      ContextMenuSeparator,
-      {
-        name: '刪除（移至回收區）', action: () => {
-          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-          this.gameCharacter.setLocation('graveyard');
-          this.selectionService.remove(this.gameCharacter);
-          SoundEffect.play(PresetSound.sweep);
-        }
-      }
-    ];
+      ],
+    ]);
+  }
 
-    return actions;
+  /** Flatten menu groups with a single separator between non-empty groups. */
+  private joinContextMenuGroups(groups: (ContextMenuAction | null)[][]): ContextMenuAction[] {
+    const out: ContextMenuAction[] = [];
+    for (const group of groups) {
+      const items = group.filter((a): a is ContextMenuAction => !!a);
+      if (!items.length) continue;
+      if (out.length) out.push(ContextMenuSeparator);
+      out.push(...items);
+    }
+    return out;
   }
 
   onDoubleClick(e: Event) {
@@ -942,7 +984,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let title = '角色卡';
+    let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);

@@ -6,6 +6,28 @@
   margin-left: 1px;
   margin-right: 2px
 }
+
+.my-char-btn {
+  font-size: 0.72em;
+  padding: 1px 6px;
+  height: 1.3rem;
+  margin-left: 2px;
+  margin-right: 2px;
+  vertical-align: baseline;
+  white-space: nowrap;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.my-char-btn.is-mine {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  font-weight: bold;
+}
+.my-char-btn.is-taken:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
 .dicebot-help {
   padding: 2px 6px;
   vertical-align: baseline;

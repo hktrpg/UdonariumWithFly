@@ -5,10 +5,11 @@ import { ObjectNode } from './core/synchronize-object/object-node';
 import { InnerXml, ObjectSerializer } from './core/synchronize-object/object-serializer';
 import { EventSystem } from './core/system';
 import { StringUtil } from './core/system/util/string-util';
+import { translate } from 'i18n';
 
 @SyncObject('chat-tab')
 export class ChatTab extends ObjectNode implements InnerXml {
-  @SyncVar() name: string = '標籤';
+  @SyncVar() name: string = translate('chatTab.defaultName');
   @SyncVar() isUseStandImage: boolean = true;
   @SyncVar() recieveOperationLogLevel: number = 0;
   get chatMessages(): ChatMessage[] { return <ChatMessage[]>this.children; }
@@ -84,7 +85,7 @@ export class ChatTab extends ObjectNode implements InnerXml {
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>Udonarium with Fly：聊天紀錄：${ StringUtil.escapeHtml(this.name == '' ? '(無名標籤)' : this.name) + (imageDict ? '（含圖片）' : '') }</title>
+<title>${ StringUtil.escapeHtml(translate('chatLog.htmlTitle', { name: this.name == '' ? translate('chat.unnamedTab') : this.name, images: imageDict ? translate('chatLog.withImages') : '' })) }</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script>
   if (window.chrome) {
