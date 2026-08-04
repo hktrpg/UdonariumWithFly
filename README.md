@@ -39,7 +39,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Feature | Description |
 |---------|-------------|
 | Multi-language UI | Switch 繁中 / 简中 / English / 日本語 at runtime (menu; persisted) |
-| Guided tour | First-run overlay walkthrough (rooms & save, menus, table gestures, shortcuts); welcome language picker; skip anytime; replay from Settings |
+| Guided tour | First-run overlay walkthrough (rooms & save, menus including preset scenes / scenario text, table gestures, shortcuts); welcome language picker; skip anytime; replay from Settings |
 | Hover teaching tips | Hover menu / chat controls for tip boxes; toggle in Settings; suppressed during the tour |
 | HKTRPG branding | Title, favicon, OG tags, landing page |
 | Role-based rooms | Per-role GM / User / Guest gates (open / password / disabled) |
@@ -62,6 +62,11 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
 | Reload save prompt | F5 / Ctrl+R offers ZIP download; with a bound folder, flushes backup before reload (skipped for guests) |
 | Local folder backup | File System Access API: bind a folder and auto-overwrite per-room ZIPs; Connection panel can bind / save / load / delete (see below) |
+| Multi-track BGM / ambience | Up to 4 tracks; room track volume; local ambience volume; audition is local-only |
+| Preset scenes | Save / one-click restore token poses, table atmosphere (darkness, weather, lights, walls, masks, …), and multi-track BGM (optional switch chat text); chat windows can open multiple copies |
+| Character resource HUD | ± / drag numberResource for claimed PCs (toggle in Settings) |
+| Scenario text | Draft narration and send full text or a selection to the active chat tab (speaker: title / character / player) |
+| Group whisper tabs | Member-based private chat tabs (client-side filter, same class as whispers) |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 
