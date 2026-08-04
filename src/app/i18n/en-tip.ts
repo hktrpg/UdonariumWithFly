@@ -28,7 +28,9 @@ export const en_tip: I18nDictionary = {
   'tip.menu.settings.title': 'Settings',
   'tip.menu.settings.body': 'Local options: grid, snap, sounds, stands, language, tutorial.',
   'tip.menu.more.title': 'More',
-  'tip.menu.more.body': 'Table, images, music, toolbox, scene, notes, settings, and more.',
+  'tip.menu.more.body': 'Play: toolbox, notes, enter Edit. Edit: table/images/music/notes on the primary bar.',
+  'tip.menu.mode.edit.title': 'Edit mode',
+  'tip.menu.mode.edit.body': 'Layout and asset tools. Switch back to Play to focus on the map and chat.',
   'tip.menu.disconnect.title': 'Disconnect',
   'tip.menu.disconnect.body': 'Leave the room and reload. Save a ZIP first if needed.',
 

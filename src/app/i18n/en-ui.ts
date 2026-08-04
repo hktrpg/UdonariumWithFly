@@ -195,6 +195,8 @@ export const en_ui: I18nDictionary = {
   'menu.folderBackup.status.error': 'Folder backup error',
   'menu.disconnect': 'Disconnect',
   'menu.more': 'More',
+  'menu.mode.enterEdit': 'Enter Edit mode',
+  'menu.mode.exitEdit': 'Back to Play mode',
   'menu.selfOnly': 'Local only',
   'menu.viewReset.default': 'Reset to initial view',
   'menu.viewReset.top': 'Top-down view',

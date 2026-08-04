@@ -17,11 +17,15 @@ export interface MobilePanelBox {
    * Nested opens (chat palette, tab settings) should leave this unset/false.
    */
   mobileReplace?: boolean;
-  /** full = near fullscreen; half = bottom sheet (chat). */
-  mobileSheet?: 'full' | 'half';
+  /** full = near fullscreen; half / peek = bottom sheet (chat / combat). */
+  mobileSheet?: 'full' | 'half' | 'peek';
 }
 
 export type MobileChromeMode = 'desktop' | 'phone' | 'tablet-portrait' | 'tablet-landscape';
+/** Play = map-first session; Edit = table/assets/scene tools. Desktop ignores. */
+export type MobileUiMode = 'play' | 'edit';
+
+const UI_MODE_KEY = 'udon.mobileUiMode';
 
 /**
  * Compact / touch-first layout for phones and tablets.
@@ -33,9 +37,11 @@ export class MobileLayoutService implements OnDestroy {
   private readonly subject = new BehaviorSubject<boolean>(false);
   private readonly chromeSubject = new BehaviorSubject<MobileChromeMode>('desktop');
   private readonly keyboardSubject = new BehaviorSubject<number>(0);
+  private readonly uiModeSubject = new BehaviorSubject<MobileUiMode>(MobileLayoutService.readStoredUiMode());
   readonly isMobile$ = this.subject.asObservable();
   readonly chromeMode$ = this.chromeSubject.asObservable();
   readonly keyboardInset$ = this.keyboardSubject.asObservable();
+  readonly uiMode$ = this.uiModeSubject.asObservable();
 
   private readonly onChange = () => this.refresh();
   private readonly onViewport = () => this.refreshKeyboardInset();
@@ -97,6 +103,26 @@ export class MobileLayoutService implements OnDestroy {
     return this.chromeMode === 'tablet-landscape';
   }
 
+  get uiMode(): MobileUiMode {
+    return this.uiModeSubject.value;
+  }
+
+  get isPlay(): boolean {
+    return this.uiMode === 'play';
+  }
+
+  get isEdit(): boolean {
+    return this.uiMode === 'edit';
+  }
+
+  /** Switch Play ↔ Edit (mobile only). Clears sheets via caller. */
+  setUiMode(mode: MobileUiMode) {
+    if (mode === this.uiModeSubject.value) return;
+    try { sessionStorage.setItem(UI_MODE_KEY, mode); } catch { /* ignore */ }
+    this.ngZone.run(() => this.uiModeSubject.next(mode));
+    this.syncUiModeClass();
+  }
+
   get keyboardInsetPx(): number {
     return this.keyboardSubject.value;
   }
@@ -122,15 +148,22 @@ export class MobileLayoutService implements OnDestroy {
     return TABLET_RAIL_WIDTH;
   }
 
+  /** Height fraction for peek / half sheets. */
+  sheetHeightPx(sheet: 'peek' | 'half' | 'full'): number {
+    const vh = this.viewportHeight;
+    if (sheet === 'peek') return Math.max(140, Math.round(vh * 0.22));
+    if (sheet === 'half') return Math.max(220, Math.round(vh * 0.48));
+    return Math.max(240, vh - (this.isTabletLandscape ? this.keyboardInsetPx : MOBILE_NAV_HEIGHT + this.keyboardInsetPx));
+  }
+
   /** Fit a desktop panel option into a sheet on mobile. */
   adaptPanelOption<T extends MobilePanelBox>(option: T = {} as T): T {
     if (!this.isMobile) return { ...option };
     const sheet = option.mobileSheet || 'full';
     const left = this.leftChromePx;
     const w = Math.max(280, this.viewportWidth - left);
-    if (sheet === 'half') {
-      const h = Math.max(220, Math.round(this.viewportHeight * 0.48));
-      // Phone: sit above bottom nav; tablet landscape: sit above keyboard only.
+    if (sheet === 'half' || sheet === 'peek') {
+      const h = this.sheetHeightPx(sheet);
       const reserveBottom = this.isTabletLandscape
         ? this.keyboardInsetPx
         : MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
@@ -142,10 +175,7 @@ export class MobileLayoutService implements OnDestroy {
         height: h,
       };
     }
-    // CSS !important sizes the sheet; JS size is a fallback before paint.
-    const fullH = this.isTabletLandscape
-      ? Math.max(240, this.viewportHeight - this.keyboardInsetPx)
-      : Math.max(240, this.viewportHeight - MOBILE_NAV_HEIGHT - this.keyboardInsetPx);
+    const fullH = this.sheetHeightPx('full');
     return {
       ...option,
       left,
@@ -153,6 +183,14 @@ export class MobileLayoutService implements OnDestroy {
       width: w,
       height: fullH,
     };
+  }
+
+  private static readStoredUiMode(): MobileUiMode {
+    try {
+      return sessionStorage.getItem(UI_MODE_KEY) === 'edit' ? 'edit' : 'play';
+    } catch {
+      return 'play';
+    }
   }
 
   private refresh() {
@@ -208,12 +246,23 @@ export class MobileLayoutService implements OnDestroy {
     root.classList.toggle('udon-tablet-portrait', mode === 'tablet-portrait');
     root.classList.toggle('udon-phone', mode === 'phone');
     this.syncChromeCssVars(isMobile, mode);
+    this.syncUiModeClass();
+  }
+
+  private syncUiModeClass() {
+    const root = document.documentElement;
+    const mobile = this.isMobile;
+    const play = mobile && this.isPlay;
+    const edit = mobile && this.isEdit;
+    root.classList.toggle('udon-mobile-play', play);
+    root.classList.toggle('udon-mobile-edit', edit);
+    document.body.classList.toggle('udon-mobile-play', play);
+    document.body.classList.toggle('udon-mobile-edit', edit);
   }
 
   private syncChromeCssVars(isMobile: boolean, mode: MobileChromeMode) {
     const root = document.documentElement;
     if (isMobile) {
-      // bottomChromePx includes keyboard inset when open.
       const bottom =
         mode === 'tablet-landscape'
           ? this.keyboardInsetPx

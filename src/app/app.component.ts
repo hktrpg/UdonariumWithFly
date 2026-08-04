@@ -116,6 +116,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isUpdateCanceled = false;
   isMobileLayout = false;
   isTabletLandscape = false;
+  isMobileEdit = false;
   private inviteHandled = false;
   private isRefreshPromptOpen = false;
   private mobileSub: Subscription = null;
@@ -661,13 +662,24 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('keydown', this.onWindowKeydown, true);
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+    this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+    // Guest cannot use Edit mode.
+    if (this.GuestMode() && this.mobileLayout.isEdit) {
+      this.mobileLayout.setUiMode('play');
+      this.isMobileEdit = false;
+    }
     this.mobileSub = this.mobileLayout.isMobile$.subscribe(v => {
       this.isMobileLayout = v;
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+      this.isMobileEdit = v && this.mobileLayout.isEdit;
     });
     this.mobileSub.add(this.mobileLayout.chromeMode$.subscribe(() => {
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
       this.isMobileLayout = this.mobileLayout.isMobile;
+      this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+    }));
+    this.mobileSub.add(this.mobileLayout.uiMode$.subscribe(() => {
+      this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
     }));
   }
 
@@ -804,6 +816,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
         option = { width: 520, height: 640, left: 100, title: this.i18n.t('combat.title') };
+        if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
@@ -880,6 +893,33 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  isNavActive(tourId: string): boolean {
+    return this.isMobileLayout && PanelService.isTourPanelOpen(tourId);
+  }
+
+  /** Bottom-nav: tap open; tap again closes sheet (map-first). */
+  openOrToggle(componentName: string) {
+    if (!this.mobileLayout.isMobile) {
+      this.open(componentName);
+      return;
+    }
+    const tourId = this.tourIdForComponent(componentName);
+    if (tourId && PanelService.isTourPanelOpen(tourId)) {
+      PanelService.closePanelsByTourId(tourId);
+      return;
+    }
+    this.open(componentName);
+  }
+
+  setMobileUiMode(mode: 'play' | 'edit') {
+    if (!this.mobileLayout.isMobile) return;
+    if (mode === 'edit' && this.GuestMode()) return;
+    PanelService.closeAllPanels();
+    this.contextMenuService.close();
+    this.mobileLayout.setUiMode(mode);
+    this.isMobileEdit = mode === 'edit';
+  }
+
   GuestMode() {
     return Network.GuestMode();
   }
@@ -948,7 +988,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.openToolboxAt(position);
   }
 
-  /** Mobile primary-nav "More" — secondary menus as an action sheet. */
+  /** Mobile primary-nav "More" — mode-aware secondary actions. */
   openMoreMenu(event: Event) {
     this.guidedTour.notifyMenuClick('menu.more');
     const button = <HTMLElement>event.target;
@@ -958,19 +998,37 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
     };
     const menu: ContextMenuAction[] = [];
-    if (!this.GuestMode()) {
-      menu.push({ name: this.i18n.t('menu.table'), materialIcon: 'layers', action: () => this.open('GameTableSettingComponent') });
-      menu.push({ name: this.i18n.t('menu.images'), materialIcon: 'photo_library', action: () => this.open('FileStorageComponent') });
-      menu.push({ name: this.i18n.t('menu.music'), materialIcon: 'queue_music', action: () => this.open('JukeboxComponent') });
-      menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
-    }
-    if (this.canOpenSceneTools) {
-      menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
-    }
-    if (!this.GuestMode()) {
-      menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
-      menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
-      menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+    if (this.isMobileEdit) {
+      menu.push({
+        name: this.i18n.t('menu.mode.exitEdit'),
+        materialIcon: 'sports_esports',
+        action: () => this.setMobileUiMode('play'),
+      });
+      menu.push(ContextMenuSeparator);
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+      }
+      if (this.canOpenSceneTools) {
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+      }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+        menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
+      }
+    } else {
+      if (!this.GuestMode()) {
+        menu.push({
+          name: this.i18n.t('menu.mode.enterEdit'),
+          materialIcon: 'edit',
+          action: () => this.setMobileUiMode('edit'),
+        });
+        menu.push(ContextMenuSeparator);
+        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+        menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+      }
+      if (this.canOpenSceneTools) {
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+      }
     }
     menu.push(ContextMenuSeparator);
     menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });

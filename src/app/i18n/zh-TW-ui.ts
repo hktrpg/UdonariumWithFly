@@ -196,6 +196,8 @@ export const zhTW_ui: I18nDictionary = {
   'menu.folderBackup.status.error': '資料夾備份錯誤',
   'menu.disconnect': '斷開連線',
   'menu.more': '更多',
+  'menu.mode.enterEdit': '進入編輯模式',
+  'menu.mode.exitEdit': '回到遊玩模式',
   'menu.selfOnly': '只有自己',
   'menu.viewReset.default': '回到最初的視點',
   'menu.viewReset.top': '使用正上方視點',

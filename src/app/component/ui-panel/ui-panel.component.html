@@ -1,9 +1,22 @@
-<div [@flyInOut]="'in'" [ngClass]="{'pointer-events-none': isPointerDragging, 'is-full-screen': isFullScreen, 'is-minimized': isMinimized && !isFullScreen, 'i-am-gm': isGMMode, 'is-mobile-sheet': isMobileSheet, 'is-mobile-sheet-half': isMobileSheetHalf}" class="draggable-panel"
+<div [@flyInOut]="'in'"
+  [ngClass]="{
+    'pointer-events-none': isPointerDragging,
+    'is-full-screen': isFullScreen,
+    'is-minimized': isMinimized && !isFullScreen,
+    'i-am-gm': isGMMode,
+    'is-mobile-sheet': isMobileSheet,
+    'is-mobile-sheet-half': isMobileSheetHalf,
+    'is-snap-peek': isMobileSheet && mobileSheetSnap === 'peek',
+    'is-snap-half': isMobileSheet && mobileSheetSnap === 'half',
+    'is-snap-full': isMobileSheet && mobileSheetSnap === 'full'
+  }"
+  class="draggable-panel"
   [attr.data-tour-panel]="panelService.tourPanelId || null"
   [style.left.px]="left" [style.top.px]="top" [style.width.px]="width" [style.height.px]="height"
-  [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical'" [draggable.disable]="isFullScreen || isMobileSheet" 
+  [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical'" [draggable.disable]="isFullScreen || isMobileSheet"
   [draggable.stack]="'.draggable-panel'" [resizable.stack]="'.draggable-panel'" appDraggable appResizable #draggablePanel>
-  <div class="title" #titleBar (dblclick)="onTitleDblClick($event)">
+  <div class="title" #titleBar (dblclick)="onTitleDblClick($event)" (click)="onMobileTitleTap($event)">
+    <div *ngIf="isMobileSheet" class="sheet-handle" aria-hidden="true"></div>
     <button *ngIf="isAbleRotateButton" style="padding: 0px; height: 14px; margin-top: 4px; margin-left: 5px" (dblclick)="notOperaion($event)" (click)="toggleRotate($event)"><i class="material-icons" style="font-size: 14px;">pivot_table_chart</i></button>
     <div class="title-text" [ngClass]="{'rotateble': isAbleRotateButton}">{{panelService.title}}</div>
     <div class="title-button">

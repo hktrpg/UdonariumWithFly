@@ -357,10 +357,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.tokenPath.hasDraft || this.tokenPath.isAnimating;
   }
   get showViewZoomControl(): boolean {
-    return this.mobileLayout.isMobile;
+    return false; // zoom lives inside map-action-hud
   }
   get showMapActionHud(): boolean {
     return this.mobileLayout.isMobile;
+  }
+  get isGuestHud(): boolean {
+    return Network.GuestMode();
   }
   get showVisionBanner(): boolean {
     if (PeerCursor.myCursor?.isGMMode) return false;
@@ -787,7 +790,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     extraActions.push(ContextMenuSeparator);
     extraActions.push({
       name: this.i18n.t('gt.mapSettings'), action: () => {
-        this.panelService.open(GameTableSettingComponent, { width: 610, height: 540, left: 100 });
+        this.panelService.open(GameTableSettingComponent, this.mobileLayout.adaptPanelOption({
+          width: 610, height: 540, left: 100,
+          mobileReplace: true,
+          tourPanelId: 'menu.table',
+          title: this.i18n.t('table.title'),
+        }));
       }
     });
     EventSystem.trigger('OPEN_TOOLBOX', {
@@ -830,7 +838,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private ensureSceneToolsPanel() {
     if (this.sceneTools.isPanelOpen) return;
-    this.panelService.open(SceneToolsComponent, { width: 380, height: 560, left: 100 });
+    this.panelService.open(SceneToolsComponent, this.mobileLayout.adaptPanelOption({
+      width: 380, height: 560, left: 100,
+      mobileReplace: true,
+      tourPanelId: 'menu.sceneTools',
+      title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),
+    }));
   }
 
   /** Scene-tools panel idles on open; run after that microtask. */

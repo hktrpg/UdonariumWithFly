@@ -195,6 +195,8 @@ export const zhCN_ui: I18nDictionary = {
   'menu.folderBackup.status.error': '文件夹备份错误',
   'menu.disconnect': '断开连接',
   'menu.more': '更多',
+  'menu.mode.enterEdit': '进入编辑模式',
+  'menu.mode.exitEdit': '回到游玩模式',
   'menu.selfOnly': '只有自己',
   'menu.viewReset.default': '回到最初的视角',
   'menu.viewReset.top': '使用正上方视角',

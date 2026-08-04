@@ -28,7 +28,9 @@ export const zhCN_tip: I18nDictionary = {
   'tip.menu.settings.title': '设定',
   'tip.menu.settings.body': '本机选项：格线、吸附、音效、Stand、语言、教学。',
   'tip.menu.more.title': '更多',
-  'tip.menu.more.body': '地图、图片、音乐、工具箱、场景、笔记、设定等次要功能。',
+  'tip.menu.more.body': '游玩：工具箱、笔记、进入编辑。编辑：地图／图库／音乐／笔记在主列。',
+  'tip.menu.mode.edit.title': '编辑模式',
+  'tip.menu.mode.edit.body': '布景与素材工具。结束后请回到游玩模式以专注地图与聊天。',
   'tip.menu.disconnect.title': '断开',
   'tip.menu.disconnect.body': '离开房间并重新加载。若尚未存档请先下载 ZIP。',
 

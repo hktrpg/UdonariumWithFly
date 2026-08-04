@@ -11,29 +11,29 @@
   </nav>
 </ui-panel>
 
-<!-- Phone / tablet portrait: bottom primary nav + More -->
-<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" aria-label="Main menu">
-  <ul>
-    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
-      <a routerLink="/" routerLinkActive="active">
+<!-- Phone / tablet portrait: Play or Edit bottom nav -->
+<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
+  <ul *ngIf="!isMobileEdit">
+    <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">people</i></div>
         <div>{{ 'menu.connection' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.chat" [appTeachingTip]="'tip.menu.chat'" (click)="open('ChatWindowComponent')">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.chat" [class.is-active]="isNavActive('menu.chat')" [appTeachingTip]="'tip.menu.chat'" (click)="openOrToggle('ChatWindowComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">speaker_notes</i></div>
         <div>{{ 'menu.chat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.combat" [class.is-active]="isNavActive('menu.combat')" [appTeachingTip]="'tip.menu.combat'" (click)="openOrToggle('CombatTrackerComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">sports_mma</i></div>
         <div>{{ 'menu.combat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.inventory" [class.is-active]="isNavActive('menu.inventory')" [appTeachingTip]="'tip.menu.inventory'" (click)="openOrToggle('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">folder_shared</i></div>
         <div>{{ 'menu.inventory' | i18n }}</div>
       </a>
@@ -45,33 +45,97 @@
       </a>
     </li>
   </ul>
+  <ul *ngIf="isMobileEdit">
+    <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">layers</i></div>
+        <div>{{ 'menu.table' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.images" [class.is-active]="isNavActive('menu.images')" [appTeachingTip]="'tip.menu.images'" (click)="openOrToggle('FileStorageComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">photo_library</i></div>
+        <div>{{ 'menu.images' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.music" [class.is-active]="isNavActive('menu.music')" [appTeachingTip]="'tip.menu.music'" (click)="openOrToggle('JukeboxComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">queue_music</i></div>
+        <div>{{ 'menu.music' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">note</i></div>
+        <div>{{ 'menu.notes' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">more_horiz</i></div>
+        <div>{{ 'menu.more' | i18n }}</div>
+      </a>
+    </li>
+  </ul>
 </nav>
 
-<!-- Tablet landscape: left icon rail -->
-<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" aria-label="Main menu">
-  <ul>
-    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
-      <a routerLink="/" routerLinkActive="active">
+<!-- Tablet landscape: left icon rail (Play / Edit) -->
+<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
+  <ul *ngIf="!isMobileEdit">
+    <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">people</i></div>
         <div>{{ 'menu.connection' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.chat" [appTeachingTip]="'tip.menu.chat'" (click)="open('ChatWindowComponent')">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.chat" [class.is-active]="isNavActive('menu.chat')" [appTeachingTip]="'tip.menu.chat'" (click)="openOrToggle('ChatWindowComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">speaker_notes</i></div>
         <div>{{ 'menu.chat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.combat" [class.is-active]="isNavActive('menu.combat')" [appTeachingTip]="'tip.menu.combat'" (click)="openOrToggle('CombatTrackerComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">sports_mma</i></div>
         <div>{{ 'menu.combat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
-      <a routerLink="/" routerLinkActive="active">
+    <li data-tour-id="menu.inventory" [class.is-active]="isNavActive('menu.inventory')" [appTeachingTip]="'tip.menu.inventory'" (click)="openOrToggle('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">folder_shared</i></div>
         <div>{{ 'menu.inventory' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">more_horiz</i></div>
+        <div>{{ 'menu.more' | i18n }}</div>
+      </a>
+    </li>
+  </ul>
+  <ul *ngIf="isMobileEdit">
+    <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">layers</i></div>
+        <div>{{ 'menu.table' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.images" [class.is-active]="isNavActive('menu.images')" [appTeachingTip]="'tip.menu.images'" (click)="openOrToggle('FileStorageComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">photo_library</i></div>
+        <div>{{ 'menu.images' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.music" [class.is-active]="isNavActive('menu.music')" [appTeachingTip]="'tip.menu.music'" (click)="openOrToggle('JukeboxComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">queue_music</i></div>
+        <div>{{ 'menu.music' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">note</i></div>
+        <div>{{ 'menu.notes' | i18n }}</div>
       </a>
     </li>
     <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">

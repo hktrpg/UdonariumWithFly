@@ -606,3 +606,35 @@ html.udon-tablet-landscape .map-action-hud {
   background: #7c2d12;
   color: #ffedd5;
 }
+
+.map-hud-zoom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--udon-chrome-border, #555);
+}
+
+.map-hud-zoom-reset {
+  min-width: 32px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 6px;
+  background: #333;
+  color: var(--udon-chrome-text, #e8e8e8);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.map-hud-zoom-range {
+  width: 88px;
+  height: 28px;
+  margin: 0;
+  accent-color: #8ab4f8;
+  cursor: pointer;
+  touch-action: none;
+}

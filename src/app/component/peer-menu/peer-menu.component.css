@@ -275,3 +275,35 @@
   color: #64748b;
   margin-top: 2px;
 }
+
+/* —— Mobile: keep room join / save actions visible —— */
+:host-context(html.udon-mobile-layout) .room-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+:host-context(html.udon-mobile-layout) .room-zip-row button,
+:host-context(html.udon-mobile-layout) .connect-actions button {
+  min-height: 40px;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+:host-context(html.udon-mobile-layout) .connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+:host-context(html.udon-mobile-layout) .connect-actions input {
+  min-height: 40px;
+  flex: 1 1 140px;
+}

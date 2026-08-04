@@ -82,6 +82,7 @@ export class GuidedTourService {
 
   start() {
     const mobile = this.mobileLayout.isMobile;
+    if (mobile) this.mobileLayout.setUiMode('play');
     this.steps = buildGuidedTourSteps(mobile).filter(s => !shouldSkipStep(s, mobile));
     this.stepIndex = 0;
     this.phase = 'running';

@@ -20,8 +20,8 @@ export interface PanelOption {
    * Nested opens (palette / tab settings) should omit this or set false.
    */
   mobileReplace?: boolean;
-  /** full (default) or half bottom sheet (chat). */
-  mobileSheet?: 'full' | 'half';
+  /** full (default), half, or peek bottom sheet. */
+  mobileSheet?: 'full' | 'half' | 'peek';
 }
 
 @Injectable()
@@ -72,6 +72,32 @@ export class PanelService {
     for (const panel of Array.from(PanelService.openPanels)) {
       if (panel.tourPanelId === tourPanelId) panel.close();
     }
+  }
+
+  static isTourPanelOpen(tourPanelId: string): boolean {
+    if (!tourPanelId) return false;
+    for (const panel of PanelService.openPanels) {
+      if (panel.tourPanelId === tourPanelId) return true;
+    }
+    return false;
+  }
+
+  /** Any open dynamic panel's tour id (topmost by z-index), for nav active state. */
+  static getTopTourPanelId(): string | null {
+    let bestId: string = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (!panel.tourPanelId || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el || !el.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!bestId || zSafe >= bestZ) {
+        bestId = panel.tourPanelId;
+        bestZ = zSafe;
+      }
+    }
+    return bestId;
   }
 
   /** Topmost open panel chrome for a tour id (by z-index, then DOM order). */
@@ -134,7 +160,9 @@ export class PanelService {
       const panelInst = panelComponentRef.instance as any;
       if (panelInst) {
         panelInst.isMobileSheet = true;
-        panelInst.isMobileSheetHalf = resolved.mobileSheet === 'half';
+        const sheet = resolved.mobileSheet || 'full';
+        panelInst.isMobileSheetHalf = sheet === 'half' || sheet === 'peek';
+        panelInst.mobileSheetSnap = sheet === 'peek' ? 'peek' : sheet === 'half' ? 'half' : 'full';
       }
     }
 

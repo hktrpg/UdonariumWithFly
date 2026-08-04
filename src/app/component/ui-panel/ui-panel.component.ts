@@ -76,6 +76,8 @@ export class UIPanelComponent implements OnInit {
   isMobileSheet: boolean = false;
   /** Bottom half-sheet (e.g. chat) — leaves map visible above. */
   isMobileSheetHalf: boolean = false;
+  /** peek | half | full — only meaningful when isMobileSheet. */
+  mobileSheetSnap: 'peek' | 'half' | 'full' = 'full';
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
@@ -264,6 +266,19 @@ export class UIPanelComponent implements OnInit {
     }
     if (this.isFullScreen) this.toggleFullScreen(e);
     else this.toggleMinimize(e);
+  }
+
+  /** Mobile: tap title/handle cycles peek → half → full (map-first sheet). */
+  onMobileTitleTap(e: Event) {
+    if (!this.isMobileSheet) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest('button')) return;
+    e.stopPropagation();
+    const order: Array<'peek' | 'half' | 'full'> = ['peek', 'half', 'full'];
+    const i = order.indexOf(this.mobileSheetSnap);
+    const next = order[(i + 1) % order.length];
+    this.mobileSheetSnap = next;
+    this.isMobileSheetHalf = next !== 'full';
   }
 
   notOperaion(e: Event = null) {

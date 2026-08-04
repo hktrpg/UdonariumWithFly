@@ -144,10 +144,46 @@
   background-color: var(--udon-chrome-title, #1f1f1f);
   color: var(--udon-chrome-muted, #aaa);
   border-bottom: 1px solid var(--udon-chrome-border, #555);
+  position: relative;
+  flex-direction: column;
+  height: auto;
+  min-height: 25px;
+  padding-top: 10px;
+}
+
+.draggable-panel.is-mobile-sheet .title .title-text,
+.draggable-panel.is-mobile-sheet .title .title-button {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.draggable-panel.is-mobile-sheet .title .title-text {
+  padding: 2px 36px 6px 12px;
+  text-align: left;
+}
+
+.draggable-panel.is-mobile-sheet .title .title-button {
+  position: absolute;
+  top: 14px;
+  right: 4px;
+  width: auto;
+}
+
+.draggable-panel.is-mobile-sheet .sheet-handle {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
 }
 
 .draggable-panel.is-mobile-sheet .scrollable-panel {
   color: #444;
+  top: 36px;
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
@@ -164,6 +200,21 @@ html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
   max-height: min(48dvh, 420px) !important;
   border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
   border-top: 1px solid var(--udon-chrome-border, #555);
+}
+
+.draggable-panel.is-mobile-sheet.is-mobile-sheet-half.is-snap-peek {
+  height: min(22dvh, 180px) !important;
+  max-height: min(22dvh, 180px) !important;
+}
+
+.draggable-panel.is-mobile-sheet.is-mobile-sheet-half.is-snap-half {
+  height: min(48dvh, 420px) !important;
+  max-height: min(48dvh, 420px) !important;
+}
+
+/* Expand toward full while staying bottom-anchored (map peek above still possible via chrome). */
+.draggable-panel.is-mobile-sheet.is-snap-full:not(.is-mobile-sheet-half) {
+  /* full class path */
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet.is-mobile-sheet-half {

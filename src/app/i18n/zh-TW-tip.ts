@@ -28,7 +28,9 @@ export const zhTW_tip: I18nDictionary = {
   'tip.menu.settings.title': '設定',
   'tip.menu.settings.body': '本機選項：格線、吸附、音效、Stand、語系、教學。',
   'tip.menu.more.title': '更多',
-  'tip.menu.more.body': '地圖、圖片、音樂、工具箱、場景、筆記、設定等次要功能。',
+  'tip.menu.more.body': '遊玩：工具箱、筆記、進入編輯。編輯：地圖／圖庫／音樂／筆記在主列。',
+  'tip.menu.mode.edit.title': '編輯模式',
+  'tip.menu.mode.edit.body': '佈景與素材工具。結束後請回到遊玩模式以專注地圖與聊天。',
   'tip.menu.disconnect.title': '切斷',
   'tip.menu.disconnect.body': '離開房間並重新載入。若尚未存檔請先下載 ZIP。',
 

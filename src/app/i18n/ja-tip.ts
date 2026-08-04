@@ -28,7 +28,9 @@ export const ja_tip: I18nDictionary = {
   'tip.menu.settings.title': '設定',
   'tip.menu.settings.body': 'ローカル設定：グリッド、スナップ、音、スタンド、言語、チュートリアル。',
   'tip.menu.more.title': 'その他',
-  'tip.menu.more.body': 'テーブル、画像、音楽、ツール箱、シーン、メモ、設定など。',
+  'tip.menu.more.body': 'プレイ：ツール箱・メモ・編集へ。編集：テーブル／画像／音楽／メモが主列。',
+  'tip.menu.mode.edit.title': '編集モード',
+  'tip.menu.mode.edit.body': 'レイアウトと素材。地図とチャットに戻るときはプレイモードへ。',
   'tip.menu.disconnect.title': '切断',
   'tip.menu.disconnect.body': '部屋を出て再読込。必要なら先に ZIP を保存。',
 

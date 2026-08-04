@@ -194,8 +194,18 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   box-sizing: border-box;
 }
 
+.mobile-bottom-nav ul > li.is-active {
+  color: #8ab4f8;
+  background-color: rgba(138, 180, 248, 0.12);
+}
+
 .mobile-bottom-nav ul > li:active {
   background-color: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+}
+
+.mobile-side-rail ul > li.is-active {
+  color: #8ab4f8;
+  background-color: rgba(138, 180, 248, 0.12);
 }
 
 .mobile-bottom-nav ul > li > a,
