@@ -77,9 +77,9 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // Long-press → contextmenu (add token / dice / etc.).
-    // iOS never fires it natively; some Android WebViews are also unreliable.
-    // Mobile ping is HUD-only — do not share this long-press with empty-table ping.
+    // Long-press → contextmenu (iOS / some Android lack native).
+    // Mobile (simplePan): empty-table long-press is ping (pointer hold), not add-menu.
+    // Object long-press still opens the object menu.
     let ua = window.navigator.userAgent.toLowerCase();
     let needsSyntheticContextMenu =
       ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
@@ -88,6 +88,13 @@ export class TableTouchGesture {
     if (!needsSyntheticContextMenu) return;
     this.hammer.add(new Hammer.Press({ time: 550 }));
     this.hammer.on('press', ev => {
+      if (this.simplePan) {
+        const t = ev.target;
+        const onObject = t instanceof Element && !!t.closest(
+          '[appMovable], [appRotable], [appResizable], game-character, card, card-stack, dice-symbol, text-note, terrain, game-table-mask, range'
+        );
+        if (!onObject) return;
+      }
       let event = new MouseEvent('contextmenu', {
         bubbles: true,
         cancelable: true,

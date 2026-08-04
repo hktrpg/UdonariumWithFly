@@ -175,11 +175,8 @@
   <button type="button" class="map-hud-btn" (click)="hudOpenChat()" [attr.title]="'menu.chat' | i18n" [attr.aria-label]="'menu.chat' | i18n">
     <i class="material-icons">chat</i>
   </button>
-  <button type="button" class="map-hud-btn" *ngIf="!isGuestHud" (click)="hudOpenAddMenu($event)" [attr.title]="'hud.add' | i18n" [attr.aria-label]="'hud.add' | i18n">
+  <button type="button" class="map-hud-btn" data-tour-id="hud.add" *ngIf="!isGuestHud" (click)="hudOpenAddMenu($event)" [attr.title]="'hud.add' | i18n" [attr.aria-label]="'hud.add' | i18n">
     <i class="material-icons">add_circle</i>
-  </button>
-  <button type="button" class="map-hud-btn" (click)="hudPing(false)" [attr.title]="'hud.ping' | i18n" [attr.aria-label]="'hud.ping' | i18n">
-    <i class="material-icons">place</i>
   </button>
   <button type="button" class="map-hud-btn map-hud-warn" (click)="hudPing(true)" [attr.title]="'hud.pingWarn' | i18n" [attr.aria-label]="'hud.pingWarn' | i18n">
     <i class="material-icons">warning</i>

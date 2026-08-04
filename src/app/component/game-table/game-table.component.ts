@@ -733,7 +733,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
-    // Desktop may still have a ping-hold timer; clear it if the menu wins.
+    // Mobile empty-table: add-menu is HUD-only; long-press is reserved for ping.
+    if (this.mobileLayout.isMobile && !this.isTouchOnTableObject(e)) {
+      e.preventDefault();
+      return;
+    }
+    // Opening a real menu cancels a pending ping-hold.
     this.clearPingHold();
     // Right-click removes the last path waypoint while a draft exists.
     if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
@@ -1250,24 +1255,25 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Mobile: long-press = context menu only; ping is HUD buttons (avoid duplicate hold gestures).
-    // Desktop: empty-table hold (~1s) still pings.
-    if (!this.mobileLayout.isMobile) {
-      this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
-      this.pingHoldLast = { x: e.clientX, y: e.clientY };
-      this.pingHoldShift = e.shiftKey;
-      this.pingHoldTimer = setTimeout(() => {
-        if (!this.pingHoldOrigin || !this.pingHoldLast) return;
-        const dx = this.pingHoldLast.x - this.pingHoldOrigin.x;
-        const dy = this.pingHoldLast.y - this.pingHoldOrigin.y;
-        if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) return;
-        if (this.pointerDeviceService.isDragging) return;
-        // Don't ping while placing scene tools.
-        if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return;
-        this.broadcastPing(pos.x, pos.y, this.pingHoldShift ? 'warning' : 'basic');
-        this.clearPingHold();
-      }, 1000);
-    }
+    // Empty-table hold → ping. Mobile ~0.55s (same feel as old long-press);
+    // desktop ~1s. Mobile add-menu is HUD-only (see onContextMenu).
+    this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
+    this.pingHoldLast = { x: e.clientX, y: e.clientY };
+    this.pingHoldShift = e.shiftKey;
+    const pingHoldMs = this.mobileLayout.isMobile ? 550 : 1000;
+    this.pingHoldTimer = setTimeout(() => {
+      if (!this.pingHoldOrigin || !this.pingHoldLast) return;
+      const dx = this.pingHoldLast.x - this.pingHoldOrigin.x;
+      const dy = this.pingHoldLast.y - this.pingHoldOrigin.y;
+      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) return;
+      if (this.pointerDeviceService.isDragging) return;
+      // Don't ping while placing scene tools.
+      if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return;
+      // Mobile: basic ping only (warning stays on HUD); desktop Shift = warning.
+      const warning = !this.mobileLayout.isMobile && this.pingHoldShift;
+      this.broadcastPing(pos.x, pos.y, warning ? 'warning' : 'basic');
+      this.clearPingHold();
+    }, pingHoldMs);
 
     if (!this.canUseSceneTools) return;
 

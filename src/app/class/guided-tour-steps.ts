@@ -301,8 +301,9 @@ function buildMobileGuidedTourSteps(): GuidedTourStep[] {
       id: 'contextMenu',
       titleKey: 'tour.step.contextMenu.title',
       bodyKey: 'tour.step.contextMenu.bodyMobile',
-      target: '[data-tour-id="table.layer"]',
-      require: 'context-menu',
+      target: '[data-tour-id="hud.add"]',
+      tourId: 'hud.add',
+      require: 'click',
       chapter: 'table',
     },
     {
