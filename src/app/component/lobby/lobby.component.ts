@@ -11,14 +11,15 @@ import { PasswordCheckComponent } from 'component/password-check/password-check.
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
 import { ModalService } from 'service/modal.service';
+import { FolderBackupService } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
-import { PanelService } from 'service/panel.service';
+import { PanelOption, PanelService } from 'service/panel.service';
 
 @Component({
-    selector: 'lobby',
-    templateUrl: './lobby.component.html',
-    styleUrls: ['../shared/settings-ui.css', './lobby.component.css'],
-    standalone: false
+  selector: 'lobby',
+  templateUrl: './lobby.component.html',
+  styleUrls: ['../shared/settings-ui.css', './lobby.component.css'],
+  standalone: false
 })
 export class LobbyComponent implements OnInit, OnDestroy {
   rooms: IRoomInfo[] = [];
@@ -27,14 +28,35 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   help: string;
 
+  static readonly DEFAULT_WIDTH = 700;
+  static readonly DEFAULT_HEIGHT = 400;
+
+  /** Panel options for a centered normal window (not a modal). */
+  static centeredPanelOption(extra: PanelOption = {}): PanelOption {
+    const width = extra.width ?? LobbyComponent.DEFAULT_WIDTH;
+    const height = extra.height ?? LobbyComponent.DEFAULT_HEIGHT;
+    return {
+      ...extra,
+      width,
+      height,
+      left: extra.left ?? Math.max(0, Math.round((window.innerWidth - width) / 2)),
+      top: extra.top ?? Math.max(0, Math.round((window.innerHeight - height) / 2)),
+      tourPanelId: extra.tourPanelId ?? 'menu.lobby',
+    };
+  }
+
   get currentRoom(): string { return Network.peer.roomId };
   get peerId(): string { return Network.peerId; }
   get isConnected(): boolean { return 0 < Network.peerIds.length; }
+  get canShowLoadRoom(): boolean {
+    return this.folderBackup.isSupported && !Network.GuestMode();
+  }
 
   constructor(
     private panelService: PanelService,
     private modalService: ModalService,
     private i18n: I18nService,
+    public folderBackup: FolderBackupService,
   ) { }
 
   ngOnInit() {
@@ -140,13 +162,26 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   private async openAndConnect(room: IRoomInfo, password: string, targetPeers: any[]) {
     const connected = await RoomConnectHelper.openAndConnect(room, password, targetPeers);
-    if (connected) this.modalService.resolve();
+    if (connected) this.dismissLobby();
   }
 
   async showRoomSetting() {
     let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
-    if (isCreate) this.modalService.resolve();
+    if (isCreate) this.dismissLobby();
     this.help = this.i18n.t('lobby.helpInitial');
+  }
+
+  /** Bind folder if needed, then open the room-backup picker. */
+  async loadFolderBackup() {
+    if (!this.canShowLoadRoom) return;
+    if (!(await this.folderBackup.ensureBound())) return;
+    await this.folderBackup.openLoadUi();
+  }
+
+  /** Close whether lobby was opened as a panel or (legacy) modal. */
+  private dismissLobby() {
+    this.modalService.resolve();
+    this.panelService.close();
   }
 
   private refreshHelp() {

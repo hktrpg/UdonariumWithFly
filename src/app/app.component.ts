@@ -29,6 +29,7 @@ import { GameCharacterSheetComponent } from 'component/game-character-sheet/game
 import { GameObjectInventoryComponent } from 'component/game-object-inventory/game-object-inventory.component';
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
 import { JukeboxComponent } from 'component/jukebox/jukebox.component';
+import { LobbyComponent } from 'component/lobby/lobby.component';
 import { NoteInventoryComponent } from 'component/note-inventory/note-inventory.component';
 import { ModalComponent } from 'component/modal/modal.component';
 import { PeerMenuComponent } from 'component/peer-menu/peer-menu.component';
@@ -118,6 +119,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isTabletLandscape = false;
   isMobileEdit = false;
   private inviteHandled = false;
+  private lobbyAutoOpened = false;
   private isRefreshPromptOpen = false;
   private mobileSub: Subscription = null;
 
@@ -264,6 +266,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
       });
       localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
+      localForage.getItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY).then(isAutoPopup => ChatWindowComponent.isAutoPopup = !!isAutoPopup);
+      ChatWindowComponent.loadGeometryFromStorage();
     } catch(e) {
       console.log(e);
     }
@@ -412,7 +416,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         this.isLoggedin = false;
         if (!this.inviteHandled && !Network.peer.isRoom) {
           this.inviteHandled = true;
-          this.ngZone.run(() => this.tryConsumeInvite());
+          this.ngZone.run(async () => {
+            await this.tryConsumeInvite();
+            if (!Network.peer?.isRoom) this.openLobbyIfNeeded();
+          });
+        } else if (!Network.peer.isRoom) {
+          this.ngZone.run(() => this.openLobbyIfNeeded());
         }
       })
       .on('ROOM_REKEY', event => {
@@ -494,6 +503,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           console.log(e);
         }
         */
+        if (ChatWindowComponent.isAutoPopup && !PanelService.isTourPanelOpen('menu.chat')) {
+          this.ngZone.run(() => this.open('ChatWindowComponent'));
+        }
         // 設定是否應交給 UI 元件持有？
         if (ChatWindowComponent.isNoticeOn) {
           if (event.data?.isDirect || !this.noticeIntervalTimer) {
@@ -779,7 +791,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
-        option.width = 700;
+        ChatWindowComponent.applySavedGeometry(option);
         option.title = this.i18n.t('chat.title');
         if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
@@ -842,9 +854,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (component) {
       if (!this.mobileLayout.isMobile) {
-        option.top = (this.openPanelCount % 10 + 1) * 20;
-        option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-        this.openPanelCount = this.openPanelCount + 1;
+        if (componentName === 'ChatWindowComponent') {
+          // Keep remembered chat geometry; nudge duplicates so they don't fully stack.
+          const chatOpenCount = PanelService.openPanelsByTourId('menu.chat');
+          if (chatOpenCount > 0) {
+            option.left = (option.left ?? ChatWindowComponent.DEFAULT_LEFT) + chatOpenCount * 24;
+            option.top = (option.top ?? ChatWindowComponent.DEFAULT_TOP) + chatOpenCount * 24;
+          }
+        } else {
+          option.top = (this.openPanelCount % 10 + 1) * 20;
+          option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+          this.openPanelCount = this.openPanelCount + 1;
+        }
       } else {
         // Bottom-nav open: replace any existing sheet so the nav stays usable.
         option.mobileReplace = true;
@@ -864,7 +885,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private openDefaultPanels() {
+  private async openDefaultPanels() {
+    await ChatWindowComponent.geometryReady;
     this.panelService.open(PeerMenuComponent, this.mobileLayout.adaptPanelOption({
       width: 520, height: 450, left: 100,
       tourPanelId: 'menu.connection',
@@ -874,12 +896,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }));
     // On mobile, only open connection by default — chat opens on demand to keep the map usable.
     if (!this.mobileLayout.isMobile) {
-      this.panelService.open(ChatWindowComponent, {
-        width: 700, height: 400, left: 100, top: 450,
+      this.panelService.open(ChatWindowComponent, ChatWindowComponent.applySavedGeometry({
         tourPanelId: 'menu.chat',
         title: this.i18n.t('chat.title'),
-      });
+      }));
     }
+    if (Network.isOpen && !Network.peer?.isRoom) {
+      this.openLobbyIfNeeded();
+    }
+  }
+
+  /** Show lobby once on cold start when not already in a room / invite join. */
+  private openLobbyIfNeeded() {
+    if (this.lobbyAutoOpened) return;
+    if (!PanelService.defaultParentViewContainerRef) return;
+    if (!Network.isOpen || Network.peer?.isRoom) return;
+    if (this.roomInvite.parseInviteFromLocation()) return;
+    this.lobbyAutoOpened = true;
+    // Normal UI panel (not modal): no overlay / focus trap; map stays usable.
+    PanelService.closePanelsByTourId('menu.lobby');
+    this.panelService.open(LobbyComponent, LobbyComponent.centeredPanelOption({
+      title: this.i18n.t('lobby.title'),
+    }));
   }
 
   private tourIdForComponent(componentName: string): string | null {
@@ -1406,6 +1444,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setChatLeftOnly(v); },
         on: `☑${this.i18n.t('menu.settings.leftOnly')}`,
         off: `☐${this.i18n.t('menu.settings.leftOnly')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.isAutoPopup,
+        set: (v) => { ChatWindowComponent.setChatAutoPopup(v); },
+        on: `☑${this.i18n.t('menu.settings.autoPopupChat')}`,
+        off: `☐${this.i18n.t('menu.settings.autoPopupChat')}`,
       }),
       contextMenuToggleCheck({
         get: () => CharacterResourceHudComponent.isVisible,

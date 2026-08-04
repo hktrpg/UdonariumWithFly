@@ -66,8 +66,11 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Multi-track BGM / ambience | Up to 4 tracks; room track volume; local ambience volume; audition is local-only |
 | Preset scenes | Save / one-click restore token poses, table atmosphere (darkness, weather, lights, walls, masks, …), and multi-track BGM (optional switch chat text); chat windows can open multiple copies |
 | Character resource HUD | ± / drag numberResource for claimed PCs (toggle in Settings) |
-| Scenario text | Draft narration and send full text or a selection to the active chat tab (speaker: title / character / player) |
+| Scenario text | Draft narration and send full text or a selection to the active chat tab (speaker: title / character / player; character + 「」 triggers floating dialog) |
 | Group whisper tabs | Member-based private chat tabs (client-side filter, same class as whispers) |
+| Chat window memory | Remembers last size & position (local); new windows reuse geometry; shorter default height |
+| Auto-open chat | Settings*: open chat when someone speaks if no chat window is open (default off) |
+| Lobby on start | Cold start opens Lobby when not in a room (skipped for invite join) |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 

@@ -1,6 +1,7 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -279,6 +280,20 @@ export class UIPanelComponent implements OnInit {
     const next = order[(i + 1) % order.length];
     this.mobileSheetSnap = next;
     this.isMobileSheetHalf = next !== 'full';
+  }
+
+  /** Sync Angular bindings after drag/resize so CD does not snap size back; persist chat geometry. */
+  onPanelGeometryEnd() {
+    if (this.isMinimized || this.isFullScreen || this.isMobileSheet) return;
+    const panel = this.draggablePanel?.nativeElement;
+    if (!panel) return;
+    this.left = panel.offsetLeft;
+    this.top = panel.offsetTop;
+    this.width = panel.offsetWidth;
+    this.height = panel.offsetHeight;
+    if (this.panelService.tourPanelId === 'menu.chat') {
+      ChatWindowComponent.saveGeometry(this.width, this.height, this.left, this.top);
+    }
   }
 
   notOperaion(e: Event = null) {

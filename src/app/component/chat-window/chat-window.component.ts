@@ -28,6 +28,64 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   
   static readonly CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-is-notice-on-local-storage';
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
+  static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
+  static readonly CHAT_GEOMETRY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-window-geometry-v2';
+  /** Designed defaults: prior 700×400 @ (100,450); height −30%. */
+  static readonly DEFAULT_WIDTH = 700;
+  static readonly DEFAULT_HEIGHT = 265;
+  static readonly DEFAULT_LEFT = 100;
+  static readonly DEFAULT_TOP = 450;
+  static savedWidth = ChatWindowComponent.DEFAULT_WIDTH;
+  static savedHeight = ChatWindowComponent.DEFAULT_HEIGHT;
+  static savedLeft = ChatWindowComponent.DEFAULT_LEFT;
+  static savedTop = ChatWindowComponent.DEFAULT_TOP;
+  static geometryReady: Promise<void> = Promise.resolve();
+
+  static applySavedGeometry(option: PanelOption): PanelOption {
+    option.width = ChatWindowComponent.savedWidth;
+    option.height = ChatWindowComponent.savedHeight;
+    option.left = ChatWindowComponent.savedLeft;
+    option.top = ChatWindowComponent.savedTop;
+    return option;
+  }
+
+  static saveGeometry(width: number, height: number, left?: number, top?: number) {
+    if (!(width >= 100) || !(height >= 100)) return;
+    const w = Math.round(width);
+    const h = Math.round(height);
+    ChatWindowComponent.savedWidth = w;
+    ChatWindowComponent.savedHeight = h;
+    if (typeof left === 'number' && Number.isFinite(left)) {
+      ChatWindowComponent.savedLeft = Math.round(left);
+    }
+    if (typeof top === 'number' && Number.isFinite(top)) {
+      ChatWindowComponent.savedTop = Math.round(top);
+    }
+    localForage.setItem(ChatWindowComponent.CHAT_GEOMETRY_LOCAL_STORAGE_KEY, {
+      width: ChatWindowComponent.savedWidth,
+      height: ChatWindowComponent.savedHeight,
+      left: ChatWindowComponent.savedLeft,
+      top: ChatWindowComponent.savedTop,
+    }).catch(e => console.log(e));
+  }
+
+  static loadGeometryFromStorage(): Promise<void> {
+    ChatWindowComponent.geometryReady = localForage.getItem<{
+      width: number; height: number; left?: number; top?: number;
+    }>(ChatWindowComponent.CHAT_GEOMETRY_LOCAL_STORAGE_KEY).then(g => {
+      if (g && typeof g.width === 'number' && typeof g.height === 'number' && g.width >= 100 && g.height >= 100) {
+        ChatWindowComponent.savedWidth = Math.round(g.width);
+        ChatWindowComponent.savedHeight = Math.round(g.height);
+        if (typeof g.left === 'number' && Number.isFinite(g.left)) {
+          ChatWindowComponent.savedLeft = Math.round(g.left);
+        }
+        if (typeof g.top === 'number' && Number.isFinite(g.top)) {
+          ChatWindowComponent.savedTop = Math.round(g.top);
+        }
+      }
+    }).catch(e => console.log(e));
+    return ChatWindowComponent.geometryReady;
+  }
 
   /** Default ON: play notice when someone chats. */
   static isNoticeOn = true;
@@ -56,6 +114,23 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   set isLeftOnly(isLeftOnly: boolean) {
     ChatWindowComponent.setChatLeftOnly(isLeftOnly);
+  }
+
+  /** Default OFF: auto-open chat when someone speaks and no chat window is open. */
+  static isAutoPopup = false;
+  static setChatAutoPopup(isAutoPopup: boolean) {
+    if (isAutoPopup) {
+      localForage.setItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY, true).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    }
+    ChatWindowComponent.isAutoPopup = !!isAutoPopup;
+  }
+  get isAutoPopup(): boolean {
+    return ChatWindowComponent.isAutoPopup;
+  }
+  set isAutoPopup(isAutoPopup: boolean) {
+    ChatWindowComponent.setChatAutoPopup(isAutoPopup);
   }
 
   /** Default ON = normal chat bubbles. OFF = compact list. */

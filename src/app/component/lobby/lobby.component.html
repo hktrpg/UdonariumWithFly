@@ -8,6 +8,11 @@
       <button type="button" class="btn btn-primary" (click)="showRoomSetting()">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
       </button>
+      <button type="button" class="btn" *ngIf="canShowLoadRoom" (click)="loadFolderBackup()"
+        [disabled]="folderBackup.status === 'writing'"
+        [title]="(folderBackup.isReady ? 'menu.folderBackup.loadRoom' : 'menu.folderBackup.bind') | i18n">
+        <i class="material-icons">folder_open</i>{{ 'menu.folderBackup.loadRoom' | i18n }}
+      </button>
     </div>
 
     <div class="room-table-wrap" *ngIf="rooms.length">
