@@ -9,7 +9,7 @@ export const ja_tutorial: I18nDictionary = {
 デスクトップ版 Chrome 推奨。最初のチャット送信後、この案内は自動で隠れます。
 詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜視点＞Ctrl＋左／右ドラッグ＝パン　中ドラッグ＝回転　ホイール＝ズーム
-　　　　Shift＋ホイール＝左右パン　Ctrl＋ホイール＝上下パン
+　　　　Alt＋ホイール（未選択）＝左右に視点回転　Alt＋Shift＋ホイール（未選択）＝上下ピッチ　Shift＋ホイール＝左右パン　Ctrl＋ホイール＝上下パン
 ＜オブジェクト＞左ドラッグで移動　回転ハンドル　右クリック＝メニュー
 　　　　ダブルクリック＝詳細（キャラ／カード／山札／ダイス／地形／メモ／マスク／範囲など）
 　　　　キャラの「次の画像」は右クリック「次の画像に切替」
@@ -25,7 +25,7 @@ export const ja_tutorial: I18nDictionary = {
 　　　　Ctrl＋Z＝元に戻す　Ctrl＋Y／Ctrl＋Shift＋Z＝やり直し
 　　　　　（移動／回転／削除／切取貼付／レイヤ；シーン作成／削除／微移動）
 　　　　[ ＝背面へ　] ＝前面へ
-　　　　Alt＋ホイール＝15°回転　Ctrl＋Shift＋ホイール＝45°回転
+　　　　Alt＋ホイール＝選択中は向き±1°；未選択は左右視点　Alt＋Shift＋ホイール＝選択中は傾き（roll）±1°；未選択は上下　Ctrl＋Shift＋ホイール＝向き±45°
 　　　　ドロップ時 Shift＝一時グリッド非吸着　Esc＝選択解除
 　　　　ゲストは編集系ショートカット不可；入力欄の Ctrl＋Z はブラウザの文字 Undo。`,
   'tutorial.chat': `＜チャット＞上でチャンネル切替；ツールバー（端末、ON／OFF）：
@@ -70,7 +70,7 @@ export const ja_tutorial: I18nDictionary = {
 ・選択ハイライト；空白左ドラッグ枠選択；Shift＋クリック／ドラッグで複数選択；Ctrl＋左／右ドラッグでパン
 ・ダブルクリックで詳細（裏返し／ドロー／ロールは右クリック）
 ・キーボード：WASD 移動、Shift＋WASD 向き、Delete、Ctrl＋C／X／V（カーソル貼付）、Ctrl＋Z／Y 元に戻す／やり直し
-・[ / ] 前後層；Alt＋ホイール 15°／Ctrl＋Shift＋ホイール 45°
+・[ / ] 前後層；Alt＋ホイール（選択＝向き1°／未選択＝左右）；Alt＋Shift＋ホイール（選択＝roll／未選択＝上下）；Ctrl＋Shift＋ホイール 45°
 ・Shift＋ホイール左右パン；Ctrl＋ホイール上下パン
 ・経路：Token 選択 → Ctrl＋左経由点（Ctrl 離可）→ 左クリック終点または Space で移動；右クリックで最後の点を取消；Esc で取消
 ・「次の画像」は右クリック；影がサイズ／高さで変化`,

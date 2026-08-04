@@ -119,7 +119,8 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.input.isGrabbing) this.cancel();
+    if (this.input.isGrabbing) this.cancelWithoutCommit();
+    else this.cancel();
     this.dispose();
     this.synchronizer.destroy();
     this.input.destroy();
@@ -142,6 +143,12 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.grabbingElement = null;
     this.setAnimatedTransition(true);
     if (this.tabletopService.tableSelecter.viewTable) this.tabletopService.tableSelecter.viewTable.gridHeight = 0;
+  }
+
+  /** Cancel pointer gesture and drop any unfinished undo capture. */
+  private cancelWithoutCommit() {
+    this.synchronizer.abortUndoCapture();
+    this.cancel();
   }
 
   dispose() {
@@ -171,9 +178,9 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   onInputMove(e: MouseEvent | TouchEvent) {
     if (this.input.isGrabbing && !this.pointerDeviceService.isDragging) {
-      return this.cancel(); // todo
+      return this.cancelWithoutCommit();
     }
-    if (this.isDisable || !this.input.isGrabbing) return this.cancel();
+    if (this.isDisable || !this.input.isGrabbing) return this.cancelWithoutCommit();
 
     if (e.cancelable) e.preventDefault();
     e.stopPropagation();
@@ -187,20 +194,20 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   onInputEnd(e: MouseEvent | TouchEvent) {
-    if (this.isDisable) return this.cancel();
+    if (this.isDisable) return this.cancelWithoutCommit();
     e.stopPropagation();
     if (this.input.isDragging) this.ondragend.emit(e as PointerEvent);
-    this.cancel();
+    // Snap first, then commit undo from final angle, then release grab state.
     this.snapToPolygonal(this.polygonal);
-    //this.snapToPolygonal();
     this.synchronizer.finishRotate();
+    this.cancel();
     this.onend.emit(e as PointerEvent);
   }
 
   onContextMenu(e: MouseEvent | TouchEvent) {
-    if (this.isDisable) return this.cancel();
+    if (this.isDisable) return this.cancelWithoutCommit();
     if (e.cancelable) e.preventDefault();
-    this.cancel();
+    this.cancelWithoutCommit();
     this.snapToPolygonal(this.polygonal);
   }
 

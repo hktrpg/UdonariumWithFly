@@ -99,12 +99,14 @@ export class TableMouseGesture {
   }
 
   onWheel(ev: WheelEvent) {
-    // Object rotation shortcuts are handled elsewhere.
-    if (ev.altKey) return;
+    // Ctrl+Shift+wheel = object rotate (handled in TabletopKeyboardService).
     if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) return;
+    // Alt+wheel with selection = object rotate (same service, capture phase).
+    // With no selection the event reaches here → rotate the view.
 
     // Prefer dominant axis (Shift+wheel often becomes deltaX on OS/browser).
-    const rawDelta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+    const useX = Math.abs(ev.deltaX) > Math.abs(ev.deltaY);
+    const rawDelta = useX ? ev.deltaX : ev.deltaY;
     let pixelDelta = 0;
     switch (ev.deltaMode) {
       case WheelEvent.DOM_DELTA_LINE:
@@ -129,7 +131,19 @@ export class TableMouseGesture {
 
     let event = TableMouseGestureEvent.ZOOM;
 
-    if (ev.shiftKey) {
+    if (ev.altKey) {
+      // Empty selection only (selection path consumed in TabletopKeyboardService).
+      if (ev.ctrlKey || ev.metaKey) return;
+      event = TableMouseGestureEvent.ROTATE;
+      if (ev.shiftKey) {
+        // Alt+Shift+wheel → pitch view up/down (same axis as middle-drag vertical).
+        rotateX = -pixelDelta / 8;
+      } else {
+        // Alt+wheel → yaw view left/right.
+        rotateZ = -pixelDelta / 8;
+      }
+      if (ev.cancelable) ev.preventDefault();
+    } else if (ev.shiftKey) {
       // Shift + wheel → pan left / right
       transformX = -pixelDelta;
       event = TableMouseGestureEvent.DRAG;

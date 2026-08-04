@@ -379,10 +379,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   get characterShadowOffset(): number {
-    // Place flattened shadow on the pedestal, centered by size.
-    const flatY = 0.66;
-    const pedestalCenter = this.gridSize * this.size / 2;
-    return pedestalCenter - this.characterShadowImageHeight * flatY;
+    // With Fly: pin near pedestal with *0.99 so the flattened silhouette falls
+    // behind the upright art — not centered on the token base.
+    let offset = 0;
+    if (0.2 < this.height && this.height <= 0.3) {
+      offset = 0.09;
+    } else if (0.1 < this.height && this.height <= 0.2) {
+      offset = 0.19;
+    } else if (0 < this.height && this.height <= 0.1) {
+      offset = 0.29;
+    }
+    return (this.gridSize * this.size / 2) - (this.characterShadowImageHeight * 0.99) - (this.gridSize * offset);
   }
 
   get shadowOpacity(): number {

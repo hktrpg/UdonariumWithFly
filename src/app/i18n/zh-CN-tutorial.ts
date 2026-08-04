@@ -9,7 +9,7 @@ export const zhCN_tutorial: I18nDictionary = {
 建议桌面版 Chrome。输入第一则聊天后，此教学会自动隐藏。
 完整说明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜视角＞Ctrl＋左键／右键拖曳＝平移地图　中键拖曳＝旋转视角　滚轮＝缩放
-　　　　Shift＋滚轮＝左右移动画面　Ctrl＋滚轮＝上下移动画面
+　　　　Alt＋滚轮（无选取）＝左右旋转视角　Alt＋Shift＋滚轮（无选取）＝俯仰　Shift＋滚轮＝左右移动画面　Ctrl＋滚轮＝上下移动画面
 ＜物件＞左键拖曳移动　拖旋转把手转向　右键＝菜单
 　　　　双击＝开启详情（角色／卡牌／牌堆／骰子／地形／笔记／遮罩／范围等）
 　　　　角色「下一张图像」改在右键菜单「切换下一张图像」
@@ -25,7 +25,7 @@ export const zhCN_tutorial: I18nDictionary = {
 　　　　Ctrl＋Z＝撤销　Ctrl＋Y／Ctrl＋Shift＋Z＝重做
 　　　　　（移动／旋转／删除／剪切粘贴／图层；场景工具创建／删除／微移）
 　　　　[ ＝送到后层　] ＝送到前层
-　　　　Alt＋滚轮＝旋转 15°　Ctrl＋Shift＋滚轮＝旋转 45°
+　　　　Alt＋滚轮＝选取时面向 ±1°；无选取时左右视角　Alt＋Shift＋滚轮＝选取时立绘倾角（roll）±1°；无选取时俯仰　Ctrl＋Shift＋滚轮＝面向 ±45°
 　　　　拖曳放开时按住 Shift＝暂时不吸附格线　Esc＝取消选取
 　　　　访客模式无法使用编辑类快捷键；输入框内 Ctrl＋Z 仍由浏览器处理文字。`,
   'tutorial.chat': `＜聊天＞上方可切频道；工具栏（本机，ON＝开／OFF＝关）：
@@ -70,7 +70,7 @@ export const zhCN_tutorial: I18nDictionary = {
 ・桌面选取高亮；左键空白框选；Shift＋点／拖曳多选；Ctrl＋左键／右键拖曳平移地图
 ・双击物件开启详情（翻面／抽牌／掷骰改右键菜单）
 ・键盘：WASD 移动、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（贴在光标）、Ctrl＋Z／Y 撤销重做
-・[ / ] 调整前后层；Alt＋滚轮 15°／Ctrl＋Shift＋滚轮 45° 旋转
+・[ / ] 调整前后层；Alt＋滚轮（选取＝面向 1°／无选取＝视角左右）；Alt＋Shift＋滚轮（选取＝roll／无选取＝俯仰）；Ctrl＋Shift＋滚轮 45°
 ・Shift＋滚轮左右移动画面；Ctrl＋滚轮上下移动画面
 ・路径移动：选取 Token → Ctrl＋左键加路点（可放开 Ctrl）→ 左键点终点或 Space 开始移动；右键取消最后路点；Esc 取消路径
 ・角色「切换下一张图像」改右键；阴影随尺寸／高度变化`,

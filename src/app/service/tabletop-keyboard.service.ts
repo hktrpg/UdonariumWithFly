@@ -37,14 +37,12 @@ export class TabletopKeyboardService {
   private readonly pressed = new Set<string>();
   private clipboardXml: string[] = [];
   private listening = false;
-  private wheelAcc = 0;
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
   private readonly onWheel = (e: WheelEvent) => this.handleWheel(e);
   private readonly onBlur = () => {
     this.pressed.clear();
-    this.wheelAcc = 0;
   };
 
   constructor(
@@ -59,8 +57,8 @@ export class TabletopKeyboardService {
     if (this.listening) return;
     this.undoService.setPoseVisualSync((object, pose) => {
       MovableDirective.syncPoseFromUndo(object, pose.x, pose.y, pose.posZ);
-      if (pose.rotate != null) {
-        RotableSelectionSynchronizer.syncRotateFromUndo(object, pose.rotate);
+      if (pose.rotate != null || pose.roll != null) {
+        RotableSelectionSynchronizer.syncRotateFromUndo(object, pose);
       }
     });
     document.addEventListener('keydown', this.onKeyDown, true);
@@ -205,10 +203,15 @@ export class TabletopKeyboardService {
     if (this.shouldIgnore(e)) return;
     if (Network.GuestMode()) return;
     if (this.selectionService.size < 1) return;
-    // Ctrl/Shift+wheel pan the view; object rotate uses Alt (15°) or Ctrl+Shift (45°).
-    const stepDeg = (e.ctrlKey || e.metaKey) && e.shiftKey ? 45
-      : e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey ? 15
-      : null;
+    // With selection:
+    //   Alt+wheel → facing (~1° per wheel notch)
+    //   Alt+Shift+wheel → roll (~1° per notch)
+    //   Ctrl+Shift+wheel → facing (~45° per notch)
+    // Empty selection: Alt / Alt+Shift view rotate is handled by TableMouseGesture.
+    const isCtrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey;
+    const isAltOnly = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+    const isAltShift = e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey;
+    const stepDeg = isCtrlShift ? 45 : (isAltOnly || isAltShift) ? 1 : null;
     if (stepDeg == null) return;
 
     // Prefer the dominant axis (Shift may still contribute deltaX while Ctrl is held).
@@ -219,21 +222,20 @@ export class TabletopKeyboardService {
     if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) amount *= 16;
     else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) amount *= 800;
 
-    const notch = 100;
-    this.wheelAcc += amount;
+    // Must always consume here. If we only stop after an accumulator threshold,
+    // TableMouseGesture still sees Alt+wheel and rotates the *view* — drowning out
+    // the tiny object step so 1° / 5° / 15° all feel the same.
+    e.preventDefault();
+    e.stopPropagation();
 
-    let applied = false;
-    while (Math.abs(this.wheelAcc) >= notch) {
-      const dir = this.wheelAcc > 0 ? 1 : -1;
-      if (RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, dir * stepDeg)) {
-        applied = true;
-      }
-      this.wheelAcc -= dir * notch;
-    }
+    // ~100px (one typical mouse notch) → stepDeg. Trackpads scale smoothly.
+    const delta = (amount / 100) * stepDeg;
+    if (Math.abs(delta) < 0.01) return;
 
-    if (applied) {
-      e.preventDefault();
-      e.stopPropagation();
+    if (isAltShift) {
+      RotableSelectionSynchronizer.rollBy(this.selectionService.objects, delta);
+    } else {
+      RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta);
     }
   }
 
