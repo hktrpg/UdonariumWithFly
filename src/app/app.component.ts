@@ -905,10 +905,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     return PanelService.isTourPanelOpen(tourId);
   }
 
-  /** Bottom-nav: tap open; tap again closes sheet (map-first). */
+  /** Open panel; tap/click again closes (chat on desktop always opens). */
   openOrToggle(componentName: string) {
     this.enforceGuestPlayMode();
-    if (!this.mobileLayout.isMobile) {
+    const isChat = componentName === 'ChatWindowComponent';
+    // Desktop chat can open multiple windows — never toggle-close from the menu.
+    if (!this.mobileLayout.isMobile && isChat) {
       this.open(componentName);
       return;
     }
@@ -991,6 +993,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toolBox(event: Event) {
     this.guidedTour.notifyMenuClick('menu.toolbox');
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = this.isMobileLayout
@@ -1357,6 +1363,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   standSetteings(event: Event) {
     this.guidedTour.notifyMenuClick('menu.settings');
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = this.isMobileLayout

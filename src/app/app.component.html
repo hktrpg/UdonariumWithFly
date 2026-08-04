@@ -150,7 +150,7 @@
 <!-- Desktop full menu (also used conceptually; mobile "More" opens a subset via context menu). -->
 <ng-template #mainMenu>
   <ul>
-    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
+    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">people</i></div>
         <div>{{ 'menu.connection' | i18n }}</div>
@@ -162,19 +162,19 @@
         <div>{{ 'menu.chat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.table" [appTeachingTip]="'tip.menu.table'" (click)="open('GameTableSettingComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.table" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">layers</i></div>
         <div>{{ 'menu.table' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.images" [appTeachingTip]="'tip.menu.images'" (click)="open('FileStorageComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.images" [appTeachingTip]="'tip.menu.images'" (click)="openOrToggle('FileStorageComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">photo_library</i></div>
         <div>{{ 'menu.images' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.music" [appTeachingTip]="'tip.menu.music'" (click)="open('JukeboxComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.music" [appTeachingTip]="'tip.menu.music'" (click)="openOrToggle('JukeboxComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons">queue_music</i></div>
         <div>{{ 'menu.music' | i18n }}</div>
@@ -186,37 +186,37 @@
         <div>{{ 'menu.toolbox' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
+    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="openOrToggle('CombatTrackerComponent')">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">sports_mma</i></div>
         <div>{{ 'menu.combat' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.sceneTools" [appTeachingTip]="'tip.menu.sceneTools'" (click)="open('SceneToolsComponent')" *ngIf="canOpenSceneTools">
+    <li data-tour-id="menu.sceneTools" [appTeachingTip]="'tip.menu.sceneTools'" (click)="openOrToggle('SceneToolsComponent')" *ngIf="canOpenSceneTools">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">architecture</i></div>
         <div>{{ 'menu.sceneTools' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.scenePreset" [appTeachingTip]="'tip.menu.scenePreset'" (click)="open('ScenePresetComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.scenePreset" [appTeachingTip]="'tip.menu.scenePreset'" (click)="openOrToggle('ScenePresetComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">theaters</i></div>
         <div>{{ 'menu.scenePreset' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.scenarioText" [appTeachingTip]="'tip.menu.scenarioText'" (click)="open('ScenarioTextComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.scenarioText" [appTeachingTip]="'tip.menu.scenarioText'" (click)="openOrToggle('ScenarioTextComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">menu_book</i></div>
         <div>{{ 'menu.scenarioText' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="openOrToggle('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">folder_shared</i></div>
         <div>{{ 'menu.inventory' | i18n }}</div>
       </a>
     </li>
-    <li data-tour-id="menu.notes" [appTeachingTip]="'tip.menu.notes'" (click)="open('NoteInventoryComponent')" *ngIf="!GuestMode()">
+    <li data-tour-id="menu.notes" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="!GuestMode()">
       <a routerLink="/" routerLinkActive="active">
         <div><i class="material-icons icon-size">note</i></div>
         <div>{{ 'menu.notes' | i18n }}</div>
