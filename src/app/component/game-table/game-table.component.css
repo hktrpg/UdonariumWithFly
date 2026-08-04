@@ -560,13 +560,16 @@
   z-index: 11040;
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 10px;
   box-sizing: border-box;
+  max-width: calc(100vw - 16px - var(--udon-left-chrome, 0px));
   background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
   border: 1px solid var(--udon-chrome-border, #555);
-  border-radius: 999px;
+  border-radius: 16px;
   pointer-events: auto;
   touch-action: manipulation;
   user-select: none;
@@ -612,9 +615,12 @@ html.udon-tablet-landscape .map-action-hud {
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  margin-left: 4px;
-  padding-left: 8px;
-  border-left: 1px solid var(--udon-chrome-border, #555);
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+  flex: 1 1 120px;
+  min-width: 110px;
+  max-width: 160px;
 }
 
 .map-hud-zoom-reset {
@@ -631,7 +637,9 @@ html.udon-tablet-landscape .map-action-hud {
 }
 
 .map-hud-zoom-range {
-  width: 88px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 64px;
   height: 28px;
   margin: 0;
   accent-color: #8ab4f8;

@@ -13,7 +13,7 @@
 
 <!-- Phone / tablet portrait: Play or Edit bottom nav -->
 <nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
-  <ul *ngIf="!isMobileEdit">
+  <ul *ngIf="!isMobileEdit || GuestMode()">
     <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">people</i></div>
@@ -45,7 +45,7 @@
       </a>
     </li>
   </ul>
-  <ul *ngIf="isMobileEdit">
+  <ul *ngIf="isMobileEdit && !GuestMode()">
     <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">layers</i></div>
@@ -81,7 +81,7 @@
 
 <!-- Tablet landscape: left icon rail (Play / Edit) -->
 <nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
-  <ul *ngIf="!isMobileEdit">
+  <ul *ngIf="!isMobileEdit || GuestMode()">
     <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">people</i></div>
@@ -113,7 +113,7 @@
       </a>
     </li>
   </ul>
-  <ul *ngIf="isMobileEdit">
+  <ul *ngIf="isMobileEdit && !GuestMode()">
     <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">layers</i></div>

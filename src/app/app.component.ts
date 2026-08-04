@@ -546,7 +546,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       })
       .on('OPEN_CHAT', -1000, () => {
-        this.ngZone.run(() => this.open('ChatWindowComponent'));
+        this.ngZone.run(() => this.openOrToggle('ChatWindowComponent'));
       });
 
     workaroundForMobileSafari();
@@ -766,6 +766,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   open(componentName: string) {
+    this.enforceGuestPlayMode();
     let component: { new(...args: any[]): any } = null;
     let option: PanelOption = { width: 450, height: 600, left: 100 }
     switch (componentName) {
@@ -899,6 +900,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Bottom-nav: tap open; tap again closes sheet (map-first). */
   openOrToggle(componentName: string) {
+    this.enforceGuestPlayMode();
     if (!this.mobileLayout.isMobile) {
       this.open(componentName);
       return;
@@ -918,6 +920,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.contextMenuService.close();
     this.mobileLayout.setUiMode(mode);
     this.isMobileEdit = mode === 'edit';
+  }
+
+  /** If identity becomes Guest while Edit is sticky, force Play + close sheets. */
+  private enforceGuestPlayMode() {
+    if (!this.mobileLayout.isMobile || !this.GuestMode() || !this.mobileLayout.isEdit) return;
+    PanelService.closeAllPanels();
+    this.mobileLayout.setUiMode('play');
+    this.isMobileEdit = false;
   }
 
   GuestMode() {
@@ -990,6 +1000,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Mobile primary-nav "More" — mode-aware secondary actions. */
   openMoreMenu(event: Event) {
+    this.enforceGuestPlayMode();
     this.guidedTour.notifyMenuClick('menu.more');
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
