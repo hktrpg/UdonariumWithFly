@@ -30,8 +30,8 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   guestPassword: string = '';
   /** Allow player (user) role to join. */
   allowUser = true;
-  /** Allow guest role to join. */
-  allowGuest = true;
+  /** Allow guest role to join. Off by default for new rooms. */
+  allowGuest = false;
   isSaving = false;
   help: string = '';
 
@@ -80,7 +80,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
       const preferredName = String(this.modalService.option?.preferredRoomName || '').trim();
       this.roomName = preferredName || this.makeDefaultRoomName();
       this.allowUser = true;
-      this.allowGuest = true;
+      this.allowGuest = false;
       this.applyPreferredAuth(this.modalService.option?.preferredAuth);
     }
     Promise.resolve().then(() => this.refreshPanelTitle());

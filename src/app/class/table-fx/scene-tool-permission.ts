@@ -2,14 +2,16 @@ import { GuestSession } from '../guest-session';
 import { SyncObject, SyncVar } from '../core/synchronize-object/decorator';
 import { GameObject } from '../core/synchronize-object/game-object';
 import { InnerXml } from '../core/synchronize-object/object-serializer';
+import { Network } from '../core/system';
 import { PeerCursor } from '../peer-cursor';
 
 export type SceneCreateKind = 'light' | 'wall' | 'draw-rect' | 'draw-ellipse' | 'draw-polygon' | 'draw-freehand' | 'draw-text';
 export type SceneModifyKind = 'light' | 'wall' | 'drawing';
 
 /**
- * Room-wide scene-tool permissions for non-GM players.
- * Defaults: all create/modify allowed. GM is always unrestricted.
+ * Room-wide permissions for non-GM players.
+ * Scene tools default allowed; room data load (ZIP / folder) defaults GM-only.
+ * GM is always unrestricted.
  */
 @SyncObject('scene-tool-permission')
 export class SceneToolPermission extends GameObject implements InnerXml {
@@ -24,6 +26,11 @@ export class SceneToolPermission extends GameObject implements InnerXml {
   @SyncVar() playerCanModifyLight: boolean = true;
   @SyncVar() playerCanModifyWall: boolean = true;
   @SyncVar() playerCanModifyDrawing: boolean = true;
+
+  /** When false (default), only GM may load a room ZIP while in a room. */
+  @SyncVar() playerCanLoadZip: boolean = false;
+  /** When false (default), only GM may load a room from the backup folder while in a room. */
+  @SyncVar() playerCanLoadRoom: boolean = false;
 
   private static _instance: SceneToolPermission;
 
@@ -101,6 +108,27 @@ export class SceneToolPermission extends GameObject implements InnerXml {
     if (mode === 'light' || mode === 'wall') return this.canCreateKind(mode);
     if (mode.startsWith('draw-')) return this.canCreateKind(mode as SceneCreateKind);
     return false;
+  }
+
+  /**
+   * Load room ZIP. Guests never; GM always; outside a room always (lobby / solo);
+   * in-room players need {@link playerCanLoadZip}.
+   */
+  canLoadZip(): boolean {
+    if (GuestSession.isGuest) return false;
+    if (this.isGM) return true;
+    if (!Network.peer?.isRoom) return true;
+    return !!this.playerCanLoadZip;
+  }
+
+  /**
+   * Load room from folder backup. Same rules as {@link canLoadZip}.
+   */
+  canLoadRoom(): boolean {
+    if (GuestSession.isGuest) return false;
+    if (this.isGM) return true;
+    if (!Network.peer?.isRoom) return true;
+    return !!this.playerCanLoadRoom;
   }
 
   setAllCreate(enabled: boolean) {

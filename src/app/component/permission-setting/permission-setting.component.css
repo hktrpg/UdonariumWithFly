@@ -31,6 +31,10 @@
   margin: 2px 0 0 1.4em;
   font-size: 12px;
 }
+.scene-perm-sub-flat {
+  margin-left: 0;
+  font-size: 13px;
+}
 
 .hint {
   font-size: 12px;

@@ -14,6 +14,7 @@ import { ModalService } from 'service/modal.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 @Component({
   selector: 'lobby',
@@ -50,6 +51,23 @@ export class LobbyComponent implements OnInit, OnDestroy {
   get isConnected(): boolean { return 0 < Network.peerIds.length; }
   get canShowLoadRoom(): boolean {
     return this.folderBackup.isSupported && !Network.GuestMode();
+  }
+
+  /** Bound → load room; needAuth/error → reauth; unbound → bind folder. */
+  get folderBackupActionLabelKey(): string {
+    if (this.folderBackup.isReady) return 'menu.folderBackup.loadRoom';
+    if (this.folderBackup.status === 'needAuth' || this.folderBackup.hasError) {
+      return 'menu.folderBackup.reauth';
+    }
+    return 'menu.folderBackup.bind';
+  }
+
+  get canLoadRoom(): boolean { return SceneToolPermission.instance.canLoadRoom(); }
+
+  /** Load-room action is blocked for players unless permission allows (bind/reauth still OK). */
+  get isFolderLoadDisabled(): boolean {
+    if (this.folderBackup.status === 'writing') return true;
+    return this.folderBackup.isReady && !this.canLoadRoom;
   }
 
   constructor(
@@ -174,7 +192,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
   /** Bind folder if needed, then open the room-backup picker. */
   async loadFolderBackup() {
     if (!this.canShowLoadRoom) return;
+    if (this.folderBackup.isReady && !this.canLoadRoom) return;
     if (!(await this.folderBackup.ensureBound())) return;
+    if (!this.canLoadRoom) return;
     await this.folderBackup.openLoadUi();
   }
 

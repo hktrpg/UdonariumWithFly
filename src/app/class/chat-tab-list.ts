@@ -20,6 +20,15 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 
   get chatTabs(): ChatTab[] { return this.children as ChatTab[]; }
 
+  /** Unread count across tabs the local user can view. */
+  get unreadLength(): number {
+    return this.chatTabs
+      .filter(tab => tab.canView())
+      .reduce((sum, tab) => sum + (tab.unreadLength || 0), 0);
+  }
+
+  get hasUnread(): boolean { return this.unreadLength > 0; }
+
   addChatTab(chatTab: ChatTab): ChatTab
   addChatTab(tabName: string, identifier?: string): ChatTab
   addChatTab(...args: any[]): ChatTab {

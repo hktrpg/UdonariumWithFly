@@ -115,13 +115,17 @@
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
       {{ 'menu.folderBackup.saveRoom' | i18n }}
     </button>
-    <button type="button" *ngIf="folderBackup.canLoadFromFolder" (click)="loadFolderBackup()">
+    <button type="button" *ngIf="folderBackup.canLoadFromFolder" (click)="loadFolderBackup()"
+      [disabled]="!canLoadRoom"
+      [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
-      {{ 'menu.folderBackup.loadRoom' | i18n }}
+      {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
     </button>
-    <button type="button" *ngIf="networkService.peer.isRoom" (click)="loadZip()">
+    <button type="button" *ngIf="networkService.peer.isRoom" (click)="loadZip()"
+      [disabled]="!canLoadZip"
+      [title]="canLoadZip ? ('menu.loadZip' | i18n) : ('peer.loadData.gmOnly' | i18n)">
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">open_in_browser</i>
-      {{ 'menu.loadZip' | i18n }}
+      {{ 'menu.loadZip' | i18n }}<ng-container *ngIf="!canLoadZip">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
     </button>
     <button type="button" *ngIf="networkService.peer.isRoom" (click)="downloadZip()"
       [disabled]="isDownloadingZip">
@@ -190,3 +194,4 @@
     </div>
   </div>
 </div>
+<div class="app-version">{{ 'peer.version' | i18n:{ version: appVersionDisplay } }}</div>

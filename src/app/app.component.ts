@@ -132,6 +132,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
+  /** Total unread chat messages (viewable tabs). */
+  get chatUnreadCount(): number { return ChatTabList.instance.unreadLength; }
+  /** Badge label: cap at 99+ so the bubble stays a tidy pill. */
+  get chatUnreadBadgeLabel(): string {
+    const n = this.chatUnreadCount;
+    return n > 99 ? '99+' : String(n);
+  }
+  /** Badge on menu chat icon only while no chat panel is open. */
+  get showChatUnreadBadge(): boolean {
+    return this.chatUnreadCount > 0 && !PanelService.isTourPanelOpen('menu.chat');
+  }
+
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
   get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
@@ -503,6 +515,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           console.log(e);
         }
         */
+        this.lazyNgZoneUpdate(true);
         if (ChatWindowComponent.isAutoPopup && !PanelService.isTourPanelOpen('menu.chat')) {
           this.ngZone.run(() => this.open('ChatWindowComponent'));
         }
@@ -520,6 +533,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.noticeIntervalTimer);
           this.noticeIntervalTimer = null;
         }
+      })
+      .on('MESSAGE_ADDED', () => {
+        this.lazyNgZoneUpdate(true);
+      })
+      .on('CHAT_PANEL_CHANGED', () => {
+        this.lazyNgZoneUpdate(true);
       })
       .on('PLAY_CUT_IN', -1000, event => {
         let cutIn = ObjectStore.instance.get<CutIn>(event.data.identifier);
@@ -706,6 +725,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let tourWasActive = false;
     this.guidedTour.state$.subscribe(s => {
       const active = s.phase === 'welcome' || s.phase === 'running';
+      if (active && !tourWasActive) {
+        // Keep the tour unobstructed: no cold-start lobby over welcome / steps.
+        this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+      }
       if (tourWasActive && !active) {
         this.ngZone.run(() => this.openDefaultPanels());
       }
@@ -882,6 +905,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.panelService.open(component, option);
       if (tourId) this.guidedTour.notifyPanelOpened(tourId);
+      if (componentName === 'ChatWindowComponent') {
+        EventSystem.trigger('CHAT_PANEL_CHANGED', null);
+      }
     }
   }
 
@@ -909,6 +935,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Show lobby once on cold start when not already in a room / invite join. */
   private openLobbyIfNeeded() {
     if (this.lobbyAutoOpened) return;
+    if (this.guidedTour.isActive) return;
     if (!PanelService.defaultParentViewContainerRef) return;
     if (!Network.isOpen || Network.peer?.isRoom) return;
     if (this.roomInvite.parseInviteFromLocation()) return;
@@ -1195,7 +1222,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);
-      menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
+      menu.push({
+        name: SceneToolPermission.instance.canLoadZip()
+          ? this.i18n.t('menu.loadZip')
+          : `${this.i18n.t('menu.loadZip')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+        materialIcon: 'open_in_browser',
+        disabled: !SceneToolPermission.instance.canLoadZip(),
+        action: () => this.openZipFileSelect()
+      });
       menu.push({
         name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
         materialIcon: 'sd_storage',
@@ -1233,8 +1267,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     ];
     if (this.folderBackup.canLoadFromFolder) {
+      const canLoad = SceneToolPermission.instance.canLoadRoom();
       subActions.push({
-        name: this.i18n.t('menu.folderBackup.load'),
+        name: canLoad
+          ? this.i18n.t('menu.folderBackup.load')
+          : `${this.i18n.t('menu.folderBackup.load')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+        disabled: !canLoad,
         action: () => { void this.openFolderBackupLoad(); }
       });
     }
@@ -1351,6 +1389,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async openZipFileSelect() {
+    if (!SceneToolPermission.instance.canLoadZip()) return;
     if (!this.isRoom) {
       let loadDirectOpened = false;
       const choice = await this.modalService.open(ConfirmationComponent, {
@@ -1387,6 +1426,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   openFolderBackupLoad() {
     if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
+    if (!SceneToolPermission.instance.canLoadRoom()) return;
     void this.folderBackup.openLoadUi();
   }
 

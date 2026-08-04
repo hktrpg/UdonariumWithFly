@@ -41,6 +41,11 @@ export class PermissionSettingComponent implements OnInit, OnDestroy {
   get sceneCanModifyDrawing(): boolean { return this.scenePerm.playerCanModifyDrawing; }
   set sceneCanModifyDrawing(v: boolean) { this.scenePerm.playerCanModifyDrawing = !!v; }
 
+  get playerCanLoadZip(): boolean { return this.scenePerm.playerCanLoadZip; }
+  set playerCanLoadZip(v: boolean) { this.scenePerm.playerCanLoadZip = !!v; }
+  get playerCanLoadRoom(): boolean { return this.scenePerm.playerCanLoadRoom; }
+  set playerCanLoadRoom(v: boolean) { this.scenePerm.playerCanLoadRoom = !!v; }
+
   get sceneAllCreate(): boolean {
     const p = this.scenePerm;
     return p.playerCanCreateLight && p.playerCanCreateWall
