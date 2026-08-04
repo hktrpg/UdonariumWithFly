@@ -184,7 +184,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   async showRoomSetting() {
-    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
+    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 720, height: 720, left: 0, top: 80 });
     if (isCreate) this.dismissLobby();
     this.help = this.i18n.t('lobby.helpInitial');
   }

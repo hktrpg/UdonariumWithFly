@@ -11,7 +11,6 @@ import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
-import { PermissionSettingComponent } from 'component/permission-setting/permission-setting.component';
 import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -295,23 +294,18 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   showCreateRoom() {
-    this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
+    this.modalService.open(RoomSettingComponent, { width: 720, height: 720, left: 0, top: 80 });
   }
 
   editRoomPasswords() {
     if (!this.isGMMode || !this.isRoleAuthRoom || !this.networkService.peer.isRoom) return;
     this.modalService.open(RoomSettingComponent, {
       editMode: true,
-      width: 700,
-      height: 460,
+      width: 720,
+      height: 720,
       left: 0,
-      top: 400,
+      top: 80,
     });
-  }
-
-  openPermissionManage() {
-    if (!this.isGMMode) return;
-    this.panelService.open(PermissionSettingComponent, { width: 500, height: 620, left: 120, top: 60 });
   }
 
   loadZip() {

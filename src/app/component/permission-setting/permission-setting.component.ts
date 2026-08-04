@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { EventSystem } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
@@ -13,8 +13,15 @@ import { PanelService } from 'service/panel.service';
   standalone: false
 })
 export class PermissionSettingComponent implements OnInit, OnDestroy {
+  /** When true (inside room create/edit), allow edits without requiring GM flag yet. */
+  @Input() embedMode = false;
+
   get isGMMode(): boolean {
     return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false;
+  }
+
+  get canEditPerms(): boolean {
+    return this.embedMode || this.isGMMode;
   }
 
   get scenePerm() { return SceneToolPermission.instance; }
@@ -86,10 +93,12 @@ export class PermissionSettingComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    Promise.resolve().then(() => this.refreshTitle());
+    if (!this.embedMode) {
+      Promise.resolve().then(() => this.refreshTitle());
+    }
     EventSystem.register(this)
-      .on('LOCALE_CHANGED', () => this.refreshTitle())
-      .on('CHANGE_GM_MODE', () => this.refreshTitle());
+      .on('LOCALE_CHANGED', () => { if (!this.embedMode) this.refreshTitle(); })
+      .on('CHANGE_GM_MODE', () => { if (!this.embedMode) this.refreshTitle(); });
   }
 
   ngOnDestroy() {

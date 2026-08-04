@@ -80,7 +80,7 @@ export const zhTW: I18nDictionary = {
   'scene.hint.text': '在地圖上點一下放置文字（不會跳窗）。',
   'scene.hint.select': '場景選取中：在地圖上拖曳可一次框選多個繪圖／燈光／牆壁；短按為單選（不會選到棋子）。WASD／方向鍵移動　Delete 刪除。再按「選取」可關閉。',
   'scene.hint.idle': '未啟用工具時可正常操作棋子。需要編輯場景物件時再按「選取」。',
-  'scene.hint.noAccess': '目前沒有場景工具權限。請向 GM 於「權限管理」中開放玩家新增／修改。',
+  'scene.hint.noAccess': '目前沒有場景工具權限。請向 GM 於「設定」中開放玩家新增／修改。',
   'scene.ctx.addLight': '新增燈光',
   'scene.ctx.addWall': '新增牆壁',
   'scene.ctx.addFreehand': '新增手繪',

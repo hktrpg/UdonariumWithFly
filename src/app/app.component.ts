@@ -1440,10 +1440,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       if (choice === true) {
         await this.modalService.open(RoomSettingComponent, {
-          width: 700,
-          height: 420,
+          width: 720,
+          height: 720,
           left: 0,
-          top: 400,
+          top: 80,
           // Keep file picker in the create-button click stack.
           afterCreate: () => this.pickZipFiles(),
         });
