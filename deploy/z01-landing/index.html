@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Udonarium 烏冬 @ HKTRPG</title>
+  <meta name="description" content="HKTRPG 改造版烏冬（Udonarium）：自架 SkyWay backend、多語介面、光照與戰鬥追蹤等 VTT 工具。">
+  <meta property="og:url" content="https://z01.hktrpg.com/">
+  <meta property="og:title" content="Udonarium 烏冬 @ HKTRPG">
+  <meta property="og:description" content="自架 backend 的 HKTRPG 烏冬：多語、教學、光照、戰鬥追蹤與資料夾備份。">
+  <meta property="og:image" content="https://z01.hktrpg.com/hktrpg-main/card.png">
+  <link rel="icon" href="https://z01.hktrpg.com/hktrpg-main/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg0: #0f1412;
+      --bg1: #18201c;
+      --ink: #e8efe8;
+      --muted: #9aada0;
+      --line: rgba(232, 239, 232, 0.12);
+      --accent: #d4a35c;
+      --accent-2: #3d8f6e;
+      --card: rgba(24, 32, 28, 0.82);
+      --ok: #5ecf9a;
+      --partial: #d4a35c;
+      --no: #6b7570;
+      --radius: 18px;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+      --font-body: "Noto Sans TC", "Noto Sans SC", "Noto Sans JP", system-ui, sans-serif;
+      --font-display: "Fraunces", "Noto Sans TC", serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: var(--font-body);
+      background:
+        radial-gradient(1000px 500px at 10% -10%, rgba(61, 143, 110, 0.28), transparent 55%),
+        radial-gradient(800px 420px at 90% 0%, rgba(212, 163, 92, 0.18), transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #121816);
+      line-height: 1.55;
+    }
+
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: #efc27e; }
+
+    .wrap {
+      width: min(1100px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1.25rem 0 4rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+      animation: rise 0.7s ease both;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: inherit;
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .brand img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .lang {
+      display: inline-flex;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+    .lang button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.4rem 0.7rem;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .lang button[aria-pressed="true"] {
+      background: var(--accent-2);
+      color: #f4fff8;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 2rem;
+      align-items: end;
+      margin-bottom: 2.75rem;
+      animation: rise 0.8s 0.05s ease both;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 0.85rem;
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 1rem;
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      line-height: 1.08;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      margin: 0 0 1.5rem;
+      max-width: 38rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      min-height: 2.85rem;
+      padding: 0.7rem 1.15rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: linear-gradient(135deg, #4aa882, #2f7a5c);
+      color: #f4fff8;
+      box-shadow: 0 10px 28px rgba(47, 122, 92, 0.35);
+    }
+    .btn-primary:hover { color: #fff; }
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .note {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .hero-panel {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 4px);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background: #101612;
+      min-height: 280px;
+      animation: floaty 7s ease-in-out infinite;
+    }
+    .hero-panel img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.92;
+    }
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 45%;
+      background: linear-gradient(transparent, rgba(15, 20, 18, 0.9));
+      pointer-events: none;
+    }
+
+    section {
+      margin-bottom: 2.5rem;
+      animation: rise 0.75s ease both;
+    }
+
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      letter-spacing: -0.01em;
+    }
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 36rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.2rem 1.25rem;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+    .card.featured {
+      border-color: rgba(61, 143, 110, 0.55);
+      background:
+        linear-gradient(180deg, rgba(61, 143, 110, 0.16), transparent 42%),
+        var(--card);
+    }
+    .card h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1.15rem;
+    }
+    .card .tag {
+      display: inline-block;
+      margin-bottom: 0.7rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: rgba(212, 163, 92, 0.16);
+      color: var(--accent);
+    }
+    .card.featured .tag {
+      background: rgba(61, 143, 110, 0.22);
+      color: #9be3c2;
+    }
+    .card p {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .card .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 0.9rem;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+    th, td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #1c2621;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+    tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    td:first-child { color: var(--ink); font-weight: 500; width: 34%; }
+    .mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+    .mark.yes { color: var(--ok); }
+    .mark.partial { color: var(--partial); }
+    .mark.no { color: var(--no); }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1.25rem;
+      margin-top: 0.85rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      justify-content: space-between;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes floaty {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @media (max-width: 900px) {
+      .hero, .cards { grid-template-columns: 1fr; }
+      .hero-panel { min-height: 220px; order: -1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <a class="brand" href="https://www.hktrpg.com/">
+        <img src="https://z01.hktrpg.com/hktrpg-main/hktrpg-icon.png" alt="HKTRPG" width="40" height="40">
+        <span>HKTRPG · Udonarium</span>
+      </a>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="zh-Hant" aria-pressed="true">繁中</button>
+        <button type="button" data-lang="zh-Hans" aria-pressed="false">简中</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow" data-i18n="eyebrow">烏冬 @ HKTRPG</div>
+        <h1 data-i18n="title">在瀏覽器跑團的 2.5D 桌面</h1>
+        <p class="lead" data-i18n="lead">以 Udonarium／With Fly 為基底的 HKTRPG 改造版：自架 SkyWay backend、多語介面，並加上光照、戰鬥追蹤與鍵盤操控等 VTT 工具。</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://z01.hktrpg.com/hktrpg-main/" data-i18n="ctaPrimary">進入正式版</a>
+          <a class="btn btn-ghost" href="https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學" data-i18n="ctaWiki">使用教學</a>
+          <a class="btn btn-ghost" href="https://github.com/zeteticl/UdonariumWithFly" data-i18n="ctaSource">源碼</a>
+        </div>
+        <p class="note" data-i18n="browserTip">推薦桌面版 Google Chrome（需 HTTPS）。連線品質仍依賴玩家網路（P2P）。</p>
+      </div>
+      <div class="hero-panel" aria-hidden="true">
+        <img src="https://z01.hktrpg.com/hktrpg-main/card.png" alt="">
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2 data-i18n="editionsTitle">三個版本</h2>
+        <p data-i18n="editionsLead">本家提供核心線上桌面；With Fly 強化表現力；HKTRPG 在其上加上多語與團務向工具，並自架 backend。</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <span class="tag" data-i18n="tagUpstream">上游</span>
+          <h3 data-i18n="cardBaseTitle">Udonarium 本家</h3>
+          <p data-i18n="cardBaseDesc">WebRTC 線上桌遊／TRPG 支援工具的原點：房間、桌面、聊天、BCDice、ZIP 存檔。</p>
+          <div class="links">
+            <a href="https://github.com/TK11235/udonarium" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://udonarium.app/" target="_blank" rel="noopener" data-i18n="tryDemo">試用</a>
+          </div>
+        </article>
+        <article class="card">
+          <span class="tag" data-i18n="tagFork">改造</span>
+          <h3 data-i18n="cardFlyTitle">Udonarium with Fly</h3>
+          <p data-i18n="cardFlyDesc">高度、立繪（Stand）、Cut-in、聊天文字顏色、骰子機器人表，以及 SkyWay 2023 連線。</p>
+          <div class="links">
+            <a href="https://github.com/NanasuNANA/UdonariumWithFly" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://nanasunana.github.io/" target="_blank" rel="noopener" data-i18n="tryDemo">試用</a>
+          </div>
+        </article>
+        <article class="card featured">
+          <span class="tag" data-i18n="tagHere">本站正式版</span>
+          <h3 data-i18n="cardHktrpgTitle">烏冬 @ HKTRPG</h3>
+          <p data-i18n="cardHktrpgDesc">繼承 With Fly，並加入多語、引導教學、角色權限、光照／FoW、戰鬥追蹤、路徑移動與本機資料夾備份；backend 自架於本站。</p>
+          <div class="links">
+            <a href="https://z01.hktrpg.com/hktrpg-main/" data-i18n="openApp">開啟</a>
+            <a href="https://github.com/zeteticl/UdonariumWithFly" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2 data-i18n="tableTitle">功能比較</h2>
+        <p data-i18n="tableLead">簡表僅列關鍵差異；細節以各專案 README／實際版本為準。</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="colFeature">功能</th>
+              <th data-i18n="colBase">本家</th>
+              <th data-i18n="colFly">With Fly</th>
+              <th data-i18n="colHktrpg">HKTRPG</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-i18n="fCore">房間／多桌面／聊天／BCDice／ZIP</td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fSkyway">SkyWay 2023 + 自架／指定 backend</td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="mark yes" data-i18n="yesSelf">有（本站自架）</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fFly">高度／Stand／Cut-in／聊天色</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fI18n">執行時多語介面（繁／简／EN／日）</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fTour">引導教學／滑過提示</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fRoles">GM／User／Guest 權限與邀請連結</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fGuest">訪客模式（UI 受限）</td>
+              <td><span class="mark partial" data-i18n="partial">基礎／依版本</span></td>
+              <td><span class="mark partial" data-i18n="partial">基礎／依版本</span></td>
+              <td><span class="mark yes" data-i18n="yes">有（加強）</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fNotes">筆記倉庫／快速擲骰</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fKeys">鍵盤操控／復原重做／路徑移動／Ping</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fLight">光照・FoW・場景工具・戰鬥追蹤</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fFx">天氣／圖片特效／狀態光環</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="fBackup">本機資料夾自動備份（Chrome／Edge）</td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark no" data-i18n="no">—</span></td>
+              <td><span class="mark yes" data-i18n="yes">有</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="legend">
+        <span><span class="mark yes" data-i18n="yes">有</span> · <span data-i18n="legendYes">支援</span></span>
+        <span><span class="mark partial" data-i18n="partial">基礎／依版本</span> · <span data-i18n="legendPartial">有限或依上游版本</span></span>
+        <span><span class="mark no" data-i18n="no">—</span> · <span data-i18n="legendNo">非重點／無</span></span>
+      </div>
+    </section>
+
+    <footer>
+      <div data-i18n="footerCopy">MIT。請一併遵守本家、With Fly 與素材授權。</div>
+      <div>
+        <a href="https://github.com/TK11235/udonarium">udonarium</a>
+        ·
+        <a href="https://github.com/NanasuNANA/UdonariumWithFly">UdonariumWithFly</a>
+        ·
+        <a href="https://www.hktrpg.com/">HKTRPG</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const I18N = {
+      "zh-Hant": {
+        eyebrow: "烏冬 @ HKTRPG",
+        title: "在瀏覽器跑團的 2.5D 桌面",
+        lead: "以 Udonarium／With Fly 為基底的 HKTRPG 改造版：自架 SkyWay backend、多語介面，並加上光照、戰鬥追蹤與鍵盤操控等 VTT 工具。",
+        ctaPrimary: "進入正式版",
+        ctaWiki: "使用教學",
+        ctaSource: "源碼",
+        browserTip: "推薦桌面版 Google Chrome（需 HTTPS）。連線品質仍依賴玩家網路（P2P）。",
+        editionsTitle: "三個版本",
+        editionsLead: "本家提供核心線上桌面；With Fly 強化表現力；HKTRPG 在其上加上多語與團務向工具，並自架 backend。",
+        tagUpstream: "上游",
+        tagFork: "改造",
+        tagHere: "本站正式版",
+        cardBaseTitle: "Udonarium 本家",
+        cardBaseDesc: "WebRTC 線上桌遊／TRPG 支援工具的原點：房間、桌面、聊天、BCDice、ZIP 存檔。",
+        cardFlyTitle: "Udonarium with Fly",
+        cardFlyDesc: "高度、立繪（Stand）、Cut-in、聊天文字顏色、骰子機器人表，以及 SkyWay 2023 連線。",
+        cardHktrpgTitle: "烏冬 @ HKTRPG",
+        cardHktrpgDesc: "繼承 With Fly，並加入多語、引導教學、角色權限、光照／FoW、戰鬥追蹤、路徑移動與本機資料夾備份；backend 自架於本站。",
+        tryDemo: "試用",
+        openApp: "開啟",
+        tableTitle: "功能比較",
+        tableLead: "簡表僅列關鍵差異；細節以各專案 README／實際版本為準。",
+        colFeature: "功能",
+        colBase: "本家",
+        colFly: "With Fly",
+        colHktrpg: "HKTRPG",
+        fCore: "房間／多桌面／聊天／BCDice／ZIP",
+        fSkyway: "SkyWay 2023 + 自架／指定 backend",
+        fFly: "高度／Stand／Cut-in／聊天色",
+        fI18n: "執行時多語介面（繁／简／EN／日）",
+        fTour: "引導教學／滑過提示",
+        fRoles: "GM／User／Guest 權限與邀請連結",
+        fGuest: "訪客模式（UI 受限）",
+        fNotes: "筆記倉庫／快速擲骰",
+        fKeys: "鍵盤操控／復原重做／路徑移動／Ping",
+        fLight: "光照・FoW・場景工具・戰鬥追蹤",
+        fFx: "天氣／圖片特效／狀態光環",
+        fBackup: "本機資料夾自動備份（Chrome／Edge）",
+        yes: "有",
+        yesSelf: "有（本站自架）",
+        partial: "基礎／依版本",
+        no: "—",
+        legendYes: "支援",
+        legendPartial: "有限或依上游版本",
+        legendNo: "非重點／無",
+        footerCopy: "MIT。請一併遵守本家、With Fly 與素材授權。"
+      },
+      "zh-Hans": {
+        eyebrow: "乌冬 @ HKTRPG",
+        title: "在浏览器跑团的 2.5D 桌面",
+        lead: "以 Udonarium／With Fly 为基底的 HKTRPG 改造版：自建 SkyWay backend、多语言界面，并加入光照、战斗追踪与键盘操控等 VTT 工具。",
+        ctaPrimary: "进入正式版",
+        ctaWiki: "使用教程",
+        ctaSource: "源码",
+        browserTip: "推荐桌面版 Google Chrome（需 HTTPS）。连线质量仍取决于玩家网络（P2P）。",
+        editionsTitle: "三个版本",
+        editionsLead: "本家提供核心在线桌面；With Fly 强化表现力；HKTRPG 在其上加入多语言与团务向工具，并自建 backend。",
+        tagUpstream: "上游",
+        tagFork: "改造",
+        tagHere: "本站正式版",
+        cardBaseTitle: "Udonarium 本家",
+        cardBaseDesc: "WebRTC 在线桌游／TRPG 支援工具的原点：房间、桌面、聊天、BCDice、ZIP 存档。",
+        cardFlyTitle: "Udonarium with Fly",
+        cardFlyDesc: "高度、立绘（Stand）、Cut-in、聊天文字颜色、骰子机器人表，以及 SkyWay 2023 连线。",
+        cardHktrpgTitle: "乌冬 @ HKTRPG",
+        cardHktrpgDesc: "继承 With Fly，并加入多语言、引导教学、角色权限、光照／FoW、战斗追踪、路径移动与本机文件夹备份；backend 自建于本站。",
+        tryDemo: "试用",
+        openApp: "打开",
+        tableTitle: "功能比较",
+        tableLead: "简表仅列关键差异；细节以各项目 README／实际版本为准。",
+        colFeature: "功能",
+        colBase: "本家",
+        colFly: "With Fly",
+        colHktrpg: "HKTRPG",
+        fCore: "房间／多桌面／聊天／BCDice／ZIP",
+        fSkyway: "SkyWay 2023 + 自建／指定 backend",
+        fFly: "高度／Stand／Cut-in／聊天色",
+        fI18n: "运行时多语言界面（繁／简／EN／日）",
+        fTour: "引导教学／悬停提示",
+        fRoles: "GM／User／Guest 权限与邀请链接",
+        fGuest: "访客模式（UI 受限）",
+        fNotes: "笔记仓库／快速掷骰",
+        fKeys: "键盘操控／撤销重做／路径移动／Ping",
+        fLight: "光照・FoW・场景工具・战斗追踪",
+        fFx: "天气／图片特效／状态光环",
+        fBackup: "本机文件夹自动备份（Chrome／Edge）",
+        yes: "有",
+        yesSelf: "有（本站自建）",
+        partial: "基础／依版本",
+        no: "—",
+        legendYes: "支持",
+        legendPartial: "有限或依上游版本",
+        legendNo: "非重点／无",
+        footerCopy: "MIT。请一并遵守本家、With Fly 与素材授权。"
+      },
+      en: {
+        eyebrow: "Udonarium @ HKTRPG",
+        title: "A 2.5D tabletop in your browser",
+        lead: "HKTRPG’s fork of Udonarium／With Fly: self-hosted SkyWay backend, runtime i18n, plus lighting, combat tracking, and keyboard-driven VTT tools.",
+        ctaPrimary: "Open production build",
+        ctaWiki: "Tutorial",
+        ctaSource: "Source",
+        browserTip: "Desktop Google Chrome recommended (HTTPS required). Connection quality still depends on peer networks (P2P).",
+        editionsTitle: "Three editions",
+        editionsLead: "Upstream covers the core online table; With Fly adds presentation power; HKTRPG adds multilingual UX and session tools with a self-hosted backend.",
+        tagUpstream: "Upstream",
+        tagFork: "Fork",
+        tagHere: "This site",
+        cardBaseTitle: "Udonarium",
+        cardBaseDesc: "The original WebRTC online board／TRPG aid: rooms, tables, chat, BCDice, and ZIP saves.",
+        cardFlyTitle: "Udonarium with Fly",
+        cardFlyDesc: "Altitude, standees, Cut-in, chat text colors, dice-bot tables, and SkyWay 2023.",
+        cardHktrpgTitle: "Udonarium @ HKTRPG",
+        cardHktrpgDesc: "Builds on With Fly with i18n, guided tour, role permissions, lighting／FoW, combat tracker, path move, and folder backup — backend hosted here.",
+        tryDemo: "Demo",
+        openApp: "Open",
+        tableTitle: "Feature comparison",
+        tableLead: "Key differences only; see each project’s README for details.",
+        colFeature: "Feature",
+        colBase: "Upstream",
+        colFly: "With Fly",
+        colHktrpg: "HKTRPG",
+        fCore: "Rooms／tables／chat／BCDice／ZIP",
+        fSkyway: "SkyWay 2023 + configurable backend",
+        fFly: "Altitude／Stand／Cut-in／chat colors",
+        fI18n: "Runtime UI languages (ZH／EN／JA)",
+        fTour: "Guided tour／hover tips",
+        fRoles: "GM／User／Guest roles & invite links",
+        fGuest: "Guest mode (restricted UI)",
+        fNotes: "Note inventory／quick roll",
+        fKeys: "Keyboard／undo-redo／path move／Ping",
+        fLight: "Lighting・FoW・scene tools・combat tracker",
+        fFx: "Weather／image FX／status auras",
+        fBackup: "Local folder auto-backup (Chrome／Edge)",
+        yes: "Yes",
+        yesSelf: "Yes (self-hosted here)",
+        partial: "Basic／varies",
+        no: "—",
+        legendYes: "Supported",
+        legendPartial: "Limited or version-dependent",
+        legendNo: "Not a focus／none",
+        footerCopy: "MIT. Also follow upstream, With Fly, and asset licenses."
+      },
+      ja: {
+        eyebrow: "ウドン @ HKTRPG",
+        title: "ブラウザで遊べる 2.5D 卓",
+        lead: "Udonarium／With Fly をベースにした HKTRPG 改造版。自前 SkyWay backend、多言語 UI、照明・戦闘トラッカー・キーボード操作などの VTT 機能を追加。",
+        ctaPrimary: "本番版を開く",
+        ctaWiki: "使い方",
+        ctaSource: "ソース",
+        browserTip: "推奨はデスクトップ版 Google Chrome（HTTPS 必須）。回線品質は P2P のため利用者環境に依存します。",
+        editionsTitle: "3つの版",
+        editionsLead: "本家はコア機能、With Fly は表現力、HKTRPG は多言語とセッション向けツール＋自前 backend。",
+        tagUpstream: "本家",
+        tagFork: "改造",
+        tagHere: "当サイト本番",
+        cardBaseTitle: "Udonarium 本家",
+        cardBaseDesc: "WebRTC 卓上／TRPG 支援の原点。部屋・卓・チャット・BCDice・ZIP セーブ。",
+        cardFlyTitle: "Udonarium with Fly",
+        cardFlyDesc: "高度、スタンド、Cut-in、チャット文字色、ダイスボット表、SkyWay 2023。",
+        cardHktrpgTitle: "ウドン @ HKTRPG",
+        cardHktrpgDesc: "With Fly を継承し、多言語・ガイド・権限・照明／FoW・戦闘・パス移動・フォルダバックアップを追加。backend は当サイトで自前運用。",
+        tryDemo: "試す",
+        openApp: "開く",
+        tableTitle: "機能比較",
+        tableLead: "主な差分のみ。詳細は各 README／実バージョンを参照。",
+        colFeature: "機能",
+        colBase: "本家",
+        colFly: "With Fly",
+        colHktrpg: "HKTRPG",
+        fCore: "部屋／複数卓／チャット／BCDice／ZIP",
+        fSkyway: "SkyWay 2023＋backend 指定",
+        fFly: "高度／Stand／Cut-in／文字色",
+        fI18n: "実行時多言語（繁／简／EN／日）",
+        fTour: "ガイドツアー／ホバー説明",
+        fRoles: "GM／User／Guest 権限と招待リンク",
+        fGuest: "ゲストモード（UI 制限）",
+        fNotes: "ノート倉庫／クイックロール",
+        fKeys: "キーボード／Undo・Redo／パス移動／Ping",
+        fLight: "照明・FoW・シーンツール・戦闘",
+        fFx: "天候／画像FX／ステータスオーラ",
+        fBackup: "ローカルフォルダ自動バックアップ",
+        yes: "あり",
+        yesSelf: "あり（当サイト自前）",
+        partial: "基本／版による",
+        no: "—",
+        legendYes: "対応",
+        legendPartial: "限定的または上流依存",
+        legendNo: "対象外／なし",
+        footerCopy: "MIT。本家・With Fly・素材ライセンスも遵守してください。"
+      }
+    };
+
+    const htmlLang = {
+      "zh-Hant": "zh-Hant",
+      "zh-Hans": "zh-Hans",
+      en: "en",
+      ja: "ja"
+    };
+
+    function applyLang(lang) {
+      const dict = I18N[lang] || I18N["zh-Hant"];
+      document.documentElement.lang = htmlLang[lang] || "zh-Hant";
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key] != null) el.textContent = dict[key];
+      });
+      document.querySelectorAll(".lang button").forEach((btn) => {
+        btn.setAttribute("aria-pressed", String(btn.dataset.lang === lang));
+      });
+      try { localStorage.setItem("z01-landing-lang", lang); } catch (_) {}
+    }
+
+    document.querySelectorAll(".lang button").forEach((btn) => {
+      btn.addEventListener("click", () => applyLang(btn.dataset.lang));
+    });
+
+    let initial = "zh-Hant";
+    try {
+      const saved = localStorage.getItem("z01-landing-lang");
+      if (saved && I18N[saved]) initial = saved;
+    } catch (_) {}
+    applyLang(initial);
+  </script>
+</body>
+</html>
