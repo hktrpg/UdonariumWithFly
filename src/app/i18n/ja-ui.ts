@@ -671,6 +671,7 @@ export const ja_ui: I18nDictionary = {
   'chatTab.private': 'グループ秘匿',
   'chatTab.privateDefaultName': '秘匿',
   'chatTab.members': 'メンバー',
+  'chatTab.membersEmpty': '（メンバー未設定）',
   'chatTab.membersHint': 'メンバーとGMのみ表示。P2Pではデータが全員に届く可能性があり、秘匿はクライアント側フィルタです。',
   'combat.roundPrefix': 'ROUND',
   'inv.resourcePlaceholder': '値',

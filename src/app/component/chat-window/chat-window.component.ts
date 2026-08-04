@@ -404,4 +404,17 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   trackByChatTab(index: number, chatTab: ChatTab) {
     return chatTab.identifier;
   }
+
+  privateTabMemberNames(tab: ChatTab): string[] {
+    if (!tab?.isPrivate) return [];
+    const ids = new Set(tab.memberIds);
+    if (tab.creatorUserId) ids.add(tab.creatorUserId);
+    const names: string[] = [];
+    for (const id of ids) {
+      const peer = PeerCursor.findByUserId(id);
+      const name = (peer?.name || '').trim();
+      names.push(name || id);
+    }
+    return names;
+  }
 }

@@ -95,6 +95,48 @@
   position: relative;
 }
 
+.private-members-tip {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  min-width: 7em;
+  max-width: 14em;
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #3a2f24;
+  background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1));
+  border: solid 1px #999;
+  border-left: solid 4px #555;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  white-space: nowrap;
+}
+
+.tab.is-private:hover .private-members-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.private-members-tip-head {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.private-members-tip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.private-members-tip-empty {
+  color: #7a6a58;
+  font-weight: normal;
+}
+
 .chat-tab input[type="radio"] {
   display: none;
 }
