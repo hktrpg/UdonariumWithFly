@@ -1,4 +1,4 @@
-<div [@flyInOut]="'in'" [ngClass]="{'pointer-events-none': isPointerDragging, 'is-full-screen': isFullScreen, 'is-minimized': isMinimized && !isFullScreen, 'i-am-gm': isGMMode, 'is-mobile-sheet': isMobileSheet}" class="draggable-panel"
+<div [@flyInOut]="'in'" [ngClass]="{'pointer-events-none': isPointerDragging, 'is-full-screen': isFullScreen, 'is-minimized': isMinimized && !isFullScreen, 'i-am-gm': isGMMode, 'is-mobile-sheet': isMobileSheet, 'is-mobile-sheet-half': isMobileSheetHalf}" class="draggable-panel"
   [attr.data-tour-panel]="panelService.tourPanelId || null"
   [style.left.px]="left" [style.top.px]="top" [style.width.px]="width" [style.height.px]="height"
   [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical'" [draggable.disable]="isFullScreen || isMobileSheet" 

@@ -74,6 +74,8 @@ export class UIPanelComponent implements OnInit {
   isHorizontal: boolean = false;
   /** Set by PanelService.open on phone/tablet sheets. Desktop panels stay false. */
   isMobileSheet: boolean = false;
+  /** Bottom half-sheet (e.g. chat) — leaves map visible above. */
+  isMobileSheetHalf: boolean = false;
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 

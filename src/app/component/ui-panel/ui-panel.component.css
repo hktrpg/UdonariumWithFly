@@ -117,18 +117,40 @@
 
 /* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets. */
 .draggable-panel.is-mobile-sheet {
-  left: 0 !important;
+  left: var(--udon-left-chrome, 0px) !important;
   top: 0 !important;
-  width: 100vw !important;
-  /* vh fallback then dvh for iOS Safari toolbar */
-  height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px)) !important;
-  height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)) !important;
+  width: calc(100vw - var(--udon-left-chrome, 0px)) !important;
+  /* vh fallback then dvh for iOS Safari toolbar; subtract keyboard when open */
+  height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px) - var(--udon-keyboard-inset, 0px)) !important;
+  height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px) - var(--udon-keyboard-inset, 0px)) !important;
   max-width: 100vw;
-  max-height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px) - var(--udon-keyboard-inset, 0px));
+  max-height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px) - var(--udon-keyboard-inset, 0px));
   cursor: default;
   border-radius: 0;
   z-index: 12000;
+  transition: height 120ms ease-out, max-height 120ms ease-out, bottom 120ms ease-out;
+}
+
+html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
+  height: calc(100vh - var(--udon-keyboard-inset, 0px)) !important;
+  height: calc(100dvh - var(--udon-keyboard-inset, 0px)) !important;
+  max-height: calc(100dvh - var(--udon-keyboard-inset, 0px));
+}
+
+/* Chat / frequent panels: half sheet above bottom nav, map stays visible */
+.draggable-panel.is-mobile-sheet.is-mobile-sheet-half {
+  top: auto !important;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px) + var(--udon-keyboard-inset, 0px)) !important;
+  height: min(48dvh, 420px) !important;
+  max-height: min(48dvh, 420px) !important;
+  border-radius: 12px 12px 0 0;
+  border-top: 1px solid #999;
+}
+
+html.udon-tablet-landscape .draggable-panel.is-mobile-sheet.is-mobile-sheet-half {
+  left: var(--udon-left-chrome, 72px) !important;
+  bottom: var(--udon-keyboard-inset, 0px) !important;
 }
 
 .scrollable-panel {

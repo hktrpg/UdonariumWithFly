@@ -303,6 +303,8 @@ input {
   /* Filled from env() so JS can read --udon-safe-bottom via getComputedStyle */
   --udon-safe-bottom: env(safe-area-inset-bottom, 0px);
   --udon-bottom-chrome: 56px;
+  --udon-left-chrome: 0px;
+  --udon-keyboard-inset: 0px;
 }
 
 body.udon-mobile-layout {

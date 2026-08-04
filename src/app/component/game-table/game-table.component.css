@@ -551,3 +551,57 @@
   background: #8ab4f8;
   border: 1px solid #555;
 }
+
+.map-action-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--udon-bottom-chrome, 56px) + 10px);
+  transform: translateX(-50%);
+  z-index: 11040;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  background: rgba(28, 28, 28, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+html.udon-tablet-landscape .map-action-hud {
+  left: calc(50% + var(--udon-left-chrome, 72px) / 2);
+  bottom: calc(12px + var(--udon-keyboard-inset, 0px));
+}
+
+.map-hud-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #666;
+  border-radius: 50%;
+  background: #3a3a3a;
+  color: #eee;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.map-hud-btn .material-icons {
+  font-size: 22px;
+}
+
+.map-hud-btn:active {
+  filter: brightness(1.15);
+}
+
+.map-hud-btn.map-hud-warn {
+  border-color: #b45309;
+  background: #7c2d12;
+  color: #ffedd5;
+}

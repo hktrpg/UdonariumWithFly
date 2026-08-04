@@ -20,6 +20,8 @@ export interface PanelOption {
    * Nested opens (palette / tab settings) should omit this or set false.
    */
   mobileReplace?: boolean;
+  /** full (default) or half bottom sheet (chat). */
+  mobileSheet?: 'full' | 'half';
 }
 
 @Injectable()
@@ -130,7 +132,10 @@ export class PanelService {
       childPanelService.isAbleMinimizeButton = false;
       childPanelService.isAbleFullScreenButton = false;
       const panelInst = panelComponentRef.instance as any;
-      if (panelInst) panelInst.isMobileSheet = true;
+      if (panelInst) {
+        panelInst.isMobileSheet = true;
+        panelInst.isMobileSheetHalf = resolved.mobileSheet === 'half';
+      }
     }
 
     let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);

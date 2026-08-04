@@ -82,7 +82,7 @@ export class GuidedTourService {
 
   start() {
     const mobile = this.mobileLayout.isMobile;
-    this.steps = buildGuidedTourSteps().filter(s => !shouldSkipStep(s, mobile));
+    this.steps = buildGuidedTourSteps(mobile).filter(s => !shouldSkipStep(s, mobile));
     this.stepIndex = 0;
     this.phase = 'running';
     this.actionDone = this.steps[0]?.require === 'ack';

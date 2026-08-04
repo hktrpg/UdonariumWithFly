@@ -1,8 +1,9 @@
 import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
-/** Bottom nav height used when clamping mobile panels. */
+/** Bottom / side nav chrome height or width. */
 export const MOBILE_NAV_HEIGHT = 56;
+export const TABLET_RAIL_WIDTH = 72;
 
 export interface MobilePanelBox {
   title?: string;
@@ -16,7 +17,11 @@ export interface MobilePanelBox {
    * Nested opens (chat palette, tab settings) should leave this unset/false.
    */
   mobileReplace?: boolean;
+  /** full = near fullscreen; half = bottom sheet (chat). */
+  mobileSheet?: 'full' | 'half';
 }
+
+export type MobileChromeMode = 'desktop' | 'phone' | 'tablet-portrait' | 'tablet-landscape';
 
 /**
  * Compact / touch-first layout for phones and tablets.
@@ -26,13 +31,16 @@ export interface MobilePanelBox {
 export class MobileLayoutService implements OnDestroy {
   private readonly mq: MediaQueryList;
   private readonly subject = new BehaviorSubject<boolean>(false);
+  private readonly chromeSubject = new BehaviorSubject<MobileChromeMode>('desktop');
+  private readonly keyboardSubject = new BehaviorSubject<number>(0);
   readonly isMobile$ = this.subject.asObservable();
+  readonly chromeMode$ = this.chromeSubject.asObservable();
+  readonly keyboardInset$ = this.keyboardSubject.asObservable();
 
   private readonly onChange = () => this.refresh();
+  private readonly onViewport = () => this.refreshKeyboardInset();
 
   constructor(private ngZone: NgZone) {
-    // any-pointer:coarse catches hybrids; still require no-hover or narrow width so
-    // desktop mice with optional touch screens stay on the classic UI.
     this.mq = window.matchMedia(
       [
         '(max-width: 900px) and (any-pointer: coarse)',
@@ -40,6 +48,7 @@ export class MobileLayoutService implements OnDestroy {
       ].join(', ')
     );
     this.refresh();
+    this.refreshKeyboardInset();
     if (typeof this.mq.addEventListener === 'function') {
       this.mq.addEventListener('change', this.onChange);
     } else {
@@ -48,6 +57,8 @@ export class MobileLayoutService implements OnDestroy {
     window.addEventListener('orientationchange', this.onChange);
     window.addEventListener('resize', this.onChange);
     window.visualViewport?.addEventListener('resize', this.onChange);
+    window.visualViewport?.addEventListener('resize', this.onViewport);
+    window.visualViewport?.addEventListener('scroll', this.onViewport);
   }
 
   ngOnDestroy() {
@@ -59,10 +70,35 @@ export class MobileLayoutService implements OnDestroy {
     window.removeEventListener('orientationchange', this.onChange);
     window.removeEventListener('resize', this.onChange);
     window.visualViewport?.removeEventListener('resize', this.onChange);
+    window.visualViewport?.removeEventListener('resize', this.onViewport);
+    window.visualViewport?.removeEventListener('scroll', this.onViewport);
   }
 
   get isMobile(): boolean {
     return this.subject.value;
+  }
+
+  get chromeMode(): MobileChromeMode {
+    return this.chromeSubject.value;
+  }
+
+  /** Phone-sized compact layout (bottom nav). */
+  get isPhone(): boolean {
+    return this.chromeMode === 'phone';
+  }
+
+  /** Tablet portrait — bottom nav, more room. */
+  get isTabletPortrait(): boolean {
+    return this.chromeMode === 'tablet-portrait';
+  }
+
+  /** Tablet landscape — left icon rail. */
+  get isTabletLandscape(): boolean {
+    return this.chromeMode === 'tablet-landscape';
+  }
+
+  get keyboardInsetPx(): number {
+    return this.keyboardSubject.value;
   }
 
   /** Visible viewport height (avoids iOS 100vh toolbar issues). */
@@ -70,53 +106,131 @@ export class MobileLayoutService implements OnDestroy {
     return Math.round(window.visualViewport?.height || window.innerHeight);
   }
 
+  get viewportWidth(): number {
+    return Math.round(window.visualViewport?.width || window.innerWidth);
+  }
+
   /** Safe area + bottom nav reserved for panels / tour bubble / context menus. */
   get bottomChromePx(): number {
     if (!this.isMobile) return 0;
-    let safe = 0;
-    try {
-      const fromVar = getComputedStyle(document.documentElement).getPropertyValue('--udon-safe-bottom');
-      safe = parseFloat(fromVar) || 0;
-    } catch { /* ignore */ }
-    return MOBILE_NAV_HEIGHT + safe;
+    if (this.isTabletLandscape) return this.keyboardInsetPx;
+    return MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
   }
 
-  /** Fit a desktop panel option into a near-full-screen sheet on mobile. */
+  get leftChromePx(): number {
+    if (!this.isTabletLandscape) return 0;
+    return TABLET_RAIL_WIDTH;
+  }
+
+  /** Fit a desktop panel option into a sheet on mobile. */
   adaptPanelOption<T extends MobilePanelBox>(option: T = {} as T): T {
     if (!this.isMobile) return { ...option };
-    const bottom = this.bottomChromePx;
-    const w = Math.max(280, window.innerWidth);
-    const h = Math.max(240, this.viewportHeight - bottom);
+    const sheet = option.mobileSheet || 'full';
+    const left = this.leftChromePx;
+    const w = Math.max(280, this.viewportWidth - left);
+    if (sheet === 'half') {
+      const h = Math.max(220, Math.round(this.viewportHeight * 0.48));
+      // Phone: sit above bottom nav; tablet landscape: sit above keyboard only.
+      const reserveBottom = this.isTabletLandscape ? this.keyboardInsetPx : MOBILE_NAV_HEIGHT + this.keyboardInsetPx;
+      return {
+        ...option,
+        left,
+        top: Math.max(0, this.viewportHeight - h - reserveBottom),
+        width: w,
+        height: h,
+      };
+    }
+    // CSS !important sizes the sheet; JS size is a fallback before paint.
+    const fullH = this.isTabletLandscape
+      ? Math.max(240, this.viewportHeight - this.keyboardInsetPx)
+      : Math.max(240, this.viewportHeight - MOBILE_NAV_HEIGHT - this.keyboardInsetPx);
     return {
       ...option,
-      left: 0,
+      left,
       top: 0,
       width: w,
-      height: h,
+      height: fullH,
     };
   }
 
   private refresh() {
-    const next = !!this.mq.matches;
-    if (next === this.subject.value) {
-      this.syncBodyClass(next);
+    const mobile = !!this.mq.matches;
+    const mode = this.resolveChromeMode(mobile);
+    const modeChanged = mode !== this.chromeSubject.value;
+    const mobileChanged = mobile !== this.subject.value;
+    if (!modeChanged && !mobileChanged) {
+      this.syncBodyClass(mobile, mode);
       return;
     }
     this.ngZone.run(() => {
-      this.subject.next(next);
-      this.syncBodyClass(next);
+      if (mobileChanged) this.subject.next(mobile);
+      if (modeChanged) this.chromeSubject.next(mode);
+      this.syncBodyClass(mobile, mode);
     });
   }
 
-  private syncBodyClass(isMobile: boolean) {
+  private resolveChromeMode(mobile: boolean): MobileChromeMode {
+    if (!mobile) return 'desktop';
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const tablet = Math.min(w, h) >= 600 && Math.max(w, h) >= 900;
+    if (tablet && w > h) return 'tablet-landscape';
+    if (tablet) return 'tablet-portrait';
+    return 'phone';
+  }
+
+  private refreshKeyboardInset() {
+    const vv = window.visualViewport;
+    if (!vv || !this.isMobile) {
+      if (this.keyboardSubject.value !== 0) {
+        this.ngZone.run(() => this.keyboardSubject.next(0));
+        document.documentElement.style.setProperty('--udon-keyboard-inset', '0px');
+        this.syncChromeCssVars(this.isMobile, this.chromeMode);
+      }
+      return;
+    }
+    const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    // Ignore tiny jitter / browser chrome.
+    const next = inset > 80 ? inset : 0;
+    if (next === this.keyboardSubject.value) return;
+    this.ngZone.run(() => this.keyboardSubject.next(next));
+    document.documentElement.style.setProperty('--udon-keyboard-inset', `${next}px`);
+    this.syncChromeCssVars(true, this.chromeMode);
+  }
+
+  private syncBodyClass(isMobile: boolean, mode: MobileChromeMode) {
+    const root = document.documentElement;
     document.body.classList.toggle('udon-mobile-layout', isMobile);
-    document.documentElement.classList.toggle('udon-mobile-layout', isMobile);
-    // Expose chrome metrics for CSS / context-menu clamping (env() is hard to read from JS).
-    const root = document.documentElement.style;
+    root.classList.toggle('udon-mobile-layout', isMobile);
+    root.classList.toggle('udon-tablet-landscape', mode === 'tablet-landscape');
+    root.classList.toggle('udon-tablet-portrait', mode === 'tablet-portrait');
+    root.classList.toggle('udon-phone', mode === 'phone');
+    this.syncChromeCssVars(isMobile, mode);
+  }
+
+  private syncChromeCssVars(isMobile: boolean, mode: MobileChromeMode) {
+    const root = document.documentElement;
     if (isMobile) {
-      root.setProperty('--udon-bottom-chrome', `${this.bottomChromePx}px`);
+      // bottomChromePx includes keyboard inset when open.
+      const bottom =
+        mode === 'tablet-landscape'
+          ? this.keyboardInsetPx
+          : MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
+      root.style.setProperty('--udon-bottom-chrome', `${bottom}px`);
+      root.style.setProperty('--udon-left-chrome', `${mode === 'tablet-landscape' ? TABLET_RAIL_WIDTH : 0}px`);
     } else {
-      root.removeProperty('--udon-bottom-chrome');
+      root.style.removeProperty('--udon-bottom-chrome');
+      root.style.removeProperty('--udon-left-chrome');
+      root.style.setProperty('--udon-keyboard-inset', '0px');
+    }
+  }
+
+  private readSafeBottom(): number {
+    try {
+      const fromVar = getComputedStyle(document.documentElement).getPropertyValue('--udon-safe-bottom');
+      return parseFloat(fromVar) || 0;
+    } catch {
+      return 0;
     }
   }
 }

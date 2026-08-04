@@ -55,7 +55,8 @@ function menuOpen(
   };
 }
 
-export function buildGuidedTourSteps(): GuidedTourStep[] {
+export function buildGuidedTourSteps(isMobile = false): GuidedTourStep[] {
+  if (isMobile) return buildMobileGuidedTourSteps();
   return [
     // Chapter 1: room + save — open Connection first, then explain; folder backup before ZIP
     {
@@ -227,6 +228,103 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'saveGuide',
       titleKey: 'tour.step.saveGuide.title',
       bodyKey: 'tour.step.saveGuide.body',
+      require: 'ack',
+      chapter: 'controls',
+    },
+  ];
+}
+
+/** Phone/tablet tour: primary nav + map HUD gestures (no wheel / WASD / path). */
+function buildMobileGuidedTourSteps(): GuidedTourStep[] {
+  return [
+    {
+      id: 'roomChapter',
+      titleKey: 'tour.step.roomChapter.title',
+      bodyKey: 'tour.step.roomChapter.bodyMobile',
+      require: 'ack',
+      chapter: 'room',
+    },
+    menuOpen('connection', 'menu.connection', 'panel-open', { chapter: 'room', autoAdvance: true }),
+    {
+      id: 'roomHow',
+      titleKey: 'tour.step.roomHow.title',
+      bodyKey: 'tour.step.roomHow.body',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
+      require: 'ack',
+      chapter: 'room',
+    },
+    {
+      id: 'saveZip',
+      titleKey: 'tour.step.saveZip.title',
+      bodyKey: 'tour.step.saveZip.bodyMobile',
+      target: '[data-tour-panel="menu.connection"]',
+      tourId: 'menu.connection',
+      require: 'ack',
+      chapter: 'room',
+    },
+    {
+      id: 'menuChapter',
+      titleKey: 'tour.step.menuChapter.title',
+      bodyKey: 'tour.step.menuChapter.bodyMobile',
+      require: 'ack',
+      chapter: 'menu',
+    },
+    menuOpen('chat', 'menu.chat', 'panel-open'),
+    menuOpen('combat', 'menu.combat', 'panel-open'),
+    menuOpen('inventory', 'menu.inventory', 'panel-open', { skipIfGuest: true }),
+    menuOpen('more', 'menu.more', 'click'),
+    {
+      id: 'tableChapter',
+      titleKey: 'tour.step.tableChapter.title',
+      bodyKey: 'tour.step.tableChapter.bodyMobile',
+      require: 'ack',
+      chapter: 'table',
+    },
+    {
+      id: 'mapPan',
+      titleKey: 'tour.step.mapPan.title',
+      bodyKey: 'tour.step.mapPan.bodyMobile',
+      target: '[data-tour-id="table.layer"]',
+      require: 'gesture-pan',
+      chapter: 'table',
+    },
+    {
+      id: 'mapZoom',
+      titleKey: 'tour.step.mapZoom.title',
+      bodyKey: 'tour.step.mapZoom.bodyMobile',
+      target: '[data-tour-id="table.layer"]',
+      require: 'gesture-zoom',
+      chapter: 'table',
+    },
+    {
+      id: 'contextMenu',
+      titleKey: 'tour.step.contextMenu.title',
+      bodyKey: 'tour.step.contextMenu.bodyMobile',
+      target: '[data-tour-id="table.layer"]',
+      require: 'context-menu',
+      chapter: 'table',
+    },
+    {
+      id: 'controlsChapter',
+      titleKey: 'tour.step.controlsChapter.title',
+      bodyKey: 'tour.step.controlsChapter.bodyMobile',
+      target: '[data-tour-id="table.layer"]',
+      require: 'select-object',
+      chapter: 'controls',
+    },
+    {
+      id: 'controlsPing',
+      titleKey: 'tour.step.controlsPing.title',
+      bodyKey: 'tour.step.controlsPing.bodyMobile',
+      target: '[data-tour-id="table.layer"]',
+      require: 'table-ping',
+      chapter: 'controls',
+    },
+    {
+      id: 'saveGuide',
+      titleKey: 'tour.step.saveGuide.title',
+      bodyKey: 'tour.step.saveGuide.bodyMobile',
       require: 'ack',
       chapter: 'controls',
     },

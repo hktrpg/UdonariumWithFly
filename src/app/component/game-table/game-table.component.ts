@@ -47,6 +47,14 @@ import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
 import { WeatherRender } from './weather-render';
 
+/** Formal touch interaction mode (mobile gesture state machine). */
+enum TableTouchMode {
+  Idle = 'idle',
+  Pan = 'pan',
+  ObjectDrag = 'object-drag',
+  Pinch = 'pinch',
+}
+
 interface TablePingView {
   id: string;
   x: number;
@@ -220,6 +228,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private touchGesture: TableTouchGesture = null;
   private pickGesture: TablePickGesture = null;
   private touchLayoutSub: Subscription = null;
+  /** Touch gesture FSM — Idle | Pan | ObjectDrag | Pinch. */
+  private touchMode: TableTouchMode = TableTouchMode.Idle;
 
   /** Top-right pose overlay for wheel/view/object angle debugging. */
   showDebugPose = sessionStorage.getItem('udon.debugPose') === '1';
@@ -347,6 +357,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.tokenPath.hasDraft || this.tokenPath.isAnimating;
   }
   get showViewZoomControl(): boolean {
+    return this.mobileLayout.isMobile;
+  }
+  get showMapActionHud(): boolean {
     return this.mobileLayout.isMobile;
   }
   get showVisionBanner(): boolean {
@@ -557,30 +570,35 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mouseGesture.cancel();
     // Touching a movable/interactive object: claim object-drag (don't wait for mouse-gesture order).
     if (this.isTouchOnTableObject(srcEvent)) {
+      this.touchMode = TableTouchMode.ObjectDrag;
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = true;
       return;
     }
     // Empty table: enable pan immediately and blur inputs so focus gate doesn't block.
+    this.touchMode = TableTouchMode.Pan;
     this.isTableTransformMode = true;
     this.pointerDeviceService.isDragging = false;
     this.removeFocus();
   }
 
   onTableTouchEnd() {
+    this.touchMode = TableTouchMode.Idle;
     this.cancelInput();
   }
 
   onTableTouchGesture() {
     // Object grab / non-transform touch: do not clear isDragging via cancelInput.
-    if (this.pointerDeviceService.isDragging || !this.isTableTransformMode) return;
+    if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging || !this.isTableTransformMode) return;
     this.cancelInput();
   }
 
   onTableTouchTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent) {
     // Object drag wins over map pan/pinch.
-    if (this.pointerDeviceService.isDragging) return;
+    if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging) return;
     if (!this.isTableTransformMode) return;
+    if (event === 'pinch' || Math.abs(transformZ) > 0) this.touchMode = TableTouchMode.Pinch;
+    else if (this.touchMode === TableTouchMode.Idle) this.touchMode = TableTouchMode.Pan;
     // Desktop keeps the strict focus gate; touch already blurred on empty-table start.
     if (document.body !== document.activeElement && !(srcEvent instanceof TouchEvent)) return;
 
@@ -990,8 +1008,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.viewPotisonZ += transformZ;
     }
 
-    // Keep Z within the slider-reachable band (±750).
-    this.viewPotisonZ = Math.min(750, Math.max(-750, this.viewPotisonZ));
     this.syncZoomSliderFromZ();
 
     if (isAbsolute || rotateX != 0 || rotateY != 0 || rotateX != 0) {
@@ -1023,7 +1039,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!Number.isFinite(raw)) return;
     const v = Math.min(100, Math.max(-100, raw));
     this.zoomSliderValue = v;
-    const z = v * GameTableComponent.ZOOM_SLIDER_TO_Z;
+    // Map to the same Z band used by touch zoom (~±750).
+    const z = Math.min(750, Math.max(-750, v * GameTableComponent.ZOOM_SLIDER_TO_Z));
     this.removeFocus();
     this.setTransform(this.viewPotisonX, this.viewPotisonY, z, this.viewRotateX, this.viewRotateY, this.viewRotateZ, true);
   }
@@ -1031,6 +1048,31 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   resetZoomSlider() {
     this.zoomSliderValue = 0;
     this.setTransform(this.viewPotisonX, this.viewPotisonY, 0, this.viewRotateX, this.viewRotateY, this.viewRotateZ, true);
+  }
+
+  /** Map HUD: open chat half-sheet. */
+  hudOpenChat() {
+    EventSystem.trigger('OPEN_CHAT', null);
+  }
+
+  /** Map HUD: open add-object menu at view center. */
+  hudOpenAddMenu(ev: Event) {
+    ev.stopPropagation();
+    const tablePos = this.coordinateService.calcTabletopLocalCoordinate();
+    const rect = (ev.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+    const x = rect ? rect.left + rect.width / 2 : (this.pointerDeviceService.pointers[0]?.x ?? window.innerWidth / 2);
+    const y = rect ? rect.top : (this.pointerDeviceService.pointers[0]?.y ?? window.innerHeight / 2);
+    EventSystem.trigger('OPEN_TOOLBOX', {
+      x,
+      y,
+      extraActions: this.tabletopActionService.makeDefaultContextMenuActions(tablePos),
+    });
+  }
+
+  /** Map HUD: ping at current pointer / table focus. */
+  hudPing(warning = false) {
+    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    this.broadcastPing(pos.x, pos.y, warning ? 'warning' : 'basic');
   }
 
   private setGameTableGrid(width: number, height: number, gridSize: number = 50, gridType: GridType = GridType.SQUARE, gridColor: string = '#000000e6', isShowNumber = true) {

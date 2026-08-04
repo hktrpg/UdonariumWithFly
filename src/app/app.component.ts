@@ -115,6 +115,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isLoggedin = false;
   isUpdateCanceled = false;
   isMobileLayout = false;
+  isTabletLandscape = false;
   private inviteHandled = false;
   private isRefreshPromptOpen = false;
   private mobileSub: Subscription = null;
@@ -542,6 +543,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             { compact: true }
           );
         });
+      })
+      .on('OPEN_CHAT', -1000, () => {
+        this.ngZone.run(() => this.open('ChatWindowComponent'));
       });
 
     workaroundForMobileSafari();
@@ -656,9 +660,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
     this.isMobileLayout = this.mobileLayout.isMobile;
+    this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     this.mobileSub = this.mobileLayout.isMobile$.subscribe(v => {
       this.isMobileLayout = v;
+      this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     });
+    this.mobileSub.add(this.mobileLayout.chromeMode$.subscribe(() => {
+      this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+      this.isMobileLayout = this.mobileLayout.isMobile;
+    }));
   }
 
   ngAfterViewInit() {
@@ -756,6 +766,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = ChatWindowComponent;
         option.width = 700;
         option.title = this.i18n.t('chat.title');
+        if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
@@ -935,6 +946,36 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
     this.openToolboxAt(position);
+  }
+
+  /** Mobile primary-nav "More" — secondary menus as an action sheet. */
+  openMoreMenu(event: Event) {
+    this.guidedTour.notifyMenuClick('menu.more');
+    const button = <HTMLElement>event.target;
+    const clientRect = button.getBoundingClientRect();
+    const position = {
+      x: window.pageXOffset + clientRect.left,
+      y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
+    };
+    const menu: ContextMenuAction[] = [];
+    if (!this.GuestMode()) {
+      menu.push({ name: this.i18n.t('menu.table'), materialIcon: 'layers', action: () => this.open('GameTableSettingComponent') });
+      menu.push({ name: this.i18n.t('menu.images'), materialIcon: 'photo_library', action: () => this.open('FileStorageComponent') });
+      menu.push({ name: this.i18n.t('menu.music'), materialIcon: 'queue_music', action: () => this.open('JukeboxComponent') });
+      menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+    }
+    if (this.canOpenSceneTools) {
+      menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+    }
+    if (!this.GuestMode()) {
+      menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+      menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
+      menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+    }
+    menu.push(ContextMenuSeparator);
+    menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });
+    menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
+    this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
   }
 
   private openToolboxAt(

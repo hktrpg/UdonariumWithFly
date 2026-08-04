@@ -232,3 +232,62 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 .mobile-bottom-nav .self-only {
   color: #f66;
 }
+
+/* Tablet landscape: left icon rail */
+.mobile-side-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 72px;
+  z-index: 12500;
+  box-sizing: border-box;
+  padding: 8px 0 env(safe-area-inset-bottom, 0px);
+  background: rgba(36, 36, 36, 0.94);
+  border-right: 1px solid #666;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-side-rail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.mobile-side-rail ul > li {
+  text-align: center;
+  padding: 8px 2px;
+  color: #ddd;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.mobile-side-rail ul > li:active {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.mobile-side-rail ul > li > a,
+.mobile-side-rail ul > li > a:hover,
+.mobile-side-rail ul > li > a:active,
+.mobile-side-rail ul > li > a:visited {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1.15;
+  user-select: none;
+}
+
+.mobile-side-rail .material-icons {
+  font-size: 22px !important;
+}
+

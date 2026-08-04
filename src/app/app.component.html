@@ -11,11 +11,79 @@
   </nav>
 </ui-panel>
 
-<!-- Phone / tablet: bottom icon bar (desktop left panel stays as above). -->
-<nav *ngIf="isMobileLayout" class="mobile-bottom-nav" aria-label="Main menu">
-  <ng-container *ngTemplateOutlet="mainMenu"></ng-container>
+<!-- Phone / tablet portrait: bottom primary nav + More -->
+<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" aria-label="Main menu">
+  <ul>
+    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons icon-size">people</i></div>
+        <div>{{ 'menu.connection' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.chat" [appTeachingTip]="'tip.menu.chat'" (click)="open('ChatWindowComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons icon-size">speaker_notes</i></div>
+        <div>{{ 'menu.chat' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons icon-size">sports_mma</i></div>
+        <div>{{ 'menu.combat' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons icon-size">folder_shared</i></div>
+        <div>{{ 'menu.inventory' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">more_horiz</i></div>
+        <div>{{ 'menu.more' | i18n }}</div>
+      </a>
+    </li>
+  </ul>
 </nav>
 
+<!-- Tablet landscape: left icon rail -->
+<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" aria-label="Main menu">
+  <ul>
+    <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons">people</i></div>
+        <div>{{ 'menu.connection' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.chat" [appTeachingTip]="'tip.menu.chat'" (click)="open('ChatWindowComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons">speaker_notes</i></div>
+        <div>{{ 'menu.chat' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.combat" [appTeachingTip]="'tip.menu.combat'" (click)="open('CombatTrackerComponent')">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons">sports_mma</i></div>
+        <div>{{ 'menu.combat' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
+      <a routerLink="/" routerLinkActive="active">
+        <div><i class="material-icons">folder_shared</i></div>
+        <div>{{ 'menu.inventory' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">more_horiz</i></div>
+        <div>{{ 'menu.more' | i18n }}</div>
+      </a>
+    </li>
+  </ul>
+</nav>
+
+<!-- Desktop full menu (also used conceptually; mobile "More" opens a subset via context menu). -->
 <ng-template #mainMenu>
   <ul>
     <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="open('PeerMenuComponent')">
