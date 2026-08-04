@@ -206,10 +206,10 @@ export class TableMouseGesture {
       const code = ev.code;
       let handled = false;
       if (code === 'KeyW' || key === Keyboard.KeyW) {
-        transformY = 10;
+        transformY = 14; // forward (depth remapped in game-table)
         handled = true;
       } else if (code === 'KeyS' || key === Keyboard.KeyS) {
-        transformY = -10;
+        transformY = -14;
         handled = true;
       } else if (code === 'KeyA' || key === Keyboard.KeyA) {
         transformX = 10;

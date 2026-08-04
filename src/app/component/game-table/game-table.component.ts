@@ -717,24 +717,32 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (srcEvent.cancelable) srcEvent.preventDefault();
 
-    //
-    let scale = (1000 + Math.abs(this.viewPotisonZ)) / 1000;
-    transformX *= scale;
-    transformY *= scale;
+    const scale = (1000 + Math.abs(this.viewPotisonZ)) / 1000;
 
-    // Keyboard WASD: pan forward/back/strafe in view yaw (Q/E), not raw screen axes.
+    // Keyboard WASD: strafe on yaw; W/S walk on the pitched table plane (Y+Z)
+    // so forward/back feels like moving into / out of the scene.
     if (
       isKeyboard
       && (transformX !== 0 || transformY !== 0)
       && rotateX === 0 && rotateY === 0 && rotateZ === 0
     ) {
-      const θ = -this.viewRotateZ * Math.PI / 180;
-      const cos = Math.cos(θ);
-      const sin = Math.sin(θ);
       const lx = transformX;
       const ly = transformY;
-      transformX = lx * cos - ly * sin;
-      transformY = lx * sin + ly * cos;
+      const pitch = this.viewRotateX * Math.PI / 180;
+      const yaw = -this.viewRotateZ * Math.PI / 180;
+      const cosYaw = Math.cos(yaw);
+      const sinYaw = Math.sin(yaw);
+      const forwardY = ly * Math.cos(pitch);
+      const forwardZ = ly * Math.sin(pitch);
+      transformX = (lx * cosYaw - forwardY * sinYaw) * scale;
+      transformY = (lx * sinYaw + forwardY * cosYaw) * scale;
+      transformZ = forwardZ * scale;
+      // Keep zoom band usable while walking in depth.
+      if (750 < transformZ + this.viewPotisonZ) transformZ += 750 - (transformZ + this.viewPotisonZ);
+      if (transformZ + this.viewPotisonZ < -750) transformZ += -750 - (transformZ + this.viewPotisonZ);
+    } else {
+      transformX *= scale;
+      transformY *= scale;
     }
 
     this.setTransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ);
