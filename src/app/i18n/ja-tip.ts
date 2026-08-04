@@ -20,7 +20,7 @@ export const ja_tip: I18nDictionary = {
   'tip.menu.scenePreset.title': 'シーンプリセット',
   'tip.menu.scenePreset.body': 'テーブルとマルチトラックBGMをワンクリック切替。切替チャットも可。',
   'tip.menu.scenarioText.title': 'シナリオテキスト',
-  'tip.menu.scenarioText.body': 'ナレーション等を用意し、現在のチャットタブへワンクリック送信（発言名＝タイトル）。',
+  'tip.menu.scenarioText.body': 'ナレーション等を用意し、現在のチャットタブへワンクリック送信（発言名はタイトル／キャラ／プレイヤー）。',
   'tip.menu.inventory.title': 'インベントリ',
   'tip.menu.inventory.body': 'キャラクター倉庫：テーブル／共有／個人／墓場。',
   'tip.menu.notes.title': 'メモ',

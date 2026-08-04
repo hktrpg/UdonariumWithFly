@@ -306,7 +306,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     AudioStorage.instance.get(PresetSound.ping).isHidden = true;
 
     PeerCursor.createMyCursor().then(() => {
-      if (PeerCursor.myCursor.name == null || PeerCursor.myCursor.name === '') PeerCursor.myCursor.name = PeerCursor.CHAT_DEFAULT_NAME;
       if (!PeerCursor.myCursor.imageIdentifier) PeerCursor.myCursor.imageIdentifier = noneIconImage.identifier;
     });
 

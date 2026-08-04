@@ -27,12 +27,17 @@
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid #c4b29a;
   border-radius: 4px;
   padding: 4px 6px;
+}
+
+.sender-character {
+  margin-top: 4px;
 }
 
 .body-row {

@@ -20,7 +20,7 @@ export const en_tip: I18nDictionary = {
   'tip.menu.scenePreset.title': 'Scene presets',
   'tip.menu.scenePreset.body': 'One-click switch of table + multi-track BGM, with optional chat text.',
   'tip.menu.scenarioText.title': 'Scenario text',
-  'tip.menu.scenarioText.body': 'Pre-write narration / info and send to the active chat tab (speaker name = title).',
+  'tip.menu.scenarioText.body': 'Pre-write narration / info and send to the active chat tab (speaker: title / character / player).',
   'tip.menu.inventory.title': 'Inventory',
   'tip.menu.inventory.body': 'Characters on table / common / personal / graveyard.',
   'tip.menu.notes.title': 'Notes',

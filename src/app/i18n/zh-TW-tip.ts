@@ -20,7 +20,7 @@ export const zhTW_tip: I18nDictionary = {
   'tip.menu.scenePreset.title': '場面預設',
   'tip.menu.scenePreset.body': '一鍵切換桌面與多軌 BGM；可附切場聊天文字。',
   'tip.menu.scenarioText.title': '劇本文字',
-  'tip.menu.scenarioText.body': '預寫旁白／資訊，一鍵送到目前聊天分頁（發言名稱＝標題）。',
+  'tip.menu.scenarioText.body': '預寫旁白／資訊，一鍵送到目前聊天分頁（發言名稱可選標題／角色／玩家）。',
   'tip.menu.inventory.title': '倉庫',
   'tip.menu.inventory.body': '角色庫：桌面／公用／私人／回收區。',
   'tip.menu.notes.title': '筆記',

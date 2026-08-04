@@ -20,7 +20,7 @@ export const zhCN_tip: I18nDictionary = {
   'tip.menu.scenePreset.title': '场面预设',
   'tip.menu.scenePreset.body': '一键切换桌面与多轨 BGM；可附切场聊天文字。',
   'tip.menu.scenarioText.title': '剧本文字',
-  'tip.menu.scenarioText.body': '预写旁白／资讯，一键送到当前聊天分页（发言名称＝标题）。',
+  'tip.menu.scenarioText.body': '预写旁白／资讯，一键送到当前聊天分页（发言名称可选标题／角色／玩家）。',
   'tip.menu.inventory.title': '仓库',
   'tip.menu.inventory.body': '角色库：桌面／公用／私人／回收区。',
   'tip.menu.notes.title': '笔记',

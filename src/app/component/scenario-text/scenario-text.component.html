@@ -2,6 +2,30 @@
   <section class="card">
     <header class="card-head"><h3>{{ 'scenarioText.title' | i18n }}</h3></header>
     <p class="hint">{{ 'scenarioText.hint' | i18n }}</p>
+    <div class="radio-row">
+      <span>{{ 'scenarioText.sender' | i18n }}</span>
+      <label>
+        <input type="radio" [name]="radioName" [(ngModel)]="senderMode" value="title" [disabled]="GuestMode()" />
+        {{ 'scenarioText.senderTitle' | i18n }}
+      </label>
+      <label>
+        <input type="radio" [name]="radioName" [(ngModel)]="senderMode" value="character" [disabled]="GuestMode()" />
+        {{ 'scenarioText.senderCharacter' | i18n }}
+      </label>
+      <label>
+        <input type="radio" [name]="radioName" [(ngModel)]="senderMode" value="player" [disabled]="GuestMode()" />
+        {{ 'scenarioText.senderPlayer' | i18n }}
+      </label>
+    </div>
+    <label class="field sender-character" *ngIf="senderMode === 'character'">
+      <span>{{ 'scenarioText.senderCharacterPick' | i18n }}</span>
+      <select [(ngModel)]="senderCharacterId" [disabled]="GuestMode() || !gameCharacters.length">
+        <option *ngIf="!gameCharacters.length" value="">{{ 'scenarioText.noCharacter' | i18n }}</option>
+        <option *ngFor="let character of gameCharacters" [ngValue]="character.identifier">
+          {{ characterOptionLabel(character) }}
+        </option>
+      </select>
+    </label>
     <footer class="actions">
       <button type="button" class="btn btn-sm btn-primary" (click)="create()" [disabled]="GuestMode()">
         <i class="material-icons">add</i>{{ 'scenarioText.create' | i18n }}
