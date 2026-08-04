@@ -15,6 +15,11 @@ export interface PanelOption {
   height?: number;
   /** Marks the panel root for guided-tour spotlight (`[data-tour-panel="…"]`). */
   tourPanelId?: string;
+  /**
+   * On mobile, close other sheets before opening (bottom-nav switches).
+   * Nested opens (palette / tab settings) should omit this or set false.
+   */
+  mobileReplace?: boolean;
 }
 
 @Injectable()
@@ -94,8 +99,8 @@ export class PanelService {
       parentViewContainerRef = PanelService.defaultParentViewContainerRef;
     }
 
-    // Mobile: one sheet at a time so the bottom nav stays reachable.
-    if (this.mobileLayout.isMobile) {
+    // Only bottom-nav switches replace sheets. Nested opens (palette, settings) keep the parent.
+    if (this.mobileLayout.isMobile && option?.mobileReplace) {
       PanelService.closeAllPanels();
     }
 

@@ -114,6 +114,12 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let diffLeft = 0;
     let diffTop = 0;
 
+    // On mobile, reserve bottom nav so the menu is not covered / clipped under it.
+    const bottomReserve = document.body.classList.contains('udon-mobile-layout')
+      ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
+      : 0;
+    const maxBottom = window.innerHeight - bottomReserve;
+
     if (window.innerWidth < panelBox.right + diffLeft) {
       diffLeft += window.innerWidth - (panelBox.right + diffLeft);
     }
@@ -121,8 +127,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       diffLeft += 0 - (panelBox.left + diffLeft);
     }
 
-    if (window.innerHeight < panelBox.bottom + diffTop) {
-      diffTop += window.innerHeight - (panelBox.bottom + diffTop);
+    if (maxBottom < panelBox.bottom + diffTop) {
+      diffTop += maxBottom - (panelBox.bottom + diffTop);
     }
     if (panelBox.top + diffTop < 0) {
       diffTop += 0 - (panelBox.top + diffTop);
@@ -146,6 +152,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let diffLeft = 0;
     let diffTop = 0;
 
+    const bottomReserve = document.body.classList.contains('udon-mobile-layout')
+      ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
+      : 0;
+    const maxBottom = window.innerHeight - bottomReserve;
+
     if (window.innerWidth < submenuBox.right + diffLeft) {
       diffLeft -= parentBox.width + submenuBox.width;
       diffLeft += 8;
@@ -154,8 +165,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       diffLeft += 0 - (submenuBox.left + diffLeft);
     }
 
-    if (window.innerHeight < submenuBox.bottom + diffTop) {
-      diffTop += window.innerHeight - (submenuBox.bottom + diffTop);
+    if (maxBottom < submenuBox.bottom + diffTop) {
+      diffTop += maxBottom - (submenuBox.bottom + diffTop);
     }
     if (submenuBox.top + diffTop < 0) {
       diffTop += 0 - (submenuBox.top + diffTop);

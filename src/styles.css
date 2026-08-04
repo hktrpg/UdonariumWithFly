@@ -299,8 +299,14 @@ input {
 }
 
 /* Mobile / tablet chrome — desktop unchanged unless .udon-mobile-layout */
+:root {
+  /* Filled from env() so JS can read --udon-safe-bottom via getComputedStyle */
+  --udon-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --udon-bottom-chrome: 56px;
+}
+
 body.udon-mobile-layout {
-  /* Reserve space visually for bottom nav over scrollable overlays */
+  /* Bottom nav + safe area reserved by sheets / tour / menus */
 }
 
 body.udon-mobile-layout .networkIndicator {
@@ -311,5 +317,5 @@ body.udon-mobile-layout .networkIndicator {
 body.udon-mobile-layout .resource-hud {
   max-width: calc(100vw - 16px);
   max-height: calc(40vh);
-  bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(var(--udon-bottom-chrome, 56px) + 8px) !important;
 }

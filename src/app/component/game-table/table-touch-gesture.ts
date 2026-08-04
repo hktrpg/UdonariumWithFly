@@ -77,13 +77,15 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // Long-press → contextmenu. iOS never fires it natively.
-    // Android usually has native contextmenu; only synthesize on iOS-like UAs.
-    // Opening the menu clears the empty-table ping hold (see game-table onContextMenu).
+    // Long-press → contextmenu.
+    // iOS never fires it natively; some Android WebViews are also unreliable.
+    // Ping on empty table is skipped in the mobile tour; opening the menu clears ping hold.
     let ua = window.navigator.userAgent.toLowerCase();
-    let isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
-      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document);
-    if (!isiOS) return;
+    let needsSyntheticContextMenu =
+      ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
+      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document)
+      || ua.indexOf('android') > -1;
+    if (!needsSyntheticContextMenu) return;
     this.hammer.add(new Hammer.Press({ time: 550 }));
     this.hammer.on('press', ev => {
       let event = new MouseEvent('contextmenu', {

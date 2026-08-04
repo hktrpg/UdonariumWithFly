@@ -185,7 +185,6 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsDelete.bodyMobile',
       require: 'ack',
       chapter: 'controls',
-      skipIfMobile: true,
     },
     {
       id: 'controlsClipboard',
@@ -194,7 +193,6 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsClipboard.bodyMobile',
       require: 'ack',
       chapter: 'controls',
-      skipIfMobile: true,
     },
     {
       id: 'controlsUndo',
@@ -203,7 +201,6 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsUndo.bodyMobile',
       require: 'ack',
       chapter: 'controls',
-      skipIfMobile: true,
     },
     {
       id: 'controlsPath',

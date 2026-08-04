@@ -818,11 +818,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         option.top = (this.openPanelCount % 10 + 1) * 20;
         option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
         this.openPanelCount = this.openPanelCount + 1;
+      } else {
+        // Bottom-nav open: replace any existing sheet so the nav stays usable.
+        option.mobileReplace = true;
       }
       option = this.mobileLayout.adaptPanelOption(option);
       const tourId = this.tourIdForComponent(componentName);
       // Chat windows may open multiple copies (different tabs / positions).
-      const allowMultiple = componentName === 'ChatWindowComponent';
+      const allowMultiple = componentName === 'ChatWindowComponent' && !this.mobileLayout.isMobile;
       if (tourId) {
         if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
         option.tourPanelId = tourId;
@@ -837,6 +840,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       width: 520, height: 450, left: 100,
       tourPanelId: 'menu.connection',
       title: this.i18n.t('peer.title'),
+      mobileReplace: true,
     }));
     // On mobile, only open connection by default — chat opens on demand to keep the map usable.
     if (!this.mobileLayout.isMobile) {
@@ -922,7 +926,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = this.isMobileLayout
-      ? { x: window.pageXOffset + clientRect.left, y: Math.max(8, window.pageYOffset + clientRect.top - 8) }
+      ? {
+          x: window.pageXOffset + clientRect.left,
+          y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
+        }
       : {
           x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
@@ -1228,7 +1235,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = this.isMobileLayout
-      ? { x: window.pageXOffset + clientRect.left, y: Math.max(8, window.pageYOffset + clientRect.top - 8) }
+      ? {
+          x: window.pageXOffset + clientRect.left,
+          y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
+        }
       : { 
           x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)

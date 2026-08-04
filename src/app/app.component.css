@@ -158,7 +158,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 11050;
+  /* Above mobile sheets (12000) so menu stays tappable while a panel is open. */
+  z-index: 12500;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;

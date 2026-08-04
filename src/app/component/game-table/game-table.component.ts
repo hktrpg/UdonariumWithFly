@@ -547,9 +547,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onTableTouchStart(srcEvent: TouchEvent | MouseEvent | PointerEvent = null) {
     this.mouseGesture.cancel();
-    // Touching a movable/interactive object: leave object-drag alone (do not clear isDragging).
+    // Touching a movable/interactive object: claim object-drag (don't wait for mouse-gesture order).
     if (this.isTouchOnTableObject(srcEvent)) {
       this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = true;
       return;
     }
     // Empty table: enable pan immediately and blur inputs so focus gate doesn't block.
@@ -1023,7 +1024,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const t = srcEvent?.target;
     if (!(t instanceof Element)) return false;
     return !!t.closest(
-      '[appMovable], [appRotable], [appResizable], game-character, card, card-stack, dice-symbol, text-note, terrain, game-table-mask, range-area'
+      '[appMovable], [appRotable], [appResizable], game-character, card, card-stack, dice-symbol, text-note, terrain, game-table-mask, range'
     );
   }
 
