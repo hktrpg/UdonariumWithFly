@@ -3,6 +3,7 @@ import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { popupCharacterChatBalloon } from '@udonarium/chat-balloon';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ScenarioText, SCENARIO_TEXT_MAX_BYTES } from '@udonarium/scenario-text';
@@ -136,6 +137,12 @@ export class ScenarioTextComponent implements OnInit, OnDestroy {
       if (character) {
         const color = character.chatPalette?.color;
         this.chatMessageService.sendMessage(tab, body, '', character.identifier, null, color);
+        if (tab.isUseStandImage) {
+          popupCharacterChatBalloon(character, body, {
+            color,
+            faceIconIdentifier: character.faceIcon?.identifier || '',
+          });
+        }
         return;
       }
     }

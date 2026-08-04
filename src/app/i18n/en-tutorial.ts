@@ -33,13 +33,15 @@ Drag images or music into the browser to import.`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
+　　　　Window size & position are remembered (local); new chat windows reuse them
 <Floating dialog> Speaking as a character pre-fills 「」; text inside appears above the token
-　　　　Toggle via right-click / inventory “Show floating dialog”
+　　　　Toggle via right-click / inventory “Show floating dialog”; scenario text as character with 「」 also triggers it
 <Dice> Pick a system in the input, then type BCDice commands
 　　　　Quick roll beside character sheet numbers goes to the current chat channel
 <Guest> Rooms can “allow guests”; guests are limited. Passwords still apply
 <Notes> Menu → Note inventory for table / shared / private / trash notes
-<Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone.`,
+<Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone.
+<Settings*> Optional “Auto-open chat when someone speaks (if closed)” (default off); lobby opens on cold start when not in a room`,
   'tutorial.scene': `<Ping> Long-press empty map = marker; Shift+long-press = warning
 <Map settings> Darkness / global brightness / weather (rain・thunderstorm・snow・fog・wind・sakura・maple・sandstorm・rainbow・aurora・burning) / enable vision
 　　　　Grid: off / square / hex (vertical・horizontal); optional coordinates; local grid snap
@@ -91,6 +93,11 @@ Upgraded to 1.13.2`,
 ・Character context menu regrouped; menu offset so it does not cover the token
 ・Double-click token art opens details; combat “Add all on table” for everyone except guests
 ・Removed character “Interact with light” (tokens always occlude); masks / terrain still toggleable`,
+  'changelog.2026chat': `2026/08/05 Chat・lobby・scenario
+・Chat window remembers last size & position (local); new windows reuse geometry; shorter default height
+・Settings*: “Auto-open chat when someone speaks (if closed)” (default off)
+・Cold start opens Lobby as a normal window when not in a room (no overlay; skipped for invite join)
+・Scenario text sent as character with 「」 triggers floating dialog`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

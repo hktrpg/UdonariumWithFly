@@ -18,8 +18,10 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | ZIP includes audio | Room ZIP packs uploaded BGM / audio blobs (not only images) | `save-data.service.ts` | Upload music → Download ZIP → reload ZIP restores audio |
 | Multi-track BGM | Up to 4 concurrent room tracks + local ambience; audition is local-only | `Jukebox.ts`, `jukebox.component.*` | Play multiple tracks; mute audition does not broadcast |
 | Preset scenes | Save / apply tabletop poses, atmosphere, multi-track BGM (+ optional switch text); included in guided tour | `scene-preset*.ts`, `scene-preset.component.*`, `guided-tour-steps.ts` | Save scene → move tokens → Apply restores poses; tour step opens panel |
-| Scenario text | Draft narration; send full / selection to active chat tab; included in guided tour | `scenario-text*.ts`, `scenario-text.component.*` | Create item → Send / Send selection appears in chat |
-| Multiple chat windows | Opening Chat from the menu does not close existing chat panels | `app.component.ts` `open()` | Open Chat twice → two panels |
+| Scenario text | Draft narration; send full / selection to active chat tab; character speaker with 「」 triggers floating dialog; included in guided tour | `scenario-text*.ts`, `scenario-text.component.*`, `chat-balloon.ts` | Create item → Send / Send selection appears in chat; character + 「」 shows bubble |
+| Multiple chat windows | Opening Chat from the menu does not close existing chat panels; remembers last size/position (local); shorter default height | `app.component.ts` `open()`, `chat-window.component.ts` geometry | Open Chat twice → two panels; resize → reopen keeps size |
+| Auto-open chat | Settings (default off): if no chat window is open and someone else speaks, open chat | `ChatWindowComponent.isAutoPopup`, `MESSAGE_NORTIFICATION` in `app.component.ts` | Enable setting → close chat → peer speaks → chat opens |
+| Lobby on start | Cold start (not in a room / no invite) auto-opens Lobby as a normal panel (no modal overlay) | `app.component.ts` `openLobbyIfNeeded` | Fresh load shows lobby panel; map stays clickable |
 | Room XML `syncId` | Persist sync identifiers across ZIP／folder reload so piece↔table bindings survive UUID regen | `object-serializer.ts`, `room.ts`, `tabletop-object.ts` | Save room → reload → tokens stay on correct table; presets rebind |
 
 ## Port decisions

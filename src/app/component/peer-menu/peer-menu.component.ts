@@ -282,7 +282,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   showLobby() {
-    this.modalService.open(LobbyComponent, { width: 700, height: 400, left: 0, top: 400 });
+    PanelService.closePanelsByTourId('menu.lobby');
+    this.panelService.open(LobbyComponent, LobbyComponent.centeredPanelOption({
+      title: this.i18n.t('lobby.title'),
+    }));
   }
 
   showCreateRoom() {

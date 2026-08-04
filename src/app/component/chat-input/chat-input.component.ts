@@ -6,6 +6,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { ResettableTimeout } from '@udonarium/core/system/util/resettable-timeout';
 import { DiceBot } from '@udonarium/dice-bot';
+import { popupCharacterChatBalloon } from '@udonarium/chat-balloon';
 import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -847,68 +848,11 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       text = text.slice(0, text.length - matchMostLongText.length);
       // 💭
       if (this.isUseChatBalloon && isUseStandImageOnChatTab && targetCharacter && StringUtil.cr(text).trim()) {
-        // CHOICE 指令的引數不當作 💭
-        const regArray = /^(([sＳｓ][rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[rＲｒ][eＥｅ][pＰｐ][eＥｅ][aＡａ][tＴｔ]|[sＳｓ][rＲｒ][eＥｅ][pＰｐ]|[rＲｒ][eＥｅ][pＰｐ]|[sＳｓ][xＸｘ]|[xＸｘ])?([\d０-９]+)?[ 　]+)?([\s\S]*)?/igm.exec(text);
-        let dialogText = (regArray[4] != null) ? regArray[4].trim() : text.trim();
-        let choiceMatch;
-        if (/^([sＳｓ]?[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ][\d０-９]*)[ 　]+([^ 　]*)/ig.test(dialogText)) {
-          dialogText = '';
-        } else if ((choiceMatch = /^([sＳｓ]?[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ][\d０-９]*[\[［][^\]］]+[\]］])/ig.exec(dialogText)) 
-                || (choiceMatch = /^([sＳｓ]?[cＣｃ][hＨｈ][oＯｏ][iＩｉ][cＣｃ][eＥｅ][\d０-９]*[\(（][^\)）]+[\)）])/ig.exec(dialogText))) {
-          dialogText = dialogText.slice(choiceMatch[1].length)
-        }
-        //console.log(dialogText)
-        //💭 改為使用 Event 功能
-        const dialogRegExp = /「+([\s\S]+?)」/gm;
-        // const dialogRegExp = /(?:^|[^\￥])「([\s\S]+?[^\￥])」/gm; 
-        // TODO: 應正確解析
-        let match;
-        let dialog = [];
-        if ((match = dialogRegExp.exec(dialogText)) !== null) {
-          dialog.push(match[1]);
-        }
-        if (dialog.length === 0) {
-          const emoteTest = dialogText.split(/[\s　]/).slice(-1)[0];
-          if (StringUtil.isEmote(emoteTest)) {
-            dialog.push(emoteTest);
-          }
-        }
-        if (dialog.length > 0) {
-          // 連續 💭 暫時停用（能否同時顯示多個？）
-          //const dialogs = [...dialog, null];
-          //const gameCharacter = this.character;
-          //const color = this.color;
-          
-          const stamp = Date.now();
-          const dialogObj = {
-            characterIdentifier: targetCharacter.identifier, 
-            text: dialog.join("\n\n"),
-            faceIconIdentifier: (isUseFaceIcon && targetCharacter.faceIcon) ? targetCharacter.faceIcon.identifier : null,
-            color: color,
-            secret: sendTo ? true : false,
-            stamp,
-          };
-          if (dialogObj.secret) {
-            const targetPeer = ObjectStore.instance.get<PeerCursor>(sendTo);
-            if (targetPeer) {
-              if (targetPeer.peerId != PeerCursor.myCursor.peerId) EventSystem.call('POPUP_CHAT_BALLOON', dialogObj, targetPeer.peerId);
-              EventSystem.call('POPUP_CHAT_BALLOON', dialogObj, PeerCursor.myCursor.peerId);
-            }
-          } else {
-            // SyncVar reaches all peers reliably (same path as HP / position).
-            targetCharacter.openChatDialog({
-              text: dialogObj.text,
-              color: dialogObj.color,
-              faceIconIdentifier: dialogObj.faceIconIdentifier || '',
-              isEmote: StringUtil.isEmote(dialogObj.text),
-              stamp,
-            });
-            EventSystem.call('POPUP_CHAT_BALLOON', dialogObj);
-          }
-        } else if (StringUtil.cr(text).trim() && (targetCharacter.text || targetCharacter.chatDialogStamp)) {
-          targetCharacter.clearChatDialog();
-          EventSystem.call('FAREWELL_CHAT_BALLOON', { characterIdentifier: targetCharacter.identifier });
-        }
+        popupCharacterChatBalloon(targetCharacter, text, {
+          color,
+          faceIconIdentifier: (isUseFaceIcon && targetCharacter.faceIcon) ? targetCharacter.faceIcon.identifier : null,
+          sendTo: sendTo || undefined,
+        });
       }
 
       if (PeerCursor.isGMHold && !sendTo && !PeerCursor.myCursor.isGMMode && /GM(?:モード)?にな(?:ります|る)/i.test(StringUtil.toHalfWidth(text))) {

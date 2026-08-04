@@ -82,6 +82,15 @@ export class PanelService {
     return false;
   }
 
+  static openPanelsByTourId(tourPanelId: string): number {
+    if (!tourPanelId) return 0;
+    let n = 0;
+    for (const panel of PanelService.openPanels) {
+      if (panel.tourPanelId === tourPanelId) n++;
+    }
+    return n;
+  }
+
   /** Any open dynamic panel's tour id (topmost by z-index), for nav active state. */
   static getTopTourPanelId(): string | null {
     let bestId: string = null;
