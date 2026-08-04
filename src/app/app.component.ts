@@ -77,6 +77,8 @@ import { RoomInviteService } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-root',
@@ -112,8 +114,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isHorizontal = false;
   isLoggedin = false;
   isUpdateCanceled = false;
+  isMobileLayout = false;
+  isTabletLandscape = false;
+  isMobileEdit = false;
   private inviteHandled = false;
   private isRefreshPromptOpen = false;
+  private mobileSub: Subscription = null;
 
   static imageUrl = '';
   get imageUrl(): string {
@@ -167,6 +173,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private folderBackup: FolderBackupService,
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
+    private mobileLayout: MobileLayoutService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -537,6 +544,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             { compact: true }
           );
         });
+      })
+      .on('OPEN_CHAT', -1000, () => {
+        this.ngZone.run(() => this.openOrToggle('ChatWindowComponent'));
       });
 
     workaroundForMobileSafari();
@@ -650,6 +660,27 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
+    this.isMobileLayout = this.mobileLayout.isMobile;
+    this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+    this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+    // Guest cannot use Edit mode.
+    if (this.GuestMode() && this.mobileLayout.isEdit) {
+      this.mobileLayout.setUiMode('play');
+      this.isMobileEdit = false;
+    }
+    this.mobileSub = this.mobileLayout.isMobile$.subscribe(v => {
+      this.isMobileLayout = v;
+      this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+      this.isMobileEdit = v && this.mobileLayout.isEdit;
+    });
+    this.mobileSub.add(this.mobileLayout.chromeMode$.subscribe(() => {
+      this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
+      this.isMobileLayout = this.mobileLayout.isMobile;
+      this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+    }));
+    this.mobileSub.add(this.mobileLayout.uiMode$.subscribe(() => {
+      this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+    }));
   }
 
   ngAfterViewInit() {
@@ -731,9 +762,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
     window.removeEventListener('keydown', this.onWindowKeydown, true);
+    this.mobileSub?.unsubscribe();
   }
 
   open(componentName: string) {
+    this.enforceGuestPlayMode();
     let component: { new(...args: any[]): any } = null;
     let option: PanelOption = { width: 450, height: 600, left: 100 }
     switch (componentName) {
@@ -741,11 +774,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         option.width = 520;
         option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
+        // Keep map visible — connection is a half sheet, not full-screen.
+        if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
         option.width = 700;
         option.title = this.i18n.t('chat.title');
+        if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
@@ -783,6 +819,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
         option = { width: 520, height: 640, left: 100, title: this.i18n.t('combat.title') };
+        if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
@@ -804,12 +841,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
     }
     if (component) {
-      option.top = (this.openPanelCount % 10 + 1) * 20;
-      option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-      this.openPanelCount = this.openPanelCount + 1;
+      if (!this.mobileLayout.isMobile) {
+        option.top = (this.openPanelCount % 10 + 1) * 20;
+        option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+        this.openPanelCount = this.openPanelCount + 1;
+      } else {
+        // Bottom-nav open: replace any existing sheet so the nav stays usable.
+        option.mobileReplace = true;
+        // Inventory / notes / table / etc. all open as half sheet (map stays visible).
+        if (!option.mobileSheet) option.mobileSheet = 'half';
+      }
+      option = this.mobileLayout.adaptPanelOption(option);
       const tourId = this.tourIdForComponent(componentName);
       // Chat windows may open multiple copies (different tabs / positions).
-      const allowMultiple = componentName === 'ChatWindowComponent';
+      const allowMultiple = componentName === 'ChatWindowComponent' && !this.mobileLayout.isMobile;
       if (tourId) {
         if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
         option.tourPanelId = tourId;
@@ -820,16 +865,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private openDefaultPanels() {
-    this.panelService.open(PeerMenuComponent, {
+    this.panelService.open(PeerMenuComponent, this.mobileLayout.adaptPanelOption({
       width: 520, height: 450, left: 100,
       tourPanelId: 'menu.connection',
       title: this.i18n.t('peer.title'),
-    });
-    this.panelService.open(ChatWindowComponent, {
-      width: 700, height: 400, left: 100, top: 450,
-      tourPanelId: 'menu.chat',
-      title: this.i18n.t('chat.title'),
-    });
+      mobileReplace: true,
+      mobileSheet: 'half',
+    }));
+    // On mobile, only open connection by default — chat opens on demand to keep the map usable.
+    if (!this.mobileLayout.isMobile) {
+      this.panelService.open(ChatWindowComponent, {
+        width: 700, height: 400, left: 100, top: 450,
+        tourPanelId: 'menu.chat',
+        title: this.i18n.t('chat.title'),
+      });
+    }
   }
 
   private tourIdForComponent(componentName: string): string | null {
@@ -847,6 +897,46 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'NoteInventoryComponent': return 'menu.notes';
       default: return null;
     }
+  }
+
+  isNavActive(tourId: string): boolean {
+    if (!this.isMobileLayout) return false;
+    if (tourId === 'menu.more') return this.contextMenuService.isShow;
+    return PanelService.isTourPanelOpen(tourId);
+  }
+
+  /** Open panel; tap/click again closes (chat on desktop always opens). */
+  openOrToggle(componentName: string) {
+    this.enforceGuestPlayMode();
+    const isChat = componentName === 'ChatWindowComponent';
+    // Desktop chat can open multiple windows — never toggle-close from the menu.
+    if (!this.mobileLayout.isMobile && isChat) {
+      this.open(componentName);
+      return;
+    }
+    const tourId = this.tourIdForComponent(componentName);
+    if (tourId && PanelService.isTourPanelOpen(tourId)) {
+      PanelService.closePanelsByTourId(tourId);
+      return;
+    }
+    this.open(componentName);
+  }
+
+  setMobileUiMode(mode: 'play' | 'edit') {
+    if (!this.mobileLayout.isMobile) return;
+    if (mode === 'edit' && this.GuestMode()) return;
+    PanelService.closeAllPanels();
+    this.contextMenuService.close();
+    this.mobileLayout.setUiMode(mode);
+    this.isMobileEdit = mode === 'edit';
+  }
+
+  /** If identity becomes Guest while Edit is sticky, force Play + close sheets. */
+  private enforceGuestPlayMode() {
+    if (!this.mobileLayout.isMobile || !this.GuestMode() || !this.mobileLayout.isEdit) return;
+    PanelService.closeAllPanels();
+    this.mobileLayout.setUiMode('play');
+    this.isMobileEdit = false;
   }
 
   GuestMode() {
@@ -903,13 +993,76 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toolBox(event: Event) {
     this.guidedTour.notifyMenuClick('menu.toolbox');
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
+    const button = <HTMLElement>event.target;
+    const clientRect = button.getBoundingClientRect();
+    const position = this.isMobileLayout
+      ? {
+          x: window.pageXOffset + clientRect.left,
+          y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
+        }
+      : {
+          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
+          y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+        };
+    this.openToolboxAt(position);
+  }
+
+  /** Mobile primary-nav "More" — mode-aware secondary actions; tap again to collapse. */
+  openMoreMenu(event: Event) {
+    this.enforceGuestPlayMode();
+    this.guidedTour.notifyMenuClick('menu.more');
+    // Second tap on More closes the action sheet (outside-click ignores this button).
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = {
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+      x: window.pageXOffset + clientRect.left,
+      y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
     };
-    this.openToolboxAt(position);
+    const menu: ContextMenuAction[] = [];
+    if (this.isMobileEdit) {
+      menu.push({
+        name: this.i18n.t('menu.mode.exitEdit'),
+        materialIcon: 'sports_esports',
+        action: () => this.setMobileUiMode('play'),
+      });
+      menu.push(ContextMenuSeparator);
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+      }
+      if (this.canOpenSceneTools) {
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+      }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+        menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
+      }
+    } else {
+      if (!this.GuestMode()) {
+        menu.push({
+          name: this.i18n.t('menu.mode.enterEdit'),
+          materialIcon: 'edit',
+          action: () => this.setMobileUiMode('edit'),
+        });
+        menu.push(ContextMenuSeparator);
+        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+        menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+      }
+      if (this.canOpenSceneTools) {
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+      }
+    }
+    menu.push(ContextMenuSeparator);
+    menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });
+    menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
+    this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
   }
 
   private openToolboxAt(
@@ -992,12 +1145,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
       ]
     });
-    menu.push({
-      name: this.i18n.t('toolbox.closeAllPanels'),
-      materialIcon: 'close_fullscreen',
-      selfOnly: true,
-      action: () => PanelService.closeAllPanels()
-    });
+    // Desktop only — mobile sheets replace each other via bottom nav.
+    if (!this.mobileLayout.isMobile) {
+      menu.push({
+        name: this.i18n.t('toolbox.closeAllPanels'),
+        materialIcon: 'close_fullscreen',
+        selfOnly: true,
+        action: () => PanelService.closeAllPanels()
+      });
+    }
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);
@@ -1207,12 +1363,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   standSetteings(event: Event) {
     this.guidedTour.notifyMenuClick('menu.settings');
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
-    };
+    const position = this.isMobileLayout
+      ? {
+          x: window.pageXOffset + clientRect.left,
+          y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
+        }
+      : { 
+          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
+          y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+        };
     this.contextMenuService.open(position, [
       contextMenuToggleCheck({
         get: () => TableSelecter.instance.gridShow,

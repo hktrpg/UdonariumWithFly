@@ -50,6 +50,14 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
+  /** Mobile dark chrome: skip default #444 so CSS muted title shows; keep custom peer colors. */
+  get titleColorStyle(): string | null {
+    if (!this.titleColor) return null;
+    const mobile = typeof document !== 'undefined' && document.body.classList.contains('udon-mobile-layout');
+    if (mobile && this.titleColor === PeerCursor.CHAT_DEFAULT_COLOR) return null;
+    return this.titleColor;
+  }
+
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     public contextMenuService: ContextMenuService,
@@ -88,6 +96,9 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onOutsideClick(event) {
     if (this.rootElementRef.nativeElement.contains(event.target) === false) {
+      const t = event.target as HTMLElement | null;
+      // Let nav toggles close the menu themselves (mousedown would reopen otherwise).
+      if (t?.closest?.('[data-tour-id="menu.more"], [data-tour-id="menu.toolbox"], [data-tour-id="menu.settings"]')) return;
       this.close();
     }
   }
@@ -102,6 +113,23 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
+    const isMobile = document.body.classList.contains('udon-mobile-layout');
+
+    // Mobile: bottom action sheet (same chrome family as chat half-sheet / nav).
+    // Icon grids (faces etc.) stay floating near the pointer.
+    if (isMobile && !this.isIconsMenu) {
+      panel.classList.add('is-mobile-action-sheet');
+      panel.style.left = '';
+      panel.style.top = '';
+      panel.style.right = '';
+      panel.style.bottom = '';
+      if (this.altitudeSlider) {
+        this.altitudeSlider.nativeElement.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
+      }
+      return;
+    }
+
+    panel.classList.remove('is-mobile-action-sheet');
 
     // Nudge away from the cursor so the menu does not cover the target token.
     const OFFSET_X = 20;
@@ -114,6 +142,12 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let diffLeft = 0;
     let diffTop = 0;
 
+    // On mobile, reserve bottom nav so the menu is not covered / clipped under it.
+    const bottomReserve = isMobile
+      ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
+      : 0;
+    const maxBottom = window.innerHeight - bottomReserve;
+
     if (window.innerWidth < panelBox.right + diffLeft) {
       diffLeft += window.innerWidth - (panelBox.right + diffLeft);
     }
@@ -121,8 +155,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       diffLeft += 0 - (panelBox.left + diffLeft);
     }
 
-    if (window.innerHeight < panelBox.bottom + diffTop) {
-      diffTop += window.innerHeight - (panelBox.bottom + diffTop);
+    if (maxBottom < panelBox.bottom + diffTop) {
+      diffTop += maxBottom - (panelBox.bottom + diffTop);
     }
     if (panelBox.top + diffTop < 0) {
       diffTop += 0 - (panelBox.top + diffTop);
@@ -139,12 +173,26 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private adjustPositionSub() {
     let parent: HTMLElement = this.elementRef.nativeElement.parentElement;
     let submenu: HTMLElement = this.rootElementRef.nativeElement;
+    const isMobile = document.body.classList.contains('udon-mobile-layout');
+
+    // Inside mobile action sheet: expand inline (no floating sub-panel).
+    if (isMobile && parent?.closest?.('.is-mobile-action-sheet')) {
+      submenu.classList.add('is-mobile-action-sheet');
+      submenu.style.left = '';
+      submenu.style.top = '';
+      return;
+    }
 
     let parentBox = parent.getBoundingClientRect();
     let submenuBox = submenu.getBoundingClientRect();
 
     let diffLeft = 0;
     let diffTop = 0;
+
+    const bottomReserve = isMobile
+      ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
+      : 0;
+    const maxBottom = window.innerHeight - bottomReserve;
 
     if (window.innerWidth < submenuBox.right + diffLeft) {
       diffLeft -= parentBox.width + submenuBox.width;
@@ -154,8 +202,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       diffLeft += 0 - (submenuBox.left + diffLeft);
     }
 
-    if (window.innerHeight < submenuBox.bottom + diffTop) {
-      diffTop += window.innerHeight - (submenuBox.bottom + diffTop);
+    if (maxBottom < submenuBox.bottom + diffTop) {
+      diffTop += maxBottom - (submenuBox.bottom + diffTop);
     }
     if (submenuBox.top + diffTop < 0) {
       diffTop += 0 - (submenuBox.top + diffTop);

@@ -1,5 +1,6 @@
 import { ComponentRef, Injectable, OnChanges, ViewContainerRef } from '@angular/core';
 import { I18nService } from './i18n.service';
+import { MobileLayoutService } from './mobile-layout.service';
 
 declare var Type: FunctionConstructor;
 interface Type<T> extends Function {
@@ -14,6 +15,13 @@ export interface PanelOption {
   height?: number;
   /** Marks the panel root for guided-tour spotlight (`[data-tour-panel="…"]`). */
   tourPanelId?: string;
+  /**
+   * On mobile, close other sheets before opening (bottom-nav switches).
+   * Nested opens (palette / tab settings) should omit this or set false.
+   */
+  mobileReplace?: boolean;
+  /** full (default), half, or peek bottom sheet. */
+  mobileSheet?: 'full' | 'half' | 'peek';
 }
 
 @Injectable()
@@ -40,7 +48,10 @@ export class PanelService {
 
   scrollablePanel: HTMLDivElement = null;
 
-  constructor(private i18n: I18nService) {
+  constructor(
+    private i18n: I18nService,
+    private mobileLayout: MobileLayoutService,
+  ) {
     this.title = this.i18n.t('panel.untitled');
   }
 
@@ -61,6 +72,32 @@ export class PanelService {
     for (const panel of Array.from(PanelService.openPanels)) {
       if (panel.tourPanelId === tourPanelId) panel.close();
     }
+  }
+
+  static isTourPanelOpen(tourPanelId: string): boolean {
+    if (!tourPanelId) return false;
+    for (const panel of PanelService.openPanels) {
+      if (panel.tourPanelId === tourPanelId) return true;
+    }
+    return false;
+  }
+
+  /** Any open dynamic panel's tour id (topmost by z-index), for nav active state. */
+  static getTopTourPanelId(): string | null {
+    let bestId: string = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (!panel.tourPanelId || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el || !el.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!bestId || zSafe >= bestZ) {
+        bestId = panel.tourPanelId;
+        bestZ = zSafe;
+      }
+    }
+    return bestId;
   }
 
   /** Topmost open panel chrome for a tour id (by z-index, then DOM order). */
@@ -90,6 +127,11 @@ export class PanelService {
       parentViewContainerRef = PanelService.defaultParentViewContainerRef;
     }
 
+    // Only bottom-nav switches replace sheets. Nested opens (palette, settings) keep the parent.
+    if (this.mobileLayout.isMobile && option?.mobileReplace) {
+      PanelService.closeAllPanels();
+    }
+
     const injector = parentViewContainerRef.injector;
 
     let panelComponentRef: ComponentRef<any> = parentViewContainerRef.createComponent(PanelService.UIPanelComponentClass, { index: parentViewContainerRef.length, injector: injector });
@@ -101,13 +143,27 @@ export class PanelService {
     const childPanelService: PanelService = panelComponentRef.injector.get(PanelService);
     childPanelService.panelComponentRef = panelComponentRef;
     PanelService.openPanels.add(childPanelService);
-    if (option) {
-      if (option.title) childPanelService.title = option.title;
-      if (option.top) childPanelService.top = option.top;
-      if (option.left) childPanelService.left = option.left;
-      if (option.width) childPanelService.width = option.width;
-      if (option.height) childPanelService.height = option.height;
-      if (option.tourPanelId) childPanelService.tourPanelId = option.tourPanelId;
+
+    // Mobile: near-full-screen sheet. Desktop options pass through unchanged.
+    const resolved = this.mobileLayout.adaptPanelOption(option || {});
+    if (resolved.title) childPanelService.title = resolved.title;
+    if (resolved.top != null) childPanelService.top = resolved.top;
+    if (resolved.left != null) childPanelService.left = resolved.left;
+    if (resolved.width != null) childPanelService.width = resolved.width;
+    if (resolved.height != null) childPanelService.height = resolved.height;
+    if (resolved.tourPanelId) childPanelService.tourPanelId = resolved.tourPanelId;
+
+    if (this.mobileLayout.isMobile) {
+      childPanelService.isAbleRotateButton = false;
+      childPanelService.isAbleMinimizeButton = false;
+      childPanelService.isAbleFullScreenButton = false;
+      const panelInst = panelComponentRef.instance as any;
+      if (panelInst) {
+        panelInst.isMobileSheet = true;
+        const sheet = resolved.mobileSheet || 'half';
+        panelInst.isMobileSheetHalf = sheet === 'half' || sheet === 'peek';
+        panelInst.mobileSheetSnap = sheet === 'peek' ? 'peek' : sheet === 'half' ? 'half' : 'full';
+      }
     }
 
     let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);

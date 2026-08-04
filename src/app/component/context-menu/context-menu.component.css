@@ -206,3 +206,129 @@ input.altitude {
   float: right;
   font-size: smaller;
 }
+
+/* —— Mobile: same dark chrome as bottom nav / sheets (desktop cream unchanged) —— */
+:host-context(html.udon-mobile-layout) .component {
+  background: var(--udon-chrome-bg-solid, #2a2a2a);
+  border: 1px solid var(--udon-chrome-border, #555);
+  color: var(--udon-chrome-text, #e8e8e8);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+}
+
+:host-context(html.udon-mobile-layout) .title {
+  color: var(--udon-chrome-muted, #aaa);
+  border-bottom-color: var(--udon-chrome-border, #555);
+}
+
+:host-context(html.udon-mobile-layout) ul > li {
+  color: var(--udon-chrome-text, #e8e8e8);
+  padding: 10px 16px;
+  font-size: 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
+/* Icon grids (faces etc.) stay compact — do not apply action-row touch sizing. */
+:host-context(html.udon-mobile-layout) .icons-panel ul > li {
+  padding: 1px 0;
+  min-height: 0;
+  font-size: 12px;
+  display: block;
+  align-items: initial;
+}
+
+:host-context(html.udon-mobile-layout) ul > li.hasHighlight:active,
+:host-context(html.udon-mobile-layout) ul > li.hasHighlight:hover {
+  color: #fff;
+  background-color: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+}
+
+:host-context(html.udon-mobile-layout) hr.separator {
+  background-color: var(--udon-chrome-border, #555);
+}
+
+:host-context(html.udon-mobile-layout) .ruler,
+:host-context(html.udon-mobile-layout) .altitude-view {
+  color: var(--udon-chrome-muted, #aaa);
+}
+
+:host-context(html.udon-mobile-layout) .disabled .menu-title,
+:host-context(html.udon-mobile-layout) .disabled .material-icons {
+  color: #777;
+}
+
+/* More / toolbox / long-press: bottom action sheet — denser than generic touch rows */
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet {
+  left: var(--udon-left-chrome, 0px) !important;
+  right: 0 !important;
+  width: calc(100vw - var(--udon-left-chrome, 0px)) !important;
+  top: auto !important;
+  bottom: calc(var(--udon-bottom-chrome, 56px)) !important;
+  max-width: none;
+  max-height: min(56dvh, 480px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: normal;
+  border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .title {
+  max-width: none;
+  font-size: 12px;
+  padding: 6px 12px 4px;
+  text-align: left;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul {
+  padding: 0;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul > li {
+  padding: 5px 12px;
+  font-size: 13px;
+  min-height: 34px;
+  line-height: 1.25;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul > li:has(> hr.separator) {
+  min-height: 0;
+  padding: 2px 0;
+  display: block;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet hr.separator {
+  margin: 0 8px;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .menu-title .material-icons {
+  font-size: 1.15em !important;
+  padding-left: 0 !important;
+  vertical-align: middle;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sub-menu-arrow {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .menu-title:not(.icon-menu) {
+  max-width: none;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .submenu-panel,
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet.submenu-panel {
+  position: static;
+  left: auto;
+  top: auto;
+  width: 100%;
+  max-height: none;
+  box-shadow: none;
+  border: none;
+  border-top: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 0;
+}

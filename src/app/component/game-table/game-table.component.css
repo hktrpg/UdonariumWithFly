@@ -480,3 +480,204 @@
   white-space: pre;
   user-select: text;
 }
+
+/* Mobile zoom slider — top-right (desktop unchanged; *ngIf gated) */
+.view-zoom-control {
+  position: fixed;
+  top: 48px;
+  right: 8px;
+  z-index: 11040;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 8px;
+  box-sizing: border-box;
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 8px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.view-zoom-reset {
+  min-width: 36px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 1px solid #777;
+  border-radius: 4px;
+  background: #333;
+  color: #eee;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.view-zoom-icon {
+  font-size: 16px !important;
+  color: #ccc;
+  line-height: 1;
+}
+
+.view-zoom-range {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 28px;
+  height: 132px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  accent-color: #8ab4f8;
+  cursor: pointer;
+}
+
+.view-zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #8ab4f8;
+  border: 1px solid #555;
+}
+
+.view-zoom-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #8ab4f8;
+  border: 1px solid #555;
+}
+
+.map-action-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--udon-bottom-chrome, 56px) + 10px);
+  transform: translateX(-50%);
+  z-index: 11040;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px - var(--udon-left-chrome, 0px));
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 16px;
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.map-action-hud.is-placed {
+  right: auto;
+  bottom: auto;
+  transform: none;
+  max-width: calc(100vw - 8px);
+}
+
+.map-action-hud.is-collapsed {
+  flex-wrap: nowrap;
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+html.udon-tablet-landscape .map-action-hud:not(.is-placed) {
+  left: calc(50% + var(--udon-left-chrome, 72px) / 2);
+  bottom: calc(12px + var(--udon-keyboard-inset, 0px));
+}
+
+.map-hud-chrome {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 10px;
+  background: #333;
+  color: var(--udon-chrome-muted, #aaa);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.map-hud-drag {
+  cursor: grab;
+}
+
+.map-hud-drag:active {
+  cursor: grabbing;
+}
+
+.map-hud-chrome .material-icons {
+  font-size: 20px;
+}
+
+.map-hud-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 50%;
+  background: #3a3a3a;
+  color: var(--udon-chrome-text, #e8e8e8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.map-hud-btn .material-icons {
+  font-size: 22px;
+}
+
+.map-hud-btn:active {
+  filter: brightness(1.15);
+  background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+}
+
+.map-hud-zoom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+  flex: 1 1 120px;
+  min-width: 110px;
+  max-width: 160px;
+}
+
+.map-hud-zoom-reset {
+  min-width: 32px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 6px;
+  background: #333;
+  color: var(--udon-chrome-text, #e8e8e8);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.map-hud-zoom-range {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 64px;
+  height: 28px;
+  margin: 0;
+  accent-color: #8ab4f8;
+  cursor: pointer;
+  touch-action: none;
+}

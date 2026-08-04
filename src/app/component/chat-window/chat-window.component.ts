@@ -1,5 +1,4 @@
 import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { ChatMessage } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -134,7 +133,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.activeChatTabIdentifier = chatTabidentifier || '';
     this.updatePanelTitle();
     if (hasChanged) {
-      this.scrollToBottom(true);
+      this.scheduleScrollToBottom(true);
     }
   }
 
@@ -164,13 +163,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.register(this)
       .on('MESSAGE_ADDED', event => {
         if (event.data.tabIdentifier !== this.chatTabidentifier) return;
-        let message = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
-        if (message && message.isSendFromSelf) {
-          this.isAutoScroll = true;
-        } else {
-          this.checkAutoScroll();
-        }
-        if (this.isAutoScroll && this.chatTab) this.chatTab.markForRead();
+        // Always follow new messages on the active tab (mobile + desktop).
+        this.isAutoScroll = true;
+        if (this.chatTab) this.chatTab.markForRead();
+        this.scrollToBottom(true);
+        // Virtual list needs a second pass after DOM height updates.
+        setTimeout(() => this.scrollToBottom(true), 50);
       })
       .on('DELETE_GAME_OBJECT', event => {
         if (this.chatTabidentifier === event.data.identifier || !this.chatTab) {
@@ -191,27 +189,64 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    queueMicrotask(() => this.scrollToBottom(true));
+    this.scheduleScrollToBottom(true);
+    this.bindScrollTracking();
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+    this.unbindScrollTracking();
+    if (this.openScrollRetryTimers.length) {
+      this.openScrollRetryTimers.forEach(t => clearTimeout(t));
+      this.openScrollRetryTimers = [];
+    }
+  }
+
+  private scrollTrackBound = false;
+  private onPanelScroll = () => this.checkAutoScroll();
+  private openScrollRetryTimers: ReturnType<typeof setTimeout>[] = [];
+
+  private bindScrollTracking() {
+    const panel = this.panelService.scrollablePanel;
+    if (!panel || this.scrollTrackBound) return;
+    panel.addEventListener('scroll', this.onPanelScroll, { passive: true });
+    this.scrollTrackBound = true;
+  }
+
+  private unbindScrollTracking() {
+    const panel = this.panelService.scrollablePanel;
+    if (!panel || !this.scrollTrackBound) return;
+    panel.removeEventListener('scroll', this.onPanelScroll);
+    this.scrollTrackBound = false;
+  }
+
+  /** Open / tab change / new message — retry until virtual list paints. */
+  private scheduleScrollToBottom(force: boolean = true) {
+    this.scrollToBottom(force);
+    queueMicrotask(() => this.scrollToBottom(force));
+    for (const delay of [50, 150, 300]) {
+      const t = setTimeout(() => this.scrollToBottom(force), delay);
+      this.openScrollRetryTimers.push(t);
+    }
   }
 
   // @TODO 做法應再斟酌
   scrollToBottom(isForce: boolean = false) {
     if (isForce) this.isAutoScroll = true;
     if (!this.isAutoScroll) return;
+    const panel = this.panelService.scrollablePanel;
+    if (!panel) return;
     let event = new CustomEvent('scrolltobottom', {});
-    this.panelService.scrollablePanel.dispatchEvent(event);
+    panel.dispatchEvent(event);
     if (this.scrollToBottomTimer != null) return;
     this.scrollToBottomTimer = setTimeout(() => {
       if (this.chatTab) this.chatTab.markForRead();
       this.scrollToBottomTimer = null;
-      this.isAutoScroll = false;
       if (this.panelService.scrollablePanel) {
         this.panelService.scrollablePanel.scrollTop = this.panelService.scrollablePanel.scrollHeight;
       }
+      // Stay following while parked at the bottom; scroll-up turns this off via checkAutoScroll.
+      this.checkAutoScroll();
     }, 0);
   }
 

@@ -72,6 +72,12 @@ export class UIPanelComponent implements OnInit {
   isMinimized: boolean = false;
   isFullScreen: boolean = false;
   isHorizontal: boolean = false;
+  /** Set by PanelService.open on phone/tablet sheets. Desktop panels stay false. */
+  isMobileSheet: boolean = false;
+  /** Bottom half-sheet (e.g. chat) — leaves map visible above. */
+  isMobileSheetHalf: boolean = false;
+  /** peek | half | full — only meaningful when isMobileSheet. */
+  mobileSheetSnap: 'peek' | 'half' | 'full' = 'full';
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
@@ -99,6 +105,7 @@ export class UIPanelComponent implements OnInit {
   }
 
   toggleMinimize(e: Event = null) {
+    if (this.isMobileSheet) return;
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -249,6 +256,29 @@ export class UIPanelComponent implements OnInit {
       e.preventDefault();
     }
     if (this.panelService) this.panelService.close();
+  }
+
+  /** Desktop: dblclick title minimizes/restores. Mobile sheets: no-op (minimize chrome is hidden). */
+  onTitleDblClick(e: Event) {
+    if (this.isMobileSheet) {
+      this.notOperaion(e);
+      return;
+    }
+    if (this.isFullScreen) this.toggleFullScreen(e);
+    else this.toggleMinimize(e);
+  }
+
+  /** Mobile: tap title/handle cycles peek → half → full (map-first sheet). */
+  onMobileTitleTap(e: Event) {
+    if (!this.isMobileSheet) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest('button')) return;
+    e.stopPropagation();
+    const order: Array<'peek' | 'half' | 'full'> = ['peek', 'half', 'full'];
+    const i = order.indexOf(this.mobileSheetSnap);
+    const next = order[(i + 1) % order.length];
+    this.mobileSheetSnap = next;
+    this.isMobileSheetHalf = next !== 'full';
   }
 
   notOperaion(e: Event = null) {

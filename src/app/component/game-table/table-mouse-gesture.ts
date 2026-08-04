@@ -15,6 +15,12 @@ enum Keyboard {
   ArrowUp = 'ArrowUp',
   ArrowRight = 'ArrowRight',
   ArrowDown = 'ArrowDown',
+  KeyW = 'w',
+  KeyA = 'a',
+  KeyS = 's',
+  KeyD = 'd',
+  KeyQ = 'q',
+  KeyE = 'e',
 }
 
 export class TableMouseGesture {
@@ -38,11 +44,13 @@ export class TableMouseGesture {
 
   /**
    * @param hasObjectSelection When true, Alt(+Shift)+wheel is owned by TabletopKeyboardService
-   *   (object facing/roll) — do not rotate the view.
+   *   (object facing/roll) — do not rotate the view. Also blocks empty-view WASD/QE.
+   * @param allowViewKeyboard Desktop only: empty-selection WASD pan / QE yaw.
    */
   constructor(
     readonly targetElement: HTMLElement,
     private readonly hasObjectSelection: () => boolean = () => false,
+    private readonly allowViewKeyboard: () => boolean = () => true,
   ) {
     this.initialize();
   }
@@ -176,6 +184,8 @@ export class TableMouseGesture {
   }
 
   onKeydown(ev: KeyboardEvent) {
+    if (this.shouldIgnoreKeyTarget(ev)) return;
+
     let transformX = 0;
     let transformY = 0;
     let transformZ = 0;
@@ -185,6 +195,42 @@ export class TableMouseGesture {
     let rotateZ = 0;
 
     let key = this.getKeyName(ev);
+
+    // Empty selection (desktop): WASD = forward/back/strafe; Q/E yaw ±3°.
+    // Pan axes are remapped by view yaw in onTableMouseTransform.
+    if (
+      this.allowViewKeyboard()
+      && !this.hasObjectSelection()
+      && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey
+    ) {
+      const code = ev.code;
+      let handled = false;
+      if (code === 'KeyW' || key === Keyboard.KeyW) {
+        transformY = 10;
+        handled = true;
+      } else if (code === 'KeyS' || key === Keyboard.KeyS) {
+        transformY = -10;
+        handled = true;
+      } else if (code === 'KeyA' || key === Keyboard.KeyA) {
+        transformX = 10;
+        handled = true;
+      } else if (code === 'KeyD' || key === Keyboard.KeyD) {
+        transformX = -10;
+        handled = true;
+      } else if (code === 'KeyQ' || key === Keyboard.KeyQ) {
+        rotateZ = -3;
+        handled = true;
+      } else if (code === 'KeyE' || key === Keyboard.KeyE) {
+        rotateZ = 3;
+        handled = true;
+      }
+      if (handled) {
+        if (ev.cancelable) ev.preventDefault();
+        if (this.ontransform) this.ontransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ, TableMouseGestureEvent.KEYBOARD, ev);
+        return;
+      }
+    }
+
     switch (key) {
       case Keyboard.ArrowLeft:
         if (ev.shiftKey) {
@@ -218,18 +264,34 @@ export class TableMouseGesture {
           transformY = -10;
         }
         break;
+      default:
+        return;
     }
-    let isArrowKey = Keyboard[key] != null;
-    if (isArrowKey && this.ontransform) this.ontransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ, TableMouseGestureEvent.KEYBOARD, ev);
+    if (this.ontransform) this.ontransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ, TableMouseGestureEvent.KEYBOARD, ev);
+  }
+
+  private shouldIgnoreKeyTarget(ev: KeyboardEvent): boolean {
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (target.isContentEditable) return true;
+    return !!target.closest('[contenteditable="true"], [contenteditable=""]');
   }
 
   private getKeyName(keyboard: KeyboardEvent): string {
-    if (keyboard.key) return keyboard.key;
+    if (keyboard.key) return keyboard.key.length === 1 ? keyboard.key.toLowerCase() : keyboard.key;
     switch (keyboard.keyCode) {
       case 37: return Keyboard.ArrowLeft;
       case 38: return Keyboard.ArrowUp;
       case 39: return Keyboard.ArrowRight;
       case 40: return Keyboard.ArrowDown;
+      case 87: return Keyboard.KeyW;
+      case 65: return Keyboard.KeyA;
+      case 83: return Keyboard.KeyS;
+      case 68: return Keyboard.KeyD;
+      case 81: return Keyboard.KeyQ;
+      case 69: return Keyboard.KeyE;
       default: return '';
     }
   }

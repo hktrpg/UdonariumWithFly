@@ -337,3 +337,30 @@
 .controls {
   padding-top: 0;
 }
+
+/* —— Mobile Play: denser combat sheet —— */
+:host-context(html.udon-mobile-layout) .combat-tracker {
+  gap: 6px;
+}
+
+:host-context(html.udon-mobile-layout) .tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+:host-context(html.udon-mobile-layout) .tool-actions .btn {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+:host-context(html.udon-mobile-layout) .field-row {
+  gap: 6px;
+}
+
+:host-context(html.udon-mobile-layout) .enc-name {
+  min-height: 36px;
+  font-size: 14px;
+}

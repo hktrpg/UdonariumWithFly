@@ -166,3 +166,50 @@
   </header>
   <pre id="udon-debug-pose-body" class="debug-pose-body"></pre>
 </aside>
+
+<!-- Mobile map HUD: actions + zoom; drag handle + collapse. -->
+<div class="map-action-hud" *ngIf="showMapActionHud"
+  [class.is-collapsed]="mapHudCollapsed"
+  [class.is-placed]="mapHudLeft != null"
+  [style.left.px]="mapHudLeft"
+  [style.top.px]="mapHudTop"
+  (pointerdown)="$event.stopPropagation()"
+  (touchstart)="$event.stopPropagation()"
+  (mousedown)="$event.stopPropagation()">
+  <button type="button" class="map-hud-chrome map-hud-drag"
+    (pointerdown)="startMapHudDrag($event)"
+    [attr.title]="'hud.move' | i18n" [attr.aria-label]="'hud.move' | i18n">
+    <i class="material-icons">drag_indicator</i>
+  </button>
+  <button type="button" class="map-hud-chrome map-hud-collapse"
+    (click)="toggleMapHudCollapsed()"
+    [attr.title]="(mapHudCollapsed ? 'hud.expand' : 'hud.collapse') | i18n"
+    [attr.aria-label]="(mapHudCollapsed ? 'hud.expand' : 'hud.collapse') | i18n">
+    <i class="material-icons">{{ mapHudCollapsed ? 'expand_less' : 'expand_more' }}</i>
+  </button>
+  <ng-container *ngIf="!mapHudCollapsed">
+    <button type="button" class="map-hud-btn" (click)="hudOpenChat()" [attr.title]="'menu.chat' | i18n" [attr.aria-label]="'menu.chat' | i18n">
+      <i class="material-icons">chat</i>
+    </button>
+    <button type="button" class="map-hud-btn" data-tour-id="hud.add" *ngIf="!isGuestHud" (click)="hudOpenAddMenu($event)" [attr.title]="'hud.add' | i18n" [attr.aria-label]="'hud.add' | i18n">
+      <i class="material-icons">add_circle</i>
+    </button>
+    <div class="map-hud-zoom"
+      (pointerdown)="$event.stopPropagation()"
+      (touchstart)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+      (wheel)="$event.stopPropagation()">
+      <button type="button" class="map-hud-zoom-reset" (click)="resetZoomSlider()" [attr.title]="'view.zoomReset' | i18n">{{ zoomSliderValue > 0 ? '+' : '' }}{{ zoomSliderValue }}</button>
+      <input
+        class="map-hud-zoom-range"
+        type="range"
+        min="-100"
+        max="100"
+        step="1"
+        [value]="zoomSliderValue"
+        (input)="onZoomSliderInput($event)"
+        [attr.aria-label]="'view.zoom' | i18n"
+      />
+    </div>
+  </ng-container>
+</div>
