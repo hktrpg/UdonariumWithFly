@@ -37,8 +37,8 @@
 .inv-tab span {
   display: inline-block;
   padding: 4px 10px;
-  border: 1px solid #c4b29a;
-  border-radius: 4px;
+  border: 1px solid var(--udon-control-border, #c4b29a);
+  border-radius: var(--udon-control-radius, 4px);
   font-size: 12px;
   font-weight: 700;
   background: #fffdf8;

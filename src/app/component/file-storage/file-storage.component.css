@@ -44,9 +44,9 @@
 .cond-select {
   min-height: 28px;
   padding: 3px 6px;
-  border: 1px solid #c4b29a;
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--udon-control-border, #c4b29a);
+  border-radius: var(--udon-control-radius, 4px);
+  background: var(--udon-control-bg, #fff);
 }
 
 .sort-label {

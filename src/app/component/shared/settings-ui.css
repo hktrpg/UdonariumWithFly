@@ -1,26 +1,35 @@
+:host {
+  container-type: inline-size;
+  display: block;
+}
+
 .settings-ui {
   display: block;
   font-size: 13px;
   color: #3a2f24;
 }
 
+/* Keep list + form side-by-side; stack only when the panel itself is narrow. */
 .settings-layout {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
   align-items: stretch;
   min-height: 100%;
 }
 
 .settings-aside {
-  flex: 0 0 168px;
+  flex: 0 0 150px;
+  width: 150px;
+  min-width: 120px;
+  max-width: 180px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .settings-main {
-  flex: 1 1 320px;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -200,9 +209,9 @@
 .field textarea {
   min-height: 28px;
   padding: 3px 6px;
-  border: 1px solid #c4b29a;
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--udon-control-border, #c4b29a);
+  border-radius: var(--udon-control-radius, 4px);
+  background: var(--udon-control-bg, #fff);
 }
 
 .field textarea {
@@ -550,15 +559,24 @@ label.disabled {
   vertical-align: middle;
 }
 
-@media (max-width: 640px) {
+/* Query panel host width (not browser viewport). */
+@container (max-width: 420px) {
+  .settings-layout {
+    flex-wrap: wrap;
+  }
+
   .settings-aside {
     flex: 1 1 100%;
+    width: auto;
+    max-width: none;
   }
 
   .settings-list {
     min-height: 120px;
   }
+}
 
+@media (max-width: 640px) {
   .image-grid {
     grid-template-columns: 1fr;
   }
