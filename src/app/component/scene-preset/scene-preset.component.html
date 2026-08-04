@@ -18,6 +18,7 @@
       <div class="list-main">
         <span class="list-item-name" [class.invalid]="!preset.isValid">{{ preset.title || ('scenePreset.untitled' | i18n) }}</span>
         <span class="list-status">{{ preset.tableDisplayName }}</span>
+        <span class="list-time" *ngIf="preset.savedAt">{{ 'scenePreset.savedAt' | i18n:{ time: preset.savedAtDisplay } }}</span>
       </div>
       <span class="btn-group" (click)="$event.stopPropagation()">
         <button type="button" class="btn btn-sm btn-primary" (click)="apply(preset)" [disabled]="GuestMode() || !preset.isValid">
@@ -48,5 +49,6 @@
       <textarea rows="4" [(ngModel)]="selected.switchText" [disabled]="GuestMode()"></textarea>
     </label>
     <p class="hint" *ngIf="!selected.isValid">{{ 'scenePreset.invalidHint' | i18n }}</p>
+    <p class="hint" *ngIf="selected.savedAt">{{ 'scenePreset.savedAt' | i18n:{ time: selected.savedAtDisplay } }}</p>
   </section>
 </div>

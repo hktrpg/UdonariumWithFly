@@ -16,7 +16,7 @@ export const zhCN: I18nDictionary = {
   'menu.toolbox': '工具箱',
   'menu.combat': '战斗轮',
   'menu.sceneTools': '场景工具',
-  'menu.scenePreset': '场面预设',
+  'menu.scenePreset': '预设场面',
   'menu.scenarioText': '剧本文字',
   'menu.inventory': '角色仓库',
   'menu.notes': '笔记仓库',

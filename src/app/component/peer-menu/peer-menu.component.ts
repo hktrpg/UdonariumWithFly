@@ -331,7 +331,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   loadFolderBackup() {
-    if (this.GuestMode()) return;
+    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
     void this.folderBackup.openLoadUi();
   }
 

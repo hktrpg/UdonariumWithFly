@@ -6,6 +6,7 @@ import { ScenePreset } from '@udonarium/scene-preset';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
@@ -54,7 +55,7 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   create() {
     if (this.GuestMode()) return;
-    this.selected = this.list.createFromCurrent(this.i18n.t('scenePreset.defaultTitle'));
+    void this.saveCurrentScene();
   }
 
   overwrite(preset: ScenePreset) {
@@ -76,6 +77,25 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
       skipText: this.skipText,
       chatTab
     });
+  }
+
+  private async saveCurrentScene() {
+    const defaultTitle = TableSelecter.instance.viewTable?.name
+      || this.i18n.t('scenePreset.defaultTitle');
+    const result = await this.modalService.open<string | boolean>(ConfirmationComponent, {
+      title: this.i18n.t('scenePreset.saveAsScene'),
+      text: this.i18n.t('scenePreset.saveConfirmText'),
+      help: this.i18n.t('scenePreset.saveConfirmHelp'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'theaters',
+      okLabel: this.i18n.t('scenePreset.saveAsScene'),
+      inputLabel: this.i18n.t('scenePreset.fieldTitle'),
+      inputValue: defaultTitle,
+      inputPlaceholder: this.i18n.t('scenePreset.defaultTitle'),
+    });
+    if (result === false || result == null) return;
+    const title = (typeof result === 'string' ? result.trim() : '') || defaultTitle;
+    this.selected = this.list.createFromCurrent(title);
   }
 
   remove(preset: ScenePreset) {

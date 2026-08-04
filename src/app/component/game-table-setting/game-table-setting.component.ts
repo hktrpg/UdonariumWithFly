@@ -191,11 +191,23 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     this.panelService.close();
   }
 
-  saveAsScene() {
+  async saveAsScene() {
     if (this.GuestMode()) return;
-    ScenePresetList.instance.createFromCurrent(
-      this.selectedTable?.name || this.i18n.t('scenePreset.defaultTitle')
-    );
+    const defaultTitle = this.selectedTable?.name || this.i18n.t('scenePreset.defaultTitle');
+    const result = await this.modalService.open<string | boolean>(ConfirmationComponent, {
+      title: this.i18n.t('scenePreset.saveAsScene'),
+      text: this.i18n.t('scenePreset.saveConfirmText'),
+      help: this.i18n.t('scenePreset.saveConfirmHelp'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'theaters',
+      okLabel: this.i18n.t('scenePreset.saveAsScene'),
+      inputLabel: this.i18n.t('scenePreset.fieldTitle'),
+      inputValue: defaultTitle,
+      inputPlaceholder: this.i18n.t('scenePreset.defaultTitle'),
+    });
+    if (result === false || result == null) return;
+    const title = (typeof result === 'string' ? result.trim() : '') || defaultTitle;
+    ScenePresetList.instance.createFromCurrent(title);
   }
 
   cloneGameTable() {

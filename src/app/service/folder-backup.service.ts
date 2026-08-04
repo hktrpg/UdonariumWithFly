@@ -108,7 +108,7 @@ export class FolderBackupService implements OnDestroy {
   }
 
   get canLoadFromFolder(): boolean {
-    return this.isSupported && !Network.GuestMode();
+    return this.isSupported && !Network.GuestMode() && this.isReady;
   }
 
   get isSupported(): boolean {
@@ -369,8 +369,7 @@ export class FolderBackupService implements OnDestroy {
   }
 
   async openLoadUi(): Promise<void> {
-    if (Network.GuestMode() || !this.isSupported) return;
-    if (!(await this.ensureBound())) return;
+    if (!this.canLoadFromFolder) return;
 
     const backups = await this.listRoomBackups();
     const selected = await this.modalService.open(FolderBackupListComponent, {

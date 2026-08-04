@@ -35,15 +35,73 @@ export class TabletopObject extends ObjectNode {
     return this.tableIdentifier === viewId;
   }
 
+  /** All tabletop subclasses (character/card/dice/…). getObjects(TabletopObject) only matches the base alias. */
+  static getAll(): TabletopObject[] {
+    const list: TabletopObject[] = [];
+    for (const obj of ObjectStore.instance.getObjects()) {
+      if (obj instanceof TabletopObject) list.push(obj);
+    }
+    return list;
+  }
+
   /** Assign unbound table pieces to the current (or given) view table. */
   static migrateUnboundTablePieces(viewTableId?: string) {
     const id = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!id) return;
-    for (const obj of ObjectStore.instance.getObjects(TabletopObject)) {
+    for (const obj of TabletopObject.getAll()) {
       if (obj.location.name === 'table' && !obj.tableIdentifier) {
         obj.tableIdentifier = id;
       }
     }
+  }
+
+  /**
+   * After room XML load: rebind pieces whose tableIdentifier points at vanished UUIDs
+   * (saves from before syncId). Returns old→new table id remap for scene presets.
+   */
+  static repairOrphanedPieceBindings(extraOrphanIds: string[] = []): Map<string, string> {
+    // Use alias string — importing GameTable here creates a circular init cycle
+    // (game-table → game-table-mask → tabletop-object).
+    const tables = ObjectStore.instance.getObjects('game-table') as Array<{ identifier: string }>;
+    const remap = new Map<string, string>();
+    if (tables.length < 1) {
+      TabletopObject.migrateUnboundTablePieces();
+      return remap;
+    }
+    const validIds = new Set(tables.map(t => t.identifier));
+    const orphanIds: string[] = [];
+    const seen = new Set<string>();
+
+    const consider = (tid: string) => {
+      if (!tid || validIds.has(tid) || seen.has(tid)) return;
+      seen.add(tid);
+      orphanIds.push(tid);
+    };
+
+    for (const obj of TabletopObject.getAll()) {
+      if (obj.location.name === 'table') consider(obj.tableIdentifier);
+    }
+    for (const tid of extraOrphanIds) consider(tid);
+
+    if (orphanIds.length > 0) {
+      if (tables.length === 1) {
+        for (const id of orphanIds) remap.set(id, tables[0].identifier);
+      } else if (orphanIds.length === tables.length) {
+        for (let i = 0; i < orphanIds.length; i++) remap.set(orphanIds[i], tables[i].identifier);
+      } else {
+        const viewId = TabletopObject.resolveViewTableIdentifier() || tables[0].identifier;
+        for (const id of orphanIds) remap.set(id, viewId);
+      }
+
+      for (const obj of TabletopObject.getAll()) {
+        if (obj.location.name !== 'table') continue;
+        const next = remap.get(obj.tableIdentifier);
+        if (next) obj.tableIdentifier = next;
+      }
+    }
+
+    TabletopObject.migrateUnboundTablePieces();
+    return remap;
   }
 
   static resolveViewTableIdentifier(): string {

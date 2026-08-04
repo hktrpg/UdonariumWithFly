@@ -144,6 +144,11 @@ export class ObjectStore {
     this.garbageMap.clear();
   }
 
+  /** Allow recreating an object with a previously deleted identifier (e.g. room reload). */
+  clearDeleted(identifier: string) {
+    if (identifier) this.garbageMap.delete(identifier);
+  }
+
   private garbageCollection(garbage: ObjectContext)
   private garbageCollection(ms: number)
   private garbageCollection(arg: any) {

@@ -389,12 +389,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   static syncPoseFromUndo(object: TabletopObject, x: number, y: number, posZ: number) {
     if (!object) return;
-    const layer = MovableDirective.layerMap.get(object.aliasName);
-    if (!layer) return;
-    for (const movable of layer) {
+    const apply = (movable: MovableDirective) => {
       if (movable.tabletopObject === object) {
         movable.applyExternalPose(x, y, posZ);
       }
+    };
+    const layer = MovableDirective.layerMap.get(object.aliasName);
+    if (layer) {
+      for (const movable of layer) apply(movable);
+      return;
+    }
+    for (const set of MovableDirective.layerMap.values()) {
+      for (const movable of set) apply(movable);
     }
   }
 

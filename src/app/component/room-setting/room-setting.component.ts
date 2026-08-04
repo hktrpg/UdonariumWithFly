@@ -78,7 +78,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
       this.guestPassword = this.allowGuest ? this.roomInvite.getRolePassword('guest') : '';
     } else {
       const preferredName = String(this.modalService.option?.preferredRoomName || '').trim();
-      this.roomName = preferredName || this.i18n.t('room.defaultName');
+      this.roomName = preferredName || this.makeDefaultRoomName();
       this.allowUser = true;
       this.allowGuest = true;
       this.applyPreferredAuth(this.modalService.option?.preferredAuth);
@@ -100,6 +100,13 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     if (typeof auth.guestPassword === 'string') {
       this.guestPassword = this.allowGuest ? auth.guestPassword.slice(0, 12) : '';
     }
+  }
+
+  /** Default display name: localized base + random 0000–9999. */
+  private makeDefaultRoomName(): string {
+    const n = Math.floor(Math.random() * 10000);
+    const suffix = ('0000' + n).slice(-4);
+    return this.i18n.t('room.defaultName') + suffix;
   }
 
   ngOnDestroy() {

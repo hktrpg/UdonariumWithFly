@@ -1016,17 +1016,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         disabled: unsupported || status === 'unbound',
         action: () => { void this.folderBackup.requestAccess(); }
       },
-      {
-        name: this.i18n.t('menu.folderBackup.load'),
-        disabled: unsupported || status === 'unbound',
-        action: () => { void this.openFolderBackupLoad(); }
-      },
-      {
-        name: this.i18n.t('menu.folderBackup.unbind'),
-        disabled: unsupported || status === 'unbound',
-        action: () => { void this.folderBackup.unbindFolder(); }
-      },
     ];
+    if (this.folderBackup.canLoadFromFolder) {
+      subActions.push({
+        name: this.i18n.t('menu.folderBackup.load'),
+        action: () => { void this.openFolderBackupLoad(); }
+      });
+    }
+    subActions.push({
+      name: this.i18n.t('menu.folderBackup.unbind'),
+      disabled: unsupported || status === 'unbound',
+      action: () => { void this.folderBackup.unbindFolder(); }
+    });
     return {
       name: this.i18n.t('menu.folderBackup'),
       materialIcon: 'folder',
@@ -1167,7 +1168,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openFolderBackupLoad() {
-    if (this.GuestMode()) return;
+    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
     void this.folderBackup.openLoadUi();
   }
 

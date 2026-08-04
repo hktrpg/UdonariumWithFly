@@ -27,6 +27,12 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   /** When true, extra button closes the modal after running extraAction. Default false. */
   extraCloses: boolean = false;
 
+  /** Optional single-line prompt; OK resolves with the string (cancel still resolves false). */
+  hasInput: boolean = false;
+  inputLabel: string = '';
+  inputValue: string = '';
+  inputPlaceholder: string = '';
+
   constructor(
     private panelService: PanelService,
     private modalService: ModalService,
@@ -46,6 +52,10 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.cancelAction = modalService.option.cancelAction ? modalService.option.cancelAction : null;
     this.extraAction = modalService.option.extraAction ? modalService.option.extraAction : null;
     this.extraCloses = !!modalService.option.extraCloses;
+    this.hasInput = !!modalService.option.inputLabel || modalService.option.inputValue != null || !!modalService.option.hasInput;
+    this.inputLabel = modalService.option.inputLabel ? modalService.option.inputLabel : '';
+    this.inputValue = modalService.option.inputValue != null ? String(modalService.option.inputValue) : '';
+    this.inputPlaceholder = modalService.option.inputPlaceholder ? modalService.option.inputPlaceholder : '';
   }
 
   ngOnInit() {
@@ -77,7 +87,11 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   }
 
   ok() {
-    this.modalService.resolve(true);
+    if (this.hasInput) {
+      this.modalService.resolve(this.inputValue);
+    } else {
+      this.modalService.resolve(true);
+    }
     if (this.action) this.action();
   }
 

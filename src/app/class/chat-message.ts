@@ -43,7 +43,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   @SyncVar() to: string;
   @SyncVar() name: string;
   @SyncVar() toName: string = '';
-  @SyncVar() tag: string; 
+  @SyncVar() tag: string = ''; 
   @SyncVar() dicebot: string;
   @SyncVar() imageIdentifier: string;
   @SyncVar() toImageIdentifier: string = '';

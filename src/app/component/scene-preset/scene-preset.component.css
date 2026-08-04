@@ -40,6 +40,16 @@
   min-width: 8em;
 }
 
+.list-status {
+  font-size: 11px;
+  color: #7a6a58;
+}
+
+.list-time {
+  font-size: 11px;
+  color: #8a7a68;
+}
+
 .list-item-name.invalid {
   color: #a94442;
 }
