@@ -313,16 +313,29 @@
     }
     tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
     td:first-child { color: var(--ink); font-weight: 500; width: 34%; }
-    .mark {
+    /* Avoid Bootstrap's `.mark` (cream highlight bg); use `.feat` instead */
+    .feat {
       display: inline-flex;
       align-items: center;
       gap: 0.35rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 6px;
       font-weight: 700;
       font-size: 0.92rem;
+      background: transparent;
     }
-    .mark.yes { color: var(--ok); }
-    .mark.partial { color: var(--partial); }
-    .mark.no { color: var(--no); }
+    .feat.yes {
+      color: var(--ok);
+      background: rgba(94, 207, 154, 0.12);
+    }
+    .feat.partial {
+      color: var(--partial);
+      background: rgba(212, 163, 92, 0.14);
+    }
+    .feat.no {
+      color: var(--no);
+      background: rgba(107, 117, 112, 0.14);
+    }
 
     .legend {
       display: flex;
@@ -517,89 +530,89 @@
           <tbody>
             <tr>
               <td data-i18n="fCore">房間／多桌面／聊天／BCDice／ZIP</td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fSkyway">SkyWay 2023 + 自架／指定 backend</td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
-              <td><span class="mark yes" data-i18n="yesSelf">有（本站自架）</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yesSelf">有（本站自架）</span></td>
             </tr>
             <tr>
               <td data-i18n="fFly">高度／Stand／Cut-in／聊天色</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fI18n">執行時多語介面（繁／简／EN／日）</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fTour">引導教學／滑過提示</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fRoles">GM／User／Guest・選單／讀檔權限與邀請連結</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fGuest">訪客模式（UI 受限）</td>
-              <td><span class="mark partial" data-i18n="partial">基礎／依版本</span></td>
-              <td><span class="mark partial" data-i18n="partial">基礎／依版本</span></td>
-              <td><span class="mark yes" data-i18n="yes">有（加強）</span></td>
+              <td><span class="feat partial" data-i18n="partial">基礎／依版本</span></td>
+              <td><span class="feat partial" data-i18n="partial">基礎／依版本</span></td>
+              <td><span class="feat yes" data-i18n="yes">有（加強）</span></td>
             </tr>
             <tr>
               <td data-i18n="fNotes">筆記倉庫／快速擲骰</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fKeys">鍵盤操控／復原重做／路徑移動／Ping</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fLight">光照・FoW・場景工具・戰鬥追蹤</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fFx">天氣／圖片特效／狀態光環</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fScene">預設場面／劇本文字／多軌 BGM（每檔 20MB）</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
             <tr>
               <td data-i18n="fBackup">本機資料夾自動備份（Chrome／Edge）</td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark no" data-i18n="no">—</span></td>
-              <td><span class="mark yes" data-i18n="yes">有</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat no" data-i18n="no">—</span></td>
+              <td><span class="feat yes" data-i18n="yes">有</span></td>
             </tr>
           </tbody>
         </table>
       </div>
       <div class="legend">
-        <span><span class="mark yes" data-i18n="yes">有</span> · <span data-i18n="legendYes">支援</span></span>
-        <span><span class="mark partial" data-i18n="partial">基礎／依版本</span> · <span data-i18n="legendPartial">有限或依上游版本</span></span>
-        <span><span class="mark no" data-i18n="no">—</span> · <span data-i18n="legendNo">非重點／無</span></span>
+        <span><span class="feat yes" data-i18n="yes">有</span> · <span data-i18n="legendYes">支援</span></span>
+        <span><span class="feat partial" data-i18n="partial">基礎／依版本</span> · <span data-i18n="legendPartial">有限或依上游版本</span></span>
+        <span><span class="feat no" data-i18n="no">—</span> · <span data-i18n="legendNo">非重點／無</span></span>
       </div>
     </section>
 
