@@ -10,6 +10,7 @@ import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
@@ -37,6 +38,7 @@ export class TabletopActionService {
     character.location.x = position.x - 25;
     character.location.y = position.y - 25;
     character.posZ = position.z;
+    character.setLocation('table');
     return character;
   }
 
@@ -82,6 +84,7 @@ export class TabletopActionService {
     textNote.location.x = position.x;
     textNote.location.y = position.y;
     textNote.posZ = position.z;
+    textNote.setLocation('table');
     return textNote;
   }
 
@@ -115,6 +118,7 @@ export class TabletopActionService {
     diceSymbol.location.x = position.x - 25;
     diceSymbol.location.y = position.y - 25;
     diceSymbol.posZ = position.z;
+    diceSymbol.setLocation('table');
     return diceSymbol;
   }
 
@@ -139,6 +143,7 @@ export class TabletopActionService {
     card.location.x = position.x - 25;
     card.location.y = position.y - 25;
     card.posZ = position.z;
+    card.setLocation('table');
     return card;
   }
 
@@ -178,6 +183,7 @@ export class TabletopActionService {
     cardStack.location.x = position.x - 25;
     cardStack.location.y = position.y - 25;
     cardStack.posZ = position.z;
+    cardStack.setLocation('table');
 
     let back: string = './assets/images/trump/z02.gif';
     if (!ImageStorage.instance.get(back)) {
@@ -237,6 +243,7 @@ export class TabletopActionService {
     range.location.y = position.y;
     range.posZ = position.z;
     range.type = typeName;
+    range.setLocation('table');
     let data = range.commonDataElement.getFirstElementByName('opacity');
     //console.log( '射程範圍TEST' + data);
     data.currentValue = 60;
@@ -257,6 +264,7 @@ export class TabletopActionService {
     gameTable.initialize();
 
     TableSelecter.instance.viewTableIdentifier = gameTable.identifier;
+    EventSystem.trigger('SELECT_GAME_TABLE', { identifier: gameTable.identifier });
   }
 
   makeDefaultTabletopObjects() {
@@ -321,6 +329,8 @@ export class TabletopActionService {
     testCharacter.location.y = 13 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.characterC'), 1, testFile.identifier);
+
+    TabletopObject.migrateUnboundTablePieces(TableSelecter.instance.viewTableIdentifier);
   }
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {

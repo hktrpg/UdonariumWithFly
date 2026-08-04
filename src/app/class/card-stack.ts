@@ -170,10 +170,11 @@ export class CardStack extends TabletopObject {
   }
 
   // override
-  setLocation(location: string) {
-    super.setLocation(location);
+  setLocation(location: string, tableIdentifier?: string) {
+    super.setLocation(location, tableIdentifier);
     let cards = this.cards;
-    for (let card of cards) card.setLocation(location);
+    const tableId = location === 'table' ? (this.tableIdentifier || tableIdentifier) : undefined;
+    for (let card of cards) card.setLocation(location, tableId);
   }
 
   private setSamePositionFor(card: Card) {
@@ -181,6 +182,7 @@ export class CardStack extends TabletopObject {
     card.location.x = this.location.x;
     card.location.y = this.location.y;
     card.posZ = this.posZ;
+    card.tableIdentifier = this.location.name === 'table' ? this.tableIdentifier : '';
   }
 
   static create(name: string, identifier?: string): CardStack {

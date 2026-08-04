@@ -275,7 +275,7 @@ export class GameCharacter extends TabletopObject {
 
   static get isStealthMode(): boolean {
     for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-      if (character.isHideIn && character.isVisible && character.location.name === 'table') return true;
+      if (character.isHideIn && character.isVisible && character.isVisibleOnTable) return true;
     }
     return false;
   }

@@ -703,7 +703,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     extraActions.push(ContextMenuSeparator);
     extraActions.push({
       name: this.i18n.t('gt.mapSettings'), action: () => {
-        this.modalService.open(GameTableSettingComponent);
+        this.panelService.open(GameTableSettingComponent, { width: 610, height: 540, left: 100 });
       }
     });
     EventSystem.trigger('OPEN_TOOLBOX', {
@@ -895,7 +895,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   isCursorHidIn(cursor: PeerCursor): boolean {
     if (cursor.isGMMode) return true;
     for (let character of this.characters) {
-      if (character.isHideIn && character.location.name === 'table' && character.owner === cursor.userId) return true;
+      if (character.isHideIn && character.isVisibleOnTable && character.owner === cursor.userId) return true;
     }
     return false;
   }

@@ -25,7 +25,7 @@ export class GameObjectInventoryService {
   set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
   get dataTags(): string[] { return this.summarySetting.dataTags; }
 
-  tableInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === 'table'; });
+  tableInventory: ObjectInventory = new ObjectInventory(object => { return object.isVisibleOnTable; });
   commonInventory: ObjectInventory = new ObjectInventory(object => { return !this.isAnyLocation(object.location.name); });
   privateInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === Network.peerId; });
   graveyardInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === 'graveyard'; });
@@ -41,6 +41,7 @@ export class GameObjectInventoryService {
   }
 
   private locationMap: Map<ObjectIdentifier, LocationName> = new Map();
+  private tableIdMap: Map<ObjectIdentifier, string> = new Map();
   private tagNameMap: Map<ObjectIdentifier, ElementName> = new Map();
 
   static _newLineDataElement = createMockElement('/');
@@ -55,14 +56,17 @@ export class GameObjectInventoryService {
       .on('OPEN_NETWORK', event => { this.refresh(); })
       .on('CONNECT_PEER', event => { this.refresh(); })
       .on('DISCONNECT_PEER', event => { this.refresh(); })
+      .on('SELECT_GAME_TABLE', event => { this.refresh(); })
       .on('UPDATE_GAME_OBJECT', event => {
         let object = ObjectStore.instance.get(event.data.identifier);
         if (!object) return;
 
         if (object instanceof GameCharacter) {
           let prevLocation = this.locationMap.get(object.identifier);
-          if (object.location.name !== prevLocation) {
+          let prevTableId = this.tableIdMap.get(object.identifier);
+          if (object.location.name !== prevLocation || object.tableIdentifier !== prevTableId) {
             this.locationMap.set(object.identifier, object.location.name);
+            this.tableIdMap.set(object.identifier, object.tableIdentifier);
             this.refresh();
           }
         } else if (object instanceof DataElement) {
@@ -90,6 +94,7 @@ export class GameObjectInventoryService {
       })
       .on('DELETE_GAME_OBJECT', event => {
         this.locationMap.delete(event.data.identifier);
+        this.tableIdMap.delete(event.data.identifier);
         this.tagNameMap.delete(event.data.identifier);
         this.refresh();
       })

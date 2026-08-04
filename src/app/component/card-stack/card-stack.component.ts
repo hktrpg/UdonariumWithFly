@@ -332,7 +332,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (card) {
       card.location.x += 100 + (Math.random() * 50);
       card.location.y += 25 + (Math.random() * 50);
-      card.setLocation(this.cardStack.location.name);
+      card.setLocation(this.cardStack.location.name, this.cardStack.tableIdentifier);
     }
     return card;
   }
@@ -355,7 +355,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       card.location.x += 25 - (Math.random() * 50);
       card.location.y += 25 - (Math.random() * 50);
       card.toTopmost();
-      card.setLocation(this.cardStack.location.name);
+      card.setLocation(this.cardStack.location.name, this.cardStack.tableIdentifier);
     }
     this.cardStack.setLocation('graveyard');
     this.cardStack.destroy();
@@ -371,6 +371,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       cardStack.location.y = this.cardStack.location.y + 50 - (Math.random() * 100);
       cardStack.posZ = this.cardStack.posZ;
       cardStack.location.name = this.cardStack.location.name;
+      cardStack.tableIdentifier = this.cardStack.tableIdentifier;
       cardStack.rotate = this.rotate;
       cardStack.toTopmost();
       cardStacks.push(cardStack);
@@ -395,6 +396,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (this.GuestMode()) return;
     let newCardStack = CardStack.create(bottomStack.name);
     newCardStack.location.name = bottomStack.location.name;
+    newCardStack.tableIdentifier = bottomStack.tableIdentifier;
     newCardStack.location.x = bottomStack.location.x;
     newCardStack.location.y = bottomStack.location.y;
     newCardStack.posZ = bottomStack.posZ;

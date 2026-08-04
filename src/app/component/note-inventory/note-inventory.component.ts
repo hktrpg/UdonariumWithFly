@@ -93,9 +93,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (this.selectFilter) {
       case 'table':
-        return notes.filter(n => n.location?.name === 'table');
+        return notes.filter(n => n.isVisibleOnTable);
       case 'other':
-        return notes.filter(n => n.location?.name !== 'table');
+        return notes.filter(n => !n.isVisibleOnTable);
       default:
         return notes;
     }
@@ -105,9 +105,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (filterId) {
       case 'table':
-        return notes.filter(n => n.location?.name === 'table').length;
+        return notes.filter(n => n.isVisibleOnTable).length;
       case 'other':
-        return notes.filter(n => n.location?.name !== 'table').length;
+        return notes.filter(n => !n.isVisibleOnTable).length;
       default:
         return notes.length;
     }
@@ -132,7 +132,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   isittable(note: TextNote) {
-    return note.location?.name == 'table';
+    return note.isVisibleOnTable;
   }
 
   selectNote(note: TextNote) {

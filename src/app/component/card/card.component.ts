@@ -334,6 +334,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     cardStack.location.y = this.card.location.y;
     cardStack.posZ = this.card.posZ;
     cardStack.location.name = this.card.location.name;
+    cardStack.tableIdentifier = this.card.tableIdentifier;
     cardStack.rotate = this.rotate;
     cardStack.zindex = this.card.zindex;
 

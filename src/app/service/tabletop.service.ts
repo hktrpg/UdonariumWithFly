@@ -44,6 +44,7 @@ export class TabletopService {
   private locationMap: Map<ObjectIdentifier, LocationName> = new Map();
   private parentMap: Map<ObjectIdentifier, ObjectIdentifier> = new Map();
   private indexMap: Map<ObjectIdentifier, ObjecNodeIndex> = new Map();
+  private tableIdMap: Map<ObjectIdentifier, string> = new Map();
   private characterCache = new TabletopCache<GameCharacter>(() => ObjectStore.instance.getObjects(GameCharacter).filter(obj => obj.isVisibleOnTable));
   private cardCache = new TabletopCache<Card>(() => ObjectStore.instance.getObjects(Card).filter(obj => obj.isVisibleOnTable));
   private cardStackCache = new TabletopCache<CardStack>(() => ObjectStore.instance.getObjects(CardStack).filter(obj => obj.isVisibleOnTable));
@@ -77,7 +78,12 @@ export class TabletopService {
 
   private initialize() {
     this.refreshCacheAll();
+    TabletopObject.migrateUnboundTablePieces();
     EventSystem.register(this)
+      .on('SELECT_GAME_TABLE', event => {
+        TabletopObject.migrateUnboundTablePieces(event.data?.identifier);
+        this.refreshCacheAll();
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier === this.currentTable.identifier || event.data.identifier === this.tableSelecter.identifier) {
           this.refreshCache(GameTableMask.aliasName);
@@ -176,6 +182,7 @@ export class TabletopService {
   private shouldRefreshCache(object: TabletopObject): boolean {
     return this.locationMap.get(object.identifier) !== object.location.name
       || this.parentMap.get(object.identifier) !== object.parentId
+      || this.tableIdMap.get(object.identifier) !== object.tableIdentifier
       || (object.isVisibleOnTable && this.indexMap.get(object.identifier) !== object.index);
   }
 
@@ -183,12 +190,14 @@ export class TabletopService {
     this.locationMap.set(object.identifier, object.location.name);
     this.parentMap.set(object.identifier, object.parentId);
     this.indexMap.set(object.identifier, object.index);
+    this.tableIdMap.set(object.identifier, object.tableIdentifier);
   }
 
   private clearMap() {
     this.locationMap.clear();
     this.parentMap.clear();
     this.indexMap.clear();
+    this.tableIdMap.clear();
   }
 
   private placeToTabletop(gameObject: TabletopObject) {

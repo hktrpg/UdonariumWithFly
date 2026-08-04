@@ -71,6 +71,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
     card.location.x = this.cardStack.location.x + 100 + (Math.random() * 50);
     card.location.y = this.cardStack.location.y + 25 + (Math.random() * 50);
     card.location.name = this.cardStack.location.name;
+    card.tableIdentifier = this.cardStack.location.name === 'table' ? this.cardStack.tableIdentifier : '';
     card.rotate += this.cardStack.rotate;
     if (360 < card.rotate) card.rotate -= 360;
     card.toTopmost();

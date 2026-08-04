@@ -23,7 +23,44 @@ export class TabletopObject extends ObjectNode {
 
   @SyncVar() posZ: number = 0;
 
-  get isVisibleOnTable(): boolean { return this.location.name === 'table'; }
+  /** Bound GameTable when on the tabletop; empty when in inventory / graveyard / hand. */
+  @SyncVar() tableIdentifier: string = '';
+
+  get isVisibleOnTable(): boolean {
+    if (this.location.name !== 'table') return false;
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    if (!viewId) return false;
+    // Do not write SyncVars in this getter (breaks CD / freezes panels). Migrate elsewhere.
+    if (!this.tableIdentifier) return false;
+    return this.tableIdentifier === viewId;
+  }
+
+  /** Assign unbound table pieces to the current (or given) view table. */
+  static migrateUnboundTablePieces(viewTableId?: string) {
+    const id = viewTableId || TabletopObject.resolveViewTableIdentifier();
+    if (!id) return;
+    for (const obj of ObjectStore.instance.getObjects(TabletopObject)) {
+      if (obj.location.name === 'table' && !obj.tableIdentifier) {
+        obj.tableIdentifier = id;
+      }
+    }
+  }
+
+  static resolveViewTableIdentifier(): string {
+    const selecter = ObjectStore.instance.get<any>('TableSelecter');
+    if (!selecter) return '';
+    const view = selecter.viewTable;
+    return view ? view.identifier : (selecter.viewTableIdentifier || '');
+  }
+
+  // GameObject Lifecycle
+  onStoreAdded() {
+    super.onStoreAdded();
+    if (this.location.name === 'table' && !this.tableIdentifier) {
+      const viewId = TabletopObject.resolveViewTableIdentifier();
+      if (viewId) this.tableIdentifier = viewId;
+    }
+  }
 
   private _imageFile: ImageFile = ImageFile.Empty;
   private _shadowImageFile: ImageFile = ImageFile.Empty;
@@ -214,8 +251,16 @@ export class TabletopObject extends ObjectNode {
     image.value = imageFile.identifier;
   }
 
-  setLocation(location: string) {
+  setLocation(location: string, tableIdentifier?: string) {
     this.location.name = location;
+    if (location === 'table') {
+      this.tableIdentifier = tableIdentifier
+        || this.tableIdentifier
+        || TabletopObject.resolveViewTableIdentifier()
+        || '';
+    } else {
+      this.tableIdentifier = '';
+    }
     this.update();
   }
 }

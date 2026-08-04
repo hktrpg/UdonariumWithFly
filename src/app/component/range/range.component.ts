@@ -358,7 +358,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   get dockableCharacters(): GameCharacter[] {
     let ary: GameCharacter[] = this.tabletopService.characters.filter(character => {
-      if (character.location.name !== 'table' || character.isHideIn) return false;
+      if (!character.isVisibleOnTable || character.isHideIn) return false;
       //if (this.range.followingCharctor && this.range.followingCharctor === character) isContainFollowing = true;
       return [
         {x: 0, y: 0},
