@@ -116,6 +116,7 @@ export class RoomInviteService {
     if (targetPeers.length < 1) return 'notFound';
 
     RoomAuth.applyIdentity(payload.r, payload.id);
+    this.setRolePassword(payload.r, payload.p || '');
     const ok = await RoomConnectHelper.openAndConnect(room, skywayPassword, targetPeers);
     return ok ? 'ok' : 'notFound';
   }

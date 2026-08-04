@@ -569,13 +569,7 @@ export class FolderBackupService implements OnDestroy {
           secrets?: FolderBackupSecretsBlob;
         } | undefined;
         if (snapshot.auth) {
-          const passwords = await this.resolveSecretPasswordsForWrite(snapshot.roomId, snapshot.auth);
-          const secrets = await FolderBackupCrypto.encrypt(passwords);
-          metaAuth = {
-            allowUser: snapshot.auth.allowUser,
-            allowGuest: snapshot.auth.allowGuest,
-            secrets,
-          };
+          metaAuth = await this.resolveMetaAuthForWrite(snapshot.roomId, snapshot.auth);
         }
         await this.saveDataService.saveRoomToDirectoryAsync(
           this.dirHandle,
@@ -650,49 +644,93 @@ export class FolderBackupService implements OnDestroy {
 
   /**
    * GM writes full in-session passwords (including intentional clears).
-   * Non-GM must not wipe secrets they don't know — empty capture fields keep existing meta values.
+   * Non-GM must not wipe secrets they don't know:
+   * - merge empty fields with decryptable existing meta
+   * - if existing secrets are undecryptable, keep the raw blob
+   * - if no prior secrets, omit empty encrypted blob entirely
    */
-  private async resolveSecretPasswordsForWrite(
+  private async resolveMetaAuthForWrite(
     roomId: string,
     capture: RoomBackupAuthSettings
-  ): Promise<{ gmPassword: string; userPassword: string; guestPassword: string }> {
+  ): Promise<{
+    allowUser: boolean;
+    allowGuest: boolean;
+    secrets?: FolderBackupSecretsBlob;
+  }> {
+    const allow = {
+      allowUser: !!capture.allowUser,
+      allowGuest: !!capture.allowGuest,
+    };
     const next = {
       gmPassword: String(capture.gmPassword || ''),
       userPassword: String(capture.userPassword || ''),
       guestPassword: String(capture.guestPassword || ''),
     };
-    if (PeerCursor.myCursor?.isGMMode) return next;
 
-    const existing = await this.readExistingSecretPasswords(roomId);
-    if (!existing) return next;
+    if (PeerCursor.myCursor?.isGMMode) {
+      return {
+        ...allow,
+        secrets: await FolderBackupCrypto.encrypt(next),
+      };
+    }
+
+    const existingMeta = await this.readExistingMeta(roomId);
+    const existingPasswords = existingMeta
+      ? await this.secretPasswordsFromMeta(existingMeta)
+      : null;
+
+    if (existingPasswords) {
+      const merged = {
+        gmPassword: next.gmPassword || existingPasswords.gmPassword,
+        userPassword: next.userPassword || existingPasswords.userPassword,
+        guestPassword: next.guestPassword || existingPasswords.guestPassword,
+      };
+      return {
+        ...allow,
+        secrets: await FolderBackupCrypto.encrypt(merged),
+      };
+    }
+
+    if (existingMeta?.secrets) {
+      // Other browser/device ciphertext — do not replace with empties or partial knowledge.
+      return {
+        ...allow,
+        secrets: existingMeta.secrets,
+      };
+    }
+
+    const hasAny = !!(next.gmPassword || next.userPassword || next.guestPassword);
+    if (!hasAny) return allow;
 
     return {
-      gmPassword: next.gmPassword || existing.gmPassword,
-      userPassword: next.userPassword || existing.userPassword,
-      guestPassword: next.guestPassword || existing.guestPassword,
+      ...allow,
+      secrets: await FolderBackupCrypto.encrypt(next),
     };
   }
 
-  private async readExistingSecretPasswords(roomId: string): Promise<{
+  private async readExistingMeta(roomId: string): Promise<RoomBackupMeta | null> {
+    if (!this.dirHandle || !this.isSafeRoomFileName(roomId)) return null;
+    try {
+      const fileHandle = await this.dirHandle.getFileHandle(`${roomId}.meta.json`);
+      return JSON.parse(await (await fileHandle.getFile()).text()) as RoomBackupMeta;
+    } catch {
+      return null;
+    }
+  }
+
+  private async secretPasswordsFromMeta(meta: RoomBackupMeta): Promise<{
     gmPassword: string;
     userPassword: string;
     guestPassword: string;
   } | null> {
-    if (!this.dirHandle || !this.isSafeRoomFileName(roomId)) return null;
-    try {
-      const fileHandle = await this.dirHandle.getFileHandle(`${roomId}.meta.json`);
-      const meta = JSON.parse(await (await fileHandle.getFile()).text()) as RoomBackupMeta;
-      const resolved = await this.authFromMeta(meta);
-      if (!resolved.auth) return null;
-      if (resolved.status !== 'ready' && resolved.status !== 'legacy') return null;
-      return {
-        gmPassword: String(resolved.auth.gmPassword || ''),
-        userPassword: String(resolved.auth.userPassword || ''),
-        guestPassword: String(resolved.auth.guestPassword || ''),
-      };
-    } catch {
-      return null;
-    }
+    const resolved = await this.authFromMeta(meta);
+    if (!resolved.auth) return null;
+    if (resolved.status !== 'ready' && resolved.status !== 'legacy') return null;
+    return {
+      gmPassword: String(resolved.auth.gmPassword || ''),
+      userPassword: String(resolved.auth.userPassword || ''),
+      guestPassword: String(resolved.auth.guestPassword || ''),
+    };
   }
 
   private resumeConfirmHelp(status: RoomBackupAuthStatus): string {

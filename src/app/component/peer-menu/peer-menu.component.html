@@ -174,12 +174,22 @@
   <div *ngIf="i == 0" style="font-weight: bold">{{ 'peer.connectionStatusTitle' | i18n }}<span class="health">（{{ 'peer.healthGood' | i18n }} </span><i class="material-icons health health-blue">sentiment_very_satisfied</i><span class="health"> ＞ </span><i class="material-icons health health-green">sentiment_dissatisfied</i><span class="health"> ＞ </span><i class="material-icons health health-yellow">mood_bad</i><span class="health"> ＞ </span><i class="material-icons health health-red">sentiment_very_dissatisfied</i><span class="health"> {{ 'peer.healthBad' | i18n }}）</span>：</div>
   <div class="peer-info">
     <span *ngIf="!peer.isOpen">{{ 'peer.connecting' | i18n }}</span>
-    <span>
+    <span class="peer-row">
       <span [ngClass]="{'is-gm-mode': findPeerIsGMMode(peer.peerId)}">
         <i class="{{'material-icons health ' + healthClass(peer.session.health)}}" style="margin-right: 2px">{{ healthIcon(peer.session.health) }}</i>
         <span style="margin-right: 3px">{{findUserId(peer.peerId)}}</span>
         [<span *ngIf="findPeerImageUrl(peer.peerId)" class="cover mini-icon" [style.background-image]="'url(' + findPeerImageUrl(peer.peerId) + ')' | safe: 'style'"></span><span><b [style.color]="findPeerColor(peer.peerId)">{{findPeerName(peer.peerId)}}</b></span>]
       </span>
+      <button
+        *ngIf="isGMMode"
+        type="button"
+        class="kick-btn"
+        [disabled]="!peer.isOpen"
+        [attr.title]="'peer.kick' | i18n"
+        (click)="kickPeer(peer)"
+      >
+        <i class="material-icons">person_remove</i>{{ 'peer.kick' | i18n }}
+      </button>
     </span>
     <div class="session-info" [style.border-left-color]="findPeerColor(peer.peerId)">
       <span>{{ 'peer.sessionStatus' | i18n }}

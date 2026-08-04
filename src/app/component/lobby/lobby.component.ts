@@ -14,6 +14,7 @@ import { ModalService } from 'service/modal.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
+import { RoomInviteService } from 'service/room-invite.service';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 @Component({
@@ -75,6 +76,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private i18n: I18nService,
     public folderBackup: FolderBackupService,
+    private roomInvite: RoomInviteService,
   ) { }
 
   ngOnInit() {
@@ -155,6 +157,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (targetPeers.length < 1) return;
 
     RoomAuth.applyIdentity(result.role, room.id);
+    this.roomInvite.setRolePassword(result.role, result.password || '');
     await this.openAndConnect(room, '', targetPeers);
   }
 
