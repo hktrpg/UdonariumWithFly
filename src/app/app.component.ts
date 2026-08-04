@@ -774,6 +774,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         option.width = 520;
         option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
+        // Keep map visible — connection is a half sheet, not full-screen.
+        if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
@@ -866,6 +868,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       tourPanelId: 'menu.connection',
       title: this.i18n.t('peer.title'),
       mobileReplace: true,
+      mobileSheet: 'half',
     }));
     // On mobile, only open connection by default — chat opens on demand to keep the map usable.
     if (!this.mobileLayout.isMobile) {
