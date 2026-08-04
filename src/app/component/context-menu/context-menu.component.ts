@@ -102,6 +102,23 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
+    const isMobile = document.body.classList.contains('udon-mobile-layout');
+
+    // Mobile: bottom action sheet (same chrome family as chat half-sheet / nav).
+    // Icon grids (faces etc.) stay floating near the pointer.
+    if (isMobile && !this.isIconsMenu) {
+      panel.classList.add('is-mobile-action-sheet');
+      panel.style.left = '';
+      panel.style.top = '';
+      panel.style.right = '';
+      panel.style.bottom = '';
+      if (this.altitudeSlider) {
+        this.altitudeSlider.nativeElement.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
+      }
+      return;
+    }
+
+    panel.classList.remove('is-mobile-action-sheet');
 
     // Nudge away from the cursor so the menu does not cover the target token.
     const OFFSET_X = 20;
@@ -115,7 +132,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let diffTop = 0;
 
     // On mobile, reserve bottom nav so the menu is not covered / clipped under it.
-    const bottomReserve = document.body.classList.contains('udon-mobile-layout')
+    const bottomReserve = isMobile
       ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
       : 0;
     const maxBottom = window.innerHeight - bottomReserve;
@@ -145,6 +162,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private adjustPositionSub() {
     let parent: HTMLElement = this.elementRef.nativeElement.parentElement;
     let submenu: HTMLElement = this.rootElementRef.nativeElement;
+    const isMobile = document.body.classList.contains('udon-mobile-layout');
+
+    // Inside mobile action sheet: expand inline (no floating sub-panel).
+    if (isMobile && parent?.closest?.('.is-mobile-action-sheet')) {
+      submenu.classList.add('is-mobile-action-sheet');
+      submenu.style.left = '';
+      submenu.style.top = '';
+      return;
+    }
 
     let parentBox = parent.getBoundingClientRect();
     let submenuBox = submenu.getBoundingClientRect();
@@ -152,7 +178,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let diffLeft = 0;
     let diffTop = 0;
 
-    const bottomReserve = document.body.classList.contains('udon-mobile-layout')
+    const bottomReserve = isMobile
       ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56)
       : 0;
     const maxBottom = window.innerHeight - bottomReserve;

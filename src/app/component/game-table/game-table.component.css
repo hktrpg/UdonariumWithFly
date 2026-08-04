@@ -493,8 +493,8 @@
   gap: 4px;
   padding: 6px 4px 8px;
   box-sizing: border-box;
-  background: rgba(28, 28, 28, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border: 1px solid var(--udon-chrome-border, #555);
   border-radius: 8px;
   pointer-events: auto;
   touch-action: none;
@@ -564,8 +564,8 @@
   gap: 8px;
   padding: 6px 10px;
   box-sizing: border-box;
-  background: rgba(28, 28, 28, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border: 1px solid var(--udon-chrome-border, #555);
   border-radius: 999px;
   pointer-events: auto;
   touch-action: manipulation;
@@ -582,10 +582,10 @@ html.udon-tablet-landscape .map-action-hud {
   height: 44px;
   margin: 0;
   padding: 0;
-  border: 1px solid #666;
+  border: 1px solid var(--udon-chrome-border, #555);
   border-radius: 50%;
   background: #3a3a3a;
-  color: #eee;
+  color: var(--udon-chrome-text, #e8e8e8);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -598,6 +598,7 @@ html.udon-tablet-landscape .map-action-hud {
 
 .map-hud-btn:active {
   filter: brightness(1.15);
+  background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
 }
 
 .map-hud-btn.map-hud-warn {

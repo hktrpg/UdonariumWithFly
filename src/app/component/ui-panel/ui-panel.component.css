@@ -130,6 +130,21 @@
   border-radius: 0;
   z-index: 12000;
   transition: height 120ms ease-out, max-height 120ms ease-out, bottom 120ms ease-out;
+  /* Match bottom-nav chrome (not desktop cream panel). */
+  color: var(--udon-chrome-text, #e8e8e8) !important;
+  background: var(--udon-chrome-bg-solid, #2a2a2a) !important;
+  border: 1px solid var(--udon-chrome-border, #555) !important;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.draggable-panel.is-mobile-sheet.i-am-gm {
+  background: var(--udon-chrome-bg-solid, #2a2a2a) !important;
+}
+
+.draggable-panel.is-mobile-sheet .title {
+  background-color: var(--udon-chrome-title, #1f1f1f);
+  color: var(--udon-chrome-muted, #aaa);
+  border-bottom: 1px solid var(--udon-chrome-border, #555);
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
@@ -144,8 +159,8 @@ html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
   bottom: calc(56px + env(safe-area-inset-bottom, 0px) + var(--udon-keyboard-inset, 0px)) !important;
   height: min(48dvh, 420px) !important;
   max-height: min(48dvh, 420px) !important;
-  border-radius: 12px 12px 0 0;
-  border-top: 1px solid #999;
+  border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
+  border-top: 1px solid var(--udon-chrome-border, #555);
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet.is-mobile-sheet-half {

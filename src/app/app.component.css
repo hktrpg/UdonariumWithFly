@@ -163,8 +163,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   height: calc(56px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
-  background: rgba(36, 36, 36, 0.94);
-  border-top: 1px solid #666;
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border-top: 1px solid var(--udon-chrome-border, #555);
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -189,13 +189,13 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   width: 64px;
   text-align: center;
   padding: 4px 2px;
-  color: #ddd;
+  color: var(--udon-chrome-text, #e8e8e8);
   cursor: pointer;
   box-sizing: border-box;
 }
 
 .mobile-bottom-nav ul > li:active {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
 }
 
 .mobile-bottom-nav ul > li > a,
@@ -243,8 +243,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   z-index: 12500;
   box-sizing: border-box;
   padding: 8px 0 env(safe-area-inset-bottom, 0px);
-  background: rgba(36, 36, 36, 0.94);
-  border-right: 1px solid #666;
+  background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
+  border-right: 1px solid var(--udon-chrome-border, #555);
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -263,13 +263,13 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 .mobile-side-rail ul > li {
   text-align: center;
   padding: 8px 2px;
-  color: #ddd;
+  color: var(--udon-chrome-text, #e8e8e8);
   cursor: pointer;
   box-sizing: border-box;
 }
 
 .mobile-side-rail ul > li:active {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
 }
 
 .mobile-side-rail ul > li > a,

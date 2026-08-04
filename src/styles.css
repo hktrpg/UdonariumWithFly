@@ -307,6 +307,18 @@ input {
   --udon-keyboard-inset: 0px;
 }
 
+html.udon-mobile-layout {
+  /* Shared mobile chrome palette (nav / sheets / menus / HUD) */
+  --udon-chrome-bg: rgba(36, 36, 36, 0.96);
+  --udon-chrome-bg-solid: #2a2a2a;
+  --udon-chrome-title: #1f1f1f;
+  --udon-chrome-border: #555;
+  --udon-chrome-text: #e8e8e8;
+  --udon-chrome-muted: #aaa;
+  --udon-chrome-active: rgba(255, 255, 255, 0.1);
+  --udon-chrome-radius: 12px;
+}
+
 body.udon-mobile-layout {
   /* Bottom nav + safe area reserved by sheets / tour / menus */
 }
