@@ -139,7 +139,7 @@ export const zhCN_tip: I18nDictionary = {
   'tour.step.saveZip.bodyMobile': '请用「下载 ZIP」备份。手机／平板上文件夹备份常不可用。',
   'tour.step.tableChapter.bodyMobile': '地图：单指拖曳平移；双指捏合或 HUD 缩放。\n长按空白＝Ping；HUD「＋」＝新增物件。',
   'tour.step.controlsChapter.bodyMobile': '点选桌面物件即可选取。\n拖曳物件可移动；HUD「＋」＝新增；长按空白＝Ping。',
-  'tour.step.controlsPing.bodyMobile': '在空白地图长按约半秒发送 Ping。警告 Ping 请用 HUD 感叹号。请试一次长按。',
+  'tour.step.controlsPing.bodyMobile': '在空白地图长按约半秒发送 Ping。请试一次长按。',
   'tour.step.saveGuide.bodyMobile': '更多说明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\n可在「更多 → 设定」重播教学。离开前请 ZIP 存档。',
   'tip.pathMove.hud': '路径移动：Ctrl＋点路点 → 左键点终点或 Space 开始　右键撤销最后路点　Esc 取消（仅单个 Token）',
   'tip.vision.noCharacter': '已启用视野，但尚未设定「我的视野角色」。请右键角色 → 作为我的视野角色。',

@@ -178,9 +178,6 @@
   <button type="button" class="map-hud-btn" data-tour-id="hud.add" *ngIf="!isGuestHud" (click)="hudOpenAddMenu($event)" [attr.title]="'hud.add' | i18n" [attr.aria-label]="'hud.add' | i18n">
     <i class="material-icons">add_circle</i>
   </button>
-  <button type="button" class="map-hud-btn map-hud-warn" (click)="hudPing(true)" [attr.title]="'hud.pingWarn' | i18n" [attr.aria-label]="'hud.pingWarn' | i18n">
-    <i class="material-icons">warning</i>
-  </button>
   <div class="map-hud-zoom"
     (pointerdown)="$event.stopPropagation()"
     (touchstart)="$event.stopPropagation()"
