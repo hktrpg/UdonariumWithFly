@@ -311,7 +311,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   openPermissionManage() {
     if (!this.isGMMode) return;
-    this.panelService.open(PermissionSettingComponent, { width: 480, height: 520, left: 120, top: 80 });
+    this.panelService.open(PermissionSettingComponent, { width: 500, height: 620, left: 120, top: 60 });
   }
 
   loadZip() {

@@ -54,18 +54,14 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 
 .menu-chat-icon {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  /* Slight padding so the badge sits in-box, not past the clip edge. */
-  padding: 2px 4px 0 0;
-  box-sizing: border-box;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: top;
 }
 
 .menu-chat-badge {
   position: absolute;
-  /* Fully inside the icon box — scrollable-panel / horizontal nav clip overflow. */
+  /* Stay inside the icon — negative offsets expand side-menu scroll and show ◀▶. */
   top: 0;
   right: 0;
   z-index: 1;
@@ -74,49 +70,35 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 9px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: #fff;
   background: #e53935;
-  border: 1.5px solid #fff;
+  border: 1px solid #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
   transform: none;
 }
 
-.mobile-bottom-nav .menu-chat-icon,
-.mobile-side-rail .menu-chat-icon {
-  padding: 1px 3px 0 0;
-}
-
 .mobile-bottom-nav .menu-chat-badge,
 .mobile-side-rail .menu-chat-badge {
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: 8px;
-  font-size: 9px;
-  border-width: 1px;
-}
-
-nav ul > li[data-tour-id="menu.chat"] {
-  overflow: visible;
-}
-nav ul > li[data-tour-id="menu.chat"] > a {
-  overflow: visible;
-  display: inline-block;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 8px;
 }
 
 .side-menu {
   top: 0px;
   left: 0px;
   box-sizing: border-box;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: absolute;
   color: #CCC;
   background-color: rgba(30, 30, 30, 0.8);

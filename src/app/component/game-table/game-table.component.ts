@@ -866,17 +866,19 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       extraActions.push(ContextMenuSeparator);
       Array.prototype.push.apply(extraActions, sceneCreates);
     }
-    extraActions.push(ContextMenuSeparator);
-    extraActions.push({
-      name: this.i18n.t('gt.mapSettings'), action: () => {
-        this.panelService.open(GameTableSettingComponent, this.mobileLayout.adaptPanelOption({
-          width: 610, height: 540, left: 100,
-          mobileReplace: true,
-          tourPanelId: 'menu.table',
-          title: this.i18n.t('table.title'),
-        }));
-      }
-    });
+    if (SceneToolPermission.instance.canOpenMenu('menu.table')) {
+      extraActions.push(ContextMenuSeparator);
+      extraActions.push({
+        name: this.i18n.t('gt.mapSettings'), action: () => {
+          this.panelService.open(GameTableSettingComponent, this.mobileLayout.adaptPanelOption({
+            width: 610, height: 540, left: 100,
+            mobileReplace: true,
+            tourPanelId: 'menu.table',
+            title: this.i18n.t('table.title'),
+          }));
+        }
+      });
+    }
     EventSystem.trigger('OPEN_TOOLBOX', {
       x: menuPosition.x,
       y: menuPosition.y,

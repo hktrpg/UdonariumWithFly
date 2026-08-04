@@ -132,6 +132,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
+  /** Menu item visibility for the local user (GM / guest / player SyncVar). */
+  canShowMenu(tourId: string): boolean {
+    return SceneToolPermission.instance.canOpenMenu(tourId);
+  }
+
   /** Total unread chat messages (viewable tabs). */
   get chatUnreadCount(): number { return ChatTabList.instance.unreadLength; }
   /** Badge label: cap at 99+ so the bubble stays a tidy pill. */
@@ -568,6 +573,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('OPEN_TOOLBOX', -1000, event => {
         this.ngZone.run(() => {
+          // Table right-click uses OPEN_TOOLBOX + extraActions; do not gate on menu.toolbox.
           const data = event.data || {};
           this.openToolboxAt(
             { x: data.x ?? 0, y: data.y ?? 0 },
@@ -802,6 +808,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   open(componentName: string) {
     this.enforceGuestPlayMode();
+    const menuTourId = this.tourIdForComponent(componentName);
+    if (menuTourId && !this.canShowMenu(menuTourId)) return;
     let component: { new(...args: any[]): any } = null;
     let option: PanelOption = { width: 450, height: 600, left: 100 }
     switch (componentName) {
@@ -1058,6 +1066,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toolBox(event: Event) {
     this.guidedTour.notifyMenuClick('menu.toolbox');
+    if (!this.canShowMenu('menu.toolbox')) return;
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
       return;
@@ -1099,14 +1108,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         action: () => this.setMobileUiMode('play'),
       });
       menu.push(ContextMenuSeparator);
-      if (!this.GuestMode()) {
+      if (this.canShowMenu('menu.toolbox')) {
         menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
       }
-      if (this.canOpenSceneTools) {
+      if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
       }
-      if (!this.GuestMode()) {
+      if (this.canShowMenu('menu.scenePreset')) {
         menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+      }
+      if (this.canShowMenu('menu.scenarioText')) {
         menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
       }
     } else {
@@ -1117,13 +1128,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           action: () => this.setMobileUiMode('edit'),
         });
         menu.push(ContextMenuSeparator);
-        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
-        menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+        if (this.canShowMenu('menu.toolbox')) {
+          menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+        }
+        if (this.canShowMenu('menu.notes')) {
+          menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+        }
       }
-      if (this.canOpenSceneTools) {
+      if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
       }
     }
+    menu.push(ContextMenuSeparator);
+    Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push(ContextMenuSeparator);
     menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
@@ -1135,12 +1152,44 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     extraActions: ContextMenuAction[] = [],
     options?: { compact?: boolean }
   ) {
-    const menu = this.buildToolboxMenuActions(!!options?.compact);
+    // Full toolbox needs menu.toolbox. View reset / close panels are always available.
+    const includeToolbox = this.canShowMenu('menu.toolbox');
+    const menu: ContextMenuAction[] = includeToolbox
+      ? this.buildToolboxMenuActions(!!options?.compact)
+      : this.buildAlwaysAvailableViewActions();
     if (extraActions.length) {
-      menu.push(ContextMenuSeparator);
+      if (menu.length) menu.push(ContextMenuSeparator);
       Array.prototype.push.apply(menu, extraActions);
     }
-    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+    if (menu.length < 1) return;
+    this.contextMenuService.open(
+      position,
+      menu,
+      includeToolbox ? this.i18n.t('menu.toolbox') : this.i18n.t('menu.title'),
+    );
+  }
+
+  /** Local view helpers — never gated by toolbox menu permission. */
+  private buildAlwaysAvailableViewActions(): ContextMenuAction[] {
+    const menu: ContextMenuAction[] = [{
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+      ]
+    }];
+    // Desktop only — mobile sheets replace each other via bottom nav.
+    if (!this.mobileLayout.isMobile) {
+      menu.push({
+        name: this.i18n.t('toolbox.closeAllPanels'),
+        materialIcon: 'close_fullscreen',
+        selfOnly: true,
+        action: () => PanelService.closeAllPanels()
+      });
+    }
+    return menu;
   }
 
   private buildToolboxMenuActions(compact: boolean = false): ContextMenuAction[] {
@@ -1201,24 +1250,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
     }
     menu.push(ContextMenuSeparator);
-    menu.push({
-      name: this.i18n.t('menu.viewReset'),
-      materialIcon: 'remove_red_eye',
-      selfOnly: true,
-      subActions: [
-        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-      ]
-    });
-    // Desktop only — mobile sheets replace each other via bottom nav.
-    if (!this.mobileLayout.isMobile) {
-      menu.push({
-        name: this.i18n.t('toolbox.closeAllPanels'),
-        materialIcon: 'close_fullscreen',
-        selfOnly: true,
-        action: () => PanelService.closeAllPanels()
-      });
-    }
+    Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);
@@ -1457,6 +1489,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
     this.contextMenuService.open(position, [
+      ...this.buildAlwaysAvailableViewActions(),
+      ContextMenuSeparator,
       contextMenuToggleCheck({
         get: () => TableSelecter.instance.gridShow,
         set: (v) => {

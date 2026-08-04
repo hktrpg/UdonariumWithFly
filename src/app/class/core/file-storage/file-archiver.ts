@@ -21,7 +21,7 @@ export class FileArchiver {
   }
 
   private maxImageSize = 2 * MEGA_BYTE;
-  private maxAudioeSize = 10 * MEGA_BYTE;
+  private maxAudioeSize = 20 * MEGA_BYTE;
 
   private callbackOnDragEnter;
   private callbackOnDragOver;
