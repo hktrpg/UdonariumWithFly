@@ -203,13 +203,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging; }
 
-  /** Default table view (「回到最初的視點」). */
+  /** Default table view (「回到最初的視點」) — desktop. */
   private static readonly DEFAULT_VIEW_POS_X = 221.6;
   private static readonly DEFAULT_VIEW_POS_Y = -123.8;
   private static readonly DEFAULT_VIEW_POS_Z = 0;
   private static readonly DEFAULT_VIEW_ROT_X = 46;
   private static readonly DEFAULT_VIEW_ROT_Y = 0;
   private static readonly DEFAULT_VIEW_ROT_Z = 0;
+  /** Phone/tablet default — framed for bottom chrome + smaller viewport. */
+  private static readonly MOBILE_DEFAULT_VIEW_POS_X = -141.29;
+  private static readonly MOBILE_DEFAULT_VIEW_POS_Y = -96.92;
+  private static readonly MOBILE_DEFAULT_VIEW_POS_Z = 0;
+  private static readonly MOBILE_DEFAULT_VIEW_ROT_X = 46;
+  private static readonly MOBILE_DEFAULT_VIEW_ROT_Y = 0;
+  private static readonly MOBILE_DEFAULT_VIEW_ROT_Z = 0;
   /** Slider -100..100 → viewPotisonZ (matches touch clamp ~±750). */
   private static readonly ZOOM_SLIDER_TO_Z = 7.5;
 
@@ -422,15 +429,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           if (event && event.data == 'top') {
             this.setTransform(0, 0, 0, 0, 0, 0, true);
           } else {
-            this.setTransform(
-              GameTableComponent.DEFAULT_VIEW_POS_X,
-              GameTableComponent.DEFAULT_VIEW_POS_Y,
-              GameTableComponent.DEFAULT_VIEW_POS_Z,
-              GameTableComponent.DEFAULT_VIEW_ROT_X,
-              GameTableComponent.DEFAULT_VIEW_ROT_Y,
-              GameTableComponent.DEFAULT_VIEW_ROT_Z,
-              true,
-            );
+            this.applyDefaultPointOfView();
           }
         }, 50);
         this.removeFocus();
@@ -485,6 +484,31 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return tmp;
   }
 
+  /** Initial / reset camera: mobile uses a tighter frame for bottom chrome. */
+  private applyDefaultPointOfView() {
+    if (this.mobileLayout.isMobile) {
+      this.setTransform(
+        GameTableComponent.MOBILE_DEFAULT_VIEW_POS_X,
+        GameTableComponent.MOBILE_DEFAULT_VIEW_POS_Y,
+        GameTableComponent.MOBILE_DEFAULT_VIEW_POS_Z,
+        GameTableComponent.MOBILE_DEFAULT_VIEW_ROT_X,
+        GameTableComponent.MOBILE_DEFAULT_VIEW_ROT_Y,
+        GameTableComponent.MOBILE_DEFAULT_VIEW_ROT_Z,
+        true,
+      );
+      return;
+    }
+    this.setTransform(
+      GameTableComponent.DEFAULT_VIEW_POS_X,
+      GameTableComponent.DEFAULT_VIEW_POS_Y,
+      GameTableComponent.DEFAULT_VIEW_POS_Z,
+      GameTableComponent.DEFAULT_VIEW_ROT_X,
+      GameTableComponent.DEFAULT_VIEW_ROT_Y,
+      GameTableComponent.DEFAULT_VIEW_ROT_Z,
+      true,
+    );
+  }
+
   ngAfterViewInit() {
     this.ngZone.runOutsideAngular(() => {
       this.initializeTableTouchGesture();
@@ -495,7 +519,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.cancelInput();
 
     this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor);
-    this.setTransform(0, 0, 0, 0, 0, 0);
+    this.applyDefaultPointOfView();
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
     this.weatherRender = new WeatherRender([

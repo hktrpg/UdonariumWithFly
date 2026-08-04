@@ -130,14 +130,17 @@
   border-radius: 0;
   z-index: 12000;
   transition: height 120ms ease-out, max-height 120ms ease-out, bottom 120ms ease-out;
-  /* Title chrome stays dark; content keeps classic cream (PeerMenu etc.). */
-  background: var(--udon-chrome-bg-solid, #2a2a2a) !important;
+  /* Classic cream body (PeerMenu etc.); only the title bar uses dark chrome. */
+  background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1)) !important;
   border: 1px solid var(--udon-chrome-border, #555) !important;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .draggable-panel.is-mobile-sheet.i-am-gm {
-  background: var(--udon-chrome-bg-solid, #2a2a2a) !important;
+  background: linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1)) !important;
 }
 
 .draggable-panel.is-mobile-sheet .title {
@@ -145,6 +148,7 @@
   color: var(--udon-chrome-muted, #aaa);
   border-bottom: 1px solid var(--udon-chrome-border, #555);
   position: relative;
+  flex: 0 0 auto;
   flex-direction: column;
   height: auto;
   min-height: 25px;
@@ -183,8 +187,12 @@
 
 .draggable-panel.is-mobile-sheet .scrollable-panel {
   color: #444;
-  top: 36px;
-  /* Opaque cream so PeerMenu / combat / etc. are not black-on-dark. */
+  position: relative;
+  top: auto;
+  bottom: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Opaque cream so PeerMenu / combat / etc. stay readable. */
   background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1));
 }
 
