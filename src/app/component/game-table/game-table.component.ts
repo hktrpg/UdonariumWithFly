@@ -541,7 +541,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onTableMouseStart(e: any) {
     // Ctrl+left with a selected token = path waypoints (not pan).
     // Plain left with draft = start move (handled in pointerup).
-    // Right-click with draft = undo last waypoint (handled in contextmenu; drag still rotates).
+    // Right-click with draft = undo last waypoint (handled in contextmenu; drag pans).
     if (e.button === 0 && e.ctrlKey && this.tokenPath.canDraft()) {
       this.isTableTransformMode = false;
       this.pointerDeviceService.isDragging = false;

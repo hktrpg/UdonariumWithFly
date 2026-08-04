@@ -93,7 +93,7 @@ export const zhTW_tip: I18nDictionary = {
   'tour.step.tableChapter.title': '第三章：地圖操作',
   'tour.step.tableChapter.body': '接下來練習桌面視角與新增物件。\n（進入本章時會先清空桌面視窗，方便操作地圖。）\n先平移與滾輪操作，再右鍵新增。',
   'tour.step.mapPan.title': '平移地圖',
-  'tour.step.mapPan.body': 'Ctrl＋左鍵拖曳＝平移地圖。\n右鍵拖曳＝旋轉視角。\n請試一次 Ctrl＋左鍵拖曳。',
+  'tour.step.mapPan.body': 'Ctrl＋左鍵／右鍵拖曳＝平移地圖。\n中鍵拖曳＝旋轉視角。\n請試一次 Ctrl＋左鍵拖曳。',
   'tour.step.mapWheel.title': '滾輪移動畫面',
   'tour.step.mapWheel.body': 'Shift＋滾輪＝左右移動畫面。\nCtrl＋滾輪＝上下移動畫面。\n（一般滾輪＝縮放，下一步練習）\n請試一次 Shift 或 Ctrl＋滾輪。',
   'tour.step.mapZoom.title': '縮放',

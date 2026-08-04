@@ -8,7 +8,7 @@ export const zhTW_tutorial: I18nDictionary = {
 ★ 離開前請「下載 ZIP」；下次「讀取 ZIP」。不存就會像煙火一樣沒了。
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
 完整說明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
-  'tutorial.view': `＜視角＞Ctrl＋左鍵拖曳＝平移地圖　右鍵拖曳＝旋轉視角　滾輪＝縮放
+  'tutorial.view': `＜視角＞Ctrl＋左鍵／右鍵拖曳＝平移地圖　中鍵拖曳＝旋轉視角　滾輪＝縮放
 　　　　Shift＋滾輪＝左右移動畫面　Ctrl＋滾輪＝上下移動畫面
 ＜物件＞左鍵拖曳移動　拖旋轉把手轉向　右鍵＝選單
 　　　　雙擊＝開啟詳情（角色／卡牌／牌堆／骰子／地形／筆記／遮罩／範圍等）
@@ -67,7 +67,7 @@ export const zhTW_tutorial: I18nDictionary = {
 ・聊天工具列：音樂／效果音／提示音／靠左／列表／精簡
 ・BCDice 4.9.0`,
   'changelog.2026ops': `2026/08/03 操作更新
-・桌面選取高亮；左鍵空白框選；Shift＋點／拖曳多選；Ctrl＋左鍵平移地圖
+・桌面選取高亮；左鍵空白框選；Shift＋點／拖曳多選；Ctrl＋左鍵／右鍵拖曳平移地圖
 ・雙擊物件開啟詳情（翻面／抽牌／擲骰改右鍵選單）
 ・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）、Ctrl＋Z／Y 復原重做
 ・[ / ] 調整前後層；Alt＋滾輪 15°／Ctrl＋Shift＋滾輪 45° 旋轉

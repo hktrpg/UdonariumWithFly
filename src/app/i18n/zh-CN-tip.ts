@@ -94,7 +94,7 @@ export const zhCN_tip: I18nDictionary = {
   'tour.step.tableChapter.body': '接下来练习桌面视角与新增物件。\n（进入本章时会先清空桌面窗口，方便操作地图。）\n先平移与滚轮操作，再右键新增。',
 
   'tour.step.mapPan.title': '平移地图',
-  'tour.step.mapPan.body': 'Ctrl＋左键拖曳＝平移地图。\n右键拖曳＝旋转视角。\n请试一次 Ctrl＋左键拖曳。',
+  'tour.step.mapPan.body': 'Ctrl＋左键／右键拖曳＝平移地图。\n中键拖曳＝旋转视角。\n请试一次 Ctrl＋左键拖曳。',
   'tour.step.mapWheel.title': '滚轮移动画面',
   'tour.step.mapWheel.body': 'Shift＋滚轮＝左右移动画面。\nCtrl＋滚轮＝上下移动画面。\n（普通滚轮＝缩放，下一步练习）\n请试一次 Shift 或 Ctrl＋滚轮。',
   'tour.step.mapZoom.title': '缩放',

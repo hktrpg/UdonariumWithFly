@@ -94,7 +94,7 @@ export const ja_tip: I18nDictionary = {
   'tour.step.tableChapter.body': '視点操作のあと、右クリックでオブジェクト追加を練習します。\n（この章に入ると卓上面板をいったん閉じます。）',
 
   'tour.step.mapPan.title': 'パン',
-  'tour.step.mapPan.body': 'Ctrl＋左ドラッグ＝パン。\n右ドラッグ＝視点回転。\nCtrl＋左ドラッグを一度試してください。',
+  'tour.step.mapPan.body': 'Ctrl＋左／右ドラッグ＝パン。\n中ドラッグ＝視点回転。\nCtrl＋左ドラッグを一度試してください。',
   'tour.step.mapWheel.title': 'ホイール移動',
   'tour.step.mapWheel.body': 'Shift＋ホイール＝左右移動。\nCtrl＋ホイール＝上下移動。\n（通常ホイール＝ズーム：次のステップ）\nShift または Ctrl＋ホイールを一度試してください。',
   'tour.step.mapZoom.title': 'ズーム',

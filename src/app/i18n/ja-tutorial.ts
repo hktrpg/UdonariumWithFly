@@ -8,7 +8,7 @@ export const ja_tutorial: I18nDictionary = {
 ★ 退出前に「ZIP保存」、次回は「ZIP読込」。保存しないと消えます。
 デスクトップ版 Chrome 推奨。最初のチャット送信後、この案内は自動で隠れます。
 詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
-  'tutorial.view': `＜視点＞Ctrl＋左ドラッグ＝パン　右ドラッグ＝回転　ホイール＝ズーム
+  'tutorial.view': `＜視点＞Ctrl＋左／右ドラッグ＝パン　中ドラッグ＝回転　ホイール＝ズーム
 　　　　Shift＋ホイール＝左右パン　Ctrl＋ホイール＝上下パン
 ＜オブジェクト＞左ドラッグで移動　回転ハンドル　右クリック＝メニュー
 　　　　ダブルクリック＝詳細（キャラ／カード／山札／ダイス／地形／メモ／マスク／範囲など）
@@ -67,7 +67,7 @@ export const ja_tutorial: I18nDictionary = {
 ・チャットツールバー：音楽／SE／通知／左寄せ／リスト／簡易
 ・BCDice 4.9.0`,
   'changelog.2026ops': `2026/08/03 操作更新
-・選択ハイライト；空白左ドラッグ枠選択；Shift＋クリック／ドラッグで複数選択；Ctrl＋左でパン
+・選択ハイライト；空白左ドラッグ枠選択；Shift＋クリック／ドラッグで複数選択；Ctrl＋左／右ドラッグでパン
 ・ダブルクリックで詳細（裏返し／ドロー／ロールは右クリック）
 ・キーボード：WASD 移動、Shift＋WASD 向き、Delete、Ctrl＋C／X／V（カーソル貼付）、Ctrl＋Z／Y 元に戻す／やり直し
 ・[ / ] 前後層；Alt＋ホイール 15°／Ctrl＋Shift＋ホイール 45°

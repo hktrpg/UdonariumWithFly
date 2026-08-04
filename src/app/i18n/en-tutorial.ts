@@ -8,7 +8,7 @@ The map is 2.5D. Data is shared peer-to-peer; the server does not keep your toke
 ★ Before leaving, Download ZIP; next time Load ZIP. Without saving, everything vanishes.
 Desktop Chrome recommended. This tutorial hides after your first chat message.
 Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
-  'tutorial.view': `<View> Ctrl+left-drag = pan  Right-drag = rotate  Wheel = zoom
+  'tutorial.view': `<View> Ctrl+left / right-drag = pan  Middle-drag = rotate  Wheel = zoom
 　　　　Shift+wheel = pan left/right  Ctrl+wheel = pan up/down
 <Objects> Left-drag to move  Drag the rotate handle  Right-click = menu
 　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…)
@@ -67,7 +67,7 @@ Upgraded to 1.13.2`,
 ・Chat toolbar: music / SFX / notice / align left / list / compact
 ・BCDice 4.9.0`,
   'changelog.2026ops': `2026/08/03 Controls update
-・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; Ctrl+left pan map
+・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; Ctrl+left / right-drag pan map
 ・Double-click opens details (flip / draw / roll via right-click)
 ・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor), Ctrl+Z/Y undo/redo
 ・[ / ] layer order; Alt+wheel 15° / Ctrl+Shift+wheel 45° rotate

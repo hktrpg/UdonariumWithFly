@@ -94,7 +94,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.tableChapter.body': 'Practice view controls, then right-click to add objects.\n(Open panels are closed when this chapter starts so the table stays clear.)',
 
   'tour.step.mapPan.title': 'Pan the map',
-  'tour.step.mapPan.body': 'Ctrl + left-drag = pan.\nRight-drag = rotate view.\nTry Ctrl + left-drag once.',
+  'tour.step.mapPan.body': 'Ctrl + left-drag / right-drag = pan.\nMiddle-drag = rotate view.\nTry Ctrl + left-drag once.',
   'tour.step.mapWheel.title': 'Wheel pan',
   'tour.step.mapWheel.body': 'Shift + wheel = move view left/right.\nCtrl + wheel = move view up/down.\n(Plain wheel = zoom — next step.)\nTry Shift or Ctrl + wheel once.',
   'tour.step.mapZoom.title': 'Zoom',
