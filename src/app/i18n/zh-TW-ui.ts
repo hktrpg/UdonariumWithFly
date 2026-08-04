@@ -679,6 +679,7 @@ export const zhTW_ui: I18nDictionary = {
   'chatTab.private': '群組私聊',
   'chatTab.privateDefaultName': '私密',
   'chatTab.members': '成員',
+  'chatTab.membersEmpty': '（尚未加入成員）',
   'chatTab.membersHint': '僅成員與 GM 可見。P2P 下資料仍可能送達所有人，隱私＝客戶端過濾。',
   'combat.roundPrefix': 'ROUND',
   'inv.resourcePlaceholder': '數值',

@@ -1,4 +1,25 @@
 /* You can add global styles to this file, and also import other style files */
+
+:root {
+  --udon-control-border: #c4b29a;
+  --udon-control-radius: 4px;
+  --udon-control-bg: #fff;
+}
+
+select,
+textarea,
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+input[type='url'],
+input[type='email'] {
+  border: 1px solid var(--udon-control-border);
+  border-radius: var(--udon-control-radius);
+  background-color: var(--udon-control-bg);
+  box-sizing: border-box;
+}
+
 button {
   background-color: #eee;
   color: #444;

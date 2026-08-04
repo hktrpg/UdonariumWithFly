@@ -363,7 +363,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   showTabSetting() {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 460, height: 330 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 520, height: 360 };
     let component = this.panelService.open<ChatTabSettingComponent>(ChatTabSettingComponent, option);
     component.selectedTab = this.chatTab;
   }
@@ -403,5 +403,18 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   trackByChatTab(index: number, chatTab: ChatTab) {
     return chatTab.identifier;
+  }
+
+  privateTabMemberNames(tab: ChatTab): string[] {
+    if (!tab?.isPrivate) return [];
+    const ids = new Set(tab.memberIds);
+    if (tab.creatorUserId) ids.add(tab.creatorUserId);
+    const names: string[] = [];
+    for (const id of ids) {
+      const peer = PeerCursor.findByUserId(id);
+      const name = (peer?.name || '').trim();
+      names.push(name || id);
+    }
+    return names;
   }
 }

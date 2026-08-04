@@ -671,6 +671,7 @@ export const en_ui: I18nDictionary = {
   'chatTab.private': 'Group private chat',
   'chatTab.privateDefaultName': 'Private',
   'chatTab.members': 'Members',
+  'chatTab.membersEmpty': '(No members yet)',
   'chatTab.membersHint': 'Visible to members and GM only. On P2P, data may still reach all peers; privacy is client-side filtering.',
   'combat.roundPrefix': 'ROUND',
   'inv.resourcePlaceholder': 'Value',
