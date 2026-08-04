@@ -1,5 +1,5 @@
 <button (click)="toggleEditMode()">{{ 'sheet.toggleEdit' | i18n }}</button>
-<ng-container [ngSwitch]="tabletopObject.aliasName">
+<ng-container *ngIf="tabletopObject" [ngSwitch]="tabletopObject.aliasName">
   <ng-container *ngSwitchCase="'numberResource'">
   </ng-container>
   <ng-container *ngSwitchCase="'card'">
@@ -33,7 +33,7 @@
     <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
   </div>
 </button>
-<ng-container *ngIf="tabletopObject.aliasName === 'character'">
+<ng-container *ngIf="tabletopObject?.aliasName === 'character'">
   <select #select *ngIf="tabletopObject" (change)="setLocation(select.value)" [ngModel]="tabletopObject.location.name">
     <option value="table">{{ 'sheet.location.table' | i18n }}</option>
     <option value="common">{{ 'sheet.location.common' | i18n }}</option>

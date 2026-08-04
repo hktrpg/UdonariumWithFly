@@ -158,3 +158,11 @@
 </div>
 <div class="path-move-hud" *ngIf="showPathMoveHud">{{ 'tip.pathMove.hud' | i18n }}</div>
 <div class="vision-banner" *ngIf="showVisionBanner">{{ 'tip.vision.noCharacter' | i18n }}</div>
+<aside class="debug-pose" *ngIf="showDebugPose">
+  <header class="debug-pose-hd">
+    <span>DEBUG pose</span>
+    <span class="debug-pose-hint">Ctrl+Shift+D</span>
+    <button type="button" class="debug-pose-close" (click)="setShowDebugPose(false)" aria-label="Close">×</button>
+  </header>
+  <pre id="udon-debug-pose-body" class="debug-pose-body"></pre>
+</aside>

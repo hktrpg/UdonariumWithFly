@@ -425,3 +425,58 @@
   line-height: 1.4;
   text-align: center;
 }
+
+.debug-pose {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 12000;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 20px));
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  color: #d7ffd9;
+  background: rgba(12, 18, 14, 0.92);
+  border: 1px solid #3d6b4f;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.debug-pose-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font: 600 11px/1.2 ui-monospace, Consolas, monospace;
+  border-bottom: 1px solid #2f513c;
+  user-select: none;
+}
+
+.debug-pose-hint {
+  margin-left: auto;
+  opacity: 0.55;
+  font-weight: 400;
+  font-size: 10px;
+}
+
+.debug-pose-close {
+  margin: 0;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: #a5d6a7;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.debug-pose-body {
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  font: 11px/1.45 ui-monospace, Consolas, monospace;
+  white-space: pre;
+  user-select: text;
+}

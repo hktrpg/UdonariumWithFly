@@ -193,17 +193,21 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging; }
 
-  private viewPotisonX: number = 100;
-  private viewPotisonY: number = 0;
+  private viewPotisonX: number = 221.6;
+  private viewPotisonY: number = -123.8;
   private viewPotisonZ: number = 0;
 
-  private viewRotateX: number = 50;
+  private viewRotateX: number = 46;
   private viewRotateY: number = 0;
-  private viewRotateZ: number = 10;
+  private viewRotateZ: number = 0;
 
   private mouseGesture: TableMouseGesture = null;
   private touchGesture: TableTouchGesture = null;
   private pickGesture: TablePickGesture = null;
+
+  /** Top-right pose overlay for wheel/view/object angle debugging. */
+  showDebugPose = sessionStorage.getItem('udon.debugPose') === '1';
+  private debugPoseTimer: ReturnType<typeof setInterval> | null = null;
 
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
   get tableMasks(): GameTableMask[] { return this.tabletopService.tableMasks; }
@@ -457,6 +461,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     ]);
     this.refreshFx();
     this.fxTimer = setInterval(() => this.refreshFx(), 200);
+    if (this.showDebugPose) {
+      this.startDebugPoseRefresh();
+      queueMicrotask(() => this.refreshDebugPoseDom());
+    }
   }
 
   ngOnDestroy() {
@@ -466,6 +474,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.pickGesture.destroy();
     this.tabletopKeyboardService.destroy();
     if (this.fxTimer) clearInterval(this.fxTimer);
+    if (this.debugPoseTimer) clearInterval(this.debugPoseTimer);
     if (this.weatherRender) this.weatherRender.destroy();
     this.clearPingHold();
     this.clearDrawDragState();
@@ -483,7 +492,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   initializeTableMouseGesture() {
-    this.mouseGesture = new TableMouseGesture(this.rootElementRef.nativeElement);
+    this.mouseGesture = new TableMouseGesture(
+      this.rootElementRef.nativeElement,
+      () => this.selectionService.size > 0,
+    );
     this.mouseGesture.onstart = this.onTableMouseStart.bind(this);
     this.mouseGesture.onend = this.onTableMouseEnd.bind(this);
     this.mouseGesture.ontransform = this.onTableMouseTransform.bind(this);
@@ -832,6 +844,79 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @HostListener('document:contextmenu', ['$event'])
   onDocumentContextMenu(e: MouseEvent) {
     if (this.isTableTransformed && !this.pointerDeviceService.isAllowedToOpenContextMenu) e.preventDefault();
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onDebugPoseHotkey(e: KeyboardEvent) {
+    if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+    if (e.code !== 'KeyD') return;
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    this.setShowDebugPose(!this.showDebugPose);
+  }
+
+  setShowDebugPose(show: boolean) {
+    this.showDebugPose = show;
+    sessionStorage.setItem('udon.debugPose', show ? '1' : '0');
+    if (show) {
+      this.startDebugPoseRefresh();
+      // One Angular pass to mount the panel; further updates are DOM-only.
+      this.changeDetector.markForCheck();
+      queueMicrotask(() => this.refreshDebugPoseDom());
+    }
+  }
+
+  private startDebugPoseRefresh() {
+    if (this.debugPoseTimer) return;
+    // Outside Angular — never NgZone.run here (global CD hits closed sheets with null objects).
+    this.ngZone.runOutsideAngular(() => {
+      this.debugPoseTimer = setInterval(() => this.refreshDebugPoseDom(), 100);
+    });
+  }
+
+  private refreshDebugPoseDom() {
+    if (!this.showDebugPose) return;
+    const el = document.getElementById('udon-debug-pose-body');
+    if (el) el.textContent = this.debugPoseText;
+  }
+
+  private fmtDebug(n: number): string {
+    if (!Number.isFinite(n)) return '—';
+    return (Math.round(n * 100) / 100).toFixed(2);
+  }
+
+  private debugObjectLabel(object: { aliasName?: string; identifier?: string; name?: string }): string {
+    const name = typeof (object as any).name === 'string' ? (object as any).name.trim() : '';
+    const alias = object.aliasName || '?';
+    const id = (object.identifier || '').slice(0, 8);
+    return name ? `${alias} “${name}” (${id})` : `${alias} (${id})`;
+  }
+
+  get debugPoseText(): string {
+    const lines: string[] = [
+      `view.rotX  ${this.fmtDebug(this.viewRotateX)}°`,
+      `view.rotY  ${this.fmtDebug(this.viewRotateY)}°`,
+      `view.rotZ  ${this.fmtDebug(this.viewRotateZ)}°`,
+      `view.pos   ${this.fmtDebug(this.viewPotisonX)}, ${this.fmtDebug(this.viewPotisonY)}, ${this.fmtDebug(this.viewPotisonZ)}`,
+      `sel.count  ${this.selectionService.size}`,
+    ];
+    const objs = this.selectionService.objects;
+    if (objs.length < 1) {
+      lines.push('', '(no selection — Alt+wheel = view)');
+    } else {
+      for (const o of objs) {
+        lines.push('', `# ${this.debugObjectLabel(o)}`);
+        lines.push(`  x,y     ${this.fmtDebug(o.location.x)}, ${this.fmtDebug(o.location.y)}`);
+        lines.push(`  posZ    ${this.fmtDebug(o.posZ)}`);
+        if (o.isAltitudeIndicate || 'altitude' in o) {
+          lines.push(`  alt     ${this.fmtDebug(o.altitude)}`);
+        }
+        if ('rotate' in o) lines.push(`  rotate  ${this.fmtDebug(+(o as any).rotate || 0)}°`);
+        if ('roll' in o) lines.push(`  roll    ${this.fmtDebug(+(o as any).roll || 0)}°`);
+      }
+    }
+    return lines.join('\n');
   }
 
   private setTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, isAbsolute: boolean=false) {

@@ -23,6 +23,8 @@ export class TableMouseGesture {
 
   private buttonCode: number = 0;
   private input: InputHandler = null;
+  /** Acc for Alt(+Shift)+wheel view rotate → exactly 3° per notch. */
+  private altWheelAcc = 0;
 
   get isGrabbing(): boolean { return this.input.isGrabbing; }
   get isDragging(): boolean { return this.input.isDragging; }
@@ -34,7 +36,14 @@ export class TableMouseGesture {
   onend: Callback = null;
   ontransform: OnTransformCallback = null;
 
-  constructor(readonly targetElement: HTMLElement) {
+  /**
+   * @param hasObjectSelection When true, Alt(+Shift)+wheel is owned by TabletopKeyboardService
+   *   (object facing/roll) — do not rotate the view.
+   */
+  constructor(
+    readonly targetElement: HTMLElement,
+    private readonly hasObjectSelection: () => boolean = () => false,
+  ) {
     this.initialize();
   }
 
@@ -102,7 +111,7 @@ export class TableMouseGesture {
     // Ctrl+Shift+wheel = object rotate (handled in TabletopKeyboardService).
     if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) return;
     // Alt+wheel with selection = object rotate (same service, capture phase).
-    // With no selection the event reaches here → rotate the view.
+    if (ev.altKey && this.hasObjectSelection()) return;
 
     // Prefer dominant axis (Shift+wheel often becomes deltaX on OS/browser).
     const useX = Math.abs(ev.deltaX) > Math.abs(ev.deltaY);
@@ -132,17 +141,22 @@ export class TableMouseGesture {
     let event = TableMouseGestureEvent.ZOOM;
 
     if (ev.altKey) {
-      // Empty selection only (selection path consumed in TabletopKeyboardService).
+      // Empty selection → rotate view ±3° per wheel notch.
       if (ev.ctrlKey || ev.metaKey) return;
+      if (ev.cancelable) ev.preventDefault();
+      const notch = 100;
+      const stepDeg = 3;
+      this.altWheelAcc += pixelDelta;
+      if (Math.abs(this.altWheelAcc) < notch) return;
+      const dir = this.altWheelAcc > 0 ? 1 : -1;
+      // Keep remainder so rapid ticks still track; one notch → exactly stepDeg.
+      this.altWheelAcc -= dir * notch;
       event = TableMouseGestureEvent.ROTATE;
       if (ev.shiftKey) {
-        // Alt+Shift+wheel → pitch view up/down (same axis as middle-drag vertical).
-        rotateX = -pixelDelta / 8;
+        rotateX = -dir * stepDeg; // pitch
       } else {
-        // Alt+wheel → yaw view left/right.
-        rotateZ = -pixelDelta / 8;
+        rotateZ = -dir * stepDeg; // yaw
       }
-      if (ev.cancelable) ev.preventDefault();
     } else if (ev.shiftKey) {
       // Shift + wheel → pan left / right
       transformX = -pixelDelta;
