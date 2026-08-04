@@ -35,7 +35,8 @@ export class SkyWayConnection implements Connection {
   private connections: SkyWayDataConnectionList = new SkyWayDataConnectionList();
 
   private listAllPeersCache: string[] = [];
-  private httpRequestInterval: number = performance.now() + 500;
+  private listAllPeersCacheUntil = 0;
+  private listAllPeersInFlight: Promise<string[]> | null = null;
 
   private outboundQueue: Promise<any> = Promise.resolve();
   private inboundQueue: Promise<any> = Promise.resolve();
@@ -164,25 +165,32 @@ export class SkyWayConnection implements Connection {
     }
   }
 
-  listAllPeers(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.skyWay) return resolve([]);
-      let now = performance.now();
-      if (now < this.httpRequestInterval) {
-        console.warn('httpRequestInterval... ' + (this.httpRequestInterval - now));
-        resolve(this.listAllPeersCache.concat());
-        return;
-      }
-      this.httpRequestInterval = now + 6000;
+  listAllPeers(force = false): Promise<string[]> {
+    if (this.listAllPeersInFlight) {
+      return this.listAllPeersInFlight;
+    }
+    if (!force && performance.now() < this.listAllPeersCacheUntil) {
+      return Promise.resolve(this.listAllPeersCache.concat());
+    }
+    if (!this.skyWay) {
+      return Promise.resolve([]);
+    }
+
+    this.listAllPeersInFlight = new Promise<string[]>((resolve) => {
       this.skyWay.listAllPeers((list) => {
-        this.listAllPeersCache = list.concat();
-        resolve(list);
+        const peers = list.concat();
+        this.listAllPeersCache = peers;
+        const ttlMs = peers.length > 0 ? 6000 : 500;
+        this.listAllPeersCacheUntil = performance.now() + ttlMs;
+        this.listAllPeersInFlight = null;
+        resolve(peers);
       });
     });
+    return this.listAllPeersInFlight;
   }
 
-  async listAllRooms(): Promise<IRoomInfo[]> {
-    let allPeerIds = await this.listAllPeers();
+  async listAllRooms(force = false): Promise<IRoomInfo[]> {
+    let allPeerIds = await this.listAllPeers(force);
     return RoomInfo.listFrom(allPeerIds);
   }
 

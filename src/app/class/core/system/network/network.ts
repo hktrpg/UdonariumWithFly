@@ -139,12 +139,12 @@ export class Network {
     }
   }
 
-  listAllPeers(): Promise<string[]> {
-    return this.connection ? this.connection.listAllPeers() : Promise.resolve([]);
+  listAllPeers(force?: boolean): Promise<string[]> {
+    return this.connection ? this.connection.listAllPeers(force) : Promise.resolve([]);
   }
 
-  listAllRooms(): Promise<IRoomInfo[]> {
-    return this.connection ? this.connection.listAllRooms() : Promise.resolve([]);
+  listAllRooms(force?: boolean): Promise<IRoomInfo[]> {
+    return this.connection ? this.connection.listAllRooms(force) : Promise.resolve([]);
   }
 
   GuestMode(): boolean {

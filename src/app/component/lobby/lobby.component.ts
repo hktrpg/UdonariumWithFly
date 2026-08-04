@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
@@ -32,6 +32,20 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   static readonly DEFAULT_WIDTH = 700;
   static readonly DEFAULT_HEIGHT = 400;
+
+  /** Auto-refresh while lobby is open (faster when empty). */
+  private static readonly AUTO_REFRESH_MS = 10000;
+  private static readonly AUTO_REFRESH_EMPTY_MS = 3000;
+
+  private autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
+  private readonly onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      void this.reload(true);
+    } else {
+      this.stopAutoRefresh();
+    }
+  };
 
   /** Panel options for a centered normal window (not a modal). */
   static centeredPanelOption(extra: PanelOption = {}): PanelOption {
@@ -77,6 +91,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private i18n: I18nService,
     public folderBackup: FolderBackupService,
     private roomInvite: RoomInviteService,
+    private ngZone: NgZone,
   ) { }
 
   ngOnInit() {
@@ -92,6 +107,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
         this.changeTitle();
         this.refreshHelp();
       });
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.help = this.i18n.t('lobby.helpInitial');
     this.reload();
   }
@@ -105,15 +121,53 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
+    this.stopAutoRefresh();
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     EventSystem.unregister(this);
   }
 
-  async reload() {
+  async reload(silent = false) {
+    if (this.isReloading) {
+      this.scheduleAutoRefresh();
+      return;
+    }
     this.isReloading = true;
-    this.help = this.i18n.t('lobby.helpSearching');
-    this.rooms = await Network.listAllRooms();
-    this.help = this.i18n.t('lobby.helpEmpty');
-    this.isReloading = false;
+    if (!silent || this.rooms.length < 1) {
+      this.help = this.i18n.t('lobby.helpSearching');
+    }
+    // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
+    let rooms = await Network.listAllRooms(true);
+    if (rooms.length < 1 && !silent) {
+      await new Promise<void>(resolve => setTimeout(resolve, 600));
+      rooms = await Network.listAllRooms(true);
+    }
+    if (this.destroyed) return;
+    this.ngZone.run(() => {
+      this.rooms = rooms;
+      this.help = this.i18n.t('lobby.helpEmpty');
+      this.isReloading = false;
+      this.scheduleAutoRefresh();
+    });
+  }
+
+  private scheduleAutoRefresh() {
+    this.stopAutoRefresh();
+    if (this.destroyed || this.isConnected) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const delay = this.rooms.length < 1
+      ? LobbyComponent.AUTO_REFRESH_EMPTY_MS
+      : LobbyComponent.AUTO_REFRESH_MS;
+    this.autoRefreshTimer = setTimeout(() => {
+      void this.reload(true);
+    }, delay);
+  }
+
+  private stopAutoRefresh() {
+    if (this.autoRefreshTimer != null) {
+      clearTimeout(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
   }
 
   displayRoomName(room: IRoomInfo): string {
