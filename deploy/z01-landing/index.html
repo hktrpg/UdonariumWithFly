@@ -10,6 +10,11 @@
   <meta property="og:description" content="自架 backend 的 HKTRPG 烏冬：多語、教學、光照、戰鬥追蹤與資料夾備份。">
   <meta property="og:image" content="https://z01.hktrpg.com/hktrpg-main/card.png">
   <link rel="icon" href="https://z01.hktrpg.com/hktrpg-main/favicon.ico">
+  <!-- Shared HKTRPG navbar (Bootstrap 4 + Iconify) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+    integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+  <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/hktrpg/TG.line.Discord.Roll.Bot@master/views/common/www-locale-head.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -361,9 +366,84 @@
         transition: none !important;
       }
     }
+
+    /* Shared navbar sits above the dark landing; keep page theme below */
+    #header {
+      position: relative;
+      z-index: 1000;
+      background: #f8f9fa;
+    }
+    #header .navbar {
+      margin-bottom: 0;
+      border-radius: 0;
+    }
   </style>
 </head>
 <body>
+  <!--
+    Same fragment as rollbot / other HKTRPG www sites.
+    Source: https://github.com/hktrpg/TG.line.Discord.Roll.Bot/blob/master/views/includes/header.html
+    Live site root uses THIS file (deploy/z01-landing), not repo root index.html.
+  -->
+  <div id="header"></div>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+    integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+    integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"
+    integrity="sha384-+YQ4JLhjyBLPDQt//I+STsc9iw4uQqACwlvpslubQzn4u2UU2UFM80nGisd026JF" crossorigin="anonymous"></script>
+  <script>
+  (function () {
+    var CDN = 'https://cdn.jsdelivr.net/gh/hktrpg/TG.line.Discord.Roll.Bot@master';
+    var SITE_TITLE = '烏冬 @ HKTRPG';
+
+    function loadScript(src) {
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { reject(new Error(src)); };
+        document.head.appendChild(s);
+      });
+    }
+
+    async function loadHktrpgHeader() {
+      var mount = document.getElementById('header');
+      if (!mount) return;
+      try {
+        var res = await fetch(CDN + '/views/includes/header.html', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        mount.innerHTML = await res.text();
+        var titleEl = mount.querySelector('#title');
+        if (titleEl) titleEl.textContent = SITE_TITLE;
+        if (window.Iconify && typeof window.Iconify.scan === 'function') {
+          window.Iconify.scan(mount);
+        }
+        try {
+          await loadScript(CDN + '/views/common/www-i18n.js');
+          if (window.wwwI18n && window.wwwI18n.ready) await window.wwwI18n.ready;
+          if (typeof wwwApplyDomI18n === 'function') wwwApplyDomI18n(mount);
+          if (typeof ensureWwwLocaleSwitcher === 'function') await ensureWwwLocaleSwitcher();
+        } catch (i18nErr) {
+          console.warn('[hktrpg-header] www-i18n optional', i18nErr);
+        }
+      } catch (err) {
+        console.warn('[hktrpg-header]', err);
+        mount.innerHTML =
+          '<nav class="navbar navbar-expand-lg navbar-light bg-light">' +
+          '<a class="navbar-brand" href="https://www.hktrpg.com/">HKTRPG · ' + SITE_TITLE + '</a></nav>';
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadHktrpgHeader);
+    } else {
+      loadHktrpgHeader();
+    }
+  })();
+  </script>
+
   <div class="wrap">
     <header class="topbar">
       <a class="brand" href="https://www.hktrpg.com/">
