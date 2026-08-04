@@ -287,16 +287,16 @@
 
     <footer class="actions">
       <ng-container *ngIf="!isDeleted">
-        <button type="button" class="btn" [disabled]="isSaveing" (click)="save()">
-          <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'table.download' | i18n }}</span>
-          <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
-        </button>
+        <button type="button" class="btn" (click)="cloneGameTable()" [disabled]="!selectedTable">{{ 'table.clone' | i18n }}</button>
         <button type="button" class="btn btn-danger" (click)="delete()" [disabled]="getGameTables().length <= 1">{{ 'table.delete' | i18n }}</button>
       </ng-container>
       <ng-container *ngIf="isDeleted">
         <button type="button" class="btn" (click)="restore()">{{ 'table.restore' | i18n }}</button>
       </ng-container>
       <button type="button" class="btn btn-primary" (click)="confirm()">{{ 'table.confirm' | i18n }}</button>
+      <button type="button" class="btn" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
+        <i class="material-icons">theaters</i>{{ 'scenePreset.saveAsScene' | i18n }}
+      </button>
       <span class="local-note"><sup class="self-only">*</sup>{{ 'table.localOnly' | i18n }}</span>
     </footer>
   </main>

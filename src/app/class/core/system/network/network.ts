@@ -68,14 +68,15 @@ export class Network {
     this.connection = this.initializeConnection();
     this.connection.open.apply(this.connection, args);
 
-    window.addEventListener('unload', this.callbackUnload, false);
+    // Prefer pagehide — Permissions-Policy may block the unload event.
+    window.addEventListener('pagehide', this.callbackUnload, false);
   }
 
   private close() {
     if (this.connection) this.connection.close();
     this.connection = null;
     this.connectionClassPromise = null;
-    window.removeEventListener('unload', this.callbackUnload, false);
+    window.removeEventListener('pagehide', this.callbackUnload, false);
     console.log('Network close...');
   }
 

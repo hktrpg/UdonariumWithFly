@@ -382,7 +382,7 @@ export class DiceBot extends GameObject {
       .on('SEND_MESSAGE', async event => {
         const chatMessage = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
         if (!chatMessage || !chatMessage.isSendFromSelf || chatMessage.isSystem || chatMessage.isOperationLog) return;
-        let gameType: string = chatMessage.tag.replace('noface', '').trim();
+        let gameType: string = (chatMessage.tag || '').replace('noface', '').trim();
         gameType = gameType ? gameType : 'DiceBot';
         try {
           const finalResult = await DiceBot.rollCommandAsync(chatMessage.text, gameType, true);

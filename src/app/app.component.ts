@@ -53,6 +53,11 @@ import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
 import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
 import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
+import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
+import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
+import { CharacterResourceHudComponent } from 'component/character-resource-hud/character-resource-hud.component';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
+import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
@@ -200,6 +205,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     subTab.recieveOperationLogLevel = 1;
 
     CutInList.instance.initialize();
+    ScenePresetList.instance.initialize();
+    ScenarioTextList.instance.initialize();
+    const sampleScenario = ScenarioTextList.instance.addItem(this.i18n.t('sample.scenarioText'));
+    sampleScenario.body = this.i18n.t('sample.scenarioTextBody');
     AuraNameConfig.instance;
     CombatTracker.instance;
     SceneToolPermission.instance;
@@ -235,10 +244,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.NOTICE_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
         if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.noticeVolume = volume;
       });
+      localForage.getItem(AudioPlayer.AMBIENT_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
+        if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.ambientVolume = volume;
+      });
       localForage.getItem(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isMute = !!isMute);
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
+      localForage.getItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAmbientMute = !!isMute);
       localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
         // Default ON when unset; honor explicit boolean from storage.
         ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
@@ -293,7 +306,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     AudioStorage.instance.get(PresetSound.ping).isHidden = true;
 
     PeerCursor.createMyCursor().then(() => {
-      if (PeerCursor.myCursor.name == null || PeerCursor.myCursor.name === '') PeerCursor.myCursor.name = PeerCursor.CHAT_DEFAULT_NAME;
       if (!PeerCursor.myCursor.imageIdentifier) PeerCursor.myCursor.imageIdentifier = noneIconImage.identifier;
     });
 
@@ -727,19 +739,22 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     switch (componentName) {
       case 'PeerMenuComponent':
         option.width = 520;
+        option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
         option.width = 700;
+        option.title = this.i18n.t('chat.title');
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
-        option = { width: 610, height: 540, left: 100 };
+        option = { width: 610, height: 540, left: 100, title: this.i18n.t('table.title') };
         break;
       case 'FileStorageComponent':
         component = FileStorageComponent;
         option.width = 700;
+        option.title = this.i18n.t('file.title');
         break;
       case 'GameCharacterSheetComponent':
         component = GameCharacterSheetComponent;
@@ -747,29 +762,45 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'JukeboxComponent':
         component = JukeboxComponent;
         option.height = 540;
+        option.title = this.i18n.t('jukebox.title');
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
+        option.title = this.i18n.t('inv.title');
         break;
       case 'NoteInventoryComponent':
         component = NoteInventoryComponent;
+        option.title = this.i18n.t('note.title');
         break;
       case 'DiceRollTableSettingComponent':
         component = DiceRollTableSettingComponent;
-        option = { width: 645, height: 475 };
+        option = { width: 645, height: 475, title: this.i18n.t('diceTable.title') };
         break;
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
-        option = { width: 700, height: 600 };
+        option = { width: 700, height: 600, title: this.i18n.t('cutin.title') };
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 640, left: 100 };
+        option = { width: 520, height: 640, left: 100, title: this.i18n.t('combat.title') };
         break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
         component = SceneToolsComponent;
-        option = { width: 380, height: 560, left: 100 };
+        option = {
+          width: 380,
+          height: 560,
+          left: 100,
+          title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),
+        };
+        break;
+      case 'ScenePresetComponent':
+        component = ScenePresetComponent;
+        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenePreset.title') };
+        break;
+      case 'ScenarioTextComponent':
+        component = ScenarioTextComponent;
+        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenarioText.title') };
         break;
     }
     if (component) {
@@ -777,8 +808,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
       this.openPanelCount = this.openPanelCount + 1;
       const tourId = this.tourIdForComponent(componentName);
+      // Chat windows may open multiple copies (different tabs / positions).
+      const allowMultiple = componentName === 'ChatWindowComponent';
       if (tourId) {
-        PanelService.closePanelsByTourId(tourId);
+        if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
         option.tourPanelId = tourId;
       }
       this.panelService.open(component, option);
@@ -787,8 +820,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private openDefaultPanels() {
-    this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100, tourPanelId: 'menu.connection' });
-    this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450, tourPanelId: 'menu.chat' });
+    this.panelService.open(PeerMenuComponent, {
+      width: 520, height: 450, left: 100,
+      tourPanelId: 'menu.connection',
+      title: this.i18n.t('peer.title'),
+    });
+    this.panelService.open(ChatWindowComponent, {
+      width: 700, height: 400, left: 100, top: 450,
+      tourPanelId: 'menu.chat',
+      title: this.i18n.t('chat.title'),
+    });
   }
 
   private tourIdForComponent(componentName: string): string | null {
@@ -800,6 +841,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'JukeboxComponent': return 'menu.music';
       case 'CombatTrackerComponent': return 'menu.combat';
       case 'SceneToolsComponent': return 'menu.sceneTools';
+      case 'ScenePresetComponent': return 'menu.scenePreset';
+      case 'ScenarioTextComponent': return 'menu.scenarioText';
       case 'GameObjectInventoryComponent': return 'menu.inventory';
       case 'NoteInventoryComponent': return 'menu.notes';
       default: return null;
@@ -994,17 +1037,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         disabled: unsupported || status === 'unbound',
         action: () => { void this.folderBackup.requestAccess(); }
       },
-      {
-        name: this.i18n.t('menu.folderBackup.load'),
-        disabled: unsupported || status === 'unbound',
-        action: () => { void this.openFolderBackupLoad(); }
-      },
-      {
-        name: this.i18n.t('menu.folderBackup.unbind'),
-        disabled: unsupported || status === 'unbound',
-        action: () => { void this.folderBackup.unbindFolder(); }
-      },
     ];
+    if (this.folderBackup.canLoadFromFolder) {
+      subActions.push({
+        name: this.i18n.t('menu.folderBackup.load'),
+        action: () => { void this.openFolderBackupLoad(); }
+      });
+    }
+    subActions.push({
+      name: this.i18n.t('menu.folderBackup.unbind'),
+      disabled: unsupported || status === 'unbound',
+      action: () => { void this.folderBackup.unbindFolder(); }
+    });
     return {
       name: this.i18n.t('menu.folderBackup'),
       materialIcon: 'folder',
@@ -1073,6 +1117,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private makeDayNightToolboxMenu() {
+    const DAY_TARGET = 0;
+    const NIGHT_TARGET = 0.85;
     const animateDarkness = (target: number) => {
       const table = TableSelecter.instance.viewTable;
       if (!table) return;
@@ -1082,13 +1128,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       const dur = 800;
       const step = (now: number) => {
         const p = Math.min(1, (now - t0) / dur);
-        table.darkness = start + (target - start) * p;
+        table.darkness = p < 1 ? start + (target - start) * p : target;
         if (p < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
     };
-    const isDay = () => (TableSelecter.instance.viewTable?.darkness ?? 0) < 0.35;
-    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.55;
+    // Mutually exclusive — match backgroundFilterType threshold (no 0.35–0.55 gap).
+    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.5;
+    const isDay = () => !isNight();
     return {
       name: this.i18n.t('table.dayNight'),
       materialIcon: 'brightness_6',
@@ -1096,13 +1143,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
-          action: () => animateDarkness(0),
+          action: () => animateDarkness(DAY_TARGET),
           checkBox: 'radio' as const,
         },
         {
           name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
           nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
-          action: () => animateDarkness(0.85),
+          action: () => animateDarkness(NIGHT_TARGET),
           checkBox: 'radio' as const,
         },
       ],
@@ -1145,7 +1192,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openFolderBackupLoad() {
-    if (this.GuestMode()) return;
+    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
     void this.folderBackup.openLoadUi();
   }
 
@@ -1194,6 +1241,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setChatLeftOnly(v); },
         on: `☑${this.i18n.t('menu.settings.leftOnly')}`,
         off: `☐${this.i18n.t('menu.settings.leftOnly')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => CharacterResourceHudComponent.isVisible,
+        set: (v) => CharacterResourceHudComponent.setVisible(v),
+        on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
+        off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
       }),
       ContextMenuSeparator,
       contextMenuToggleCheck({

@@ -28,7 +28,8 @@ export class FolderBackupListComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.refreshTitle();
+    // Defer title write — Modal already CD-checked with default untitled title (NG0100).
+    Promise.resolve().then(() => this.refreshTitle());
     EventSystem.register(this).on('LOCALE_CHANGED', () => this.refreshTitle());
     if (!this.backups.length) {
       void this.reloadList();

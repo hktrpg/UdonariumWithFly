@@ -24,7 +24,7 @@ export interface TransformPose {
 }
 
 export type DeleteEntry =
-  | { kind: 'graveyard'; id: string; fromLocation: string }
+  | { kind: 'graveyard'; id: string; fromLocation: string; fromTableIdentifier?: string }
   | { kind: 'destroy'; xml: string; parentId: string; liveId: string };
 
 const MAX_STACK = 50;
@@ -244,7 +244,7 @@ export class UndoService {
         for (const e of state) {
           if (e.kind === 'graveyard') {
             const obj = ObjectStore.instance.get<GameCharacter>(e.id);
-            if (obj) obj.setLocation(e.fromLocation);
+            if (obj) obj.setLocation(e.fromLocation, e.fromTableIdentifier);
           } else {
             const restored = restoreFromXml(e.xml, e.parentId);
             if (restored) e.liveId = restored.identifier;

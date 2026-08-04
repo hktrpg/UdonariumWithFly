@@ -3,6 +3,7 @@ import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem } from './core/system';
 import { GameTable } from './game-table';
+import { TabletopObject } from './tabletop-object';
 
 @SyncObject('TableSelecter')
 export class TableSelecter extends GameObject {
@@ -29,6 +30,7 @@ export class TableSelecter extends GameObject {
         if (this.viewTable) this.viewTable.selected = false;
         this.viewTableIdentifier = event.data.identifier;
         if (this.viewTable) this.viewTable.selected = true;
+        TabletopObject.migrateUnboundTablePieces(this.viewTableIdentifier);
       });
   }
 

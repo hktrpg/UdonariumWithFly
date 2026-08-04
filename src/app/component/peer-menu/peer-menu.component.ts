@@ -79,12 +79,13 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
   set myPeerName(name: string) {
     if (PeerCursor.myCursor) {
-      PeerCursor.myCursor.name = name;
-      if (PeerCursor.myCursor.name === PeerCursor.CHAT_DEFAULT_NAME) {
-        localForage.removeItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+      const trimmed = (name ?? '').trim();
+      if (!trimmed) {
+        PeerCursor.myCursor.name = PeerCursor.generateDefaultName();
       } else {
-        localForage.setItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY, PeerCursor.myCursor.name).catch(e => console.log(e));
+        PeerCursor.myCursor.name = name;
       }
+      localForage.setItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY, PeerCursor.myCursor.name).catch(e => console.log(e));
     }
   }
 
@@ -330,7 +331,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   loadFolderBackup() {
-    if (this.GuestMode()) return;
+    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
     void this.folderBackup.openLoadUi();
   }
 

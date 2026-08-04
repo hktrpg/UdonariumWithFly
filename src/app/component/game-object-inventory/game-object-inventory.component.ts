@@ -307,13 +307,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const inGraveyard = gameObject.location.name === 'graveyard';
 
     const identity: (ContextMenuAction | null)[] = [
-      (gameObject.location.name === 'table' && (this.isGMMode || gameObject.isVisible)) ? {
+      (gameObject.isVisibleOnTable && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.findOnTable'),
         action: () => {
-          if (gameObject.location.name === 'table') EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
+          if (gameObject.isVisibleOnTable) EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
         },
-        default: gameObject.location.name === 'table',
-        disabled: gameObject.location.name !== 'table',
+        default: gameObject.isVisibleOnTable,
+        disabled: !gameObject.isVisibleOnTable,
         selfOnly: true
       } : null,
       (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
@@ -347,7 +347,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       (!gameObject.isHideIn || !gameObject.isVisible) ? {
         name: this.i18n.t('char.selfOnlyStealth'),
         action: () => {
-          if (gameObject.location.name === 'table' && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
+          if (gameObject.isVisibleOnTable && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
               title: this.i18n.t('char.stealthTitle'),
               text: this.i18n.t('char.stealthText'),
@@ -373,7 +373,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
           action: () => {
             gameObject.currntImageIndex = i;
-            if (!gameObject.isHideIn && gameObject.location.name === 'table') SoundEffect.play(PresetSound.surprise);
+            if (!gameObject.isHideIn && gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           default: gameObject.currntImageIndex == i,
@@ -429,7 +429,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         action: () => {
           if (gameObject.altitude != 0) {
             gameObject.altitude = 0;
-            if (gameObject.location.name === 'table') SoundEffect.play(PresetSound.sweep);
+            if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
           }
         },
         altitudeHande: gameObject
@@ -670,7 +670,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (!(e.target instanceof HTMLElement)) return;
     if (new Set(['input', 'button']).has(e.target.tagName.toLowerCase())) return;
     if (e instanceof MouseEvent && e.shiftKey) return;
-    if (gameObject.location.name !== 'table' || (!gameObject.isVisible && !this.isGMMode)) return;
+    if (!gameObject.isVisibleOnTable || (!gameObject.isVisible && !this.isGMMode)) return;
     EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x + gameObject.size * 50 / 2, y: gameObject.location.y + gameObject.size * 50 / 2, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
   }
 

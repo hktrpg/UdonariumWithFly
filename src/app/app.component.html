@@ -52,6 +52,18 @@
           <div>{{ 'menu.sceneTools' | i18n }}</div>
         </a>
       </li>
+      <li data-tour-id="menu.scenePreset" [appTeachingTip]="'tip.menu.scenePreset'" (click)="open('ScenePresetComponent')" *ngIf="!GuestMode()">
+        <a routerLink="/" routerLinkActive="active">
+          <div><i class="material-icons icon-size">theaters</i></div>
+          <div>{{ 'menu.scenePreset' | i18n }}</div>
+        </a>
+      </li>
+      <li data-tour-id="menu.scenarioText" [appTeachingTip]="'tip.menu.scenarioText'" (click)="open('ScenarioTextComponent')" *ngIf="!GuestMode()">
+        <a routerLink="/" routerLinkActive="active">
+          <div><i class="material-icons icon-size">menu_book</i></div>
+          <div>{{ 'menu.scenarioText' | i18n }}</div>
+        </a>
+      </li>
       <li data-tour-id="menu.inventory" [appTeachingTip]="'tip.menu.inventory'" (click)="open('GameObjectInventoryComponent')" *ngIf="!GuestMode()">
         <a routerLink="/" routerLinkActive="active">
           <div><i class="material-icons icon-size">folder_shared</i></div>
@@ -86,6 +98,7 @@
 <teaching-tip></teaching-tip>
 <guided-tour></guided-tour>
 <combat-announce></combat-announce>
+<character-resource-hud></character-resource-hud>
 <network-indicator class="networkIndicator"></network-indicator>
 <div *ngIf="imageUrl" class="image-view-background is-fill" (click)="closeImagePreview()" [@fadeInOut]="'in'">
   <div class="close-button is-pointer-events-none" style="z-index: 10"><i class="material-icons">close</i></div>

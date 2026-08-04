@@ -16,6 +16,8 @@ export const en: I18nDictionary = {
   'menu.toolbox': 'Toolbox',
   'menu.combat': 'Combat',
   'menu.sceneTools': 'Scene Tools',
+  'menu.scenePreset': 'Preset Scenes',
+  'menu.scenarioText': 'Scenario Text',
   'menu.inventory': 'Characters',
   'menu.notes': 'Notes',
   'menu.diceOpen': 'Reveal Dice',

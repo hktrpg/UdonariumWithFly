@@ -2,6 +2,16 @@
 <hr />
 <div class="help" *ngIf="help && !helpHtml">{{help}}</div>
 <div class="help" *ngIf="helpHtml" [innerHTML]="helpHtml | safe: 'html'"></div>
+<label class="prompt-field" *ngIf="hasInput">
+  <span *ngIf="inputLabel">{{ inputLabel }}</span>
+  <input
+    type="text"
+    [(ngModel)]="inputValue"
+    [placeholder]="inputPlaceholder"
+    (keydown.enter)="ok()"
+    autofocus
+  />
+</label>
 <button *ngIf="extraLabel" type="button" (click)="extra()">{{ extraLabel }}</button>
 <button type="submit" (click)="ok()">{{ okLabel || ('confirm.ok' | i18n) }}</button>
 <button *ngIf="type > 1" type="button" (click)="cancel()">{{ cancelLabel || ('confirm.cancel' | i18n) }}</button>

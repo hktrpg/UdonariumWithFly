@@ -82,6 +82,9 @@ import { ConfirmationComponent } from './component/confirmation/confirmation.com
 import { FolderBackupListComponent } from './component/folder-backup-list/folder-backup-list.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
+import { ScenePresetComponent } from './component/scene-preset/scene-preset.component';
+import { ScenarioTextComponent } from './component/scenario-text/scenario-text.component';
+import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
 import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
@@ -157,6 +160,9 @@ import '@udonarium/table-fx/combat-tracker';
     FolderBackupListComponent,
     RangeComponent,
     SceneToolsComponent,
+    ScenePresetComponent,
+    ScenarioTextComponent,
+    CharacterResourceHudComponent,
     CombatTrackerComponent,
     CombatAnnounceComponent,
     TeachingTipDirective,

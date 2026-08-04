@@ -6,7 +6,7 @@ import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { Jukebox } from '@udonarium/Jukebox';
+import { Jukebox, JUKEBOX_TRACK_COUNT, JukeboxTrackState } from '@udonarium/Jukebox';
 import { PresetSound } from '@udonarium/sound-effect';
 import { ContextMenuAction, ContextMenuService } from 'service/context-menu.service';
 
@@ -23,6 +23,10 @@ import * as localForage from 'localforage';
     standalone: false
 })
 export class JukeboxComponent implements OnInit, OnDestroy {
+
+  readonly trackCount = JUKEBOX_TRACK_COUNT;
+  showExtraTracks = false;
+  playTargetTrack = 0;
 
   get isMute() { return AudioPlayer.isMute; }
   set isMute(isMute: boolean) {
@@ -43,6 +47,28 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       localForage.removeItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     } else {
       localForage.setItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY, volume).catch(e => console.log(e));
+    }
+  }
+
+  get isAmbientMute() { return AudioPlayer.isAmbientMute; }
+  set isAmbientMute(isAmbientMute: boolean) {
+    AudioPlayer.isAmbientMute = isAmbientMute;
+    EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
+    if (!isAmbientMute) {
+      localForage.removeItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    } else {
+      localForage.setItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY, isAmbientMute).catch(e => console.log(e));
+    }
+  }
+  get ambientVolume(): number { return AudioPlayer.ambientVolume; }
+  set ambientVolume(ambientVolume: number) {
+    this.isAmbientMute = (ambientVolume == 0);
+    AudioPlayer.ambientVolume = ambientVolume;
+    EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
+    if (AudioPlayer.ambientVolume == 0.5) {
+      localForage.removeItem(AudioPlayer.AMBIENT_VOLUME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    } else {
+      localForage.setItem(AudioPlayer.AMBIENT_VOLUME_LOCAL_STORAGE_KEY, ambientVolume).catch(e => console.log(e));
     }
   }
 
@@ -81,7 +107,6 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   set soundEffectVolume(soundEffectVolume: number) {
     this.isSoundEffectMute = (soundEffectVolume == 0);
     AudioPlayer.soundEffectVolume = soundEffectVolume;
-    //EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
     if (AudioPlayer.soundEffectVolume == 0.5) {
       localForage.removeItem(AudioPlayer.SOUND_EFFECT_VOLUME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     } else {
@@ -102,7 +127,6 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   set noticeVolume(noticeVolume: number) {
     this.isNoticeMute = (noticeVolume == 0);
     AudioPlayer.noticeVolume = noticeVolume;
-    //EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
     if (AudioPlayer.noticeVolume == 0.5) {
       localForage.removeItem(AudioPlayer.NOTICE_VOLUME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     } else {
@@ -112,9 +136,18 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   get audios(): AudioFile[] { return AudioStorage.instance.audios.filter(audio => !audio.isHidden); }
   get jukebox(): Jukebox { return ObjectStore.instance.get<Jukebox>('Jukebox'); }
+  get tracks(): JukeboxTrackState[] { return this.jukebox?.tracks || []; }
+
+  get visibleTrackIndexes(): number[] {
+    const max = this.showExtraTracks ? JUKEBOX_TRACK_COUNT : 2;
+    return Array.from({ length: max }, (_, i) => i);
+  }
 
   get percentVolume(): number { return Math.floor(this.volume * 100); }
   set percentVolume(percentVolume: number) { this.volume = percentVolume / 100; }
+
+  get percentAmbientVolume(): number { return Math.floor(this.ambientVolume * 100); }
+  set percentAmbientVolume(percentAmbientVolume: number) { this.ambientVolume = percentAmbientVolume / 100; }
 
   get percentAuditionVolume(): number { return Math.floor(this.auditionVolume * 100); }
   set percentAuditionVolume(percentAuditionVolume: number) { this.auditionVolume = percentAuditionVolume / 100; }
@@ -146,13 +179,36 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return Network.GuestMode();
   }
 
+  trackName(index: number): string {
+    if (index === 0) return this.i18n.t('jukebox.trackBgm');
+    if (index === 1) return this.i18n.t('jukebox.trackAmbient');
+    return this.i18n.t('jukebox.trackN', { n: index + 1 });
+  }
+
+  trackAudio(index: number): AudioFile {
+    return this.jukebox?.audioAt(index);
+  }
+
+  trackRoomGainPercent(index: number): number {
+    return Math.floor((this.tracks[index]?.roomGain ?? 1) * 100);
+  }
+
+  setTrackRoomGainPercent(index: number, percent: number) {
+    if (this.GuestMode()) return;
+    this.jukebox?.setTrackRoomGain(index, percent / 100);
+  }
+
+  setTrackLabel(index: number, label: string) {
+    if (this.GuestMode()) return;
+    this.jukebox?.setTrackLabel(index, label);
+  }
 
   ngOnInit() {
     Promise.resolve().then(() => this.refreshPanelTitle());
     this.auditionPlayer.volumeType = VolumeType.AUDITION;
     EventSystem.register(this)
       .on('*', event => {
-        if (event.eventName.startsWith('FILE_')) this.lazyNgZoneUpdate();
+        if (event.eventName.startsWith('FILE_') || event.eventName.startsWith('UPDATE_GAME_OBJECT')) this.lazyNgZoneUpdate();
       })
       .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
@@ -174,12 +230,27 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   playBGM(audio: AudioFile) {
     if (this.GuestMode()) return;
-    this.jukebox.play(audio.identifier, true);
+    this.jukebox.playTrack(this.playTargetTrack, audio.identifier, true);
   }
 
   stopBGM(audio: AudioFile) {
     if (this.GuestMode()) return;
-    if (this.jukebox.audio === audio) this.jukebox.stop();
+    const tracks = this.tracks;
+    for (let i = 0; i < tracks.length; i++) {
+      if (tracks[i].isPlaying && tracks[i].audioIdentifier === audio.identifier) {
+        this.jukebox.stopTrack(i);
+      }
+    }
+  }
+
+  stopTrack(index: number) {
+    if (this.GuestMode()) return;
+    this.jukebox?.stopTrack(index);
+  }
+
+  stopAllTracks() {
+    if (this.GuestMode()) return;
+    this.jukebox?.stopAll();
   }
 
   handleFileSelect(event: Event) {

@@ -4,9 +4,17 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { Card } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
+import { DiceSymbol } from '@udonarium/dice-symbol';
 import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
+import { GameCharacter } from '@udonarium/game-character';
 import { ImageTag } from '@udonarium/image-tag';
+import { RangeArea } from '@udonarium/range';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
+import { TextNote } from '@udonarium/text-note';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -15,7 +23,6 @@ import { ImageService } from 'service/image.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
-import { SaveDataService } from 'service/save-data.service';
 
 @Component({
     selector: 'game-table-setting',
@@ -124,13 +131,9 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     return !this.isEmpty && !this.isDeleted;
   }
 
-  isSaveing: boolean = false;
-  progresPercent: number = 0;
-
   constructor(
     private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
-    private saveDataService: SaveDataService,
     private imageService: ImageService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
@@ -188,21 +191,55 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     this.panelService.close();
   }
 
-  async save() {
+  async saveAsScene() {
     if (this.GuestMode()) return;
-    if (!this.selectedTable || this.isSaveing) return;
-    this.isSaveing = true;
-    this.progresPercent = 0;
-
-    this.selectedTable.selected = true;
-    await this.saveDataService.saveGameObjectAsync(this.selectedTable, 'fly_map_' + this.selectedTable.name, percent => {
-      this.progresPercent = percent;
+    const defaultTitle = this.selectedTable?.name || this.i18n.t('scenePreset.defaultTitle');
+    const result = await this.modalService.open<string | boolean>(ConfirmationComponent, {
+      title: this.i18n.t('scenePreset.saveAsScene'),
+      text: this.i18n.t('scenePreset.saveConfirmText'),
+      help: this.i18n.t('scenePreset.saveConfirmHelp'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'theaters',
+      okLabel: this.i18n.t('scenePreset.saveAsScene'),
+      inputLabel: this.i18n.t('scenePreset.fieldTitle'),
+      inputValue: defaultTitle,
+      inputPlaceholder: this.i18n.t('scenePreset.defaultTitle'),
     });
+    if (result === false || result == null) return;
+    const title = (typeof result === 'string' ? result.trim() : '') || defaultTitle;
+    ScenePresetList.instance.createFromCurrent(title);
+  }
 
-    setTimeout(() => {
-      this.isSaveing = false;
-      this.progresPercent = 0;
-    }, 500);
+  cloneGameTable() {
+    if (this.GuestMode()) return;
+    if (!this.selectedTable || this.isDeleted) return;
+
+    const source = this.selectedTable;
+    const sourceId = source.identifier;
+    const clone = source.clone();
+    clone.selected = false;
+    clone.name = source.name + this.i18n.t('table.cloneSuffix');
+
+    const pieceTypes = [GameCharacter, Card, CardStack, DiceSymbol, TextNote, RangeArea];
+    for (const type of pieceTypes) {
+      for (const obj of ObjectStore.instance.getObjects(type as any) as TabletopObject[]) {
+        if (obj.location.name !== 'table') continue;
+        if (obj.parentIsAssigned && !obj.parentIsDestroyed) continue;
+        if (obj.tableIdentifier && obj.tableIdentifier !== sourceId) continue;
+        if (!obj.tableIdentifier && TabletopObject.resolveViewTableIdentifier() !== sourceId) continue;
+        const copy = obj.clone() as TabletopObject;
+        copy.tableIdentifier = clone.identifier;
+        if (copy instanceof GameCharacter) {
+          copy.playerOwner = '';
+          copy.visionOwner = '';
+        }
+        if (copy instanceof RangeArea) {
+          copy.followingCharctorIdentifier = null;
+        }
+      }
+    }
+
+    this.selectGameTable(clone.identifier);
   }
 
   delete() {

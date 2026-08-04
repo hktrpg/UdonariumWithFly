@@ -7,9 +7,9 @@
   <form *ngIf="!ClarifyModeActive()">
     <div class="chat-toolbar">
       <div class="chat-tab">
-        <label *ngFor="let chatTab of chatMessageService.chatTabs; trackBy: trackByChatTab" class="tab">
+        <label *ngFor="let chatTab of chatTabs; trackBy: trackByChatTab" class="tab" [class.is-private]="chatTab.isPrivate">
           <input name="chat-tab" type="radio" value="{{chatTab.identifier}}" ng-control="options" [(ngModel)]="chatTabidentifier">
-          <div><span [style.cursor]="chatTabidentifier != chatTab.identifier ? 'pointer' : ''" [style.color]="chatTab.name == '' && chatTabidentifier != chatTab.identifier ? 'gray' : ''">{{chatTab.name == '' ? ('chat.unnamedTab' | i18n) : chatTab.name}}</span><i *ngIf="chatTab.isUseStandImage" class="material-icons small-font">how_to_reg</i><i *ngIf="chatTab.recieveOperationLogLevel > 0" class="material-icons small-font">history_edu</i><badge *ngIf="chatTab.hasUnread" class="badge" [count]="chatTab.unreadLength"></badge></div>
+          <div><span [style.cursor]="chatTabidentifier != chatTab.identifier ? 'pointer' : ''" [style.color]="chatTab.name == '' && chatTabidentifier != chatTab.identifier ? 'gray' : ''"><i *ngIf="chatTab.isPrivate" class="material-icons small-font">lock</i>{{chatTab.name == '' ? ('chat.unnamedTab' | i18n) : chatTab.name}}</span><i *ngIf="chatTab.isUseStandImage" class="material-icons small-font">how_to_reg</i><i *ngIf="chatTab.recieveOperationLogLevel > 0" class="material-icons small-font">history_edu</i><badge *ngIf="chatTab.hasUnread" class="badge" [count]="chatTab.unreadLength"></badge></div>
         </label>
         <button type="button" class="tab-setting small-font" (click)="showTabSetting()" *ngIf="!GuestMode()"><i class="material-icons small-font">settings</i>{{ 'chat.tabsButton' | i18n }}</button>
         <button type="button" class="tab-setting small-font" (click)="showLogOutput()" *ngIf="!GuestMode()"><i class="material-icons small-font">history_edu</i>{{ 'chat.logButton' | i18n }}</button>

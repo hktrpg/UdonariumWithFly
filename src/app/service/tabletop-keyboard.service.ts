@@ -449,6 +449,7 @@ export class TabletopKeyboardService {
           kind: 'graveyard',
           id: object.identifier,
           fromLocation: object.location.name,
+          fromTableIdentifier: object.tableIdentifier,
         });
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: object.identifier });
         object.setLocation('graveyard');

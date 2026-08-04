@@ -184,7 +184,7 @@ export class ChatMessageComponent implements OnInit {
   }
 
   discloseMessage() {
-    this.chatMessage.tag = this.chatMessage.tag.replace('secret', '');
+    this.chatMessage.tag = (this.chatMessage.tag || '').replace('secret', '');
   }
 
   editStart() {

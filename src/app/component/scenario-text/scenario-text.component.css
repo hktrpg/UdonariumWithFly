@@ -1,0 +1,60 @@
+:host { display: block; height: 100%; }
+
+.scenario-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 100%;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.list-item.is-selected { background: rgba(0, 0, 0, 0.06); }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c4b29a;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.sender-character {
+  margin-top: 4px;
+}
+
+.body-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.body-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.send-selection {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.hint.warn { color: #a94442; }

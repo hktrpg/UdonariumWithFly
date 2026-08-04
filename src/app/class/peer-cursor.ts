@@ -31,6 +31,24 @@ export class PeerCursor extends GameObject {
   static get CHAT_DEFAULT_NAME(): string { return translate('peer.defaultName'); }
   static readonly CHAT_TRANSPARENT_COLOR = '#ffffff';
 
+  /** e.g. `玩家3847` / `Player0421` — used when no nickname has been saved yet. */
+  static generateDefaultName(): string {
+    const n = Math.floor(Math.random() * 10000);
+    return `${PeerCursor.CHAT_DEFAULT_NAME}${String(n).padStart(4, '0')}`;
+  }
+
+  /** If name is empty, assign a random-suffixed default and persist it. */
+  static async ensureDefaultName(): Promise<void> {
+    if (!PeerCursor.myCursor) return;
+    if ((PeerCursor.myCursor.name || '').trim()) return;
+    PeerCursor.myCursor.name = PeerCursor.generateDefaultName();
+    try {
+      await localForage.setItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY, PeerCursor.myCursor.name);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
   static myCursor: PeerCursor = null;
   private static userIdMap: Map<UserId, ObjectIdentifier> = new Map();
   private static peerIdMap: Map<PeerId, ObjectIdentifier> = new Map();
@@ -176,6 +194,7 @@ export class PeerCursor extends GameObject {
       await localForage.removeItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
       await localForage.removeItem(PeerCursor.CHAT_MY_COLOR_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     }
+    await PeerCursor.ensureDefaultName();
     return PeerCursor.myCursor;
   }
 

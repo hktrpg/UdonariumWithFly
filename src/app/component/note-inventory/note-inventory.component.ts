@@ -50,7 +50,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.refreshLabels();
+    // Defer panel title — UIPanel already CD-checked with default untitled (NG0100).
+    Promise.resolve().then(() => this.refreshLabels());
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', -1000, event => {
         let object = ObjectStore.instance.get(event.data.identifier);
@@ -93,9 +94,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (this.selectFilter) {
       case 'table':
-        return notes.filter(n => n.location?.name === 'table');
+        return notes.filter(n => n.isVisibleOnTable);
       case 'other':
-        return notes.filter(n => n.location?.name !== 'table');
+        return notes.filter(n => !n.isVisibleOnTable);
       default:
         return notes;
     }
@@ -105,9 +106,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (filterId) {
       case 'table':
-        return notes.filter(n => n.location?.name === 'table').length;
+        return notes.filter(n => n.isVisibleOnTable).length;
       case 'other':
-        return notes.filter(n => n.location?.name !== 'table').length;
+        return notes.filter(n => !n.isVisibleOnTable).length;
       default:
         return notes.length;
     }
@@ -132,7 +133,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   isittable(note: TextNote) {
-    return note.location?.name == 'table';
+    return note.isVisibleOnTable;
   }
 
   selectNote(note: TextNote) {

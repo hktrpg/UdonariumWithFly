@@ -115,7 +115,7 @@
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
       {{ 'menu.folderBackup.saveRoom' | i18n }}
     </button>
-    <button type="button" (click)="loadFolderBackup()">
+    <button type="button" *ngIf="folderBackup.canLoadFromFolder" (click)="loadFolderBackup()">
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
       {{ 'menu.folderBackup.loadRoom' | i18n }}
     </button>

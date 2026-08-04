@@ -1023,7 +1023,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
                 name: `${this.character.currntImageIndex == i ? '◉' : '○'}`, 
                 action: () => { 
                   this.character.currntImageIndex = i;
-                  if (!this.character.isHideIn && this.character.location.name === 'table') SoundEffect.play(PresetSound.surprise);
+                  if (!this.character.isHideIn && this.character.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
                   EventSystem.trigger('UPDATE_INVENTORY', null);
                 }, 
                 default: this.character.currntImageIndex == i,
