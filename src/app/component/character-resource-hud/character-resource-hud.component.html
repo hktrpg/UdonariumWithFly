@@ -1,14 +1,14 @@
 <div class="resource-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top">
-  <header class="hud-head">
-    <button type="button" class="hud-drag" (pointerdown)="startDrag($event)" [attr.title]="'resourceHud.move' | i18n" [attr.aria-label]="'resourceHud.move' | i18n">
+  <header class="hud-head" (pointerdown)="startDrag($event)">
+    <button type="button" class="hud-drag" [attr.title]="'resourceHud.move' | i18n" [attr.aria-label]="'resourceHud.move' | i18n">
       <i class="material-icons">drag_indicator</i>
     </button>
     <span class="hud-title">{{ 'resourceHud.title' | i18n }}</span>
-    <label *ngIf="isGm && !collapsed" class="gm-toggle">
+    <label *ngIf="isGm && !collapsed" class="gm-toggle" (pointerdown)="$event.stopPropagation()">
       <input type="checkbox" [checked]="showAllForGm" (change)="toggleShowAll()" />
       {{ 'resourceHud.showAll' | i18n }}
     </label>
-    <button type="button" class="hud-collapse" (click)="toggleCollapsed()" [attr.title]="(collapsed ? 'resourceHud.expand' : 'resourceHud.collapse') | i18n">
+    <button type="button" class="hud-collapse" (pointerdown)="$event.stopPropagation()" (click)="toggleCollapsed()" [attr.title]="(collapsed ? 'resourceHud.expand' : 'resourceHud.collapse') | i18n">
       <i class="material-icons">{{ collapsed ? 'expand_more' : 'expand_less' }}</i>
     </button>
   </header>

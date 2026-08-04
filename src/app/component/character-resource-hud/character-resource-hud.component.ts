@@ -151,12 +151,13 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   }
 
   startDrag(event: PointerEvent) {
+    if ((event.target as HTMLElement).closest('button.hud-collapse, label, input')) return;
     event.preventDefault();
     event.stopPropagation();
     this.dragging = true;
     this.dragOffsetX = event.clientX - this.left;
     this.dragOffsetY = event.clientY - this.top;
-    (event.target as HTMLElement)?.setPointerCapture?.(event.pointerId);
+    (event.currentTarget as HTMLElement)?.setPointerCapture?.(event.pointerId);
   }
 
   private onPointerMove = (event: PointerEvent) => {

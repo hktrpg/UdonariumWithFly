@@ -33,6 +33,12 @@
   gap: 4px;
   font-weight: 700;
   margin-bottom: 6px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.hud-head:active {
+  cursor: grabbing;
 }
 
 .resource-hud.is-collapsed .hud-head {

@@ -575,9 +575,50 @@
   user-select: none;
 }
 
-html.udon-tablet-landscape .map-action-hud {
+.map-action-hud.is-placed {
+  right: auto;
+  bottom: auto;
+  transform: none;
+  max-width: calc(100vw - 8px);
+}
+
+.map-action-hud.is-collapsed {
+  flex-wrap: nowrap;
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+html.udon-tablet-landscape .map-action-hud:not(.is-placed) {
   left: calc(50% + var(--udon-left-chrome, 72px) / 2);
   bottom: calc(12px + var(--udon-keyboard-inset, 0px));
+}
+
+.map-hud-chrome {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 10px;
+  background: #333;
+  color: var(--udon-chrome-muted, #aaa);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.map-hud-drag {
+  cursor: grab;
+}
+
+.map-hud-drag:active {
+  cursor: grabbing;
+}
+
+.map-hud-chrome .material-icons {
+  font-size: 20px;
 }
 
 .map-hud-btn {

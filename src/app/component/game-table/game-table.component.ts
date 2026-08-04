@@ -227,6 +227,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Public -100..100 zoom control (synced from pinch / wheel / slider). */
   zoomSliderValue = 0;
 
+  /** Mobile map HUD: free position + collapse (session). */
+  private static readonly MAP_HUD_POS_KEY = 'udon.mapHud.pos';
+  private static readonly MAP_HUD_COLLAPSED_KEY = 'udon.mapHud.collapsed';
+  mapHudCollapsed = sessionStorage.getItem(GameTableComponent.MAP_HUD_COLLAPSED_KEY) === '1';
+  mapHudLeft: number | null = null;
+  mapHudTop: number | null = null;
+  private mapHudDragging = false;
+  private mapHudDragOffsetX = 0;
+  private mapHudDragOffsetY = 0;
+  private readonly onMapHudPointerMove = (e: PointerEvent) => this.moveMapHudDrag(e);
+  private readonly onMapHudPointerUp = () => this.endMapHudDrag();
+
   private viewRotateX: number = GameTableComponent.DEFAULT_VIEW_ROT_X;
   private viewRotateY: number = GameTableComponent.DEFAULT_VIEW_ROT_Y;
   private viewRotateZ: number = GameTableComponent.DEFAULT_VIEW_ROT_Z;
@@ -533,6 +545,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.startDebugPoseRefresh();
       queueMicrotask(() => this.refreshDebugPoseDom());
     }
+    this.restoreMapHudLayout();
+    document.addEventListener('pointermove', this.onMapHudPointerMove);
+    document.addEventListener('pointerup', this.onMapHudPointerUp);
   }
 
   ngOnDestroy() {
@@ -548,6 +563,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.weatherRender) this.weatherRender.destroy();
     this.clearPingHold();
     this.clearDrawDragState();
+    document.removeEventListener('pointermove', this.onMapHudPointerMove);
+    document.removeEventListener('pointerup', this.onMapHudPointerUp);
     if (this._currentTableImageUrl) URL.revokeObjectURL(this._currentTableImageUrl);
     if (this._currentBackgroundImageUrl) URL.revokeObjectURL(this._currentBackgroundImageUrl);
     if (this._currentBackgroundImageUrl2) URL.revokeObjectURL(this._currentBackgroundImageUrl2);
@@ -1125,6 +1142,76 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   hudPing(warning = false) {
     const pos = this.coordinateService.calcTabletopLocalCoordinate();
     this.broadcastPing(pos.x, pos.y, warning ? 'warning' : 'basic');
+  }
+
+  toggleMapHudCollapsed() {
+    this.mapHudCollapsed = !this.mapHudCollapsed;
+    try {
+      sessionStorage.setItem(GameTableComponent.MAP_HUD_COLLAPSED_KEY, this.mapHudCollapsed ? '1' : '0');
+    } catch { /* ignore */ }
+    this.changeDetector.markForCheck();
+  }
+
+  startMapHudDrag(ev: PointerEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const host = (ev.currentTarget as HTMLElement)?.closest?.('.map-action-hud') as HTMLElement
+      || document.querySelector('.map-action-hud') as HTMLElement;
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    if (this.mapHudLeft == null || this.mapHudTop == null) {
+      this.mapHudLeft = rect.left;
+      this.mapHudTop = rect.top;
+    }
+    this.mapHudDragging = true;
+    this.mapHudDragOffsetX = ev.clientX - this.mapHudLeft;
+    this.mapHudDragOffsetY = ev.clientY - this.mapHudTop;
+    (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId);
+  }
+
+  private moveMapHudDrag(ev: PointerEvent) {
+    if (!this.mapHudDragging || this.mapHudLeft == null || this.mapHudTop == null) return;
+    this.mapHudLeft = ev.clientX - this.mapHudDragOffsetX;
+    this.mapHudTop = ev.clientY - this.mapHudDragOffsetY;
+    this.clampMapHudPosition();
+    this.changeDetector.detectChanges();
+  }
+
+  private endMapHudDrag() {
+    if (!this.mapHudDragging) return;
+    this.mapHudDragging = false;
+    this.persistMapHudLayout();
+  }
+
+  private restoreMapHudLayout() {
+    try {
+      const raw = sessionStorage.getItem(GameTableComponent.MAP_HUD_POS_KEY);
+      if (!raw) return;
+      const pos = JSON.parse(raw) as { left?: number; top?: number };
+      if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+        this.mapHudLeft = pos.left;
+        this.mapHudTop = pos.top;
+        this.clampMapHudPosition();
+      }
+    } catch { /* ignore */ }
+  }
+
+  private persistMapHudLayout() {
+    if (this.mapHudLeft == null || this.mapHudTop == null) return;
+    try {
+      sessionStorage.setItem(
+        GameTableComponent.MAP_HUD_POS_KEY,
+        JSON.stringify({ left: this.mapHudLeft, top: this.mapHudTop }),
+      );
+    } catch { /* ignore */ }
+  }
+
+  private clampMapHudPosition() {
+    if (this.mapHudLeft == null || this.mapHudTop == null) return;
+    const maxLeft = Math.max(0, window.innerWidth - 56);
+    const maxTop = Math.max(0, window.innerHeight - 40);
+    this.mapHudLeft = Math.min(maxLeft, Math.max(0, this.mapHudLeft));
+    this.mapHudTop = Math.min(maxTop, Math.max(0, this.mapHudTop));
   }
 
   private setGameTableGrid(width: number, height: number, gridSize: number = 50, gridType: GridType = GridType.SQUARE, gridColor: string = '#000000e6', isShowNumber = true) {
