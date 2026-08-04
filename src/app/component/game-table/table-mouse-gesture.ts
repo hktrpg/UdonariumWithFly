@@ -196,7 +196,8 @@ export class TableMouseGesture {
 
     let key = this.getKeyName(ev);
 
-    // Empty selection (desktop): WASD pan view; Q/E yaw ±3° (same step as Alt+wheel).
+    // Empty selection (desktop): WASD = forward/back/strafe; Q/E yaw ±3°.
+    // Pan axes are remapped by view yaw in onTableMouseTransform.
     if (
       this.allowViewKeyboard()
       && !this.hasObjectSelection()

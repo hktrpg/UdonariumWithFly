@@ -722,6 +722,21 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     transformX *= scale;
     transformY *= scale;
 
+    // Keyboard WASD: pan forward/back/strafe in view yaw (Q/E), not raw screen axes.
+    if (
+      isKeyboard
+      && (transformX !== 0 || transformY !== 0)
+      && rotateX === 0 && rotateY === 0 && rotateZ === 0
+    ) {
+      const θ = -this.viewRotateZ * Math.PI / 180;
+      const cos = Math.cos(θ);
+      const sin = Math.sin(θ);
+      const lx = transformX;
+      const ly = transformY;
+      transformX = lx * cos - ly * sin;
+      transformY = lx * sin + ly * cos;
+    }
+
     this.setTransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ);
     this.isTableTransformed = true;
   }
