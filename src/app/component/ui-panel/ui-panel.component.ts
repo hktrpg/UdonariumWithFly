@@ -101,6 +101,7 @@ export class UIPanelComponent implements OnInit {
   }
 
   toggleMinimize(e: Event = null) {
+    if (this.isMobileSheet) return;
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -251,6 +252,16 @@ export class UIPanelComponent implements OnInit {
       e.preventDefault();
     }
     if (this.panelService) this.panelService.close();
+  }
+
+  /** Desktop: dblclick title minimizes/restores. Mobile sheets: no-op (minimize chrome is hidden). */
+  onTitleDblClick(e: Event) {
+    if (this.isMobileSheet) {
+      this.notOperaion(e);
+      return;
+    }
+    if (this.isFullScreen) this.toggleFullScreen(e);
+    else this.toggleMinimize(e);
   }
 
   notOperaion(e: Event = null) {

@@ -94,6 +94,11 @@ export class PanelService {
       parentViewContainerRef = PanelService.defaultParentViewContainerRef;
     }
 
+    // Mobile: one sheet at a time so the bottom nav stays reachable.
+    if (this.mobileLayout.isMobile) {
+      PanelService.closeAllPanels();
+    }
+
     const injector = parentViewContainerRef.injector;
 
     let panelComponentRef: ComponentRef<any> = parentViewContainerRef.createComponent(PanelService.UIPanelComponentClass, { index: parentViewContainerRef.length, injector: injector });
@@ -118,6 +123,7 @@ export class PanelService {
     if (this.mobileLayout.isMobile) {
       childPanelService.isAbleRotateButton = false;
       childPanelService.isAbleMinimizeButton = false;
+      childPanelService.isAbleFullScreenButton = false;
       const panelInst = panelComponentRef.instance as any;
       if (panelInst) panelInst.isMobileSheet = true;
     }

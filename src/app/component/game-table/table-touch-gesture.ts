@@ -77,14 +77,14 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // Long-press → contextmenu on touch devices (iOS never fires it; Android is inconsistent).
+    // Long-press → contextmenu. iOS never fires it natively.
+    // Android usually has native contextmenu; only synthesize on iOS-like UAs.
+    // Opening the menu clears the empty-table ping hold (see game-table onContextMenu).
     let ua = window.navigator.userAgent.toLowerCase();
-    let isTouchUa = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
-      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document)
-      || ua.indexOf('android') > -1
-      || ('ontouchstart' in window);
-    if (!isTouchUa) return;
-    this.hammer.add(new Hammer.Press({ time: 480 }));
+    let isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
+      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document);
+    if (!isiOS) return;
+    this.hammer.add(new Hammer.Press({ time: 550 }));
     this.hammer.on('press', ev => {
       let event = new MouseEvent('contextmenu', {
         bubbles: true,
@@ -135,6 +135,7 @@ export class TableTouchGesture {
 
   private onTappedPanStart(ev: HammerInput) {
     if (this.simplePan) {
+      // Enable transform mode once; do not spam gesture (would clear object isDragging).
       if (this.ongesture) this.ongesture(ev.srcEvent);
       return;
     }
@@ -152,7 +153,7 @@ export class TableTouchGesture {
       let transformX = this.deltaHammerDeltaX;
       let transformY = this.deltaHammerDeltaY;
       let transformZ = 0;
-      if (this.ongesture) this.ongesture(ev.srcEvent);
+      // Pan must not call ongesture each move — that clears pointerDevice.isDragging mid object-drag.
       if (this.ontransform) this.ontransform(transformX, transformY, transformZ, 0, 0, 0, TableTouchGestureEvent.PAN, ev.srcEvent);
     } else {
       this.clearTappedPanTimer(false);

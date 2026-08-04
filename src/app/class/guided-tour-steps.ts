@@ -185,6 +185,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsDelete.bodyMobile',
       require: 'ack',
       chapter: 'controls',
+      skipIfMobile: true,
     },
     {
       id: 'controlsClipboard',
@@ -193,6 +194,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsClipboard.bodyMobile',
       require: 'ack',
       chapter: 'controls',
+      skipIfMobile: true,
     },
     {
       id: 'controlsUndo',
@@ -201,6 +203,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       bodyKeyMobile: 'tour.step.controlsUndo.bodyMobile',
       require: 'ack',
       chapter: 'controls',
+      skipIfMobile: true,
     },
     {
       id: 'controlsPath',
@@ -220,6 +223,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       target: '[data-tour-id="table.layer"]',
       require: 'table-ping',
       chapter: 'controls',
+      // Long-press is reserved for context menu on touch; ping conflicts.
+      skipIfMobile: true,
     },
     {
       id: 'saveGuide',

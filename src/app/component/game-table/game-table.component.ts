@@ -1,4 +1,5 @@
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Subscription } from 'rxjs';
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
@@ -213,6 +214,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private mouseGesture: TableMouseGesture = null;
   private touchGesture: TableTouchGesture = null;
   private pickGesture: TablePickGesture = null;
+  private touchLayoutSub: Subscription = null;
 
   /** Top-right pose overlay for wheel/view/object angle debugging. */
   showDebugPose = sessionStorage.getItem('udon.debugPose') === '1';
@@ -491,6 +493,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchGesture.destroy();
     this.pickGesture.destroy();
     this.tabletopKeyboardService.destroy();
+    this.touchLayoutSub?.unsubscribe();
+    this.touchLayoutSub = null;
     if (this.fxTimer) clearInterval(this.fxTimer);
     if (this.debugPoseTimer) clearInterval(this.debugPoseTimer);
     if (this.weatherRender) this.weatherRender.destroy();
@@ -509,7 +513,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchGesture.onend = this.onTableTouchEnd.bind(this);
     this.touchGesture.ongesture = this.onTableTouchGesture.bind(this);
     this.touchGesture.ontransform = this.onTableTouchTransform.bind(this);
-    this.mobileLayout.isMobile$.subscribe(isMobile => {
+    this.touchLayoutSub?.unsubscribe();
+    this.touchLayoutSub = this.mobileLayout.isMobile$.subscribe(isMobile => {
       if (this.touchGesture) this.touchGesture.simplePan = isMobile;
     });
   }
@@ -540,10 +545,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.pickGesture.onpick = this.onTablePick.bind(this);
   }
 
-  onTableTouchStart() {
+  onTableTouchStart(srcEvent: TouchEvent | MouseEvent | PointerEvent = null) {
     this.mouseGesture.cancel();
-    // Touch has no right-click pan: enable transform immediately and blur inputs
-    // so document.activeElement === body (otherwise pan is silently ignored).
+    // Touching a movable/interactive object: leave object-drag alone (do not clear isDragging).
+    if (this.isTouchOnTableObject(srcEvent)) {
+      this.isTableTransformMode = false;
+      return;
+    }
+    // Empty table: enable pan immediately and blur inputs so focus gate doesn't block.
     this.isTableTransformMode = true;
     this.pointerDeviceService.isDragging = false;
     this.removeFocus();
@@ -554,12 +563,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableTouchGesture() {
+    // Object grab / non-transform touch: do not clear isDragging via cancelInput.
+    if (this.pointerDeviceService.isDragging || !this.isTableTransformMode) return;
     this.cancelInput();
   }
 
   onTableTouchTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent) {
+    // Object drag wins over map pan/pinch.
+    if (this.pointerDeviceService.isDragging) return;
     if (!this.isTableTransformMode) return;
-    // Desktop keeps the strict focus gate; touch already blurred on start.
+    // Desktop keeps the strict focus gate; touch already blurred on empty-table start.
     if (document.body !== document.activeElement && !(srcEvent instanceof TouchEvent)) return;
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu && this.contextMenuService.isShow) {
@@ -690,6 +703,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
+    // Context menu and empty-table ping both use long-press — cancel ping when menu opens.
+    this.clearPingHold();
     // Right-click removes the last path waypoint while a draft exists.
     if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
       if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
@@ -1001,6 +1016,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
+  }
+
+  /** True when the touch target is a tabletop object that should drag, not pan the map. */
+  private isTouchOnTableObject(srcEvent: TouchEvent | MouseEvent | PointerEvent | null): boolean {
+    const t = srcEvent?.target;
+    if (!(t instanceof Element)) return false;
+    return !!t.closest(
+      '[appMovable], [appRotable], [appResizable], game-character, card, card-stack, dice-symbol, text-note, terrain, game-table-mask, range-area'
+    );
   }
 
   trackByGameObject(index: number, gameObject: GameObject) {
