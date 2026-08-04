@@ -139,7 +139,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.saveZip.bodyMobile': 'Use Download ZIP to back up. Folder backup is often unavailable on phones/tablets.',
   'tour.step.tableChapter.bodyMobile': 'Map: one-finger drag to pan; pinch or HUD zoom.\nLong-press empty = ping; HUD + = add objects.',
   'tour.step.controlsChapter.bodyMobile': 'Tap a token to select.\nDrag to move; HUD + = add; long-press empty = ping.',
-  'tour.step.controlsPing.bodyMobile': 'Long-press empty map (~0.5s) to ping. Warning ping: HUD warning icon. Try a long-press once.',
+  'tour.step.controlsPing.bodyMobile': 'Long-press empty map (~0.5s) to ping. Try a long-press once.',
   'tour.step.saveGuide.bodyMobile': 'Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nReplay the tour from More → Settings. ZIP before leaving.',
   'tip.pathMove.hud': 'Path move: Ctrl+click waypoints → left-click destination or Space to go · right-click undoes last point · Esc cancels (one token only)',
   'tip.vision.noCharacter': 'Vision is on, but you have no “My vision character”. Right-click a token → set as my vision character.',

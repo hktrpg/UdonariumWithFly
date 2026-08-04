@@ -604,12 +604,6 @@ html.udon-tablet-landscape .map-action-hud {
   background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
 }
 
-.map-hud-btn.map-hud-warn {
-  border-color: #b45309;
-  background: #7c2d12;
-  color: #ffedd5;
-}
-
 .map-hud-zoom {
   display: flex;
   flex-direction: row;

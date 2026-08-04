@@ -139,7 +139,7 @@ export const ja_tip: I18nDictionary = {
   'tour.step.saveZip.bodyMobile': 'ZIP で保存。スマホ／タブレットではフォルダバックアップが使えないことが多いです。',
   'tour.step.tableChapter.bodyMobile': 'マップ：1本指ドラッグでパン、ピンチまたは HUD ズーム。\n空白長押し＝Ping、HUD「＋」＝追加。',
   'tour.step.controlsChapter.bodyMobile': '駒をタップで選択。\nドラッグで移動、HUD「＋」＝追加、空白長押し＝Ping。',
-  'tour.step.controlsPing.bodyMobile': '空白を約0.5秒長押しで Ping。警告 Ping は HUD の警告アイコン。一度試してください。',
+  'tour.step.controlsPing.bodyMobile': '空白を約0.5秒長押しで Ping。一度試してください。',
   'tour.step.saveGuide.bodyMobile': '詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nその他→設定 からツアー再開。退出前に ZIP を。',
   'tip.pathMove.hud': 'パス移動：Ctrl+クリックで経由点 → 左クリック終点または Space で開始　右クリックで末点取消　Esc で取消（1体のみ）',
   'tip.vision.noCharacter': '視界オンですが「自分の視界キャラ」未設定です。駒を右クリック→自分の視界に設定。',
