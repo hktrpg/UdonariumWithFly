@@ -132,6 +132,23 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get canOpenSceneTools(): boolean { return SceneToolPermission.instance.canOpenPanel; }
 
+  /** Menu item visibility for the local user (GM / guest / player SyncVar). */
+  canShowMenu(tourId: string): boolean {
+    return SceneToolPermission.instance.canOpenMenu(tourId);
+  }
+
+  /** Total unread chat messages (viewable tabs). */
+  get chatUnreadCount(): number { return ChatTabList.instance.unreadLength; }
+  /** Badge label: cap at 99+ so the bubble stays a tidy pill. */
+  get chatUnreadBadgeLabel(): string {
+    const n = this.chatUnreadCount;
+    return n > 99 ? '99+' : String(n);
+  }
+  /** Badge on menu chat icon only while no chat panel is open. */
+  get showChatUnreadBadge(): boolean {
+    return this.chatUnreadCount > 0 && !PanelService.isTourPanelOpen('menu.chat');
+  }
+
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
   get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
@@ -503,6 +520,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           console.log(e);
         }
         */
+        this.lazyNgZoneUpdate(true);
         if (ChatWindowComponent.isAutoPopup && !PanelService.isTourPanelOpen('menu.chat')) {
           this.ngZone.run(() => this.open('ChatWindowComponent'));
         }
@@ -520,6 +538,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.noticeIntervalTimer);
           this.noticeIntervalTimer = null;
         }
+      })
+      .on('MESSAGE_ADDED', () => {
+        this.lazyNgZoneUpdate(true);
+      })
+      .on('CHAT_PANEL_CHANGED', () => {
+        this.lazyNgZoneUpdate(true);
       })
       .on('PLAY_CUT_IN', -1000, event => {
         let cutIn = ObjectStore.instance.get<CutIn>(event.data.identifier);
@@ -549,6 +573,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('OPEN_TOOLBOX', -1000, event => {
         this.ngZone.run(() => {
+          // Table right-click uses OPEN_TOOLBOX + extraActions; do not gate on menu.toolbox.
           const data = event.data || {};
           this.openToolboxAt(
             { x: data.x ?? 0, y: data.y ?? 0 },
@@ -706,6 +731,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let tourWasActive = false;
     this.guidedTour.state$.subscribe(s => {
       const active = s.phase === 'welcome' || s.phase === 'running';
+      if (active && !tourWasActive) {
+        // Keep the tour unobstructed: no cold-start lobby over welcome / steps.
+        this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+      }
       if (tourWasActive && !active) {
         this.ngZone.run(() => this.openDefaultPanels());
       }
@@ -779,6 +808,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   open(componentName: string) {
     this.enforceGuestPlayMode();
+    const menuTourId = this.tourIdForComponent(componentName);
+    if (menuTourId && !this.canShowMenu(menuTourId)) return;
     let component: { new(...args: any[]): any } = null;
     let option: PanelOption = { width: 450, height: 600, left: 100 }
     switch (componentName) {
@@ -882,6 +913,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.panelService.open(component, option);
       if (tourId) this.guidedTour.notifyPanelOpened(tourId);
+      if (componentName === 'ChatWindowComponent') {
+        EventSystem.trigger('CHAT_PANEL_CHANGED', null);
+      }
     }
   }
 
@@ -909,6 +943,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Show lobby once on cold start when not already in a room / invite join. */
   private openLobbyIfNeeded() {
     if (this.lobbyAutoOpened) return;
+    if (this.guidedTour.isActive) return;
     if (!PanelService.defaultParentViewContainerRef) return;
     if (!Network.isOpen || Network.peer?.isRoom) return;
     if (this.roomInvite.parseInviteFromLocation()) return;
@@ -1031,6 +1066,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toolBox(event: Event) {
     this.guidedTour.notifyMenuClick('menu.toolbox');
+    if (!this.canShowMenu('menu.toolbox')) return;
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
       return;
@@ -1072,14 +1108,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         action: () => this.setMobileUiMode('play'),
       });
       menu.push(ContextMenuSeparator);
-      if (!this.GuestMode()) {
+      if (this.canShowMenu('menu.toolbox')) {
         menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
       }
-      if (this.canOpenSceneTools) {
+      if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
       }
-      if (!this.GuestMode()) {
+      if (this.canShowMenu('menu.scenePreset')) {
         menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+      }
+      if (this.canShowMenu('menu.scenarioText')) {
         menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
       }
     } else {
@@ -1090,13 +1128,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           action: () => this.setMobileUiMode('edit'),
         });
         menu.push(ContextMenuSeparator);
-        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
-        menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+        if (this.canShowMenu('menu.toolbox')) {
+          menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+        }
+        if (this.canShowMenu('menu.notes')) {
+          menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+        }
       }
-      if (this.canOpenSceneTools) {
+      if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
       }
     }
+    menu.push(ContextMenuSeparator);
+    Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push(ContextMenuSeparator);
     menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
@@ -1108,12 +1152,44 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     extraActions: ContextMenuAction[] = [],
     options?: { compact?: boolean }
   ) {
-    const menu = this.buildToolboxMenuActions(!!options?.compact);
+    // Full toolbox needs menu.toolbox. View reset / close panels are always available.
+    const includeToolbox = this.canShowMenu('menu.toolbox');
+    const menu: ContextMenuAction[] = includeToolbox
+      ? this.buildToolboxMenuActions(!!options?.compact)
+      : this.buildAlwaysAvailableViewActions();
     if (extraActions.length) {
-      menu.push(ContextMenuSeparator);
+      if (menu.length) menu.push(ContextMenuSeparator);
       Array.prototype.push.apply(menu, extraActions);
     }
-    this.contextMenuService.open(position, menu, this.i18n.t('menu.toolbox'));
+    if (menu.length < 1) return;
+    this.contextMenuService.open(
+      position,
+      menu,
+      includeToolbox ? this.i18n.t('menu.toolbox') : this.i18n.t('menu.title'),
+    );
+  }
+
+  /** Local view helpers — never gated by toolbox menu permission. */
+  private buildAlwaysAvailableViewActions(): ContextMenuAction[] {
+    const menu: ContextMenuAction[] = [{
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+      ]
+    }];
+    // Desktop only — mobile sheets replace each other via bottom nav.
+    if (!this.mobileLayout.isMobile) {
+      menu.push({
+        name: this.i18n.t('toolbox.closeAllPanels'),
+        materialIcon: 'close_fullscreen',
+        selfOnly: true,
+        action: () => PanelService.closeAllPanels()
+      });
+    }
+    return menu;
   }
 
   private buildToolboxMenuActions(compact: boolean = false): ContextMenuAction[] {
@@ -1174,28 +1250,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
     }
     menu.push(ContextMenuSeparator);
-    menu.push({
-      name: this.i18n.t('menu.viewReset'),
-      materialIcon: 'remove_red_eye',
-      selfOnly: true,
-      subActions: [
-        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-      ]
-    });
-    // Desktop only — mobile sheets replace each other via bottom nav.
-    if (!this.mobileLayout.isMobile) {
-      menu.push({
-        name: this.i18n.t('toolbox.closeAllPanels'),
-        materialIcon: 'close_fullscreen',
-        selfOnly: true,
-        action: () => PanelService.closeAllPanels()
-      });
-    }
+    Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);
-      menu.push({ name: this.i18n.t('menu.loadZip'), materialIcon: 'open_in_browser', action: () => this.openZipFileSelect() });
+      menu.push({
+        name: SceneToolPermission.instance.canLoadZip()
+          ? this.i18n.t('menu.loadZip')
+          : `${this.i18n.t('menu.loadZip')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+        materialIcon: 'open_in_browser',
+        disabled: !SceneToolPermission.instance.canLoadZip(),
+        action: () => this.openZipFileSelect()
+      });
       menu.push({
         name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
         materialIcon: 'sd_storage',
@@ -1233,8 +1299,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     ];
     if (this.folderBackup.canLoadFromFolder) {
+      const canLoad = SceneToolPermission.instance.canLoadRoom();
       subActions.push({
-        name: this.i18n.t('menu.folderBackup.load'),
+        name: canLoad
+          ? this.i18n.t('menu.folderBackup.load')
+          : `${this.i18n.t('menu.folderBackup.load')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+        disabled: !canLoad,
         action: () => { void this.openFolderBackupLoad(); }
       });
     }
@@ -1351,6 +1421,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async openZipFileSelect() {
+    if (!SceneToolPermission.instance.canLoadZip()) return;
     if (!this.isRoom) {
       let loadDirectOpened = false;
       const choice = await this.modalService.open(ConfirmationComponent, {
@@ -1387,6 +1458,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   openFolderBackupLoad() {
     if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
+    if (!SceneToolPermission.instance.canLoadRoom()) return;
     void this.folderBackup.openLoadUi();
   }
 
@@ -1417,6 +1489,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
     this.contextMenuService.open(position, [
+      ...this.buildAlwaysAvailableViewActions(),
+      ContextMenuSeparator,
       contextMenuToggleCheck({
         get: () => TableSelecter.instance.gridShow,
         set: (v) => {

@@ -2,6 +2,7 @@ import { I18nDictionary } from './types';
 
 export const zhCN_ui: I18nDictionary = {
   'peer.title': '连接信息',
+  'peer.version': '版本：{{version}}',
   'peer.language': '🌐 Language / 语言',
   'peer.currentRole': '当前身份：',
   'peer.role.gm': 'GM',
@@ -427,7 +428,7 @@ export const zhCN_ui: I18nDictionary = {
 
   'inv.title': '仓库', 'inv.emptySuffix': '仓库是空的', 'inv.emptyGraveyard': '清空回收区', 'inv.sort': '排序：', 'inv.tagName': '标签名', 'inv.sortAsc': '由小到大', 'inv.sortDesc': '由大到小', 'inv.displayItems': '显示项目：', 'inv.displayItemsPlaceholder': '以空格分隔标签名，斜线换行 例：「HP MP / 笔记」', 'inv.done': '完成', 'inv.settings': '设置', 'inv.showAll': '全部显示', 'inv.multiSelectHint': '+点击可多选', 'inv.showChatBubble': '显示浮动式对话框', 'inv.showChatBubbleTip': '对话内容「」内的文字会立即显示在 Token 上方', 'inv.menu': '菜单', 'inv.tab.table': '桌面', 'inv.tab.personal': '个人', 'inv.tab.graveyard': '回收区', 'inv.tab.common': '公用',
   'note.title': '笔记仓库', 'note.refresh': '刷新', 'note.menu': '菜单', 'note.moveToTable': '移到桌面', 'note.collapse': '收起', 'note.expand': '展开', 'note.empty': '尚无笔记（桌面上的共享笔记会显示在这里）', 'note.guestUnavailable': '访客模式无法使用笔记仓库', 'note.filter.all': '全部', 'note.filter.table': '桌面', 'note.filter.other': '其他', 'note.location.table': '桌面', 'note.location.graveyard': '回收区', 'note.location.common': '公用', 'note.location.personal': '个人', 'note.untitled': '(无标题笔记)', 'note.moveTo': '移动位置', 'note.moveToCommon': '移至公用区', 'note.moveToPersonal': '移至个人区（仅自己可见）', 'note.moveToGraveyard': '移至回收区', 'note.edit': '编辑笔记...', 'note.clone': '建立副本', 'note.delete': '删除', 'note.detailTitle': '共享笔记设置',
-  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 10MB', 'jukebox.auditionVolume': '试听音量', 'jukebox.playbackVolume': '播放音量', 'jukebox.noticeVolume': '通知音量', 'jukebox.sfxVolume': 'ＳＥ音量', 'jukebox.volumeSaved': '※设置的音量会保存在浏览器中。', 'jukebox.sfxTest': 'ＳＥ测试',
+  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 20MB', 'jukebox.auditionVolume': '试听音量', 'jukebox.playbackVolume': '播放音量', 'jukebox.noticeVolume': '通知音量', 'jukebox.sfxVolume': 'ＳＥ音量', 'jukebox.volumeSaved': '※设置的音量会保存在浏览器中。', 'jukebox.sfxTest': 'ＳＥ测试',
   'chatTab.title': '聊天标签设置', 'chatTab.create': '新增聊天标签', 'chatTab.untitled': '(未命名标签)', 'chatTab.name': '标签名称：', 'chatTab.enableStand': '浮动式对话框、过场、立绘启用', 'chatTab.showOperationLog': '显示操作记录', 'chatTab.log': '日志', 'chatTab.download': '下载', 'chatTab.delete': '删除', 'chatTab.restore': '恢复', 'chatTab.empty': '*尚未新增聊天标签。您可以使用「新增聊天标签」来建立。', 'chatTab.defaultName': '标签',
   'chatLog.title': '聊天日志输出', 'chatLog.tab': '标签：', 'chatLog.selectedTabs': '选择的标签', 'chatLog.allTabs': '全部标签', 'chatLog.format': '形式：', 'chatLog.text': '文字', 'chatLog.time': '时间：', 'chatLog.none': '没有', 'chatLog.hoursMinutes': '时：分', 'chatLog.dateTime': '日期时间', 'chatLog.includeOperationLog': '包括操作记录', 'chatLog.export': '导出日志', 'chatLog.empty': '*尚未新增聊天标签。',
   'confirm.title': '确认', 'confirm.ok': 'ＯＫ', 'confirm.cancel': '取消',

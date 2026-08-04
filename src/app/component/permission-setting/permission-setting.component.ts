@@ -41,6 +41,28 @@ export class PermissionSettingComponent implements OnInit, OnDestroy {
   get sceneCanModifyDrawing(): boolean { return this.scenePerm.playerCanModifyDrawing; }
   set sceneCanModifyDrawing(v: boolean) { this.scenePerm.playerCanModifyDrawing = !!v; }
 
+  get playerCanLoadZip(): boolean { return this.scenePerm.playerCanLoadZip; }
+  set playerCanLoadZip(v: boolean) { this.scenePerm.playerCanLoadZip = !!v; }
+  get playerCanLoadRoom(): boolean { return this.scenePerm.playerCanLoadRoom; }
+  set playerCanLoadRoom(v: boolean) { this.scenePerm.playerCanLoadRoom = !!v; }
+
+  get playerCanOpenTable(): boolean { return this.scenePerm.playerCanOpenTable; }
+  set playerCanOpenTable(v: boolean) { this.scenePerm.playerCanOpenTable = !!v; }
+  get playerCanOpenImages(): boolean { return this.scenePerm.playerCanOpenImages; }
+  set playerCanOpenImages(v: boolean) { this.scenePerm.playerCanOpenImages = !!v; }
+  get playerCanOpenMusic(): boolean { return this.scenePerm.playerCanOpenMusic; }
+  set playerCanOpenMusic(v: boolean) { this.scenePerm.playerCanOpenMusic = !!v; }
+  get playerCanOpenToolbox(): boolean { return this.scenePerm.playerCanOpenToolbox; }
+  set playerCanOpenToolbox(v: boolean) { this.scenePerm.playerCanOpenToolbox = !!v; }
+  get playerCanOpenScenePreset(): boolean { return this.scenePerm.playerCanOpenScenePreset; }
+  set playerCanOpenScenePreset(v: boolean) { this.scenePerm.playerCanOpenScenePreset = !!v; }
+  get playerCanOpenScenarioText(): boolean { return this.scenePerm.playerCanOpenScenarioText; }
+  set playerCanOpenScenarioText(v: boolean) { this.scenePerm.playerCanOpenScenarioText = !!v; }
+  get playerCanOpenInventory(): boolean { return this.scenePerm.playerCanOpenInventory; }
+  set playerCanOpenInventory(v: boolean) { this.scenePerm.playerCanOpenInventory = !!v; }
+  get playerCanOpenNotes(): boolean { return this.scenePerm.playerCanOpenNotes; }
+  set playerCanOpenNotes(v: boolean) { this.scenePerm.playerCanOpenNotes = !!v; }
+
   get sceneAllCreate(): boolean {
     const p = this.scenePerm;
     return p.playerCanCreateLight && p.playerCanCreateWall
@@ -52,8 +74,11 @@ export class PermissionSettingComponent implements OnInit, OnDestroy {
     const p = this.scenePerm;
     return p.playerCanModifyLight && p.playerCanModifyWall && p.playerCanModifyDrawing;
   }
+  get allMenusEnabled(): boolean { return this.scenePerm.allMenusEnabled; }
+
   setAllSceneCreate(v: boolean) { this.scenePerm.setAllCreate(v); }
   setAllSceneModify(v: boolean) { this.scenePerm.setAllModify(v); }
+  setAllMenus(v: boolean) { this.scenePerm.setAllMenus(v); }
 
   constructor(
     private panelService: PanelService,

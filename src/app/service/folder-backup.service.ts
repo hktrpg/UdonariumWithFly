@@ -3,6 +3,7 @@ import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth } from '@udonarium/room-auth';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { FolderBackupListComponent } from 'component/folder-backup-list/folder-backup-list.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -370,6 +371,7 @@ export class FolderBackupService implements OnDestroy {
 
   async openLoadUi(): Promise<void> {
     if (!this.canLoadFromFolder) return;
+    if (!SceneToolPermission.instance.canLoadRoom()) return;
 
     const backups = await this.listRoomBackups();
     const selected = await this.modalService.open(FolderBackupListComponent, {

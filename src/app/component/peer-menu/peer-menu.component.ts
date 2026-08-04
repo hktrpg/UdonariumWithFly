@@ -31,6 +31,8 @@ import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { RoomInfo } from '@udonarium/core/system/network/room-info';
 import { RoomJoinResult, RoomRole } from '@udonarium/room-auth';
+import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+import { appVersion } from '../../../environments/version';
 
 import * as localForage from 'localforage';
 
@@ -139,6 +141,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   get maskedPassword(): string { return '●●●●●●●●' }
   get config(): AppConfig { return AppConfigService.appConfig; }
   get canUsePrivateSession(): boolean { return this.config.backend.mode == 'skyway'; }
+  /** Build stamp: git commit date, short SHA, branch. */
+  readonly appVersionDisplay = appVersion.display;
+  get canLoadZip(): boolean { return SceneToolPermission.instance.canLoadZip(); }
+  get canLoadRoom(): boolean { return SceneToolPermission.instance.canLoadRoom(); }
 
   constructor(
     private ngZone: NgZone,
@@ -305,11 +311,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   openPermissionManage() {
     if (!this.isGMMode) return;
-    this.panelService.open(PermissionSettingComponent, { width: 480, height: 420, left: 120, top: 80 });
+    this.panelService.open(PermissionSettingComponent, { width: 500, height: 620, left: 120, top: 60 });
   }
 
   loadZip() {
-    if (this.GuestMode() || !this.networkService.peer.isRoom) return;
+    if (this.GuestMode() || !this.networkService.peer.isRoom || !this.canLoadZip) return;
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
@@ -334,7 +340,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   loadFolderBackup() {
-    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder) return;
+    if (this.GuestMode() || !this.folderBackup.canLoadFromFolder || !this.canLoadRoom) return;
     void this.folderBackup.openLoadUi();
   }
 

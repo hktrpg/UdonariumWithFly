@@ -56,6 +56,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Ping | Long-press map for a marker; Shift+long-press for a warning |
 | Table lighting & vision | Darkness / FoW, lights, walls, vision ranges; claim vision character |
 | Scene tools | GM light / wall / draw / text tools; optional per-tool player permissions |
+| Menu visibility perms | GM can hide player menus; **default on**: images / music / toolbox / inventory / notes; **default off**: table / scene preset / scenario text; connection / chat / combat / settings / disconnect always visible |
+| Load room data perms | Load ZIP / folder restore **GM-only by default** (can enable for players) |
 | Combat tracker | Initiative, rounds/turns, announce, end turn, defeated skip |
 | Player token claim | “My character”: default chat speaker, vision, others can’t move it |
 | Weather | Rain / snow / sakura / maple / aurora / etc. on table settings |
@@ -63,13 +65,15 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
 | Reload save prompt | F5 / Ctrl+R offers ZIP download; with a bound folder, flushes backup before reload (skipped for guests) |
 | Local folder backup | File System Access API: bind a folder and auto-overwrite per-room ZIPs; Connection panel can bind / save / load / delete (see below) |
-| Multi-track BGM / ambience | Up to 4 tracks; room track volume; local ambience volume; audition is local-only |
+| Multi-track BGM / ambience | Up to 4 tracks; **max 20MB per file**; room track volume; local ambience volume; audition is local-only |
 | Preset scenes | Save / one-click restore token poses, table atmosphere (darkness, weather, lights, walls, masks, …), and multi-track BGM (optional switch chat text); chat windows can open multiple copies |
 | Character resource HUD | ± / drag numberResource for claimed PCs (toggle in Settings) |
 | Scenario text | Draft narration and send full text or a selection to the active chat tab (speaker: title / character / player; character + 「」 triggers floating dialog) |
 | Group whisper tabs | Member-based private chat tabs (client-side filter, same class as whispers) |
 | Chat window memory | Remembers last size & position (local); new windows reuse geometry; shorter default height |
 | Auto-open chat | Settings*: open chat when someone speaks if no chat window is open (default off) |
+| Chat unread badge | Unread count on the menu chat icon while no chat panel is open |
+| View reset / close panels | Available to everyone (Settings / More / right-click); not gated by toolbox menu permission |
 | Lobby on start | Cold start opens Lobby when not in a room (skipped for invite join) |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).

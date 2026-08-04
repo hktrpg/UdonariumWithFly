@@ -52,11 +52,53 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   font-size: 40px;
 }
 
+.menu-chat-icon {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: top;
+}
+
+.menu-chat-badge {
+  position: absolute;
+  /* Stay inside the icon — negative offsets expand side-menu scroll and show ◀▶. */
+  top: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #fff;
+  background: #e53935;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transform: none;
+}
+
+.mobile-bottom-nav .menu-chat-badge,
+.mobile-side-rail .menu-chat-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 8px;
+}
+
 .side-menu {
   top: 0px;
   left: 0px;
   box-sizing: border-box;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: absolute;
   color: #CCC;
   background-color: rgba(30, 30, 30, 0.8);

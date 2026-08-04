@@ -2,6 +2,7 @@ import { I18nDictionary } from './types';
 
 export const ja_ui: I18nDictionary = {
   'peer.title': '接続情報',
+  'peer.version': 'バージョン：{{version}}',
   'peer.language': '🌐 Language / 言語',
   'peer.currentRole': '現在の役割：',
   'peer.role.gm': 'GM',
@@ -427,7 +428,7 @@ export const ja_ui: I18nDictionary = {
 
   'inv.title': '倉庫', 'inv.emptySuffix': 'の倉庫は空です', 'inv.emptyGraveyard': 'ごみ箱を空にする', 'inv.sort': '並び順：', 'inv.tagName': 'タグ名', 'inv.sortAsc': '昇順', 'inv.sortDesc': '降順', 'inv.displayItems': '表示項目：', 'inv.displayItemsPlaceholder': 'タグ名を空白で区切り、スラッシュで改行 例：「HP MP / メモ」', 'inv.done': '完了', 'inv.settings': '設定', 'inv.showAll': 'すべて表示', 'inv.multiSelectHint': '+クリックで複数選択', 'inv.showChatBubble': 'フローティング台詞を表示', 'inv.showChatBubbleTip': 'チャットの「」内の内容がトークン上にすぐに表示されます', 'inv.menu': 'メニュー', 'inv.tab.table': '卓上', 'inv.tab.personal': '個人', 'inv.tab.graveyard': 'ごみ箱', 'inv.tab.common': '共有',
   'note.title': 'メモ倉庫', 'note.refresh': '更新', 'note.menu': 'メニュー', 'note.moveToTable': '卓上へ移動', 'note.collapse': '閉じる', 'note.expand': '展開', 'note.empty': 'メモはありません（卓上の共有メモはここに表示されます）', 'note.guestUnavailable': 'ゲストモードではメモ倉庫を利用できません', 'note.filter.all': 'すべて', 'note.filter.table': '卓上', 'note.filter.other': 'その他', 'note.location.table': '卓上', 'note.location.graveyard': 'ごみ箱', 'note.location.common': '共有', 'note.location.personal': '個人', 'note.untitled': '(無題のメモ)', 'note.moveTo': '移動先', 'note.moveToCommon': '共有へ移動', 'note.moveToPersonal': '個人へ移動（自分のみ）', 'note.moveToGraveyard': 'ごみ箱へ移動', 'note.edit': 'メモを編集...', 'note.clone': '複製を作成', 'note.delete': '削除', 'note.detailTitle': '共有メモ設定',
-  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 10MB', 'jukebox.auditionVolume': '試聴音量', 'jukebox.playbackVolume': '再生音量', 'jukebox.noticeVolume': '通知音量', 'jukebox.sfxVolume': 'SE音量', 'jukebox.volumeSaved': '※音量設定はブラウザに保存されます。', 'jukebox.sfxTest': 'SEテスト',
+  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 20MB', 'jukebox.auditionVolume': '試聴音量', 'jukebox.playbackVolume': '再生音量', 'jukebox.noticeVolume': '通知音量', 'jukebox.sfxVolume': 'SE音量', 'jukebox.volumeSaved': '※音量設定はブラウザに保存されます。', 'jukebox.sfxTest': 'SEテスト',
   'chatTab.title': 'チャットタブ設定', 'chatTab.create': 'チャットタブを追加', 'chatTab.untitled': '(無題のタブ)', 'chatTab.name': 'タブ名：', 'chatTab.enableStand': 'フローティング台詞、演出、立ち絵を有効化', 'chatTab.showOperationLog': '操作ログを表示', 'chatTab.log': 'ログ', 'chatTab.download': 'ダウンロード', 'chatTab.delete': '削除', 'chatTab.restore': '復元', 'chatTab.empty': '*チャットタブはありません。「チャットタブを追加」で作成できます。', 'chatTab.defaultName': 'タブ',
   'chatLog.title': 'チャットログ出力', 'chatLog.tab': 'タブ：', 'chatLog.selectedTabs': '選択したタブ', 'chatLog.allTabs': 'すべてのタブ', 'chatLog.format': '形式：', 'chatLog.text': 'テキスト', 'chatLog.time': '時刻：', 'chatLog.none': 'なし', 'chatLog.hoursMinutes': '時：分', 'chatLog.dateTime': '日時', 'chatLog.includeOperationLog': '操作ログを含める', 'chatLog.export': 'ログを出力', 'chatLog.empty': '*チャットタブはありません。',
   'confirm.title': '確認', 'confirm.ok': 'OK', 'confirm.cancel': 'キャンセル',

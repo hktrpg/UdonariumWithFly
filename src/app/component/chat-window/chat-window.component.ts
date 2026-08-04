@@ -275,6 +275,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       this.openScrollRetryTimers.forEach(t => clearTimeout(t));
       this.openScrollRetryTimers = [];
     }
+    EventSystem.trigger('CHAT_PANEL_CHANGED', null);
   }
 
   private scrollTrackBound = false;
