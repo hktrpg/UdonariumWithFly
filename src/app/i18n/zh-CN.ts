@@ -80,7 +80,7 @@ export const zhCN: I18nDictionary = {
   'scene.hint.text': '在地图上点一下放置文字（不会弹窗）。',
   'scene.hint.select': '场景选取中：在地图上拖曳可一次框选多个绘图／灯光／墙壁；短按为单选（不会选到棋子）。WASD／方向键移动　Delete 删除。再按「选取」可关闭。',
   'scene.hint.idle': '未启用工具时可正常操作棋子。需要编辑场景物件时再按「选取」。',
-  'scene.hint.noAccess': '目前没有场景工具权限。请向 GM 于「设置」中开放玩家新增／修改。',
+  'scene.hint.noAccess': '目前没有场景工具权限。请向 GM 于「房间设置」中开放玩家新增／修改。',
   'scene.ctx.addLight': '新增灯光',
   'scene.ctx.addWall': '新增墙壁',
   'scene.ctx.addFreehand': '新增手绘',
