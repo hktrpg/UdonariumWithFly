@@ -159,7 +159,7 @@ export class MobileLayoutService implements OnDestroy {
   /** Fit a desktop panel option into a sheet on mobile. */
   adaptPanelOption<T extends MobilePanelBox>(option: T = {} as T): T {
     if (!this.isMobile) return { ...option };
-    const sheet = option.mobileSheet || 'full';
+    const sheet = option.mobileSheet || 'half';
     const left = this.leftChromePx;
     const w = Math.max(280, this.viewportWidth - left);
     if (sheet === 'half' || sheet === 'peek') {

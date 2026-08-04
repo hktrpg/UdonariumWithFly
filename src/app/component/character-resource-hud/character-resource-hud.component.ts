@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -17,15 +17,18 @@ import * as localForage from 'localforage';
 export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   static readonly VISIBLE_KEY = 'udonanaumu-resource-hud-visible';
   static readonly GM_ALL_KEY = 'udonanaumu-resource-hud-gm-all';
+  static readonly POS_KEY = 'udonanaumu-resource-hud-pos';
+  static readonly COLLAPSED_KEY = 'udonanaumu-resource-hud-collapsed';
   static isVisible = false;
   static showAllForGm = false;
 
   left = 12;
   top = 72;
+  collapsed = false;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
   private dragging = false;
-  private lazyUpdateTimer: NodeJS.Timeout = null;
+  private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
 
   get visible(): boolean { return CharacterResourceHudComponent.isVisible; }
   get showAllForGm(): boolean { return CharacterResourceHudComponent.showAllForGm; }
@@ -45,24 +48,48 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     return mine ? [mine] : [];
   }
 
+  constructor(private changeDetector: ChangeDetectorRef) {}
+
   ngOnInit() {
     localForage.getItem(CharacterResourceHudComponent.VISIBLE_KEY).then(v => {
-      if (typeof v === 'boolean') CharacterResourceHudComponent.isVisible = v;
+      if (typeof v === 'boolean') {
+        CharacterResourceHudComponent.isVisible = v;
+        this.changeDetector.markForCheck();
+      }
     });
     localForage.getItem(CharacterResourceHudComponent.GM_ALL_KEY).then(v => {
-      if (typeof v === 'boolean') CharacterResourceHudComponent.showAllForGm = v;
+      if (typeof v === 'boolean') {
+        CharacterResourceHudComponent.showAllForGm = v;
+        this.changeDetector.markForCheck();
+      }
+    });
+    localForage.getItem<{ left: number; top: number }>(CharacterResourceHudComponent.POS_KEY).then(pos => {
+      if (pos && typeof pos.left === 'number' && typeof pos.top === 'number') {
+        this.left = pos.left;
+        this.top = pos.top;
+        this.clampToViewport();
+        this.changeDetector.markForCheck();
+      }
+    });
+    localForage.getItem(CharacterResourceHudComponent.COLLAPSED_KEY).then(v => {
+      if (typeof v === 'boolean') {
+        this.collapsed = v;
+        this.changeDetector.markForCheck();
+      }
     });
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', () => this.lazyNgZoneUpdate())
       .on('DELETE_GAME_OBJECT', () => this.lazyNgZoneUpdate());
     document.addEventListener('pointermove', this.onPointerMove);
     document.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('resize', this.onResize);
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
     document.removeEventListener('pointermove', this.onPointerMove);
     document.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('resize', this.onResize);
   }
 
   static setVisible(v: boolean) {
@@ -77,6 +104,11 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
 
   toggleShowAll() {
     CharacterResourceHudComponent.setShowAllForGm(!this.showAllForGm);
+  }
+
+  toggleCollapsed() {
+    this.collapsed = !this.collapsed;
+    localForage.setItem(CharacterResourceHudComponent.COLLAPSED_KEY, this.collapsed).catch(() => {});
   }
 
   resourcesOf(ch: GameCharacter): DataElement[] {
@@ -119,27 +151,49 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   }
 
   startDrag(event: PointerEvent) {
-    if ((event.target as HTMLElement).closest('button,input,label')) return;
+    event.preventDefault();
+    event.stopPropagation();
     this.dragging = true;
     this.dragOffsetX = event.clientX - this.left;
     this.dragOffsetY = event.clientY - this.top;
+    (event.target as HTMLElement)?.setPointerCapture?.(event.pointerId);
   }
 
   private onPointerMove = (event: PointerEvent) => {
     if (!this.dragging) return;
-    this.left = Math.max(0, event.clientX - this.dragOffsetX);
-    this.top = Math.max(0, event.clientY - this.dragOffsetY);
+    this.left = event.clientX - this.dragOffsetX;
+    this.top = event.clientY - this.dragOffsetY;
+    this.clampToViewport();
+    this.changeDetector.detectChanges();
   };
 
   private onPointerUp = () => {
+    if (!this.dragging) return;
     this.dragging = false;
+    this.persistPosition();
   };
+
+  private onResize = () => {
+    this.clampToViewport();
+    this.changeDetector.markForCheck();
+  };
+
+  private clampToViewport() {
+    const maxLeft = Math.max(0, window.innerWidth - 48);
+    const maxTop = Math.max(0, window.innerHeight - 40);
+    this.left = Math.min(maxLeft, Math.max(0, this.left));
+    this.top = Math.min(maxTop, Math.max(0, this.top));
+  }
+
+  private persistPosition() {
+    localForage.setItem(CharacterResourceHudComponent.POS_KEY, { left: this.left, top: this.top }).catch(() => {});
+  }
 
   private lazyNgZoneUpdate() {
     if (this.lazyUpdateTimer !== null) return;
     this.lazyUpdateTimer = setTimeout(() => {
       this.lazyUpdateTimer = null;
-      // trigger CD via zone
+      this.changeDetector.markForCheck();
     }, 80);
   }
 }

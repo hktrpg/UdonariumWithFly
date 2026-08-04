@@ -848,6 +848,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       } else {
         // Bottom-nav open: replace any existing sheet so the nav stays usable.
         option.mobileReplace = true;
+        // Inventory / notes / table / etc. all open as half sheet (map stays visible).
+        if (!option.mobileSheet) option.mobileSheet = 'half';
       }
       option = this.mobileLayout.adaptPanelOption(option);
       const tourId = this.tourIdForComponent(componentName);
@@ -898,7 +900,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   isNavActive(tourId: string): boolean {
-    return this.isMobileLayout && PanelService.isTourPanelOpen(tourId);
+    if (!this.isMobileLayout) return false;
+    if (tourId === 'menu.more') return this.contextMenuService.isShow;
+    return PanelService.isTourPanelOpen(tourId);
   }
 
   /** Bottom-nav: tap open; tap again closes sheet (map-first). */
@@ -1001,10 +1005,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.openToolboxAt(position);
   }
 
-  /** Mobile primary-nav "More" — mode-aware secondary actions. */
+  /** Mobile primary-nav "More" — mode-aware secondary actions; tap again to collapse. */
   openMoreMenu(event: Event) {
     this.enforceGuestPlayMode();
     this.guidedTour.notifyMenuClick('menu.more');
+    // Second tap on More closes the action sheet (outside-click ignores this button).
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
     const position = {
@@ -1130,12 +1139,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
       ]
     });
-    menu.push({
-      name: this.i18n.t('toolbox.closeAllPanels'),
-      materialIcon: 'close_fullscreen',
-      selfOnly: true,
-      action: () => PanelService.closeAllPanels()
-    });
+    // Desktop only — mobile sheets replace each other via bottom nav.
+    if (!this.mobileLayout.isMobile) {
+      menu.push({
+        name: this.i18n.t('toolbox.closeAllPanels'),
+        materialIcon: 'close_fullscreen',
+        selfOnly: true,
+        action: () => PanelService.closeAllPanels()
+      });
+    }
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
       menu.push(ContextMenuSeparator);

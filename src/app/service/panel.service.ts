@@ -160,7 +160,7 @@ export class PanelService {
       const panelInst = panelComponentRef.instance as any;
       if (panelInst) {
         panelInst.isMobileSheet = true;
-        const sheet = resolved.mobileSheet || 'full';
+        const sheet = resolved.mobileSheet || 'half';
         panelInst.isMobileSheetHalf = sheet === 'half' || sheet === 'peek';
         panelInst.mobileSheetSnap = sheet === 'peek' ? 'peek' : sheet === 'half' ? 'half' : 'full';
       }

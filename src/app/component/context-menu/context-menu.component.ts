@@ -96,6 +96,9 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onOutsideClick(event) {
     if (this.rootElementRef.nativeElement.contains(event.target) === false) {
+      const t = event.target as HTMLElement | null;
+      // Let bottom-nav More toggle close the sheet itself (mousedown would reopen otherwise).
+      if (t?.closest?.('[data-tour-id="menu.more"]')) return;
       this.close();
     }
   }
