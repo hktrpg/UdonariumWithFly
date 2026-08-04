@@ -202,10 +202,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private static readonly DEFAULT_VIEW_ROT_X = 46;
   private static readonly DEFAULT_VIEW_ROT_Y = 0;
   private static readonly DEFAULT_VIEW_ROT_Z = 0;
+  /** Slider -100..100 → viewPotisonZ (matches touch clamp ~±750). */
+  private static readonly ZOOM_SLIDER_TO_Z = 7.5;
 
   private viewPotisonX: number = GameTableComponent.DEFAULT_VIEW_POS_X;
   private viewPotisonY: number = GameTableComponent.DEFAULT_VIEW_POS_Y;
   private viewPotisonZ: number = GameTableComponent.DEFAULT_VIEW_POS_Z;
+
+  /** Public -100..100 zoom control (synced from pinch / wheel / slider). */
+  zoomSliderValue = 0;
 
   private viewRotateX: number = GameTableComponent.DEFAULT_VIEW_ROT_X;
   private viewRotateY: number = GameTableComponent.DEFAULT_VIEW_ROT_Y;
@@ -340,6 +345,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get pathWaypoints() { return this.tokenPath.waypoints; }
   get showPathMoveHud(): boolean {
     return this.tokenPath.hasDraft || this.tokenPath.isAnimating;
+  }
+  get showViewZoomControl(): boolean {
+    return this.mobileLayout.isMobile;
   }
   get showVisionBanner(): boolean {
     if (PeerCursor.myCursor?.isGMMode) return false;
@@ -982,6 +990,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.viewPotisonZ += transformZ;
     }
 
+    // Keep Z within the slider-reachable band (±750).
+    this.viewPotisonZ = Math.min(750, Math.max(-750, this.viewPotisonZ));
+    this.syncZoomSliderFromZ();
+
     if (isAbsolute || rotateX != 0 || rotateY != 0 || rotateX != 0) {
       this.ngZone.run(() => {
         EventSystem.trigger('TABLE_VIEW_ROTATE', {
@@ -993,6 +1005,32 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.gameTable.nativeElement.style.transform = `translateZ(${this.viewPotisonZ.toFixed(4)}px) translateY(${this.viewPotisonY.toFixed(4)}px) translateX(${this.viewPotisonX.toFixed(4)}px) rotateY(${this.viewRotateY.toFixed(4)}deg) rotateX(${this.viewRotateX.toFixed(4) + 'deg) rotateZ(' + this.viewRotateZ.toFixed(4)}deg)`;
+  }
+
+  /** Map viewPotisonZ → slider -100..100 (pinch / wheel / reset). */
+  private syncZoomSliderFromZ() {
+    const next = Math.round(Math.min(100, Math.max(-100, this.viewPotisonZ / GameTableComponent.ZOOM_SLIDER_TO_Z)));
+    if (next === this.zoomSliderValue) return;
+    this.ngZone.run(() => {
+      this.zoomSliderValue = next;
+      this.changeDetector.markForCheck();
+    });
+  }
+
+  /** Top-right zoom slider (-100..100). */
+  onZoomSliderInput(ev: Event) {
+    const raw = Number((ev.target as HTMLInputElement)?.value);
+    if (!Number.isFinite(raw)) return;
+    const v = Math.min(100, Math.max(-100, raw));
+    this.zoomSliderValue = v;
+    const z = v * GameTableComponent.ZOOM_SLIDER_TO_Z;
+    this.removeFocus();
+    this.setTransform(this.viewPotisonX, this.viewPotisonY, z, this.viewRotateX, this.viewRotateY, this.viewRotateZ, true);
+  }
+
+  resetZoomSlider() {
+    this.zoomSliderValue = 0;
+    this.setTransform(this.viewPotisonX, this.viewPotisonY, 0, this.viewRotateX, this.viewRotateY, this.viewRotateZ, true);
   }
 
   private setGameTableGrid(width: number, height: number, gridSize: number = 50, gridType: GridType = GridType.SQUARE, gridColor: string = '#000000e6', isShowNumber = true) {

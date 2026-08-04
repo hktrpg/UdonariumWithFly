@@ -166,3 +166,23 @@
   </header>
   <pre id="udon-debug-pose-body" class="debug-pose-body"></pre>
 </aside>
+
+<!-- Mobile/tablet: zoom without mouse wheel (-100..100). Desktop keeps wheel / pinch only. -->
+<div class="view-zoom-control" *ngIf="showViewZoomControl"
+  (pointerdown)="$event.stopPropagation()"
+  (touchstart)="$event.stopPropagation()"
+  (mousedown)="$event.stopPropagation()"
+  (wheel)="$event.stopPropagation()">
+  <button type="button" class="view-zoom-reset" (click)="resetZoomSlider()" [attr.title]="'view.zoomReset' | i18n">{{ zoomSliderValue > 0 ? '+' : '' }}{{ zoomSliderValue }}</button>
+  <input
+    class="view-zoom-range"
+    type="range"
+    min="-100"
+    max="100"
+    step="1"
+    [value]="zoomSliderValue"
+    (input)="onZoomSliderInput($event)"
+    [attr.aria-label]="'view.zoom' | i18n"
+  />
+  <i class="material-icons view-zoom-icon" aria-hidden="true">zoom_in</i>
+</div>

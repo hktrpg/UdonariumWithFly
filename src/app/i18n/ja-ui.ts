@@ -197,6 +197,8 @@ export const ja_ui: I18nDictionary = {
   'menu.selfOnly': '自分のみ',
   'menu.viewReset.default': '初期視点に戻す',
   'menu.viewReset.top': '真上視点',
+  'view.zoom': 'ズーム',
+  'view.zoomReset': 'タップでズームリセット（0）',
   'menu.settings.showGrid': 'グリッドを常に表示',
   'menu.settings.gridSnap': '移動時にグリッド吸着',
   'menu.settings.noticeSound': '新着メッセージ音',

@@ -198,6 +198,8 @@ export const zhTW_ui: I18nDictionary = {
   'menu.selfOnly': '只有自己',
   'menu.viewReset.default': '回到最初的視點',
   'menu.viewReset.top': '使用正上方視點',
+  'view.zoom': '縮放畫面',
+  'view.zoomReset': '點擊重設縮放（0）',
   'menu.settings.showGrid': '一律顯示桌面格線',
   'menu.settings.gridSnap': '物件移動時對齊格線',
   'menu.settings.noticeSound': '新訊息提示音',

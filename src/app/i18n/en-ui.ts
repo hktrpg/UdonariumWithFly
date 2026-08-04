@@ -197,6 +197,8 @@ export const en_ui: I18nDictionary = {
   'menu.selfOnly': 'Local only',
   'menu.viewReset.default': 'Reset to initial view',
   'menu.viewReset.top': 'Top-down view',
+  'view.zoom': 'Zoom view',
+  'view.zoomReset': 'Tap to reset zoom (0)',
   'menu.settings.showGrid': 'Always show grid',
   'menu.settings.gridSnap': 'Snap objects to grid',
   'menu.settings.noticeSound': 'New message sound',

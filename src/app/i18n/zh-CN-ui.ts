@@ -197,6 +197,8 @@ export const zhCN_ui: I18nDictionary = {
   'menu.selfOnly': '只有自己',
   'menu.viewReset.default': '回到最初的视角',
   'menu.viewReset.top': '使用正上方视角',
+  'view.zoom': '缩放画面',
+  'view.zoomReset': '点击重设缩放（0）',
   'menu.settings.showGrid': '一律显示桌面格线',
   'menu.settings.gridSnap': '物件移动时对齐格线',
   'menu.settings.noticeSound': '新消息提示音',
