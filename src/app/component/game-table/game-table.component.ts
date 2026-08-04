@@ -570,7 +570,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   initializeTableMouseGesture() {
     this.mouseGesture = new TableMouseGesture(
       this.rootElementRef.nativeElement,
-      () => this.selectionService.size > 0,
+      () => this.selectionService.size > 0 || this.sceneTools.selectionCount > 0,
+      () => !this.mobileLayout.isMobile,
     );
     this.mouseGesture.onstart = this.onTableMouseStart.bind(this);
     this.mouseGesture.onend = this.onTableMouseEnd.bind(this);
@@ -681,8 +682,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.cancelInput();
   }
 
-  onTableMouseTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent) {
-    if (!this.isTableTransformMode || document.body !== document.activeElement) return;
+  onTableMouseTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent | KeyboardEvent) {
+    const isKeyboard = srcEvent instanceof KeyboardEvent;
+    if (isKeyboard) {
+      // Desktop empty-selection WASD / QE: always apply view transform.
+      if (this.mobileLayout.isMobile) return;
+      if (this.selectionService.size > 0 || this.sceneTools.selectionCount > 0) return;
+      this.removeFocus();
+      this.isTableTransformMode = true;
+    } else if (!this.isTableTransformMode || document.body !== document.activeElement) {
+      return;
+    }
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu && this.contextMenuService.isShow) {
       this.ngZone.run(() => this.contextMenuService.close());
