@@ -37,6 +37,7 @@ import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
 import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
@@ -331,6 +332,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private sceneTools: SceneToolService,
     private tokenPath: TokenPathMoveService,
     private i18n: I18nService,
+    private mobileLayout: MobileLayoutService,
   ) { }
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
@@ -501,10 +503,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   initializeTableTouchGesture() {
     this.touchGesture = new TableTouchGesture(this.rootElementRef.nativeElement, this.ngZone);
+    // Phones/pads: 1-finger drag always pans (no right-click). Pinch = zoom.
+    this.touchGesture.simplePan = this.mobileLayout.isMobile;
     this.touchGesture.onstart = this.onTableTouchStart.bind(this);
     this.touchGesture.onend = this.onTableTouchEnd.bind(this);
     this.touchGesture.ongesture = this.onTableTouchGesture.bind(this);
     this.touchGesture.ontransform = this.onTableTouchTransform.bind(this);
+    this.mobileLayout.isMobile$.subscribe(isMobile => {
+      if (this.touchGesture) this.touchGesture.simplePan = isMobile;
+    });
   }
 
   initializeTableMouseGesture() {
@@ -535,6 +542,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onTableTouchStart() {
     this.mouseGesture.cancel();
+    // Touch has no right-click pan: enable transform immediately and blur inputs
+    // so document.activeElement === body (otherwise pan is silently ignored).
+    this.isTableTransformMode = true;
+    this.pointerDeviceService.isDragging = false;
+    this.removeFocus();
   }
 
   onTableTouchEnd() {
@@ -546,7 +558,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableTouchTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent) {
-    if (!this.isTableTransformMode || document.body !== document.activeElement) return;
+    if (!this.isTableTransformMode) return;
+    // Desktop keeps the strict focus gate; touch already blurred on start.
+    if (document.body !== document.activeElement && !(srcEvent instanceof TouchEvent)) return;
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu && this.contextMenuService.isShow) {
       this.ngZone.run(() => this.contextMenuService.close());

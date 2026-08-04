@@ -297,3 +297,19 @@ input {
   width: 0;
   height: 0;
 }
+
+/* Mobile / tablet chrome — desktop unchanged unless .udon-mobile-layout */
+body.udon-mobile-layout {
+  /* Reserve space visually for bottom nav over scrollable overlays */
+}
+
+body.udon-mobile-layout .networkIndicator {
+  top: 8px;
+  right: 8px;
+}
+
+body.udon-mobile-layout .resource-hud {
+  max-width: calc(100vw - 16px);
+  max-height: calc(40vh);
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+}

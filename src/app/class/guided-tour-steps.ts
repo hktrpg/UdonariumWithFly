@@ -18,6 +18,8 @@ export interface GuidedTourStep {
   id: string;
   titleKey: string;
   bodyKey: string;
+  /** Optional mobile/touch-specific body copy. */
+  bodyKeyMobile?: string;
   target?: string;
   /** After panel-open succeeds, spotlight this instead of `target` (usually the opened panel). */
   focusTarget?: string;
@@ -26,6 +28,8 @@ export interface GuidedTourStep {
   chapter?: string;
   skipIfGuest?: boolean;
   skipIfNoSceneTools?: boolean;
+  /** Skip on phone/tablet compact layout (desktop-only gestures). */
+  skipIfMobile?: boolean;
   /** When true, panel-open auto-advances (e.g. Connection → room explain). */
   autoAdvance?: boolean;
 }
@@ -123,6 +127,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'mapPan',
       titleKey: 'tour.step.mapPan.title',
       bodyKey: 'tour.step.mapPan.body',
+      bodyKeyMobile: 'tour.step.mapPan.bodyMobile',
       target: '[data-tour-id="table.layer"]',
       require: 'gesture-pan',
       chapter: 'table',
@@ -134,11 +139,13 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       target: '[data-tour-id="table.layer"]',
       require: 'gesture-wheel-pan',
       chapter: 'table',
+      skipIfMobile: true,
     },
     {
       id: 'mapZoom',
       titleKey: 'tour.step.mapZoom.title',
       bodyKey: 'tour.step.mapZoom.body',
+      bodyKeyMobile: 'tour.step.mapZoom.bodyMobile',
       target: '[data-tour-id="table.layer"]',
       require: 'gesture-zoom',
       chapter: 'table',
@@ -147,6 +154,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'contextMenu',
       titleKey: 'tour.step.contextMenu.title',
       bodyKey: 'tour.step.contextMenu.body',
+      bodyKeyMobile: 'tour.step.contextMenu.bodyMobile',
       target: '[data-tour-id="table.layer"]',
       require: 'context-menu',
       chapter: 'table',
@@ -168,11 +176,13 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       target: '[data-tour-id="table.layer"]',
       require: 'key-move',
       chapter: 'controls',
+      skipIfMobile: true,
     },
     {
       id: 'controlsDelete',
       titleKey: 'tour.step.controlsDelete.title',
       bodyKey: 'tour.step.controlsDelete.body',
+      bodyKeyMobile: 'tour.step.controlsDelete.bodyMobile',
       require: 'ack',
       chapter: 'controls',
     },
@@ -180,6 +190,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'controlsClipboard',
       titleKey: 'tour.step.controlsClipboard.title',
       bodyKey: 'tour.step.controlsClipboard.body',
+      bodyKeyMobile: 'tour.step.controlsClipboard.bodyMobile',
       require: 'ack',
       chapter: 'controls',
     },
@@ -187,6 +198,7 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'controlsUndo',
       titleKey: 'tour.step.controlsUndo.title',
       bodyKey: 'tour.step.controlsUndo.body',
+      bodyKeyMobile: 'tour.step.controlsUndo.bodyMobile',
       require: 'ack',
       chapter: 'controls',
     },
@@ -194,10 +206,12 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
       id: 'controlsPath',
       titleKey: 'tour.step.controlsPath.title',
       bodyKey: 'tour.step.controlsPath.body',
+      bodyKeyMobile: 'tour.step.controlsPath.bodyMobile',
       target: '[data-tour-id="table.layer"]',
       require: 'path-draft',
       chapter: 'controls',
       skipIfGuest: true,
+      skipIfMobile: true,
     },
     {
       id: 'controlsPing',
@@ -217,7 +231,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
   ];
 }
 
-export function shouldSkipStep(step: GuidedTourStep): boolean {
+export function shouldSkipStep(step: GuidedTourStep, isMobile = false): boolean {
+  if (step.skipIfMobile && isMobile) return true;
   if (step.skipIfGuest && Network.GuestMode()) return true;
   if (step.skipIfNoSceneTools && !SceneToolPermission.instance.canOpenPanel) return true;
   if (step.target && typeof document !== 'undefined' && !document.querySelector(step.target)) {

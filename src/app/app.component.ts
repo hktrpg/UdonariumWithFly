@@ -77,6 +77,8 @@ import { RoomInviteService } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-root',
@@ -112,8 +114,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   isHorizontal = false;
   isLoggedin = false;
   isUpdateCanceled = false;
+  isMobileLayout = false;
   private inviteHandled = false;
   private isRefreshPromptOpen = false;
+  private mobileSub: Subscription = null;
 
   static imageUrl = '';
   get imageUrl(): string {
@@ -167,6 +171,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private folderBackup: FolderBackupService,
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
+    private mobileLayout: MobileLayoutService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -650,6 +655,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
+    this.isMobileLayout = this.mobileLayout.isMobile;
+    this.mobileSub = this.mobileLayout.isMobile$.subscribe(v => {
+      this.isMobileLayout = v;
+    });
   }
 
   ngAfterViewInit() {
@@ -731,6 +740,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
     window.removeEventListener('keydown', this.onWindowKeydown, true);
+    this.mobileSub?.unsubscribe();
   }
 
   open(componentName: string) {
@@ -804,9 +814,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
     }
     if (component) {
-      option.top = (this.openPanelCount % 10 + 1) * 20;
-      option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-      this.openPanelCount = this.openPanelCount + 1;
+      if (!this.mobileLayout.isMobile) {
+        option.top = (this.openPanelCount % 10 + 1) * 20;
+        option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+        this.openPanelCount = this.openPanelCount + 1;
+      }
+      option = this.mobileLayout.adaptPanelOption(option);
       const tourId = this.tourIdForComponent(componentName);
       // Chat windows may open multiple copies (different tabs / positions).
       const allowMultiple = componentName === 'ChatWindowComponent';
@@ -820,16 +833,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private openDefaultPanels() {
-    this.panelService.open(PeerMenuComponent, {
+    this.panelService.open(PeerMenuComponent, this.mobileLayout.adaptPanelOption({
       width: 520, height: 450, left: 100,
       tourPanelId: 'menu.connection',
       title: this.i18n.t('peer.title'),
-    });
-    this.panelService.open(ChatWindowComponent, {
-      width: 700, height: 400, left: 100, top: 450,
-      tourPanelId: 'menu.chat',
-      title: this.i18n.t('chat.title'),
-    });
+    }));
+    // On mobile, only open connection by default — chat opens on demand to keep the map usable.
+    if (!this.mobileLayout.isMobile) {
+      this.panelService.open(ChatWindowComponent, {
+        width: 700, height: 400, left: 100, top: 450,
+        tourPanelId: 'menu.chat',
+        title: this.i18n.t('chat.title'),
+      });
+    }
   }
 
   private tourIdForComponent(componentName: string): string | null {
@@ -905,10 +921,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.guidedTour.notifyMenuClick('menu.toolbox');
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
-    const position = {
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
-    };
+    const position = this.isMobileLayout
+      ? { x: window.pageXOffset + clientRect.left, y: Math.max(8, window.pageYOffset + clientRect.top - 8) }
+      : {
+          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
+          y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+        };
     this.openToolboxAt(position);
   }
 
@@ -1209,10 +1227,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.guidedTour.notifyMenuClick('menu.settings');
     const button = <HTMLElement>event.target;
     const clientRect = button.getBoundingClientRect();
-    const position = { 
-      x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
-      y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
-    };
+    const position = this.isMobileLayout
+      ? { x: window.pageXOffset + clientRect.left, y: Math.max(8, window.pageYOffset + clientRect.top - 8) }
+      : { 
+          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
+          y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
+        };
     this.contextMenuService.open(position, [
       contextMenuToggleCheck({
         get: () => TableSelecter.instance.gridShow,

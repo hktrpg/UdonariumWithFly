@@ -27,6 +27,13 @@ export class TableTouchGesture {
   private tappedPanTimer: NodeJS.Timeout = null;
   private tappedPanCenter: HammerPoint = { x: 0, y: 0 };
 
+  /**
+   * When true (phones / tablets), 1-finger drag always pans.
+   * Tap-then-drag vertical zoom is disabled — pinch zooms instead.
+   * Desktop mouse path does not use this class.
+   */
+  simplePan = false;
+
   onstart: Callback = null;
   onend: Callback = null;
   ongesture: OnGestureCallback = null;
@@ -70,11 +77,14 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // Workaround：iOS 上 contextmenu 不會觸發。
+    // Long-press → contextmenu on touch devices (iOS never fires it; Android is inconsistent).
     let ua = window.navigator.userAgent.toLowerCase();
-    let isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf('macintosh') > -1 && 'ontouchend' in document;
-    if (!isiOS) return;
-    this.hammer.add(new Hammer.Press({ time: 251 }));
+    let isTouchUa = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
+      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document)
+      || ua.indexOf('android') > -1
+      || ('ontouchstart' in window);
+    if (!isTouchUa) return;
+    this.hammer.add(new Hammer.Press({ time: 480 }));
     this.hammer.on('press', ev => {
       let event = new MouseEvent('contextmenu', {
         bubbles: true,
@@ -106,7 +116,7 @@ export class TableTouchGesture {
     this.prevHammerDeltaX = ev.deltaX;
     this.prevHammerDeltaY = ev.deltaY;
 
-    if (this.tappedPanTimer == null || ev.eventType != Hammer.INPUT_START) return;
+    if (this.simplePan || this.tappedPanTimer == null || ev.eventType != Hammer.INPUT_START) return;
     let distance = MathUtil.sqrMagnitude(this.tappedPanCenter, ev.center);
     if (50 ** 2 < distance) {
       this.clearTappedPanTimer();
@@ -114,12 +124,20 @@ export class TableTouchGesture {
   }
 
   private onTap(ev: HammerInput) {
+    if (this.simplePan) {
+      if (this.ongesture) this.ongesture(ev.srcEvent);
+      return;
+    }
     this.tappedPanCenter = ev.center;
     this.tappedPanTimer = setTimeout(() => { this.tappedPanTimer = null; }, 400);
     if (this.ongesture) this.ongesture(ev.srcEvent);
   }
 
   private onTappedPanStart(ev: HammerInput) {
+    if (this.simplePan) {
+      if (this.ongesture) this.ongesture(ev.srcEvent);
+      return;
+    }
     if (this.tappedPanTimer == null) return;
     this.clearTappedPanTimer(false);
     if (this.ongesture) this.ongesture(ev.srcEvent);
@@ -130,10 +148,11 @@ export class TableTouchGesture {
   }
 
   private onTappedPanMove(ev: HammerInput) {
-    if (this.tappedPanTimer == null) {
+    if (this.simplePan || this.tappedPanTimer == null) {
       let transformX = this.deltaHammerDeltaX;
       let transformY = this.deltaHammerDeltaY;
       let transformZ = 0;
+      if (this.ongesture) this.ongesture(ev.srcEvent);
       if (this.ontransform) this.ontransform(transformX, transformY, transformZ, 0, 0, 0, TableTouchGestureEvent.PAN, ev.srcEvent);
     } else {
       this.clearTappedPanTimer(false);

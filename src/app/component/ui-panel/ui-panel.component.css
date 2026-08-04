@@ -115,6 +115,19 @@
   /*background: linear-gradient(-30deg, rgba(240,218,189, 0.9), rgba(255, 244, 232, 0.9));*/
 }
 
+/* Phone/tablet sheets: fixed above bottom nav, no grab cursor. */
+.draggable-panel.is-mobile-sheet {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px)) !important;
+  max-width: 100vw;
+  max-height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px));
+  cursor: default;
+  border-radius: 0;
+  z-index: 12000;
+}
+
 .scrollable-panel {
   scrollbar-width: thin;
 }

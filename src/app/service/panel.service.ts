@@ -1,5 +1,6 @@
 import { ComponentRef, Injectable, OnChanges, ViewContainerRef } from '@angular/core';
 import { I18nService } from './i18n.service';
+import { MobileLayoutService } from './mobile-layout.service';
 
 declare var Type: FunctionConstructor;
 interface Type<T> extends Function {
@@ -40,7 +41,10 @@ export class PanelService {
 
   scrollablePanel: HTMLDivElement = null;
 
-  constructor(private i18n: I18nService) {
+  constructor(
+    private i18n: I18nService,
+    private mobileLayout: MobileLayoutService,
+  ) {
     this.title = this.i18n.t('panel.untitled');
   }
 
@@ -101,13 +105,21 @@ export class PanelService {
     const childPanelService: PanelService = panelComponentRef.injector.get(PanelService);
     childPanelService.panelComponentRef = panelComponentRef;
     PanelService.openPanels.add(childPanelService);
-    if (option) {
-      if (option.title) childPanelService.title = option.title;
-      if (option.top) childPanelService.top = option.top;
-      if (option.left) childPanelService.left = option.left;
-      if (option.width) childPanelService.width = option.width;
-      if (option.height) childPanelService.height = option.height;
-      if (option.tourPanelId) childPanelService.tourPanelId = option.tourPanelId;
+
+    // Mobile: near-full-screen sheet. Desktop options pass through unchanged.
+    const resolved = this.mobileLayout.adaptPanelOption(option || {});
+    if (resolved.title) childPanelService.title = resolved.title;
+    if (resolved.top != null) childPanelService.top = resolved.top;
+    if (resolved.left != null) childPanelService.left = resolved.left;
+    if (resolved.width != null) childPanelService.width = resolved.width;
+    if (resolved.height != null) childPanelService.height = resolved.height;
+    if (resolved.tourPanelId) childPanelService.tourPanelId = resolved.tourPanelId;
+
+    if (this.mobileLayout.isMobile) {
+      childPanelService.isAbleRotateButton = false;
+      childPanelService.isAbleMinimizeButton = false;
+      const panelInst = panelComponentRef.instance as any;
+      if (panelInst) panelInst.isMobileSheet = true;
     }
 
     let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);

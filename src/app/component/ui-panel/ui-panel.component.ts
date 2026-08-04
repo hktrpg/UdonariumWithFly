@@ -72,6 +72,8 @@ export class UIPanelComponent implements OnInit {
   isMinimized: boolean = false;
   isFullScreen: boolean = false;
   isHorizontal: boolean = false;
+  /** Set by PanelService.open on phone/tablet sheets. Desktop panels stay false. */
+  isMobileSheet: boolean = false;
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
