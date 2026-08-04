@@ -39,6 +39,11 @@ export class TabletopKeyboardService {
   private listening = false;
   /** Acc for Alt/Ctrl+Shift wheel → one discrete step per notch. */
   private wheelAcc = 0;
+  /**
+   * Track Alt from keydown/keyup only — do not trust e.altKey after Alt+wheel.
+   * Windows/Chrome can leave altKey sticky or steal focus to the menu bar.
+   */
+  private altHeld = false;
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
@@ -46,6 +51,7 @@ export class TabletopKeyboardService {
   private readonly onBlur = () => {
     this.pressed.clear();
     this.wheelAcc = 0;
+    this.altHeld = false;
   };
 
   constructor(
@@ -85,11 +91,18 @@ export class TabletopKeyboardService {
     if (this.shouldIgnore(e)) return;
 
     const code = e.code;
+    if (code === 'AltLeft' || code === 'AltRight') {
+      this.altHeld = true;
+      // Stop Windows/Chrome from focusing the menu bar (breaks WASD after Alt+wheel).
+      if (e.cancelable) e.preventDefault();
+      return;
+    }
+
     if (MOVE_CODES.has(code)) this.pressed.add(code);
 
     const mod = e.ctrlKey || e.metaKey;
 
-    if (mod && !e.altKey && !e.shiftKey) {
+    if (mod && !this.altHeld && !e.shiftKey) {
       if (code === 'KeyZ') {
         if (this.undoService.undo()) this.consume(e);
         return;
@@ -114,7 +127,7 @@ export class TabletopKeyboardService {
       }
     }
 
-    if (mod && e.shiftKey && !e.altKey && code === 'KeyZ') {
+    if (mod && e.shiftKey && !this.altHeld && code === 'KeyZ') {
       if (this.undoService.redo()) this.consume(e);
       return;
     }
@@ -122,7 +135,7 @@ export class TabletopKeyboardService {
     if (Network.GuestMode()) return;
 
     // Path draft: Space commits movement along existing waypoints.
-    if (code === 'Space' && !mod && !e.altKey && !e.shiftKey) {
+    if (code === 'Space' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
         void this.tokenPath.commit();
         this.consume(e);
@@ -131,7 +144,7 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (code === 'Escape' && !mod && !e.altKey && !e.shiftKey) {
+    if (code === 'Escape' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
         this.tokenPath.cancelDraft();
         this.consume(e);
@@ -149,7 +162,7 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (code === 'Delete' && !mod && !e.altKey) {
+    if (code === 'Delete' && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) {
         if (this.sceneTools.deleteSelection()) this.consume(e);
         return;
@@ -158,12 +171,12 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if ((code === 'BracketLeft' || code === 'BracketRight') && !mod && !e.altKey && !e.shiftKey) {
+    if ((code === 'BracketLeft' || code === 'BracketRight') && !mod && !this.altHeld && !e.shiftKey) {
       if (this.changeLayerOrder(code === 'BracketRight')) this.consume(e);
       return;
     }
 
-    if (!MOVE_CODES.has(code) || mod || e.altKey) return;
+    if (!MOVE_CODES.has(code) || mod || this.altHeld) return;
 
     // Scene-tool selection: WASD / arrows nudge drawings, lights, walls.
     if (this.sceneTools.selectionCount > 0) {
@@ -199,6 +212,12 @@ export class TabletopKeyboardService {
   }
 
   private handleKeyUp(e: KeyboardEvent) {
+    if (e.code === 'AltLeft' || e.code === 'AltRight') {
+      this.altHeld = false;
+      return;
+    }
+    // Heal lost Alt keyup (common after Alt+wheel on Windows).
+    if (!e.altKey) this.altHeld = false;
     this.pressed.delete(e.code);
   }
 
@@ -210,9 +229,11 @@ export class TabletopKeyboardService {
     //   Alt+Shift+wheel → roll ±3° per notch
     //   Ctrl+Shift+wheel → facing ±45° per notch
     // Empty selection: Alt / Alt+Shift view rotate (±3°) is handled by TableMouseGesture.
+    // Prefer live e.altKey for the gesture; also accept tracked altHeld.
+    const alt = e.altKey || this.altHeld;
     const isCtrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey;
-    const isAltOnly = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
-    const isAltShift = e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey;
+    const isAltOnly = alt && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+    const isAltShift = alt && e.shiftKey && !e.ctrlKey && !e.metaKey;
     const stepDeg = isCtrlShift ? 45 : (isAltOnly || isAltShift) ? 3 : null;
     if (stepDeg == null) return;
     if (this.selectionService.size < 1) return;

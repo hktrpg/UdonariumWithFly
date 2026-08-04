@@ -31,12 +31,16 @@ export class TableMouseGesture {
   private input: InputHandler = null;
   /** Acc for Alt(+Shift)+wheel view rotate → exactly 3° per notch. */
   private altWheelAcc = 0;
+  /** Track Alt from key events — e.altKey can stick after Alt+wheel on Windows. */
+  private altHeld = false;
 
   get isGrabbing(): boolean { return this.input.isGrabbing; }
   get isDragging(): boolean { return this.input.isDragging; }
 
   private callbackOnWheel = (e) => this.onWheel(e);
   private callbackOnKeydown = (e) => this.onKeydown(e);
+  private callbackOnKeyup = (e) => this.onKeyup(e);
+  private callbackOnBlur = () => { this.altHeld = false; };
 
   onstart: Callback = null;
   onend: Callback = null;
@@ -119,7 +123,7 @@ export class TableMouseGesture {
     // Ctrl+Shift+wheel = object rotate (handled in TabletopKeyboardService).
     if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) return;
     // Alt+wheel with selection = object rotate (same service, capture phase).
-    if (ev.altKey && this.hasObjectSelection()) return;
+    if ((ev.altKey || this.altHeld) && this.hasObjectSelection()) return;
 
     // Prefer dominant axis (Shift+wheel often becomes deltaX on OS/browser).
     const useX = Math.abs(ev.deltaX) > Math.abs(ev.deltaY);
@@ -148,7 +152,7 @@ export class TableMouseGesture {
 
     let event = TableMouseGestureEvent.ZOOM;
 
-    if (ev.altKey) {
+    if (ev.altKey || this.altHeld) {
       // Empty selection → rotate view ±3° per wheel notch.
       if (ev.ctrlKey || ev.metaKey) return;
       if (ev.cancelable) ev.preventDefault();
@@ -186,6 +190,12 @@ export class TableMouseGesture {
   onKeydown(ev: KeyboardEvent) {
     if (this.shouldIgnoreKeyTarget(ev)) return;
 
+    if (ev.code === 'AltLeft' || ev.code === 'AltRight') {
+      this.altHeld = true;
+      if (ev.cancelable) ev.preventDefault();
+      return;
+    }
+
     let transformX = 0;
     let transformY = 0;
     let transformZ = 0;
@@ -198,10 +208,11 @@ export class TableMouseGesture {
 
     // Empty selection (desktop): WASD = forward/back/strafe; Q/E yaw ±3°.
     // Pan axes are remapped by view yaw in onTableMouseTransform.
+    // Use tracked altHeld — not e.altKey (sticky after Alt+wheel on Windows).
     if (
       this.allowViewKeyboard()
       && !this.hasObjectSelection()
-      && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey
+      && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !this.altHeld
     ) {
       const code = ev.code;
       let handled = false;
@@ -279,6 +290,15 @@ export class TableMouseGesture {
     return !!target.closest('[contenteditable="true"], [contenteditable=""]');
   }
 
+  onKeyup(ev: KeyboardEvent) {
+    if (ev.code === 'AltLeft' || ev.code === 'AltRight') {
+      this.altHeld = false;
+      return;
+    }
+    // Heal lost Alt keyup (common after Alt+wheel on Windows).
+    if (!ev.altKey) this.altHeld = false;
+  }
+
   private getKeyName(keyboard: KeyboardEvent): string {
     if (keyboard.key) return keyboard.key.length === 1 ? keyboard.key.toLowerCase() : keyboard.key;
     switch (keyboard.keyCode) {
@@ -299,10 +319,14 @@ export class TableMouseGesture {
   private addEventListeners() {
     this.targetElement.addEventListener('wheel', this.callbackOnWheel, { passive: false });
     document.body.addEventListener('keydown', this.callbackOnKeydown, false);
+    document.body.addEventListener('keyup', this.callbackOnKeyup, false);
+    window.addEventListener('blur', this.callbackOnBlur);
   }
 
   private removeEventListeners() {
     this.targetElement.removeEventListener('wheel', this.callbackOnWheel);
     document.body.removeEventListener('keydown', this.callbackOnKeydown, false);
+    document.body.removeEventListener('keyup', this.callbackOnKeyup, false);
+    window.removeEventListener('blur', this.callbackOnBlur);
   }
 }
