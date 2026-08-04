@@ -3,6 +3,9 @@
     <button type="button" class="btn btn-primary btn-block" (click)="create()">
       <i class="material-icons">add</i>{{ 'chatTab.create' | i18n }}
     </button>
+    <button type="button" class="btn btn-block" (click)="createPrivate()" [disabled]="GuestMode()">
+      <i class="material-icons">lock</i>{{ 'chatTab.createPrivate' | i18n }}
+    </button>
     <select
       #select
       class="settings-list"
@@ -16,7 +19,7 @@
         [title]="chatTab.name"
         [class.is-unnamed]="chatTab.name == ''"
       >
-        {{ chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name }}
+        {{ chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name }}{{ chatTab.isPrivate ? ' 🔒' : '' }}
       </option>
     </select>
   </aside>
@@ -52,6 +55,23 @@
             [disabled]="!isEditable"
           />
           {{ 'chatTab.showOperationLog' | i18n }}
+        </label>
+        <label [class.disabled]="!isEditable || GuestMode()" [style.cursor]="isEditable ? 'pointer' : 'default'">
+          <input type="checkbox" [(ngModel)]="isPrivate" [disabled]="!isEditable || GuestMode()" />
+          {{ 'chatTab.private' | i18n }}
+        </label>
+      </div>
+      <div class="members" *ngIf="isPrivate">
+        <header class="card-head"><h3>{{ 'chatTab.members' | i18n }}</h3></header>
+        <p class="hint">{{ 'chatTab.membersHint' | i18n }}</p>
+        <label class="member-row" *ngFor="let peer of peerCandidates">
+          <input
+            type="checkbox"
+            [checked]="isMemberChecked(peer.userId)"
+            (change)="toggleMember(peer.userId, $any($event.target).checked)"
+            [disabled]="!isEditable || GuestMode()"
+          />
+          <span [style.color]="peer.color">{{ peer.name }}</span>
         </label>
       </div>
     </section>

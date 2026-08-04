@@ -16,6 +16,8 @@ export const zhTW: I18nDictionary = {
   'menu.toolbox': '工具箱',
   'menu.combat': '戰鬥輪',
   'menu.sceneTools': '場景工具',
+  'menu.scenePreset': '場面預設',
+  'menu.scenarioText': '劇本文字',
   'menu.inventory': '角色倉庫',
   'menu.notes': '筆記倉庫',
   'menu.diceOpen': '公開骰子',

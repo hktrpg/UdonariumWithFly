@@ -23,6 +23,7 @@ import * as localForage from 'localforage';
     standalone: false
 })
 export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
+  static activeChatTabIdentifier: string = '';
   @ViewChild('chatTabComponemt', { static: false }) chatTabComponemt: ChatTabComponent;
   sendFrom: string = 'Guest';
   
@@ -122,10 +123,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   set gameType(gameType: string) { this.chatMessageService.gameType = gameType; }
 
   private _chatTabidentifier: string = '';
+  get chatTabs(): ChatTab[] {
+    return this.chatMessageService.chatTabs.filter(tab => tab.canView());
+  }
+
   get chatTabidentifier(): string { return this._chatTabidentifier; }
   set chatTabidentifier(chatTabidentifier: string) {
     let hasChanged: boolean = this._chatTabidentifier !== chatTabidentifier;
     this._chatTabidentifier = chatTabidentifier;
+    ChatWindowComponent.activeChatTabIdentifier = chatTabidentifier || '';
     this.updatePanelTitle();
     if (hasChanged) {
       this.scrollToBottom(true);
@@ -152,7 +158,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit() {
     const preferred = GameCharacter.preferredChatCharacter();
     this.sendFrom = preferred?.identifier || PeerCursor.myCursor.identifier;
-    this._chatTabidentifier = 0 < this.chatMessageService.chatTabs.length ? this.chatMessageService.chatTabs[0].identifier : '';
+    this._chatTabidentifier = 0 < this.chatTabs.length ? this.chatTabs[0].identifier : '';
+    ChatWindowComponent.activeChatTabIdentifier = this._chatTabidentifier;
 
     EventSystem.register(this)
       .on('MESSAGE_ADDED', event => {
@@ -172,7 +179,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('UPDATE_GAME_OBJECT', event => {
         // After room sync / ZIP load replaces ChatTabList, reselect main if current tab is gone.
-        if (!this.chatTab) this.selectMainChatTab();
+        if (!this.chatTab || !this.chatTab.canView()) this.selectMainChatTab();
       })
       .on('CHANGE_JUKEBOX_VOLUME', event => {
         this.changeDetector.markForCheck();
@@ -227,9 +234,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  /** Jump to the first (main) chat tab when the current selection is gone. */
+  /** Jump to the first visible chat tab when the current selection is gone. */
   private selectMainChatTab() {
-    const tabs = this.chatMessageService.chatTabs;
+    const tabs = this.chatTabs;
     const nextId = tabs.length > 0 ? tabs[0].identifier : '';
     if (this._chatTabidentifier === nextId) {
       this.updatePanelTitle();

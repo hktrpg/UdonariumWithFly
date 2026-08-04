@@ -16,6 +16,8 @@ export const ja: I18nDictionary = {
   'menu.toolbox': 'ツールボックス',
   'menu.combat': '戦闘トラッカー',
   'menu.sceneTools': 'シーンツール',
+  'menu.scenePreset': 'シーンプリセット',
+  'menu.scenarioText': 'シナリオテキスト',
   'menu.inventory': 'キャラ倉庫',
   'menu.notes': 'メモ倉庫',
   'menu.diceOpen': 'ダイス公開',

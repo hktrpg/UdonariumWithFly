@@ -297,6 +297,9 @@
         <button type="button" class="btn" (click)="restore()">{{ 'table.restore' | i18n }}</button>
       </ng-container>
       <button type="button" class="btn btn-primary" (click)="confirm()">{{ 'table.confirm' | i18n }}</button>
+      <button type="button" class="btn" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
+        <i class="material-icons">theaters</i>{{ 'scenePreset.saveAsScene' | i18n }}
+      </button>
       <span class="local-note"><sup class="self-only">*</sup>{{ 'table.localOnly' | i18n }}</span>
     </footer>
   </main>

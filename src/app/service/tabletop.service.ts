@@ -8,6 +8,10 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
+import { ScenePreset } from '@udonarium/scene-preset';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
+import { ScenarioText } from '@udonarium/scenario-text';
+import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceSymbol } from '@udonarium/dice-symbol';
@@ -121,6 +125,10 @@ export class TabletopService {
           DiceRollTableList.instance.addDiceRollTable(gameObject);
         }  else if (gameObject instanceof CutIn) {
           CutInList.instance.addCutIn(gameObject);
+        } else if (gameObject instanceof ScenePreset) {
+          ScenePresetList.instance.addPreset(gameObject);
+        } else if (gameObject instanceof ScenarioText) {
+          ScenarioTextList.instance.addItem(gameObject);
         }
       });
   }

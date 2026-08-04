@@ -5,7 +5,8 @@ export enum VolumeType {
   MASTER,
   AUDITION,
   SOUND_EFFECT,
-  NOTICE
+  NOTICE,
+  AMBIENT
 }
 
 declare global {
@@ -23,11 +24,13 @@ export class AudioPlayer {
   static readonly MAIN_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-main-volume-local-storage';
   static readonly SOUND_EFFECT_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-sound-effect-volume-local-storage';
   static readonly NOTICE_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-notice-volume-local-storage';
+  static readonly AMBIENT_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-ambient-volume-local-storage';
 
   static readonly AUDITION_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-audition-is-mute-local-storage';
   static readonly MAIN_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-main-is-mute-local-storage';
   static readonly SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-sound-effect-is-mute-local-storage';
   static readonly NOTICE_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-notice-is-mute-local-storage';
+  static readonly AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-ambient-is-mute-local-storage';
 
   private static _audioContext: AudioContext;
   static get audioContext(): AudioContext {
@@ -91,6 +94,20 @@ export class AudioPlayer {
     AudioPlayer.noticeGainNode.gain.setTargetAtTime(AudioPlayer.isNoticeMute ? 0 : AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime, 0.01);
   }
 
+  private static _isAmbientMute: boolean = false;
+  static get isAmbientMute(): boolean { return AudioPlayer._isAmbientMute; }
+  static set isAmbientMute(isAmbientMute: boolean) {
+    AudioPlayer._isAmbientMute = isAmbientMute;
+    AudioPlayer.ambientVolume = AudioPlayer._ambientVolume;
+  }
+
+  private static _ambientVolume: number = 0.5;
+  static get ambientVolume(): number { return AudioPlayer._ambientVolume; }
+  static set ambientVolume(ambientVolume: number) {
+    AudioPlayer._ambientVolume = ambientVolume;
+    AudioPlayer.ambientGainNode.gain.setTargetAtTime(AudioPlayer.isAmbientMute ? 0 : AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime, 0.01);
+  }
+
   private static _masterGainNode: GainNode
   private static get masterGainNode(): GainNode {
     if (!AudioPlayer._masterGainNode) {
@@ -135,10 +152,22 @@ export class AudioPlayer {
     return AudioPlayer._noticeGainNode;
   }
 
+  private static _ambientGainNode: GainNode
+  private static get ambientGainNode(): GainNode {
+    if (!AudioPlayer._ambientGainNode) {
+      let ambientGain = AudioPlayer.audioContext.createGain();
+      ambientGain.gain.setValueAtTime(AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime);
+      ambientGain.connect(AudioPlayer.audioContext.destination);
+      AudioPlayer._ambientGainNode = ambientGain;
+    }
+    return AudioPlayer._ambientGainNode;
+  }
+
   static get rootNode(): AudioNode { return AudioPlayer.masterGainNode; }
   static get auditionNode(): AudioNode { return AudioPlayer.auditionGainNode; }
   static get soundEffectNode(): AudioNode { return AudioPlayer.soundEffectGainNode; }
   static get noticeNode(): AudioNode { return AudioPlayer.noticeGainNode; }
+  static get ambientNode(): AudioNode { return AudioPlayer.ambientGainNode; }
 
   private _audioElm: HTMLAudioElement;
   private get audioElm(): HTMLAudioElement {
@@ -228,6 +257,8 @@ export class AudioPlayer {
         return AudioPlayer.soundEffectNode;
       case VolumeType.NOTICE:
         return AudioPlayer.noticeNode;
+      case VolumeType.AMBIENT:
+        return AudioPlayer.ambientNode;
       default:
         return AudioPlayer.rootNode;
     }

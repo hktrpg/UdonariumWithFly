@@ -53,6 +53,11 @@ import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
 import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
 import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
+import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
+import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
+import { CharacterResourceHudComponent } from 'component/character-resource-hud/character-resource-hud.component';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
+import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
@@ -200,6 +205,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     subTab.recieveOperationLogLevel = 1;
 
     CutInList.instance.initialize();
+    ScenePresetList.instance.initialize();
+    ScenarioTextList.instance.initialize();
+    const sampleScenario = ScenarioTextList.instance.addItem(this.i18n.t('sample.scenarioText'));
+    sampleScenario.body = this.i18n.t('sample.scenarioTextBody');
     AuraNameConfig.instance;
     CombatTracker.instance;
     SceneToolPermission.instance;
@@ -235,10 +244,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.NOTICE_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
         if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.noticeVolume = volume;
       });
+      localForage.getItem(AudioPlayer.AMBIENT_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
+        if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.ambientVolume = volume;
+      });
       localForage.getItem(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isMute = !!isMute);
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
+      localForage.getItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAmbientMute = !!isMute);
       localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
         // Default ON when unset; honor explicit boolean from storage.
         ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
@@ -771,6 +784,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = SceneToolsComponent;
         option = { width: 380, height: 560, left: 100 };
         break;
+      case 'ScenePresetComponent':
+        component = ScenePresetComponent;
+        option = { width: 520, height: 560, left: 100 };
+        break;
+      case 'ScenarioTextComponent':
+        component = ScenarioTextComponent;
+        option = { width: 520, height: 560, left: 100 };
+        break;
     }
     if (component) {
       option.top = (this.openPanelCount % 10 + 1) * 20;
@@ -800,6 +821,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'JukeboxComponent': return 'menu.music';
       case 'CombatTrackerComponent': return 'menu.combat';
       case 'SceneToolsComponent': return 'menu.sceneTools';
+      case 'ScenePresetComponent': return 'menu.scenePreset';
+      case 'ScenarioTextComponent': return 'menu.scenarioText';
       case 'GameObjectInventoryComponent': return 'menu.inventory';
       case 'NoteInventoryComponent': return 'menu.notes';
       default: return null;
@@ -1194,6 +1217,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setChatLeftOnly(v); },
         on: `☑${this.i18n.t('menu.settings.leftOnly')}`,
         off: `☐${this.i18n.t('menu.settings.leftOnly')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => CharacterResourceHudComponent.isVisible,
+        set: (v) => CharacterResourceHudComponent.setVisible(v),
+        on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
+        off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
       }),
       ContextMenuSeparator,
       contextMenuToggleCheck({

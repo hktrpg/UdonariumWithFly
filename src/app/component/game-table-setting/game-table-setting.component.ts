@@ -6,6 +6,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
@@ -186,6 +187,13 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   confirm() {
     this.panelService.close();
+  }
+
+  saveAsScene() {
+    if (this.GuestMode()) return;
+    ScenePresetList.instance.createFromCurrent(
+      this.selectedTable?.name || this.i18n.t('scenePreset.defaultTitle')
+    );
   }
 
   async save() {

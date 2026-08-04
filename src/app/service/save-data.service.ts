@@ -22,6 +22,8 @@ import { CutInList } from '@udonarium/cut-in-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import { ScenePresetList } from '@udonarium/scene-preset-list';
+import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { I18nService } from './i18n.service';
@@ -78,6 +80,8 @@ export class SaveDataService {
     let auraNameXml = this.convertToXml(AuraNameConfig.instance);
     let combatXml = this.convertToXml(CombatTracker.instance);
     let scenePermXml = this.convertToXml(SceneToolPermission.instance);
+    let scenePresetXml = this.convertToXml(ScenePresetList.instance);
+    let scenarioTextXml = this.convertToXml(ScenarioTextList.instance);
     files.push(new File([roomXml], 'fly_data.xml', { type: 'text/plain' }));
     files.push(new File([chatXml], 'fly_chat.xml', { type: 'text/plain' }));
     files.push(new File([diceRollTableXml], 'fly_rollTable.xml', { type: 'text/plain' }));
@@ -86,6 +90,8 @@ export class SaveDataService {
     files.push(new File([auraNameXml], 'fly_auraNames.xml', { type: 'text/plain' }));
     files.push(new File([combatXml], 'fly_combat.xml', { type: 'text/plain' }));
     files.push(new File([scenePermXml], 'fly_scenePerm.xml', { type: 'text/plain' }));
+    files.push(new File([scenePresetXml], 'fly_scenePreset.xml', { type: 'text/plain' }));
+    files.push(new File([scenarioTextXml], 'fly_scenarioText.xml', { type: 'text/plain' }));
 
     let images: ImageFile[] = [];
     images = images.concat(this.searchImageFiles(roomXml));

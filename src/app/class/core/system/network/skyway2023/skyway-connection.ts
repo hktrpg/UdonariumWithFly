@@ -45,7 +45,7 @@ export class SkyWayConnection implements Connection {
   private readonly maybeUnavailablePeerIds: Set<string> = new Set();
 
   configure(config: any) {
-    this.skyWay.url = config?.backend?.url ?? '';
+    this.skyWay.url = resolveBackendUrl(config?.backend?.url ?? '');
   }
 
   open(userId?: string)
@@ -359,4 +359,24 @@ export class SkyWayConnection implements Connection {
       ? PeerContext.create(userId, this.peer.roomId, this.peer.roomName, this.peer.password)
       : PeerContext.create(userId);
   }
+}
+
+/** Prefer same-origin so Angular proxy `/v1` works whether the page is localhost or 127.0.0.1. */
+function resolveBackendUrl(configured: string): string {
+  const url = (configured || '').trim();
+  const pageOrigin = typeof location !== 'undefined' ? `${location.origin}/` : '';
+  if (!url || url.includes('{your-backend')) return pageOrigin;
+  if (!pageOrigin) return url;
+  try {
+    const configuredUrl = new URL(url);
+    const pageHost = location.hostname;
+    const configHost = configuredUrl.hostname;
+    const isLocal = (h: string) => h === 'localhost' || h === '127.0.0.1';
+    if (isLocal(pageHost) && isLocal(configHost) && pageHost !== configHost) {
+      return pageOrigin;
+    }
+  } catch {
+    return pageOrigin || url;
+  }
+  return url.endsWith('/') ? url : `${url}/`;
 }

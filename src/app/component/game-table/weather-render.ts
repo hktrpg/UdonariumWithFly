@@ -176,7 +176,7 @@ export class WeatherRender {
       this.lastW = width;
       this.lastH = height;
       this.flash = 0;
-      this.flashCooldown = 50 + Math.random() * 90;
+      this.flashCooldown = 100 + Math.random() * 160;
       this.bolt = [];
       this.rebuild(type, intensity, width, height);
     }
@@ -358,15 +358,16 @@ export class WeatherRender {
       return;
     }
     if (this.flash > 0) {
-      this.flash = Math.max(0, this.flash - 0.065);
+      this.flash = Math.max(0, this.flash - 0.09);
       if (this.flash <= 0) this.bolt = [];
       return;
     }
     this.flashCooldown -= 1;
     if (this.flashCooldown > 0) return;
-    this.flash = 0.88 + Math.random() * 0.12;
-    this.flashCooldown = 55 + Math.random() * (150 - intensity * 70);
-    if (Math.random() < 0.4) this.flashCooldown = 10 + Math.random() * 16;
+    // Softer, rarer flashes — avoid rapid strobing.
+    this.flash = 0.42 + Math.random() * 0.28;
+    this.flashCooldown = 140 + Math.random() * (260 - intensity * 90);
+    if (Math.random() < 0.12) this.flashCooldown = 28 + Math.random() * 36;
     this.rebuildBolt(width, height);
   }
 
@@ -508,7 +509,7 @@ export class WeatherRender {
       case 'thunderstorm': {
         this.wash(ctx, width, height, [36, 48, 72], this.layerWash(index, 0.34, 0.22, 0.13) * i);
         if (this.flash > 0) {
-          this.wash(ctx, width, height, [220, 235, 255], this.flash * this.layerWash(index, 0.2, 0.3, 0.48) * i);
+          this.wash(ctx, width, height, [220, 235, 255], this.flash * this.layerWash(index, 0.1, 0.16, 0.26) * i);
         }
         break;
       }
@@ -561,13 +562,13 @@ export class WeatherRender {
 
   private drawBolt(ctx: CanvasRenderingContext2D, intensity: number) {
     if (this.bolt.length < 2) return;
-    const a = this.flash * 0.7 * intensity;
+    const a = this.flash * 0.55 * intensity;
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     // Glow
-    ctx.strokeStyle = `rgba(180, 210, 255, ${a * 0.35})`;
-    ctx.lineWidth = 6 + intensity * 3;
+    ctx.strokeStyle = `rgba(180, 210, 255, ${a * 0.28})`;
+    ctx.lineWidth = 5 + intensity * 2.2;
     ctx.beginPath();
     ctx.moveTo(this.bolt[0].x, this.bolt[0].y);
     for (let i = 1; i < this.bolt.length; i++) ctx.lineTo(this.bolt[i].x, this.bolt[i].y);

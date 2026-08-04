@@ -1,0 +1,35 @@
+<div class="resource-hud" *ngIf="visible" [style.left.px]="left" [style.top.px]="top" (pointerdown)="startDrag($event)">
+  <header class="hud-head">
+    <span>{{ 'resourceHud.title' | i18n }}</span>
+    <label *ngIf="isGm" class="gm-toggle">
+      <input type="checkbox" [checked]="showAllForGm" (change)="toggleShowAll()" />
+      {{ 'resourceHud.showAll' | i18n }}
+    </label>
+  </header>
+  <p class="empty" *ngIf="!characters.length">{{ 'resourceHud.noClaim' | i18n }}</p>
+  <section class="char-block" *ngFor="let ch of characters">
+    <div class="char-name">{{ ch.name }}</div>
+    <div class="res-row" *ngFor="let el of resourcesOf(ch)">
+      <span class="res-label">{{ el.name }}</span>
+      <button type="button" class="btn-nudge" (click)="nudge(el, ch, -1)" [disabled]="!canEditCharacter(ch)">−</button>
+      <input
+        type="range"
+        [min]="0"
+        [max]="max(el) || 1"
+        [value]="current(el)"
+        (input)="onRange(el, ch, $event)"
+        [disabled]="!canEditCharacter(ch)"
+      />
+      <input
+        type="number"
+        class="res-num"
+        [ngModel]="current(el)"
+        (ngModelChange)="setCurrent(el, ch, $event)"
+        [disabled]="!canEditCharacter(ch)"
+      />
+      <span class="res-max">/ {{ max(el) }}</span>
+      <button type="button" class="btn-nudge" (click)="nudge(el, ch, 1)" [disabled]="!canEditCharacter(ch)">+</button>
+    </div>
+    <p class="empty" *ngIf="!resourcesOf(ch).length">{{ 'resourceHud.noResources' | i18n }}</p>
+  </section>
+</div>

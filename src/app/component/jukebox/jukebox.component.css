@@ -47,3 +47,59 @@
   color: #c0392b;
   vertical-align: text-top;
 }
+
+.track-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.now-playing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+}
+
+.now-playing-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.track-badge {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 4.5em;
+  color: #5c4630;
+}
+
+.room-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-gain input[type="range"] {
+  width: 80px;
+}
+
+.hint-inline {
+  font-size: 11px;
+  color: #7a654f;
+}
+
+.track-label-input {
+  min-width: 8em;
+  max-width: 14em;
+  border: 1px solid #c4b29a;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
