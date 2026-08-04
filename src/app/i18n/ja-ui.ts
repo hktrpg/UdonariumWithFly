@@ -2,7 +2,7 @@ import { I18nDictionary } from './types';
 
 export const ja_ui: I18nDictionary = {
   'peer.title': '接続情報',
-  'peer.language': '表示言語',
+  'peer.language': '🌐 Language / 言語',
   'peer.currentRole': '現在の役割：',
   'peer.role.gm': 'GM',
   'peer.role.user': 'プレイヤー',

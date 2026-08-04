@@ -1,7 +1,7 @@
 import { I18nDictionary } from './types';
 
 export const ja: I18nDictionary = {
-  'lang.label': '表示言語',
+  'lang.label': '🌐 Language / 言語',
   'lang.zh-TW': '繁體中文',
   'lang.zh-CN': '简体中文',
   'lang.en': 'English',

@@ -2,7 +2,7 @@ import { I18nDictionary } from './types';
 
 export const zhCN_ui: I18nDictionary = {
   'peer.title': '连接信息',
-  'peer.language': '界面语言',
+  'peer.language': '🌐 Language / 语言',
   'peer.currentRole': '当前身份：',
   'peer.role.gm': 'GM',
   'peer.role.user': '玩家',

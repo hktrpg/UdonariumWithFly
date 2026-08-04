@@ -39,7 +39,7 @@ export const ja_tip: I18nDictionary = {
 
   'tour.welcome.title': 'ようこそ — ガイドツアー',
   'tour.welcome.body': '各機能の説明を読んでから、開く／一度試します。\nいつでもスキップ可。以後はホバーで教學 BOX が出ます。\nデスクトップ版 Chrome 推奨。退出前に保存（ZIP またはフォルダバックアップ）。',
-  'tour.welcome.language': '言語 / Language',
+  'tour.welcome.language': '🌐 Language / 言語',
   'tour.welcome.start': '開始',
   'tour.welcome.skip': 'スキップ',
   'tour.prev': '戻る',

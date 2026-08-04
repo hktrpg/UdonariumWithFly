@@ -3,7 +3,7 @@ import { I18nDictionary } from './types';
 /** Connection / chat / lobby / room-join / remaining menu strings. */
 export const zhTW_ui: I18nDictionary = {
   'peer.title': '連線資訊',
-  'peer.language': '介面語言',
+  'peer.language': '🌐 Language / 語言',
   'peer.currentRole': '目前身份：',
   'peer.role.gm': 'GM',
   'peer.role.user': '玩家',

@@ -2,7 +2,7 @@ import { I18nDictionary } from './types';
 
 export const en_ui: I18nDictionary = {
   'peer.title': 'Connection',
-  'peer.language': 'Language',
+  'peer.language': '🌐 Language / 語言',
   'peer.currentRole': 'Role: ',
   'peer.role.gm': 'GM',
   'peer.role.user': 'Player',

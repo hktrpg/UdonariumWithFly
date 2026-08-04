@@ -1,7 +1,7 @@
 import { I18nDictionary } from './types';
 
 export const en: I18nDictionary = {
-  'lang.label': 'Language',
+  'lang.label': '🌐 Language / 語言',
   'lang.zh-TW': '繁體中文',
   'lang.zh-CN': '简体中文',
   'lang.en': 'English',

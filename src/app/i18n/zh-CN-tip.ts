@@ -39,7 +39,7 @@ export const zhCN_tip: I18nDictionary = {
 
   'tour.welcome.title': '欢迎 — 引导教学',
   'tour.welcome.body': '请先阅读说明，再打开／尝试各主要功能。\n可随时跳过。之后滑过按钮仍会立刻显示教学 BOX。\n建议桌面版 Chrome。离开前请存档（ZIP 或文件夹备份）。',
-  'tour.welcome.language': '语言 / Language',
+  'tour.welcome.language': '🌐 Language / 语言',
   'tour.welcome.start': '开始',
   'tour.welcome.skip': '跳过',
   'tour.prev': '上一步',
