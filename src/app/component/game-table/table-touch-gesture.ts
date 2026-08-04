@@ -77,9 +77,9 @@ export class TableTouchGesture {
     this.hammer.on('pinchmove', this.onPinchMove.bind(this));
     this.hammer.on('rotatemove', this.onRotateMove.bind(this));
 
-    // Long-press → contextmenu.
+    // Long-press → contextmenu (add token / dice / etc.).
     // iOS never fires it natively; some Android WebViews are also unreliable.
-    // Ping on empty table is skipped in the mobile tour; opening the menu clears ping hold.
+    // Mobile ping is HUD-only — do not share this long-press with empty-table ping.
     let ua = window.navigator.userAgent.toLowerCase();
     let needsSyntheticContextMenu =
       ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
