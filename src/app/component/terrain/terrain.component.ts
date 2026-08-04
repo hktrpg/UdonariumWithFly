@@ -235,10 +235,17 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
 
     let menuPosition = this.pointerDeviceService.pointers[0];
     let menuActions: ContextMenuAction[] = [];
-    menuActions = menuActions.concat(this.makeSelectionContextMenu());
-    menuActions = menuActions.concat(this.makeContextMenu());
+    let title = this.name;
 
-    this.contextMenuService.open(menuPosition, menuActions, this.name);
+    if (this.isMultiSelectedTerrains()) {
+      menuActions = this.makeSelectionContextMenu();
+      title = this.i18n.t('terrain.selectedCount', { count: this.selectedTerrains().length });
+    } else {
+      menuActions = menuActions.concat(this.makeSelectionContextMenu());
+      menuActions = menuActions.concat(this.makeContextMenu());
+    }
+
+    this.contextMenuService.open(menuPosition, menuActions, title);
   }
 
   onMove() {
@@ -294,16 +301,26 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     return ret;
   }
 
+  private selectedTerrains(): Terrain[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.terrain.aliasName
+    ) as Terrain[];
+  }
+
+  private isMultiSelectedTerrains(): boolean {
+    return this.isSelected && this.selectedTerrains().length > 1;
+  }
+
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     actions.push({ name: this.i18n.t('terrain.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
-    if (this.isSelected) {
-      let selectedGameTableMasks = () => this.selectionService.objects.filter(object => object.aliasName === this.terrain.aliasName) as Terrain[];
+    if (this.isMultiSelectedTerrains()) {
+      let selectedGameTableMasks = () => this.selectedTerrains();
       actions.push(
         {
           name: this.i18n.t('terrain.menu.2'), action: null, subActions: [
@@ -326,7 +343,12 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
               }
             }
           ]
-        }
+        },
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('char.clearSelection'),
+          action: () => this.selectionService.clear()
+        },
       );
     }
     actions.push(ContextMenuSeparator);

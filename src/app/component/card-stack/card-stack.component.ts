@@ -311,10 +311,17 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     let position = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
-    menuActions = menuActions.concat(this.makeSelectionContextMenu());
-    menuActions = menuActions.concat(this.makeContextMenu());
+    let title = this.name;
 
-    this.contextMenuService.open(position, menuActions, this.name);
+    if (this.isMultiSelectedStacks()) {
+      menuActions = this.makeSelectionContextMenu();
+      title = this.i18n.t('stack.selectedCount', { count: this.selectedCardStacks().length });
+    } else {
+      menuActions = menuActions.concat(this.makeSelectionContextMenu());
+      menuActions = menuActions.concat(this.makeContextMenu());
+    }
+
+    this.contextMenuService.open(position, menuActions, title);
   }
 
   onMove() {
@@ -424,8 +431,18 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     }
   }
 
+  private selectedCardStacks(): CardStack[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.cardStack.aliasName
+    ) as CardStack[];
+  }
+
+  private isMultiSelectedStacks(): boolean {
+    return this.isSelected && this.selectedCardStacks().length > 1;
+  }
+
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 
@@ -437,8 +454,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     };
     actions.push({ name: this.i18n.t('stack.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
-    if (this.isSelected) {
-      let selectedCardStacks = () => this.selectionService.objects.filter(object => object.aliasName === this.cardStack.aliasName) as CardStack[];
+    if (this.isMultiSelectedStacks()) {
+      let selectedCardStacks = () => this.selectedCardStacks();
       actions.push(
         {
           name: this.i18n.t('stack.menu.2'), action: null, subActions: [
@@ -471,7 +488,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
               }
             },
           ]
-        }
+        },
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('char.clearSelection'),
+          action: () => this.selectionService.clear()
+        },
       );
     }
     actions.push(ContextMenuSeparator);

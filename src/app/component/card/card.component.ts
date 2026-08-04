@@ -300,10 +300,16 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     let position = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
-    menuActions = menuActions.concat(this.makeSelectionContextMenu());
-    menuActions = menuActions.concat(this.makeContextMenu());
+    let title = this.isVisible ? this.name : this.i18n.t('card.noun');
+    if (this.isMultiSelectedCards()) {
+      menuActions = this.makeSelectionContextMenu();
+      title = this.i18n.t('card.selectedCount', { count: this.selectedCards().length });
+    } else {
+      menuActions = menuActions.concat(this.makeSelectionContextMenu());
+      menuActions = menuActions.concat(this.makeContextMenu());
+    }
 
-    this.contextMenuService.open(position, menuActions, this.isVisible ? this.name : this.i18n.t('card.noun'));
+    this.contextMenuService.open(position, menuActions, title);
   }
 
   onMove() {
@@ -364,8 +370,18 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
   }
 
+  private selectedCards(): Card[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.card.aliasName
+    ) as Card[];
+  }
+
+  private isMultiSelectedCards(): boolean {
+    return this.isSelected && this.selectedCards().length > 1;
+  }
+
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 
@@ -376,8 +392,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     };
     actions.push({ name: this.i18n.t('card.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
-    if (this.isSelected) {
-      let selectedCards = () => this.selectionService.objects.filter(object => object.aliasName === this.card.aliasName) as Card[];
+    if (this.isMultiSelectedCards()) {
+      let selectedCards = () => this.selectedCards();
       actions.push(
         {
           name: this.i18n.t('card.menu.2'), action: null, subActions: [
@@ -430,7 +446,12 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
               }
             },
           ]
-        }
+        },
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('char.clearSelection'),
+          action: () => this.selectionService.clear()
+        },
       );
     }
     actions.push(ContextMenuSeparator);

@@ -418,10 +418,17 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     let menuPosition = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
-    menuActions = menuActions.concat(this.makeSelectionContextMenu());
-    menuActions = menuActions.concat(this.makeContextMenu());
+    let title = this.name;
 
-    this.contextMenuService.open(menuPosition, menuActions, this.name);
+    if (this.isMultiSelectedMasks()) {
+      menuActions = this.makeSelectionContextMenu();
+      title = this.i18n.t('mask.selectedCount', { count: this.selectedMasks().length });
+    } else {
+      menuActions = menuActions.concat(this.makeSelectionContextMenu());
+      menuActions = menuActions.concat(this.makeContextMenu());
+    }
+
+    this.contextMenuService.open(menuPosition, menuActions, title);
   }
 
   onMove() {
@@ -475,16 +482,26 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     e.stopPropagation();
   }
 
+  private selectedMasks(): GameTableMask[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.gameTableMask.aliasName
+    ) as GameTableMask[];
+  }
+
+  private isMultiSelectedMasks(): boolean {
+    return this.isSelected && this.selectedMasks().length > 1;
+  }
+
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     actions.push({ name: this.i18n.t('mask.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
-    if (this.isSelected) {
-      let selectedGameTableMasks = () => this.selectionService.objects.filter(object => object.aliasName === this.gameTableMask.aliasName) as GameTableMask[];
+    if (this.isMultiSelectedMasks()) {
+      let selectedGameTableMasks = () => this.selectedMasks();
       actions.push(
         {
           name: this.i18n.t('mask.menu.2'), action: null, subActions: [
@@ -507,7 +524,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
               }
             },
           ]
-        }
+        },
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('char.clearSelection'),
+          action: () => this.selectionService.clear()
+        },
       );
     }
     actions.push(ContextMenuSeparator);

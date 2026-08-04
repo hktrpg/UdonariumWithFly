@@ -315,16 +315,31 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     let position = this.pointerDeviceService.pointers[0];
 
     let actions: ContextMenuAction[] = [];
+    let title = this.name;
 
-    //if (this.isVisible) {
-    actions = actions.concat(this.makeSelectionContextMenu());
-    actions = actions.concat(this.makeContextMenu());
+    if (this.isMultiSelectedDice()) {
+      actions = this.makeSelectionContextMenu();
+      title = this.i18n.t('dice.selectedCount', { count: this.selectedDiceSymbols().length });
+    } else {
+      actions = actions.concat(this.makeSelectionContextMenu());
+      actions = actions.concat(this.makeContextMenu());
+    }
 
-    this.contextMenuService.open(position, actions, this.name);
+    this.contextMenuService.open(position, actions, title);
+  }
+
+  private selectedDiceSymbols(): DiceSymbol[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.diceSymbol.aliasName
+    ) as DiceSymbol[];
+  }
+
+  private isMultiSelectedDice(): boolean {
+    return this.isSelected && this.selectedDiceSymbols().length > 1;
   }
 
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 
@@ -335,8 +350,8 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     };
     actions.push({ name: this.i18n.t('dice.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
 
-    if (this.isSelected) {
-      let selectedDiceSymbols = () => this.selectionService.objects.filter(object => object.aliasName === this.diceSymbol.aliasName) as DiceSymbol[];
+    if (this.isMultiSelectedDice()) {
+      let selectedDiceSymbols = () => this.selectedDiceSymbols();
       const isContainCoin = selectedDiceSymbols().some(diceSymbol => diceSymbol.isCoin);
       const isContainDice = selectedDiceSymbols().some(diceSymbol => !diceSymbol.isCoin);
       const kinds = [isContainCoin ? this.i18n.t('dice.dynamic.1') : '', isContainDice ? this.i18n.t('dice.dynamic.2') : ''].filter(Boolean).join('／');
@@ -406,7 +421,12 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
 
             },
           ]
-        }
+        },
+        ContextMenuSeparator,
+        {
+          name: this.i18n.t('char.clearSelection'),
+          action: () => this.selectionService.clear()
+        },
       );
     }
     actions.push(ContextMenuSeparator);

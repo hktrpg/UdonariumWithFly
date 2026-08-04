@@ -264,7 +264,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
   }
 
   private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+    if (this.selectionService.size <= 1) return [];
 
     let actions: ContextMenuAction[] = [];
 

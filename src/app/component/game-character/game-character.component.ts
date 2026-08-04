@@ -642,15 +642,21 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     e.stopPropagation();
     e.preventDefault();
 
-
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
     let position = this.pointerDeviceService.pointers[0];
     let menuActions: ContextMenuAction[] = [];
-    menuActions = menuActions.concat(this.makeSelectionContextMenu());
-    menuActions = menuActions.concat(this.makeContextMenu());
-    this.contextMenuService.open(position, menuActions, this.name);
+    let title = this.name;
+
+    if (this.isMultiSelectedCharacters()) {
+      menuActions = this.makeMultiSelectionContextMenu();
+      title = this.i18n.t('char.selectedCount', { count: this.selectedCharacters().length });
+    } else {
+      menuActions = menuActions.concat(this.makeSelectionContextMenu());
+      menuActions = menuActions.concat(this.makeContextMenu());
+    }
+    this.contextMenuService.open(position, menuActions, title);
   }
 
   onMove() {
@@ -674,56 +680,125 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     //EventSystem.trigger('UPDATE_GAME_OBJECT', this.gameCharacter);
   }
 
-  private makeSelectionContextMenu(): ContextMenuAction[] {
-    if (this.selectionService.objects.length < 1) return [];
+  private selectedCharacters(): GameCharacter[] {
+    return this.selectionService.objects.filter(
+      object => object.aliasName === this.gameCharacter.aliasName
+    ) as GameCharacter[];
+  }
 
-    let actions: ContextMenuAction[] = [];
+  private isMultiSelectedCharacters(): boolean {
+    return this.isSelected && this.selectedCharacters().length > 1;
+  }
+
+  private moveCharacterOffTable(gameCharacter: GameCharacter, location: string) {
+    EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
+    gameCharacter.setLocation(location);
+    this.selectionService.remove(gameCharacter);
+  }
+
+  /** Congregate only — used when not in multi-character mode (e.g. gather selection to an unselected token). */
+  private makeSelectionContextMenu(): ContextMenuAction[] {
+    if (this.selectionService.size <= 1) return [];
 
     let objectPosition = {
       x: this.gameCharacter.location.x + (this.gameCharacter.size * this.gridSize) / 2,
       y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
       z: this.gameCharacter.posZ
     };
-    actions.push({ name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) });
+    return [
+      { name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) },
+      ContextMenuSeparator,
+    ];
+  }
 
-    if (this.isSelected) {
-      let selectedCharacter = () => this.selectionService.objects.filter(object => object.aliasName === this.gameCharacter.aliasName) as GameCharacter[];
-      actions.push(
-        {
-          name: this.i18n.t('char.selectedCharacters'), action: null, subActions: [
-            {
-              name: this.i18n.t('char.moveAllToCommon'), action: () => {
-                selectedCharacter().forEach(gameCharacter => {
-                  gameCharacter.setLocation('common')
-                  this.selectionService.remove(gameCharacter);
-                });
-                SoundEffect.play(PresetSound.piecePut);
-              }
-            },
-            {
-              name: this.i18n.t('char.moveAllToPersonal'), action: () => {
-                selectedCharacter().forEach(gameCharacter => {
-                  gameCharacter.setLocation(Network.peerId);
-                  this.selectionService.remove(gameCharacter);
-                });
-                SoundEffect.play(PresetSound.piecePut);
-              }
-            },
-            {
-              name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
-                selectedCharacter().forEach(gameCharacter => {
-                  gameCharacter.setLocation('graveyard');
-                  this.selectionService.remove(gameCharacter);
-                });
-                SoundEffect.play(PresetSound.sweep);
-              }
-            },
-          ]
+  /** Right-click menu when 2+ selected characters include this token. */
+  private makeMultiSelectionContextMenu(): ContextMenuAction[] {
+    const selectedCharacter = () => this.selectedCharacters();
+    let objectPosition = {
+      x: this.gameCharacter.location.x + (this.gameCharacter.size * this.gridSize) / 2,
+      y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
+      z: this.gameCharacter.posZ
+    };
+
+    return [
+      { name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) },
+      ContextMenuSeparator,
+      this.characterFxMenu.makeCombatMenu(this.gameCharacter),
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('char.moveTo'),
+        action: null,
+        subActions: [
+          {
+            name: this.i18n.t('char.moveAllToCommon'),
+            action: () => {
+              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'common'));
+              SoundEffect.play(PresetSound.piecePut);
+            }
+          },
+          {
+            name: this.i18n.t('char.moveAllToPersonal'),
+            action: () => {
+              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, Network.peerId));
+              SoundEffect.play(PresetSound.piecePut);
+            }
+          },
+          {
+            name: this.i18n.t('char.moveAllToGraveyard'),
+            action: () => {
+              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'graveyard'));
+              SoundEffect.play(PresetSound.sweep);
+            }
+          },
+        ]
+      },
+      {
+        name: this.i18n.t('char.inventoryAllOn'),
+        action: () => {
+          selectedCharacter().forEach(ch => { ch.isInventoryIndicate = true; });
+          EventSystem.trigger('UPDATE_INVENTORY', null);
         }
-      );
-    }
-    actions.push(ContextMenuSeparator);
-    return actions;
+      },
+      {
+        name: this.i18n.t('char.inventoryAllOff'),
+        action: () => {
+          selectedCharacter().forEach(ch => { ch.isInventoryIndicate = false; });
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        }
+      },
+      {
+        name: this.i18n.t('char.resetAltitudeAll'),
+        action: () => {
+          selectedCharacter().forEach(ch => { ch.altitude = 0; });
+          SoundEffect.play(PresetSound.sweep);
+        }
+      },
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('char.cloneAll'),
+        action: () => {
+          selectedCharacter().forEach(ch => {
+            const cloneObject = ch.clone();
+            cloneObject.location.x += this.gridSize;
+            cloneObject.location.y += this.gridSize;
+            cloneObject.update();
+          });
+          SoundEffect.play(PresetSound.piecePut);
+        }
+      },
+      {
+        name: this.i18n.t('char.deleteAllToGraveyard'),
+        action: () => {
+          selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'graveyard'));
+          SoundEffect.play(PresetSound.sweep);
+        }
+      },
+      ContextMenuSeparator,
+      {
+        name: this.i18n.t('char.clearSelection'),
+        action: () => this.selectionService.clear()
+      },
+    ];
   }
 
   private makeContextMenu(): ContextMenuAction[] {
