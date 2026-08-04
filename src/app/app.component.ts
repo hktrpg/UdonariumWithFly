@@ -114,7 +114,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isHorizontal = false;
   isLoggedin = false;
-  isUpdateCanceled = false;
   isMobileLayout = false;
   isTabletLandscape = false;
   isMobileEdit = false;
@@ -748,7 +747,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       tourWasActive = active;
     });
     
-    // PWA
+    // PWA: download quietly, activate when ready; apply on next F5 / reopen (no confirm).
     let notification: Notification;
     this.swUpdate.versionUpdates.subscribe(event => {
       switch (event.type) {
@@ -775,29 +774,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         case 'VERSION_READY':
           console.log(`Current app version: ${event.currentVersion.hash}`);
           console.log(`New app version ready for use: ${event.latestVersion.hash}`);
-          if (!this.isUpdateCanceled) {
-            this.modalService.open(ConfirmationComponent, {
-              title: this.i18n.t('update.title'), 
-              text: this.i18n.t('update.text'),
-              helpHtml: this.i18n.t('update.help'),
-              type: ConfirmationType.OK_CANCEL,
-              materialIcon: 'browser_updated',
-              action: () => {
-                void this.swUpdate.activateUpdate().then(async () => {
-                  if (notification) {
-                    notification.close();
-                    notification = null;
-                  }
-                  await this.folderBackup.flush({ timeoutMs: 15000 });
-                  window.removeEventListener('beforeunload', AppComponent.beforeUnloadProc);
-                  document.location.reload();
-                });
-              },
-              cancelAction: () => {
-                this.isUpdateCanceled = true;
-              }
-            });
-          }
+          void this.swUpdate.activateUpdate().then(() => {
+            if (notification) {
+              notification.close();
+              notification = null;
+            }
+            console.log('New app version activated; will apply on next reload.');
+          });
           break;
         case 'VERSION_INSTALLATION_FAILED':
           console.log(`Failed to install app version '${event.version.hash}': ${event.error}`);
