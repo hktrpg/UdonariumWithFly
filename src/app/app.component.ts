@@ -739,19 +739,22 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     switch (componentName) {
       case 'PeerMenuComponent':
         option.width = 520;
+        option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
         option.width = 700;
+        option.title = this.i18n.t('chat.title');
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
-        option = { width: 610, height: 540, left: 100 };
+        option = { width: 610, height: 540, left: 100, title: this.i18n.t('table.title') };
         break;
       case 'FileStorageComponent':
         component = FileStorageComponent;
         option.width = 700;
+        option.title = this.i18n.t('file.title');
         break;
       case 'GameCharacterSheetComponent':
         component = GameCharacterSheetComponent;
@@ -759,37 +762,45 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'JukeboxComponent':
         component = JukeboxComponent;
         option.height = 540;
+        option.title = this.i18n.t('jukebox.title');
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
+        option.title = this.i18n.t('inv.title');
         break;
       case 'NoteInventoryComponent':
         component = NoteInventoryComponent;
+        option.title = this.i18n.t('note.title');
         break;
       case 'DiceRollTableSettingComponent':
         component = DiceRollTableSettingComponent;
-        option = { width: 645, height: 475 };
+        option = { width: 645, height: 475, title: this.i18n.t('diceTable.title') };
         break;
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
-        option = { width: 700, height: 600 };
+        option = { width: 700, height: 600, title: this.i18n.t('cutin.title') };
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 640, left: 100 };
+        option = { width: 520, height: 640, left: 100, title: this.i18n.t('combat.title') };
         break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
         component = SceneToolsComponent;
-        option = { width: 380, height: 560, left: 100 };
+        option = {
+          width: 380,
+          height: 560,
+          left: 100,
+          title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),
+        };
         break;
       case 'ScenePresetComponent':
         component = ScenePresetComponent;
-        option = { width: 520, height: 560, left: 100 };
+        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenePreset.title') };
         break;
       case 'ScenarioTextComponent':
         component = ScenarioTextComponent;
-        option = { width: 520, height: 560, left: 100 };
+        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenarioText.title') };
         break;
     }
     if (component) {
@@ -797,8 +808,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
       this.openPanelCount = this.openPanelCount + 1;
       const tourId = this.tourIdForComponent(componentName);
+      // Chat windows may open multiple copies (different tabs / positions).
+      const allowMultiple = componentName === 'ChatWindowComponent';
       if (tourId) {
-        PanelService.closePanelsByTourId(tourId);
+        if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
         option.tourPanelId = tourId;
       }
       this.panelService.open(component, option);
@@ -807,8 +820,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private openDefaultPanels() {
-    this.panelService.open(PeerMenuComponent, { width: 520, height: 450, left: 100, tourPanelId: 'menu.connection' });
-    this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450, tourPanelId: 'menu.chat' });
+    this.panelService.open(PeerMenuComponent, {
+      width: 520, height: 450, left: 100,
+      tourPanelId: 'menu.connection',
+      title: this.i18n.t('peer.title'),
+    });
+    this.panelService.open(ChatWindowComponent, {
+      width: 700, height: 400, left: 100, top: 450,
+      tourPanelId: 'menu.chat',
+      title: this.i18n.t('chat.title'),
+    });
   }
 
   private tourIdForComponent(componentName: string): string | null {
@@ -1096,6 +1117,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private makeDayNightToolboxMenu() {
+    const DAY_TARGET = 0;
+    const NIGHT_TARGET = 0.85;
     const animateDarkness = (target: number) => {
       const table = TableSelecter.instance.viewTable;
       if (!table) return;
@@ -1105,13 +1128,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       const dur = 800;
       const step = (now: number) => {
         const p = Math.min(1, (now - t0) / dur);
-        table.darkness = start + (target - start) * p;
+        table.darkness = p < 1 ? start + (target - start) * p : target;
         if (p < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
     };
-    const isDay = () => (TableSelecter.instance.viewTable?.darkness ?? 0) < 0.35;
-    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.55;
+    // Mutually exclusive — match backgroundFilterType threshold (no 0.35–0.55 gap).
+    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.5;
+    const isDay = () => !isNight();
     return {
       name: this.i18n.t('table.dayNight'),
       materialIcon: 'brightness_6',
@@ -1119,13 +1143,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
-          action: () => animateDarkness(0),
+          action: () => animateDarkness(DAY_TARGET),
           checkBox: 'radio' as const,
         },
         {
           name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
           nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
-          action: () => animateDarkness(0.85),
+          action: () => animateDarkness(NIGHT_TARGET),
           checkBox: 'radio' as const,
         },
       ],

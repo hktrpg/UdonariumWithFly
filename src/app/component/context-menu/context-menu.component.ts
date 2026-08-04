@@ -198,6 +198,17 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     if (typeof action.nameUpdate === 'function') {
       refreshList(this.actions);
       if (this.subMenu) refreshList(this.subMenu);
+      // Radio: force the clicked row selected. nameUpdate may still see pre-action /
+      // mid-animation state (e.g. day/night darkness tween), which would leave the
+      // wrong ◉ until the menu is reopened.
+      if (action.checkBox === 'radio' && action.name) {
+        const list = this.subMenu && this.subMenu.includes(action) ? this.subMenu : this.actions;
+        for (const a of list) {
+          if (!a || a.checkBox !== 'radio' || !a.name) continue;
+          if (a === action) a.name = a.name.replace(/^[◉○]/, '◉');
+          else a.name = a.name.replace(/^[◉○]/, '○');
+        }
+      }
       return;
     }
 

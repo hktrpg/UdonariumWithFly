@@ -93,10 +93,12 @@ export class PanelService {
     const injector = parentViewContainerRef.injector;
 
     let panelComponentRef: ComponentRef<any> = parentViewContainerRef.createComponent(PanelService.UIPanelComponentClass, { index: parentViewContainerRef.length, injector: injector });
-    let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);
+
+    // Avoid NG0100: createComponent already CD-checked the panel with the default title.
+    const panelCdr = panelComponentRef.changeDetectorRef;
+    panelCdr.detach();
 
     const childPanelService: PanelService = panelComponentRef.injector.get(PanelService);
-
     childPanelService.panelComponentRef = panelComponentRef;
     PanelService.openPanels.add(childPanelService);
     if (option) {
@@ -107,6 +109,12 @@ export class PanelService {
       if (option.height) childPanelService.height = option.height;
       if (option.tourPanelId) childPanelService.tourPanelId = option.tourPanelId;
     }
+
+    let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);
+
+    panelCdr.reattach();
+    panelCdr.detectChanges();
+
     panelComponentRef.onDestroy(() => {
       PanelService.openPanels.delete(childPanelService);
       childPanelService.panelComponentRef = null;

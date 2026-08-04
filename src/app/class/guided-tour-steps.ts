@@ -105,6 +105,8 @@ export function buildGuidedTourSteps(): GuidedTourStep[] {
     menuOpen('toolbox', 'menu.toolbox', 'click', { skipIfGuest: true }),
     menuOpen('combat', 'menu.combat', 'panel-open'),
     menuOpen('sceneTools', 'menu.sceneTools', 'panel-open', { skipIfNoSceneTools: true }),
+    menuOpen('scenePreset', 'menu.scenePreset', 'panel-open', { skipIfGuest: true }),
+    menuOpen('scenarioText', 'menu.scenarioText', 'panel-open', { skipIfGuest: true }),
     menuOpen('inventory', 'menu.inventory', 'panel-open', { skipIfGuest: true }),
     menuOpen('notes', 'menu.notes', 'panel-open', { skipIfGuest: true }),
     menuOpen('settings', 'menu.settings', 'click'),

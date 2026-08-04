@@ -50,7 +50,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.refreshLabels();
+    // Defer panel title — UIPanel already CD-checked with default untitled (NG0100).
+    Promise.resolve().then(() => this.refreshLabels());
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', -1000, event => {
         let object = ObjectStore.instance.get(event.data.identifier);
