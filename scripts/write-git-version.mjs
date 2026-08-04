@@ -27,7 +27,9 @@ const branch = (
   git('git rev-parse --abbrev-ref HEAD') ||
   'unknown'
 ).trim();
+// Prefer the stamped commit's author date (works with GITHUB_SHA in Actions).
 const date = (
+  (shaFull && shaFull !== 'unknown' ? git(`git log -1 --format=%cs ${shaFull}`) : '') ||
   git('git log -1 --format=%cs') ||
   new Date().toISOString().slice(0, 10)
 ).trim();
