@@ -1,4 +1,13 @@
-<div class="component is-pointer-events-none" [@fadeInOut]="'in'" appDraggable #draggablePanel>
+<div class="component is-pointer-events-none" [@fadeInOut]="fadeState" appDraggable #draggablePanel
+  [class.is-pinned]="isPinned">
+  <button type="button" class="pin-button is-pointer-events-auto"
+    [class.is-pinned]="isPinned"
+    [attr.title]="isPinned ? (i18n.t('overview.unpin')) : (i18n.t('overview.pin'))"
+    (mousedown)="$event.stopPropagation()"
+    (pointerdown)="$event.stopPropagation()"
+    (click)="togglePin($event)">
+    <i class="material-icons">push_pin</i>
+  </button>
   <ng-container [ngSwitch]="tabletopObject.aliasName">
     <ng-container *ngSwitchCase="'numberResource'">
     </ng-container>

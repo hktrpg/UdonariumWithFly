@@ -48,7 +48,8 @@
 | 精简模式（ClarifyMode） | 聊天工具栏精简显示切换 |
 | 笔记仓库 | 按桌面／共用／私人／坟场整理备忘 |
 | 快速掷骰 | 角色卡字段一键送到聊天给 BCDice 结算 |
-| 键盘操控棋子 | 选取后 WASD／方向键移动；Shift+WASD 面向；Delete；Ctrl+C/X/V；Ctrl+Z 撤销／Ctrl+Y（或 Ctrl+Shift+Z）重做；`[`/`]` 图层；Ctrl(+Shift)+滚轮旋转；Shift 放下不吸附 |
+| 键盘操控棋子 | 选取后 WASD／方向键移动；Shift+WASD 面向；Delete；Ctrl+C/X/V；Ctrl+Z 撤销／Ctrl+Y（或 Ctrl+Shift+Z）重做；`[`/`]` 图层；Alt(+Shift)／Ctrl+Shift+滚轮旋转；Ctrl+Shift+D 开关 DEBUG pose；Shift 放下不吸附 |
+| 浮动预览钉选 | Hover Token 显示预览；钉选可固定；移开约 0.5 秒淡出；删除／回收后关闭 |
 | 撤销／重做 | 本机堆叠：移动／旋转／删除／剪切粘贴／图层／路径移动；场景工具创建／删除／微移。访客不可用；输入框内不拦截（由浏览器处理文字撤销） |
 | 路径移动 | 选取单个 Token → Ctrl+左键设路点（放开 Ctrl 仍保留）→ 左键点终点或 Space 开始移动；右键取消最后路点；Esc 取消路径 |
 | 选取体验 | 点选／框选；Shift+点／拖曳多选；双击详情；选取高亮 |

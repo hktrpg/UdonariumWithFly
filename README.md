@@ -48,7 +48,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Clarify mode | Compact chat toolbar toggle |
 | Note inventory | Notes by tabletop / shared / private / trash |
 | Quick roll | Send character-sheet fields to chat for BCDice in one click |
-| Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; Ctrl+Z undo / Ctrl+Y (or Ctrl+Shift+Z) redo; `[`/`]` layer; Ctrl(+Shift)+wheel rotate; Shift drop skips snap |
+| Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; Ctrl+Z undo / Ctrl+Y (or Ctrl+Shift+Z) redo; `[`/`]` layer; Alt(+Shift)/Ctrl+Shift+wheel rotate; Ctrl+Shift+D toggles DEBUG pose; Shift drop skips snap |
+| Hover overview pin | Hover token shows preview; pin keeps it open; fades out ~0.5s after leave; closes on delete/trash |
 | Undo / redo | Local stack: move / rotate / delete / cut-paste / layer / path move; scene create / delete / nudge. Guests blocked; ignored in text fields (browser handles text undo) |
 | Path move | Select one token → Ctrl+left waypoints (draft stays after release) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels |
 | Selection UX | Click / box select; Shift+click/drag multi-select; double-click details; selection highlight |

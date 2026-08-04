@@ -334,6 +334,7 @@ export const zhTW_obj: I18nDictionary = {
   'url.title': '打開參考網址', 'url.confirm': '您要打開此 URL 嗎？（在新視窗中打開，請允許彈出視窗）', 'url.invalid': '⚠️網址無效。', 'url.open': '開啟', 'url.cancel': '取消',
   'pass.title': '密碼〈{{title}}〉', 'pass.label': '密碼', 'pass.placeholder': '密碼', 'pass.submit': '進入房間', 'pass.invalid': '密碼錯誤',
   'overview.top': '的頂部', 'overview.cardBack': '卡牌（背面）', 'overview.icon': '大頭貼', 'overview.invalidUrl': '網址無效',
+  'overview.pin': '釘選（保持顯示）', 'overview.unpin': '取消釘選',
   'dice.blank': '無',
   'range.menu.25': '☑ 縱（上下）方向',
   'range.menu.26': '☐ 縱（上下）方向',

@@ -362,6 +362,8 @@ export const ja_obj: I18nDictionary = {
   'overview.cardBack': 'カード（裏面）',
   'overview.icon': 'アイコン',
   'overview.invalidUrl': 'URLが無効です',
+  'overview.pin': 'ピン留め（表示を維持）',
+  'overview.unpin': 'ピン解除',
   'range.menu.25': '☑ 縦（上下）方向',
   'range.menu.26': '☐ 縦（上下）方向',
   'cutin.conditionPlaceholder': '1行に1つ。先頭の @ は一致時に本文から削除されます',

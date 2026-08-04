@@ -193,13 +193,21 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging; }
 
-  private viewPotisonX: number = 221.6;
-  private viewPotisonY: number = -123.8;
-  private viewPotisonZ: number = 0;
+  /** Default table view (「回到最初的視點」). */
+  private static readonly DEFAULT_VIEW_POS_X = 221.6;
+  private static readonly DEFAULT_VIEW_POS_Y = -123.8;
+  private static readonly DEFAULT_VIEW_POS_Z = 0;
+  private static readonly DEFAULT_VIEW_ROT_X = 46;
+  private static readonly DEFAULT_VIEW_ROT_Y = 0;
+  private static readonly DEFAULT_VIEW_ROT_Z = 0;
 
-  private viewRotateX: number = 46;
-  private viewRotateY: number = 0;
-  private viewRotateZ: number = 0;
+  private viewPotisonX: number = GameTableComponent.DEFAULT_VIEW_POS_X;
+  private viewPotisonY: number = GameTableComponent.DEFAULT_VIEW_POS_Y;
+  private viewPotisonZ: number = GameTableComponent.DEFAULT_VIEW_POS_Z;
+
+  private viewRotateX: number = GameTableComponent.DEFAULT_VIEW_ROT_X;
+  private viewRotateY: number = GameTableComponent.DEFAULT_VIEW_ROT_Y;
+  private viewRotateZ: number = GameTableComponent.DEFAULT_VIEW_ROT_Z;
 
   private mouseGesture: TableMouseGesture = null;
   private touchGesture: TableTouchGesture = null;
@@ -386,7 +394,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           if (event && event.data == 'top') {
             this.setTransform(0, 0, 0, 0, 0, 0, true);
           } else {
-            this.setTransform(100, 0, 0, 50, 0, 10, true);
+            this.setTransform(
+              GameTableComponent.DEFAULT_VIEW_POS_X,
+              GameTableComponent.DEFAULT_VIEW_POS_Y,
+              GameTableComponent.DEFAULT_VIEW_POS_Z,
+              GameTableComponent.DEFAULT_VIEW_ROT_X,
+              GameTableComponent.DEFAULT_VIEW_ROT_Y,
+              GameTableComponent.DEFAULT_VIEW_ROT_Z,
+              true,
+            );
           }
         }, 50);
         this.removeFocus();

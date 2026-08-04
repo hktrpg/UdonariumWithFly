@@ -1,4 +1,4 @@
-import { animate, keyframes, style, transition, trigger } from '@angular/animations';
+import { animate, state, style, transition, trigger } from '@angular/animations';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -36,17 +36,14 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@ud
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('fadeInOut', [
-            transition('void => *', [
-                animate('100ms ease-out', keyframes([
-                    style({ opacity: 0, offset: 0 }),
-                    style({ opacity: 1, offset: 1.0 })
-                ]))
+            state('in', style({ opacity: 1 })),
+            state('out', style({ opacity: 0 })),
+            transition('void => in', [
+                style({ opacity: 0 }),
+                animate('150ms ease-out')
             ]),
-            transition('* => void', [
-                animate('100ms ease-in', keyframes([
-                    style({ opacity: 1, offset: 0 }),
-                    style({ opacity: 0, offset: 1.0 })
-                ]))
+            transition('in => out', [
+                animate('300ms ease-in')
             ])
         ])
     ],
@@ -64,6 +61,24 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   @Input() top: number = 0;
 
   @Input() cardState: CardState = null;
+
+  /** When true, tooltip stays until unpinned (or object deleted). */
+  isPinned = false;
+  /** Set by TooltipDirective to sync pin state. */
+  onPinnedChange: ((pinned: boolean) => void) | null = null;
+
+  /** Angular animation state for enter / leave. */
+  fadeState: 'in' | 'out' = 'in';
+  private fadeOutPromise: Promise<void> | null = null;
+
+  /** Fade out then resolve (for dynamic destroy — leave animation alone is skipped). */
+  beginFadeOut(durationMs = 300): Promise<void> {
+    if (this.fadeOutPromise) return this.fadeOutPromise;
+    this.fadeState = 'out';
+    this.changeDetector.markForCheck();
+    this.fadeOutPromise = new Promise(resolve => setTimeout(resolve, durationMs));
+    return this.fadeOutPromise;
+  }
 
   readonly CardStateFront = CardState.FRONT;
   readonly CardStateBack = CardState.BACK;
@@ -224,6 +239,13 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     return Network.GuestMode();
   }
 
+  togglePin(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isPinned = !this.isPinned;
+    this.onPinnedChange?.(this.isPinned);
+    this.changeDetector.markForCheck();
+  }
 
   ngOnChanges(): void {
     EventSystem.unregister(this);

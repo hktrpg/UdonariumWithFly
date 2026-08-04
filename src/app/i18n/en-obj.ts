@@ -332,6 +332,7 @@ export const en_obj: I18nDictionary = {
   'url.title': 'Open Reference URL', 'url.confirm': 'Open this URL in a new window? Allow pop-ups.', 'url.invalid': '⚠️ Invalid URL.', 'url.open': 'Open', 'url.cancel': 'Cancel',
   'pass.title': 'Password: {{title}}', 'pass.label': 'Password', 'pass.placeholder': 'Password', 'pass.submit': 'Enter Room', 'pass.invalid': 'Incorrect password',
   'overview.top': ' top card', 'overview.cardBack': 'Card (back)', 'overview.icon': 'Icon', 'overview.invalidUrl': 'Invalid URL',
+  'overview.pin': 'Pin (keep open)', 'overview.unpin': 'Unpin',
   'dice.blank': 'Blank',
   'range.menu.25': '☑ Vertical',
   'range.menu.26': '☐ Vertical',

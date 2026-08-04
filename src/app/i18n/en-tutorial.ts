@@ -26,8 +26,10 @@ Drag images or music into the browser to import.`,
 　　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
 　　　　[ = send back  ] = bring front
 　　　　Alt+wheel = facing ±3° when selected; yaw when empty  Alt+Shift+wheel = roll ±3° when selected; pitch when empty  Ctrl+Shift+wheel = facing ±45°
+　　　　Ctrl+Shift+D = toggle DEBUG pose (top-right view / selection angles & height; off by default)
 　　　　Hold Shift on drop = temporary no grid snap  Esc = clear selection
-　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.`,
+　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.
+<Hover preview> Pause on an object = preview card  Pin (top-left) = keep open; closes on delete/trash  Unpinned: fade out ~0.5s after leave`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
@@ -71,6 +73,7 @@ Upgraded to 1.13.2`,
 ・Double-click opens details (flip / draw / roll via right-click)
 ・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor), Ctrl+Z/Y undo/redo
 ・[ / ] layer order; Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
+・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
 ・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels
 ・“Next image” moved to right-click; shadow scales with size/height`,

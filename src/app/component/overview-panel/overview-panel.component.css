@@ -15,6 +15,49 @@
   cursor: grab;
 }
 
+.component.is-pinned {
+  z-index: 9100;
+}
+
+.pin-button {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #777;
+  border-radius: 3px;
+  background: rgba(60, 60, 60, 0.92);
+  color: #bbb;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.pin-button .material-icons {
+  font-size: 18px;
+  transform: rotate(45deg);
+}
+
+.pin-button.is-pinned {
+  color: #ffca28;
+  border-color: #c9a227;
+  background: rgba(40, 40, 30, 0.95);
+}
+
+.pin-button.is-pinned .material-icons {
+  transform: none;
+}
+
+.pin-button:hover {
+  color: #fff;
+}
+
 .component-content {
   font-size: 12px;
 }
