@@ -80,6 +80,22 @@
     <p class="hint">{{ (editMode ? 'room.editPasswordHint' : 'room.passwordHint') | i18n }}</p>
     <p class="hint" *ngIf="editMode && isConnected">{{ 'room.editReconnectHint' | i18n }}</p>
 
+    <div class="perm-embed">
+      <button
+        type="button"
+        class="btn perm-toggle"
+        [attr.aria-expanded]="showPermissions"
+        (click)="showPermissions = !showPermissions"
+      >
+        <i class="material-icons">admin_panel_settings</i>
+        <span>{{ 'peer.permissionManage' | i18n }}</span>
+        <i class="material-icons perm-chevron">{{ showPermissions ? 'expand_less' : 'expand_more' }}</i>
+      </button>
+      <div class="perm-embed-body" *ngIf="showPermissions">
+        <permission-setting [embedMode]="true"></permission-setting>
+      </div>
+    </div>
+
     <div class="error-text" *ngIf="roomNameValidation.errors && (roomNameValidation.dirty || roomNameValidation.touched)">
       <div [hidden]="!roomNameValidation.errors.required && !roomNameValidation.errors.minlength">
         {{ 'room.errorNameRequired' | i18n }}

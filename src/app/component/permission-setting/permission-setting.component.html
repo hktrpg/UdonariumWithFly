@@ -1,4 +1,4 @@
-<div class="permission-setting" *ngIf="isGMMode; else notGm">
+<div class="permission-setting" *ngIf="canEditPerms; else notGm">
   <div class="section-title">{{ 'peer.loadDataPermTitle' | i18n }}</div>
   <div class="scene-perm-group">
     <div class="scene-perm-sub scene-perm-sub-flat">

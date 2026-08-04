@@ -34,6 +34,8 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   allowGuest = false;
   isSaving = false;
   help: string = '';
+  /** Permission panel is collapsed until the user opens it. */
+  showPermissions = false;
 
   get peerId(): string { return Network.peerId; }
   get isConnected(): boolean { return 0 < Network.peerIds.length; }

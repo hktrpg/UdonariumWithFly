@@ -2,7 +2,7 @@ import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { PeerContext } from '@udonarium/core/system/network/peer-context';
+import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
@@ -11,7 +11,6 @@ import { RoomAuth } from '@udonarium/room-auth';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
-import { PermissionSettingComponent } from 'component/permission-setting/permission-setting.component';
 import { RolePasswordPromptComponent } from 'component/role-password-prompt/role-password-prompt.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -295,23 +294,18 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   showCreateRoom() {
-    this.modalService.open(RoomSettingComponent, { width: 700, height: 420, left: 0, top: 400 });
+    this.modalService.open(RoomSettingComponent, { width: 720, height: 720, left: 0, top: 80 });
   }
 
   editRoomPasswords() {
     if (!this.isGMMode || !this.isRoleAuthRoom || !this.networkService.peer.isRoom) return;
     this.modalService.open(RoomSettingComponent, {
       editMode: true,
-      width: 700,
-      height: 460,
+      width: 720,
+      height: 720,
       left: 0,
-      top: 400,
+      top: 80,
     });
-  }
-
-  openPermissionManage() {
-    if (!this.isGMMode) return;
-    this.panelService.open(PermissionSettingComponent, { width: 500, height: 620, left: 120, top: 60 });
   }
 
   loadZip() {
@@ -397,6 +391,29 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   findPeerIsGMMode(peerId: string): boolean {
     const peerCursor = PeerCursor.findByPeerId(peerId);
     return peerCursor ? peerCursor.isGMMode : false;
+  }
+
+  kickPeer(peer: IPeerContext) {
+    if (!this.isGMMode || !peer?.peerId || peer.peerId === this.networkService.peerId) return;
+    const name = this.findPeerName(peer.peerId) || peer.userId || peer.peerId;
+    this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('peer.kick.confirmTitle'),
+      text: this.i18n.t('peer.kick.confirmText', { name }),
+      help: this.i18n.t('peer.kick.confirmHelp'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'person_remove',
+      action: () => {
+        EventSystem.call('KICK_PEER', {
+          byPeerId: this.networkService.peerId,
+          byName: this.myPeerName || this.networkService.peer.userId || '',
+        }, peer.peerId);
+        // Allow the kick message to flush before tearing down the link.
+        setTimeout(() => {
+          this.networkService.disconnect(peer);
+        }, 250);
+        this.chatMessageService.sendOperationLog(this.i18n.t('peer.kick.log', { name }));
+      },
+    });
   }
 
   copyPeerId() {
@@ -525,6 +542,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
             await this.folderBackup.flush({ timeoutMs: 15000 });
           }
           RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
+          this.roomInvite.setRolePassword(result.role, result.password || '');
           // Clear legacy hold state.
           PeerCursor.isGMHold = false;
           this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {

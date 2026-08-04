@@ -453,6 +453,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           RoomConnectHelper.rekeyRoom(roomId, roomName).catch(e => console.warn('ROOM_REKEY failed', e));
         });
       })
+      .on('KICK_PEER', event => {
+        if (event.isSendFromSelf) return;
+        const byName = String(event.data?.byName || '').trim();
+        this.ngZone.run(() => {
+          void this.handleKicked(byName);
+        });
+      })
       .on('NETWORK_ERROR', event => {
         console.log('NETWORK_ERROR', event.data.peerId);
         let errorType: string = event.data.errorType;
@@ -1440,10 +1447,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       if (choice === true) {
         await this.modalService.open(RoomSettingComponent, {
-          width: 700,
-          height: 420,
+          width: 720,
+          height: 720,
           left: 0,
-          top: 400,
+          top: 80,
           // Keep file picker in the create-button click stack.
           afterCreate: () => this.pickZipFiles(),
         });
@@ -1640,6 +1647,23 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       option.extraAction = () => { void this.save(); };
     }
     this.modalService.open(ConfirmationComponent, option);
+  }
+
+  private async handleKicked(byName: string) {
+    try {
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('peer.kick.notifyTitle'),
+        text: this.i18n.t(
+          byName ? 'peer.kick.notifyTextNamed' : 'peer.kick.notifyText',
+          byName ? { name: byName } : undefined
+        ),
+        type: ConfirmationType.OK,
+        materialIcon: 'person_remove',
+      });
+    } catch {
+      /* ignore */
+    }
+    await this.flushFolderThenReload();
   }
 
   deleteGameObject(gameObject: any) {
