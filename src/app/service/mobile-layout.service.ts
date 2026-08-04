@@ -131,7 +131,9 @@ export class MobileLayoutService implements OnDestroy {
     if (sheet === 'half') {
       const h = Math.max(220, Math.round(this.viewportHeight * 0.48));
       // Phone: sit above bottom nav; tablet landscape: sit above keyboard only.
-      const reserveBottom = this.isTabletLandscape ? this.keyboardInsetPx : MOBILE_NAV_HEIGHT + this.keyboardInsetPx;
+      const reserveBottom = this.isTabletLandscape
+        ? this.keyboardInsetPx
+        : MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
       return {
         ...option,
         left,

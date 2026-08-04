@@ -230,6 +230,15 @@ input.altitude {
   align-items: center;
 }
 
+/* Icon grids (faces etc.) stay compact — do not apply action-row touch sizing. */
+:host-context(html.udon-mobile-layout) .icons-panel ul > li {
+  padding: 1px 0;
+  min-height: 0;
+  font-size: 12px;
+  display: block;
+  align-items: initial;
+}
+
 :host-context(html.udon-mobile-layout) ul > li.hasHighlight:active,
 :host-context(html.udon-mobile-layout) ul > li.hasHighlight:hover {
   color: #fff;

@@ -50,6 +50,14 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
+  /** Mobile dark chrome: skip default #444 so CSS muted title shows; keep custom peer colors. */
+  get titleColorStyle(): string | null {
+    if (!this.titleColor) return null;
+    const mobile = typeof document !== 'undefined' && document.body.classList.contains('udon-mobile-layout');
+    if (mobile && this.titleColor === PeerCursor.CHAT_DEFAULT_COLOR) return null;
+    return this.titleColor;
+  }
+
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     public contextMenuService: ContextMenuService,
