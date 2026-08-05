@@ -25,6 +25,9 @@ export class GameObjectInventoryService {
   set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
   get dataTags(): string[] { return this.summarySetting.dataTags; }
 
+  /** Every character (all maps + inventories + graveyard). */
+  allInventory: ObjectInventory = new ObjectInventory(() => true);
+  /** Tokens on the currently viewed map only. */
   tableInventory: ObjectInventory = new ObjectInventory(object => { return object.isVisibleOnTable; });
   commonInventory: ObjectInventory = new ObjectInventory(object => { return !this.isAnyLocation(object.location.name); });
   privateInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === Network.peerId; });
@@ -121,6 +124,7 @@ export class GameObjectInventoryService {
   }
 
   private refreshObjects() {
+    this.allInventory.refreshObjects();
     this.tableInventory.refreshObjects();
     this.commonInventory.refreshObjects();
     this.privateInventory.refreshObjects();
@@ -128,6 +132,7 @@ export class GameObjectInventoryService {
   }
 
   private refreshDataElements() {
+    this.allInventory.refreshDataElements();
     this.tableInventory.refreshDataElements();
     this.commonInventory.refreshDataElements();
     this.privateInventory.refreshDataElements();
@@ -137,6 +142,7 @@ export class GameObjectInventoryService {
   private refreshSort() {
     if (this.sortStop) return;
     //console.log('refreshSort')
+    this.allInventory.refreshSort();
     this.tableInventory.refreshSort();
     this.commonInventory.refreshSort();
     this.privateInventory.refreshSort();

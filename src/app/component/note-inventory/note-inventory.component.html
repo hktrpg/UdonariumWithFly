@@ -30,7 +30,7 @@
         </button>
         <button *ngIf="!isittable(gameObject)" type="button" class="btn btn-sm btn-primary"
           (click)="settotable(gameObject); $event.stopPropagation()">
-          {{ 'note.moveToTable' | i18n }}
+          {{ (isOnOtherTable(gameObject) ? 'inv.moveToCurrentMap' : 'note.moveToTable') | i18n }}
           <i class="material-icons">open_with</i>
         </button>
       </span>

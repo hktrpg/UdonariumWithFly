@@ -12,6 +12,7 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { setSkipEmptyDialogQuotes } from '@udonarium/chat-balloon';
 
 import * as localForage from 'localforage';
 
@@ -29,6 +30,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY = 'udonanaumu-chat-is-notice-on-local-storage';
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
   static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
+  static readonly CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-skip-empty-quotes-local-storage';
   static readonly CHAT_GEOMETRY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-window-geometry-v2';
   /** Designed defaults: prior 700×400 @ (100,450); height −30%. */
   static readonly DEFAULT_WIDTH = 700;
@@ -131,6 +133,20 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   set isAutoPopup(isAutoPopup: boolean) {
     ChatWindowComponent.setChatAutoPopup(isAutoPopup);
+  }
+
+  /** Default ON: hide empty 「」 in chat display (WWWWWW「」 → WWWWWW). */
+  static skipEmptyDialogQuotes = true;
+  static setSkipEmptyDialogQuotes(skip: boolean) {
+    localForage.setItem(ChatWindowComponent.CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY, !!skip).catch(e => console.log(e));
+    ChatWindowComponent.skipEmptyDialogQuotes = !!skip;
+    setSkipEmptyDialogQuotes(!!skip);
+  }
+  get skipEmptyDialogQuotes(): boolean {
+    return ChatWindowComponent.skipEmptyDialogQuotes;
+  }
+  set skipEmptyDialogQuotes(skip: boolean) {
+    ChatWindowComponent.setSkipEmptyDialogQuotes(skip);
   }
 
   /** Mobile: toolbar action icons collapsed behind tune toggle (session only). */
@@ -243,7 +259,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit() {
     const preferred = GameCharacter.preferredChatCharacter();
-    this.sendFrom = preferred?.identifier || PeerCursor.myCursor.identifier;
+    this.sendFrom = preferred?.identifier || PeerCursor.myCursor?.identifier || '';
     this._chatTabidentifier = 0 < this.chatTabs.length ? this.chatTabs[0].identifier : '';
     ChatWindowComponent.activeChatTabIdentifier = this._chatTabidentifier;
 

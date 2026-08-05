@@ -134,7 +134,10 @@ export class GameCharacter extends TabletopObject {
     for (let child of this.children) {
       if (child instanceof ChatPalette) return child;
     }
-    return null;
+    let palette = new ChatPalette('ChatPalette_' + this.identifier);
+    palette.initialize();
+    this.appendChild(palette);
+    return palette;
   }
 
   get ownerName(): string {
@@ -155,6 +158,14 @@ export class GameCharacter extends TabletopObject {
   get playerOwnerColor(): string {
     const object = PeerCursor.findByUserId(this.playerOwner);
     return object ? object.color : '#64748b';
+  }
+
+  /** Chat send-from label: "Name (Player)" when claimed as someone's PC. */
+  get chatSelectLabel(): string {
+    const name = this.name || '';
+    if (!this.playerOwner) return name;
+    const owner = this.playerOwnerName;
+    return owner ? `${name} (${owner})` : name;
   }
   
   get standList(): StandList {

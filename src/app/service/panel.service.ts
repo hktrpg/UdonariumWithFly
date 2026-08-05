@@ -182,7 +182,31 @@ export class PanelService {
     let bodyComponentRef: ComponentRef<any> = panelComponentRef.instance.content.createComponent(childComponent);
 
     panelCdr.reattach();
-    panelCdr.detectChanges();
+    // Defer CD until after the caller assigns @Input (e.g. character / tabletopObject).
+    // Sync detectChanges() here ran with null inputs and broke panels (standList TypeError → untitled).
+    // Isolate body CD so a child template error does not leave the panel chrome undraggable.
+    const runCd = () => {
+      if (!panelComponentRef) return;
+      try {
+        bodyComponentRef?.changeDetectorRef?.detectChanges();
+      } catch (e) {
+        console.error('[PanelService] body detectChanges failed', e);
+      }
+      try {
+        panelCdr.detectChanges();
+      } catch (e) {
+        console.error('[PanelService] panel detectChanges failed', e);
+      }
+      const panelOnChanges = panelComponentRef.instance as OnChanges;
+      const bodyOnChanges = bodyComponentRef?.instance as OnChanges;
+      if (bodyComponentRef && bodyOnChanges?.ngOnChanges != null) {
+        try { bodyOnChanges.ngOnChanges({}); } catch (e) { console.error(e); }
+      }
+      if (panelOnChanges?.ngOnChanges != null) {
+        try { panelOnChanges.ngOnChanges({}); } catch (e) { console.error(e); }
+      }
+    };
+    queueMicrotask(runCd);
 
     panelComponentRef.onDestroy(() => {
       PanelService.openPanels.delete(childPanelService);
@@ -193,15 +217,6 @@ export class PanelService {
     bodyComponentRef.onDestroy(() => {
       bodyComponentRef = null;
     });
-
-    let panelOnChanges = panelComponentRef.instance as OnChanges;
-    let bodyOnChanges = bodyComponentRef.instance as OnChanges;
-    if (panelOnChanges?.ngOnChanges != null || bodyOnChanges?.ngOnChanges != null) {
-      queueMicrotask(() => {
-        if (bodyComponentRef && bodyOnChanges?.ngOnChanges != null) bodyOnChanges?.ngOnChanges({});
-        if (panelComponentRef && panelOnChanges?.ngOnChanges != null) panelOnChanges?.ngOnChanges({});
-      });
-    }
 
     return <T>bodyComponentRef.instance;
   }

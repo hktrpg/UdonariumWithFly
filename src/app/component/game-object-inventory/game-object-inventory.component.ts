@@ -67,9 +67,9 @@ import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEff
     standalone: false
 })
 export class GameObjectInventoryComponent implements OnInit, OnDestroy {
-  inventoryTypes: string[] = ['table', 'common', 'graveyard'];
+  inventoryTypes: string[] = ['all', 'table', 'common', 'graveyard'];
 
-  _selectTab: string = 'table';
+  _selectTab: string = 'all';
   get selectTab(): string { return this._selectTab; };
   set selectTab(selectTab: string) {
     this._selectTab = selectTab;
@@ -145,16 +145,16 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         }
       })
       .on('OPEN_NETWORK', event => {
-        this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
+        this.inventoryTypes = ['all', 'table', 'common', Network.peerId, 'graveyard'];
         if (!this.inventoryTypes.includes(this.selectTab)) {
-          this.selectTab = Network.peerId;
+          this.selectTab = 'all';
         }
       })
       .on('LOCALE_CHANGED', () => {
         this.refreshPanelTitle();
         this.changeDetector.markForCheck();
       });
-    this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
+    this.inventoryTypes = ['all', 'table', 'common', Network.peerId, 'graveyard'];
     this.panelId = UUID.generateUuid();
   }
 
@@ -166,6 +166,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   getTabTitle(inventoryType: string) {
     if (this.GuestMode()) return;
     switch (inventoryType) {
+      case 'all':
+        return this.i18n.t('inv.tab.all');
       case 'table':
         return this.i18n.t('inv.tab.table');
       case Network.peerId:
@@ -180,6 +182,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   getInventory(inventoryType: string) {
     if (this.GuestMode()) return;
     switch (inventoryType) {
+      case 'all':
+        return this.inventoryService.allInventory;
       case 'table':
         return this.inventoryService.tableInventory;
       case Network.peerId:
@@ -192,11 +196,51 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   getGameObjects(inventoryType: string): TabletopObject[] {
-    return this.getInventory(inventoryType).tabletopObjects.filter((tabletopObject) => { return inventoryType != 'table' || this.indicateAll || tabletopObject.isInventoryIndicate });
+    return this.getInventory(inventoryType).tabletopObjects.filter((tabletopObject) => {
+      if (inventoryType === 'all') return true;
+      if (inventoryType !== 'table') return true;
+      return this.indicateAll || tabletopObject.isInventoryIndicate;
+    });
+  }
+
+  /** Token is on another map (still location=table, not the current view). */
+  isOnOtherTable(gameObject: TabletopObject): boolean {
+    return gameObject.location?.name === 'table' && !gameObject.isVisibleOnTable;
+  }
+
+  otherTableLabel(gameObject: TabletopObject): string {
+    const tid = gameObject.tableIdentifier;
+    if (!tid) return this.i18n.t('inv.otherMap');
+    const table = ObjectStore.instance.get(tid) as { name?: string } | null;
+    const name = table?.name?.trim();
+    return name
+      ? this.i18n.t('inv.otherMapNamed', { name })
+      : this.i18n.t('inv.otherMap');
+  }
+
+  /** Location badge for the All tab (and other-map tokens elsewhere). */
+  locationBadge(gameObject: TabletopObject): string {
+    const name = gameObject.location?.name || '';
+    if (name === 'table') {
+      if (gameObject.isVisibleOnTable) return this.i18n.t('inv.tab.table');
+      return this.otherTableLabel(gameObject);
+    }
+    if (name === 'graveyard') return this.i18n.t('inv.tab.graveyard');
+    if (name === Network.peerId) return this.i18n.t('inv.tab.personal');
+    if (name === 'common' || !name) return this.i18n.t('inv.tab.common');
+    // Another peer's personal inventory
+    return this.i18n.t('inv.tab.personal');
+  }
+
+  showLocationBadge(gameObject: TabletopObject): boolean {
+    return this.selectTab === 'all' || this.isOnOtherTable(gameObject);
   }
 
   getInventoryTags(gameObject: GameCharacter): DataElement[] {
-    return this.getInventory(gameObject.location.name).dataElementMap.get(gameObject.identifier);
+    const loc = gameObject.location?.name === 'table' ? 'table'
+      : (gameObject.location?.name === 'graveyard' ? 'graveyard'
+        : (gameObject.location?.name === Network.peerId ? Network.peerId : 'common'));
+    return this.getInventory(loc).dataElementMap.get(gameObject.identifier);
   }
 
   /** Blank area: block browser menu (item menus call stopPropagation). */
@@ -266,7 +310,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           }
         });
       }
-      if (this.selectTab === 'table' || this.selectTab === 'common' || this.selectTab === 'graveyard') {
+      if (this.selectTab === 'all' || this.selectTab === 'table' || this.selectTab === 'common' || this.selectTab === 'graveyard') {
         subActions.push({
           name: this.i18n.t('char.moveAllToPersonal'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
@@ -315,6 +359,12 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         default: gameObject.isVisibleOnTable,
         disabled: !gameObject.isVisibleOnTable,
         selfOnly: true
+      } : null,
+      (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+        name: this.i18n.t('inv.moveToCurrentMap'),
+        action: () => {
+          this.moveCharacterToLocation(gameObject, 'table');
+        }
       } : null,
       (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.moveToTable'),
@@ -746,6 +796,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   onInventoryTabDragOver(e: DragEvent, inventoryType: string) {
+    if (inventoryType === 'all') return;
     if (!this.readInventoryDragId(e)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -770,6 +821,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const id = this.readInventoryDragId(e);
     this.dropTargetTab = '';
     if (!id || id === '__pending__') return;
+    if (inventoryType === 'all') return;
     e.preventDefault();
     e.stopPropagation();
     if (this.GuestMode()) return;
@@ -777,8 +829,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (!(ch instanceof GameCharacter)) return;
     if (!ch.isVisible && !this.isGMMode) return;
     if (ch.location?.name === inventoryType) {
-      this.changeDetector.markForCheck();
-      return;
+      // Same location name, but other-map tokens still need rebinding to the current view table.
+      if (!(inventoryType === 'table' && this.isOnOtherTable(ch))) {
+        this.changeDetector.markForCheck();
+        return;
+      }
     }
     this.moveCharacterToLocation(ch, inventoryType);
     if (this.selectTab !== inventoryType) this.selectTab = inventoryType;

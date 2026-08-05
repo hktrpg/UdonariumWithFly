@@ -312,9 +312,11 @@ export class TabletopObject extends ObjectNode {
   setLocation(location: string, tableIdentifier?: string) {
     this.location.name = location;
     if (location === 'table') {
+      // Prefer explicit id, then current view table (inventory drag / "move to table").
+      // Fall back to existing binding only when no view table is resolved yet.
       this.tableIdentifier = tableIdentifier
-        || this.tableIdentifier
         || TabletopObject.resolveViewTableIdentifier()
+        || this.tableIdentifier
         || '';
     } else {
       this.tableIdentifier = '';

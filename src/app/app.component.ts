@@ -23,6 +23,7 @@ import { FilterType, WeatherType } from '@udonarium/game-table';
 import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
+import { setSkipEmptyDialogQuotes } from '@udonarium/chat-balloon';
 import { ContextMenuComponent } from 'component/context-menu/context-menu.component';
 import { FileStorageComponent } from 'component/file-storage/file-storage.component';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
@@ -283,6 +284,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
       localForage.getItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY).then(isAutoPopup => ChatWindowComponent.isAutoPopup = !!isAutoPopup);
+      localForage.getItem(ChatWindowComponent.CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY).then(skip => {
+        const on = skip == null ? true : !!skip;
+        ChatWindowComponent.skipEmptyDialogQuotes = on;
+        setSkipEmptyDialogQuotes(on);
+      });
       ChatWindowComponent.loadGeometryFromStorage();
     } catch(e) {
       console.log(e);
@@ -1514,6 +1520,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setChatAutoPopup(v); },
         on: `☑${this.i18n.t('menu.settings.autoPopupChat')}`,
         off: `☐${this.i18n.t('menu.settings.autoPopupChat')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.skipEmptyDialogQuotes,
+        set: (v) => { ChatWindowComponent.setSkipEmptyDialogQuotes(v); },
+        on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
+        off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
       }),
       contextMenuToggleCheck({
         get: () => CharacterResourceHudComponent.isVisible,

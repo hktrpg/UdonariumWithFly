@@ -21,11 +21,23 @@ import { I18nService } from 'service/i18n.service';
     standalone: false
 })
 export class ChatPaletteComponent implements OnInit, OnDestroy {
-  @ViewChild('chatInput', { static: true }) chatInputComponent: ChatInputComponent;
+  @ViewChild('chatInput') chatInputComponent: ChatInputComponent;
   @ViewChild('chatPlette') chatPletteElementRef: ElementRef<HTMLSelectElement>;
-  @Input() character: GameCharacter = null;
+  private _character: GameCharacter = null;
+  @Input()
+  get character(): GameCharacter { return this._character; }
+  set character(value: GameCharacter) {
+    this._character = value;
+    if (value) {
+      const gameType = value.chatPalette ? value.chatPalette.dicebot : '';
+      if (0 < gameType.length) this._gameType = gameType;
+      this.updatePanelTitle();
+    }
+  }
 
-  get palette(): ChatPalette { return this.character.chatPalette; }
+  get palette(): ChatPalette {
+    return this.character ? this.character.chatPalette : null;
+  }
   
   paletteCache: string[] = [];
   paletteRenewInterval: boolean = true;
@@ -33,6 +45,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     this.paletteRenewInterval = true;
   }, 200);
   get filteredPaletteStrings(): string[] {
+    if (!this.character || !this.character.chatPalette) return this.paletteCache;
     this.ngZone.run(() => {
       if (this.paletteRenewInterval) {
         this.paletteRenewInterval = false;
@@ -43,17 +56,17 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   get color(): string {
-    return this.chatInputComponent.color;
+    return this.chatInputComponent?.color || PeerCursor.CHAT_DEFAULT_COLOR;
   }
 
   private _gameType: string = '';
   get gameType(): string { return !this._gameType ? 'DiceBot' : this._gameType; };
   set gameType(gameType: string) {
     this._gameType = gameType;
-    if (this.character.chatPalette) this.character.chatPalette.dicebot = gameType;
+    if (this.character?.chatPalette) this.character.chatPalette.dicebot = gameType;
   };
 
-  get sendFrom(): string { return this.character.identifier; }
+  get sendFrom(): string { return this.character ? this.character.identifier : ''; }
   set sendFrom(sendFrom: string) {
     this.onSelectedCharacter(sendFrom);
   }
@@ -88,7 +101,9 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   ngOnInit() {
     Promise.resolve().then(() => this.updatePanelTitle());
     this.chatTabidentifier = this.chatMessageService.chatTabs ? this.chatMessageService.chatTabs[0].identifier : '';
-    this.gameType = this.character.chatPalette ? this.character.chatPalette.dicebot : '';
+    if (this.character?.chatPalette) {
+      this.gameType = this.character.chatPalette.dicebot || '';
+    }
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', event => {
         if (this.character && this.character.identifier === event.data.identifier) {
@@ -108,6 +123,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   updatePanelTitle() {
+    if (!this.character) return;
     this.panelService.title = this.i18n.t('palette.title', { name: this.character.name });
   }
 
@@ -123,7 +139,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   clickPalette(line: string) {
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement || !this.chatInputComponent || !this.character || !this.palette) return;
     const evaluatedLine = this.palette.evaluate(line, this.character.rootDataElement);
     if (this.doubleClickTimer && this.selectedPaletteIndex === this.chatPletteElementRef.nativeElement.selectedIndex) {
       clearTimeout(this.doubleClickTimer);
@@ -132,37 +148,44 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     } else {
       this.selectedPaletteIndex = this.chatPletteElementRef.nativeElement.selectedIndex;
       this.text = evaluatedLine;
-      let textArea: HTMLTextAreaElement = this.chatInputComponent.textAreaElementRef.nativeElement;
-      textArea.value = this.text;
+      let textArea: HTMLTextAreaElement = this.chatInputComponent.textAreaElementRef?.nativeElement;
+      if (textArea) {
+        textArea.value = this.text;
+      }
       this.doubleClickTimer = setTimeout(() => { this.doubleClickTimer = null }, 400);
     }
   }
 
   moveToInput(e: Event) {
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement || !this.chatInputComponent) return;
     const selectedPaletteIndex = this.chatPletteElementRef.nativeElement.selectedIndex;
     if (selectedPaletteIndex <= 0) {
       this.text = this._tempText;
-      this.chatInputComponent.textAreaElementRef.nativeElement.value = this._tempText;
-      this.chatInputComponent.textAreaElementRef.nativeElement.focus();
+      const textArea = this.chatInputComponent.textAreaElementRef?.nativeElement;
+      if (textArea) {
+        textArea.value = this._tempText;
+        textArea.focus();
+      }
       e.preventDefault();
     }
   }
 
   arrowPalette() {
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement || !this.chatInputComponent || !this.character || !this.palette) return;
     this.selectedPaletteIndex = this.chatPletteElementRef.nativeElement.selectedIndex;
     if (this.selectedPaletteIndex >= 0 && this.chatPletteElementRef.nativeElement.options[this.selectedPaletteIndex]) {
       this.ngZone.run(() => {
         this.text = this.palette.evaluate(this.chatPletteElementRef.nativeElement.options[this.selectedPaletteIndex].value, this.character.rootDataElement);
-        let textArea: HTMLTextAreaElement = this.chatInputComponent.textAreaElementRef.nativeElement;
-        textArea.value = this.text;
+        let textArea: HTMLTextAreaElement = this.chatInputComponent.textAreaElementRef?.nativeElement;
+        if (textArea) {
+          textArea.value = this.text;
+        }
       });
     }
   }
 
   enterPalette(line: string, e: Event=null) {
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement || !this.chatInputComponent || !this.character || !this.palette) return;
     this.text = this.palette.evaluate(line, this.character.rootDataElement);
     //this.chatInputComponent.sendChat(null);
     this.chatInputComponent.focusInput();
@@ -174,7 +197,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   private _tempText: string;
   moveToPalette(tempText: string) {
     this._tempText = tempText;
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement) return;
     if (this.chatPletteElementRef.nativeElement.options.length <= 0) return;
     if (this.chatPletteElementRef.nativeElement.selectedIndex <= 0) this.chatPletteElementRef.nativeElement.options[0].selected = true;
     this.chatPletteElementRef.nativeElement.focus();
@@ -182,36 +205,36 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   sendChat(value: { text: string, gameType: string, sendFrom: string, sendTo: string,
     color?: string, isInverse?:boolean, isHollow?: boolean, isBlackPaint?: boolean, imageFx?: string, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName?: string, isUseStandImage?: boolean }) {
-    if (this.chatTab) {
-      let text = this.palette.evaluate(value.text, this.character.rootDataElement);
-      this.chatMessageService.sendMessage(
-        this.chatTab, 
-        text, 
-        value.gameType, 
-        value.sendFrom, 
-        value.sendTo,
-        value.color, 
-        value.isInverse,
-        value.isHollow,
-        value.isBlackPaint,
-        value.aura,
-        value.isUseFaceIcon,
-        value.characterIdentifier,
-        value.standIdentifier,
-        value.standName,
-        value.isUseStandImage,
-        value.imageFx
-      );
-      this.filterText = '';
-    }
+    if (!this.chatTab || !this.character || !this.palette) return;
+    let text = this.palette.evaluate(value.text, this.character.rootDataElement);
+    this.chatMessageService.sendMessage(
+      this.chatTab, 
+      text, 
+      value.gameType, 
+      value.sendFrom, 
+      value.sendTo,
+      value.color, 
+      value.isInverse,
+      value.isHollow,
+      value.isBlackPaint,
+      value.aura,
+      value.isUseFaceIcon,
+      value.characterIdentifier,
+      value.standIdentifier,
+      value.standName,
+      value.isUseStandImage,
+      value.imageFx
+    );
+    this.filterText = '';
   }
 
   resetPletteSelect() {
-    if (!this.chatPletteElementRef.nativeElement) return;
+    if (!this.chatPletteElementRef?.nativeElement) return;
     this.chatPletteElementRef.nativeElement.selectedIndex = -1;
   }
 
   toggleEditMode() {
+    if (!this.palette) return;
     this.isEdit = this.isEdit ? false : true;
     if (this.isEdit) {
       this.editPalette = this.palette.value + '';
@@ -225,6 +248,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     const nomarizeFilterText = StringUtil.toHalfWidth(this.filterText.replace(/[―ー—‐]/g, '-').replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60))).replace(/[\r\n\s]+/, ' ').toUpperCase().trim();
     const nomarizeValue = StringUtil.toHalfWidth(value.replace(/[―ー—‐]/g, '-').replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60))).replace(/[\r\n\s]+/, ' ').toUpperCase().trim();
     if (nomarizeValue.indexOf(nomarizeFilterText) >= 0) return true;
+    if (!this.palette || !this.character) return false;
     const nomarizeEvaluateValue = StringUtil.toHalfWidth(!/[{｛]/.test(value) ? value : this.palette.evaluate(value, this.character.rootDataElement).replace(/[―ー—‐]/g, '-').replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60))).replace(/[\r\n\s]+/, ' ').toUpperCase().trim();
     return nomarizeEvaluateValue.indexOf(nomarizeFilterText) >= 0;
   }

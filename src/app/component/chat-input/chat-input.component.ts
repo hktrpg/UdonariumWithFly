@@ -183,6 +183,13 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     return this.character.standList.standElements.length > 0;
   }
 
+  get standPosition(): number {
+    return this.character?.standList?.position ?? 0;
+  }
+  set standPosition(position: number) {
+    if (this.character?.standList) this.character.standList.position = position;
+  }
+
   get standNameList(): string[] {
     if (!this.hasStand) return [];
     let ret: string[] = [];
@@ -239,6 +246,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   set paletteColor(color: string) {
+    if (!this.character?.chatPalette) return;
     this.character.chatPalette.color = color ? color : PeerCursor.CHAT_TRANSPARENT_COLOR;
   }
 

@@ -26,6 +26,10 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
   readonly CardStateFront = CardState.FRONT;
   readonly CardStateBack = CardState.BACK;
 
+  get cards(): Card[] {
+    return this.cardStack ? this.cardStack.cards : [];
+  }
+
   constructor(
     private panelService: PanelService,
     private changeDetector: ChangeDetectorRef,
@@ -39,16 +43,19 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
 
 
   ngOnChanges() {
-    Promise.resolve().then(() => this.panelService.title = this.cardStack.name + this.i18n.t('stack.listSuffix'));
+    if (!this.cardStack) return;
+    Promise.resolve().then(() => {
+      if (this.cardStack) this.panelService.title = this.cardStack.name + this.i18n.t('stack.listSuffix');
+    });
     EventSystem.unregister(this);
     EventSystem.register(this)
-      .on(`UPDATE_GAME_OBJECT/identifier/${this.cardStack?.identifier}`, event => {
+      .on(`UPDATE_GAME_OBJECT/identifier/${this.cardStack.identifier}`, event => {
         this.changeDetector.markForCheck();
-        if (this.cardStack.owner !== this.owner) {
+        if (this.cardStack && this.cardStack.owner !== this.owner) {
           this.panelService.close();
         }
       })
-      .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.cardStack?.identifier}`, event => {
+      .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.cardStack.identifier}`, event => {
         this.changeDetector.markForCheck();
       })
       .on('DELETE_GAME_OBJECT', event => {
@@ -60,13 +67,13 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
-    if (this.cardStack.owner === this.owner) {
+    if (this.cardStack && this.cardStack.owner === this.owner) {
       this.cardStack.owner = '';
     }
   }
 
   drawCard(card: Card) {
-    if (this.GuestMode()) return;
+    if (this.GuestMode() || !this.cardStack) return;
     card.parent.removeChild(card);
     card.location.x = this.cardStack.location.x + 100 + (Math.random() * 50);
     card.location.y = this.cardStack.location.y + 25 + (Math.random() * 50);
@@ -107,7 +114,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
 
   close(needShuffle: boolean = false) {
     if (this.GuestMode()) return;
-    if (needShuffle) {
+    if (needShuffle && this.cardStack) {
       this.cardStack.shuffle();
       EventSystem.call('SHUFFLE_CARD_STACK', { identifier: this.cardStack.identifier });
       SoundEffect.play(PresetSound.cardShuffle);
