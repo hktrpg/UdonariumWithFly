@@ -22,7 +22,6 @@
   >
     <div class="note-head">
       <strong class="note-title">{{showgameObject(gameObject)}}</strong>
-      <span class="location-badge">{{locationLabel(gameObject)}}</span>
       <span class="actions-spacer">
         <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="btn btn-sm" [title]="'note.menu' | i18n"
           (click)="onContextMenu($event, gameObject); $event.stopPropagation()">

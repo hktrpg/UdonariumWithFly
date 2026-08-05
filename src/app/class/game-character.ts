@@ -45,6 +45,33 @@ export class GameCharacter extends TabletopObject {
 
   /** HTML5 DnD type for dragging inventory characters onto the table. */
   static readonly INVENTORY_DRAG_MIME = 'application/x-udonarium-character';
+  /** CTRL+drag from inventory: spawn a temporary copy (delete skips graveyard). */
+  static readonly INVENTORY_TEMP_COPY_MIME = 'application/x-udonarium-character-temp';
+
+  /**
+   * Clone as a temporary token on the current (or given) map.
+   * Source object is untouched. Copy is hidden from inventory and destroyed on delete.
+   */
+  static createTemporaryCopy(
+    source: GameCharacter,
+    pose?: { x?: number; y?: number; posZ?: number },
+    tableId?: string
+  ): GameCharacter {
+    const copy = source.clone() as GameCharacter;
+    copy.isTemporaryCopy = true;
+    copy.isInventoryIndicate = false;
+    copy.playerOwner = '';
+    copy.visionOwner = '';
+    copy.tablePlacements = '';
+    copy.tableIdentifier = '';
+    const id = tableId || TabletopObject.resolveViewTableIdentifier();
+    copy.addToTable(id, {
+      x: pose?.x ?? source.location.x,
+      y: pose?.y ?? source.location.y,
+      posZ: pose?.posZ ?? source.posZ,
+    }, true);
+    return copy;
+  }
 
   /** characterId → userId for chat-window auto vision (local session only). */
   private static autoVisionUser = new Map<string, string>();

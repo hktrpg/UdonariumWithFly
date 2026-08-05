@@ -115,24 +115,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     }
   }
 
-  locationLabel(note: TextNote): string {
-    const name = note.location?.name || '';
-    if (name === 'table') {
-      if (!note.isVisibleOnTable) {
-        const tid = note.tableIdentifier;
-        const table = tid ? ObjectStore.instance.get(tid) as { name?: string } | null : null;
-        const mapName = table?.name?.trim();
-        return mapName
-          ? this.i18n.t('note.location.otherMapNamed', { name: mapName })
-          : this.i18n.t('note.location.otherMap');
-      }
-      return this.i18n.t('note.location.table');
-    }
-    if (name === 'graveyard') return this.i18n.t('note.location.graveyard');
-    if (name === 'common' || !name) return this.i18n.t('note.location.common');
-    return this.i18n.t('note.location.personal');
-  }
-
   settotable(gameObject: TextNote) {
     if (this.GuestMode()) return;
     gameObject.setLocation('table');

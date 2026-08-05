@@ -110,6 +110,7 @@ export const en: I18nDictionary = {
   'app.documentTitle': 'Udonarium with Fly HKTRPG',
   'app.ogTitle': 'Udonarium with Fly HKTRPG',
   'common.keyCtrl': 'Ctrl',
+  'common.keyShift': 'Shift',
   'common.listSep': ', ',
   'common.colon': ': ',
 };

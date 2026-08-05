@@ -611,6 +611,16 @@ button.link {
 .object-container.is-draggable:active {
   cursor: grabbing;
 }
+.object-container.is-draggable input,
+.object-container.is-draggable button,
+.object-container.is-draggable select,
+.object-container.is-draggable textarea,
+.object-container.is-draggable a,
+.object-container.is-draggable label,
+.object-container.is-draggable .resource-tag,
+.object-container.is-draggable .tag-value-box {
+  cursor: auto;
+}
 
 .url-link {
   cursor: inherit;

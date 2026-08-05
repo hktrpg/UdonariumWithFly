@@ -692,8 +692,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private moveCharacterOffTable(gameCharacter: GameCharacter, location: string) {
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
-    gameCharacter.setLocation(location);
     this.selectionService.remove(gameCharacter);
+    if (location === 'graveyard' && gameCharacter.isTemporaryCopy) {
+      gameCharacter.destroy();
+      return;
+    }
+    gameCharacter.setLocation(location);
   }
 
   /** Congregate only — used when not in multi-character mode (e.g. gather selection to an unselected token). */
@@ -986,11 +990,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: this.i18n.t('char.graveyard'),
+              name: this.gameCharacter.isTemporaryCopy
+                ? this.i18n.t('char.deleteTemporaryCopy')
+                : this.i18n.t('char.graveyard'),
               action: () => {
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-                this.gameCharacter.setLocation('graveyard');
                 this.selectionService.remove(this.gameCharacter);
+                if (this.gameCharacter.isTemporaryCopy) {
+                  this.gameCharacter.destroy();
+                } else {
+                  this.gameCharacter.setLocation('graveyard');
+                }
                 SoundEffect.play(PresetSound.sweep);
               }
             },
@@ -999,6 +1009,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ],
       // Clone / delete
       [
+        {
+          name: this.i18n.t('char.createTemporaryCopy'),
+          action: () => {
+            const pose = this.gameCharacter.getPoseForView();
+            GameCharacter.createTemporaryCopy(this.gameCharacter, {
+              x: pose.x + this.gridSize,
+              y: pose.y + this.gridSize,
+              posZ: pose.posZ,
+            });
+            SoundEffect.play(PresetSound.piecePut);
+          }
+        },
         {
           name: this.i18n.t('char.clone'),
           action: () => {
@@ -1034,11 +1056,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: this.i18n.t('char.deleteToGraveyard'),
+          name: this.gameCharacter.isTemporaryCopy
+            ? this.i18n.t('char.deleteTemporaryCopy')
+            : this.i18n.t('char.deleteToGraveyard'),
           action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
+            if (this.gameCharacter.isTemporaryCopy) {
+              this.gameCharacter.destroy();
+            } else {
+              this.gameCharacter.setLocation('graveyard');
+            }
             SoundEffect.play(PresetSound.sweep);
           }
         },

@@ -47,6 +47,8 @@ export const zhTW_ctx: I18nDictionary = {
   'char.personalInventory': '個人倉庫',
   'char.graveyard': '回收區',
   'char.clone': '建立副本',
+  'char.createTemporaryCopy': '建立暫存副本',
+  'char.deleteTemporaryCopy': '刪除暫存副本',
   'char.cloneNumbered': '建立副本（自動編號）',
   'char.deleteToGraveyard': '刪除（移至回收區）',
   'char.sheetTitle': '角色卡',

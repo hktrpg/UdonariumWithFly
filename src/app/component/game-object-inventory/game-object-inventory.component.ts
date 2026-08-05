@@ -208,39 +208,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     return gameObject.location?.name === 'table' && !gameObject.isVisibleOnTable;
   }
 
-  otherTableLabel(gameObject: TabletopObject): string {
-    const tid = gameObject.tableIdentifier;
-    if (!tid) return this.i18n.t('inv.otherMap');
-    const table = ObjectStore.instance.get(tid) as { name?: string } | null;
-    const name = table?.name?.trim();
-    return name
-      ? this.i18n.t('inv.otherMapNamed', { name })
-      : this.i18n.t('inv.otherMap');
-  }
-
-  /** Location badge for the All tab (and other-map tokens elsewhere). */
-  locationBadge(gameObject: TabletopObject): string {
-    const name = gameObject.location?.name || '';
-    if (name === 'table') {
-      if (gameObject.isVisibleOnTable) return this.i18n.t('inv.tab.table');
-      return this.otherTableLabel(gameObject);
-    }
-    if (name === 'graveyard') return this.i18n.t('inv.tab.graveyard');
-    if (name === Network.peerId) return this.i18n.t('inv.tab.personal');
-    if (name === 'common' || !name) return this.i18n.t('inv.tab.common');
-    // Another peer's personal inventory
-    return this.i18n.t('inv.tab.personal');
-  }
-
-  showLocationBadge(gameObject: TabletopObject): boolean {
-    return this.selectTab === 'all' || this.isOnOtherTable(gameObject);
-  }
-
   getInventoryTags(gameObject: GameCharacter): DataElement[] {
-    const loc = gameObject.location?.name === 'table' ? 'table'
-      : (gameObject.location?.name === 'graveyard' ? 'graveyard'
-        : (gameObject.location?.name === Network.peerId ? Network.peerId : 'common'));
-    return this.getInventory(loc).dataElementMap.get(gameObject.identifier);
+    // Always resolve from allInventory: tableInventory only has the current map,
+    // so other-map tokens in the All tab would otherwise get empty tags.
+    return this.inventoryService.allInventory.dataElementMap.get(gameObject.identifier) || [];
   }
 
   /** Blank area: block browser menu (item menus call stopPropagation). */
@@ -326,7 +297,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         subActions.push({
           name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
-              gameCharacter.setLocation('graveyard');
+              TabletopObject.disposeObject(gameCharacter, () => gameCharacter.setLocation('graveyard'));
               this.selectionService.remove(gameCharacter);
             });
             SoundEffect.play(PresetSound.sweep);
@@ -361,9 +332,28 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         selfOnly: true
       } : null,
       (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
-        name: this.i18n.t('inv.moveToCurrentMap'),
+        name: this.i18n.t('inv.placeOnCurrentMap'),
         action: () => {
-          this.moveCharacterToLocation(gameObject, 'table');
+          gameObject.addToTable();
+          SoundEffect.play(PresetSound.piecePut);
+          EventSystem.call('UPDATE_INVENTORY', true);
+        }
+      } : null,
+      (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+        name: this.i18n.t('inv.moveToCurrentMapOnly'),
+        action: () => {
+          gameObject.moveToTableOnly();
+          SoundEffect.play(PresetSound.piecePut);
+          EventSystem.call('UPDATE_INVENTORY', true);
+        }
+      } : null,
+      (gameObject.isVisibleOnTable && (this.isGMMode || gameObject.isVisible)) ? {
+        name: this.i18n.t('inv.removeFromCurrentMap'),
+        action: () => {
+          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
+          gameObject.removeFromTable();
+          SoundEffect.play(PresetSound.piecePut);
+          EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
       (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
@@ -578,6 +568,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
     const cloneDelete: ContextMenuAction[] = [
       {
+        name: this.i18n.t('char.createTemporaryCopy'),
+        action: () => {
+          this.createTemporaryCopy(gameObject);
+        },
+        disabled: !gameObject.isVisible && !this.isGMMode
+      },
+      {
         name: this.i18n.t('char.clone'),
         action: () => {
           this.cloneGameObject(gameObject);
@@ -616,12 +613,19 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.sweep);
         }
       } : {
-        name: this.i18n.t('char.deleteToGraveyard'),
+        name: gameObject.isTemporaryCopy
+          ? this.i18n.t('char.deleteTemporaryCopy')
+          : this.i18n.t('char.deleteToGraveyard'),
         action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
           this.selectionService.remove(gameObject);
-          gameObject.setLocation('graveyard');
+          if (gameObject.isTemporaryCopy) {
+            this.deleteGameObject(gameObject);
+          } else {
+            gameObject.setLocation('graveyard');
+          }
           SoundEffect.play(PresetSound.sweep);
+          EventSystem.call('UPDATE_INVENTORY', true);
         }
       },
     ];
@@ -676,6 +680,18 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   private cloneGameObject(gameObject: TabletopObject) {
     if (this.GuestMode()) return;
     gameObject.clone();
+  }
+
+  private createTemporaryCopy(gameObject: GameCharacter) {
+    if (this.GuestMode()) return;
+    const pose = gameObject.getPoseForView();
+    GameCharacter.createTemporaryCopy(gameObject, {
+      x: pose.x + 50,
+      y: pose.y + 50,
+      posZ: pose.posZ,
+    });
+    SoundEffect.play(PresetSound.piecePut);
+    EventSystem.call('UPDATE_INVENTORY', true);
   }
 
   private showDetail(gameObject: GameCharacter) {
@@ -773,26 +789,51 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     return gameObject.isVisible || this.isGMMode;
   }
 
+  /** True after pointerdown on a bar/input — next dragstart must be cancelled. */
+  private inventoryDragBlocked = false;
+
   /** Stop panel appDraggable from treating this as a window move. */
   onInventoryDragGestureStart(e: Event, gameObject: GameCharacter) {
-    if (!this.canDragInventory(gameObject)) return;
+    this.inventoryDragBlocked = this.isInventoryUiControl(e.target);
+    if (!this.canDragInventory(gameObject) || this.inventoryDragBlocked) return;
     e.stopPropagation();
   }
 
   onInventoryDragStart(e: DragEvent, gameObject: GameCharacter) {
+    // Range/HP bars and other controls must not start a token DnD.
+    if (this.inventoryDragBlocked || this.isInventoryUiControl(e.target)) {
+      this.inventoryDragBlocked = false;
+      e.preventDefault();
+      return;
+    }
     if (!this.canDragInventory(gameObject) || !e.dataTransfer) {
       e.preventDefault();
       return;
     }
     e.stopPropagation();
+    const tempCopy = !!(e.ctrlKey || e.metaKey);
     e.dataTransfer.setData(GameCharacter.INVENTORY_DRAG_MIME, gameObject.identifier);
     e.dataTransfer.setData('text/plain', `udonarium-character:${gameObject.identifier}`);
-    e.dataTransfer.effectAllowed = 'move';
+    if (tempCopy) {
+      e.dataTransfer.setData(GameCharacter.INVENTORY_TEMP_COPY_MIME, '1');
+      e.dataTransfer.effectAllowed = 'copy';
+    } else {
+      e.dataTransfer.effectAllowed = 'move';
+    }
   }
 
   onInventoryDragEnd() {
+    this.inventoryDragBlocked = false;
     this.dropTargetTab = '';
     this.changeDetector.markForCheck();
+  }
+
+  /** Inputs / bars / buttons keep normal interaction; rest of the row can DnD the token. */
+  private isInventoryUiControl(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest(
+      'input, button, select, textarea, a, label, .resource-tag, .tag-value-box, .tag-value, .resource-value'
+    );
   }
 
   onInventoryTabDragOver(e: DragEvent, inventoryType: string) {

@@ -17,7 +17,6 @@
       [title]="('char.selectAsMine' | i18n:{ name: $any(gameObject).playerOwnerName })">
       {{ $any(gameObject).playerOwnerName }}
     </div>
-    <div *ngIf="showLocationBadge(gameObject)" class="other-table-tag" [title]="locationBadge(gameObject)">{{ locationBadge(gameObject) }}</div>
     <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject}"></ng-container>
   </div>
   <div class="actions" *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
@@ -80,7 +79,8 @@
           <input type="checkbox" [(ngModel)]="indicateAll" />
           {{ 'inv.showAll' | i18n }}<sup class="self_only">*</sup>
         </label>
-        <span class="multi-hint"><kbd>{{ 'common.keyCtrl' | i18n }}</kbd>{{ 'inv.multiSelectHint' | i18n }}</span>
+        <span class="multi-hint"><kbd>{{ 'common.keyShift' | i18n }}</kbd>{{ 'inv.multiSelectHint' | i18n }}</span>
+        <span class="multi-hint"><kbd>{{ 'common.keyCtrl' | i18n }}</kbd>{{ 'inv.tempCopyDragHint' | i18n }}</span>
       </span>
     </div>
   </ng-container>

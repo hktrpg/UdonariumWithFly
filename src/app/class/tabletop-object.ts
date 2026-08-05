@@ -13,6 +13,13 @@ export interface TabletopLocation {
   y: number;
 }
 
+/** Per-map pose for multi-map presence (same SyncObject on several tables). */
+export interface TablePlacementPose {
+  x: number;
+  y: number;
+  posZ: number;
+}
+
 @SyncObject('TabletopObject')
 export class TabletopObject extends ObjectNode {
   @SyncVar() location: TabletopLocation = {
@@ -23,16 +30,200 @@ export class TabletopObject extends ObjectNode {
 
   @SyncVar() posZ: number = 0;
 
-  /** Bound GameTable when on the tabletop; empty when in inventory / graveyard / hand. */
+  /**
+   * Last-touched / primary GameTable id (compat). Visibility uses tablePlacements.
+   * Empty when in inventory / graveyard / hand.
+   */
   @SyncVar() tableIdentifier: string = '';
+
+  /**
+   * JSON map of tableId → { x, y, posZ }. Same object can sit on multiple maps.
+   * Migrated from legacy single tableIdentifier + location when empty.
+   */
+  @SyncVar() tablePlacements: string = '';
+
+  /** Clone from「建立暫存副本」/ CTRL+drag; delete destroys (no graveyard). */
+  @SyncVar() isTemporaryCopy: boolean = false;
 
   get isVisibleOnTable(): boolean {
     if (this.location.name !== 'table') return false;
     const viewId = TabletopObject.resolveViewTableIdentifier();
     if (!viewId) return false;
-    // Do not write SyncVars in this getter (breaks CD / freezes panels). Migrate elsewhere.
-    if (!this.tableIdentifier) return false;
-    return this.tableIdentifier === viewId;
+    // Do not write SyncVars here (breaks CD / freezes panels). Migrate elsewhere.
+    return this.hasPlacement(viewId);
+  }
+
+  /** Parsed placements (may migrate legacy binding — do not call from pure getters used in CD). */
+  getPlacements(): { [tableId: string]: TablePlacementPose } {
+    this.ensurePlacementsMigrated();
+    return this.parsePlacements();
+  }
+
+  /** Read-only placement check; supports legacy single tableIdentifier without writing. */
+  hasPlacement(tableId: string): boolean {
+    if (!tableId) return false;
+    if (this.tablePlacements) {
+      return !!this.parsePlacements()[tableId];
+    }
+    return this.tableIdentifier === tableId;
+  }
+
+  get placementTableIds(): string[] {
+    if (this.tablePlacements) return Object.keys(this.parsePlacements());
+    if (this.location.name === 'table' && this.tableIdentifier) return [this.tableIdentifier];
+    return [];
+  }
+
+  getPoseForTable(tableId: string): TablePlacementPose | null {
+    if (!tableId) return null;
+    if (this.tablePlacements) {
+      return this.parsePlacements()[tableId] || null;
+    }
+    if (this.tableIdentifier === tableId && this.location.name === 'table') {
+      return { x: this.location.x, y: this.location.y, posZ: this.posZ };
+    }
+    return null;
+  }
+
+  /** Pose for current view table, else live location/posZ. */
+  getPoseForView(): TablePlacementPose {
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    const pose = viewId ? this.getPoseForTable(viewId) : null;
+    if (pose) return pose;
+    return { x: this.location.x, y: this.location.y, posZ: this.posZ };
+  }
+
+  setPoseForTable(tableId: string, pose: TablePlacementPose, syncLive = true) {
+    if (!tableId) return;
+    this.ensurePlacementsMigrated();
+    const map = this.parsePlacements();
+    map[tableId] = {
+      x: pose.x,
+      y: pose.y,
+      posZ: pose.posZ,
+    };
+    this.tablePlacements = JSON.stringify(map);
+    this.tableIdentifier = tableId;
+    this.location.name = 'table';
+    if (syncLive) {
+      const viewId = TabletopObject.resolveViewTableIdentifier();
+      if (!viewId || viewId === tableId) {
+        this.location.x = pose.x;
+        this.location.y = pose.y;
+        this.posZ = pose.posZ;
+      }
+    }
+    this.update();
+  }
+
+  /**
+   * Place on a table without removing other map placements.
+   * @param exclusive if true, clear other placements first (「僅移至此地圖」)
+   */
+  addToTable(tableId?: string, pose?: Partial<TablePlacementPose>, exclusive = false) {
+    const id = tableId || TabletopObject.resolveViewTableIdentifier() || this.tableIdentifier || '';
+    if (!id) {
+      this.location.name = 'table';
+      this.update();
+      return;
+    }
+    if (exclusive) this.clearPlacements(false);
+    const existing = this.getPoseForTable(id);
+    const next: TablePlacementPose = {
+      x: pose?.x ?? existing?.x ?? this.location.x,
+      y: pose?.y ?? existing?.y ?? this.location.y,
+      posZ: pose?.posZ ?? existing?.posZ ?? this.posZ,
+    };
+    this.setPoseForTable(id, next, true);
+  }
+
+  /** Remove from one map; if none left, move to inventoryLocation (default common). */
+  removeFromTable(tableId?: string, inventoryLocation = 'common') {
+    const id = tableId || TabletopObject.resolveViewTableIdentifier() || this.tableIdentifier || '';
+    if (!id) return;
+    this.ensurePlacementsMigrated();
+    const map = this.parsePlacements();
+    if (!map[id]) return;
+    delete map[id];
+    const keys = Object.keys(map);
+    if (keys.length < 1) {
+      this.tablePlacements = '';
+      this.tableIdentifier = '';
+      this.location.name = inventoryLocation;
+      this.update();
+      return;
+    }
+    this.tablePlacements = JSON.stringify(map);
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    const keep = (viewId && map[viewId]) ? viewId : keys[0];
+    this.tableIdentifier = keep;
+    const pose = map[keep];
+    this.location.name = 'table';
+    this.location.x = pose.x;
+    this.location.y = pose.y;
+    this.posZ = pose.posZ;
+    this.update();
+  }
+
+  /** Mirror placements[view] into live location for the current view (call on map switch). */
+  hydratePoseForView(viewTableId?: string) {
+    const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
+    if (!viewId || this.location.name !== 'table') return;
+    const pose = this.getPoseForTable(viewId);
+    if (!pose) return;
+    this.location.x = pose.x;
+    this.location.y = pose.y;
+    this.posZ = pose.posZ;
+    this.tableIdentifier = viewId;
+    this.update();
+  }
+
+  static hydrateAllForView(viewTableId?: string) {
+    const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
+    if (!viewId) return;
+    for (const obj of TabletopObject.getAll()) {
+      if (obj.location.name === 'table' && obj.hasPlacement(viewId)) {
+        obj.hydratePoseForView(viewId);
+      }
+    }
+  }
+
+  /** Destroy temporary copies; otherwise optional graveyard callback. */
+  static disposeObject(obj: TabletopObject, toGraveyard?: () => void) {
+    if (obj.isTemporaryCopy) {
+      obj.destroy();
+      return;
+    }
+    if (toGraveyard) toGraveyard();
+    else obj.destroy();
+  }
+
+  private parsePlacements(): { [tableId: string]: TablePlacementPose } {
+    if (!this.tablePlacements) return {};
+    try {
+      const raw = JSON.parse(this.tablePlacements);
+      if (!raw || typeof raw !== 'object') return {};
+      return raw as { [tableId: string]: TablePlacementPose };
+    } catch {
+      return {};
+    }
+  }
+
+  private clearPlacements(update = true) {
+    this.tablePlacements = '';
+    if (update) this.update();
+  }
+
+  /** Seed placements from legacy tableIdentifier + location once. */
+  ensurePlacementsMigrated() {
+    if (this.tablePlacements) return;
+    if (this.location.name !== 'table') return;
+    const id = this.tableIdentifier || TabletopObject.resolveViewTableIdentifier();
+    if (!id) return;
+    this.tablePlacements = JSON.stringify({
+      [id]: { x: this.location.x, y: this.location.y, posZ: this.posZ },
+    });
+    if (!this.tableIdentifier) this.tableIdentifier = id;
   }
 
   /** All tabletop subclasses (character/card/dice/…). getObjects(TabletopObject) only matches the base alias. */
@@ -49,8 +240,12 @@ export class TabletopObject extends ObjectNode {
     const id = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!id) return;
     for (const obj of TabletopObject.getAll()) {
-      if (obj.location.name === 'table' && !obj.tableIdentifier) {
-        obj.tableIdentifier = id;
+      if (obj.location.name !== 'table') continue;
+      obj.ensurePlacementsMigrated();
+      if (!obj.tableIdentifier) {
+        obj.addToTable(id);
+      } else if (!obj.tablePlacements) {
+        obj.ensurePlacementsMigrated();
       }
     }
   }
@@ -79,7 +274,10 @@ export class TabletopObject extends ObjectNode {
     };
 
     for (const obj of TabletopObject.getAll()) {
-      if (obj.location.name === 'table') consider(obj.tableIdentifier);
+      if (obj.location.name !== 'table') continue;
+      obj.ensurePlacementsMigrated();
+      consider(obj.tableIdentifier);
+      for (const tid of Object.keys(obj.parsePlacements())) consider(tid);
     }
     for (const tid of extraOrphanIds) consider(tid);
 
@@ -95,8 +293,23 @@ export class TabletopObject extends ObjectNode {
 
       for (const obj of TabletopObject.getAll()) {
         if (obj.location.name !== 'table') continue;
-        const next = remap.get(obj.tableIdentifier);
-        if (next) obj.tableIdentifier = next;
+        const nextPrimary = remap.get(obj.tableIdentifier);
+        if (nextPrimary) obj.tableIdentifier = nextPrimary;
+        const map = obj.parsePlacements();
+        let changed = false;
+        const nextMap: { [tableId: string]: TablePlacementPose } = {};
+        for (const [tid, pose] of Object.entries(map)) {
+          const next = remap.get(tid) || tid;
+          if (validIds.has(next)) {
+            nextMap[next] = pose;
+            if (next !== tid) changed = true;
+          } else {
+            changed = true;
+          }
+        }
+        if (changed || Object.keys(nextMap).length !== Object.keys(map).length) {
+          obj.tablePlacements = Object.keys(nextMap).length ? JSON.stringify(nextMap) : '';
+        }
       }
     }
 
@@ -114,6 +327,8 @@ export class TabletopObject extends ObjectNode {
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
+    // Only bind table id here. Do not seed placements yet — create flows set
+    // location.x/y after initialize(), then call setLocation('table').
     if (this.location.name === 'table' && !this.tableIdentifier) {
       const viewId = TabletopObject.resolveViewTableIdentifier();
       if (viewId) this.tableIdentifier = viewId;
@@ -310,17 +525,23 @@ export class TabletopObject extends ObjectNode {
   }
 
   setLocation(location: string, tableIdentifier?: string) {
-    this.location.name = location;
     if (location === 'table') {
-      // Prefer explicit id, then current view table (inventory drag / "move to table").
-      // Fall back to existing binding only when no view table is resolved yet.
-      this.tableIdentifier = tableIdentifier
-        || TabletopObject.resolveViewTableIdentifier()
-        || this.tableIdentifier
-        || '';
-    } else {
-      this.tableIdentifier = '';
+      // Prefer current live coords (create/drop set x/y before setLocation).
+      this.addToTable(tableIdentifier, {
+        x: this.location.x,
+        y: this.location.y,
+        posZ: this.posZ,
+      }, false);
+      return;
     }
+    this.clearPlacements(false);
+    this.tableIdentifier = '';
+    this.location.name = location;
     this.update();
+  }
+
+  /** Move exclusively to one map (clear other placements). */
+  moveToTableOnly(tableIdentifier?: string, pose?: Partial<TablePlacementPose>) {
+    this.addToTable(tableIdentifier, pose, true);
   }
 }
