@@ -511,7 +511,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     const peer = this.networkService.peer;
     const room = peer.isRoom
       ? new RoomInfo(peer.roomId, peer.roomName, [peer as any])
-      : new RoomInfo('local', RoomAuth.encode(this.i18n.t('peer.localRoom'), 'local', { gm: '', user: '', guest: '' }), []);
+      : new RoomInfo('local', RoomAuth.encode(this.i18n.t('peer.localRoom'), 'local', { gm: '', user: '', guest: '' }).roomName, []);
 
     const result = await this.modalService.open<RoomJoinResult>(RoomJoinComponent, {
       room,
@@ -543,6 +543,11 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
           }
           RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
           this.roomInvite.setRolePassword(result.role, result.password || '');
+          RoomAuth.rememberSession(
+            result.role,
+            result.password || RoomAuth.getSessionRolePassword(result.role),
+            RoomAuth.getSessionMeshPassword() || Network.peer?.password || undefined,
+          );
           // Clear legacy hold state.
           PeerCursor.isGMHold = false;
           this.chatMessageService.sendOperationLog(this.i18n.t('peer.roleSwitchLog', {

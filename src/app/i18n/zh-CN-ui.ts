@@ -366,7 +366,7 @@ export const zhCN_ui: I18nDictionary = {
   'room.errorNameRequired': '房间名称是必填项目。',
   'room.errorNameMaxLength': '房间名称的长度应小于或等于16。',
   'room.errorPasswordMaxLength': '密码长度应小于等于12。',
-  'room.errorPeerIdLength': '房间名称和密码信息似乎太长。请缩短房间名称。',
+  'room.errorPeerIdLength': '房间名称过长（含密码设定后超出连线 ID 上限）。请缩短房间名称，或减少有密码的身份。',
   'room.create': '创建新房间',
   'room.resumeTitle': '恢复房间',
   'room.resume': '恢复房间',

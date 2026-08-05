@@ -31,10 +31,16 @@ export class RoomInviteService {
     if (passwords.gm != null) this.rolePasswords.gm = passwords.gm;
     if (passwords.user != null) this.rolePasswords.user = passwords.user;
     if (passwords.guest != null) this.rolePasswords.guest = passwords.guest;
+    for (const role of ['gm', 'user', 'guest'] as RoomRole[]) {
+      if (passwords[role] != null) {
+        RoomAuth.rememberSession(role, passwords[role] || '');
+      }
+    }
   }
 
   setRolePassword(role: RoomRole, password: string) {
     this.rolePasswords[role] = password || '';
+    RoomAuth.rememberSession(role, password || '');
   }
 
   getRolePassword(role: RoomRole): string {
@@ -110,13 +116,20 @@ export class RoomInviteService {
 
     if (!room) return 'notFound';
 
-    // Role-auth rooms use empty skyway password.
-    const skywayPassword = RoomAuth.isRoleAuthRoom(payload.n) ? '' : (payload.p || '');
-    const targetPeers = room.filterByPassword(skywayPassword);
+    let skywayPassword = '';
+    if (RoomAuth.isRoleAuthRoom(payload.n)) {
+      skywayPassword = RoomAuth.resolveMeshPassword(
+        payload.id, payload.n, payload.r, payload.p || '');
+    } else {
+      skywayPassword = payload.p || '';
+    }
+    const targetPeers = room.filterByPassword(
+      RoomAuth.isMeshLocked(payload.n) || RoomAuth.isRoleAuthRoom(payload.n) ? '' : skywayPassword);
     if (targetPeers.length < 1) return 'notFound';
 
     RoomAuth.applyIdentity(payload.r, payload.id);
     this.setRolePassword(payload.r, payload.p || '');
+    RoomAuth.rememberSession(payload.r, payload.p || '', skywayPassword);
     const ok = await RoomConnectHelper.openAndConnect(room, skywayPassword, targetPeers);
     return ok ? 'ok' : 'notFound';
   }

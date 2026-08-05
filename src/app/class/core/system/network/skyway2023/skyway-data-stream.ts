@@ -83,6 +83,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     this.peer = PeerContext.parse(peer.peerId);
     this.peer.userId = peer.userId;
     this.peer.password = peer.password;
+    this.peer.meshPassword = peer.meshPassword || '';
   }
 
   static createPublication(skyWay: SkyWayFacade, peer: IPeerContext): SkyWayDataStream {

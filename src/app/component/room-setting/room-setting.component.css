@@ -54,6 +54,14 @@
   background: rgba(180, 83, 9, 0.1);
 }
 
+.hint.hint-ok {
+  color: #166534;
+}
+
+.hint.hint-warn {
+  color: #92400e;
+}
+
 .perm-embed {
   margin: 12px 0 8px;
 }

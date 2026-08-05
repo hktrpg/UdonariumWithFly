@@ -366,7 +366,7 @@ export const en_ui: I18nDictionary = {
   'room.errorNameRequired': 'Room name is required.',
   'room.errorNameMaxLength': 'Room name must be 16 characters or fewer.',
   'room.errorPasswordMaxLength': 'Passwords must be 12 characters or fewer.',
-  'room.errorPeerIdLength': 'The room name and password information are too long. Shorten the room name.',
+  'room.errorPeerIdLength': 'Room name is too long after password settings (connection ID limit). Shorten the name, or enable fewer password-protected roles.',
   'room.create': 'Create room',
   'room.resumeTitle': 'Resume room',
   'room.resume': 'Resume room',

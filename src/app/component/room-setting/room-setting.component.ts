@@ -160,23 +160,21 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
 
   recalcPeerId() {
     const roomId = this.resolveCreateRoomId();
-    const encoded = RoomAuth.encode(this.roomName, roomId, this.buildRoleAuthInputs());
+    const { roomName, meshPassword } = RoomAuth.encode(this.roomName, roomId, this.buildRoleAuthInputs());
     const userId = Network.peer.userId;
-    const peer = PeerContext.create(userId, roomId, encoded, '');
-    this.validateLength = peer.peerId.length < 64;
+    const peer = PeerContext.create(userId, roomId, roomName, meshPassword);
+    this.validateLength = peer.peerId.length <= 64;
   }
 
   createRoom() {
     const userId = Network.peer.userId;
     const roomId = this.resolveCreateRoomId();
     const roles = this.buildRoleAuthInputs();
-    const encodedName = RoomAuth.encode(this.roomName, roomId, roles);
-    // Role-auth rooms use empty skyway password; roles are gated by RoomAuth digests.
-    Network.open(userId, roomId, encodedName, '');
+    const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
+    Network.open(userId, roomId, encodedName, meshPassword);
     PeerCursor.myCursor.peerId = Network.peerId;
-    // Host joins as GM. Pass roomId explicitly — Network.open is async so peer.roomId may lag.
     RoomAuth.applyIdentity('gm', roomId);
-    // Keep plaintext role passwords in-session for invite-link generation.
+    RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
     this.roomInvite.setRolePasswords({
       gm: this.gmPassword,
       user: this.allowUser ? this.userPassword : '',
@@ -196,21 +194,21 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     this.help = '';
     const roomId = Network.peer.roomId;
     const roles = this.buildRoleAuthInputs();
-    const encodedName = RoomAuth.encode(this.roomName, roomId, roles);
+    const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
     this.roomInvite.setRolePasswords({
       gm: this.gmPassword,
       user: this.allowUser ? this.userPassword : '',
       guest: this.allowGuest ? this.guestPassword : '',
     });
+    RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
 
     try {
-      // Notify others before we leave the old SkyWay channel.
       if (Network.peers.length > 0) {
         EventSystem.call('ROOM_REKEY', { roomId, roomName: encodedName });
         await new Promise(r => setTimeout(r, 150));
       }
-      await RoomConnectHelper.rekeyRoom(roomId, encodedName);
+      await RoomConnectHelper.rekeyRoom(roomId, encodedName, meshPassword);
       RoomAuth.applyIdentity('gm', roomId);
       RoomAuth.noteAttained('gm', roomId);
       this.modalService.resolve(true);

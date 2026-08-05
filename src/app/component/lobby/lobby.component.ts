@@ -206,13 +206,17 @@ export class LobbyComponent implements OnInit, OnDestroy {
     });
     if (!result) return;
 
-    // Role-auth rooms always use empty skyway password.
+    const meshPassword = RoomAuth.resolveMeshPassword(
+      room.id, room.name, result.role, result.password || RoomAuth.getSessionRolePassword(result.role));
+    // Mesh is channel-only; peerIds have empty password digests.
     const targetPeers = room.filterByPassword('');
     if (targetPeers.length < 1) return;
 
+    const rolePw = result.password || RoomAuth.getSessionRolePassword(result.role);
     RoomAuth.applyIdentity(result.role, room.id);
-    this.roomInvite.setRolePassword(result.role, result.password || '');
-    await this.openAndConnect(room, '', targetPeers);
+    RoomAuth.rememberSession(result.role, rolePw, meshPassword);
+    this.roomInvite.setRolePassword(result.role, rolePw);
+    await this.openAndConnect(room, meshPassword, targetPeers);
   }
 
   private async connectLegacy(room: IRoomInfo, asGuest: boolean) {

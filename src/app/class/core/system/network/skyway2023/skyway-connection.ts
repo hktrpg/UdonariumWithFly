@@ -371,7 +371,7 @@ export class SkyWayConnection implements Connection {
 
   private makeFriendPeer(userId: string): PeerContext {
     return this.peer.isRoom
-      ? PeerContext.create(userId, this.peer.roomId, this.peer.roomName, this.peer.password)
+      ? PeerContext.create(userId, this.peer.roomId, this.peer.roomName, this.peer.channelPassword)
       : PeerContext.create(userId);
   }
 }

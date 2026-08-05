@@ -367,7 +367,7 @@ export const zhTW_ui: I18nDictionary = {
   'room.errorNameRequired': '房間名稱是必填項目。',
   'room.errorNameMaxLength': '房間名稱的長度應小於或等於16。',
   'room.errorPasswordMaxLength': '密碼長度應小於等於12。',
-  'room.errorPeerIdLength': '房間名稱和密碼資訊似乎太長。請縮短房間名稱。',
+  'room.errorPeerIdLength': '房間名稱過長（含密碼設定後超出連線 ID 上限）。請縮短房間名稱，或減少有密碼的身份。',
   'room.create': '建立新房間',
   'room.resumeTitle': '恢復房間',
   'room.resume': '恢復房間',

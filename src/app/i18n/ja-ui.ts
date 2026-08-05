@@ -366,7 +366,7 @@ export const ja_ui: I18nDictionary = {
   'room.errorNameRequired': '部屋名は必須です。',
   'room.errorNameMaxLength': '部屋名は16文字以内にしてください。',
   'room.errorPasswordMaxLength': 'パスワードは12文字以内にしてください。',
-  'room.errorPeerIdLength': '部屋名とパスワード情報が長すぎます。部屋名を短くしてください。',
+  'room.errorPeerIdLength': '部屋名が長すぎます（パスワード設定後に接続ID上限超過）。部屋名を短くするか、パスワード付き役割を減らしてください。',
   'room.create': '新規部屋作成',
   'room.resumeTitle': '部屋を再開',
   'room.resume': '部屋を再開',

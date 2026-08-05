@@ -42,6 +42,7 @@ export class SkyWayFacade {
       this.peer = PeerContext.parse(peer.peerId);
       this.peer.userId = peer.userId;
       this.peer.password = peer.password;
+      this.peer.meshPassword = peer.meshPassword || '';
       this.isDestroyed = false;
 
       await this.createContext();
@@ -80,7 +81,7 @@ export class SkyWayFacade {
 
     let backend = new SkyWayBackend(this.url);
     let channelName = this.peer.isRoom
-      ? CryptoUtil.sha256Base64Url(this.peer.roomId + this.peer.roomName + this.peer.password)
+      ? CryptoUtil.sha256Base64Url(this.peer.roomId + this.peer.roomName + this.peer.channelPassword)
       : this.peer.peerId;
 
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
@@ -196,7 +197,7 @@ export class SkyWayFacade {
     await this.leaveRoomChannel();
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed) return;
 
-    let roomName = CryptoUtil.sha256Base64Url(this.peer.roomId + this.peer.roomName + this.peer.password);
+    let roomName = CryptoUtil.sha256Base64Url(this.peer.roomId + this.peer.roomName + this.peer.channelPassword);
     console.log(`roomName: ${roomName}`);
 
     let room = await SkyWayChannel.FindOrCreate(this.context, {

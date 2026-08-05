@@ -70,14 +70,23 @@ export class RoomConnectHelper {
   /**
    * Re-open into the same roomId with a new encoded roomName (auth re-key),
    * then remesh with peers advertising that name.
+   * @param meshPassword SkyWay password for the new roomName ('' if unlocked).
    */
-  static async rekeyRoom(roomId: string, roomName: string): Promise<void> {
+  static async rekeyRoom(roomId: string, roomName: string, meshPassword: string = ''): Promise<void> {
     const userId = Network.peer.userId;
     const wasGuest = GuestSession.isGuest;
     const wasGM = !!PeerCursor.myCursor?.isGMMode;
     let role: RoomRole = 'user';
     if (wasGM) role = 'gm';
     else if (wasGuest) role = 'guest';
+
+    // Prefer explicit mesh; otherwise unseal with the role password we joined with.
+    let mesh = meshPassword;
+    if (mesh === '' && RoomAuth.isMeshLocked(roomName)) {
+      const rolePw = RoomAuth.getSessionRolePassword(role);
+      mesh = RoomAuth.resolveMeshPassword(roomId, roomName, role, rolePw);
+    }
+    RoomAuth.rememberSession(role, RoomAuth.getSessionRolePassword(role), mesh);
 
     await new Promise<void>(resolve => {
       const key = { rekey: true };
@@ -86,7 +95,7 @@ export class RoomConnectHelper {
           EventSystem.unregister(key);
           resolve();
         });
-      Network.open(userId, roomId, roomName, '');
+      Network.open(userId, roomId, roomName, mesh);
       PeerCursor.myCursor.peerId = Network.peerId;
     });
 
