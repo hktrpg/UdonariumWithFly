@@ -84,6 +84,7 @@ export const zhTW_ui: I18nDictionary = {
   'chat.tabStale': '※聊天標籤的內容已更新。請重新選擇聊天標籤，或重新開啟此聊天視窗。',
   'chat.unnamedTab': '(未命名標籤)',
   'chat.tabsButton': '標籤',
+  'chat.toolbarMoreTitle': '聊天選項',
   'chat.logButton': '日誌',
   'chat.musicTitle': '音樂：ON＝播放 BGM／OFF＝靜音（本機設定）',
   'chat.soundEffectTitle': '效果音：ON＝播放音效／OFF＝靜音（本機設定）',

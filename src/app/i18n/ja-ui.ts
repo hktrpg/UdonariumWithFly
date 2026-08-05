@@ -83,6 +83,7 @@ export const ja_ui: I18nDictionary = {
   'chat.tabStale': '※チャットタブが更新されました。タブを選び直すか、この窓を開き直してください。',
   'chat.unnamedTab': '(無名タブ)',
   'chat.tabsButton': 'タブ',
+  'chat.toolbarMoreTitle': 'チャット設定',
   'chat.logButton': 'ログ',
   'chat.musicTitle': '音楽：ON＝BGM再生／OFF＝ミュート（端末設定）',
   'chat.soundEffectTitle': '効果音：ON＝再生／OFF＝ミュート（端末設定）',

@@ -83,6 +83,7 @@ export const en_ui: I18nDictionary = {
   'chat.tabStale': '* Chat tab content changed. Reselect a tab or reopen this window.',
   'chat.unnamedTab': '(Untitled tab)',
   'chat.tabsButton': 'Tabs',
+  'chat.toolbarMoreTitle': 'Chat options',
   'chat.logButton': 'Log',
   'chat.musicTitle': 'Music: ON = play BGM / OFF = mute (local)',
   'chat.soundEffectTitle': 'SFX: ON = play effects / OFF = mute (local)',
