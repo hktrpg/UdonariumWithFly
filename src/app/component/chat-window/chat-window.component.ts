@@ -33,7 +33,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
   static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
   static readonly CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-skip-empty-quotes-local-storage';
-  static readonly CHAT_GEOMETRY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-window-geometry-v2';
   /** Designed defaults: prior 700×400 @ (100,450); height −30%. */
   static readonly DEFAULT_WIDTH = 700;
   static readonly DEFAULT_HEIGHT = 265;
@@ -46,48 +45,40 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static geometryReady: Promise<void> = Promise.resolve();
 
   static applySavedGeometry(option: PanelOption): PanelOption {
-    option.width = ChatWindowComponent.savedWidth;
-    option.height = ChatWindowComponent.savedHeight;
-    option.left = ChatWindowComponent.savedLeft;
-    option.top = ChatWindowComponent.savedTop;
+    option.tourPanelId = option.tourPanelId || 'menu.chat';
+    PanelService.applySavedGeometry(option, { includePosition: true });
+    option.width = option.width ?? ChatWindowComponent.DEFAULT_WIDTH;
+    option.height = option.height ?? ChatWindowComponent.DEFAULT_HEIGHT;
+    option.left = option.left ?? ChatWindowComponent.DEFAULT_LEFT;
+    option.top = option.top ?? ChatWindowComponent.DEFAULT_TOP;
+    ChatWindowComponent.savedWidth = option.width;
+    ChatWindowComponent.savedHeight = option.height;
+    ChatWindowComponent.savedLeft = option.left;
+    ChatWindowComponent.savedTop = option.top;
     return option;
   }
 
   static saveGeometry(width: number, height: number, left?: number, top?: number) {
-    if (!(width >= 100) || !(height >= 100)) return;
-    const w = Math.round(width);
-    const h = Math.round(height);
-    ChatWindowComponent.savedWidth = w;
-    ChatWindowComponent.savedHeight = h;
-    if (typeof left === 'number' && Number.isFinite(left)) {
-      ChatWindowComponent.savedLeft = Math.round(left);
+    PanelService.saveGeometry('menu.chat', width, height, left, top);
+    const g = PanelService.getGeometry('menu.chat');
+    if (g) {
+      ChatWindowComponent.savedWidth = g.width;
+      ChatWindowComponent.savedHeight = g.height;
+      if (typeof g.left === 'number') ChatWindowComponent.savedLeft = g.left;
+      if (typeof g.top === 'number') ChatWindowComponent.savedTop = g.top;
     }
-    if (typeof top === 'number' && Number.isFinite(top)) {
-      ChatWindowComponent.savedTop = Math.round(top);
-    }
-    localForage.setItem(ChatWindowComponent.CHAT_GEOMETRY_LOCAL_STORAGE_KEY, {
-      width: ChatWindowComponent.savedWidth,
-      height: ChatWindowComponent.savedHeight,
-      left: ChatWindowComponent.savedLeft,
-      top: ChatWindowComponent.savedTop,
-    }).catch(e => console.log(e));
   }
 
   static loadGeometryFromStorage(): Promise<void> {
-    ChatWindowComponent.geometryReady = localForage.getItem<{
-      width: number; height: number; left?: number; top?: number;
-    }>(ChatWindowComponent.CHAT_GEOMETRY_LOCAL_STORAGE_KEY).then(g => {
-      if (g && typeof g.width === 'number' && typeof g.height === 'number' && g.width >= 100 && g.height >= 100) {
-        ChatWindowComponent.savedWidth = Math.round(g.width);
-        ChatWindowComponent.savedHeight = Math.round(g.height);
-        if (typeof g.left === 'number' && Number.isFinite(g.left)) {
-          ChatWindowComponent.savedLeft = Math.round(g.left);
-        }
-        if (typeof g.top === 'number' && Number.isFinite(g.top)) {
-          ChatWindowComponent.savedTop = Math.round(g.top);
-        }
+    ChatWindowComponent.geometryReady = PanelService.geometryReady.then(() => {
+      const g = PanelService.getGeometry('menu.chat');
+      if (g) {
+        ChatWindowComponent.savedWidth = g.width;
+        ChatWindowComponent.savedHeight = g.height;
+        if (typeof g.left === 'number') ChatWindowComponent.savedLeft = g.left;
+        if (typeof g.top === 'number') ChatWindowComponent.savedTop = g.top;
       }
-    }).catch(e => console.log(e));
+    });
     return ChatWindowComponent.geometryReady;
   }
 
@@ -104,14 +95,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.setChatNotice(isNoticeOn);
   }
 
-  static isLeftOnly = false;
+  /** Default ON: all messages align left (local). */
+  static isLeftOnly = true;
   static setChatLeftOnly(isLeftOnly: boolean) {
-    if (isLeftOnly) {
-      localForage.setItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY, isLeftOnly).catch(e => console.log(e));
-    } else {
-      localForage.removeItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).catch(e => console.log(e));
-    }
-    ChatWindowComponent.isLeftOnly = isLeftOnly;
+    localForage.setItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY, !!isLeftOnly).catch(e => console.log(e));
+    ChatWindowComponent.isLeftOnly = !!isLeftOnly;
   }
   get isLeftOnly(): boolean {
     return ChatWindowComponent.isLeftOnly;
@@ -461,7 +449,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   showTabSetting() {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 520, height: 360 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 520, height: 360, geometryKey: 'chat.tabSetting' };
     let component = this.panelService.open<ChatTabSettingComponent>(ChatTabSettingComponent, option);
     component.selectedTab = this.chatTab;
   }
@@ -469,7 +457,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   showLogOutput() {
     if (this.GuestMode()) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 540, height: 300 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 540, height: 300, geometryKey: 'chat.logOutput' };
     let component = this.panelService.open<ChatLogOutputComponent>(ChatLogOutputComponent, option);
     component.selectedTabs = this.chatTab ? [this.chatTab] : [];
     component.selectTabsApplay();

@@ -4,7 +4,9 @@
 
 <!-- Desktop: classic left menu panel (unchanged behaviour). -->
 <ui-panel *ngIf="!isMobileLayout"
-  (rotateEvent)="rotateChange($event)" [top]="0" [left]="0" [width]="100" [height]="765" [title]="'menu.title' | i18n" [isAbleFullScreenButton]="false" [isAbleCloseButton]="false"  [isAbleRotateButton]="true">
+  (rotateEvent)="rotateChange($event)" [top]="0" [left]="0" [width]="100" [height]="765" [title]="'menu.title' | i18n"
+  geometryKey="menu.main"
+  [isAbleFullScreenButton]="false" [isAbleCloseButton]="false"  [isAbleRotateButton]="true">
   <nav [ngClass]="{'horizontal': isHorizontal, 'vertical': !isHorizontal}">
     <ng-container *ngTemplateOutlet="mainMenu"></ng-container>
     <div class="self-only-indicater" style="font-size: 8px; text-align: center;"><b><sup class="self-only">*</sup>{{ 'menu.selfOnly' | i18n }}</b></div>

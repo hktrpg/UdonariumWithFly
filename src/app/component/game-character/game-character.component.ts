@@ -1096,7 +1096,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }

@@ -282,13 +282,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         // Default ON when unset; honor explicit boolean from storage.
         ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
       });
-      localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => {
+        // Default ON (always left) when unset; honor explicit boolean from storage.
+        ChatWindowComponent.isLeftOnly = isLeftOnly == null ? true : !!isLeftOnly;
+      });
       localForage.getItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY).then(isAutoPopup => ChatWindowComponent.isAutoPopup = !!isAutoPopup);
       localForage.getItem(ChatWindowComponent.CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY).then(skip => {
         const on = skip == null ? true : !!skip;
         ChatWindowComponent.skipEmptyDialogQuotes = on;
         setSkipEmptyDialogQuotes(on);
       });
+      PanelService.loadGeometryFromStorage();
       ChatWindowComponent.loadGeometryFromStorage();
     } catch(e) {
       console.log(e);
@@ -922,6 +926,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async openDefaultPanels() {
+    await PanelService.geometryReady;
     await ChatWindowComponent.geometryReady;
     this.panelService.open(PeerMenuComponent, this.mobileLayout.adaptPanelOption({
       width: 520, height: 450, left: 100,

@@ -83,7 +83,13 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@ud
 export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('mainImage', { static: false }) mainImageElement: ElementRef;
 
-  @Input() tabletopObject: TabletopObject = null;
+  private _tabletopObject: TabletopObject = null;
+  @Input()
+  get tabletopObject(): TabletopObject { return this._tabletopObject; }
+  set tabletopObject(value: TabletopObject) {
+    this._tabletopObject = value;
+    this.bindSheetGeometry();
+  }
   isEdit: boolean = false;
 
   networkService = Network;
@@ -134,6 +140,18 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  /** Remember / restore detail-sheet size by object type (character, card, note, …). */
+  private bindSheetGeometry() {
+    if (!this._tabletopObject) return;
+    const key = PanelService.sheetGeometryKey(this._tabletopObject.aliasName);
+    this.panelService.geometryKey = key;
+    const g = PanelService.getGeometry(key);
+    if (g && g.width >= 100 && g.height >= 100) {
+      this.panelService.width = g.width;
+      this.panelService.height = g.height;
+    }
   }
 
   toggleEditMode() {
