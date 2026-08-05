@@ -99,6 +99,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       const t = event.target as HTMLElement | null;
       // Let nav toggles close the menu themselves (mousedown would reopen otherwise).
       if (t?.closest?.('[data-tour-id="menu.more"], [data-tour-id="menu.toolbox"], [data-tour-id="menu.settings"]')) return;
+      // Map HUD sits above the action sheet — using it should not dismiss toolbox/More.
+      if (t?.closest?.('.map-action-hud')) return;
       this.close();
     }
   }
@@ -214,10 +216,16 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   doAction(action: ContextMenuAction) {
-    this.showSubMenu(action);
+    this.showSubMenu(action, { fromClick: true });
     if (action.action == null) return;
 
+    // Capture before action: nested open() (e.g. More → Toolbox) replaces this menu.
+    const serialBefore = this.contextMenuService.serial;
+    const host = this.rootElementRef?.nativeElement;
     action.action();
+    if (serialBefore !== this.contextMenuService.serial) return;
+    if (host && !host.isConnected) return;
+
     this.refreshActionVisual(action);
 
     // Checkbox / radio stay open so users can toggle several options.
@@ -279,16 +287,36 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  showSubMenu(action: ContextMenuAction) {
+  showSubMenu(action: ContextMenuAction, opts?: { fromClick?: boolean }) {
     if (this.GuestMode()) return;
-    this.hideSubMenu();
-    clearTimeout(this.showSubMenuTimer);
     if (action.subActions == null || action.subActions.length < 1) return;
+
+    const host = this.rootElementRef?.nativeElement;
+    const mobileSheet = !!(host?.classList?.contains('is-mobile-action-sheet')
+      || host?.closest?.('.is-mobile-action-sheet'));
+
+    // Touch action sheets synthesize sticky hover — only expand/collapse from click.
+    if (mobileSheet && !opts?.fromClick) return;
+
+    clearTimeout(this.showSubMenuTimer);
+
+    // Second tap on the same row collapses the inline submenu.
+    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
+      clearTimeout(this.hideSubMenuTimer);
+      this.parentMenu = null;
+      this.subMenu = null;
+      this.changeDetector.detectChanges();
+      return;
+    }
+
+    this.hideSubMenu();
+    const delay = mobileSheet ? 0 : 250;
     this.showSubMenuTimer = setTimeout(() => {
       this.parentMenu = action;
       this.subMenu = action.subActions;
       clearTimeout(this.hideSubMenuTimer);
-    }, 250);
+      this.changeDetector.detectChanges();
+    }, delay);
   }
 
   hideSubMenu() {

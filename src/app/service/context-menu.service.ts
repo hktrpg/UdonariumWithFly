@@ -86,6 +86,8 @@ export class ContextMenuService {
   static ContextMenuComponentClass: { new(...args: any[]): any } = null;
 
   private panelComponentRef: ComponentRef<any>
+  /** Bumped on each open(); actions that replace the menu must not close the successor. */
+  private openSerial = 0;
 
   title: string = '';
   actions: ContextMenuAction[] = [];
@@ -97,8 +99,14 @@ export class ContextMenuService {
     return this.panelComponentRef ? true : false;
   }
 
+  /** Monotonic id for the currently opening / open menu. */
+  get serial(): number {
+    return this.openSerial;
+  }
+
   open(position: ContextMenuPoint, actions: ContextMenuAction[], title?: string, parentViewContainerRef?: ViewContainerRef, titleColor?: string, titleBold?: boolean) {
     this.close();
+    this.openSerial++;
     if (!parentViewContainerRef) {
       parentViewContainerRef = ContextMenuService.defaultParentViewContainerRef;
     }
