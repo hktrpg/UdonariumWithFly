@@ -7,6 +7,8 @@ import { translate } from 'i18n';
 /** One object’s SyncVar bag (+ optional altitude / explicit pose). */
 export interface SceneObjectSnap {
   identifier: string;
+  /** SyncObject alias when captured (e.g. character); used to skip tokens reliably. */
+  aliasName?: string;
   syncData: Object;
   altitude?: number;
   /** Explicit pose — preferred over digging syncData.attributes (ObjectNode SyncAttrs). */
@@ -86,9 +88,17 @@ export class ScenePreset extends ObjectNode {
   }
 
   get savedAtDisplay(): string {
+    return this.savedAtCompact;
+  }
+
+  /** Compact local time: YYYY-M-D HH:mm */
+  get savedAtCompact(): string {
     if (!this.savedAt) return '';
     try {
-      return new Date(this.savedAt).toLocaleString();
+      const d = new Date(this.savedAt);
+      if (Number.isNaN(d.getTime())) return '';
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch {
       return '';
     }

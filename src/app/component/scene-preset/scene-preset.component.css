@@ -6,16 +6,36 @@
 .scene-preset {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-height: 100%;
 }
 
-.apply-opts {
+.card-top {
+  padding: 6px 8px;
+}
+
+.toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.toolbar .material-icons {
+  font-size: 14px;
+}
+
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.card-list {
+  padding: 2px 4px;
 }
 
 .list-item {
@@ -23,10 +43,14 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 8px;
+  gap: 4px 6px;
+  padding: 4px 6px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
+}
+
+.list-item:last-child {
+  border-bottom: none;
 }
 
 .list-item.is-selected {
@@ -36,16 +60,17 @@
 .list-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 8em;
+  gap: 0;
+  min-width: 6em;
+  line-height: 1.25;
 }
 
-.list-status {
-  font-size: 11px;
-  color: #7a6a58;
+.list-item-name {
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.list-time {
+.list-meta {
   font-size: 11px;
   color: #8a7a68;
 }
@@ -54,11 +79,20 @@
   color: #a94442;
 }
 
+.card-edit {
+  padding: 8px 10px;
+}
+
+.card-edit .card-head {
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
+  gap: 2px;
+  margin-bottom: 6px;
 }
 
 .field input,
@@ -67,6 +101,15 @@
   box-sizing: border-box;
   border: 1px solid var(--udon-control-border, #c4b29a);
   border-radius: var(--udon-control-radius, 4px);
-  padding: 4px 6px;
+  padding: 3px 6px;
   background: var(--udon-control-bg, #fff);
+}
+
+.hint-meta {
+  margin: 0;
+  font-size: 11px;
+}
+
+.empty-hint {
+  margin: 4px 0;
 }

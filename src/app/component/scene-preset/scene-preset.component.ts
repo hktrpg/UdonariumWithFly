@@ -37,6 +37,16 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   GuestMode() { return Network.GuestMode(); }
 
+  /** One meta line: table (if ≠ title) · saved time. */
+  metaLine(preset: ScenePreset): string {
+    const title = (preset.title || '').trim();
+    const table = (preset.tableDisplayName || '').trim();
+    const parts: string[] = [];
+    if (table && table !== title) parts.push(table);
+    if (preset.savedAt) parts.push(this.i18n.t('scenePreset.savedAt', { time: preset.savedAtCompact }));
+    return parts.join(' · ');
+  }
+
   ngOnInit() {
     Promise.resolve().then(() => {
       this.modalService.title = this.panelService.title = this.i18n.t('scenePreset.title');
@@ -85,6 +95,12 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   apply(preset: ScenePreset, keepTokens = false) {
     if (this.GuestMode() || !preset || !preset.isValid) return;
+    console.log('[ScenePreset] UI apply click', {
+      title: preset.title,
+      keepTokens,
+      skipBgm: this.skipBgm,
+      skipText: this.skipText,
+    });
     const chatTab = this.resolveActiveChatTab();
     this.list.applyPreset(preset, {
       skipBgm: this.skipBgm,
