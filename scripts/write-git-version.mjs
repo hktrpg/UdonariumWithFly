@@ -19,6 +19,26 @@ function git(cmd) {
   }
 }
 
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** Local wall time: YYYY-MM-DD HH:mm */
+function formatStamp(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function stampFromGit(sha) {
+  const iso = (
+    (sha && sha !== 'unknown' ? git(`git log -1 --format=%cI ${sha}`) : '') ||
+    git('git log -1 --format=%cI')
+  ).trim();
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 16).replace('T', ' ');
+  return formatStamp(d);
+}
+
 const shaFull = (process.env.GITHUB_SHA || git('git rev-parse HEAD') || 'unknown').trim();
 const sha = shaFull.length >= 7 ? shaFull.slice(0, 7) : shaFull;
 const branch = (
@@ -27,12 +47,8 @@ const branch = (
   git('git rev-parse --abbrev-ref HEAD') ||
   'unknown'
 ).trim();
-// Prefer the stamped commit's author date (works with GITHUB_SHA in Actions).
-const date = (
-  (shaFull && shaFull !== 'unknown' ? git(`git log -1 --format=%cs ${shaFull}`) : '') ||
-  git('git log -1 --format=%cs') ||
-  new Date().toISOString().slice(0, 10)
-).trim();
+// Prefer the stamped commit's time (works with GITHUB_SHA in Actions).
+const date = stampFromGit(shaFull) || formatStamp(new Date());
 
 const display = `${date} ${sha} ${branch}`;
 
