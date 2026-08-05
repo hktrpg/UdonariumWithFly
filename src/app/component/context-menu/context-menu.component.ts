@@ -214,7 +214,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   doAction(action: ContextMenuAction) {
-    this.showSubMenu(action);
+    this.showSubMenu(action, { fromClick: true });
     if (action.action == null) return;
 
     // Capture before action: nested open() (e.g. More → Toolbox) replaces this menu.
@@ -285,16 +285,36 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  showSubMenu(action: ContextMenuAction) {
+  showSubMenu(action: ContextMenuAction, opts?: { fromClick?: boolean }) {
     if (this.GuestMode()) return;
-    this.hideSubMenu();
-    clearTimeout(this.showSubMenuTimer);
     if (action.subActions == null || action.subActions.length < 1) return;
+
+    const host = this.rootElementRef?.nativeElement;
+    const mobileSheet = !!(host?.classList?.contains('is-mobile-action-sheet')
+      || host?.closest?.('.is-mobile-action-sheet'));
+
+    // Touch action sheets synthesize sticky hover — only expand/collapse from click.
+    if (mobileSheet && !opts?.fromClick) return;
+
+    clearTimeout(this.showSubMenuTimer);
+
+    // Second tap on the same row collapses the inline submenu.
+    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
+      clearTimeout(this.hideSubMenuTimer);
+      this.parentMenu = null;
+      this.subMenu = null;
+      this.changeDetector.detectChanges();
+      return;
+    }
+
+    this.hideSubMenu();
+    const delay = mobileSheet ? 0 : 250;
     this.showSubMenuTimer = setTimeout(() => {
       this.parentMenu = action;
       this.subMenu = action.subActions;
       clearTimeout(this.hideSubMenuTimer);
-    }, 250);
+      this.changeDetector.detectChanges();
+    }, delay);
   }
 
   hideSubMenu() {

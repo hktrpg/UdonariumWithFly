@@ -980,6 +980,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const tourId = this.tourIdForComponent(componentName);
     if (tourId && PanelService.isTourPanelOpen(tourId)) {
       PanelService.closePanelsByTourId(tourId);
+      // Dismiss More / toolbox sheets so a re-tap does not feel like a re-open.
+      this.contextMenuService.close();
       return;
     }
     this.open(componentName);
@@ -1102,13 +1104,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
       }
       if (this.canShowMenu('menu.sceneTools')) {
-        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
       }
       if (this.canShowMenu('menu.scenePreset')) {
-        menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.open('ScenePresetComponent') });
+        menu.push({ name: this.i18n.t('menu.scenePreset'), materialIcon: 'theaters', action: () => this.openOrToggle('ScenePresetComponent') });
       }
       if (this.canShowMenu('menu.scenarioText')) {
-        menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.open('ScenarioTextComponent') });
+        menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.openOrToggle('ScenarioTextComponent') });
       }
     } else {
       if (!this.GuestMode()) {
@@ -1122,11 +1124,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
         }
         if (this.canShowMenu('menu.notes')) {
-          menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.open('NoteInventoryComponent') });
+          menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.openOrToggle('NoteInventoryComponent') });
         }
       }
       if (this.canShowMenu('menu.sceneTools')) {
-        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.open('SceneToolsComponent') });
+        menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
       }
     }
     menu.push(ContextMenuSeparator);
