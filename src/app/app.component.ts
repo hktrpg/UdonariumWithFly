@@ -1165,6 +1165,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       Array.prototype.push.apply(menu, extraActions);
     }
     if (menu.length < 1) return;
+    // Mobile: collapse floating map HUD so it does not cover the toolbox sheet.
+    if (this.mobileLayout.isMobile) {
+      EventSystem.trigger('COLLAPSE_MAP_HUD', null);
+    }
     this.contextMenuService.open(
       position,
       menu,

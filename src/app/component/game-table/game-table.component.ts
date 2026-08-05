@@ -482,6 +482,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
             100 - rotatedMovedX - this.viewPotisonX, -rotatedMovedY - this.viewPotisonY, -rotatedMovedZ - this.viewPotisonZ, 0, 0, 0
           );
         }, 50);
+      })
+      .on('COLLAPSE_MAP_HUD', () => {
+        this.ngZone.run(() => this.setMapHudCollapsed(true));
       });
     this.tabletopActionService.makeDefaultTable();
     this.tabletopActionService.makeDefaultTabletopObjects();
@@ -1158,9 +1161,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.trigger('OPEN_CHAT', null);
   }
 
-  /** Map HUD: open add-object menu at view center. */
+  /** Map HUD: open add-object menu at view center; re-tap closes toolbox. */
   hudOpenAddMenu(ev: Event) {
     ev.stopPropagation();
+    // Outside-click ignores .map-action-hud, so toggle close here.
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const tablePos = this.coordinateService.calcTabletopLocalCoordinate();
     const rect = (ev.currentTarget as HTMLElement)?.getBoundingClientRect?.();
     const x = rect ? rect.left + rect.width / 2 : (this.pointerDeviceService.pointers[0]?.x ?? window.innerWidth / 2);
@@ -1179,7 +1187,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleMapHudCollapsed() {
-    this.mapHudCollapsed = !this.mapHudCollapsed;
+    this.setMapHudCollapsed(!this.mapHudCollapsed);
+  }
+
+  /** Collapse/expand floating map HUD (persisted for session). */
+  setMapHudCollapsed(collapsed: boolean) {
+    if (this.mapHudCollapsed === collapsed) return;
+    this.mapHudCollapsed = collapsed;
     try {
       sessionStorage.setItem(GameTableComponent.MAP_HUD_COLLAPSED_KEY, this.mapHudCollapsed ? '1' : '0');
     } catch { /* ignore */ }
