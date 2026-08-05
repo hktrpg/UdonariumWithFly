@@ -557,7 +557,8 @@
   left: 50%;
   bottom: calc(var(--udon-bottom-chrome, 56px) + 10px);
   transform: translateX(-50%);
-  z-index: 11040;
+  /* Above mobile action sheets / toolbox (context-menu ~2000000) so HUD stays usable. */
+  z-index: 2000010;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;

@@ -99,6 +99,8 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       const t = event.target as HTMLElement | null;
       // Let nav toggles close the menu themselves (mousedown would reopen otherwise).
       if (t?.closest?.('[data-tour-id="menu.more"], [data-tour-id="menu.toolbox"], [data-tour-id="menu.settings"]')) return;
+      // Map HUD sits above the action sheet — using it should not dismiss toolbox/More.
+      if (t?.closest?.('.map-action-hud')) return;
       this.close();
     }
   }
