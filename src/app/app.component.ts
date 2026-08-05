@@ -1557,12 +1557,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         })),
       },
       ContextMenuSeparator,
-      contextMenuToggleCheck({
+      // Hover tips stick after taps on touch UIs — desktop-only setting.
+      ...(this.teachingTips.isAvailable ? [contextMenuToggleCheck({
         get: () => this.teachingTips.isEnabled,
         set: (v) => this.teachingTips.setEnabled(v),
         on: `☑${this.i18n.t('tour.hoverTips')}`,
         off: `☐${this.i18n.t('tour.hoverTips')}`,
-      }),
+      })] : []),
       {
         name: this.i18n.t('tour.replay'),
         materialIcon: 'school',

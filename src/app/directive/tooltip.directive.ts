@@ -14,6 +14,7 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { OverviewPanelComponent } from 'component/overview-panel/overview-panel.component';
 import { ContextMenuService } from 'service/context-menu.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
 @Directive({
@@ -43,7 +44,8 @@ export class TooltipDirective implements AfterViewInit, OnDestroy {
   constructor(
     private ngZone: NgZone,
     private viewContainerRef: ViewContainerRef,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private mobileLayout: MobileLayoutService,
   ) { }
 
   ngAfterViewInit() {
@@ -60,6 +62,8 @@ export class TooltipDirective implements AfterViewInit, OnDestroy {
   }
 
   private onMouseEnter(e: any) {
+    // Mobile synthesizes sticky hover after tap; overview cards block the map.
+    if (this.mobileLayout.isMobile) return;
     this.clearTimer();
     if (!this.tooltipComponentRef) this.startOpenTimer();
   }
@@ -113,6 +117,7 @@ export class TooltipDirective implements AfterViewInit, OnDestroy {
   }
 
   private open() {
+    if (this.mobileLayout.isMobile) return;
     // Keep pinned cards; only dismiss other hover previews.
     this.closeUnpinned();
     if (this.tooltipComponentRef) return;
