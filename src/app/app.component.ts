@@ -1132,7 +1132,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     menu.push(ContextMenuSeparator);
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push(ContextMenuSeparator);
-    menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.standSetteings(event) });
+    // Force-open: standSetteings() would toggle-close while More is still showing.
+    menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.openSettingsAt(position) });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
   }
@@ -1463,6 +1464,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   standSetteings(event: Event) {
     this.guidedTour.notifyMenuClick('menu.settings');
+    // Nav toggle: second tap closes. Nested opens (More → Settings) use openSettingsAt.
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
       return;
@@ -1474,10 +1476,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           x: window.pageXOffset + clientRect.left,
           y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
         }
-      : { 
-          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9), 
+      : {
+          x: window.pageXOffset + clientRect.left + (this.isHorizontal ? 0 : button.clientWidth * 0.9),
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
+    this.openSettingsAt(position);
+  }
+
+  /** Open settings sheet/menu (replaces any current context menu). */
+  private openSettingsAt(position: { x: number; y: number }) {
+    this.guidedTour.notifyMenuClick('menu.settings');
     this.contextMenuService.open(position, [
       ...this.buildAlwaysAvailableViewActions(),
       ContextMenuSeparator,

@@ -217,7 +217,13 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     this.showSubMenu(action);
     if (action.action == null) return;
 
+    // Capture before action: nested open() (e.g. More → Toolbox) replaces this menu.
+    const serialBefore = this.contextMenuService.serial;
+    const host = this.rootElementRef?.nativeElement;
     action.action();
+    if (serialBefore !== this.contextMenuService.serial) return;
+    if (host && !host.isConnected) return;
+
     this.refreshActionVisual(action);
 
     // Checkbox / radio stay open so users can toggle several options.
