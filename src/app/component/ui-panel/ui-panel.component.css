@@ -116,7 +116,8 @@
 }
 
 /* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets.
-   Width uses left/right (not 100vw) so content never overflows the visual viewport. */
+   Width uses left/right (not 100vw) so content never overflows the visual viewport.
+   Heights come from --udon-sheet-* (set by MobileLayoutService.sheetHeightPx). */
 .draggable-panel.is-mobile-sheet {
   left: var(--udon-left-chrome, 0px) !important;
   right: 0 !important;
@@ -125,8 +126,8 @@
   width: auto !important;
   max-width: none;
   /* Default to half; peek/half classes override. Never fullscreen. */
-  height: min(48dvh, 420px) !important;
-  max-height: min(48dvh, 420px) !important;
+  height: var(--udon-sheet-half, 48dvh) !important;
+  max-height: var(--udon-sheet-half, 48dvh) !important;
   cursor: default;
   border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
   z-index: 12000;
@@ -211,13 +212,13 @@
 /* Two heights only: peek ↔ half (peek must come last to win over half). */
 .draggable-panel.is-mobile-sheet.is-mobile-sheet-half,
 .draggable-panel.is-mobile-sheet.is-snap-half {
-  height: min(48dvh, 420px) !important;
-  max-height: min(48dvh, 420px) !important;
+  height: var(--udon-sheet-half, 48dvh) !important;
+  max-height: var(--udon-sheet-half, 48dvh) !important;
 }
 
 .draggable-panel.is-mobile-sheet.is-snap-peek {
-  height: min(22dvh, 180px) !important;
-  max-height: min(22dvh, 180px) !important;
+  height: var(--udon-sheet-peek, 22dvh) !important;
+  max-height: var(--udon-sheet-peek, 22dvh) !important;
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {

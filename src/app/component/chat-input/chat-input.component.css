@@ -266,7 +266,7 @@ button.is-active .material-icons {
   visibility: hidden;
 }
 
-/* —— Mobile: keep chat input within sheet width —— */
+/* —— Mobile: keep chat input within sheet width (row layout, no stacked avatar) —— */
 :host-context(html.udon-mobile-layout) {
   display: block;
   width: 100%;
@@ -276,7 +276,9 @@ button.is-active .material-icons {
 }
 
 :host-context(html.udon-mobile-layout) .table {
-  display: block;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -285,6 +287,17 @@ button.is-active .material-icons {
 
 :host-context(html.udon-mobile-layout) .table .table-cell {
   display: block;
+}
+
+:host-context(html.udon-mobile-layout) .table .table-cell.imagebox {
+  flex: 0 0 auto;
+}
+
+:host-context(html.udon-mobile-layout) .table .table-cell:not(.imagebox) {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 :host-context(html.udon-mobile-layout) .ff-flex {
@@ -313,7 +326,7 @@ button.is-active .material-icons {
 }
 
 :host-context(html.udon-mobile-layout) .chat-input {
-  width: calc(100% - 72px);
+  width: calc(100% - 4.5em);
   max-width: 100%;
   box-sizing: border-box;
 }

@@ -281,11 +281,10 @@ export class UIPanelComponent implements OnInit {
     this.mobileSheetSnap = next;
     this.isMobileSheetHalf = true;
     this.mobileLayout.rememberSheetSnap(next);
-    // Keep panelService height in sync for layout math / keyboard inset.
+    // Keep panelService height in sync with --udon-sheet-* CSS vars (painted size).
     const h = this.mobileLayout.sheetHeightPx(next);
     this.height = h;
-    const reserveBottom = this.mobileLayout.bottomChromePx;
-    this.top = Math.max(0, this.mobileLayout.viewportHeight - h - reserveBottom);
+    this.top = Math.max(0, this.mobileLayout.viewportHeight - h - this.mobileLayout.bottomChromePx);
   }
 
   /** Sync Angular bindings after drag/resize so CD does not snap size back; persist chat geometry. */

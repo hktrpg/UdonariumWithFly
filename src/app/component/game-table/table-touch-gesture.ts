@@ -196,6 +196,8 @@ export class TableTouchGesture {
 
   private onPinchMove(ev: HammerInput) {
     this.clearTappedPanTimer();
+    // Ignore tiny scale jitter while two-finger pan/rotate dominates.
+    if (Math.abs(this.deltaHammerScale) < 0.008) return;
     const transformZ = this.deltaHammerScale * 500;
     if (this.ongesture) this.ongesture(ev.srcEvent);
     if (this.ontransform) this.ontransform(0, 0, transformZ, 0, 0, 0, TableTouchGestureEvent.PINCH, ev.srcEvent);

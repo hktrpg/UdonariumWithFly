@@ -137,7 +137,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.more.body': 'Tap More for secondary features.',
   'tour.step.roomChapter.bodyMobile': 'Start with Connection on the bottom bar: join a room and save.\n(Folder backup may be unavailable on mobile — use ZIP.)',
   'tour.step.saveZip.bodyMobile': 'Use Download ZIP to back up. Folder backup is often unavailable on phones/tablets.',
-  'tour.step.tableChapter.bodyMobile': 'Map: one-finger drag to pan; pinch or HUD zoom.\nLong-press empty = ping; HUD + = add objects.',
+  'tour.step.tableChapter.bodyMobile': 'Map: one- or two-finger drag to pan; pinch or HUD zoom.\nLong-press empty = ping; HUD + = add objects.',
   'tour.step.controlsChapter.bodyMobile': 'Tap a token to select.\nDrag to move; HUD + = add; long-press empty = ping.',
   'tour.step.controlsPing.bodyMobile': 'Long-press empty map (~0.5s) to ping. Try a long-press once.',
   'tour.step.saveGuide.bodyMobile': 'Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nReplay the tour from More → Settings. ZIP before leaving.',

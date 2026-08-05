@@ -93,6 +93,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private pingHoldOrigin: { x: number; y: number } = null;
   private pingHoldLast: { x: number; y: number } = null;
   private pingHoldShift = false;
+  /** Local multi-touch tracking (PointerDevice can keep stale multi-touch after touchend). */
+  private activePointerIds = new Set<number>();
   private static readonly PING_MOVE_THRESHOLD_SQ = 8 * 8;
   private drawDragStart: { x: number; y: number } = null;
   private drawDragCurrent: { x: number; y: number } = null;
@@ -642,8 +644,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     // Object drag wins over map pan/pinch.
     if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging) return;
     if (!this.isTableTransformMode) return;
-    // Any map transform (1-finger pan / 2-finger pinch-pan-rotate) cancels long-press ping.
-    this.clearPingHold();
+    // Cancel ping only for multi-touch / pinch / rotate — not 1-finger pan jitter
+    // (pan1p threshold is 0; movement cancel uses PING_MOVE_THRESHOLD_SQ instead).
+    const touchCount = srcEvent instanceof TouchEvent ? srcEvent.touches.length : 0;
+    if (touchCount > 1 || event === 'pinch' || event === 'rotate' || event === 'tappinch') {
+      this.clearPingHold();
+    }
     if (event === 'pinch' || Math.abs(transformZ) > 0) this.touchMode = TableTouchMode.Pinch;
     else if (this.touchMode === TableTouchMode.Idle) this.touchMode = TableTouchMode.Pan;
     // Desktop keeps the strict focus gate; touch already blurred on empty-table start.
@@ -1389,8 +1395,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @HostListener('pointerdown', ['$event'])
   onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
+    this.activePointerIds.add(e.pointerId);
     // Second+ finger: cancel ping hold so two-finger pan/pinch can take over.
-    if (e.pointerType === 'touch' && e.isPrimary === false) {
+    if (e.pointerType === 'touch' && (e.isPrimary === false || this.activePointerIds.size > 1)) {
       this.clearPingHold();
       return;
     }
@@ -1426,7 +1433,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       // Don't ping while placing scene tools.
       if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return;
       // Multi-touch in progress — leave room for two-finger gestures.
-      if (this.pointerDeviceService.pointers.length > 1) return;
+      if (this.activePointerIds.size > 1) return;
       // Mobile: basic ping only (warning stays on HUD); desktop Shift = warning.
       const warning = !this.mobileLayout.isMobile && this.pingHoldShift;
       const tablePos = this.tablePosFromClient(pingPageX, pingPageY);
@@ -1510,7 +1517,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onPointerMove(e: PointerEvent) {
     if (this.pingHoldOrigin) {
       // Two-finger gesture started — release ping hold.
-      if (this.pointerDeviceService.pointers.length > 1) {
+      if (this.activePointerIds.size > 1) {
         this.clearPingHold();
       } else {
         this.pingHoldLast = { x: e.clientX, y: e.clientY };
@@ -1535,6 +1542,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('pointerup', ['$event'])
   onPointerUp(e: PointerEvent) {
+    this.activePointerIds.delete(e.pointerId);
     this.clearPingHold();
     if (this.finishPathClick(e)) return;
     if (this.sceneMarqueeStart) {
@@ -1544,8 +1552,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.commitDrawDrag();
   }
 
+  @HostListener('pointercancel', ['$event'])
+  onPointerCancel(e: PointerEvent) {
+    this.activePointerIds.delete(e.pointerId);
+    this.clearPingHold();
+  }
+
   @HostListener('document:pointerup', ['$event'])
   onDocumentPointerUp(e: PointerEvent) {
+    this.activePointerIds.delete(e.pointerId);
     if (this.finishPathClick(e)) {
       this.clearPingHold();
       return;

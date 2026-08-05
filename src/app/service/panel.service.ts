@@ -20,7 +20,10 @@ export interface PanelOption {
    * Nested opens (palette / tab settings) should omit this or set false.
    */
   mobileReplace?: boolean;
-  /** full (default), half, or peek bottom sheet. */
+  /**
+   * Bottom-sheet height hint on mobile.
+   * `half` / unset / `full` → restore last snap; `peek` forces peek. Never fullscreen.
+   */
   mobileSheet?: 'full' | 'half' | 'peek';
 }
 
@@ -153,7 +156,7 @@ export class PanelService {
     childPanelService.panelComponentRef = panelComponentRef;
     PanelService.openPanels.add(childPanelService);
 
-    // Mobile: near-full-screen sheet. Desktop options pass through unchanged.
+    // Mobile: peek/half bottom sheet (height remembered). Desktop options pass through.
     const resolved = this.mobileLayout.adaptPanelOption(option || {});
     if (resolved.title) childPanelService.title = resolved.title;
     if (resolved.top != null) childPanelService.top = resolved.top;

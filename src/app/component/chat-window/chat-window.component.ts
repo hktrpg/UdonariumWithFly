@@ -319,17 +319,16 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.chatTab) this.chatTab.markForRead();
       this.scrollToBottomTimer = null;
       const el = this.panelService.scrollablePanel;
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-        // Second pass after layout (mobile sheet / virtual list height settle).
-        requestAnimationFrame(() => {
-          if (!this.isAutoScroll || !this.panelService.scrollablePanel) return;
-          this.panelService.scrollablePanel.scrollTop = this.panelService.scrollablePanel.scrollHeight;
-          this.checkAutoScroll();
-        });
-      }
-      // Stay following while parked at the bottom; scroll-up turns this off via checkAutoScroll.
-      this.checkAutoScroll();
+      if (!el) return;
+      // Hold follow through layout settle; checkAutoScroll only after final scroll.
+      this.isAutoScroll = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        if (!this.panelService.scrollablePanel) return;
+        this.isAutoScroll = true;
+        this.panelService.scrollablePanel.scrollTop = this.panelService.scrollablePanel.scrollHeight;
+        this.checkAutoScroll();
+      });
     }, 0);
   }
 
