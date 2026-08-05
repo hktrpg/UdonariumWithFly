@@ -348,6 +348,32 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
         action: null,
         subActions: [
           {
+            name: this.i18n.t('inv.placeOnCurrentMap'),
+            action: () => {
+              this.textNote.addToTable();
+              SoundEffect.play(PresetSound.cardPut);
+            },
+            disabled: this.textNote.isVisibleOnTable
+          },
+          {
+            name: this.i18n.t('inv.moveToCurrentMapOnly'),
+            action: () => {
+              this.textNote.moveToTableOnly();
+              SoundEffect.play(PresetSound.cardPut);
+            },
+            disabled: !(this.textNote.location?.name === 'table' && !this.textNote.isVisibleOnTable)
+          },
+          {
+            name: this.i18n.t('inv.removeFromCurrentMap'),
+            action: () => {
+              this.textNote.removeFromTable();
+              this.selectionService.remove(this.textNote);
+              SoundEffect.play(PresetSound.cardPut);
+            },
+            disabled: !this.textNote.isVisibleOnTable
+          },
+          ContextMenuSeparator,
+          {
             name: this.i18n.t('note.moveToCommon'),
             action: () => {
               this.textNote.setLocation('common');

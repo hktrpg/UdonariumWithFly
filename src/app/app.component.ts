@@ -23,6 +23,7 @@ import { FilterType, WeatherType } from '@udonarium/game-table';
 import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
+import { setSkipEmptyDialogQuotes } from '@udonarium/chat-balloon';
 import { ContextMenuComponent } from 'component/context-menu/context-menu.component';
 import { FileStorageComponent } from 'component/file-storage/file-storage.component';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
@@ -281,8 +282,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         // Default ON when unset; honor explicit boolean from storage.
         ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
       });
-      localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => ChatWindowComponent.isLeftOnly = !!isLeftOnly);
+      localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => {
+        // Default ON (always left) when unset; honor explicit boolean from storage.
+        ChatWindowComponent.isLeftOnly = isLeftOnly == null ? true : !!isLeftOnly;
+      });
       localForage.getItem(ChatWindowComponent.CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY).then(isAutoPopup => ChatWindowComponent.isAutoPopup = !!isAutoPopup);
+      localForage.getItem(ChatWindowComponent.CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY).then(skip => {
+        const on = skip == null ? true : !!skip;
+        ChatWindowComponent.skipEmptyDialogQuotes = on;
+        setSkipEmptyDialogQuotes(on);
+      });
+      PanelService.loadGeometryFromStorage();
       ChatWindowComponent.loadGeometryFromStorage();
     } catch(e) {
       console.log(e);
@@ -590,6 +600,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('OPEN_CHAT', -1000, () => {
         this.ngZone.run(() => this.openOrToggle('ChatWindowComponent'));
+      })
+      .on('SHOW_CHAT', -1000, event => {
+        this.ngZone.run(() => {
+          const tabIdentifier = event.data?.tabIdentifier as string | undefined;
+          this.showChatWindow(tabIdentifier);
+        });
       });
 
     workaroundForMobileSafari();
@@ -910,6 +926,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async openDefaultPanels() {
+    await PanelService.geometryReady;
     await ChatWindowComponent.geometryReady;
     this.panelService.open(PeerMenuComponent, this.mobileLayout.adaptPanelOption({
       width: 520, height: 450, left: 100,
@@ -968,7 +985,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     return PanelService.isTourPanelOpen(tourId);
   }
 
-  /** Open panel; tap/click again closes (chat on desktop always opens). */
+  /**
+   * Menu icon: open if closed; if open and already frontmost, close;
+   * if open but behind another panel, bring to front (chat on desktop always opens).
+   */
   openOrToggle(componentName: string) {
     this.enforceGuestPlayMode();
     const isChat = componentName === 'ChatWindowComponent';
@@ -979,12 +999,33 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const tourId = this.tourIdForComponent(componentName);
     if (tourId && PanelService.isTourPanelOpen(tourId)) {
-      PanelService.closePanelsByTourId(tourId);
-      // Dismiss More / toolbox sheets so a re-tap does not feel like a re-open.
-      this.contextMenuService.close();
+      if (PanelService.isTourPanelTopmost(tourId)) {
+        PanelService.closePanelsByTourId(tourId);
+        // Dismiss More / toolbox sheets so a re-tap does not feel like a re-open.
+        this.contextMenuService.close();
+      } else {
+        PanelService.bringTourPanelToFront(tourId);
+      }
       return;
     }
     this.open(componentName);
+  }
+
+  /** Open chat if needed, bring to front (never close), optionally select a tab. */
+  showChatWindow(tabIdentifier?: string) {
+    this.enforceGuestPlayMode();
+    if (!this.canShowMenu('menu.chat')) return;
+    if (tabIdentifier) {
+      ChatWindowComponent.pendingTabIdentifier = tabIdentifier;
+    }
+    if (PanelService.isTourPanelOpen('menu.chat')) {
+      PanelService.bringTourPanelToFront('menu.chat');
+    } else {
+      this.open('ChatWindowComponent');
+    }
+    if (tabIdentifier) {
+      queueMicrotask(() => EventSystem.trigger('SELECT_CHAT_TAB', { tabIdentifier }));
+    }
   }
 
   setMobileUiMode(mode: 'play' | 'edit') {
@@ -1526,6 +1567,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         off: `☐${this.i18n.t('menu.settings.autoPopupChat')}`,
       }),
       contextMenuToggleCheck({
+        get: () => ChatWindowComponent.skipEmptyDialogQuotes,
+        set: (v) => { ChatWindowComponent.setSkipEmptyDialogQuotes(v); },
+        on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
+        off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
+      }),
+      contextMenuToggleCheck({
         get: () => CharacterResourceHudComponent.isVisible,
         set: (v) => CharacterResourceHudComponent.setVisible(v),
         on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
@@ -1567,12 +1614,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         })),
       },
       ContextMenuSeparator,
-      contextMenuToggleCheck({
+      // Hover tips stick after taps on touch UIs — desktop-only setting.
+      ...(this.teachingTips.isAvailable ? [contextMenuToggleCheck({
         get: () => this.teachingTips.isEnabled,
         set: (v) => this.teachingTips.setEnabled(v),
         on: `☑${this.i18n.t('tour.hoverTips')}`,
         off: `☐${this.i18n.t('tour.hoverTips')}`,
-      }),
+      })] : []),
       {
         name: this.i18n.t('tour.replay'),
         materialIcon: 'school',

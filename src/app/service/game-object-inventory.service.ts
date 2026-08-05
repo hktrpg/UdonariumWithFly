@@ -25,10 +25,13 @@ export class GameObjectInventoryService {
   set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
   get dataTags(): string[] { return this.summarySetting.dataTags; }
 
-  tableInventory: ObjectInventory = new ObjectInventory(object => { return object.isVisibleOnTable; });
-  commonInventory: ObjectInventory = new ObjectInventory(object => { return !this.isAnyLocation(object.location.name); });
-  privateInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === Network.peerId; });
-  graveyardInventory: ObjectInventory = new ObjectInventory(object => { return object.location.name === 'graveyard'; });
+  /** Every character (all maps + inventories + graveyard). Temporary copies stay off the list. */
+  allInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy);
+  /** Tokens on the currently viewed map only. */
+  tableInventory: ObjectInventory = new ObjectInventory(object => object.isVisibleOnTable && !object.isTemporaryCopy);
+  commonInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && !this.isAnyLocation(object.location.name));
+  privateInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && object.location.name === Network.peerId);
+  graveyardInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && object.location.name === 'graveyard');
 
   indicateAll: boolean = false;
   
@@ -42,6 +45,7 @@ export class GameObjectInventoryService {
 
   private locationMap: Map<ObjectIdentifier, LocationName> = new Map();
   private tableIdMap: Map<ObjectIdentifier, string> = new Map();
+  private placementsMap: Map<ObjectIdentifier, string> = new Map();
   private tagNameMap: Map<ObjectIdentifier, ElementName> = new Map();
 
   static _newLineDataElement = createMockElement('/');
@@ -64,9 +68,12 @@ export class GameObjectInventoryService {
         if (object instanceof GameCharacter) {
           let prevLocation = this.locationMap.get(object.identifier);
           let prevTableId = this.tableIdMap.get(object.identifier);
-          if (object.location.name !== prevLocation || object.tableIdentifier !== prevTableId) {
+          const placementsKey = object.tablePlacements || '';
+          const prevPlacements = this.placementsMap.get(object.identifier);
+          if (object.location.name !== prevLocation || object.tableIdentifier !== prevTableId || placementsKey !== prevPlacements) {
             this.locationMap.set(object.identifier, object.location.name);
             this.tableIdMap.set(object.identifier, object.tableIdentifier);
+            this.placementsMap.set(object.identifier, placementsKey);
             this.refresh();
           }
         } else if (object instanceof DataElement) {
@@ -121,6 +128,7 @@ export class GameObjectInventoryService {
   }
 
   private refreshObjects() {
+    this.allInventory.refreshObjects();
     this.tableInventory.refreshObjects();
     this.commonInventory.refreshObjects();
     this.privateInventory.refreshObjects();
@@ -128,6 +136,7 @@ export class GameObjectInventoryService {
   }
 
   private refreshDataElements() {
+    this.allInventory.refreshDataElements();
     this.tableInventory.refreshDataElements();
     this.commonInventory.refreshDataElements();
     this.privateInventory.refreshDataElements();
@@ -137,6 +146,7 @@ export class GameObjectInventoryService {
   private refreshSort() {
     if (this.sortStop) return;
     //console.log('refreshSort')
+    this.allInventory.refreshSort();
     this.tableInventory.refreshSort();
     this.commonInventory.refreshSort();
     this.privateInventory.refreshSort();

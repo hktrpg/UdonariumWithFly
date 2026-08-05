@@ -66,6 +66,7 @@ export const zhTW_sheet: I18nDictionary = {
 ・浮動式對話框
 　以角色傳送聊天時，「 與 」包住的內容會以浮動式對話框顯示在 Token 上方。`,
   'stand.sortNameList': '聊天輸入時排序名稱', 'stand.heightGlobal': '高度（0=維持原圖片）: ', 'stand.keepOriginalImage': '維持原圖片',
+  'stand.common': '共通設定', 'stand.list': '立繪清單', 'stand.listEmpty': '尚未新增立繪設定',
   'stand.noOverview': '總覽不使用立繪圖片', 'stand.add': '新增立繪設定', 'stand.restore': '還原剛刪除的立繪設定',
   'stand.title': '{{name}} 的立繪設定', 'stand.deleteTitle': '刪除立繪設定', 'stand.deleteText': '要刪除立繪設定嗎？',
   'stand.helpTitle': '立繪設定說明', 'stand.changeImage': '變更圖片', 'stand.namePlaceholder': '名稱', 'stand.condition': '條件: ',

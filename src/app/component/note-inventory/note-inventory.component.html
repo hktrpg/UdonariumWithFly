@@ -22,7 +22,6 @@
   >
     <div class="note-head">
       <strong class="note-title">{{showgameObject(gameObject)}}</strong>
-      <span class="location-badge">{{locationLabel(gameObject)}}</span>
       <span class="actions-spacer">
         <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="btn btn-sm" [title]="'note.menu' | i18n"
           (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
@@ -30,7 +29,7 @@
         </button>
         <button *ngIf="!isittable(gameObject)" type="button" class="btn btn-sm btn-primary"
           (click)="settotable(gameObject); $event.stopPropagation()">
-          {{ 'note.moveToTable' | i18n }}
+          {{ (isOnOtherTable(gameObject) ? 'inv.placeOnCurrentMap' : 'note.moveToTable') | i18n }}
           <i class="material-icons">open_with</i>
         </button>
       </span>

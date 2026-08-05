@@ -1602,7 +1602,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onInventoryCharacterDragOver(e: DragEvent) {
     if (!this.readInventoryCharacterDragId(e)) return;
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (e.dataTransfer) {
+      const types = Array.from(e.dataTransfer.types || []);
+      e.dataTransfer.dropEffect = types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME) ? 'copy' : 'move';
+    }
   }
 
   @HostListener('drop', ['$event'])
@@ -1621,12 +1624,28 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
     );
     const grid = this.currentTable?.gridSize || 50;
-    ch.location.x = pos.x - (ch.size * grid) / 2;
-    ch.location.y = pos.y - (ch.size * grid) / 2;
+    const x = pos.x - (ch.size * grid) / 2;
+    const y = pos.y - (ch.size * grid) / 2;
+    const isTemp = this.readInventoryTempCopy(e);
+
+    if (isTemp) {
+      GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ });
+      SoundEffect.play(PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+      return;
+    }
+
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-    ch.setLocation('table');
+    ch.addToTable(undefined, { x, y, posZ: ch.posZ });
     SoundEffect.play(PresetSound.piecePut);
     EventSystem.call('UPDATE_INVENTORY', true);
+  }
+
+  private readInventoryTempCopy(e: DragEvent): boolean {
+    if (!e.dataTransfer) return false;
+    if (e.dataTransfer.getData(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return true;
+    const types = Array.from(e.dataTransfer.types || []);
+    return types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME);
   }
 
   private readInventoryCharacterDragId(e: DragEvent): string {
@@ -1637,6 +1656,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (e.type === 'dragover') {
       const types = Array.from(e.dataTransfer.types || []);
       if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return '__pending__';
+      if (types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return '__pending__';
       const plainHint = types.includes('text/plain');
       return plainHint ? '__pending__' : '';
     }

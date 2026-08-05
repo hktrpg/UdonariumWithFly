@@ -692,8 +692,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private moveCharacterOffTable(gameCharacter: GameCharacter, location: string) {
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
-    gameCharacter.setLocation(location);
     this.selectionService.remove(gameCharacter);
+    if (location === 'graveyard' && gameCharacter.isTemporaryCopy) {
+      gameCharacter.destroy();
+      return;
+    }
+    gameCharacter.setLocation(location);
   }
 
   /** Congregate only — used when not in multi-character mode (e.g. gather selection to an unselected token). */
@@ -986,11 +990,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: this.i18n.t('char.graveyard'),
+              name: this.gameCharacter.isTemporaryCopy
+                ? this.i18n.t('char.deleteTemporaryCopy')
+                : this.i18n.t('char.graveyard'),
               action: () => {
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-                this.gameCharacter.setLocation('graveyard');
                 this.selectionService.remove(this.gameCharacter);
+                if (this.gameCharacter.isTemporaryCopy) {
+                  this.gameCharacter.destroy();
+                } else {
+                  this.gameCharacter.setLocation('graveyard');
+                }
                 SoundEffect.play(PresetSound.sweep);
               }
             },
@@ -999,6 +1009,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       ],
       // Clone / delete
       [
+        {
+          name: this.i18n.t('char.createTemporaryCopy'),
+          action: () => {
+            const pose = this.gameCharacter.getPoseForView();
+            GameCharacter.createTemporaryCopy(this.gameCharacter, {
+              x: pose.x + this.gridSize,
+              y: pose.y + this.gridSize,
+              posZ: pose.posZ,
+            });
+            SoundEffect.play(PresetSound.piecePut);
+          }
+        },
         {
           name: this.i18n.t('char.clone'),
           action: () => {
@@ -1034,11 +1056,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           }
         },
         {
-          name: this.i18n.t('char.deleteToGraveyard'),
+          name: this.gameCharacter.isTemporaryCopy
+            ? this.i18n.t('char.deleteTemporaryCopy')
+            : this.i18n.t('char.deleteToGraveyard'),
           action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation('graveyard');
             this.selectionService.remove(this.gameCharacter);
+            if (this.gameCharacter.isTemporaryCopy) {
+              this.gameCharacter.destroy();
+            } else {
+              this.gameCharacter.setLocation('graveyard');
+            }
             SoundEffect.play(PresetSound.sweep);
           }
         },
@@ -1068,23 +1096,30 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }
 
   private showChatPalette(gameObject: GameCharacter) {
     if (!gameObject || !gameObject.isAllowsChat) return;
+    const tourId = PanelService.tourIdChatPalette(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350, tourPanelId: tourId };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
     component.character = gameObject;
   }
 
   private showStandSetting(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
+    const tourId = PanelService.tourIdStandSetting(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572 };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
     component.character = gameObject;
   }

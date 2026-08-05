@@ -527,7 +527,8 @@ button.link {
 
 /* Claim / stealth tags sit above the row so they don't cover the token name. */
 .object-container:has(.player-owner-tag),
-.object-container:has(.owner-tag) {
+.object-container:has(.owner-tag),
+.object-container:has(.other-table-tag) {
   padding-top: 16px;
 }
 
@@ -579,11 +580,46 @@ button.link {
   z-index: 2;
 }
 
+.other-table-tag {
+  position: absolute;
+  font-size: 8px;
+  width: min-content;
+  max-width: calc(60% - 4px);
+  overflow: hidden;
+  color: #fffaf2;
+  background-color: #7a5c3a;
+  box-sizing: border-box;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.95;
+  top: 1px;
+  right: 1px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.object-container.is-other-table {
+  opacity: 0.88;
+  border-style: dashed;
+}
+
 .object-container.is-draggable {
   cursor: grab;
 }
 .object-container.is-draggable:active {
   cursor: grabbing;
+}
+.object-container.is-draggable input,
+.object-container.is-draggable button,
+.object-container.is-draggable select,
+.object-container.is-draggable textarea,
+.object-container.is-draggable a,
+.object-container.is-draggable label,
+.object-container.is-draggable .resource-tag,
+.object-container.is-draggable .tag-value-box {
+  cursor: auto;
 }
 
 .url-link {

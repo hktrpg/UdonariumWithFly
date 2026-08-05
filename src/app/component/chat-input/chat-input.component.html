@@ -28,7 +28,7 @@
       <span class="send-from-wrap" style="white-space: nowrap">
         <select class="send-from-select" [style.max-width]="character ? '10em' : '13em'" [ngClass]="{'not-allow-chat': !isAllowsChat}" [(ngModel)]="sendFrom" (change)="onChangeSendFromList()" [ngStyle]="{'color': color, 'font-weight': (sendFrom != myPeer?.identifier ? 'normal' : 'bolder')}">
           <option *ngIf="!onlyCharacters" value="{{myPeer?.identifier}}" [style.color]="myColor" style="font-weight: bolder;">{{myPeer?.name}}{{ 'chat.you' | i18n }}</option>
-          <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.name}}</option>
+          <option *ngFor="let gameCharacter of gameCharacters" style="font-weight: normal" [style.color]="gameCharacter.chatPalette && gameCharacter.chatPalette.color && gameCharacter.chatPalette.color != '#ffffff' ? gameCharacter.chatPalette.color : '#444'" value="{{gameCharacter.identifier}}">{{gameCharacter.chatSelectLabel}}</option>
         </select>
         <button *ngIf="character" type="button" class="ff-button my-char-btn"
           [class.is-mine]="isMyClaimedCharacter"
@@ -77,8 +77,8 @@
         <option *ngFor="let name of standNameList" value="{{name}}">{{name}}</option>
       </select>
       <span class="stand-position" style="white-space: nowrap; margin-left: 0.6em; display: inline-block">
-        <b style="font-size: smaller;">{{ 'chat.standPosition' | i18n }}</b><input style="width: 176px" (change)="isUseStandImage = true" type="range" min="0" max="100" [(ngModel)]="character.standList.position" [attr.disabled]="!isUseStandImageOnChatTab || !isUseStandImage ? '' : null">
-        <input style="width: 3em; text-align: right; margin-right: 3px;" type="number" min="0" max="100" (change)="isUseStandImage = true" [(ngModel)]="character.standList.position" [attr.disabled]="!isUseStandImageOnChatTab || !isUseStandImage ? '' : null"><b style="font-size: smaller;">{{ 'chat.standPercent' | i18n }}</b>
+        <b style="font-size: smaller;">{{ 'chat.standPosition' | i18n }}</b><input style="width: 176px" (change)="isUseStandImage = true" type="range" min="0" max="100" [(ngModel)]="standPosition" [attr.disabled]="!isUseStandImageOnChatTab || !isUseStandImage ? '' : null">
+        <input style="width: 3em; text-align: right; margin-right: 3px;" type="number" min="0" max="100" (change)="isUseStandImage = true" [(ngModel)]="standPosition" [attr.disabled]="!isUseStandImageOnChatTab || !isUseStandImage ? '' : null"><b style="font-size: smaller;">{{ 'chat.standPercent' | i18n }}</b>
       </span>
       <button style="margin-left: 0.6em; font-size: smaller;" type="button" (click)="farewellStand()">{{ 'chat.standExit' | i18n }}</button>
     </div>

@@ -45,6 +45,33 @@ export class GameCharacter extends TabletopObject {
 
   /** HTML5 DnD type for dragging inventory characters onto the table. */
   static readonly INVENTORY_DRAG_MIME = 'application/x-udonarium-character';
+  /** CTRL+drag from inventory: spawn a temporary copy (delete skips graveyard). */
+  static readonly INVENTORY_TEMP_COPY_MIME = 'application/x-udonarium-character-temp';
+
+  /**
+   * Clone as a temporary token on the current (or given) map.
+   * Source object is untouched. Copy is hidden from inventory and destroyed on delete.
+   */
+  static createTemporaryCopy(
+    source: GameCharacter,
+    pose?: { x?: number; y?: number; posZ?: number },
+    tableId?: string
+  ): GameCharacter {
+    const copy = source.clone() as GameCharacter;
+    copy.isTemporaryCopy = true;
+    copy.isInventoryIndicate = false;
+    copy.playerOwner = '';
+    copy.visionOwner = '';
+    copy.tablePlacements = '';
+    copy.tableIdentifier = '';
+    const id = tableId || TabletopObject.resolveViewTableIdentifier();
+    copy.addToTable(id, {
+      x: pose?.x ?? source.location.x,
+      y: pose?.y ?? source.location.y,
+      posZ: pose?.posZ ?? source.posZ,
+    }, true);
+    return copy;
+  }
 
   /** characterId → userId for chat-window auto vision (local session only). */
   private static autoVisionUser = new Map<string, string>();
@@ -134,7 +161,10 @@ export class GameCharacter extends TabletopObject {
     for (let child of this.children) {
       if (child instanceof ChatPalette) return child;
     }
-    return null;
+    let palette = new ChatPalette('ChatPalette_' + this.identifier);
+    palette.initialize();
+    this.appendChild(palette);
+    return palette;
   }
 
   get ownerName(): string {
@@ -155,6 +185,14 @@ export class GameCharacter extends TabletopObject {
   get playerOwnerColor(): string {
     const object = PeerCursor.findByUserId(this.playerOwner);
     return object ? object.color : '#64748b';
+  }
+
+  /** Chat send-from label: "Name (Player)" when claimed as someone's PC. */
+  get chatSelectLabel(): string {
+    const name = this.name || '';
+    if (!this.playerOwner) return name;
+    const owner = this.playerOwnerName;
+    return owner ? `${name} (${owner})` : name;
   }
   
   get standList(): StandList {

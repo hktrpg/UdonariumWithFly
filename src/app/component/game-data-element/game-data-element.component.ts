@@ -193,13 +193,20 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
     if (this.currentValue !== '' && this.currentValue != null) {
       payload = `${this.currentValue}/${this.value}`;
     }
-    const text = `${payload} ${this.name}`.trim();
+    let text = `${payload} ${this.name}`.trim();
     if (!text) return;
 
     const sendFrom = (this.tabletopObject instanceof GameCharacter)
       ? this.tabletopObject.identifier
       : PeerCursor.myCursor.identifier;
-    const gameType = this.chatMessageService.gameType || 'DiceBot';
+    let gameType = this.chatMessageService.gameType || 'DiceBot';
+
+    // Same {} / ｛｝ ability TAG expansion as chat palette (e.g. 2d6+{敏捷} in 戰鬥特技).
+    if (this.tabletopObject instanceof GameCharacter && this.tabletopObject.chatPalette) {
+      const palette = this.tabletopObject.chatPalette;
+      text = palette.evaluate(text, this.tabletopObject.rootDataElement);
+      if (palette.dicebot) gameType = palette.dicebot;
+    }
 
     this.chatMessageService.sendMessage(chatTab, text, gameType, sendFrom);
   }

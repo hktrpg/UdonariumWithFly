@@ -83,7 +83,13 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@ud
 export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('mainImage', { static: false }) mainImageElement: ElementRef;
 
-  @Input() tabletopObject: TabletopObject = null;
+  private _tabletopObject: TabletopObject = null;
+  @Input()
+  get tabletopObject(): TabletopObject { return this._tabletopObject; }
+  set tabletopObject(value: TabletopObject) {
+    this._tabletopObject = value;
+    this.bindSheetGeometry();
+  }
   isEdit: boolean = false;
 
   networkService = Network;
@@ -136,6 +142,18 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     EventSystem.unregister(this);
   }
 
+  /** Remember / restore detail-sheet size by object type (character, card, note, …). */
+  private bindSheetGeometry() {
+    if (!this._tabletopObject) return;
+    const key = PanelService.sheetGeometryKey(this._tabletopObject.aliasName);
+    this.panelService.geometryKey = key;
+    const g = PanelService.getGeometry(key);
+    if (g && g.width >= 100 && g.height >= 100) {
+      this.panelService.width = g.width;
+      this.panelService.height = g.height;
+    }
+  }
+
   toggleEditMode() {
     this.isEdit = this.isEdit ? false : true;
   }
@@ -182,6 +200,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   }
 
   get tabletopObjectName(): string {
+    if (!this.tabletopObject?.commonDataElement) return '';
     let element = this.tabletopObject.commonDataElement.getFirstElementByName('name') || this.tabletopObject.commonDataElement.getFirstElementByName('title');
     return element ? <string>element.value : '';
   }
@@ -194,6 +213,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   }
 
   get descriptionType(): string {
+    if (!this.tabletopObject) return '';
     if (this.tabletopObject instanceof RangeArea && !this.tabletopObject.isApplyWidth) return 'range-not-width';
     return this.tabletopObject.aliasName;
   }
@@ -404,18 +424,24 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   showChatPalette() {
     if (!(this.tabletopObject instanceof GameCharacter)) return;
+    const character = this.tabletopObject as GameCharacter;
+    const tourId = PanelService.tourIdChatPalette(character.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350, tourPanelId: tourId };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
-    component.character = <GameCharacter>this.tabletopObject;
+    component.character = character;
   }
 
   showStandSetting() {
     if (!(this.tabletopObject instanceof GameCharacter)) return;
+    const character = this.tabletopObject as GameCharacter;
+    const tourId = PanelService.tourIdStandSetting(character.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 720, height: 572 };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 720, height: 572, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
-    component.character = <GameCharacter>this.tabletopObject;
+    component.character = character;
   }
 
   onMainImageLoad() {
@@ -543,12 +569,14 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   }
 
   showCaseOffset(index: number): number {
+    if (!this.tabletopObject) return 0;
     let len = this.tabletopObject.imageFiles.length;
     if (len <= 5) return 0; 
     return (50 - (160 / (len - 2))) * (this.tabletopObject.currntImageIndex <= index ? index-1 : index);
   }
 
   showIconOffset(index): number {
+    if (!this.tabletopObject) return 0;
     let len = this.tabletopObject.faceIcons.length;
     if (len <= 5) return 0;
     return (50 - (200 / (len - 1))) * index + 2;

@@ -225,17 +225,17 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
       for (const obj of ObjectStore.instance.getObjects(type as any) as TabletopObject[]) {
         if (obj.location.name !== 'table') continue;
         if (obj.parentIsAssigned && !obj.parentIsDestroyed) continue;
-        if (obj.tableIdentifier && obj.tableIdentifier !== sourceId) continue;
-        if (!obj.tableIdentifier && TabletopObject.resolveViewTableIdentifier() !== sourceId) continue;
-        const copy = obj.clone() as TabletopObject;
-        copy.tableIdentifier = clone.identifier;
-        if (copy instanceof GameCharacter) {
-          copy.playerOwner = '';
-          copy.visionOwner = '';
+        if (!obj.hasPlacement(sourceId) && obj.tableIdentifier !== sourceId) {
+          if (obj.tableIdentifier || obj.tablePlacements) continue;
+          if (TabletopObject.resolveViewTableIdentifier() !== sourceId) continue;
         }
-        if (copy instanceof RangeArea) {
-          copy.followingCharctorIdentifier = null;
-        }
+        // Same SyncObject on both maps (shared HP / palette / claim).
+        const pose = obj.getPoseForTable(sourceId) || {
+          x: obj.location.x,
+          y: obj.location.y,
+          posZ: obj.posZ,
+        };
+        obj.setPoseForTable(clone.identifier, { ...pose }, false);
       }
     }
 

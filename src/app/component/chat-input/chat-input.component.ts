@@ -183,6 +183,13 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     return this.character.standList.standElements.length > 0;
   }
 
+  get standPosition(): number {
+    return this.character?.standList?.position ?? 0;
+  }
+  set standPosition(position: number) {
+    if (this.character?.standList) this.character.standList.position = position;
+  }
+
   get standNameList(): string[] {
     if (!this.hasStand) return [];
     let ret: string[] = [];
@@ -239,6 +246,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   set paletteColor(color: string) {
+    if (!this.character?.chatPalette) return;
     this.character.chatPalette.color = color ? color : PeerCursor.CHAT_TRANSPARENT_COLOR;
   }
 
@@ -1071,21 +1079,28 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('chat.characterSheet');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600 };
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 800, height: 600,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }
 
   private showChatPalette(gameObject: GameCharacter) {
+    const tourId = PanelService.tourIdChatPalette(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350, tourPanelId: tourId };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
     component.character = gameObject;
   }
 
   private showStandSetting(gameObject: GameCharacter) {
+    const tourId = PanelService.tourIdStandSetting(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572 };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
     component.character = gameObject;
   }

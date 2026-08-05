@@ -43,6 +43,15 @@ export class UIPanelComponent implements OnInit {
   @Input() set isAbleFullScreenButton(isAbleFullScreenButton: boolean) { this.panelService.isAbleFullScreenButton = isAbleFullScreenButton; }
   @Input() set isAbleCloseButton(isAbleCloseButton: boolean) { this.panelService.isAbleCloseButton = isAbleCloseButton; }
   @Input() set isAbleRotateButton(isAbleRotateButton: boolean) { this.panelService.isAbleRotateButton = isAbleRotateButton; }
+  /** Persist size under this key (fixed left menu, etc.). */
+  @Input() set geometryKey(key: string) {
+    this.panelService.geometryKey = key || null;
+    const g = key ? PanelService.getGeometry(key) : null;
+    if (g && g.width >= 100 && g.height >= 100) {
+      this.panelService.width = g.width;
+      this.panelService.height = g.height;
+    }
+  }
 
   @Output() rotateEvent = new EventEmitter<boolean>();
 
@@ -287,7 +296,7 @@ export class UIPanelComponent implements OnInit {
     this.top = Math.max(0, this.mobileLayout.viewportHeight - h - this.mobileLayout.bottomChromePx);
   }
 
-  /** Sync Angular bindings after drag/resize so CD does not snap size back; persist chat geometry. */
+  /** Sync Angular bindings after drag/resize so CD does not snap size back; persist panel geometry. */
   onPanelGeometryEnd() {
     if (this.isMinimized || this.isFullScreen || this.isMobileSheet) return;
     const panel = this.draggablePanel?.nativeElement;
@@ -298,6 +307,11 @@ export class UIPanelComponent implements OnInit {
     this.height = panel.offsetHeight;
     if (this.panelService.tourPanelId === 'menu.chat') {
       ChatWindowComponent.saveGeometry(this.width, this.height, this.left, this.top);
+      return;
+    }
+    const key = this.panelService.geometryKey || this.panelService.tourPanelId;
+    if (key) {
+      PanelService.saveGeometry(key, this.width, this.height, this.left, this.top);
     }
   }
 

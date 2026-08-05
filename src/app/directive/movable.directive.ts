@@ -370,9 +370,10 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private setPosition(object: TabletopObject) {
-    this._posX = object.location.x;
-    this._posY = object.location.y;
-    this._posZ = object.posZ;
+    const pose = object.getPoseForView();
+    this._posX = pose.x;
+    this._posY = pose.y;
+    this._posZ = pose.posZ;
     this.updateTransformCss();
   }
 
@@ -408,9 +409,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     if (!this.isUpdateBatching && this.tabletopObject) {
       this.isUpdateBatching = true;
       this.batchService.add(() => {
-        this.tabletopObject.location.x = this.posX;
-        this.tabletopObject.location.y = this.posY;
-        this.tabletopObject.posZ = this.posZ;
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        if (this.tabletopObject.location.name === 'table' && viewId) {
+          this.tabletopObject.setPoseForTable(viewId, {
+            x: this.posX,
+            y: this.posY,
+            posZ: this.posZ,
+          }, true);
+        } else {
+          this.tabletopObject.location.x = this.posX;
+          this.tabletopObject.location.y = this.posY;
+          this.tabletopObject.posZ = this.posZ;
+        }
         this.isUpdateBatching = false;
       });
     }

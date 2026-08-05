@@ -31,6 +31,7 @@ export class TableSelecter extends GameObject {
         this.viewTableIdentifier = event.data.identifier;
         if (this.viewTable) this.viewTable.selected = true;
         TabletopObject.migrateUnboundTablePieces(this.viewTableIdentifier);
+        TabletopObject.hydrateAllForView(this.viewTableIdentifier);
       });
   }
 

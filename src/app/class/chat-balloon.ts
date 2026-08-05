@@ -4,6 +4,24 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
+/**
+ * Personal preference (default ON): hide empty 「」 when rendering chat text.
+ * Persisted via ChatWindowComponent / localForage.
+ */
+export let skipEmptyDialogQuotes = true;
+export function setSkipEmptyDialogQuotes(skip: boolean) {
+  skipEmptyDialogQuotes = !!skip;
+}
+
+/**
+ * Remove empty 「」 pairs (nothing between the brackets).
+ * 「 」 or 「anything」 is kept. Used for chat display when the personal setting is on.
+ */
+export function stripEmptyDialogQuotes(text: string): string {
+  if (!text || !text.includes('「')) return text;
+  return text.replace(/「+」+/g, '');
+}
+
 /** Strip repeat/choice prefixes, then take 「…」 or trailing emote for floating dialogue. */
 export function extractChatDialogText(text: string): string | null {
   if (!text) return null;
@@ -17,6 +35,7 @@ export function extractChatDialogText(text: string): string | null {
     dialogText = dialogText.slice(choiceMatch[1].length);
   }
 
+  // Require non-empty content inside quotes (space counts as content).
   const dialogRegExp = /「+([\s\S]+?)」/gm;
   const match = dialogRegExp.exec(dialogText);
   if (match) return match[1];

@@ -60,6 +60,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
           this.changeDetector.markForCheck();
         }
       })
+      .on('SELECT_GAME_TABLE', event => {
+        this.refresh();
+      })
       .on('UPDATE_INVENTORY', event => {
         this.refresh();
       })
@@ -94,9 +97,10 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (this.selectFilter) {
       case 'table':
-        return notes.filter(n => n.isVisibleOnTable);
+        // All notes bound to any map (not just the current view).
+        return notes.filter(n => n.location?.name === 'table');
       case 'other':
-        return notes.filter(n => !n.isVisibleOnTable);
+        return notes.filter(n => n.location?.name !== 'table');
       default:
         return notes;
     }
@@ -106,25 +110,18 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (filterId) {
       case 'table':
-        return notes.filter(n => n.isVisibleOnTable).length;
+        return notes.filter(n => n.location?.name === 'table').length;
       case 'other':
-        return notes.filter(n => !n.isVisibleOnTable).length;
+        return notes.filter(n => n.location?.name !== 'table').length;
       default:
         return notes.length;
     }
   }
 
-  locationLabel(note: TextNote): string {
-    const name = note.location?.name || '';
-    if (name === 'table') return this.i18n.t('note.location.table');
-    if (name === 'graveyard') return this.i18n.t('note.location.graveyard');
-    if (name === 'common' || !name) return this.i18n.t('note.location.common');
-    return this.i18n.t('note.location.personal');
-  }
-
   settotable(gameObject: TextNote) {
     if (this.GuestMode()) return;
-    gameObject.setLocation('table');
+    // Multi-map: add to current view without removing other maps.
+    gameObject.addToTable();
     this.refresh();
   }
 
@@ -132,8 +129,14 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     return gameObject.title || this.i18n.t('note.untitled');
   }
 
+  /** On the current view table (not another map, not inventory). */
   isittable(note: TextNote) {
     return note.isVisibleOnTable;
+  }
+
+  /** On some table but not the current map — offer "also place on current map". */
+  isOnOtherTable(note: TextNote): boolean {
+    return note.location?.name === 'table' && !note.isVisibleOnTable;
   }
 
   selectNote(note: TextNote) {
@@ -168,14 +171,33 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     }
 
     const location = gameObject.location?.name || '';
+    const onTable = location === 'table';
+    const onCurrentMap = gameObject.isVisibleOnTable;
+    const onOtherMap = this.isOnOtherTable(gameObject);
     const actions: ContextMenuAction[] = [
       {
-        name: this.i18n.t('note.moveToTable'),
+        name: this.i18n.t(onOtherMap ? 'inv.placeOnCurrentMap' : 'note.moveToTable'),
         action: () => {
-          gameObject.setLocation('table');
+          gameObject.addToTable();
           this.refresh();
         },
-        disabled: location === 'table'
+        disabled: onCurrentMap
+      },
+      {
+        name: this.i18n.t('inv.moveToCurrentMapOnly'),
+        action: () => {
+          gameObject.moveToTableOnly();
+          this.refresh();
+        },
+        disabled: !onOtherMap
+      },
+      {
+        name: this.i18n.t('inv.removeFromCurrentMap'),
+        action: () => {
+          gameObject.removeFromTable();
+          this.refresh();
+        },
+        disabled: !onCurrentMap
       },
       {
         name: this.i18n.t('note.moveToCommon'),

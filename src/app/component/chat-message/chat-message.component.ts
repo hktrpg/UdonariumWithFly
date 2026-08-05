@@ -4,6 +4,7 @@ import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { skipEmptyDialogQuotes, stripEmptyDialogQuotes } from '@udonarium/chat-balloon';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { EventSystem } from '@udonarium/core/system';
@@ -141,7 +142,11 @@ export class ChatMessageComponent implements OnInit {
   } 
 
   get htmlEscapedText():string  {
-    let text = this._htmlEscapeLinking(this.chatMessage.text, false, !this.chatMessage.isOperationLog);
+    let raw = this.chatMessage.text || '';
+    if (skipEmptyDialogQuotes) {
+      raw = stripEmptyDialogQuotes(raw);
+    }
+    let text = this._htmlEscapeLinking(raw, false, !this.chatMessage.isOperationLog);
     if (this.chatMessage.isDicebot) text = ChatMessage.decorationDiceResult(text);
     return text;
   }

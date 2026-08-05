@@ -173,8 +173,18 @@ export class CardStack extends TabletopObject {
   setLocation(location: string, tableIdentifier?: string) {
     super.setLocation(location, tableIdentifier);
     let cards = this.cards;
-    const tableId = location === 'table' ? (this.tableIdentifier || tableIdentifier) : undefined;
-    for (let card of cards) card.setLocation(location, tableId);
+    if (location === 'table') {
+      const tableId = tableIdentifier || this.tableIdentifier || TabletopObject.resolveViewTableIdentifier();
+      for (let card of cards) {
+        card.addToTable(tableId, {
+          x: this.location.x,
+          y: this.location.y,
+          posZ: this.posZ,
+        });
+      }
+    } else {
+      for (let card of cards) card.setLocation(location);
+    }
   }
 
   private setSamePositionFor(card: Card) {
@@ -182,7 +192,13 @@ export class CardStack extends TabletopObject {
     card.location.x = this.location.x;
     card.location.y = this.location.y;
     card.posZ = this.posZ;
-    card.tableIdentifier = this.location.name === 'table' ? this.tableIdentifier : '';
+    if (this.location.name === 'table') {
+      card.tablePlacements = this.tablePlacements;
+      card.tableIdentifier = this.tableIdentifier;
+    } else {
+      card.tableIdentifier = '';
+      card.tablePlacements = '';
+    }
   }
 
   static create(name: string, identifier?: string): CardStack {
