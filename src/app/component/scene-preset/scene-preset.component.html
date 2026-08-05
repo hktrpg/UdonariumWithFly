@@ -21,8 +21,13 @@
         <span class="list-time" *ngIf="preset.savedAt">{{ 'scenePreset.savedAt' | i18n:{ time: preset.savedAtDisplay } }}</span>
       </div>
       <span class="btn-group" (click)="$event.stopPropagation()">
-        <button type="button" class="btn btn-sm btn-primary" (click)="apply(preset)" [disabled]="GuestMode() || !preset.isValid">
+        <button type="button" class="btn btn-sm btn-primary" (click)="apply(preset)" [disabled]="GuestMode() || !preset.isValid"
+          [title]="'scenePreset.applyTip' | i18n">
           <i class="material-icons">play_arrow</i>{{ 'scenePreset.apply' | i18n }}
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="apply(preset, true)" [disabled]="GuestMode() || !preset.isValid"
+          [title]="'scenePreset.applyKeepTokensTip' | i18n">
+          <i class="material-icons">person_pin_circle</i>{{ 'scenePreset.applyKeepTokens' | i18n }}
         </button>
         <button type="button" class="btn btn-sm" (click)="overwrite(preset)" [disabled]="GuestMode()" [title]="'scenePreset.overwrite' | i18n">
           <i class="material-icons">save</i>

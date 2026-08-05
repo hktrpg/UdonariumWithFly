@@ -153,6 +153,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       .on('LOCALE_CHANGED', () => {
         this.refreshPanelTitle();
         this.changeDetector.markForCheck();
+      })
+      .on('INVENTORY_SELECT_ALL', () => {
+        this.selectAllInCurrentTab();
       });
     this.inventoryTypes = ['all', 'table', 'common', Network.peerId, 'graveyard'];
     this.panelId = UUID.generateUuid();
@@ -723,6 +726,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     if (!(gameObject instanceof TabletopObject)) return;
     if (e && e instanceof MouseEvent && e.shiftKey) {
       SoundEffect.playLocal(PresetSound.selectionStart);
+      // Seed primary highlight into the set so Shift-extend keeps the first pick.
+      if (this.selectionService.size === 0 && this.selectedIdentifier) {
+        const primary = ObjectStore.instance.get(this.selectedIdentifier);
+        if (primary instanceof TabletopObject && primary !== gameObject) {
+          this.selectionService.add(primary);
+        }
+      }
       if (this.checkSelected(gameObject)) {
         this.selectionService.remove(gameObject);
       } else {
@@ -733,8 +743,32 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName, highlighting: true });
       if (!this.checkSelected(gameObject)) {
         this.selectionService.clear();
+        this.selectionService.add(gameObject);
       }
     }
+  }
+
+  private selectAllInCurrentTab() {
+    if (this.GuestMode()) return;
+    const objects = this.getGameObjects(this.selectTab);
+    this.selectionService.clear();
+    let first: GameCharacter = null;
+    for (const obj of objects) {
+      if (!(obj instanceof GameCharacter)) continue;
+      if (!obj.isVisible && !this.isGMMode) continue;
+      this.selectionService.add(obj);
+      if (!first) first = obj;
+    }
+    if (first) {
+      EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+        identifier: first.identifier,
+        className: first.aliasName,
+        highlighting: true,
+      });
+      this.selectedIdentifier = first.identifier;
+      SoundEffect.playLocal(PresetSound.selectionStart);
+    }
+    this.changeDetector.markForCheck();
   }
 
   focusGameObject(gameObject: GameCharacter, e: Event) {
@@ -817,14 +851,31 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
     e.stopPropagation();
     const tempCopy = !!(e.ctrlKey || e.metaKey);
-    e.dataTransfer.setData(GameCharacter.INVENTORY_DRAG_MIME, gameObject.identifier);
-    e.dataTransfer.setData('text/plain', `udonarium-character:${gameObject.identifier}`);
+    const ids = this.inventoryDragIdentifiers(gameObject);
+    const payload = ids.join(',');
+    e.dataTransfer.setData(GameCharacter.INVENTORY_DRAG_MIME, payload);
+    e.dataTransfer.setData('text/plain', `udonarium-character:${payload}`);
     if (tempCopy) {
       e.dataTransfer.setData(GameCharacter.INVENTORY_TEMP_COPY_MIME, '1');
       e.dataTransfer.effectAllowed = 'copy';
     } else {
       e.dataTransfer.effectAllowed = 'move';
     }
+  }
+
+  /** Drag selected group when the row is in the multi-select set; otherwise only that row. */
+  private inventoryDragIdentifiers(gameObject: GameCharacter): string[] {
+    if (!this.checkSelected(gameObject)) return [gameObject.identifier];
+    const selected = this.selectionService.objects
+      .filter((o): o is GameCharacter => o instanceof GameCharacter && o.aliasName === gameObject.aliasName)
+      .filter(ch => this.canDragInventory(ch))
+      .map(ch => ch.identifier);
+    if (selected.length < 2) return [gameObject.identifier];
+    if (!selected.includes(gameObject.identifier)) {
+      return [gameObject.identifier, ...selected];
+    }
+    // Keep the dragged row first so drop offsets stay predictable.
+    return [gameObject.identifier, ...selected.filter(id => id !== gameObject.identifier)];
   }
 
   onInventoryDragEnd() {
@@ -843,7 +894,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   onInventoryTabDragOver(e: DragEvent, inventoryType: string) {
     if (inventoryType === 'all') return;
-    if (!this.readInventoryDragId(e)) return;
+    if (!this.readInventoryDragIds(e).length) return;
     e.preventDefault();
     e.stopPropagation();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
@@ -864,29 +915,34 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   onInventoryTabDrop(e: DragEvent, inventoryType: string) {
-    const id = this.readInventoryDragId(e);
+    const ids = this.readInventoryDragIds(e);
     this.dropTargetTab = '';
-    if (!id || id === '__pending__') return;
+    if (!ids.length || ids[0] === '__pending__') return;
     if (inventoryType === 'all') return;
     e.preventDefault();
     e.stopPropagation();
     if (this.GuestMode()) return;
-    const ch = ObjectStore.instance.get(id);
-    if (!(ch instanceof GameCharacter)) return;
-    if (!ch.isVisible && !this.isGMMode) return;
-    if (ch.location?.name === inventoryType) {
-      // Same location name, but other-map tokens still need rebinding to the current view table.
-      if (!(inventoryType === 'table' && this.isOnOtherTable(ch))) {
-        this.changeDetector.markForCheck();
-        return;
+    let moved = 0;
+    for (const id of ids) {
+      const ch = ObjectStore.instance.get(id);
+      if (!(ch instanceof GameCharacter)) continue;
+      if (!ch.isVisible && !this.isGMMode) continue;
+      if (ch.location?.name === inventoryType) {
+        // Same location name, but other-map tokens still need rebinding to the current view table.
+        if (!(inventoryType === 'table' && this.isOnOtherTable(ch))) continue;
       }
+      this.moveCharacterToLocation(ch, inventoryType, { silent: true });
+      moved++;
     }
-    this.moveCharacterToLocation(ch, inventoryType);
-    if (this.selectTab !== inventoryType) this.selectTab = inventoryType;
+    if (moved > 0) {
+      SoundEffect.play(inventoryType === 'graveyard' ? PresetSound.sweep : PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+      if (this.selectTab !== inventoryType) this.selectTab = inventoryType;
+    }
     this.changeDetector.markForCheck();
   }
 
-  private moveCharacterToLocation(gameObject: GameCharacter, location: string) {
+  private moveCharacterToLocation(gameObject: GameCharacter, location: string, opts?: { silent?: boolean }) {
     const isStealthMode = GameCharacter.isStealthMode;
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
     gameObject.setLocation(location);
@@ -900,22 +956,30 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         materialIcon: 'disabled_visible'
       });
     }
-    SoundEffect.play(location === 'graveyard' ? PresetSound.sweep : PresetSound.piecePut);
-    EventSystem.call('UPDATE_INVENTORY', true);
+    if (!opts?.silent) {
+      SoundEffect.play(location === 'graveyard' ? PresetSound.sweep : PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+    }
   }
 
-  private readInventoryDragId(e: DragEvent): string {
-    if (!e.dataTransfer) return '';
+  private readInventoryDragIds(e: DragEvent): string[] {
+    if (!e.dataTransfer) return [];
     const typed = e.dataTransfer.getData(GameCharacter.INVENTORY_DRAG_MIME);
-    if (typed) return typed;
+    if (typed) return this.parseInventoryDragPayload(typed);
     if (e.type === 'dragover') {
       const types = Array.from(e.dataTransfer.types || []);
-      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return '__pending__';
-      return types.includes('text/plain') ? '__pending__' : '';
+      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME) || types.includes('text/plain')) {
+        return ['__pending__'];
+      }
+      return [];
     }
     const plain = e.dataTransfer.getData('text/plain') || '';
     const m = /^udonarium-character:(.+)$/.exec(plain);
-    return m ? m[1] : '';
+    return m ? this.parseInventoryDragPayload(m[1]) : [];
+  }
+
+  private parseInventoryDragPayload(payload: string): string[] {
+    return payload.split(',').map(s => s.trim()).filter(Boolean);
   }
 
   private deleteGameObject(gameObject: GameObject) {

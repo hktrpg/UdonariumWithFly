@@ -834,7 +834,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
-        option = { width: 610, height: 540, left: 100, title: this.i18n.t('table.title') };
+        option = { width: 620, height: 520, left: 100, title: this.i18n.t('table.title') };
         break;
       case 'FileStorageComponent':
         component = FileStorageComponent;
@@ -890,6 +890,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
     }
     if (component) {
+      const tourId = this.tourIdForComponent(componentName);
+      // Chat windows may open multiple copies (different tabs / positions).
+      const allowMultiple = componentName === 'ChatWindowComponent' && !this.mobileLayout.isMobile;
+      if (tourId) {
+        if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
+        option.tourPanelId = tourId;
+      }
       if (!this.mobileLayout.isMobile) {
         if (componentName === 'ChatWindowComponent') {
           // Keep remembered chat geometry; nudge duplicates so they don't fully stack.
@@ -899,9 +906,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             option.top = (option.top ?? ChatWindowComponent.DEFAULT_TOP) + chatOpenCount * 24;
           }
         } else {
-          option.top = (this.openPanelCount % 10 + 1) * 20;
-          option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-          this.openPanelCount = this.openPanelCount + 1;
+          const geoKey = PanelService.resolveGeometryKey(option);
+          const saved = geoKey ? PanelService.getGeometry(geoKey) : null;
+          const hasSavedPos = !!(saved
+            && typeof saved.left === 'number' && Number.isFinite(saved.left)
+            && typeof saved.top === 'number' && Number.isFinite(saved.top));
+          if (!hasSavedPos) {
+            option.top = (this.openPanelCount % 10 + 1) * 20;
+            option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+            this.openPanelCount = this.openPanelCount + 1;
+          }
         }
       } else {
         // Bottom-nav open: replace any existing sheet so the nav stays usable.
@@ -910,13 +924,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         if (!option.mobileSheet) option.mobileSheet = 'half';
       }
       option = this.mobileLayout.adaptPanelOption(option);
-      const tourId = this.tourIdForComponent(componentName);
-      // Chat windows may open multiple copies (different tabs / positions).
-      const allowMultiple = componentName === 'ChatWindowComponent' && !this.mobileLayout.isMobile;
-      if (tourId) {
-        if (!allowMultiple) PanelService.closePanelsByTourId(tourId);
-        option.tourPanelId = tourId;
-      }
       this.panelService.open(component, option);
       if (tourId) this.guidedTour.notifyPanelOpened(tourId);
       if (componentName === 'ChatWindowComponent') {

@@ -157,19 +157,42 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
       this.scrollEventShortTimer = new ResettableTimeout(() => this.lazyScrollUpdate(), 33);
       this.scrollEventLongTimer = new ResettableTimeout(() => this.lazyScrollUpdate(false), 66);
       this.onScroll();
-      this.panelService.scrollablePanel.addEventListener('scroll', this.callbackOnScroll, false);
-      this.panelService.scrollablePanel.addEventListener('scrolltobottom', this.callbackOnScrollToBottom, false);
+      this.bindScrollListeners();
     });
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
-    this.panelService.scrollablePanel.removeEventListener('scroll', this.callbackOnScroll, false);
-    this.panelService.scrollablePanel.removeEventListener('scrolltobottom', this.callbackOnScrollToBottom, false);
-    this.scrollEventShortTimer.clear();
-    this.scrollEventLongTimer.clear();
+    this.unbindScrollListeners();
+    this.scrollEventShortTimer?.clear();
+    this.scrollEventLongTimer?.clear();
     if (this.addMessageEventTimer) clearTimeout(this.addMessageEventTimer);
     this.addMessageEventTimer = null;
+  }
+
+  private scrollListenersBound = false;
+  private scrollBindRetries = 0;
+
+  private bindScrollListeners() {
+    const panel = this.panelService.scrollablePanel;
+    if (panel && !this.scrollListenersBound) {
+      panel.addEventListener('scroll', this.callbackOnScroll, false);
+      panel.addEventListener('scrolltobottom', this.callbackOnScrollToBottom, false);
+      this.scrollListenersBound = true;
+      return;
+    }
+    if (!panel && this.scrollBindRetries < 10) {
+      this.scrollBindRetries++;
+      queueMicrotask(() => this.bindScrollListeners());
+    }
+  }
+
+  private unbindScrollListeners() {
+    const panel = this.panelService.scrollablePanel;
+    if (!panel || !this.scrollListenersBound) return;
+    panel.removeEventListener('scroll', this.callbackOnScroll, false);
+    panel.removeEventListener('scrolltobottom', this.callbackOnScrollToBottom, false);
+    this.scrollListenersBound = false;
   }
 
   ngOnChanges() {
@@ -195,7 +218,8 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   resetMessages() {
     let lastIndex = this.chatTab.chatMessages.length - 1;
-    this.topIndex = lastIndex - Math.floor(this.panelService.scrollablePanel.clientHeight / this.minMessageHeight);
+    const panelHeight = this.panelService.scrollablePanel?.clientHeight ?? 300;
+    this.topIndex = lastIndex - Math.floor(panelHeight / this.minMessageHeight);
     this.bottomIndex = lastIndex;
     this.needUpdate = true;
     this.preScrollTop = -1;
@@ -232,9 +256,11 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   }
 
   private getScrollPosition(): ScrollPosition {
-    let top = this.panelService.scrollablePanel.scrollTop;
-    let clientHeight = this.panelService.scrollablePanel.clientHeight;
-    let scrollHeight = this.panelService.scrollablePanel.scrollHeight;
+    const panel = this.panelService.scrollablePanel;
+    if (!panel) return { top: 0, bottom: 0, clientHeight: 0, scrollHeight: 0 };
+    let top = panel.scrollTop;
+    let clientHeight = panel.clientHeight;
+    let scrollHeight = panel.scrollHeight;
     if (top < 0) top = 0;
     if (scrollHeight - clientHeight < top)
       top = scrollHeight - clientHeight;
@@ -277,7 +303,8 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
     currentBox = elm.getBoundingClientRect();
     diff = prevBox.top - currentBox.top - this.scrollSpeed;
     if ((!hasTopBlank || !hasBotomBlank) && 0.5 ** 2 < diff ** 2) {
-      this.panelService.scrollablePanel.scrollTop -= diff;
+      const panel = this.panelService.scrollablePanel;
+      if (panel) panel.scrollTop -= diff;
     }
 
     let logBox: DOMRect = this.logContainerRef.nativeElement.getBoundingClientRect();

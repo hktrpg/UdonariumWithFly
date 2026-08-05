@@ -8,6 +8,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { PeerCursor } from '@udonarium/peer-cursor';
 import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -44,10 +45,13 @@ export class TabletopKeyboardService {
    * Windows/Chrome can leave altKey sticky or steal focus to the menu bar.
    */
   private altHeld = false;
+  /** Last pointer context for Ctrl+A (inventory vs map vs other panels). */
+  private interactionContext: 'inventory' | 'map' | 'other' = 'map';
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
   private readonly onWheel = (e: WheelEvent) => this.handleWheel(e);
+  private readonly onPointerDown = (e: PointerEvent) => this.handlePointerDown(e);
   private readonly onBlur = () => {
     this.pressed.clear();
     this.wheelAcc = 0;
@@ -72,6 +76,7 @@ export class TabletopKeyboardService {
     });
     document.addEventListener('keydown', this.onKeyDown, true);
     document.addEventListener('keyup', this.onKeyUp, true);
+    document.addEventListener('pointerdown', this.onPointerDown, true);
     document.addEventListener('wheel', this.onWheel, { capture: true, passive: false });
     window.addEventListener('blur', this.onBlur);
     this.listening = true;
@@ -81,6 +86,7 @@ export class TabletopKeyboardService {
     if (!this.listening) return;
     document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('keyup', this.onKeyUp, true);
+    document.removeEventListener('pointerdown', this.onPointerDown, true);
     document.removeEventListener('wheel', this.onWheel, true);
     window.removeEventListener('blur', this.onBlur);
     this.pressed.clear();
@@ -123,6 +129,11 @@ export class TabletopKeyboardService {
       }
       if (code === 'KeyV') {
         if (this.pasteClipboard()) this.consume(e);
+        return;
+      }
+      if (code === 'KeyA') {
+        // Outside text fields: never let the browser select the whole page.
+        this.handleSelectAll(e);
         return;
       }
     }
@@ -262,6 +273,72 @@ export class TabletopKeyboardService {
     } else {
       RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta);
     }
+  }
+
+  private handlePointerDown(e: PointerEvent) {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('game-object-inventory, [data-tour-panel="menu.inventory"]')) {
+      this.interactionContext = 'inventory';
+      return;
+    }
+    if (target.closest('game-table')) {
+      this.interactionContext = 'map';
+      return;
+    }
+    if (target.closest('.draggable-panel')) {
+      this.interactionContext = 'other';
+      return;
+    }
+    // Empty canvas / app chrome → treat as map.
+    this.interactionContext = 'map';
+  }
+
+  private handleSelectAll(e: KeyboardEvent) {
+    const context = this.resolveSelectAllContext(e);
+    if (context === 'inventory') {
+      EventSystem.trigger('INVENTORY_SELECT_ALL', null);
+      this.consume(e);
+      return;
+    }
+    if (context === 'map' && !Network.GuestMode()) {
+      this.selectAllMapTokens();
+    }
+    // Always consume outside text fields so Ctrl+A does not highlight the whole page.
+    this.consume(e);
+  }
+
+  private resolveSelectAllContext(e: KeyboardEvent): 'inventory' | 'map' | 'other' {
+    const target = e.target;
+    if (target instanceof Element) {
+      if (target.closest('game-object-inventory, [data-tour-panel="menu.inventory"]')) return 'inventory';
+      if (target.closest('game-table')) return 'map';
+      if (target.closest('.draggable-panel')) return 'other';
+    }
+    return this.interactionContext;
+  }
+
+  private selectAllMapTokens(): boolean {
+    this.selectionService.clear();
+    const characters = ObjectStore.instance.getObjects(GameCharacter) as GameCharacter[];
+    let count = 0;
+    let first: GameCharacter = null;
+    for (const ch of characters) {
+      if (!ch.isVisibleOnTable) continue;
+      if (!ch.isVisible && !(PeerCursor.myCursor?.isGMMode)) continue;
+      this.selectionService.add(ch);
+      if (!first) first = ch;
+      count++;
+    }
+    if (first) {
+      EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+        identifier: first.identifier,
+        className: first.aliasName,
+        highlighting: true,
+      });
+      SoundEffect.playLocal(PresetSound.selectionStart);
+    }
+    return count > 0;
   }
 
   private shouldIgnore(e: Event): boolean {

@@ -13,6 +13,7 @@ import { SceneObjectSnap, ScenePreset, SceneTabletopSnap, resolveScenePresetTabl
 import { StringUtil } from './core/system/util/string-util';
 import { translate } from 'i18n';
 import { TabletopLocation, TabletopObject } from './tabletop-object';
+import { GameCharacter } from './game-character';
 import { GameTable } from './game-table';
 import { MovableDirective } from 'directive/movable.directive';
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
@@ -21,6 +22,8 @@ export interface ScenePresetApplyOptions {
   skipBgm?: boolean;
   skipText?: boolean;
   skipTabletop?: boolean;
+  /** Skip restoring GameCharacter (token) poses / sync from the snapshot. */
+  skipTokens?: boolean;
   chatTab?: ChatTab;
 }
 
@@ -83,6 +86,10 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
       preset.tableIdentifier = table.identifier;
     }
 
+    // Before switching maps: remember live token poses so "keep tokens" can
+    // re-stamp them onto the target table (per-map placements would otherwise jump).
+    const keptTokens = options.skipTokens ? this.captureVisibleTokenPoses() : null;
+
     EventSystem.call('SELECT_GAME_TABLE', { identifier: table.identifier }, Network.peerId);
 
     if (!options.skipBgm) {
@@ -91,7 +98,11 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     }
 
     if (!options.skipTabletop) {
-      this.applyTabletopSnap(preset, table);
+      this.applyTabletopSnap(preset, table, options);
+    }
+
+    if (keptTokens) {
+      this.applyKeptTokenPoses(table.identifier, keptTokens);
     }
 
     if (!options.skipText && preset.switchText && preset.switchText.trim()) {
@@ -182,7 +193,7 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     return entry;
   }
 
-  private applyTabletopSnap(preset: ScenePreset, table: GameTable) {
+  private applyTabletopSnap(preset: ScenePreset, table: GameTable, options: ScenePresetApplyOptions = {}) {
     const snap = preset.tabletopSnap;
     if (!snap || snap.version !== 1) return;
 
@@ -206,6 +217,7 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     }
     if (Array.isArray(snap.pieces)) {
       for (const pieceSnap of snap.pieces) {
+        if (options.skipTokens && this.isTokenSnap(pieceSnap)) continue;
         const pose = this.applyObjectSnap(pieceSnap, table.identifier);
         if (pose) pendingPoses.push(pose);
       }
@@ -215,6 +227,56 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     this.flushPoseVisuals(pendingPoses);
     queueMicrotask(() => this.flushPoseVisuals(pendingPoses));
     setTimeout(() => this.flushPoseVisuals(pendingPoses), 50);
+  }
+
+  /** Character tokens on the table (not cards / dice / notes / ranges). */
+  private isTokenSnap(entry: SceneObjectSnap): boolean {
+    if (!entry?.identifier) return false;
+    const obj = ObjectStore.instance.get(entry.identifier);
+    return obj instanceof GameCharacter;
+  }
+
+  private captureVisibleTokenPoses(): PendingPose[] {
+    const kept: PendingPose[] = [];
+    for (const ch of ObjectStore.instance.getObjects(GameCharacter) as GameCharacter[]) {
+      if (!ch.isVisibleOnTable) continue;
+      const pose = ch.getPoseForView();
+      const entry: PendingPose = {
+        obj: ch,
+        x: toNum(pose.x),
+        y: toNum(pose.y),
+        posZ: toNum(pose.posZ),
+      };
+      if (typeof ch.rotate === 'number' && !Number.isNaN(ch.rotate)) {
+        entry.rotate = ch.rotate;
+      }
+      kept.push(entry);
+    }
+    return kept;
+  }
+
+  /** Stamp current-view token poses onto the target map after a scene apply. */
+  private applyKeptTokenPoses(tableId: string, kept: PendingPose[]) {
+    if (!tableId || kept.length < 1) return;
+    const pending: PendingPose[] = [];
+    for (const pose of kept) {
+      const ch = ObjectStore.instance.get(pose.obj.identifier);
+      if (!(ch instanceof GameCharacter)) continue;
+      ch.addToTable(tableId, { x: pose.x, y: pose.y, posZ: pose.posZ }, false);
+      if (pose.rotate != null) {
+        try { ch.rotate = pose.rotate; } catch { /* optional */ }
+      }
+      pending.push({
+        obj: ch,
+        x: pose.x,
+        y: pose.y,
+        posZ: pose.posZ,
+        rotate: pose.rotate,
+      });
+    }
+    this.flushPoseVisuals(pending);
+    queueMicrotask(() => this.flushPoseVisuals(pending));
+    setTimeout(() => this.flushPoseVisuals(pending), 50);
   }
 
   private applyObjectSnap(entry: SceneObjectSnap, tableIdentifier: string): PendingPose | null {

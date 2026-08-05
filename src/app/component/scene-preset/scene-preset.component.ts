@@ -60,6 +60,20 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   overwrite(preset: ScenePreset) {
     if (this.GuestMode() || !preset) return;
+    void this.confirmOverwrite(preset);
+  }
+
+  private async confirmOverwrite(preset: ScenePreset) {
+    const title = preset.title?.trim() || this.i18n.t('scenePreset.untitled');
+    const result = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('scenePreset.overwrite'),
+      text: this.i18n.t('scenePreset.overwriteConfirmText', { title }),
+      help: this.i18n.t('scenePreset.overwriteConfirmHelp'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'save',
+      okLabel: this.i18n.t('scenePreset.overwriteOk'),
+    });
+    if (result === false || result == null) return;
     this.list.writeSnapshot(preset);
   }
 
@@ -69,12 +83,13 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
     if (table) preset.tableIdentifier = table.identifier;
   }
 
-  apply(preset: ScenePreset) {
+  apply(preset: ScenePreset, keepTokens = false) {
     if (this.GuestMode() || !preset || !preset.isValid) return;
     const chatTab = this.resolveActiveChatTab();
     this.list.applyPreset(preset, {
       skipBgm: this.skipBgm,
       skipText: this.skipText,
+      skipTokens: keepTokens,
       chatTab
     });
   }

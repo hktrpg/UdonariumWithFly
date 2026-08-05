@@ -372,8 +372,8 @@ export class PanelService {
     childPanelService.panelComponentRef = panelComponentRef;
     PanelService.openPanels.add(childPanelService);
 
-    // Mobile: peek/half bottom sheet (height remembered). Desktop: restore last size for every panel type.
-    // Position is left to the caller (chat restores left/top itself, then may nudge duplicates).
+    // Mobile: peek/half bottom sheet (height remembered). Desktop: restore last size;
+    // non-chat panels also restore last left/top (chat applies position before open()).
     let resolved: PanelOption = { ...(option || {}) };
     if (!resolved.geometryKey && !resolved.tourPanelId) {
       const autoKey = PanelService.geometryKeyForComponent(childComponent);
@@ -381,7 +381,14 @@ export class PanelService {
     }
     resolved = this.mobileLayout.adaptPanelOption(resolved);
     if (!this.mobileLayout.isMobile) {
-      resolved = PanelService.applySavedGeometry(resolved);
+      const geoKey = PanelService.resolveGeometryKey(resolved);
+      const isChat = geoKey === 'menu.chat';
+      resolved = PanelService.applySavedGeometry(resolved, { includePosition: !isChat });
+      // Compact map UI still needs enough room for toolbar + all blocks without clipping.
+      if (geoKey === 'menu.table') {
+        if ((resolved.width ?? 0) < 620) resolved.width = 620;
+        if ((resolved.height ?? 0) < 520) resolved.height = 520;
+      }
     }
     if (resolved.title) childPanelService.title = resolved.title;
     if (resolved.top != null) childPanelService.top = resolved.top;
@@ -413,17 +420,19 @@ export class PanelService {
     // Defer CD until after the caller assigns @Input (e.g. character / tabletopObject).
     // Sync detectChanges() here ran with null inputs and broke panels (standList TypeError → untitled).
     // Isolate body CD so a child template error does not leave the panel chrome undraggable.
+    // Panel CD must run before body CD so ui-panel ngOnInit sets scrollablePanel
+    // (chat-tab / chat-window attach scroll listeners in AfterViewInit).
     const runCd = () => {
       if (!panelComponentRef) return;
-      try {
-        bodyComponentRef?.changeDetectorRef?.detectChanges();
-      } catch (e) {
-        console.error('[PanelService] body detectChanges failed', e);
-      }
       try {
         panelCdr.detectChanges();
       } catch (e) {
         console.error('[PanelService] panel detectChanges failed', e);
+      }
+      try {
+        bodyComponentRef?.changeDetectorRef?.detectChanges();
+      } catch (e) {
+        console.error('[PanelService] body detectChanges failed', e);
       }
       const panelOnChanges = panelComponentRef.instance as OnChanges;
       const bodyOnChanges = bodyComponentRef?.instance as OnChanges;

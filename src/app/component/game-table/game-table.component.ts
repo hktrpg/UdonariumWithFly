@@ -1600,7 +1600,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('dragover', ['$event'])
   onInventoryCharacterDragOver(e: DragEvent) {
-    if (!this.readInventoryCharacterDragId(e)) return;
+    if (!this.readInventoryCharacterDragIds(e).length) return;
     e.preventDefault();
     if (e.dataTransfer) {
       const types = Array.from(e.dataTransfer.types || []);
@@ -1610,35 +1610,43 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('drop', ['$event'])
   onInventoryCharacterDrop(e: DragEvent) {
-    const id = this.readInventoryCharacterDragId(e);
-    if (!id || id === '__pending__') return;
+    const ids = this.readInventoryCharacterDragIds(e);
+    if (!ids.length || ids[0] === '__pending__') return;
     e.preventDefault();
     e.stopPropagation();
     if (GuestSession.isGuest) return;
-    const ch = ObjectStore.instance.get(id);
-    if (!(ch instanceof GameCharacter)) return;
-    if (!ch.isVisible && !this.isGMMode) return;
 
     const pos = this.coordinateService.calcTabletopLocalCoordinate(
       { x: e.clientX, y: e.clientY, z: 0 },
       this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
     );
     const grid = this.currentTable?.gridSize || 50;
-    const x = pos.x - (ch.size * grid) / 2;
-    const y = pos.y - (ch.size * grid) / 2;
     const isTemp = this.readInventoryTempCopy(e);
+    let placed = 0;
 
-    if (isTemp) {
-      GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ });
-      SoundEffect.play(PresetSound.piecePut);
-      EventSystem.call('UPDATE_INVENTORY', true);
-      return;
+    for (let i = 0; i < ids.length; i++) {
+      const ch = ObjectStore.instance.get(ids[i]);
+      if (!(ch instanceof GameCharacter)) continue;
+      if (!ch.isVisible && !this.isGMMode) continue;
+
+      const col = i % 5;
+      const row = Math.floor(i / 5);
+      const x = pos.x - (ch.size * grid) / 2 + col * grid;
+      const y = pos.y - (ch.size * grid) / 2 + row * grid;
+
+      if (isTemp) {
+        GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ });
+      } else {
+        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
+        ch.addToTable(undefined, { x, y, posZ: ch.posZ });
+      }
+      placed++;
     }
 
-    EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-    ch.addToTable(undefined, { x, y, posZ: ch.posZ });
-    SoundEffect.play(PresetSound.piecePut);
-    EventSystem.call('UPDATE_INVENTORY', true);
+    if (placed > 0) {
+      SoundEffect.play(PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+    }
   }
 
   private readInventoryTempCopy(e: DragEvent): boolean {
@@ -1648,21 +1656,25 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME);
   }
 
-  private readInventoryCharacterDragId(e: DragEvent): string {
-    if (!e.dataTransfer) return '';
+  private readInventoryCharacterDragIds(e: DragEvent): string[] {
+    if (!e.dataTransfer) return [];
     const typed = e.dataTransfer.getData(GameCharacter.INVENTORY_DRAG_MIME);
-    if (typed) return typed;
+    if (typed) return this.parseInventoryDragPayload(typed);
     // During dragover some browsers only expose types, not data.
     if (e.type === 'dragover') {
       const types = Array.from(e.dataTransfer.types || []);
-      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return '__pending__';
-      if (types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return '__pending__';
+      if (types.includes(GameCharacter.INVENTORY_DRAG_MIME)) return ['__pending__'];
+      if (types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return ['__pending__'];
       const plainHint = types.includes('text/plain');
-      return plainHint ? '__pending__' : '';
+      return plainHint ? ['__pending__'] : [];
     }
     const plain = e.dataTransfer.getData('text/plain') || '';
     const m = /^udonarium-character:(.+)$/.exec(plain);
-    return m ? m[1] : '';
+    return m ? this.parseInventoryDragPayload(m[1]) : [];
+  }
+
+  private parseInventoryDragPayload(payload: string): string[] {
+    return payload.split(',').map(s => s.trim()).filter(Boolean);
   }
 
   @HostListener('document:keydown', ['$event'])
