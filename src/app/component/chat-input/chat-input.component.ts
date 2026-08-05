@@ -53,6 +53,18 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
 
   @Input() onlyCharacters: boolean = false;
   @Input() chatTabidentifier: string = '';
+  /**
+   * Mobile chat-window: when false, hide dicebot (follows the tune panel).
+   * null = always show (palette / unbound).
+   */
+  @Input() mobileExtrasOpen: boolean | null = null;
+
+  /** Collapse dicebot only under mobile layout when extras panel is closed. */
+  get isDiceBotCollapsed(): boolean {
+    if (this.mobileExtrasOpen !== false) return false;
+    return typeof document !== 'undefined'
+      && document.documentElement.classList.contains('udon-mobile-layout');
+  }
   get isUseStandImageOnChatTab(): boolean {
     const chatTab = <ChatTab>ObjectStore.instance.get(this.chatTabidentifier);
     return chatTab && chatTab.isUseStandImage;

@@ -87,7 +87,17 @@ export class PointerDeviceService {
 
   private onTouchMove(e: TouchEvent) {
     let length = e.touches.length;
-    if (length < 1) return;
+    if (length < 1) {
+      // touchend/cancel with no remaining touches — collapse to last known point
+      // so multi-touch guards (pointers.length > 1) do not stick after the gesture.
+      const ended = e.changedTouches?.[0];
+      if (ended) {
+        const last: PointerData = { x: ended.pageX, y: ended.pageY, z: 0, identifier: ended.identifier };
+        this.pointers = [last];
+        this.primaryPointer = last;
+      }
+      return;
+    }
     this.pointers = [];
     for (let i = 0; i < length; i++) {
       let touch = e.touches[i];

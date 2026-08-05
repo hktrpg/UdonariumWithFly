@@ -67,6 +67,16 @@ body {
   overflow: hidden;
   background-color: hsl(0, 0%, 97%);
   touch-action: none;
+  /* Lock layout size; map pinch/zoom is handled by app gestures, not the browser. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Block legacy Safari/iOS page pinch-zoom while preserving app two-finger gestures. */
+html.udon-mobile-layout,
+html.udon-mobile-layout body {
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 body {

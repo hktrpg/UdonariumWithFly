@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChatTab } from '@udonarium/chat-tab';
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -133,6 +133,17 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.setChatAutoPopup(isAutoPopup);
   }
 
+  /** Mobile: toolbar action icons collapsed behind tune toggle (session only). */
+  toolbarActionsOpen = false;
+
+  toggleToolbarActions() {
+    this.toolbarActionsOpen = !this.toolbarActionsOpen;
+    queueMicrotask(() => {
+      this.pinComposerToPanel();
+      if (this.isAutoScroll) this.scrollToBottom(true);
+    });
+  }
+
   /** Default ON = normal chat bubbles. OFF = compact list. */
   private _isCompact = false;
   get isCompact(): boolean {
@@ -222,6 +233,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
     private changeDetector: ChangeDetectorRef,
+    private elementRef: ElementRef<HTMLElement>,
   ) { }
 
   GuestMode() {
@@ -264,13 +276,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    this.scheduleScrollToBottom(true);
     this.bindScrollTracking();
+    this.bindPanelResizePin();
+    this.scheduleScrollToBottom(true);
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
     this.unbindScrollTracking();
+    this.unbindPanelResizePin();
     if (this.openScrollRetryTimers.length) {
       this.openScrollRetryTimers.forEach(t => clearTimeout(t));
       this.openScrollRetryTimers = [];
@@ -281,6 +295,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   private scrollTrackBound = false;
   private onPanelScroll = () => this.checkAutoScroll();
   private openScrollRetryTimers: ReturnType<typeof setTimeout>[] = [];
+  private panelResizeObserver: ResizeObserver | null = null;
 
   private bindScrollTracking() {
     const panel = this.panelService.scrollablePanel;
@@ -296,11 +311,55 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     this.scrollTrackBound = false;
   }
 
+  private bindPanelResizePin() {
+    const panel = this.panelService.scrollablePanel;
+    if (!panel || typeof ResizeObserver === 'undefined' || this.panelResizeObserver) return;
+    this.panelResizeObserver = new ResizeObserver(() => {
+      this.pinComposerToPanel();
+      if (this.isAutoScroll) this.scrollToBottom(true);
+    });
+    this.panelResizeObserver.observe(panel);
+  }
+
+  private unbindPanelResizePin() {
+    this.panelResizeObserver?.disconnect();
+    this.panelResizeObserver = null;
+  }
+
+  /**
+   * Match host min-height to the sheet scrollport so short logs still pin the composer
+   * to the bottom on open / tab switch / snap resize (CSS % height is unreliable early).
+   * Mobile only — never stretch desktop panels.
+   */
+  private pinComposerToPanel() {
+    const panel = this.panelService.scrollablePanel;
+    const host = this.elementRef?.nativeElement;
+    if (!panel || !host) return;
+    if (!document.documentElement.classList.contains('udon-mobile-layout')) {
+      host.style.minHeight = '';
+      return;
+    }
+    const h = Math.round(panel.clientHeight);
+    if (h <= 0) return;
+    host.style.minHeight = `${h}px`;
+  }
+
+  /** Avoid browser scrolling the focused tab control into mid-sheet (composer leaves bottom). */
+  preventTabFocusScroll(event: Event) {
+    event.preventDefault();
+  }
+
   /** Open / tab change / new message — retry until virtual list paints. */
   private scheduleScrollToBottom(force: boolean = true) {
+    if (this.openScrollRetryTimers.length) {
+      this.openScrollRetryTimers.forEach(t => clearTimeout(t));
+      this.openScrollRetryTimers = [];
+    }
+    this.pinComposerToPanel();
     this.scrollToBottom(force);
     queueMicrotask(() => this.scrollToBottom(force));
-    for (const delay of [50, 150, 300]) {
+    // Include post flyInOut (~100ms) and virtual-list settle.
+    for (const delay of [50, 120, 200, 350, 550]) {
       const t = setTimeout(() => this.scrollToBottom(force), delay);
       this.openScrollRetryTimers.push(t);
     }
@@ -312,17 +371,26 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.isAutoScroll) return;
     const panel = this.panelService.scrollablePanel;
     if (!panel) return;
+    this.pinComposerToPanel();
     let event = new CustomEvent('scrolltobottom', {});
     panel.dispatchEvent(event);
     if (this.scrollToBottomTimer != null) return;
     this.scrollToBottomTimer = setTimeout(() => {
       if (this.chatTab) this.chatTab.markForRead();
       this.scrollToBottomTimer = null;
-      if (this.panelService.scrollablePanel) {
+      const el = this.panelService.scrollablePanel;
+      if (!el) return;
+      this.pinComposerToPanel();
+      // Hold follow through layout settle; checkAutoScroll only after final scroll.
+      this.isAutoScroll = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        if (!this.panelService.scrollablePanel) return;
+        this.pinComposerToPanel();
+        this.isAutoScroll = true;
         this.panelService.scrollablePanel.scrollTop = this.panelService.scrollablePanel.scrollHeight;
-      }
-      // Stay following while parked at the bottom; scroll-up turns this off via checkAutoScroll.
-      this.checkAutoScroll();
+        this.checkAutoScroll();
+      });
     }, 0);
   }
 

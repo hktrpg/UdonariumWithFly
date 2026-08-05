@@ -83,6 +83,7 @@ export const zhCN_ui: I18nDictionary = {
   'chat.tabStale': '※聊天标签的内容已更新。请重新选择聊天标签，或重新打开此聊天窗口。',
   'chat.unnamedTab': '(未命名标签)',
   'chat.tabsButton': '标签',
+  'chat.toolbarMoreTitle': '聊天选项',
   'chat.logButton': '日志',
   'chat.musicTitle': '音乐：ON＝播放 BGM／OFF＝静音（本机设置）',
   'chat.soundEffectTitle': '效果音：ON＝播放音效／OFF＝静音（本机设置）',
