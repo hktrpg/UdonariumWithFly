@@ -185,6 +185,12 @@ function isV3RoomName(roomName: string): boolean {
 }
 
 /**
+ * V3 open-gate flag `*` is not \w and is rejected by the token backend / SkyWay peerId rules.
+ * Map to `o` only inside the packed peerId blob (hex digests/seals never contain `o`).
+ */
+const V3_OPEN_GATE_PACKED = 'o';
+
+/**
  * Pack roomName into peerId-safe \w chars.
  * V3: only Base62-encode the display name; keep ASCII auth blob raw (avoids 4/3 expansion).
  */
@@ -192,7 +198,7 @@ function packRoomName(roomName: string): string {
   if (isV3RoomName(roomName)) {
     const i = roomName.indexOf(V3_MARKER);
     const display = roomName.slice(0, i);
-    const blob = roomName.slice(i + V3_MARKER.length);
+    const blob = roomName.slice(i + V3_MARKER.length).replace(/\*/g, V3_OPEN_GATE_PACKED);
     const dispB62 = Base62.encode(new TextEncoder().encode(display));
     if (dispB62.length > 99) {
       // Fallback: whole-string pack (will likely fail length check upstream).
@@ -214,7 +220,7 @@ function unpackRoomName(packed: string): string {
     const len = parseInt(packed.slice(1, 3), 10);
     if (!Number.isFinite(len) || len < 0) return '';
     const dispB62 = packed.slice(3, 3 + len);
-    const blob = packed.slice(3 + len);
+    const blob = packed.slice(3 + len).replace(/o/g, '*');
     const display = new TextDecoder().decode(Base62.decode(dispB62));
     return display + V3_MARKER + blob;
   }
