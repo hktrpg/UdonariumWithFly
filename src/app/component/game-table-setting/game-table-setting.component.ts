@@ -207,7 +207,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     });
     if (result === false || result == null) return;
     const title = (typeof result === 'string' ? result.trim() : '') || defaultTitle;
-    ScenePresetList.instance.createFromCurrent(title);
+    await ScenePresetList.instance.createFromCurrentAsync(title);
   }
 
   cloneGameTable() {

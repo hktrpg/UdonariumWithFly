@@ -553,10 +553,10 @@ export class TabletopKeyboardService {
           kind: 'graveyard',
           id: object.identifier,
           fromLocation: object.location.name,
-          fromTableIdentifier: object.tableIdentifier,
+          fromTableIdentifier: object.tableIdentifier || TabletopObject.resolveViewTableIdentifier() || '',
         });
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: object.identifier });
-        object.setLocation('graveyard');
+        object.leaveCurrentTable('graveyard');
         this.selectionService.remove(object);
         deleted = true;
         continue;

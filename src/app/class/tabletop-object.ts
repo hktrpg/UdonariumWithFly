@@ -148,7 +148,8 @@ export class TabletopObject extends ObjectNode {
     const keys = Object.keys(map);
     if (keys.length < 1) {
       this.tablePlacements = '';
-      this.tableIdentifier = '';
+      // Keep map id so common / graveyard / personal inventories stay per-map.
+      this.tableIdentifier = id;
       this.location.name = inventoryLocation;
       this.update();
       return;
@@ -535,9 +536,37 @@ export class TabletopObject extends ObjectNode {
       return;
     }
     this.clearPlacements(false);
-    this.tableIdentifier = '';
+    // Bind off-table inventory to a map (per-map common / graveyard / personal).
+    this.tableIdentifier = tableIdentifier
+      || TabletopObject.resolveViewTableIdentifier()
+      || this.tableIdentifier
+      || '';
     this.location.name = location;
     this.update();
+  }
+
+  /** Whether an off-table inventory entry belongs to the currently viewed map. */
+  isInventoryForCurrentView(): boolean {
+    if (this.location.name === 'table') return false;
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    if (!viewId) return true;
+    // Legacy unbound inventory entries remain visible on every map until rebound.
+    if (!this.tableIdentifier) return true;
+    return this.tableIdentifier === viewId;
+  }
+
+  /**
+   * Leave the current view map for an inventory (common / graveyard / personal).
+   * Other maps' placements are kept. If this was the last map, moves to {@param inventoryLocation}.
+   * Use this instead of {@link setLocation} when removing from one map only.
+   */
+  leaveCurrentTable(inventoryLocation: string = 'common') {
+    if (this.location.name !== 'table') {
+      this.setLocation(inventoryLocation);
+      return;
+    }
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    this.removeFromTable(viewId || undefined, inventoryLocation);
   }
 
   /** Move exclusively to one map (clear other placements). */

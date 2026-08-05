@@ -22,6 +22,10 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
   selected: ScenePreset = null;
   skipBgm = false;
   skipText = false;
+  /** Fixed-position hover zoom for list thumbs (immediate, no delay). */
+  thumbPreviewSrc = '';
+  thumbPreviewX = 0;
+  thumbPreviewY = 0;
   private lazyUpdateTimer: NodeJS.Timeout = null;
 
   get list(): ScenePresetList { return ScenePresetList.instance; }
@@ -60,6 +64,7 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.hideThumbPreview();
     EventSystem.unregister(this);
   }
 
@@ -84,7 +89,7 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
       okLabel: this.i18n.t('scenePreset.overwriteOk'),
     });
     if (result === false || result == null) return;
-    this.list.writeSnapshot(preset);
+    await this.list.writeSnapshot(preset);
   }
 
   rebind(preset: ScenePreset) {
@@ -126,7 +131,7 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
     });
     if (result === false || result == null) return;
     const title = (typeof result === 'string' ? result.trim() : '') || defaultTitle;
-    this.selected = this.list.createFromCurrent(title);
+    this.selected = await this.list.createFromCurrentAsync(title);
   }
 
   remove(preset: ScenePreset) {
@@ -137,6 +142,38 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   select(preset: ScenePreset) {
     this.selected = preset;
+  }
+
+  showThumbPreview(e: MouseEvent, preset: ScenePreset) {
+    if (!preset?.previewJpeg) {
+      this.hideThumbPreview();
+      return;
+    }
+    this.thumbPreviewSrc = preset.previewJpeg;
+    this.placeThumbPreview(e.clientX, e.clientY);
+  }
+
+  moveThumbPreview(e: MouseEvent) {
+    if (!this.thumbPreviewSrc) return;
+    this.placeThumbPreview(e.clientX, e.clientY);
+  }
+
+  hideThumbPreview() {
+    this.thumbPreviewSrc = '';
+  }
+
+  private placeThumbPreview(clientX: number, clientY: number) {
+    const pad = 12;
+    const w = 360;
+    const h = 270;
+    let x = clientX + pad;
+    let y = clientY + pad;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (x + w > vw - 8) x = Math.max(8, clientX - w - pad);
+    if (y + h > vh - 8) y = Math.max(8, vh - h - 8);
+    this.thumbPreviewX = x;
+    this.thumbPreviewY = y;
   }
 
   moveUp(preset: ScenePreset) {

@@ -10,6 +10,7 @@ import { TableSelecter } from './table-selecter';
 import { ChatTab } from './chat-tab';
 import { ChatTabList } from './chat-tab-list';
 import { SceneObjectSnap, ScenePreset, SceneTabletopSnap, resolveScenePresetTable } from './scene-preset';
+import { captureMapPreviewDataUrl } from './scene-preset-preview';
 import { StringUtil } from './core/system/util/string-util';
 import { translate } from 'i18n';
 import { TabletopLocation, TabletopObject } from './tabletop-object';
@@ -76,11 +77,18 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
 
   createFromCurrent(title?: string): ScenePreset {
     const preset = this.addPreset(title);
-    this.writeSnapshot(preset);
+    void this.writeSnapshot(preset);
     return preset;
   }
 
-  writeSnapshot(preset: ScenePreset) {
+  /** Create preset and wait for snapshot + map preview. */
+  async createFromCurrentAsync(title?: string): Promise<ScenePreset> {
+    const preset = this.addPreset(title);
+    await this.writeSnapshot(preset);
+    return preset;
+  }
+
+  async writeSnapshot(preset: ScenePreset): Promise<void> {
     const table = TableSelecter.instance.viewTable;
     const jukebox = ObjectStore.instance.get<Jukebox>('Jukebox');
     preset.tableIdentifier = table ? table.identifier : '';
@@ -97,6 +105,12 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
       pieceAliases: (snap.pieces || []).map(p => ({ id: p.identifier?.slice(0, 8), alias: p.aliasName })),
       tokensNow: this.debugTokenSummaries(),
     });
+    try {
+      const preview = await captureMapPreviewDataUrl();
+      if (preview) preset.previewJpeg = preview;
+    } catch (e) {
+      console.warn('[ScenePreset] preview capture skipped', e);
+    }
   }
 
   applyPreset(preset: ScenePreset, options: ScenePresetApplyOptions = {}): boolean {

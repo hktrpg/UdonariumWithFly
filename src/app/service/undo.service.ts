@@ -259,7 +259,8 @@ export class UndoService {
             const obj = ObjectStore.instance.get<GameCharacter>(e.id);
             if (obj) {
               EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: obj.identifier });
-              obj.setLocation('graveyard');
+              if (obj.location.name === 'table') obj.leaveCurrentTable('graveyard');
+              else obj.setLocation('graveyard');
             }
           } else {
             const obj = ObjectStore.instance.get(e.liveId);

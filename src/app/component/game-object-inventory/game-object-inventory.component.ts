@@ -276,8 +276,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         subActions.push({
           name: this.i18n.t('char.moveAllToCommon'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
-              gameCharacter.setLocation('common');
-              this.selectionService.remove(gameCharacter);
+              this.moveCharacterToLocation(gameCharacter, 'common', { silent: true });
             });
             SoundEffect.play(PresetSound.piecePut);
             EventSystem.call('UPDATE_INVENTORY', true);
@@ -288,8 +287,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         subActions.push({
           name: this.i18n.t('char.moveAllToPersonal'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
-              gameCharacter.setLocation(Network.peerId);
-              this.selectionService.remove(gameCharacter);
+              this.moveCharacterToLocation(gameCharacter, Network.peerId, { silent: true });
             });
             SoundEffect.play(PresetSound.piecePut);
             EventSystem.call('UPDATE_INVENTORY', true);
@@ -300,7 +298,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         subActions.push({
           name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
-              TabletopObject.disposeObject(gameCharacter, () => gameCharacter.setLocation('graveyard'));
+              TabletopObject.disposeObject(gameCharacter, () => {
+                if (gameCharacter.location.name === 'table') gameCharacter.leaveCurrentTable('graveyard');
+                else gameCharacter.setLocation('graveyard');
+              });
               this.selectionService.remove(gameCharacter);
             });
             SoundEffect.play(PresetSound.sweep);
@@ -544,25 +545,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           .map((location) => ({
             name: this.i18n.t(location.aliasKey),
             action: () => {
-              let isStealthMode = GameCharacter.isStealthMode;
-              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
-              gameObject.setLocation(location.name);
-              this.selectionService.remove(gameObject);
-              if (location.name === 'table' && gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
-                this.modalService.open(ConfirmationComponent, {
-                  title: this.i18n.t('char.stealthTitle'),
-                  text: this.i18n.t('char.stealthText'),
-                  help: this.i18n.t('char.stealthHelp'),
-                  type: ConfirmationType.OK,
-                  materialIcon: 'disabled_visible'
-                });
-              }
-              if (location.name == 'graveyard') {
-                SoundEffect.play(PresetSound.sweep);
-              } else {
-                SoundEffect.play(PresetSound.piecePut);
-              }
-              EventSystem.call('UPDATE_INVENTORY', true);
+              this.moveCharacterToLocation(gameObject, location.name);
             }
           })),
         disabled: !gameObject.isVisible && !this.isGMMode
@@ -624,6 +607,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           this.selectionService.remove(gameObject);
           if (gameObject.isTemporaryCopy) {
             this.deleteGameObject(gameObject);
+          } else if (gameObject.location.name === 'table') {
+            gameObject.leaveCurrentTable('graveyard');
           } else {
             gameObject.setLocation('graveyard');
           }
@@ -850,6 +835,20 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       return;
     }
     e.stopPropagation();
+
+    // Dragging an unselected row: switch selection to that token only (do not drag prior picks).
+    if (!this.checkSelected(gameObject)) {
+      this.selectionService.clear();
+      this.selectionService.add(gameObject);
+      this.selectedIdentifier = gameObject.identifier;
+      EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+        identifier: gameObject.identifier,
+        className: gameObject.aliasName,
+        highlighting: true,
+      });
+      this.changeDetector.markForCheck();
+    }
+
     const tempCopy = !!(e.ctrlKey || e.metaKey);
     const ids = this.inventoryDragIdentifiers(gameObject);
     const payload = ids.join(',');
@@ -863,16 +862,15 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Drag selected group when the row is in the multi-select set; otherwise only that row. */
+  /** Multi-drag only when the dragged row is already in the selection set (≥2). */
   private inventoryDragIdentifiers(gameObject: GameCharacter): string[] {
     if (!this.checkSelected(gameObject)) return [gameObject.identifier];
     const selected = this.selectionService.objects
       .filter((o): o is GameCharacter => o instanceof GameCharacter && o.aliasName === gameObject.aliasName)
       .filter(ch => this.canDragInventory(ch))
       .map(ch => ch.identifier);
-    if (selected.length < 2) return [gameObject.identifier];
-    if (!selected.includes(gameObject.identifier)) {
-      return [gameObject.identifier, ...selected];
+    if (selected.length < 2 || !selected.includes(gameObject.identifier)) {
+      return [gameObject.identifier];
     }
     // Keep the dragged row first so drop offsets stay predictable.
     return [gameObject.identifier, ...selected.filter(id => id !== gameObject.identifier)];
@@ -929,7 +927,13 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       if (!ch.isVisible && !this.isGMMode) continue;
       if (ch.location?.name === inventoryType) {
         // Same location name, but other-map tokens still need rebinding to the current view table.
-        if (!(inventoryType === 'table' && this.isOnOtherTable(ch))) continue;
+        if (inventoryType === 'table' && this.isOnOtherTable(ch)) {
+          // fall through → place on current map
+        } else if (inventoryType !== 'table' && !ch.isInventoryForCurrentView()) {
+          // fall through → rebind inventory to current map
+        } else {
+          continue;
+        }
       }
       this.moveCharacterToLocation(ch, inventoryType, { silent: true });
       moved++;
@@ -945,7 +949,15 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   private moveCharacterToLocation(gameObject: GameCharacter, location: string, opts?: { silent?: boolean }) {
     const isStealthMode = GameCharacter.isStealthMode;
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
-    gameObject.setLocation(location);
+    if (location === 'table') {
+      gameObject.setLocation('table');
+    } else if (gameObject.location.name === 'table') {
+      gameObject.leaveCurrentTable(location);
+    } else {
+      // Off-table → off-table (or rebind to current map's inventory).
+      const viewId = TabletopObject.resolveViewTableIdentifier() || '';
+      gameObject.setLocation(location, viewId || undefined);
+    }
     this.selectionService.remove(gameObject);
     if (location === 'table' && gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
       this.modalService.open(ConfirmationComponent, {

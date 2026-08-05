@@ -63,6 +63,8 @@ export class ScenePreset extends ObjectNode {
   @SyncVar() savedAt: number = 0;
   /** JSON {@link SceneTabletopSnap}: table atmosphere, FX children, token/piece SyncVars. */
   @SyncVar() tabletopJson: string = '';
+  /** JPEG data URL of the map at save time (no UI panels); used for list + hover preview. */
+  @SyncVar() previewJpeg: string = '';
 
   get table(): GameTable {
     return resolveScenePresetTable(this);

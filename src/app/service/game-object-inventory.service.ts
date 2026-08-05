@@ -29,9 +29,14 @@ export class GameObjectInventoryService {
   allInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy);
   /** Tokens on the currently viewed map only. */
   tableInventory: ObjectInventory = new ObjectInventory(object => object.isVisibleOnTable && !object.isTemporaryCopy);
-  commonInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && !this.isAnyLocation(object.location.name));
-  privateInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && object.location.name === Network.peerId);
-  graveyardInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy && object.location.name === 'graveyard');
+  /** Common inventory for the currently viewed map only. */
+  commonInventory: ObjectInventory = new ObjectInventory(object =>
+    !object.isTemporaryCopy && !this.isAnyLocation(object.location.name) && object.isInventoryForCurrentView());
+  privateInventory: ObjectInventory = new ObjectInventory(object =>
+    !object.isTemporaryCopy && object.location.name === Network.peerId && object.isInventoryForCurrentView());
+  /** Graveyard for the currently viewed map only. */
+  graveyardInventory: ObjectInventory = new ObjectInventory(object =>
+    !object.isTemporaryCopy && object.location.name === 'graveyard' && object.isInventoryForCurrentView());
 
   indicateAll: boolean = false;
   

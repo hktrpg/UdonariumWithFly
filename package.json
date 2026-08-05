@@ -38,6 +38,7 @@
     "js-yaml": "^4.1.0",
     "localforage": "^1.10.0",
     "lzbase62": "^2.0.0",
+    "modern-screenshot": "^4.7.0",
     "msgpack-lite": "^0.1.26",
     "ngx-linky": "^4.0.0",
     "pako": "^2.1.0",

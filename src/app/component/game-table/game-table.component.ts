@@ -39,6 +39,7 @@ import { TabletopService } from 'service/tabletop.service';
 import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { MovableDirective } from 'directive/movable.directive';
 
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
@@ -1623,6 +1624,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const grid = this.currentTable?.gridSize || 50;
     const isTemp = this.readInventoryTempCopy(e);
     let placed = 0;
+    const placedChars: GameCharacter[] = [];
 
     for (let i = 0; i < ids.length; i++) {
       const ch = ObjectStore.instance.get(ids[i]);
@@ -1637,13 +1639,29 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (isTemp) {
         GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ });
       } else {
+        // Selected tokens ignore self UPDATE in MovableDirective — clear first, then force pose sync.
+        this.selectionService.remove(ch);
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
         ch.addToTable(undefined, { x, y, posZ: ch.posZ });
+        MovableDirective.syncPoseFromUndo(ch, x, y, ch.posZ);
+        placedChars.push(ch);
       }
       placed++;
     }
 
     if (placed > 0) {
+      // Restore multi-select so the dropped group stays boxed like a table selection.
+      if (placedChars.length > 0) {
+        this.selectionService.clear();
+        for (const ch of placedChars) {
+          this.selectionService.add(ch);
+        }
+        EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+          identifier: placedChars[0].identifier,
+          className: placedChars[0].aliasName,
+          highlighting: true,
+        });
+      }
       SoundEffect.play(PresetSound.piecePut);
       EventSystem.call('UPDATE_INVENTORY', true);
     }

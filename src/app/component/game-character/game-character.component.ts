@@ -697,7 +697,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       gameCharacter.destroy();
       return;
     }
-    gameCharacter.setLocation(location);
+    if (location === 'table') {
+      gameCharacter.setLocation('table');
+    } else {
+      // Per-map: keep placements on other maps.
+      gameCharacter.leaveCurrentTable(location);
+    }
   }
 
   /** Congregate only — used when not in multi-character mode (e.g. gather selection to an unselected token). */
@@ -975,7 +980,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               name: this.i18n.t('char.commonInventory'),
               action: () => {
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-                this.gameCharacter.setLocation('common');
+                this.gameCharacter.leaveCurrentTable('common');
                 this.selectionService.remove(this.gameCharacter);
                 SoundEffect.play(PresetSound.piecePut);
               }
@@ -984,7 +989,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               name: this.i18n.t('char.personalInventory'),
               action: () => {
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-                this.gameCharacter.setLocation(Network.peerId);
+                this.gameCharacter.leaveCurrentTable(Network.peerId);
                 this.selectionService.remove(this.gameCharacter);
                 SoundEffect.play(PresetSound.piecePut);
               }
@@ -999,7 +1004,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
                 if (this.gameCharacter.isTemporaryCopy) {
                   this.gameCharacter.destroy();
                 } else {
-                  this.gameCharacter.setLocation('graveyard');
+                  this.gameCharacter.leaveCurrentTable('graveyard');
                 }
                 SoundEffect.play(PresetSound.sweep);
               }
@@ -1065,7 +1070,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
             if (this.gameCharacter.isTemporaryCopy) {
               this.gameCharacter.destroy();
             } else {
-              this.gameCharacter.setLocation('graveyard');
+              this.gameCharacter.leaveCurrentTable('graveyard');
             }
             SoundEffect.play(PresetSound.sweep);
           }

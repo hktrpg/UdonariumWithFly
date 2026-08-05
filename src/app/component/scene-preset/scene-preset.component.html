@@ -12,6 +12,13 @@
 
   <section class="card card-list" *ngIf="presets.length">
     <div class="list-item" *ngFor="let preset of presets" [class.is-selected]="preset === selected" (click)="select(preset)">
+      <div class="list-thumb" aria-hidden="true"
+        (mouseenter)="showThumbPreview($event, preset)"
+        (mousemove)="moveThumbPreview($event)"
+        (mouseleave)="hideThumbPreview()">
+        <img *ngIf="preset.previewJpeg" [src]="preset.previewJpeg" alt="" />
+        <i *ngIf="!preset.previewJpeg" class="material-icons">image</i>
+      </div>
       <div class="list-main">
         <span class="list-item-name" [class.invalid]="!preset.isValid">{{ preset.title || ('scenePreset.untitled' | i18n) }}</span>
         <span class="list-meta" *ngIf="metaLine(preset) as meta">{{ meta }}</span>
@@ -52,4 +59,9 @@
     <p class="hint" *ngIf="!selected.isValid">{{ 'scenePreset.invalidHint' | i18n }}</p>
     <p class="hint hint-meta" *ngIf="selected.savedAt">{{ 'scenePreset.savedAt' | i18n:{ time: selected.savedAtCompact } }}</p>
   </section>
+
+  <div class="thumb-preview" *ngIf="thumbPreviewSrc"
+    [style.left.px]="thumbPreviewX" [style.top.px]="thumbPreviewY">
+    <img [src]="thumbPreviewSrc" alt="" />
+  </div>
 </div>
