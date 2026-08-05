@@ -110,7 +110,7 @@
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder</i>
       {{ (folderBackup.status === 'needAuth' || folderBackup.hasError ? 'menu.folderBackup.reauth' : 'menu.folderBackup.bind') | i18n }}
     </button>
-    <button type="button" *ngIf="networkService.peer.isRoom" (click)="saveFolderBackup()"
+    <button type="button" *ngIf="networkService.peer.isRoom && folderBackup.isReady" (click)="saveFolderBackup()"
       [disabled]="folderBackup.status === 'writing'">
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
       {{ 'menu.folderBackup.saveRoom' | i18n }}
@@ -200,4 +200,13 @@
     </div>
   </div>
 </div>
-<div class="app-version">{{ 'peer.version' | i18n:{ version: appVersionDisplay } }}</div>
+<div class="app-version">
+  <span>{{ 'peer.version' | i18n:{ version: appVersionDisplay } }}</span>
+  <i *ngIf="appUpdate.isUpdateReady" class="material-icons app-update-icon"
+    role="button" tabindex="0"
+    (click)="confirmApplyUpdate($event)"
+    (keydown.enter)="confirmApplyUpdate($event)"
+    (keydown.space)="confirmApplyUpdate($event)"
+    [attr.title]="'update.readyHint' | i18n"
+    [attr.aria-label]="'update.readyHint' | i18n">system_update</i>
+</div>

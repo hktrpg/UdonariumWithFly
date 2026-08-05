@@ -70,13 +70,13 @@ import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
-import { SwUpdate } from '@angular/service-worker';
 
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { RoomInviteService } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
+import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
@@ -176,7 +176,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   constructor(
-    private swUpdate: SwUpdate,
+    private appUpdate: AppUpdateService,
     private modalService: ModalService,
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
@@ -763,46 +763,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       tourWasActive = active;
     });
     
-    // PWA: download quietly, activate when ready; apply on next F5 / reopen (no confirm).
-    let notification: Notification;
-    this.swUpdate.versionUpdates.subscribe(event => {
-      switch (event.type) {
-        case 'VERSION_DETECTED':
-          console.log(`Downloading new app version: ${event.version.hash}`);
-          Notification.requestPermission().then((permission) => {
-            if (permission === 'granted') {
-              notification = new Notification('Udonarium with Fly', { 
-                body: this.i18n.t('update.downloading'),
-                icon: 'card.png'
-              });
-              notification.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (notification) {
-                  notification.close();
-                  notification = null;
-                }
-                return false;
-              });
-            }
-          });
-          break;
-        case 'VERSION_READY':
-          console.log(`Current app version: ${event.currentVersion.hash}`);
-          console.log(`New app version ready for use: ${event.latestVersion.hash}`);
-          void this.swUpdate.activateUpdate().then(() => {
-            if (notification) {
-              notification.close();
-              notification = null;
-            }
-            console.log('New app version activated; will apply on next reload.');
-          });
-          break;
-        case 'VERSION_INSTALLATION_FAILED':
-          console.log(`Failed to install app version '${event.version.hash}': ${event.error}`);
-          break;
-      }
-    });
+    // PWA: download in background, activate for next reload; peer-menu shows an icon (no auto-reload).
+    this.appUpdate.start();
   }
 
   ngOnDestroy() {

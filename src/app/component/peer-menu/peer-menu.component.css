@@ -334,4 +334,20 @@
   font-size: 11px;
   color: #64748b;
   word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-update-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+  color: #c45c26;
+  cursor: pointer;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.app-update-icon:hover {
+  color: #a34618;
 }

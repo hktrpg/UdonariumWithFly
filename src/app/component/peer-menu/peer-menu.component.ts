@@ -21,6 +21,7 @@ import { animate, style, transition, trigger } from '@angular/animations';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { FolderBackupService } from 'service/folder-backup.service';
+import { AppUpdateService } from 'service/app-update.service';
 import { I18nService } from 'service/i18n.service';
 import { RoomInviteService } from 'service/room-invite.service';
 import { SaveDataService } from 'service/save-data.service';
@@ -161,6 +162,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     public appConfigService: AppConfigService,
     public i18n: I18nService,
     public folderBackup: FolderBackupService,
+    public appUpdate: AppUpdateService,
     private saveDataService: SaveDataService,
   ) { }
 
@@ -171,6 +173,25 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   onLocaleChange(locale: AppLocale) {
     this.i18n.setLocale(locale);
     this.refreshPanelTitle();
+  }
+
+  async confirmApplyUpdate(e?: Event) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (!this.appUpdate.isUpdateReady) return;
+    const result = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('update.title'),
+      text: this.i18n.t('update.text'),
+      help: this.i18n.t('update.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'system_update',
+      okLabel: this.i18n.t('update.restart'),
+    });
+    if (result === false || result == null) return;
+    if (this.folderBackup.isReady) {
+      await this.folderBackup.flush({ timeoutMs: 15000 });
+    }
+    document.location.reload();
   }
 
   private refreshPanelTitle() {
@@ -189,7 +210,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => { });
       })
-      .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()));
+      .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))
+      .on('APP_UPDATE_READY', () => this.ngZone.run(() => { }));
     this.interval = setInterval(() => { }, 1000);
   }
 

@@ -176,7 +176,11 @@ import '@udonarium/table-fx/combat-tracker';
     FormsModule,
     LinkyModule,
     YouTubePlayerModule,
-    ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production })
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      enabled: environment.production,
+      // Start SW ASAP so update checks overlap the loading screen.
+      registrationStrategy: 'registerImmediately',
+    })
   ],
   providers: [
     AppConfigService,
