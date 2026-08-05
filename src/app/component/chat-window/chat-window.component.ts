@@ -24,6 +24,8 @@ import * as localForage from 'localforage';
 })
 export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static activeChatTabIdentifier: string = '';
+  /** Applied on next chat window open (palette tab double-click). */
+  static pendingTabIdentifier: string = '';
   @ViewChild('chatTabComponemt', { static: false }) chatTabComponemt: ChatTabComponent;
   sendFrom: string = 'Guest';
   
@@ -260,7 +262,13 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit() {
     const preferred = GameCharacter.preferredChatCharacter();
     this.sendFrom = preferred?.identifier || PeerCursor.myCursor?.identifier || '';
-    this._chatTabidentifier = 0 < this.chatTabs.length ? this.chatTabs[0].identifier : '';
+    const pending = ChatWindowComponent.pendingTabIdentifier;
+    ChatWindowComponent.pendingTabIdentifier = '';
+    if (pending && this.chatTabs.some(t => t.identifier === pending)) {
+      this._chatTabidentifier = pending;
+    } else {
+      this._chatTabidentifier = 0 < this.chatTabs.length ? this.chatTabs[0].identifier : '';
+    }
     ChatWindowComponent.activeChatTabIdentifier = this._chatTabidentifier;
 
     EventSystem.register(this)
@@ -287,6 +295,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('LOCALE_CHANGED', () => {
         this.updatePanelTitle();
+      })
+      .on('SELECT_CHAT_TAB', event => {
+        const id = event.data?.tabIdentifier as string | undefined;
+        if (!id || !this.chatTabs.some(t => t.identifier === id)) return;
+        this.chatTabidentifier = id;
+        this.changeDetector.markForCheck();
       });
     Promise.resolve().then(() => this.updatePanelTitle());
   }

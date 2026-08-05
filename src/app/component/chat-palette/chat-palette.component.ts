@@ -127,6 +127,17 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     this.panelService.title = this.i18n.t('palette.title', { name: this.character.name });
   }
 
+  /** Double-click a chat tab: open / bring chat window forward and show that tab. */
+  showChatTab(tabIdentifier: string, e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!tabIdentifier) return;
+    this.chatTabidentifier = tabIdentifier;
+    EventSystem.trigger('SHOW_CHAT', { tabIdentifier });
+  }
+
   onSelectedCharacter(identifier: string) {
     if (this.isEdit) this.toggleEditMode();
     let object = ObjectStore.instance.get(identifier);

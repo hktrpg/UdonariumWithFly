@@ -406,18 +406,24 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   showChatPalette() {
     if (!(this.tabletopObject instanceof GameCharacter)) return;
+    const character = this.tabletopObject as GameCharacter;
+    const tourId = PanelService.tourIdChatPalette(character.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350, tourPanelId: tourId };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
-    component.character = <GameCharacter>this.tabletopObject;
+    component.character = character;
   }
 
   showStandSetting() {
     if (!(this.tabletopObject instanceof GameCharacter)) return;
+    const character = this.tabletopObject as GameCharacter;
+    const tourId = PanelService.tourIdStandSetting(character.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 720, height: 572 };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 720, height: 572, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
-    component.character = <GameCharacter>this.tabletopObject;
+    component.character = character;
   }
 
   onMainImageLoad() {

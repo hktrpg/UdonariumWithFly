@@ -60,6 +60,9 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
           this.changeDetector.markForCheck();
         }
       })
+      .on('SELECT_GAME_TABLE', event => {
+        this.refresh();
+      })
       .on('UPDATE_INVENTORY', event => {
         this.refresh();
       })
@@ -117,7 +120,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   settotable(gameObject: TextNote) {
     if (this.GuestMode()) return;
-    gameObject.setLocation('table');
+    // Multi-map: add to current view without removing other maps.
+    gameObject.addToTable();
     this.refresh();
   }
 
@@ -130,7 +134,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     return note.isVisibleOnTable;
   }
 
-  /** On some table but not the current map — offer "move to current map". */
+  /** On some table but not the current map — offer "also place on current map". */
   isOnOtherTable(note: TextNote): boolean {
     return note.location?.name === 'table' && !note.isVisibleOnTable;
   }
@@ -167,15 +171,33 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     }
 
     const location = gameObject.location?.name || '';
+    const onTable = location === 'table';
+    const onCurrentMap = gameObject.isVisibleOnTable;
     const onOtherMap = this.isOnOtherTable(gameObject);
     const actions: ContextMenuAction[] = [
       {
-        name: this.i18n.t(onOtherMap ? 'inv.moveToCurrentMap' : 'note.moveToTable'),
+        name: this.i18n.t(onOtherMap ? 'inv.placeOnCurrentMap' : 'note.moveToTable'),
         action: () => {
-          gameObject.setLocation('table');
+          gameObject.addToTable();
           this.refresh();
         },
-        disabled: location === 'table' && !onOtherMap
+        disabled: onCurrentMap
+      },
+      {
+        name: this.i18n.t('inv.moveToCurrentMapOnly'),
+        action: () => {
+          gameObject.moveToTableOnly();
+          this.refresh();
+        },
+        disabled: !onOtherMap
+      },
+      {
+        name: this.i18n.t('inv.removeFromCurrentMap'),
+        action: () => {
+          gameObject.removeFromTable();
+          this.refresh();
+        },
+        disabled: !onCurrentMap
       },
       {
         name: this.i18n.t('note.moveToCommon'),

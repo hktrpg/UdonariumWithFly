@@ -596,6 +596,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('OPEN_CHAT', -1000, () => {
         this.ngZone.run(() => this.openOrToggle('ChatWindowComponent'));
+      })
+      .on('SHOW_CHAT', -1000, event => {
+        this.ngZone.run(() => {
+          const tabIdentifier = event.data?.tabIdentifier as string | undefined;
+          this.showChatWindow(tabIdentifier);
+        });
       });
 
     workaroundForMobileSafari();
@@ -974,7 +980,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     return PanelService.isTourPanelOpen(tourId);
   }
 
-  /** Open panel; tap/click again closes (chat on desktop always opens). */
+  /**
+   * Menu icon: open if closed; if open and already frontmost, close;
+   * if open but behind another panel, bring to front (chat on desktop always opens).
+   */
   openOrToggle(componentName: string) {
     this.enforceGuestPlayMode();
     const isChat = componentName === 'ChatWindowComponent';
@@ -985,10 +994,31 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const tourId = this.tourIdForComponent(componentName);
     if (tourId && PanelService.isTourPanelOpen(tourId)) {
-      PanelService.closePanelsByTourId(tourId);
+      if (PanelService.isTourPanelTopmost(tourId)) {
+        PanelService.closePanelsByTourId(tourId);
+      } else {
+        PanelService.bringTourPanelToFront(tourId);
+      }
       return;
     }
     this.open(componentName);
+  }
+
+  /** Open chat if needed, bring to front (never close), optionally select a tab. */
+  showChatWindow(tabIdentifier?: string) {
+    this.enforceGuestPlayMode();
+    if (!this.canShowMenu('menu.chat')) return;
+    if (tabIdentifier) {
+      ChatWindowComponent.pendingTabIdentifier = tabIdentifier;
+    }
+    if (PanelService.isTourPanelOpen('menu.chat')) {
+      PanelService.bringTourPanelToFront('menu.chat');
+    } else {
+      this.open('ChatWindowComponent');
+    }
+    if (tabIdentifier) {
+      queueMicrotask(() => EventSystem.trigger('SELECT_CHAT_TAB', { tabIdentifier }));
+    }
   }
 
   setMobileUiMode(mode: 'play' | 'edit') {

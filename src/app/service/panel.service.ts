@@ -62,6 +62,16 @@ export class PanelService {
     return this.panelComponentRef ? true : false;
   }
 
+  /** Guided tour / singleton id for a character's chat palette panel. */
+  static tourIdChatPalette(characterId: string): string {
+    return characterId ? `char.palette.${characterId}` : '';
+  }
+
+  /** Guided tour / singleton id for a character's stand settings panel. */
+  static tourIdStandSetting(characterId: string): string {
+    return characterId ? `char.stand.${characterId}` : '';
+  }
+
   /** Close all closable desktop UI panels opened via PanelService.open(). */
   static closeAllPanels() {
     for (const panel of Array.from(PanelService.openPanels)) {
@@ -132,6 +142,76 @@ export class PanelService {
     // Fallback for panels that set the attribute but are not yet in openPanels timing edge cases.
     const nodes = document.querySelectorAll(`[data-tour-panel="${tourPanelId}"]`);
     return (nodes.item(nodes.length - 1) as HTMLElement) || null;
+  }
+
+  /** True when this tour panel is the frontmost among all dynamically opened panels. */
+  static isTourPanelTopmost(tourPanelId: string): boolean {
+    const el = PanelService.getTourPanelElement(tourPanelId);
+    if (!el) return false;
+    let bestEl: HTMLElement = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (!panel.panelComponentRef) continue;
+      const panelEl = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!panelEl?.isConnected) continue;
+      const z = parseInt(panelEl.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!bestEl || zSafe >= bestZ) {
+        bestEl = panelEl;
+        bestZ = zSafe;
+      }
+    }
+    return bestEl === el;
+  }
+
+  /**
+   * Raise the tour panel above other `.draggable-panel` peers (same stacking as appDraggable).
+   * Restores minimize if needed. Returns false if no matching panel.
+   */
+  static bringTourPanelToFront(tourPanelId: string): boolean {
+    if (!tourPanelId) return false;
+    let best: PanelService = null;
+    let bestEl: HTMLElement = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (panel.tourPanelId !== tourPanelId || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el?.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!best || zSafe >= bestZ) {
+        best = panel;
+        bestEl = el;
+        bestZ = zSafe;
+      }
+    }
+    if (!best || !bestEl) return false;
+
+    const instance = best.panelComponentRef.instance as { isMinimized?: boolean; toggleMinimize?: (e?: Event) => void } | null;
+    if (instance?.isMinimized && typeof instance.toggleMinimize === 'function') {
+      instance.toggleMinimize();
+    }
+
+    const stacks = bestEl.ownerDocument.querySelectorAll<HTMLElement>('.draggable-panel');
+    let topZindex = 0;
+    let bottomZindex = 99999;
+    stacks.forEach(elm => {
+      const zIndex = parseInt(elm.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(zIndex) ? zIndex : 0;
+      if (topZindex < zSafe) topZindex = zSafe;
+      if (zSafe < bottomZindex) bottomZindex = zSafe;
+    });
+    const selfZ = parseInt(bestEl.style.zIndex || '0', 10);
+    const selfSafe = Number.isFinite(selfZ) ? selfZ : 0;
+    if (topZindex <= selfSafe) return true;
+
+    stacks.forEach(elm => {
+      const zIndex = parseInt(elm.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(zIndex) ? zIndex : 0;
+      elm.style.zIndex = (zSafe - bottomZindex) + '';
+    });
+    bestEl.style.zIndex = (topZindex + 1) + '';
+    return true;
   }
 
   open<T>(childComponent: Type<T>, option?: PanelOption, parentViewContainerRef?: ViewContainerRef): T {

@@ -707,8 +707,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   private showChatPalette(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
+    const tourId = PanelService.tourIdChatPalette(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 620, height: 350, tourPanelId: tourId };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
     component.character = gameObject;
   }
@@ -921,8 +923,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   private showStandSetting(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
+    const tourId = PanelService.tourIdStandSetting(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572 };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
     component.character = gameObject;
   }
