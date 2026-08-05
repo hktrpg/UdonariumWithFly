@@ -115,28 +115,31 @@
   /*background: linear-gradient(-30deg, rgba(240,218,189, 0.9), rgba(255, 244, 232, 0.9));*/
 }
 
-/* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets. */
+/* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets.
+   Width uses left/right (not 100vw) so content never overflows the visual viewport. */
 .draggable-panel.is-mobile-sheet {
   left: var(--udon-left-chrome, 0px) !important;
-  top: 0 !important;
-  width: calc(100vw - var(--udon-left-chrome, 0px)) !important;
-  /* --udon-bottom-chrome already includes nav + safe-area + keyboard inset */
-  height: calc(100vh - var(--udon-bottom-chrome, 56px)) !important;
-  height: calc(100dvh - var(--udon-bottom-chrome, 56px)) !important;
-  max-width: 100vw;
-  max-height: calc(100vh - var(--udon-bottom-chrome, 56px));
-  max-height: calc(100dvh - var(--udon-bottom-chrome, 56px));
+  right: 0 !important;
+  top: auto !important;
+  bottom: var(--udon-bottom-chrome, 56px) !important;
+  width: auto !important;
+  max-width: none;
+  /* Default to half; peek/half classes override. Never fullscreen. */
+  height: min(48dvh, 420px) !important;
+  max-height: min(48dvh, 420px) !important;
   cursor: default;
-  border-radius: 0;
+  border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
   z-index: 12000;
   transition: height 120ms ease-out, max-height 120ms ease-out, bottom 120ms ease-out;
   /* Classic cream body (PeerMenu etc.); only the title bar uses dark chrome. */
   background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1)) !important;
   border: 1px solid var(--udon-chrome-border, #555) !important;
+  border-top: 1px solid var(--udon-chrome-border, #555);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .draggable-panel.is-mobile-sheet.i-am-gm {
@@ -192,6 +195,11 @@
   bottom: auto;
   flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
   /* Opaque cream so PeerMenu / combat / etc. stay readable. */
   background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1));
 }
@@ -200,39 +208,21 @@
   background: linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1));
 }
 
-html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
-  height: calc(100vh - var(--udon-bottom-chrome, 0px)) !important;
-  height: calc(100dvh - var(--udon-bottom-chrome, 0px)) !important;
-  max-height: calc(100dvh - var(--udon-bottom-chrome, 0px));
-}
-
-/* Chat / frequent panels: half sheet above bottom nav, map stays visible */
-.draggable-panel.is-mobile-sheet.is-mobile-sheet-half {
-  top: auto !important;
-  bottom: var(--udon-bottom-chrome, 56px) !important;
+/* Two heights only: peek ↔ half (peek must come last to win over half). */
+.draggable-panel.is-mobile-sheet.is-mobile-sheet-half,
+.draggable-panel.is-mobile-sheet.is-snap-half {
   height: min(48dvh, 420px) !important;
   max-height: min(48dvh, 420px) !important;
-  border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
-  border-top: 1px solid var(--udon-chrome-border, #555);
 }
 
-.draggable-panel.is-mobile-sheet.is-mobile-sheet-half.is-snap-peek {
+.draggable-panel.is-mobile-sheet.is-snap-peek {
   height: min(22dvh, 180px) !important;
   max-height: min(22dvh, 180px) !important;
 }
 
-.draggable-panel.is-mobile-sheet.is-mobile-sheet-half.is-snap-half {
-  height: min(48dvh, 420px) !important;
-  max-height: min(48dvh, 420px) !important;
-}
-
-/* Expand toward full while staying bottom-anchored (map peek above still possible via chrome). */
-.draggable-panel.is-mobile-sheet.is-snap-full:not(.is-mobile-sheet-half) {
-  /* full class path */
-}
-
-html.udon-tablet-landscape .draggable-panel.is-mobile-sheet.is-mobile-sheet-half {
+html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {
   left: var(--udon-left-chrome, 72px) !important;
+  right: 0 !important;
   bottom: var(--udon-bottom-chrome, 0px) !important;
 }
 

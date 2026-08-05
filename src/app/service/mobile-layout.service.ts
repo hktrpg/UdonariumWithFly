@@ -26,6 +26,10 @@ export type MobileChromeMode = 'desktop' | 'phone' | 'tablet-portrait' | 'tablet
 export type MobileUiMode = 'play' | 'edit';
 
 const UI_MODE_KEY = 'udon.mobileUiMode';
+/** Remember last sheet height (peek | half). Full-screen sheets are not used. */
+const SHEET_SNAP_KEY = 'udon.mobileSheetSnap';
+
+export type MobileSheetSnap = 'peek' | 'half';
 
 /**
  * Compact / touch-first layout for phones and tablets.
@@ -45,6 +49,7 @@ export class MobileLayoutService implements OnDestroy {
 
   private readonly onChange = () => this.refresh();
   private readonly onViewport = () => this.refreshKeyboardInset();
+  private readonly onGesture = (e: Event) => e.preventDefault();
 
   constructor(private ngZone: NgZone) {
     this.mq = window.matchMedia(
@@ -65,6 +70,10 @@ export class MobileLayoutService implements OnDestroy {
     window.visualViewport?.addEventListener('resize', this.onChange);
     window.visualViewport?.addEventListener('resize', this.onViewport);
     window.visualViewport?.addEventListener('scroll', this.onViewport);
+    // iOS Safari legacy gesture events — block page zoom so app two-finger wins.
+    document.addEventListener('gesturestart', this.onGesture, { passive: false, capture: true });
+    document.addEventListener('gesturechange', this.onGesture, { passive: false, capture: true });
+    document.addEventListener('gestureend', this.onGesture, { passive: false, capture: true });
   }
 
   ngOnDestroy() {
@@ -78,6 +87,26 @@ export class MobileLayoutService implements OnDestroy {
     window.visualViewport?.removeEventListener('resize', this.onChange);
     window.visualViewport?.removeEventListener('resize', this.onViewport);
     window.visualViewport?.removeEventListener('scroll', this.onViewport);
+    document.removeEventListener('gesturestart', this.onGesture, true);
+    document.removeEventListener('gesturechange', this.onGesture, true);
+    document.removeEventListener('gestureend', this.onGesture, true);
+  }
+
+  /** Last user-chosen sheet height (peek or half). */
+  get rememberedSheetSnap(): MobileSheetSnap {
+    return MobileLayoutService.readStoredSheetSnap();
+  }
+
+  rememberSheetSnap(snap: MobileSheetSnap) {
+    try { sessionStorage.setItem(SHEET_SNAP_KEY, snap); } catch { /* ignore */ }
+  }
+
+  /** Coerce any sheet request to the two supported heights; restore last height for half opens. */
+  resolveSheetSnap(requested?: 'full' | 'half' | 'peek'): MobileSheetSnap {
+    if (requested === 'peek') return 'peek';
+    if (requested === 'full') return this.rememberedSheetSnap;
+    // half / unset → restore previous height
+    return this.rememberedSheetSnap;
   }
 
   get isMobile(): boolean {
@@ -148,40 +177,31 @@ export class MobileLayoutService implements OnDestroy {
     return TABLET_RAIL_WIDTH;
   }
 
-  /** Height fraction for peek / half sheets. */
-  sheetHeightPx(sheet: 'peek' | 'half' | 'full'): number {
+  /** Height fraction for peek / half sheets (no fullscreen). */
+  sheetHeightPx(sheet: MobileSheetSnap): number {
     const vh = this.viewportHeight;
     if (sheet === 'peek') return Math.max(140, Math.round(vh * 0.22));
-    if (sheet === 'half') return Math.max(220, Math.round(vh * 0.48));
-    return Math.max(240, vh - (this.isTabletLandscape ? this.keyboardInsetPx : MOBILE_NAV_HEIGHT + this.keyboardInsetPx));
+    return Math.max(220, Math.round(vh * 0.48));
   }
 
-  /** Fit a desktop panel option into a sheet on mobile. */
+  /** Fit a desktop panel option into a sheet on mobile. Only peek / half (never fullscreen). */
   adaptPanelOption<T extends MobilePanelBox>(option: T = {} as T): T {
     if (!this.isMobile) return { ...option };
-    const sheet = option.mobileSheet || 'half';
+    const sheet = this.resolveSheetSnap(option.mobileSheet);
     const left = this.leftChromePx;
-    const w = Math.max(280, this.viewportWidth - left);
-    if (sheet === 'half' || sheet === 'peek') {
-      const h = this.sheetHeightPx(sheet);
-      const reserveBottom = this.isTabletLandscape
-        ? this.keyboardInsetPx
-        : MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
-      return {
-        ...option,
-        left,
-        top: Math.max(0, this.viewportHeight - h - reserveBottom),
-        width: w,
-        height: h,
-      };
-    }
-    const fullH = this.sheetHeightPx('full');
+    // Prefer visualViewport width over 100vw (avoids overflow from scrollbar / browser chrome).
+    const w = Math.max(1, this.viewportWidth - left);
+    const h = this.sheetHeightPx(sheet);
+    const reserveBottom = this.isTabletLandscape
+      ? this.keyboardInsetPx
+      : MOBILE_NAV_HEIGHT + this.readSafeBottom() + this.keyboardInsetPx;
     return {
       ...option,
+      mobileSheet: sheet,
       left,
-      top: 0,
+      top: Math.max(0, this.viewportHeight - h - reserveBottom),
       width: w,
-      height: fullH,
+      height: h,
     };
   }
 
@@ -190,6 +210,14 @@ export class MobileLayoutService implements OnDestroy {
       return sessionStorage.getItem(UI_MODE_KEY) === 'edit' ? 'edit' : 'play';
     } catch {
       return 'play';
+    }
+  }
+
+  private static readStoredSheetSnap(): MobileSheetSnap {
+    try {
+      return sessionStorage.getItem(SHEET_SNAP_KEY) === 'peek' ? 'peek' : 'half';
+    } catch {
+      return 'half';
     }
   }
 

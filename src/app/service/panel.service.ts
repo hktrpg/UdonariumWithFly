@@ -169,9 +169,10 @@ export class PanelService {
       const panelInst = panelComponentRef.instance as any;
       if (panelInst) {
         panelInst.isMobileSheet = true;
-        const sheet = resolved.mobileSheet || 'half';
-        panelInst.isMobileSheetHalf = sheet === 'half' || sheet === 'peek';
-        panelInst.mobileSheetSnap = sheet === 'peek' ? 'peek' : sheet === 'half' ? 'half' : 'full';
+        // Only two heights: peek / half (never fullscreen).
+        const sheet = this.mobileLayout.resolveSheetSnap(resolved.mobileSheet);
+        panelInst.isMobileSheetHalf = true;
+        panelInst.mobileSheetSnap = sheet;
       }
     }
 

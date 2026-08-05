@@ -265,3 +265,55 @@ button.is-active .material-icons {
 .table-cell.imagebox.not-allow-chat {
   visibility: hidden;
 }
+
+/* —— Mobile: keep chat input within sheet width —— */
+:host-context(html.udon-mobile-layout) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) .table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+:host-context(html.udon-mobile-layout) .table .table-cell {
+  display: block;
+}
+
+:host-context(html.udon-mobile-layout) .ff-flex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) .ff-flex > span {
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+:host-context(html.udon-mobile-layout) select {
+  max-width: min(11em, 42vw) !important;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) input[type="range"] {
+  width: min(176px, 42vw) !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) .chat-input {
+  width: calc(100% - 72px);
+  max-width: 100%;
+  box-sizing: border-box;
+}

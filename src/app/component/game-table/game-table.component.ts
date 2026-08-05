@@ -642,6 +642,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     // Object drag wins over map pan/pinch.
     if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging) return;
     if (!this.isTableTransformMode) return;
+    // Any map transform (1-finger pan / 2-finger pinch-pan-rotate) cancels long-press ping.
+    this.clearPingHold();
     if (event === 'pinch' || Math.abs(transformZ) > 0) this.touchMode = TableTouchMode.Pinch;
     else if (this.touchMode === TableTouchMode.Idle) this.touchMode = TableTouchMode.Pan;
     // Desktop keeps the strict focus gate; touch already blurred on empty-table start.
@@ -1387,7 +1389,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @HostListener('pointerdown', ['$event'])
   onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    const pos = this.coordinateService.calcTabletopLocalCoordinate();
+    // Second+ finger: cancel ping hold so two-finger pan/pinch can take over.
+    if (e.pointerType === 'touch' && e.isPrimary === false) {
+      this.clearPingHold();
+      return;
+    }
+    // Use event page coords (PointerDevice may still be stale before touchstart).
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
     // clearPingHold must run before setting origin (it nulls origin/timer).
     this.clearPingHold();
 
@@ -1403,6 +1411,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Empty-table hold → ping. Mobile ~0.55s (same feel as old long-press);
     // desktop ~1s. Mobile add-menu is HUD-only (see onContextMenu).
+    const pingPageX = e.pageX;
+    const pingPageY = e.pageY;
     this.pingHoldOrigin = { x: e.clientX, y: e.clientY };
     this.pingHoldLast = { x: e.clientX, y: e.clientY };
     this.pingHoldShift = e.shiftKey;
@@ -1415,9 +1425,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.pointerDeviceService.isDragging) return;
       // Don't ping while placing scene tools.
       if (this.canUseSceneTools && this.sceneTools.isBlockingPick) return;
+      // Multi-touch in progress — leave room for two-finger gestures.
+      if (this.pointerDeviceService.pointers.length > 1) return;
       // Mobile: basic ping only (warning stays on HUD); desktop Shift = warning.
       const warning = !this.mobileLayout.isMobile && this.pingHoldShift;
-      this.broadcastPing(pos.x, pos.y, warning ? 'warning' : 'basic');
+      const tablePos = this.tablePosFromClient(pingPageX, pingPageY);
+      this.broadcastPing(tablePos.x, tablePos.y, warning ? 'warning' : 'basic');
       this.clearPingHold();
     }, pingHoldMs);
 
@@ -1496,10 +1509,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @HostListener('pointermove', ['$event'])
   onPointerMove(e: PointerEvent) {
     if (this.pingHoldOrigin) {
-      this.pingHoldLast = { x: e.clientX, y: e.clientY };
-      const dx = e.clientX - this.pingHoldOrigin.x;
-      const dy = e.clientY - this.pingHoldOrigin.y;
-      if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
+      // Two-finger gesture started — release ping hold.
+      if (this.pointerDeviceService.pointers.length > 1) {
+        this.clearPingHold();
+      } else {
+        this.pingHoldLast = { x: e.clientX, y: e.clientY };
+        const dx = e.clientX - this.pingHoldOrigin.x;
+        const dy = e.clientY - this.pingHoldOrigin.y;
+        if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
+      }
     }
     this.updateSceneMarqueeFromEvent(e);
     this.updateDrawDraftFromPointer();

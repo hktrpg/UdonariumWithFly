@@ -237,33 +237,55 @@ button.indicate sup {
   position: relative;
 }
 /* —— Mobile compact chat (Play half-sheet) —— */
+:host-context(html.udon-mobile-layout) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Grow with messages so the panel (not .log) scrolls — matches chat-tab virtual list. */
 :host-context(html.udon-mobile-layout) .component {
   min-height: 100%;
-  height: 100%;
+  height: auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 :host-context(html.udon-mobile-layout) .log {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 :host-context(html.udon-mobile-layout) .sticky-bottom {
   position: sticky;
   bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background-color: #f3e6d4;
   border-top: 1px solid #999;
   flex-shrink: 0;
+  z-index: 2;
 }
 
 :host-context(html.udon-mobile-layout) .chat-toolbar {
   padding: 4px 6px;
   gap: 2px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 :host-context(html.udon-mobile-layout) .chat-toolbar-actions {
   gap: 2px;
+  flex-wrap: wrap;
 }
 
 :host-context(html.udon-mobile-layout) .chat-toolbar-actions .indicate {

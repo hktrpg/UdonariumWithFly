@@ -2,6 +2,7 @@ import { animate, keyframes, style, transition, trigger } from '@angular/animati
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 import { PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -75,16 +76,17 @@ export class UIPanelComponent implements OnInit {
   isHorizontal: boolean = false;
   /** Set by PanelService.open on phone/tablet sheets. Desktop panels stay false. */
   isMobileSheet: boolean = false;
-  /** Bottom half-sheet (e.g. chat) — leaves map visible above. */
+  /** Bottom half-sheet (e.g. chat) — leaves map visible above. Always true on mobile. */
   isMobileSheetHalf: boolean = false;
-  /** peek | half | full — only meaningful when isMobileSheet. */
-  mobileSheetSnap: 'peek' | 'half' | 'full' = 'full';
+  /** peek | half — only meaningful when isMobileSheet (no fullscreen). */
+  mobileSheetSnap: 'peek' | 'half' = 'half';
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
   constructor(
     public panelService: PanelService,
-    private pointerDeviceService: PointerDeviceService
+    private pointerDeviceService: PointerDeviceService,
+    private mobileLayout: MobileLayoutService,
   ) { }
 
   ngOnInit() {
@@ -269,17 +271,21 @@ export class UIPanelComponent implements OnInit {
     else this.toggleMinimize(e);
   }
 
-  /** Mobile: tap title/handle cycles peek → half → full (map-first sheet). */
+  /** Mobile: tap title/handle toggles peek ↔ half (two heights only; remembered). */
   onMobileTitleTap(e: Event) {
     if (!this.isMobileSheet) return;
     const t = e.target as HTMLElement | null;
     if (t?.closest('button')) return;
     e.stopPropagation();
-    const order: Array<'peek' | 'half' | 'full'> = ['peek', 'half', 'full'];
-    const i = order.indexOf(this.mobileSheetSnap);
-    const next = order[(i + 1) % order.length];
+    const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' ? 'half' : 'peek';
     this.mobileSheetSnap = next;
-    this.isMobileSheetHalf = next !== 'full';
+    this.isMobileSheetHalf = true;
+    this.mobileLayout.rememberSheetSnap(next);
+    // Keep panelService height in sync for layout math / keyboard inset.
+    const h = this.mobileLayout.sheetHeightPx(next);
+    this.height = h;
+    const reserveBottom = this.mobileLayout.bottomChromePx;
+    this.top = Math.max(0, this.mobileLayout.viewportHeight - h - reserveBottom);
   }
 
   /** Sync Angular bindings after drag/resize so CD does not snap size back; persist chat geometry. */
