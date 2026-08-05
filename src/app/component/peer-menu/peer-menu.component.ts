@@ -140,8 +140,15 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   get maskedPassword(): string { return '●●●●●●●●' }
   get config(): AppConfig { return AppConfigService.appConfig; }
   get canUsePrivateSession(): boolean { return this.config.backend.mode == 'skyway'; }
-  /** Build stamp: git commit date, short SHA, branch. */
-  readonly appVersionDisplay = appVersion.display;
+  /** Build stamp: commit time in local TZ, short SHA, branch. */
+  get appVersionDisplay(): string {
+    const d = new Date(appVersion.committedAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const date = Number.isNaN(d.getTime())
+      ? appVersion.committedAt
+      : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${date} ${appVersion.sha} ${appVersion.branch}`;
+  }
   get canLoadZip(): boolean { return SceneToolPermission.instance.canLoadZip(); }
   get canLoadRoom(): boolean { return SceneToolPermission.instance.canLoadRoom(); }
 
