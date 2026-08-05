@@ -111,7 +111,9 @@ export class RoomConnectHelper {
       RoomAuth.clearAttained();
       if (PeerCursor.myCursor) {
         PeerCursor.isGMHold = false;
-        PeerCursor.myCursor.isGMMode = false;
+        const wasGM = PeerCursor.myCursor.isGMMode;
+        PeerCursor.myCursor.isGMMode = true;
+        if (!wasGM) EventSystem.trigger('CHANGE_GM_MODE', null);
       }
       Network.open();
       PeerCursor.myCursor.peerId = Network.peerId;

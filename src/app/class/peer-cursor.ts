@@ -19,7 +19,7 @@ export class PeerCursor extends GameObject {
   @SyncVar() name: string = '';
   @SyncVar() imageIdentifier: string = '';
   @SyncVar() color: string = PeerCursor.CHAT_DEFAULT_COLOR;
-  @SyncVar() isGMMode: boolean = false;
+  @SyncVar() isGMMode: boolean = true;
 
   static isGMHold: boolean = false;
 
