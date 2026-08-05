@@ -43,7 +43,7 @@ export const ja_tip: I18nDictionary = {
 
   'tour.welcome.title': 'ようこそ — ガイドツアー',
   'tour.welcome.body': '各機能の説明を読んでから、開く／一度試します。\nいつでもスキップ可。以後はホバーで教學 BOX が出ます。\nデスクトップ版 Chrome 推奨。退出前に保存（ZIP またはフォルダバックアップ）。',
-  'tour.welcome.bodyMobile': 'スマホ／タブレット：下部メニューで機能を開く。1本指ドラッグでパン、ピンチでズーム、空白長押し＝Ping、追加は地図 HUD。\nいつでもスキップ可。退出前に保存してください。',
+  'tour.welcome.bodyMobile': 'スマホ／タブレット：下部メニューで機能を開く。1／2本指ドラッグでパン、ピンチでズーム、空白長押し＝Ping、追加は地図 HUD。\nいつでもスキップ可。退出前に保存してください。',
   'tour.welcome.language': '🌐 Language / 言語',
   'tour.welcome.start': '開始',
   'tour.welcome.skip': 'スキップ',
@@ -100,7 +100,7 @@ export const ja_tip: I18nDictionary = {
 
   'tour.step.mapPan.title': 'パン',
   'tour.step.mapPan.body': 'Ctrl＋左／右ドラッグ＝パン。\n中ドラッグ＝視点回転。\nCtrl＋左ドラッグを一度試してください。',
-  'tour.step.mapPan.bodyMobile': 'マップ上を1本指でドラッグ＝パン。\n2本指の上下ドラッグで俯角調整。\n1本指パンを一度試してください。',
+  'tour.step.mapPan.bodyMobile': 'マップ上を1本指でドラッグ＝パン。\n2本指ドラッグでもパン；ピンチ＝ズーム；2本指回転＝ヨー。\n1本指パンを一度試してください。',
   'tour.step.mapWheel.title': 'ホイール移動',
   'tour.step.mapWheel.body': 'Shift＋ホイール＝左右移動。\nCtrl＋ホイール＝上下移動。\n（通常ホイール＝ズーム：次のステップ）\nShift または Ctrl＋ホイールを一度試してください。',
   'tour.step.mapZoom.title': 'ズーム',

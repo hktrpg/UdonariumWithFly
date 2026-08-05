@@ -43,7 +43,7 @@ export const en_tip: I18nDictionary = {
 
   'tour.welcome.title': 'Welcome — guided tour',
   'tour.welcome.body': 'Read each intro, then open / try the main features once.\nYou can skip anytime. Hover tips stay available afterward.\nDesktop Chrome recommended. Save (ZIP or folder backup) before leaving.',
-  'tour.welcome.bodyMobile': 'Phone/tablet: use the bottom menu; one-finger drag pans; pinch to zoom; long-press empty = ping; add objects via map HUD.\nSkip anytime. Save before leaving.',
+  'tour.welcome.bodyMobile': 'Phone/tablet: use the bottom menu; one- or two-finger drag pans; pinch to zoom; long-press empty = ping; add objects via map HUD.\nSkip anytime. Save before leaving.',
   'tour.welcome.language': '🌐 Language / 語言',
   'tour.welcome.start': 'Start',
   'tour.welcome.skip': 'Skip',
@@ -100,7 +100,7 @@ export const en_tip: I18nDictionary = {
 
   'tour.step.mapPan.title': 'Pan the map',
   'tour.step.mapPan.body': 'Ctrl + left-drag / right-drag = pan.\nMiddle-drag = rotate view.\nTry Ctrl + left-drag once.',
-  'tour.step.mapPan.bodyMobile': 'One-finger drag on the map = pan.\nTwo-finger vertical drag adjusts pitch.\nTry a one-finger pan once.',
+  'tour.step.mapPan.bodyMobile': 'One-finger drag on the map = pan.\nTwo-finger drag also pans; pinch = zoom; two-finger twist = yaw.\nTry a one-finger pan once.',
   'tour.step.mapWheel.title': 'Wheel pan',
   'tour.step.mapWheel.body': 'Shift + wheel = move view left/right.\nCtrl + wheel = move view up/down.\n(Plain wheel = zoom — next step.)\nTry Shift or Ctrl + wheel once.',
   'tour.step.mapZoom.title': 'Zoom',
