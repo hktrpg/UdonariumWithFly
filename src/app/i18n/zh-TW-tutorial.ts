@@ -20,7 +20,10 @@ export const zhTW_tutorial: I18nDictionary = {
 　　　　左鍵空白拖曳＝框選　Shift＋拖曳＝加選框選　點空白／Esc＝取消選取
 圖片、音樂可直接拖進瀏覽器匯入。`,
   'tutorial.keyboard': `＜鍵盤（選取後）＞WASD／方向鍵＝移動（可對角）
-　　　　Shift＋WASD＝改變面向　Delete＝刪除（角色進回收區）
+　　　　Shift＋WASD＝改變面向　Q／E＝旋轉 ±45°　Shift＋Q／E＝±15°　R＝重置面向 0°
+　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）　F＝翻面（卡／硬幣）或擲骰　L＝鎖定／解鎖
+　　　　H＝顯隱選取角色（僅 GM）　Delete＝刪除（角色進回收區）
+　　　　1–9＝切換第 N 個可檢視聊天頻道（並開啟聊天）
 　　　　Ctrl＋C／X／V＝複製／剪下／貼上（貼在滑鼠游標處；選取文字時仍可複製文字）
 　　　　Ctrl＋Z＝復原　Ctrl＋Y／Ctrl＋Shift＋Z＝重做
 　　　　　（移動／旋轉／刪除／剪下貼上／圖層；場景工具建立／刪除／微移）
@@ -73,7 +76,7 @@ export const zhTW_tutorial: I18nDictionary = {
   'changelog.2026ops': `2026/08/03 操作更新
 ・桌面選取高亮；左鍵空白框選；Shift＋點／拖曳多選；Ctrl＋左鍵／右鍵拖曳平移地圖
 ・雙擊物件開啟詳情（翻面／抽牌／擲骰改右鍵選單）
-・鍵盤：WASD 移動、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（貼在游標）、Ctrl＋Z／Y 復原重做
+・鍵盤：WASD 移動、Shift＋WASD 面向、Q／E／R 旋轉、PageUp／Down 高度、F 翻面、L 鎖定、H 顯隱（GM）、1–9 聊天頻道、Delete、Ctrl＋C／X／V、Ctrl＋Z／Y
 ・[ / ] 調整前後層；Alt＋滾輪（選取＝面向 3°／無選取＝視角左右）；Alt＋Shift＋滾輪（選取＝roll／無選取＝俯仰）；Ctrl＋Shift＋滾輪 45°
 ・Ctrl＋Shift＋D：DEBUG pose（視角／選取姿態）；浮動預覽可釘選固定
 ・Shift＋滾輪左右移動畫面；Ctrl＋滾輪上下移動畫面

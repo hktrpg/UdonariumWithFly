@@ -7,13 +7,13 @@
   top: 0px;
   left: 0;
   */
-  width: 250px;
-  height: 250px;
+  width: 200px;
+  height: 200px;
   
   z-index: 0;
 }
 .main-image {
-  width: 250px;
+  width: 200px;
   object-position: center bottom;
 }
 

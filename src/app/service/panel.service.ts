@@ -53,8 +53,15 @@ export class PanelService {
   private static readonly GEOMETRY_STORAGE_KEY = 'udonanaumu-panel-geometry-v1';
   /** Legacy chat-only geometry (migrated into GEOMETRY_STORAGE_KEY / menu.chat). */
   private static readonly LEGACY_CHAT_GEOMETRY_KEY = 'udonanaumu-chat-window-geometry-v2';
+  private static readonly SINGLE_NON_CHAT_KEY = 'udonanaumu-panel-single-non-chat';
   private static readonly geometries = new Map<string, PanelGeometry>();
   static geometryReady: Promise<void> = Promise.resolve();
+
+  /**
+   * Personal setting: opening a non-chat panel closes other non-chat panels.
+   * Default off. Desktop only (mobile sheets already replace each other).
+   */
+  static singleNonChatWindow = false;
 
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
@@ -199,6 +206,14 @@ export class PanelService {
         PanelService.geometries.forEach((value, id) => { payload[id] = value; });
         localForage.setItem(PanelService.GEOMETRY_STORAGE_KEY, payload).catch(e => console.log(e));
       }
+      // Drop chat size that was accidentally saved from open()'s shared 450×560 starter.
+      const chatG = PanelService.geometries.get('menu.chat');
+      if (chatG && chatG.width === 450 && chatG.height === 560) {
+        PanelService.geometries.delete('menu.chat');
+        const payload: { [id: string]: PanelGeometry } = {};
+        PanelService.geometries.forEach((value, id) => { payload[id] = value; });
+        localForage.setItem(PanelService.GEOMETRY_STORAGE_KEY, payload).catch(e => console.log(e));
+      }
     }).catch(e => console.log(e));
     return PanelService.geometryReady;
   }
@@ -208,10 +223,169 @@ export class PanelService {
     return key ? (PanelService.geometries.get(key) || null) : null;
   }
 
+  /** Clear remembered panel sizes/positions (including chat). Next open uses defaults. */
+  static clearSavedGeometry() {
+    PanelService.geometries.clear();
+    localForage.removeItem(PanelService.GEOMETRY_STORAGE_KEY).catch(() => {});
+    localForage.removeItem(PanelService.LEGACY_CHAT_GEOMETRY_KEY).catch(() => {});
+  }
+
   /** Close all closable desktop UI panels opened via PanelService.open(). */
   static closeAllPanels() {
     for (const panel of Array.from(PanelService.openPanels)) {
       if (panel.isAbleCloseButton) panel.close();
+    }
+  }
+
+  static isChatPanel(panel: PanelService): boolean {
+    return panel.tourPanelId === 'menu.chat' || panel.geometryKey === 'menu.chat';
+  }
+
+  static loadSingleNonChatFromStorage() {
+    localForage.getItem(PanelService.SINGLE_NON_CHAT_KEY).then(v => {
+      PanelService.singleNonChatWindow = !!v;
+    }).catch(() => {});
+  }
+
+  static setSingleNonChatWindow(v: boolean) {
+    PanelService.singleNonChatWindow = !!v;
+    if (v) {
+      localForage.setItem(PanelService.SINGLE_NON_CHAT_KEY, true).catch(() => {});
+    } else {
+      localForage.removeItem(PanelService.SINGLE_NON_CHAT_KEY).catch(() => {});
+    }
+  }
+
+  /** Close every closable non-chat panel (optionally keep one instance). */
+  static closeOtherNonChatPanels(except: PanelService = null) {
+    for (const panel of Array.from(PanelService.openPanels)) {
+      if (!panel.isAbleCloseButton) continue;
+      if (PanelService.isChatPanel(panel)) continue;
+      if (except && panel === except) continue;
+      panel.close();
+    }
+  }
+
+  /**
+   * Safe insets so rearrange / chat defaults do not cover the desktop main menu (menu.main).
+   * Vertical menu → reserve left/right; horizontal → top/bottom.
+   */
+  static getDesktopMenuInsets(gap: number = 8, margin: number = 8): { left: number; top: number; right: number; bottom: number } {
+    const insets = { left: margin, top: margin, right: margin, bottom: margin };
+    const el = document.querySelector('.draggable-panel[data-geometry-key="menu.main"]') as HTMLElement | null;
+    if (!el?.isConnected) return insets;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return insets;
+
+    const vertical = r.height >= r.width;
+    if (vertical) {
+      const centerX = r.left + r.width / 2;
+      if (centerX < window.innerWidth / 2) {
+        insets.left = Math.max(insets.left, Math.round(r.right) + gap);
+      } else {
+        insets.right = Math.max(insets.right, Math.round(window.innerWidth - r.left) + gap);
+      }
+    } else {
+      const centerY = r.top + r.height / 2;
+      if (centerY < window.innerHeight / 2) {
+        insets.top = Math.max(insets.top, Math.round(r.bottom) + gap);
+      } else {
+        insets.bottom = Math.max(insets.bottom, Math.round(window.innerHeight - r.top) + gap);
+      }
+    }
+    return insets;
+  }
+
+  /**
+   * Tile open closable panels: chat column bottom-left (stacked up),
+   * then other panels left→right, bottom→top. Skips / avoids the main menu.
+   */
+  static rearrangePanels() {
+    const margin = 8;
+    const gap = 8;
+    const insets = PanelService.getDesktopMenuInsets(gap, margin);
+    const availW = window.innerWidth;
+    const availH = window.innerHeight;
+    const maxRight = availW - insets.right;
+    const maxBottom = availH - insets.bottom;
+
+    const panels: PanelService[] = [];
+    for (const panel of PanelService.openPanels) {
+      if (!panel.isAbleCloseButton || !panel.panelComponentRef) continue;
+      if (panel.geometryKey === 'menu.main') continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el?.isConnected) continue;
+      panels.push(panel);
+    }
+    if (panels.length < 1) return;
+
+    for (const panel of panels) {
+      const inst = panel.panelComponentRef.instance as {
+        isFullScreen?: boolean;
+        isMinimized?: boolean;
+        toggleFullScreen?: (e?: Event) => void;
+        toggleMinimize?: (e?: Event) => void;
+      } | null;
+      if (inst?.isFullScreen && typeof inst.toggleFullScreen === 'function') inst.toggleFullScreen();
+      if (inst?.isMinimized && typeof inst.toggleMinimize === 'function') inst.toggleMinimize();
+    }
+
+    const chats = panels.filter(p => PanelService.isChatPanel(p));
+    const others = panels.filter(p => !PanelService.isChatPanel(p));
+
+    let chatRight = insets.left;
+    let chatTopMost = maxBottom;
+
+    let chatBottom = maxBottom;
+    for (const chat of chats) {
+      const w = Math.max(100, chat.width || 100);
+      const h = Math.max(100, chat.height || 100);
+      chat.left = insets.left;
+      chat.top = Math.max(insets.top, chatBottom - h);
+      chatBottom = chat.top - gap;
+      chatRight = Math.max(chatRight, insets.left + w);
+      chatTopMost = Math.min(chatTopMost, chat.top);
+      PanelService.applyPanelPosition(chat);
+    }
+
+    let startX = chats.length ? chatRight + gap : insets.left;
+    let cursorX = startX;
+    let cursorBottom = maxBottom;
+    let rowHeight = 0;
+
+    for (const panel of others) {
+      const w = Math.max(100, panel.width || 100);
+      const h = Math.max(100, panel.height || 100);
+
+      // Wrap to next row above when this panel does not fit on the current row.
+      if (cursorX > startX && cursorX + w + insets.right > availW) {
+        cursorBottom = cursorBottom - rowHeight - gap;
+        cursorX = startX;
+        rowHeight = 0;
+      }
+      // If even a fresh row at startX is too narrow (wide chat), wrap to left above chats.
+      if (cursorX + w + insets.right > availW) {
+        cursorX = insets.left;
+        cursorBottom = Math.min(cursorBottom, chatTopMost) - gap;
+        rowHeight = 0;
+      }
+
+      panel.left = Math.max(insets.left, Math.min(cursorX, Math.max(insets.left, maxRight - w)));
+      panel.top = Math.max(insets.top, cursorBottom - h);
+      cursorX = panel.left + w + gap;
+      rowHeight = Math.max(rowHeight, h);
+      PanelService.applyPanelPosition(panel);
+    }
+  }
+
+  private static applyPanelPosition(panel: PanelService) {
+    const key = panel.geometryKey || panel.tourPanelId;
+    if (key) {
+      PanelService.saveGeometry(key, panel.width, panel.height, panel.left, panel.top);
+    }
+    const cdr = panel.panelComponentRef?.changeDetectorRef;
+    if (cdr) {
+      try { cdr.detectChanges(); } catch { /* ignore */ }
     }
   }
 
@@ -382,12 +556,16 @@ export class PanelService {
     resolved = this.mobileLayout.adaptPanelOption(resolved);
     if (!this.mobileLayout.isMobile) {
       const geoKey = PanelService.resolveGeometryKey(resolved);
-      const isChat = geoKey === 'menu.chat';
+      const isChat = geoKey === 'menu.chat' || resolved.tourPanelId === 'menu.chat';
       resolved = PanelService.applySavedGeometry(resolved, { includePosition: !isChat });
       // Compact map UI still needs enough room for toolbar + all blocks without clipping.
       if (geoKey === 'menu.table') {
         if ((resolved.width ?? 0) < 620) resolved.width = 620;
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
+      }
+      // Personal setting: one non-chat window at a time (chat windows stay).
+      if (PanelService.singleNonChatWindow && !isChat) {
+        PanelService.closeOtherNonChatPanels(childPanelService);
       }
     }
     if (resolved.title) childPanelService.title = resolved.title;

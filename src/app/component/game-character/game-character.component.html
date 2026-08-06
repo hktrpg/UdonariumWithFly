@@ -15,8 +15,15 @@
         [style.background-image]="'url(' + floorRingUrl + ')'"
         [style.animation-duration.s]="(8 / floorRingSpeed)"
         [style.filter]="floorRingColor ? 'drop-shadow(0 0 4px ' + floorRingColor + ')' : ''"></div>
-      <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-inner" [ngClass]="{'selected': selected, 'not-inventory': !gameCharacter.isInventoryIndicate, 'is-hide-in-pedestal': isHideIn}"></div>
-      <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
+      <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-inner"
+        [ngClass]="{
+          'selected': selected,
+          'not-inventory': !gameCharacter.isInventoryIndicate && !gameCharacter.isTemporaryCopy,
+          'is-temporary': gameCharacter.isTemporaryCopy,
+          'is-hide-in-pedestal': isHideIn
+        }"></div>
+      <div *ngIf="isSelected" class="selected-highlight"
+        [ngClass]="{'is-magnetic': isMagnetic, 'is-temporary': gameCharacter.isTemporaryCopy}"></div>
       <div [@switchImagePedestal]="gameCharacter.currntImageIndex" class="pedestal-outer"></div>
       <div class="is-pointer-events-none is-3d" style="transform-origin: center bottom" [style.transform]="'translateX(' + shadowTranslateX + 'px) translateY(' + characterShadowOffset + 'px) scale(1.0, 0.66)'">
         <div class="image-box is-3d" [style.width.px]="characterShadowImageWidth" [style.height.px]="characterShadowImageHeight" style="pointer-events: none"

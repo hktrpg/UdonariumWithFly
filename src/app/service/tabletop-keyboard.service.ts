@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import { ChatTabList } from '@udonarium/chat-tab-list';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -30,6 +31,9 @@ const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
 ]);
+
+const ALTITUDE_MIN = -12;
+const ALTITUDE_MAX = 12;
 
 @Injectable({
   providedIn: 'root'
@@ -143,6 +147,15 @@ export class TabletopKeyboardService {
       return;
     }
 
+    // 1–9: switch chat tab (works for guests; blocked in text fields by shouldIgnore).
+    if (!mod && !this.altHeld && !e.shiftKey) {
+      const tabIndex = this.digitIndexFromCode(code);
+      if (tabIndex != null) {
+        if (this.selectChatTabByIndex(tabIndex)) this.consume(e);
+        return;
+      }
+    }
+
     if (Network.GuestMode()) return;
 
     // Path draft: Space commits movement along existing waypoints.
@@ -184,6 +197,62 @@ export class TabletopKeyboardService {
 
     if ((code === 'BracketLeft' || code === 'BracketRight') && !mod && !this.altHeld && !e.shiftKey) {
       if (this.changeLayerOrder(code === 'BracketRight')) this.consume(e);
+      return;
+    }
+
+    // Q/E: rotate selection (±45°; Shift = ±15°). Empty selection → view yaw in TableMouseGesture.
+    if ((code === 'KeyQ' || code === 'KeyE') && !mod && !this.altHeld) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      const step = e.shiftKey ? 15 : 45;
+      const delta = code === 'KeyQ' ? -step : step;
+      if (RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta)) {
+        this.consume(e);
+      }
+      return;
+    }
+
+    // R: reset facing to 0°.
+    if (code === 'KeyR' && !mod && !this.altHeld && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      if (RotableSelectionSynchronizer.face(this.selectionService.objects, 0)) {
+        this.consume(e);
+      }
+      return;
+    }
+
+    // PageUp / PageDown: nudge altitude (±1; Shift = ±0.5).
+    if ((code === 'PageUp' || code === 'PageDown') && !mod && !this.altHeld) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      const step = e.shiftKey ? 0.5 : 1;
+      const delta = code === 'PageUp' ? step : -step;
+      if (this.nudgeAltitude(delta)) this.consume(e);
+      return;
+    }
+
+    // F: flip cards / coin faces; roll multi-face dice.
+    if (code === 'KeyF' && !mod && !this.altHeld && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      if (this.flipSelection()) this.consume(e);
+      return;
+    }
+
+    // H: GM hide / reveal selected characters.
+    if (code === 'KeyH' && !mod && !this.altHeld && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      if (this.toggleHideSelection()) this.consume(e);
+      return;
+    }
+
+    // L: lock / unlock selected objects.
+    if (code === 'KeyL' && !mod && !this.altHeld && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      if (this.toggleLockSelection()) this.consume(e);
       return;
     }
 
@@ -578,6 +647,130 @@ export class TabletopKeyboardService {
       SoundEffect.play(PresetSound.sweep);
     }
     return deleted;
+  }
+
+  private digitIndexFromCode(code: string): number | null {
+    if (/^Digit[1-9]$/.test(code)) return code.charCodeAt(5) - 49; // '1' → 0
+    if (/^Numpad[1-9]$/.test(code)) return code.charCodeAt(6) - 49;
+    return null;
+  }
+
+  /** Switch to the Nth viewable chat tab (0-based) and open chat if needed. */
+  private selectChatTabByIndex(index: number): boolean {
+    const tabs = ChatTabList.instance.chatTabs.filter(tab => tab.canView());
+    if (index < 0 || index >= tabs.length) return false;
+    const tabIdentifier = tabs[index].identifier;
+    EventSystem.trigger('SHOW_CHAT', { tabIdentifier });
+    return true;
+  }
+
+  private nudgeAltitude(delta: number): boolean {
+    if (delta === 0) return false;
+    let changed = false;
+    for (const object of this.selectionService.objects) {
+      if (this.isLocked(object)) continue;
+      if (!object.isHaveAltitude) continue;
+      const next = Math.min(ALTITUDE_MAX, Math.max(ALTITUDE_MIN, object.altitude + delta));
+      if (next === object.altitude) continue;
+      object.altitude = next;
+      changed = true;
+    }
+    if (changed) SoundEffect.play(PresetSound.piecePut);
+    return changed;
+  }
+
+  /** Flip cards / coin faces; roll multi-face dice. */
+  private flipSelection(): boolean {
+    let flippedCard = false;
+    let rolledCoin = false;
+    let rolledDice = false;
+
+    for (const object of this.selectionService.objects) {
+      if (this.isLocked(object)) continue;
+
+      if (object instanceof Card) {
+        if (object.isFront) object.faceDown();
+        else object.faceUp();
+        flippedCard = true;
+        continue;
+      }
+
+      if (object instanceof CardStack) {
+        const top = object.topCard;
+        if (!top) continue;
+        if (top.isFront) object.faceDown();
+        else object.faceUp();
+        flippedCard = true;
+        continue;
+      }
+
+      if (object instanceof DiceSymbol) {
+        if (!object.isVisible && !PeerCursor.myCursor?.isGMMode) continue;
+        if (object.isCoin) {
+          const faces = object.faces;
+          if (faces.length >= 2) {
+            object.face = faces[0] === object.face ? faces[1] : faces[0];
+            rolledCoin = true;
+          }
+        } else {
+          EventSystem.call('ROLL_DICE_SYMBOL', { identifier: object.identifier });
+          object.diceRoll();
+          rolledDice = true;
+        }
+      }
+    }
+
+    if (flippedCard) SoundEffect.play(PresetSound.cardDraw);
+    if (rolledCoin) SoundEffect.play(PresetSound.coinToss);
+    if (rolledDice) SoundEffect.play(PresetSound.diceRoll1);
+    return flippedCard || rolledCoin || rolledDice;
+  }
+
+  /** GM only: hide / reveal selected characters (owner stealth). */
+  private toggleHideSelection(): boolean {
+    if (!PeerCursor.myCursor?.isGMMode) return false;
+    const characters = this.selectionService.objects.filter(
+      (o): o is GameCharacter => o instanceof GameCharacter
+    );
+    if (characters.length < 1) return false;
+
+    const anyVisible = characters.some(ch => !ch.isHideIn);
+    const userId = Network.peer.userId;
+    for (const ch of characters) {
+      if (anyVisible) {
+        if (ch.isHideIn) continue;
+        ch.owner = userId;
+        if (!ch.visionOwner) ch.visionOwner = userId;
+        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
+      } else {
+        ch.owner = '';
+      }
+    }
+    EventSystem.call('UPDATE_INVENTORY', true);
+    SoundEffect.play(anyVisible ? PresetSound.sweep : PresetSound.piecePut);
+    return true;
+  }
+
+  /** Toggle lock on selected objects that support isLocked / isLock. */
+  private toggleLockSelection(): boolean {
+    const lockable: TabletopObject[] = [];
+    for (const object of this.selectionService.objects) {
+      if (object instanceof GameCharacter) continue; // soft player-owner lock only
+      if ('isLocked' in object || 'isLock' in object) lockable.push(object);
+    }
+    if (lockable.length < 1) return false;
+
+    const anyUnlocked = lockable.some(o => !this.hasHardLock(o));
+    for (const object of lockable) {
+      if ('isLocked' in object) (object as any).isLocked = anyUnlocked;
+      else if ('isLock' in object) (object as any).isLock = anyUnlocked;
+    }
+    SoundEffect.play(anyUnlocked ? PresetSound.lock : PresetSound.unlock);
+    return true;
+  }
+
+  private hasHardLock(object: TabletopObject): boolean {
+    return !!(object as any).isLocked || !!(object as any).isLock;
   }
 
   private isLocked(object: TabletopObject): boolean {

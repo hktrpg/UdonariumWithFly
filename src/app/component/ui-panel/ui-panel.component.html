@@ -11,6 +11,7 @@
   }"
   class="draggable-panel"
   [attr.data-tour-panel]="panelService.tourPanelId || null"
+  [attr.data-geometry-key]="panelService.geometryKey || null"
   [style.left.px]="left" [style.top.px]="top" [style.width.px]="width" [style.height.px]="height"
   [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical'" [draggable.disable]="isFullScreen || isMobileSheet"
   [draggable.stack]="'.draggable-panel'" [resizable.stack]="'.draggable-panel'"

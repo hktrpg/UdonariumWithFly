@@ -439,7 +439,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     const tourId = PanelService.tourIdStandSetting(character.identifier);
     if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 720, height: 572, tourPanelId: tourId };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 690, height: 540, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
     component.character = character;
   }

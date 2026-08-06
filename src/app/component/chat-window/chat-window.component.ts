@@ -33,10 +33,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
   static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
   static readonly CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-skip-empty-quotes-local-storage';
-  /** Designed defaults: prior 700×400 @ (100,450); height −30%. */
+  /** Designed defaults: 700×265, bottom-left beside the main menu (not fixed 100,450). */
   static readonly DEFAULT_WIDTH = 700;
   static readonly DEFAULT_HEIGHT = 265;
-  static readonly DEFAULT_LEFT = 100;
+  /** Fallback when viewport/menu not available yet (≈ menu width 100 + gap). */
+  static readonly DEFAULT_LEFT = 108;
+  /** Fallback only; prefer computeDefaultTop(). */
   static readonly DEFAULT_TOP = 450;
   static savedWidth = ChatWindowComponent.DEFAULT_WIDTH;
   static savedHeight = ChatWindowComponent.DEFAULT_HEIGHT;
@@ -44,13 +46,27 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static savedTop = ChatWindowComponent.DEFAULT_TOP;
   static geometryReady: Promise<void> = Promise.resolve();
 
+  /** Default left: clear of desktop main menu (same inset as rearrange). */
+  static computeDefaultLeft(): number {
+    if (typeof window === 'undefined') return ChatWindowComponent.DEFAULT_LEFT;
+    return PanelService.getDesktopMenuInsets(8, 8).left;
+  }
+
+  /** Default top: bottom-aligned within safe insets. */
+  static computeDefaultTop(height: number = ChatWindowComponent.DEFAULT_HEIGHT): number {
+    if (typeof window === 'undefined') return ChatWindowComponent.DEFAULT_TOP;
+    const insets = PanelService.getDesktopMenuInsets(8, 8);
+    return Math.max(insets.top, window.innerHeight - insets.bottom - height);
+  }
+
   static applySavedGeometry(option: PanelOption): PanelOption {
     option.tourPanelId = option.tourPanelId || 'menu.chat';
     PanelService.applySavedGeometry(option, { includePosition: true });
+    // Always fall back to chat defaults (never leave width/height unset for open()).
     option.width = option.width ?? ChatWindowComponent.DEFAULT_WIDTH;
     option.height = option.height ?? ChatWindowComponent.DEFAULT_HEIGHT;
-    option.left = option.left ?? ChatWindowComponent.DEFAULT_LEFT;
-    option.top = option.top ?? ChatWindowComponent.DEFAULT_TOP;
+    option.left = option.left ?? ChatWindowComponent.computeDefaultLeft();
+    option.top = option.top ?? ChatWindowComponent.computeDefaultTop(option.height);
     ChatWindowComponent.savedWidth = option.width;
     ChatWindowComponent.savedHeight = option.height;
     ChatWindowComponent.savedLeft = option.left;
@@ -80,6 +96,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
     return ChatWindowComponent.geometryReady;
+  }
+
+  /** Reset in-memory chat geometry to defaults (after PanelService.clearSavedGeometry). */
+  static resetSavedGeometryToDefaults() {
+    ChatWindowComponent.savedWidth = ChatWindowComponent.DEFAULT_WIDTH;
+    ChatWindowComponent.savedHeight = ChatWindowComponent.DEFAULT_HEIGHT;
+    ChatWindowComponent.savedLeft = ChatWindowComponent.computeDefaultLeft();
+    ChatWindowComponent.savedTop = ChatWindowComponent.computeDefaultTop(ChatWindowComponent.DEFAULT_HEIGHT);
   }
 
   /** Default ON: play notice when someone chats. */

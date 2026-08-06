@@ -293,6 +293,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         setSkipEmptyDialogQuotes(on);
       });
       PanelService.loadGeometryFromStorage();
+      PanelService.loadSingleNonChatFromStorage();
       ChatWindowComponent.loadGeometryFromStorage();
     } catch(e) {
       console.log(e);
@@ -779,10 +780,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     const menuTourId = this.tourIdForComponent(componentName);
     if (menuTourId && !this.canShowMenu(menuTourId)) return;
     let component: { new(...args: any[]): any } = null;
-    let option: PanelOption = { width: 450, height: 600, left: 100 }
+    let option: PanelOption = { width: 450, height: 560, left: 100 }
     switch (componentName) {
       case 'PeerMenuComponent':
         option.width = 520;
+        option.height = 480;
         option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
         // Keep map visible — connection is a half sheet, not full-screen.
@@ -790,8 +792,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'ChatWindowComponent':
         component = ChatWindowComponent;
+        // Do not inherit the shared 450×560 starter size — chat has its own defaults.
+        option = { title: this.i18n.t('chat.title') };
         ChatWindowComponent.applySavedGeometry(option);
-        option.title = this.i18n.t('chat.title');
         if (this.mobileLayout.isMobile) option.mobileSheet = 'half';
         break;
       case 'GameTableSettingComponent':
@@ -800,15 +803,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'FileStorageComponent':
         component = FileStorageComponent;
-        option.width = 700;
+        option.width = 690;
+        option.height = 540;
         option.title = this.i18n.t('file.title');
         break;
       case 'GameCharacterSheetComponent':
         component = GameCharacterSheetComponent;
+        option = { width: 690, height: 560, left: 100 };
         break;
       case 'JukeboxComponent':
         component = JukeboxComponent;
-        option.height = 540;
+        option.height = 480;
         option.title = this.i18n.t('jukebox.title');
         break;
       case 'GameObjectInventoryComponent':
@@ -825,11 +830,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
-        option = { width: 700, height: 600, title: this.i18n.t('cutin.title') };
+        option = { width: 690, height: 540, title: this.i18n.t('cutin.title') };
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 640, left: 100, title: this.i18n.t('combat.title') };
+        option = { width: 520, height: 560, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':
@@ -837,18 +842,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = SceneToolsComponent;
         option = {
           width: 380,
-          height: 560,
+          height: 520,
           left: 100,
           title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),
         };
         break;
       case 'ScenePresetComponent':
         component = ScenePresetComponent;
-        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenePreset.title') };
+        option = { width: 520, height: 520, left: 100, title: this.i18n.t('scenePreset.title') };
         break;
       case 'ScenarioTextComponent':
         component = ScenarioTextComponent;
-        option = { width: 520, height: 560, left: 100, title: this.i18n.t('scenarioText.title') };
+        option = { width: 520, height: 520, left: 100, title: this.i18n.t('scenarioText.title') };
         break;
     }
     if (component) {
@@ -864,8 +869,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           // Keep remembered chat geometry; nudge duplicates so they don't fully stack.
           const chatOpenCount = PanelService.openPanelsByTourId('menu.chat');
           if (chatOpenCount > 0) {
-            option.left = (option.left ?? ChatWindowComponent.DEFAULT_LEFT) + chatOpenCount * 24;
-            option.top = (option.top ?? ChatWindowComponent.DEFAULT_TOP) + chatOpenCount * 24;
+            option.left = (option.left ?? ChatWindowComponent.computeDefaultLeft()) + chatOpenCount * 24;
+            option.top = (option.top ?? ChatWindowComponent.computeDefaultTop(option.height)) + chatOpenCount * 24;
           }
         } else {
           const geoKey = PanelService.resolveGeometryKey(option);
@@ -1186,6 +1191,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Desktop only — mobile sheets replace each other via bottom nav.
     if (!this.mobileLayout.isMobile) {
       menu.push({
+        name: this.i18n.t('toolbox.rearrangePanels'),
+        materialIcon: 'dashboard',
+        selfOnly: true,
+        action: () => PanelService.rearrangePanels()
+      });
+      menu.push({
         name: this.i18n.t('toolbox.closeAllPanels'),
         materialIcon: 'close_fullscreen',
         selfOnly: true,
@@ -1443,8 +1454,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       if (choice === true) {
         await this.modalService.open(RoomSettingComponent, {
-          width: 720,
-          height: 720,
+          width: 690,
+          height: 600,
           left: 0,
           top: 80,
           // Keep file picker in the create-button click stack.
@@ -1499,8 +1510,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private openSettingsAt(position: { x: number; y: number }) {
     this.guidedTour.notifyMenuClick('menu.settings');
     this.contextMenuService.open(position, [
+      // View / panels
       ...this.buildAlwaysAvailableViewActions(),
       ContextMenuSeparator,
+      // Grid
       contextMenuToggleCheck({
         get: () => TableSelecter.instance.gridShow,
         set: (v) => {
@@ -1517,6 +1530,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         off: `☐${this.i18n.t('menu.settings.gridSnap')}`,
       }),
       ContextMenuSeparator,
+      // Chat
       contextMenuToggleCheck({
         get: () => ChatWindowComponent.isNoticeOn,
         set: (v) => { ChatWindowComponent.setChatNotice(v); },
@@ -1541,13 +1555,30 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
       }),
+      ContextMenuSeparator,
+      // Desktop UI
       contextMenuToggleCheck({
         get: () => CharacterResourceHudComponent.isVisible,
         set: (v) => CharacterResourceHudComponent.setVisible(v),
         on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
         off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
       }),
+      contextMenuToggleCheck({
+        get: () => PanelService.singleNonChatWindow,
+        set: (v) => PanelService.setSingleNonChatWindow(v),
+        on: `☑${this.i18n.t('menu.settings.singleNonChat')}`,
+        off: `☐${this.i18n.t('menu.settings.singleNonChat')}`,
+      }),
+      {
+        name: this.i18n.t('menu.settings.clearPanelGeometry'),
+        materialIcon: 'restart_alt',
+        action: () => {
+          PanelService.clearSavedGeometry();
+          ChatWindowComponent.resetSavedGeometryToDefaults();
+        },
+      },
       ContextMenuSeparator,
+      // Stands
       contextMenuToggleCheck({
         get: () => StandImageComponent.isShowStand,
         set: (v) => { StandImageComponent.isShowStand = v; },
@@ -1570,7 +1601,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         level: 1,
         disabled: !StandImageComponent.isShowStand,
       }),
+      { name: this.i18n.t('menu.settings.clearStands'), action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) },
       ContextMenuSeparator,
+      // Language / help
       {
         name: this.i18n.t('lang.label'),
         materialIcon: 'language',
@@ -1582,8 +1615,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           nameUpdate: () => `${this.i18n.locale === locale.id ? '☑' : '☐'} ${locale.nativeLabel}`,
         })),
       },
-      ContextMenuSeparator,
-      // Hover tips stick after taps on touch UIs — desktop-only setting.
       ...(this.teachingTips.isAvailable ? [contextMenuToggleCheck({
         get: () => this.teachingTips.isEnabled,
         set: (v) => this.teachingTips.setEnabled(v),
@@ -1600,8 +1631,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         materialIcon: 'help_outline',
         action: () => this.openControlsHelp(),
       },
-      ContextMenuSeparator,
-      { name: this.i18n.t('menu.settings.clearStands'), action: () => EventSystem.trigger('DESTORY_STAND_IMAGE_ALL', null) }
     ], this.i18n.t('menu.settings'));
   }
 

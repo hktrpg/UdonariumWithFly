@@ -100,12 +100,6 @@ export class ScenePresetComponent implements OnInit, OnDestroy {
 
   apply(preset: ScenePreset, keepTokens = false) {
     if (this.GuestMode() || !preset || !preset.isValid) return;
-    console.log('[ScenePreset] UI apply click', {
-      title: preset.title,
-      keepTokens,
-      skipBgm: this.skipBgm,
-      skipText: this.skipText,
-    });
     const chatTab = this.resolveActiveChatTab();
     this.list.applyPreset(preset, {
       skipBgm: this.skipBgm,

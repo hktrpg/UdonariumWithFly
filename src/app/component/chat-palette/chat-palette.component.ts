@@ -266,7 +266,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   helpChatPallet() {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 560, height: 620, geometryKey: 'palette.help' };
+    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 560, height: 560, geometryKey: 'palette.help' };
     let textView = this.panelService.open(TextViewComponent, option);
     textView.title = this.i18n.t('palette.helpTitle');
     textView.shadowing = '💭';

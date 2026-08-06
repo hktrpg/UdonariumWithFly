@@ -1161,12 +1161,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Map HUD: toggle toolbox (open / close). Outside-click ignores .map-action-hud. */
   hudOpenAddMenu(ev: Event) {
     ev.stopPropagation();
-    const toolboxTitle = this.i18n.t('menu.toolbox');
-    const menuTitle = this.i18n.t('menu.title');
-    if (
-      this.contextMenuService.isShow &&
-      (this.contextMenuService.title === toolboxTitle || this.contextMenuService.title === menuTitle)
-    ) {
+    // Same pattern as More / Settings: HUD is excluded from outside-click dismiss,
+    // so re-tap must close here (do not rely on title match — open() can leave stale titles).
+    if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
       return;
     }

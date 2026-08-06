@@ -19,14 +19,6 @@ import { GameTable } from './game-table';
 import { MovableDirective } from 'directive/movable.directive';
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
-/** Set true while diagnosing keep-tokens / apply. Filter console by `[ScenePreset]`. */
-const SCENE_PRESET_DEBUG = true;
-
-function spLog(...args: any[]) {
-  if (!SCENE_PRESET_DEBUG) return;
-  console.log('[ScenePreset]', ...args);
-}
-
 export interface ScenePresetApplyOptions {
   skipBgm?: boolean;
   skipText?: boolean;
@@ -96,15 +88,6 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     preset.savedAt = Date.now();
     const snap = this.captureTabletopSnap(table);
     preset.tabletopJson = JSON.stringify(snap);
-    spLog('writeSnapshot', {
-      title: preset.title,
-      tableId: preset.tableIdentifier,
-      tableName: table?.name,
-      pieceCount: snap.pieces?.length ?? 0,
-      childCount: snap.tableChildren?.length ?? 0,
-      pieceAliases: (snap.pieces || []).map(p => ({ id: p.identifier?.slice(0, 8), alias: p.aliasName })),
-      tokensNow: this.debugTokenSummaries(),
-    });
     try {
       const preview = await captureMapPreviewDataUrl();
       if (preview) preset.previewJpeg = preview;
@@ -122,36 +105,14 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
       preset.tableIdentifier = table.identifier;
     }
 
-    const viewBefore = TableSelecter.instance.viewTable;
-    const snap = preset.tabletopSnap;
     // Capture BEFORE map switch — screen positions of currently visible tokens.
     const keptTokens = options.skipTokens ? this.captureVisibleTokenPoses() : null;
     const keptTokenIds = keptTokens
       ? new Set(keptTokens.map(p => p.obj.identifier))
       : null;
 
-    spLog('applyPreset START', {
-      title: preset.title,
-      skipTokens: !!options.skipTokens,
-      targetTableId: table.identifier,
-      targetTableName: table.name,
-      viewTableId: viewBefore?.identifier,
-      viewTableName: viewBefore?.name,
-      snapPieceCount: snap?.pieces?.length ?? 0,
-      keptVisible: keptTokens?.map(p => ({
-        id: p.obj.identifier.slice(0, 8),
-        xy: `${p.x},${p.y}`,
-      })),
-      tokensBefore: this.debugTokenSummaries(),
-    });
-
     // Must be sync — EventSystem.call(..., peerId) is queued and apply would hit the old map.
     EventSystem.trigger('SELECT_GAME_TABLE', { identifier: table.identifier });
-    spLog('after SELECT_GAME_TABLE', {
-      viewTableId: TableSelecter.instance.viewTable?.identifier,
-      viewTableName: TableSelecter.instance.viewTable?.name,
-      tokens: this.debugTokenSummaries(),
-    });
 
     if (!options.skipBgm) {
       const jukebox = ObjectStore.instance.get<Jukebox>('Jukebox');
@@ -160,15 +121,10 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
 
     if (!options.skipTabletop) {
       this.applyTabletopSnap(preset, table, options, keptTokenIds);
-      spLog('after applyTabletopSnap', { tokens: this.debugTokenSummaries() });
     }
 
     if (keptTokens) {
       this.applyKeptTokenPoses(table.identifier, keptTokens);
-      spLog('after applyKeptTokenPoses', {
-        stamped: keptTokens.length,
-        tokens: this.debugTokenSummaries(),
-      });
     }
 
     if (!options.skipText && preset.switchText && preset.switchText.trim()) {
@@ -186,10 +142,6 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
         });
       }
     }
-
-    queueMicrotask(() => spLog('microtask tokens', this.debugTokenSummaries()));
-    setTimeout(() => spLog('timeout50 tokens', this.debugTokenSummaries()), 50);
-    setTimeout(() => spLog('applyPreset END tokens', this.debugTokenSummaries()), 200);
 
     return true;
   }
@@ -273,13 +225,10 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
   ) {
     const snap = preset.tabletopSnap;
     if (!snap || snap.version !== 1) {
-      spLog('applyTabletopSnap abort', { hasSnap: !!snap, version: (snap as any)?.version });
       return;
     }
 
     const pendingPoses: PendingPose[] = [];
-    let applied = 0;
-    let skippedTokens = 0;
 
     if (snap.tableSync && typeof snap.tableSync === 'object') {
       const merged = deepCopy(snap.tableSync) as any;
@@ -294,26 +243,21 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     if (Array.isArray(snap.tableChildren)) {
       for (const childSnap of snap.tableChildren) {
         if (options.skipTokens && this.isTokenSnap(childSnap)) {
-          skippedTokens++;
           continue;
         }
         const pose = this.applyObjectSnap(childSnap, table.identifier, options);
-        if (pose) { pendingPoses.push(pose); applied++; }
+        if (pose) pendingPoses.push(pose);
       }
     }
     if (Array.isArray(snap.pieces)) {
       for (const pieceSnap of snap.pieces) {
         if (options.skipTokens && this.isTokenSnap(pieceSnap)) {
-          skippedTokens++;
-          spLog('skip token pieceSnap', pieceSnap.identifier?.slice(0, 8), { x: pieceSnap.x, y: pieceSnap.y });
           continue;
         }
         const pose = this.applyObjectSnap(pieceSnap, table.identifier, options);
-        if (pose) { pendingPoses.push(pose); applied++; }
+        if (pose) pendingPoses.push(pose);
       }
     }
-
-    spLog('applyTabletopSnap pieces', { applied, skippedTokens, pendingPoses: pendingPoses.length });
 
     this.removeExtraPiecesFromTable(table.identifier, snap, options, keptTokenIds);
 
@@ -352,17 +296,14 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
 
       if (options.skipTokens && this.isTokenObject(obj)) {
         if (keptTokenIds && keptTokenIds.has(obj.identifier)) {
-          spLog('removeExtra keep visible token', obj.identifier.slice(0, 8));
           continue;
         }
         // Not in the pre-switch visible set — clear off this target map.
-        spLog('removeExtra clear non-kept token from target', obj.identifier.slice(0, 8));
         obj.removeFromTable(tableId);
         continue;
       }
 
       if (keepIds.has(obj.identifier)) continue;
-      spLog('removeExtra remove', obj.identifier.slice(0, 8), obj.aliasName);
       obj.removeFromTable(tableId);
     }
   }
@@ -427,7 +368,6 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
         posZ: pose.posZ,
         rotate: pose.rotate,
       });
-      spLog('stamp kept token', ch.identifier.slice(0, 8), { x: pose.x, y: pose.y, tableId: tableId.slice(0, 8) });
     }
     this.flushPoseVisuals(pending);
     queueMicrotask(() => this.flushPoseVisuals(pending));
@@ -443,16 +383,7 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     const obj = ObjectStore.instance.get(entry.identifier);
     if (!obj) return null;
     if (options.skipTokens && this.isTokenObject(obj)) {
-      spLog('applyObjectSnap BLOCKED token', obj.identifier.slice(0, 8), obj.aliasName);
       return null;
-    }
-    if (this.isTokenObject(obj)) {
-      spLog('applyObjectSnap APPLYING token', obj.identifier.slice(0, 8), {
-        skipTokens: !!options.skipTokens,
-        from: { x: (obj as TabletopObject).location?.x, y: (obj as TabletopObject).location?.y },
-        to: { x: entry.x, y: entry.y },
-        tableIdentifier,
-      });
     }
     const syncData = deepCopy(entry.syncData);
     this.applyObjectSync(obj, syncData);
@@ -475,21 +406,6 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     }
     if (!pose) return null;
     return { obj, x: pose.x, y: pose.y, posZ: pose.posZ, rotate: pose.rotate };
-  }
-
-  /** Compact token dump for console debugging. */
-  private debugTokenSummaries(): Array<Record<string, unknown>> {
-    const viewId = TableSelecter.instance.viewTable?.identifier || '';
-    return (ObjectStore.instance.getObjects(GameCharacter) as GameCharacter[]).map(ch => ({
-      id: ch.identifier.slice(0, 8),
-      name: (ch as any).name || '',
-      loc: ch.location?.name,
-      tableId: ch.tableIdentifier?.slice(0, 8),
-      xy: `${toNum(ch.location?.x)},${toNum(ch.location?.y)}`,
-      visible: ch.isVisibleOnTable,
-      hasViewPlacement: viewId ? ch.hasPlacement(viewId) : false,
-      placements: ch.tablePlacements || '(legacy)',
-    }));
   }
 
   private applyObjectSync(obj: GameObject, syncData: Object) {

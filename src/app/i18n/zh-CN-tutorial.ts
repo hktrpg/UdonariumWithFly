@@ -20,7 +20,10 @@ export const zhCN_tutorial: I18nDictionary = {
 　　　　左键空白拖曳＝框选　Shift＋拖曳＝加选框选　点空白／Esc＝取消选取
 图片、音乐可直接拖进浏览器导入。`,
   'tutorial.keyboard': `＜键盘（选取后）＞WASD／方向键＝移动（可对角）
-　　　　Shift＋WASD＝改变面向　Delete＝删除（角色进回收区）
+　　　　Shift＋WASD＝改变面向　Q／E＝旋转 ±45°　Shift＋Q／E＝±15°　R＝重置面向 0°
+　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）　F＝翻面（卡／硬币）或掷骰　L＝锁定／解锁
+　　　　H＝显隐选取角色（仅 GM）　Delete＝删除（角色进回收区）
+　　　　1–9＝切换第 N 个可检视聊天频道（并开启聊天）
 　　　　Ctrl＋C／X／V＝复制／剪切／粘贴（贴在鼠标光标处；选取文字时仍可复制文字）
 　　　　Ctrl＋Z＝撤销　Ctrl＋Y／Ctrl＋Shift＋Z＝重做
 　　　　　（移动／旋转／删除／剪切粘贴／图层；场景工具创建／删除／微移）
@@ -73,7 +76,7 @@ export const zhCN_tutorial: I18nDictionary = {
   'changelog.2026ops': `2026/08/03 操作更新
 ・桌面选取高亮；左键空白框选；Shift＋点／拖曳多选；Ctrl＋左键／右键拖曳平移地图
 ・双击物件开启详情（翻面／抽牌／掷骰改右键菜单）
-・键盘：WASD 移动、Shift＋WASD 面向、Delete、Ctrl＋C／X／V（贴在光标）、Ctrl＋Z／Y 撤销重做
+・键盘：WASD 移动、Shift＋WASD 面向、Q／E／R 旋转、PageUp／Down 高度、F 翻面、L 锁定、H 显隐（GM）、1–9 聊天频道、Delete、Ctrl＋C／X／V、Ctrl＋Z／Y
 ・[ / ] 调整前后层；Alt＋滚轮（选取＝面向 3°／无选取＝视角左右）；Alt＋Shift＋滚轮（选取＝roll／无选取＝俯仰）；Ctrl＋Shift＋滚轮 45°
 ・Ctrl＋Shift＋D：DEBUG pose（视角／选取姿态）；浮动预览可钉选固定
 ・Shift＋滚轮左右移动画面；Ctrl＋滚轮上下移动画面

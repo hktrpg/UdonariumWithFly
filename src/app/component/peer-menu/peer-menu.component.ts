@@ -323,15 +323,15 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   }
 
   showCreateRoom() {
-    this.modalService.open(RoomSettingComponent, { width: 720, height: 720, left: 0, top: 80 });
+    this.modalService.open(RoomSettingComponent, { width: 690, height: 600, left: 0, top: 80 });
   }
 
   editRoomPasswords() {
     if (!this.isGMMode || !this.isRoleAuthRoom || !this.networkService.peer.isRoom) return;
     this.modalService.open(RoomSettingComponent, {
       editMode: true,
-      width: 720,
-      height: 720,
+      width: 690,
+      height: 600,
       left: 0,
       top: 80,
     });
