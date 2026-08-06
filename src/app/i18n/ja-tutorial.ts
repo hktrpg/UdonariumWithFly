@@ -20,7 +20,10 @@ export const ja_tutorial: I18nDictionary = {
 　　　　空白を左ドラッグ＝枠選択　Shift＋ドラッグ＝追加枠選択　空白クリック／Esc＝解除
 画像・音楽はブラウザへドラッグで取り込み可。`,
   'tutorial.keyboard': `＜キーボード（選択中）＞WASD／矢印＝移動（斜め可）
-　　　　Shift＋WASD＝向き　Delete＝削除（キャラはゴミ箱）
+　　　　Shift＋WASD＝向き　Q／E＝回転 ±45°　Shift＋Q／E＝±15°　R＝向きリセット 0°
+　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）　F＝裏表反転（カード／コイン）またはダイス　L＝ロック／解除
+　　　　H＝選択キャラの表示／秘匿（GM のみ）　Delete＝削除（キャラはゴミ箱）
+　　　　1–9＝閲覧可能な N 番目のチャットタブへ（チャットを開く）
 　　　　Ctrl＋C／X／V＝コピー／切取／貼付（カーソル位置；文字選択時は文字コピー可）
 　　　　Ctrl＋Z＝元に戻す　Ctrl＋Y／Ctrl＋Shift＋Z＝やり直し
 　　　　　（移動／回転／削除／切取貼付／レイヤ；シーン作成／削除／微移動）
@@ -73,7 +76,7 @@ export const ja_tutorial: I18nDictionary = {
   'changelog.2026ops': `2026/08/03 操作更新
 ・選択ハイライト；空白左ドラッグ枠選択；Shift＋クリック／ドラッグで複数選択；Ctrl＋左／右ドラッグでパン
 ・ダブルクリックで詳細（裏返し／ドロー／ロールは右クリック）
-・キーボード：WASD 移動、Shift＋WASD 向き、Delete、Ctrl＋C／X／V（カーソル貼付）、Ctrl＋Z／Y 元に戻す／やり直し
+・キーボード：WASD 移動、Shift＋WASD 向き、Q／E／R 回転、PageUp／Down 高さ、F 裏表、L ロック、H 秘匿（GM）、1–9 チャット、Delete、Ctrl＋C／X／V、Ctrl＋Z／Y
 ・[ / ] 前後層；Alt＋ホイール（選択＝向き3°／未選択＝左右）；Alt＋Shift＋ホイール（選択＝roll／未選択＝上下）；Ctrl＋Shift＋ホイール 45°
 ・Ctrl＋Shift＋D：DEBUG pose（視点／選択姿勢）；ホバー概要はピン留め可
 ・Shift＋ホイール左右パン；Ctrl＋ホイール上下パン

@@ -1158,9 +1158,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.trigger('OPEN_CHAT', null);
   }
 
-  /** Map HUD: open add-object menu at view center. */
+  /** Map HUD: toggle toolbox (open / close). Outside-click ignores .map-action-hud. */
   hudOpenAddMenu(ev: Event) {
     ev.stopPropagation();
+    // Same pattern as More / Settings: HUD is excluded from outside-click dismiss,
+    // so re-tap must close here (do not rely on title match — open() can leave stale titles).
+    if (this.contextMenuService.isShow) {
+      this.contextMenuService.close();
+      return;
+    }
     const tablePos = this.coordinateService.calcTabletopLocalCoordinate();
     const rect = (ev.currentTarget as HTMLElement)?.getBoundingClientRect?.();
     const x = rect ? rect.left + rect.width / 2 : (this.pointerDeviceService.pointers[0]?.x ?? window.innerWidth / 2);

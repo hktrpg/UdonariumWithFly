@@ -57,7 +57,7 @@
         </span>
       </div>
     </div>
-    <div class="image-showcase" style="position: absolute; height: 50px; top: 300px">
+    <div class="image-showcase" style="position: absolute; height: 50px; top: 220px">
       <span *ngFor="let imageFile of tabletopObject.imageFiles; index as i" class="image-thumbnail" [ngClass]="{'hide': tabletopObject.currntImageIndex == i}" style="position: absolute;" [style.left.px]="(tabletopObject.currntImageIndex <= i ? i-1 : i) * 50 - showCaseOffset(i)">
         <img @bounceInOut [src]="imageFile.url | safe: 'resourceUrl'" style="cursor: pointer" [alt]="imageFile.name" (click)="selectImage(i)" draggable="false" />
       </span>

@@ -689,7 +689,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = {
-      title: title, left: coordinate.x - 800, top: coordinate.y - 300, width: 800, height: 600,
+      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 690, height: 560,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
@@ -1005,7 +1005,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const tourId = PanelService.tourIdStandSetting(gameObject.identifier);
     if (PanelService.bringTourPanelToFront(tourId)) return;
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 730, height: 572, tourPanelId: tourId };
+    let option: PanelOption = { left: coordinate.x - 400, top: coordinate.y - 175, width: 690, height: 540, tourPanelId: tourId };
     let component = this.panelService.open<StandSettingComponent>(StandSettingComponent, option);
     component.character = gameObject;
   }

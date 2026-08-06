@@ -97,6 +97,11 @@
   border-color: #80CCEE;
 }
 
+/* Temp copies: violet — distinct from selection cyan (hsla 200°) and normal orange. */
+.pedestal-inner.is-temporary {
+  border-color: #B388FF;
+}
+
 .pedestal-outer {
   backface-visibility: hidden;
   position: absolute;
@@ -120,6 +125,19 @@
 
 .selected-highlight.is-magnetic {
   background-color: hsla(60, 100%, 75%, 0.6);
+}
+
+/* Keep temp identity when selected: violet wash + leave purple ring visible. */
+.selected-highlight.is-temporary {
+  background-color: hsla(270, 85%, 72%, 0.5);
+  top: 6px;
+  left: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+}
+
+.selected-highlight.is-temporary.is-magnetic {
+  background-color: hsla(280, 70%, 70%, 0.45);
 }
 
 .upright-transform {

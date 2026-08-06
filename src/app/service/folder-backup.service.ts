@@ -402,8 +402,8 @@ export class FolderBackupService implements OnDestroy {
       });
       if (choice === true) {
         await this.modalService.open(RoomSettingComponent, {
-          width: 720,
-          height: 720,
+          width: 690,
+          height: 600,
           left: 0,
           top: 80,
           preferredRoomId: selected.roomId,

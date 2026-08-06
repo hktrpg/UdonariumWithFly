@@ -385,7 +385,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
 
   helpCutIn() {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 730 };
+    let option: PanelOption = { left: coordinate.x, top: coordinate.y, width: 620, height: 600 };
     let textView = this.panelService.open(TextViewComponent, option);
     textView.title = this.i18n.t('cutin.help');
     textView.text = this.i18n.t('cutin.helpText', { minSize: CutInComponent.MIN_SIZE });

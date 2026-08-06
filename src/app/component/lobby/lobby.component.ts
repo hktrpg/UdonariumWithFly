@@ -30,7 +30,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   help: string;
 
-  static readonly DEFAULT_WIDTH = 700;
+  static readonly DEFAULT_WIDTH = 690;
   static readonly DEFAULT_HEIGHT = 400;
 
   /** Auto-refresh while lobby is open (faster when empty). */
@@ -245,7 +245,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   async showRoomSetting() {
-    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 720, height: 720, left: 0, top: 80 });
+    let isCreate = await this.modalService.open(RoomSettingComponent, { width: 690, height: 600, left: 0, top: 80 });
     if (isCreate) this.dismissLobby();
     this.help = this.i18n.t('lobby.helpInitial');
   }

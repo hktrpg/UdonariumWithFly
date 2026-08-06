@@ -20,7 +20,10 @@ Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
 　　　　Left-drag empty = box select  Shift+drag = additive box  Click empty / Esc = clear
 Drag images or music into the browser to import.`,
   'tutorial.keyboard': `<Keyboard (with selection)> WASD / arrows = move (diagonals OK)
-　　　　Shift+WASD = face direction  Delete = delete (characters go to trash)
+　　　　Shift+WASD = face direction  Q/E = rotate ±45°  Shift+Q/E = ±15°  R = reset facing 0°
+　　　　PageUp/PageDown = altitude ±1 (Shift = ±0.5)  F = flip card/coin or roll dice  L = lock/unlock
+　　　　H = hide/reveal selected characters (GM only)  Delete = delete (characters go to trash)
+　　　　1–9 = switch Nth viewable chat tab (opens chat)
 　　　　Ctrl+C/X/V = copy / cut / paste (paste at cursor; text selection still copies text)
 　　　　Ctrl+Z = undo  Ctrl+Y / Ctrl+Shift+Z = redo
 　　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
@@ -73,7 +76,7 @@ Upgraded to 1.13.2`,
   'changelog.2026ops': `2026/08/03 Controls update
 ・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; Ctrl+left / right-drag pan map
 ・Double-click opens details (flip / draw / roll via right-click)
-・Keyboard: WASD move, Shift+WASD face, Delete, Ctrl+C/X/V (paste at cursor), Ctrl+Z/Y undo/redo
+・Keyboard: WASD move, Shift+WASD face, Q/E/R rotate, PageUp/Down altitude, F flip, L lock, H hide (GM), 1–9 chat tab, Delete, Ctrl+C/X/V, Ctrl+Z/Y
 ・[ / ] layer order; Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
 ・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
