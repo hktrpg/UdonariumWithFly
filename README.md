@@ -75,6 +75,15 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Chat unread badge | Unread count on the menu chat icon while no chat panel is open |
 | View reset / close panels | Available to everyone (Settings / More / right-click); not gated by toolbox menu permission |
 | Lobby on start | Cold start opens Lobby when not in a room (skipped for invite join) |
+| Multi-map placements | Same object can sit on several tables; pose kept when switching maps; notes supported |
+| Temporary token copy | Ctrl+drag a character for a temp copy (not sent to graveyard) |
+| Inventory multi-place | Shift multi-select / Select All, then drag onto the table |
+| Preset scene preview / keep tokens | Thumbnail preview; “Apply (keep tokens)” keeps current poses; inventory bound to viewed map |
+| Panel geometry memory | All panels remember size/position (local); rearrange panels available |
+| GM kick | GM can kick a peer from the Connection panel |
+| V3 mesh-lock | When every enabled role has a password, SkyWay channel uses sealed mesh lock |
+| PWA update hint | Connection panel shows when a new version is ready to reload |
+| Mobile UX | Chat toolbar & map HUD/toolbox exclusivity; hover teaching tips desktop-only |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 

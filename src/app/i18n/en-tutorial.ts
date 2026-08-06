@@ -36,7 +36,7 @@ Drag images or music into the browser to import.`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
-　　　　Window size & position are remembered (local); new chat windows reuse them
+　　　　Window size & position are remembered (local); new chat windows reuse them; other panels too
 <Floating dialog> Speaking as a character pre-fills 「」; text inside appears above the token
 　　　　Toggle via right-click / inventory “Show floating dialog”; scenario text as character with 「」 also triggers it
 <Dice> Pick a system in the input, then type BCDice commands
@@ -101,6 +101,14 @@ Upgraded to 1.13.2`,
 ・Settings*: “Auto-open chat when someone speaks (if closed)” (default off)
 ・Cold start opens Lobby as a normal window when not in a room (no overlay; skipped for invite join)
 ・Scenario text sent as character with 「」 triggers floating dialog`,
+  'changelog.2026map': `2026/08/05–06 Multi-map・scene・room
+・Multi-map placements: same object on several tables; pose kept on switch; notes supported
+・Ctrl+drag character = temporary copy (not graveyard); inventory multi-select / Select All → drop
+・Preset scenes: thumbnail preview, “Apply (keep tokens)”; inventory bound to viewed map
+・All panel sizes/positions remembered (local); rearrange panels available
+・GM can kick peers; V3 mesh-lock when every enabled role has a password
+・Menu/load ZIP perms, 20MB audio cap, chat unread badge; Connection panel PWA update hint
+・Mobile: chat toolbar & map HUD/toolbox mutual exclusivity; hover teaching tips desktop-only`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

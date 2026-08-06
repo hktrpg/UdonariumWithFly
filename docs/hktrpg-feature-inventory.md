@@ -28,6 +28,15 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | Music max 20MB | Uploaded audio capped at 20 MB per file | `file-archiver.ts` `maxAudioeSize`, i18n `jukebox.maxFileSize` | Reject >20MB; UI shows “20MB” |
 | Lobby on start | Cold start (not in a room / no invite) auto-opens Lobby as a normal panel (no modal overlay) | `app.component.ts` `openLobbyIfNeeded` | Fresh load shows lobby panel; map stays clickable |
 | Room XML `syncId` | Persist sync identifiers across ZIP／folder reload so piece↔table bindings survive UUID regen | `object-serializer.ts`, `room.ts`, `tabletop-object.ts` | Save room → reload → tokens stay on correct table; presets rebind |
+| Multi-map placements | Objects / notes can sit on several tables via `tablePlacements`; pose kept on map switch | `tabletop-object.ts`, inventory / game-table | Place on map A → switch to B → object absent; switch back → pose restored |
+| Temporary token copy | Ctrl+drag character creates temp copy that does not enter graveyard | `game-character.ts` `createTemporaryCopy`, movable | Ctrl+drag → temp token; delete does not go to trash listing |
+| Inventory multi-place | Shift multi-select / Select All, drag multiple onto table | `game-object-inventory.component.*` | Select several → drop on table places all |
+| Preset preview / keep tokens | Scene preset JPEG thumbnail; Apply (keep tokens) preserves current poses; inventory bound to viewed map | `scene-preset-preview.ts`, `scene-preset*.ts` | Save shows thumb; Apply keep-tokens leaves current tokens |
+| Panel geometry memory | Unified localForage store for all panel sizes/positions; rearrange action | `panel.service.ts`, `ui-panel.component.*` | Resize connection → reopen keeps size |
+| GM kick | Connection panel kick with confirm; kicked peer notified and reloads | `peer-menu.component.*`, `KICK_PEER` | GM kicks → peer sees notice → reload |
+| V3 mesh-lock | When every enabled role is password-gated, SkyWay channel uses sealed mesh password | `room-auth.ts`, `peer-context.ts` | All roles password → join still works; channel key not in peerId |
+| PWA update hint | Service worker update ready → Connection panel icon / confirm reload | `app-update.service.ts`, `peer-menu` | Deploy new build → icon appears → reload applies |
+| Mobile HUD / tips | Map HUD and toolbox exclusivity; hover teaching tips desktop-only | `app.component`, teaching-tip / overview | Mobile: open toolbox collapses HUD; no sticky hover tips |
 
 ## Port decisions
 
