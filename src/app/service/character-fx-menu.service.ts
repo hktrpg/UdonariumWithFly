@@ -354,6 +354,18 @@ export class CharacterFxMenuService {
     EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 
+  /** Remove a status immediately (token badge right-click). */
+  clearStatus(character: GameCharacter, id: CharacterStatusId) {
+    if (GuestSession.isGuest) return;
+    const list = parseStatusesJson(character.statusesJson);
+    if (!list.some(s => s.id === id)) return;
+    character.statusesJson = stringifyStatuses(setStatusFlag(list, id, false));
+    if (id === 'dead') {
+      CombatTracker.instance.setDefeatedForCharacter(character.identifier, false);
+    }
+    EventSystem.trigger('UPDATE_INVENTORY', null);
+  }
+
   private cycleExhaustion(character: GameCharacter) {
     const list = parseStatusesJson(character.statusesJson);
     const idx = list.findIndex(s => s.id === 'exhaustion');

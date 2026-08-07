@@ -321,7 +321,12 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     submenu.style.top = submenu.offsetTop + diffTop + 'px';
   }
 
-  doAction(action: ContextMenuAction) {
+  doAction(action: ContextMenuAction, event?: Event) {
+    // Nested <context-menu> items sit inside the parent <li>; without this, a
+    // checkbox click bubbles up and the parent treats it as a second tap that
+    // collapses the submenu (status / aura / ring toggles close immediately).
+    event?.stopPropagation();
+
     this.showSubMenu(action, { fromClick: true });
     if (action.action == null) return;
 
@@ -405,21 +410,24 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     clearTimeout(this.showSubMenuTimer);
 
-    // First-level row without a submenu: close any open second-level menu immediately.
+    // Row without a submenu: close any open nested menu (e.g. left a flyout parent).
+    // Checkbox/radio rows still call this from doAction; clearing nested menus is fine,
+    // and stopPropagation prevents the parent row from treating it as a collapse tap.
     if (action.subActions == null || action.subActions.length < 1) {
       this.clearSubMenuNow();
       return;
     }
 
-    // Second tap on the same row collapses the inline submenu.
+    // Already open: on desktop hover already expanded it — a click must not collapse.
+    // Mobile sheets have no reliable hover; second tap toggles closed.
     if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
-      this.clearSubMenuNow();
+      if (mobileSheet) this.clearSubMenuNow();
       return;
     }
 
     // Switching to another first-level item: drop the previous submenu before opening the next.
     clearTimeout(this.hideSubMenuTimer);
-    const delay = mobileSheet ? 0 : (this.parentMenu === action ? 0 : 120);
+    const delay = (mobileSheet || opts?.fromClick || this.parentMenu === action) ? 0 : 120;
     this.showSubMenuTimer = setTimeout(() => {
       this.parentMenu = action;
       this.subMenu = action.subActions;

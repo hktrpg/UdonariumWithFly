@@ -28,7 +28,7 @@
       [style.color]="action.color ? action.color : ''" 
       [style.text-align]="action.center ? 'center': ''"
       [attr.title]="action.tip || null"
-      (click)="(action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)) ? false : doAction(action)"
+      (click)="(action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)) ? false : doAction(action, $event)"
       (mouseenter)="(action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)) ? false : showSubMenu(action)">
     <div class="menu-title" [ngClass]="{'icon-menu': action.icon, default: action.default}" style="width: 100%">
       <span *ngIf="action.error" title="{{action.error}}">⚠️</span>
