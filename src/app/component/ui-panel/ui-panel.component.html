@@ -14,7 +14,7 @@
   [attr.data-geometry-key]="panelService.geometryKey || null"
   [style.left.px]="left" [style.top.px]="top" [style.width.px]="width" [style.height.px]="height"
   [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical'" [draggable.disable]="isFullScreen || isMobileSheet"
-  [draggable.stack]="'.draggable-panel'" [resizable.stack]="'.draggable-panel'"
+  [draggable.handle]="'.title'" [draggable.stack]="'.draggable-panel'" [resizable.stack]="'.draggable-panel'"
   (resizable.end)="onPanelGeometryEnd()" (draggable.end)="onPanelGeometryEnd()"
   appDraggable appResizable #draggablePanel>
   <div class="title" #titleBar (dblclick)="onTitleDblClick($event)" (click)="onMobileTitleTap($event)">

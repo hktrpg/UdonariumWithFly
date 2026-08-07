@@ -24,6 +24,7 @@ import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
+import { AudioLibrary } from '@udonarium/audio-library';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { I18nService } from './i18n.service';
@@ -92,6 +93,7 @@ export class SaveDataService {
     files.push(new File([scenePermXml], 'fly_scenePerm.xml', { type: 'text/plain' }));
     files.push(new File([scenePresetXml], 'fly_scenePreset.xml', { type: 'text/plain' }));
     files.push(new File([scenarioTextXml], 'fly_scenarioText.xml', { type: 'text/plain' }));
+    files.push(new File([this.convertToXml(AudioLibrary.instance)], 'fly_audioLibrary.xml', { type: 'text/plain' }));
 
     let images: ImageFile[] = [];
     images = images.concat(this.searchImageFiles(roomXml));
@@ -106,11 +108,22 @@ export class SaveDataService {
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
 
     // User-uploaded BGM / SE (preset asset sounds are isHidden and omitted).
+    const urlAudioManifest: { identifier: string; name: string; url: string }[] = [];
     for (const audio of AudioStorage.instance.audios) {
       if (audio.isHidden) continue;
-      if (audio.state !== AudioState.COMPLETE || !audio.blob) continue;
-      const ext = MimeType.extension(audio.blob.type) || 'mp3';
-      files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
+      if (audio.state === AudioState.COMPLETE && audio.blob) {
+        const ext = MimeType.extension(audio.blob.type) || 'mp3';
+        files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
+      } else if (audio.state === AudioState.URL && StringUtil.validUrl(audio.url)) {
+        urlAudioManifest.push({
+          identifier: audio.identifier,
+          name: audio.name,
+          url: audio.url
+        });
+      }
+    }
+    if (urlAudioManifest.length > 0) {
+      files.push(new File([JSON.stringify(urlAudioManifest)], 'fly_audioUrls.json', { type: 'application/json' }));
     }
     return files;
   }

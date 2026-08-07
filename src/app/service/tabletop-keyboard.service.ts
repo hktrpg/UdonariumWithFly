@@ -212,11 +212,11 @@ export class TabletopKeyboardService {
       return;
     }
 
-    // R: reset facing to 0°.
+    // R: reset facing + tilt (roll) to 0°.
     if (code === 'KeyR' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
-      if (RotableSelectionSynchronizer.face(this.selectionService.objects, 0)) {
+      if (RotableSelectionSynchronizer.resetAngles(this.selectionService.objects)) {
         this.consume(e);
       }
       return;

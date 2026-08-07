@@ -45,11 +45,21 @@ export class AudioPlayer {
     AudioPlayer.volume = AudioPlayer._volume;
   }
 
+  /** Players using element-direct playback (cross-origin URL without CORS). */
+  private static elementDirectPlayers = new Set<AudioPlayer>();
+
+  private static refreshElementDirectVolumes() {
+    for (const player of AudioPlayer.elementDirectPlayers) {
+      player.applyElementVolume();
+    }
+  }
+
   private static _volume: number = 0.5;
   static get volume(): number { return AudioPlayer._volume; }
   static set volume(volume: number) {
     AudioPlayer._volume = volume;
     AudioPlayer.masterGainNode.gain.setTargetAtTime(AudioPlayer.isMute ? 0 : AudioPlayer._volume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.refreshElementDirectVolumes();
   }
 
   private static _isAuditionMute: boolean = false;
@@ -64,6 +74,7 @@ export class AudioPlayer {
   static set auditionVolume(auditionVolume: number) {
     AudioPlayer._auditionVolume = auditionVolume;
     AudioPlayer.auditionGainNode.gain.setTargetAtTime(AudioPlayer.isAuditionMute ? 0 : AudioPlayer._auditionVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.refreshElementDirectVolumes();
   }
 
   private static _isSoundEffectMute: boolean = false;
@@ -78,6 +89,7 @@ export class AudioPlayer {
   static set soundEffectVolume(soundEffectVolume: number) {
     AudioPlayer._soundEffectVolume = soundEffectVolume;
     AudioPlayer.soundEffectGainNode.gain.setTargetAtTime(AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer._soundEffectVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.refreshElementDirectVolumes();
   }
 
   private static _isNoticeMute: boolean = false;
@@ -92,6 +104,7 @@ export class AudioPlayer {
   static set noticeVolume(noticeVolume: number) {
     AudioPlayer._noticeVolume = noticeVolume;
     AudioPlayer.noticeGainNode.gain.setTargetAtTime(AudioPlayer.isNoticeMute ? 0 : AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.refreshElementDirectVolumes();
   }
 
   private static _isAmbientMute: boolean = false;
@@ -106,6 +119,7 @@ export class AudioPlayer {
   static set ambientVolume(ambientVolume: number) {
     AudioPlayer._ambientVolume = ambientVolume;
     AudioPlayer.ambientGainNode.gain.setTargetAtTime(AudioPlayer.isAmbientMute ? 0 : AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.refreshElementDirectVolumes();
   }
 
   private static _masterGainNode: GainNode
@@ -180,11 +194,28 @@ export class AudioPlayer {
     return this._audioElm;
   }
 
+  /** Separate element that never attaches MediaElementSource (required for non-CORS remote URLs). */
+  private _directAudioElm: HTMLAudioElement;
+  private get directAudioElm(): HTMLAudioElement {
+    if (!this._directAudioElm) {
+      this._directAudioElm = new Audio();
+    }
+    return this._directAudioElm;
+  }
+
   private _mediaElementSource: MediaElementAudioSourceNode;
   private get mediaElementSource(): MediaElementAudioSourceNode {
     if (!this._mediaElementSource) this._mediaElementSource = AudioPlayer.audioContext.createMediaElementSource(this.audioElm);
     return this._mediaElementSource;
   }
+
+  /** When true, play remote URL via HTMLAudioElement (speakers), not Web Audio. */
+  private elementDirect = false;
+  private roomGain = 1;
+  private loopFlag = false;
+  private readonly onEndedBound = () => {
+    if (this.endedAction) this.endedAction();
+  };
 
   // Make this an event?
   public endedAction: Function;
@@ -192,11 +223,21 @@ export class AudioPlayer {
   audio: AudioFile;
   volumeType: VolumeType = VolumeType.MASTER;
 
-  get volume(): number { return this.audioElm.volume; }
-  set volume(volume) { this.audioElm.volume = volume; }
-  get loop(): boolean { return this.audioElm.loop; }
-  set loop(loop) { this.audioElm.loop = loop; }
-  get paused(): boolean { return this.audioElm.paused; }
+  get volume(): number { return this.roomGain; }
+  set volume(volume) {
+    this.roomGain = volume;
+    this.applyElementVolume();
+  }
+  get loop(): boolean { return this.loopFlag; }
+  set loop(loop) {
+    this.loopFlag = !!loop;
+    if (this._audioElm) this._audioElm.loop = this.loopFlag;
+    if (this._directAudioElm) this._directAudioElm.loop = this.loopFlag;
+  }
+  get paused(): boolean {
+    if (this.elementDirect) return !this._directAudioElm || this._directAudioElm.paused;
+    return !this._audioElm || this._audioElm.paused;
+  }
 
   private static cacheMap: Map<string, AudioCache> = new Map();
 
@@ -212,41 +253,113 @@ export class AudioPlayer {
     this.playBufferAsyncBase(AudioPlayer.soundEffectNode, audio, volume);
   }
 
+  private static isCrossOriginHttpUrl(url: string): boolean {
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return false;
+    try {
+      const absolute = new URL(url, window.location.href);
+      if (absolute.protocol !== 'http:' && absolute.protocol !== 'https:') return false;
+      return absolute.origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  private getChannelLinearVolume(): number {
+    switch (this.volumeType) {
+      case VolumeType.AUDITION:
+        return AudioPlayer.isAuditionMute ? 0 : AudioPlayer.auditionVolume;
+      case VolumeType.SOUND_EFFECT:
+        return AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer.soundEffectVolume;
+      case VolumeType.NOTICE:
+        return AudioPlayer.isNoticeMute ? 0 : AudioPlayer.noticeVolume;
+      case VolumeType.AMBIENT:
+        return AudioPlayer.isAmbientMute ? 0 : AudioPlayer.ambientVolume;
+      default:
+        return AudioPlayer.isMute ? 0 : AudioPlayer.volume;
+    }
+  }
+
+  private applyElementVolume() {
+    const gain = Math.max(0, Math.min(1, this.roomGain));
+    if (this.elementDirect && this._directAudioElm) {
+      this._directAudioElm.volume = Math.max(0, Math.min(1, gain * this.getChannelLinearVolume()));
+    } else if (this._audioElm) {
+      this._audioElm.volume = gain;
+    }
+  }
+
   play(audio: AudioFile = this.audio) {
     this.stop();
     this.audio = audio;
     if (!this.audio) return;
 
     let url = this.audio.url;
+    const remoteCrossOrigin = audio.state === AudioState.URL && AudioPlayer.isCrossOriginHttpUrl(url);
+    const hasBlobCache = audio.state === AudioState.URL && AudioPlayer.cacheMap.has(audio.identifier);
 
-    if (audio.state === AudioState.URL) {
-      if (AudioPlayer.cacheMap.has(audio.identifier)) {
-        url = AudioPlayer.cacheMap.get(audio.identifier).url;
-      } else {
-        AudioPlayer.createCacheAsync(audio);
-      }
+    if (hasBlobCache) {
+      url = AudioPlayer.cacheMap.get(audio.identifier).url;
+    } else if (audio.state === AudioState.URL && !remoteCrossOrigin) {
+      // Same-origin / relative assets: optional prefetch into blob cache.
+      AudioPlayer.createCacheAsync(audio);
+    }
+    // Remote cross-origin: do not fetch() — CORS usually blocks and only spams console.
+
+    // MediaElementSource requires CORS for remote media; without it output is silent.
+    // Use a dedicated HTMLAudioElement that never joins the Web Audio graph.
+    this.elementDirect = remoteCrossOrigin && !hasBlobCache;
+
+    if (this.elementDirect) {
+      AudioPlayer.elementDirectPlayers.add(this);
+      const elm = this.directAudioElm;
+      elm.loop = this.loopFlag;
+      elm.removeAttribute('crossorigin');
+      elm.src = url;
+      this.applyElementVolume();
+      elm.addEventListener('ended', this.onEndedBound, { once: true });
+      elm.load();
+      elm.play().catch(reason => { console.warn(reason); });
+      return;
     }
 
+    AudioPlayer.elementDirectPlayers.delete(this);
     this.mediaElementSource.connect(this.getConnectingAudioNode());
+    this.audioElm.loop = this.loopFlag;
+    this.audioElm.crossOrigin = null;
     this.audioElm.src = url;
-    this.audioElm.addEventListener('ended', () => {
-      if (this.endedAction) this.endedAction();
-    });
+    this.applyElementVolume();
+    this.audioElm.addEventListener('ended', this.onEndedBound, { once: true });
     this.audioElm.load();
     this.audioElm.play().catch(reason => { console.warn(reason); });
   }
 
   pause() {
+    if (this.elementDirect) {
+      this._directAudioElm?.pause();
+      return;
+    }
     this.audioElm.pause();
   }
 
   stop() {
-    if (!this.audioElm) return;
-    this.pause();
-    this.audioElm.currentTime = 0;
-    this.audioElm.src = '';
-    this.audioElm.load();
-    this.mediaElementSource.disconnect();
+    AudioPlayer.elementDirectPlayers.delete(this);
+    this.elementDirect = false;
+
+    if (this._directAudioElm) {
+      this._directAudioElm.removeEventListener('ended', this.onEndedBound);
+      this._directAudioElm.pause();
+      this._directAudioElm.currentTime = 0;
+      this._directAudioElm.removeAttribute('src');
+      this._directAudioElm.load();
+    }
+
+    if (!this._audioElm) return;
+    this._audioElm.removeEventListener('ended', this.onEndedBound);
+    this._audioElm.pause();
+    this._audioElm.currentTime = 0;
+    this._audioElm.src = '';
+    this._audioElm.load();
+    if (this._mediaElementSource) this._mediaElementSource.disconnect();
   }
 
   private getConnectingAudioNode() {
@@ -359,7 +472,8 @@ export class AudioPlayer {
     try {
       cache.blob = await AudioPlayer.getBlobAsync(audio);
     } catch (e) {
-      console.error(e);
+      // Expected for many remote hosts (no CORS). Playback may still work via element-direct.
+      console.warn('Audio cache skipped (CORS or network):', audio.url);
       return cache;
     }
 

@@ -242,10 +242,10 @@
         <div class="block-head"><span>{{ 'table.atmosphere' | i18n }}</span></div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.darkness' | i18n }}</span>
-          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable">
+          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable || !canControlDayNight">
           <span class="val">{{ tableDarkness | number:'1.0-2' }}</span>
-          <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable">{{ 'table.day' | i18n }}</button>
-          <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable">{{ 'table.night' | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.day' | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.night' | i18n }}</button>
         </div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.globalIllumination' | i18n }}</span>
@@ -255,7 +255,7 @@
         <div class="compact-row wrap">
           <label class="inline-field">
             <span>{{ 'table.weather' | i18n }}</span>
-            <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable">
+            <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable || !canControlWeather">
               <option value="none">{{ 'table.none' | i18n }}</option>
               <option value="rain">{{ 'table.rain' | i18n }}</option>
               <option value="thunderstorm">{{ 'table.thunderstorm' | i18n }}</option>
@@ -278,7 +278,7 @@
               max="1"
               step="0.05"
               [(ngModel)]="tableWeatherIntensity"
-              [disabled]="!isEditable || tableWeatherType === 'none'"
+              [disabled]="!isEditable || !canControlWeather || tableWeatherType === 'none'"
             >
           </label>
           <label class="check" [title]="'table.visionHint' | i18n">

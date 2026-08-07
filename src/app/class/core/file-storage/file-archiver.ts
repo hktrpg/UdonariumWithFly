@@ -2,6 +2,7 @@ import { BlobReader, BlobWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 import { saveAs } from 'file-saver';
 
 import { EventSystem } from '../system';
+import { StringUtil } from '../system/util/string-util';
 import { XmlUtil } from '../system/util/xml-util';
 import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
@@ -84,9 +85,36 @@ export class FileArchiver {
     for (let file of loadFiles) {
       await this.handleImage(file);
       await this.handleAudio(file);
+      await this.handleAudioUrlManifest(file);
       await this.handleText(file);
       await this.handleZip(file);
       EventSystem.trigger('FILE_LOADED', { file: file });
+    }
+  }
+
+  private async handleAudioUrlManifest(file: File) {
+    const baseName = file.name.split(/[\\/]/).pop();
+    if (baseName !== 'fly_audioUrls.json') return;
+    try {
+      const text = await FileReaderUtil.readAsTextAsync(file);
+      const list = JSON.parse(text);
+      if (!Array.isArray(list)) return;
+      for (const item of list) {
+        if (!item || typeof item.url !== 'string') continue;
+        const url = item.url.trim();
+        if (!StringUtil.validUrl(url)) continue;
+        const name = (typeof item.name === 'string' && item.name.trim()) ? item.name.trim() : url;
+        const identifier = (typeof item.identifier === 'string' && item.identifier.trim()) ? item.identifier.trim() : url;
+        AudioStorage.instance.add({
+          identifier,
+          name,
+          type: '',
+          blob: null,
+          url
+        });
+      }
+    } catch (reason) {
+      console.warn(reason);
     }
   }
 

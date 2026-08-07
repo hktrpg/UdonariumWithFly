@@ -16,6 +16,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
 import { DiceBot } from '@udonarium/dice-bot';
 import { Jukebox } from '@udonarium/Jukebox';
+import { AudioLibrary } from '@udonarium/audio-library';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -58,6 +59,7 @@ import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component
 import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
 import { CharacterResourceHudComponent } from 'component/character-resource-hud/character-resource-hud.component';
+import { MusicHudComponent } from 'component/music-hud/music-hud.component';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
@@ -222,6 +224,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
     let jukebox: Jukebox = new Jukebox('Jukebox');
     jukebox.initialize();
+    AudioLibrary.instance;
 
     let soundEffect: SoundEffect = new SoundEffect('SoundEffect');
     soundEffect.initialize();
@@ -562,6 +565,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       .on('CHAT_PANEL_CHANGED', () => {
         this.lazyNgZoneUpdate(true);
       })
+      .on('OPEN_OR_TOGGLE_PANEL', event => {
+        const name = typeof event.data === 'string' ? event.data : event.data?.component;
+        if (name) this.ngZone.run(() => this.openOrToggle(name));
+      })
       .on('PLAY_CUT_IN', -1000, event => {
         let cutIn = ObjectStore.instance.get<CutIn>(event.data.identifier);
         this.cutInService.play(cutIn, event.data.secret ? event.data.secret : false, event.data.test ? event.data.test : false, event.data.sender);
@@ -813,8 +820,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'JukeboxComponent':
         component = JukeboxComponent;
-        option.height = 480;
-        option.title = this.i18n.t('jukebox.title');
+        option = { width: 300, height: 520, title: this.i18n.t('jukebox.title') };
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
@@ -1256,8 +1262,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       menu.push(ContextMenuSeparator);
     }
-    menu.push(this.makeWeatherToolboxMenu());
-    menu.push(this.makeDayNightToolboxMenu());
+    if (SceneToolPermission.instance.canControlWeather()) {
+      menu.push(this.makeWeatherToolboxMenu());
+    }
+    if (SceneToolPermission.instance.canControlDayNight()) {
+      menu.push(this.makeDayNightToolboxMenu());
+    }
     if (!compact) {
       menu.push(ContextMenuSeparator);
       menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
@@ -1562,6 +1572,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => CharacterResourceHudComponent.setVisible(v),
         on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
         off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => MusicHudComponent.isVisible,
+        set: (v) => MusicHudComponent.setVisible(v),
+        on: `☑${this.i18n.t('menu.settings.musicHud')}`,
+        off: `☐${this.i18n.t('menu.settings.musicHud')}`,
       }),
       contextMenuToggleCheck({
         get: () => PanelService.singleNonChatWindow,

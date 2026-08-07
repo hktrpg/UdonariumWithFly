@@ -113,6 +113,14 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.GuestMode()) return;
   }
 
+  /** Menu labels must not be text-selectable while clicking / dragging. */
+  @HostListener('selectstart', ['$event'])
+  onSelectStart(e: Event) {
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+  }
+
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
     const isMobile = document.body.classList.contains('udon-mobile-layout');

@@ -44,6 +44,13 @@ export class SceneToolPermission extends GameObject implements InnerXml {
   @SyncVar() playerCanLoadRoom: boolean = false;
 
   /**
+   * Atmosphere controls (toolbox + map settings).
+   * Default on so players with toolbox/table access keep current behaviour; GM can revoke.
+   */
+  @SyncVar() playerCanControlWeather: boolean = true;
+  @SyncVar() playerCanControlDayNight: boolean = true;
+
+  /**
    * Player menu visibility.
    * Default on: images / music / toolbox / inventory / notes.
    * Default off: table / scene preset / scenario text.
@@ -155,6 +162,25 @@ export class SceneToolPermission extends GameObject implements InnerXml {
     if (this.isGM) return true;
     if (!Network.peer?.isRoom) return true;
     return !!this.playerCanLoadRoom;
+  }
+
+  /**
+   * Change map weather (type / intensity). Guests never; GM always;
+   * missing SyncVar (older rooms) falls back to allowed.
+   */
+  canControlWeather(): boolean {
+    if (GuestSession.isGuest) return false;
+    if (this.isGM) return true;
+    return this.menuFlag(this.playerCanControlWeather, true);
+  }
+
+  /**
+   * Change day/night (darkness tween / darkness slider). Same rules as weather.
+   */
+  canControlDayNight(): boolean {
+    if (GuestSession.isGuest) return false;
+    if (this.isGM) return true;
+    return this.menuFlag(this.playerCanControlDayNight, true);
   }
 
   /**

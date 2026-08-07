@@ -85,6 +85,7 @@ import { SceneToolsComponent } from './component/scene-tools/scene-tools.compone
 import { ScenePresetComponent } from './component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from './component/scenario-text/scenario-text.component';
 import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
+import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
 import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
@@ -163,6 +164,7 @@ import '@udonarium/table-fx/combat-tracker';
     ScenePresetComponent,
     ScenarioTextComponent,
     CharacterResourceHudComponent,
+    MusicHudComponent,
     CombatTrackerComponent,
     CombatAnnounceComponent,
     TeachingTipDirective,

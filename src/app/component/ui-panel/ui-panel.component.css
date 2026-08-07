@@ -18,7 +18,7 @@
   width: 300px;
   max-height: 100%;
   max-width: 100%;
-  cursor: grab;
+  cursor: default;
 }
 
 .scrollable-panel {
@@ -43,6 +43,7 @@
   background-color: #555;
   color: #CCC;
   user-select: none;
+  cursor: grab;
 
   display: flex;
 }
@@ -70,6 +71,7 @@
   border-radius: 0;
   outline: none;
   color: #CCC;
+  cursor: pointer;
 }
 
 .pointer-events-none {

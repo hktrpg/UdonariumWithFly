@@ -16,6 +16,23 @@
   </div>
   <p class="hint">{{ 'peer.loadDataPermHelp' | i18n }}</p>
 
+  <div class="section-title">{{ 'peer.atmospherePermTitle' | i18n }}</div>
+  <div class="scene-perm-group">
+    <div class="scene-perm-sub scene-perm-sub-flat">
+      <label>
+        <input type="checkbox" [(ngModel)]="playerCanControlWeather">
+        <i class="material-icons perm-icon">wb_cloudy</i>
+        {{ 'table.weather' | i18n }}
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="playerCanControlDayNight">
+        <i class="material-icons perm-icon">brightness_6</i>
+        {{ 'table.dayNight' | i18n }}
+      </label>
+    </div>
+  </div>
+  <p class="hint">{{ 'peer.atmospherePermHelp' | i18n }}</p>
+
   <div class="section-title">{{ 'peer.menuPermTitle' | i18n }}</div>
   <div class="scene-perm-group">
     <div class="scene-perm-row scene-perm-head">

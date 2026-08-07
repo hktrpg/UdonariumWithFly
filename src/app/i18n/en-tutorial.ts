@@ -8,58 +8,110 @@ The map is 2.5D. Data is shared peer-to-peer; the server does not keep your toke
 ★ Before leaving, Download ZIP; next time Load ZIP. Without saving, everything vanishes.
 Desktop Chrome recommended. This tutorial hides after your first chat message.
 Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
-  'tutorial.view': `<View> Ctrl+left / right-drag = pan  Middle-drag = rotate  Wheel = zoom
-　　　　Alt+wheel (no selection) = yaw ±3°  Alt+Shift+wheel = pitch ±3°  Shift+wheel = pan left/right  Ctrl+wheel = pan up/down
-<Objects> Left-drag to move  Drag the rotate handle  Right-click = menu
+  'tutorial.view': `<View> Right-drag = pan
+　　　　Middle-drag / Ctrl+right-drag = rotate
+　　　　Wheel = zoom
+　　　　WASD = move view (no selection)
+　　　　Q/E = yaw view left/right (no selection)
+　　　　Alt+wheel (no selection) = yaw ±3°
+　　　　Alt+Shift+wheel (no selection) = pitch ±3°
+　　　　Shift+wheel = pan left/right
+　　　　Ctrl+wheel = pan up/down
+　　　　Ctrl+Shift+D = toggle DEBUG pose (top-right view / selection pose; off by default)
+<Objects> Left-drag = move
+　　　　Drag rotate handle = turn
+　　　　Right-click = menu
 　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…)
-　　　　“Next image” for characters is in the right-click menu
-　　　　Flip cards, draw from decks, roll dice: use the right-click menu
-<Path move> Select a token, Ctrl+left-click to add waypoints (release Ctrl — path stays)
-　　　　Then left-click a new position = final stop and go  or Space = go with current waypoints  Right-click = undo last waypoint  Esc = cancel path
-<Select> Left-click = select (highlight)  Shift+click = add/remove
-　　　　Left-drag empty = box select  Shift+drag = additive box  Click empty / Esc = clear
+　　　　Character “Next image” = right-click “Switch to next image”
+　　　　Flip cards / draw / roll dice = right-click menu
+<Path move> After selecting a token: Ctrl+left-click = add waypoint (release Ctrl — path stays)
+　　　　Left-click new position = final stop and go
+　　　　Space = go with current waypoints
+　　　　Right-click = undo last waypoint
+　　　　Esc = cancel path
+<Select> Left-click = select (highlight)
+　　　　Shift+click = add/remove
+　　　　Left-drag empty = box select
+　　　　Shift+drag = additive box
+　　　　Click empty / Esc = clear
+<Hover preview> Pause on an object = preview card
+　　　　Pin (top-left) = keep open (closes on delete/trash)
+　　　　Unpinned leave = fade out ~0.5s
 Drag images or music into the browser to import.`,
   'tutorial.keyboard': `<Keyboard (with selection)> WASD / arrows = move (diagonals OK)
-　　　　Shift+WASD = face direction  Q/E = rotate ±45°  Shift+Q/E = ±15°  R = reset facing 0°
-　　　　PageUp/PageDown = altitude ±1 (Shift = ±0.5)  F = flip card/coin or roll dice  L = lock/unlock
-　　　　H = hide/reveal selected characters (GM only)  Delete = delete (characters go to trash)
-　　　　1–9 = switch Nth viewable chat tab (opens chat)
-　　　　Ctrl+C/X/V = copy / cut / paste (paste at cursor; text selection still copies text)
-　　　　Ctrl+Z = undo  Ctrl+Y / Ctrl+Shift+Z = redo
-　　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
-　　　　[ = send back  ] = bring front
-　　　　Alt+wheel = facing ±3° when selected; yaw when empty  Alt+Shift+wheel = roll ±3° when selected; pitch when empty  Ctrl+Shift+wheel = facing ±45°
-　　　　Ctrl+Shift+D = toggle DEBUG pose (top-right view / selection angles & height; off by default)
-　　　　Hold Shift on drop = temporary no grid snap  Esc = clear selection
-　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.
-<Hover preview> Pause on an object = preview card  Pin (top-left) = keep open; closes on delete/trash  Unpinned: fade out ~0.5s after leave`,
+　　　　Shift+WASD = face direction
+　　　　Q/E = rotate ±45°
+　　　　Shift+Q/E = ±15°
+　　　　R = reset all angles (facing / tilt) to 0°
+　　　　PageUp/PageDown = altitude ±1 (Shift = ±0.5)
+　　　　F = flip card/coin or roll dice
+　　　　L = lock/unlock
+　　　　H = hide/reveal selected characters (GM only)
+　　　　Delete = delete (characters go to trash)
+　　　　Ctrl+C　Ctrl+X　Ctrl+V = copy / cut / paste (paste at cursor; text selection still copies text)
+　　　　[ = send back
+　　　　] = bring front
+　　　　Alt+wheel = facing ±3°
+　　　　Alt+Shift+wheel = roll ±3°
+　　　　Ctrl+Shift+wheel = facing ±45°
+　　　　Hold Shift on drop = temporary no grid snap
+　　　　Esc = clear selection
+<Keyboard (general)> Ctrl+Z = undo
+　　　　Ctrl+Y　Ctrl+Shift+Z = redo
+　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
+　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.`,
   'tutorial.chat': `<Chat> Switch channels above; toolbar (local, ON/OFF):
 　　　　Music / SFX / notice / align left / list (bubbles) / compact toolbar
 　　　　Compact = hide tabs & toolbar, keep input; restore with the bottom-right button
-　　　　Window size & position are remembered (local); new chat windows reuse them; other panels too
+　　　　Window size & position = remembered (local); new chat windows reuse them
+　　　　1–9 = switch Nth viewable chat tab (opens chat; no table selection required)
 <Floating dialog> Speaking as a character pre-fills 「」; text inside appears above the token
-　　　　Toggle via right-click / inventory “Show floating dialog”; scenario text as character with 「」 also triggers it
+　　　　Right-click / inventory = toggle “Show floating dialog”
+　　　　Scenario text as character with 「」 also triggers it
 <Dice> Pick a system in the input, then type BCDice commands
-　　　　Quick roll beside character sheet numbers goes to the current chat channel
+　　　　Beside character sheet numbers = Quick roll to the current chat channel
+<Connection> GM can kick peers from the Connection panel
+　　　　Every enabled role has a password = V3 mesh-lock
+　　　　When a new build is ready = Connection shows a PWA update hint — confirm to reload
 <Guest> Rooms can “allow guests”; guests are limited. Passwords still apply
 <Notes> Menu → Note inventory for table / shared / private / trash notes
-<Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone.
-<Settings*> Optional “Auto-open chat when someone speaks (if closed)” (default off); lobby opens on cold start when not in a room`,
-  'tutorial.scene': `<Ping> Long-press empty map = marker; Shift+long-press = warning
+<Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone
+<Settings*> Optional “Auto-open chat when someone speaks (if closed)” (default off)
+　　　　Cold start not in a room = lobby as a normal window
+　　　　Settings / More = “Rearrange panels”; panel sizes & positions remembered (local)`,
+  'tutorial.scene': `<Ping> Long-press empty map = marker
+　　　　Shift+long-press = warning
 <Map settings> Darkness / global brightness / weather (rain・thunderstorm・snow・fog・wind・sakura・maple・sandstorm・rainbow・aurora・burning) / enable vision
-　　　　Grid: off / square / hex (vertical・horizontal); optional coordinates; local grid snap
-　　　　Toolbox can switch weather and day/night quickly
+　　　　Grid = off / square / hex (vertical・horizontal); optional coordinates; local grid snap
+　　　　Toolbox = quick weather and day/night
+<Multi-map> Same object / note can sit on several tables (placements); pose kept when switching maps
+　　　　Inventory “On table” = follows the viewed map; Shift multi-select / Select All then drag onto the table
+　　　　Ctrl+drag a character = temporary copy (not sent to graveyard)
+<Preset scenes> Thumbnail on save
+　　　　Apply = restores poses & atmosphere
+　　　　“Apply (keep tokens)” = atmosphere / BGM only
 <Vision> When on, players only see around their vision character (GM unrestricted)
 　　　　Picking a speaker in chat = temporary vision; closing that chat clears it
-　　　　For persistent vision, right-click “My vision character”; set vision / bright / dim
-　　　　Character tokens always block light; masks・terrain block by default — right-click can disable light interaction
-　　　　Status icons stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
-　　　　Image effects: right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
-　　　　Base rings via right-click “Ring”
+　　　　Persistent = right-click “My vision character”; set vision / bright / dim
+　　　　Character tokens = always block light; masks・terrain block by default — right-click can disable light interaction
+　　　　Status icons = stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
+　　　　Image effects = right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
+　　　　Base rings = right-click “Ring”
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
-　　　　After select: WASD/arrows move, Delete removes, Ctrl+Z/Y undo/redo; wall・polygon: Enter/double-click finish; Esc cancel
+　　　　After select: WASD/arrows = move
+　　　　Delete = remove
+　　　　Ctrl+Z　Ctrl+Y = undo / redo
+　　　　Wall・polygon: Enter/double-click = finish; Esc = cancel
 <Combat> Open from menu; add selection / all on table, roll initiative, rounds
-　　　　Character right-click “Join combat”; turn announce appears when started`,
+　　　　Character right-click = “Join combat”; turn announce appears when started`,
+  'tutorial.card.ops': 'Controls',
+  'tutorial.card.ops.hint': 'View · keyboard · chat · connection',
+  'tutorial.card.scene': 'Scene',
+  'tutorial.card.scene.hint': 'Map · multi-map · presets · combat',
+  'tutorial.card.changelog': 'Changelog',
+  'tutorial.card.changelog.hint': 'Version history',
+  'tutorial.card.expand': 'Expand',
+  'tutorial.card.collapse': 'Collapse',
   'changelog.v1132': `Re-localized from https://nanasunana.github.io/ private build with extra features.
 Upgraded to 1.13.2`,
   'changelog.v1133b': `Upgraded to 1.13.3b
@@ -74,9 +126,10 @@ Upgraded to 1.13.2`,
 ・Chat toolbar: music / SFX / notice / align left / list / compact
 ・BCDice 4.9.0`,
   'changelog.2026ops': `2026/08/03 Controls update
-・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; Ctrl+left / right-drag pan map
+・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; right-drag pan map
 ・Double-click opens details (flip / draw / roll via right-click)
-・Keyboard: WASD move, Shift+WASD face, Q/E/R rotate, PageUp/Down altitude, F flip, L lock, H hide (GM), 1–9 chat tab, Delete, Ctrl+C/X/V, Ctrl+Z/Y
+・Keyboard (with selection): WASD move, Shift+WASD face, Q/E rotate, R reset all angles, PageUp/Down altitude, F flip, L lock, H hide (GM), Delete, Ctrl+C　Ctrl+X　Ctrl+V, Ctrl+Z/Y
+・Chat: 1–9 switch viewable tab (opens chat; no selection required)
 ・[ / ] layer order; Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
 ・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical

@@ -4,8 +4,12 @@ import { AudioStorage } from './core/file-storage/audio-storage';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject, ObjectContext } from './core/synchronize-object/game-object';
 import { EventSystem } from './core/system';
+import { AudioLibrary } from './audio-library';
 
 export const JUKEBOX_TRACK_COUNT = 4;
+export const MUSIC_HUD_SLOT_COUNT = 3;
+
+export type JukeboxQueueMode = 'single' | 'shuffle-loop' | 'shuffle-once';
 
 export interface JukeboxTrackState {
   audioIdentifier: string;
@@ -13,10 +17,25 @@ export interface JukeboxTrackState {
   isLoop: boolean;
   roomGain: number;
   label: string;
+  queue: string[];
+  queueMode: JukeboxQueueMode;
 }
 
 function emptyTrack(): JukeboxTrackState {
-  return { audioIdentifier: '', isPlaying: false, isLoop: true, roomGain: 1, label: '' };
+  return {
+    audioIdentifier: '',
+    isPlaying: false,
+    isLoop: true,
+    roomGain: 1,
+    label: '',
+    queue: [],
+    queueMode: 'single',
+  };
+}
+
+function normalizeQueueMode(raw: any): JukeboxQueueMode {
+  if (raw === 'shuffle-loop' || raw === 'shuffle-once' || raw === 'single') return raw;
+  return 'single';
 }
 
 function normalizeTracks(raw: any): JukeboxTrackState[] {
@@ -24,6 +43,9 @@ function normalizeTracks(raw: any): JukeboxTrackState[] {
   const src = Array.isArray(raw) ? raw : [];
   for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) {
     const t = src[i] || {};
+    const queue = Array.isArray(t.queue)
+      ? t.queue.filter((id: any) => typeof id === 'string' && id)
+      : [];
     list.push({
       audioIdentifier: typeof t.audioIdentifier === 'string' ? t.audioIdentifier : '',
       isPlaying: !!t.isPlaying,
@@ -32,9 +54,22 @@ function normalizeTracks(raw: any): JukeboxTrackState[] {
         ? Math.max(0, Math.min(1, t.roomGain))
         : 1,
       label: typeof t.label === 'string' ? t.label : '',
+      queue,
+      queueMode: normalizeQueueMode(t.queueMode),
     });
   }
   return list;
+}
+
+function shuffleIds(ids: string[]): string[] {
+  const arr = ids.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
 }
 
 @SyncObject('jukebox')
@@ -107,6 +142,21 @@ export class Jukebox extends GameObject {
     this.stopTrack(0);
   }
 
+  /** Assign audio to a track without starting playback. */
+  setTrackAudio(index: number, identifier: string) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    this.ensureMigrated();
+    const next = this.tracks;
+    next[index] = {
+      ...next[index],
+      audioIdentifier: identifier || '',
+      queue: [],
+      queueMode: 'single',
+    };
+    this.tracks = next;
+    this.syncLegacyFields();
+  }
+
   playTrack(index: number, identifier: string, isLoop: boolean = true) {
     if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
     const audio = AudioStorage.instance.get(identifier);
@@ -118,7 +168,55 @@ export class Jukebox extends GameObject {
       audioIdentifier: identifier,
       isPlaying: true,
       isLoop: !!isLoop,
+      queue: [],
+      queueMode: 'single',
     };
+    this.tracks = next;
+    this.syncLegacyFields();
+    this._playTrack(index);
+  }
+
+  /**
+   * Play a list on a track.
+   * - shuffle-loop: shuffle and repeat forever
+   * - shuffle-once: shuffle once through then stop
+   * - single: play first id only (use playTrack for normal once/loop)
+   */
+  playQueue(index: number, identifiers: string[], mode: JukeboxQueueMode, isLoopSingle = false) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    const ids = (identifiers || []).filter(id => {
+      const audio = AudioStorage.instance.get(id);
+      return audio && audio.isReady;
+    });
+    if (ids.length < 1) return;
+
+    this.ensureMigrated();
+    const next = this.tracks;
+    if (mode === 'shuffle-loop' || mode === 'shuffle-once') {
+      const queue = shuffleIds(ids);
+      const startIndex = AudioLibrary.instance.effectiveTrackType(queue[0]) % JUKEBOX_TRACK_COUNT;
+      next[startIndex] = {
+        ...next[startIndex],
+        audioIdentifier: queue[0],
+        isPlaying: true,
+        isLoop: false,
+        queue,
+        queueMode: mode,
+      };
+      this.tracks = next;
+      this.syncLegacyFields();
+      this._playTrack(startIndex);
+      return;
+    } else {
+      next[index] = {
+        ...next[index],
+        audioIdentifier: ids[0],
+        isPlaying: true,
+        isLoop: !!isLoopSingle,
+        queue: [],
+        queueMode: 'single',
+      };
+    }
     this.tracks = next;
     this.syncLegacyFields();
     this._playTrack(index);
@@ -130,9 +228,22 @@ export class Jukebox extends GameObject {
     const next = this.tracks;
     next[index] = {
       ...next[index],
-      audioIdentifier: '',
+      audioIdentifier: next[index].audioIdentifier,
       isPlaying: false,
+      queue: [],
+      queueMode: 'single',
     };
+    this.tracks = next;
+    this.syncLegacyFields();
+    this._stopTrack(index);
+  }
+
+  /** Stop and clear assigned audio. */
+  clearTrack(index: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    this.ensureMigrated();
+    const next = this.tracks;
+    next[index] = { ...emptyTrack(), roomGain: next[index].roomGain, label: next[index].label };
     this.tracks = next;
     this.syncLegacyFields();
     this._stopTrack(index);
@@ -140,7 +251,15 @@ export class Jukebox extends GameObject {
 
   stopAll() {
     this.ensureMigrated();
-    this.tracks = normalizeTracks([]).map(t => ({ ...t, isPlaying: false, audioIdentifier: '' }));
+    this.tracks = normalizeTracks([]).map((t, i) => ({
+      ...t,
+      isPlaying: false,
+      audioIdentifier: '',
+      queue: [],
+      queueMode: 'single' as JukeboxQueueMode,
+      roomGain: this.tracks[i]?.roomGain ?? 1,
+      label: this.tracks[i]?.label ?? '',
+    }));
     this.syncLegacyFields();
     this.stopAllLocal();
   }
@@ -163,6 +282,18 @@ export class Jukebox extends GameObject {
     const next = this.tracks;
     next[index] = { ...next[index], label: label || '' };
     this.tracks = next;
+  }
+
+  /** Toggle play/stop for a track that already has an assigned audio (HUD). */
+  toggleTrackPlayback(index: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    const track = this.tracks[index];
+    if (!track?.audioIdentifier) return;
+    if (track.isPlaying) {
+      this.stopTrack(index);
+      return;
+    }
+    this.playTrack(index, track.audioIdentifier, track.isLoop !== false);
   }
 
   snapshotTracksJson(): string {
@@ -242,15 +373,13 @@ export class Jukebox extends GameObject {
         }
       } catch { /* fall through */ }
     }
-    // Migrate legacy single-track SyncVars into track0.
     const migrated = normalizeTracks([]);
     if (this.audioIdentifier || this.isPlaying) {
       migrated[0] = {
+        ...migrated[0],
         audioIdentifier: this.audioIdentifier || '',
         isPlaying: !!this.isPlaying,
         isLoop: this.isLoop !== false,
-        roomGain: 1,
-        label: '',
       };
     }
     this.tracksJson = JSON.stringify(migrated);
@@ -279,13 +408,70 @@ export class Jukebox extends GameObject {
     const player = this.audioPlayers[index];
     player.loop = track.isLoop;
     player.volume = track.roomGain;
+    player.endedAction = () => this.onTrackEnded(index);
     player.play(audio);
+  }
+
+  private onTrackEnded(index: number) {
+    const track = this.tracks[index];
+    if (!track || !track.isPlaying) return;
+
+    if (track.queueMode === 'shuffle-loop' || track.queueMode === 'shuffle-once') {
+      const queue = track.queue.slice();
+      if (queue.length < 1) {
+        this.stopTrack(index);
+        return;
+      }
+      const cur = track.audioIdentifier;
+      let nextIdx = queue.indexOf(cur) + 1;
+      let nextQueue = queue;
+      if (nextIdx >= queue.length) {
+        if (track.queueMode === 'shuffle-once') {
+          this.stopTrack(index);
+          return;
+        }
+        nextQueue = shuffleIds(queue);
+        nextIdx = 0;
+      }
+      const nextId = nextQueue[nextIdx];
+      const target = AudioLibrary.instance.effectiveTrackType(nextId) % JUKEBOX_TRACK_COUNT;
+      if (target !== index) {
+        // Finish current slot; continue the remaining queue on the preferred track.
+        const remaining = nextQueue.slice(nextIdx);
+        const mode = track.queueMode;
+        this.stopTrack(index);
+        this.playQueue(target, remaining, mode);
+        return;
+      }
+      const next = this.tracks;
+      next[index] = {
+        ...next[index],
+        queue: nextQueue,
+        audioIdentifier: nextId,
+        isPlaying: true,
+        isLoop: false,
+      };
+      this.tracks = next;
+      this.syncLegacyFields();
+      this._playTrack(index);
+      return;
+    }
+
+    // single once
+    if (!track.isLoop) {
+      const assigned = track.audioIdentifier;
+      this.stopTrack(index);
+      if (assigned) this.setTrackAudio(index, assigned);
+    }
   }
 
   private _stopTrack(index: number, unregister = true) {
     this.ensurePlayers();
     if (unregister) this.unregisterFileWait(index);
-    this.audioPlayers[index]?.stop();
+    if (this.audioPlayers[index]) {
+      this.audioPlayers[index].endedAction = null;
+      this.audioPlayers[index].stop();
+    }
   }
 
   private stopAllLocal() {

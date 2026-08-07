@@ -1,0 +1,169 @@
+:host {
+  pointer-events: none;
+}
+
+.music-hud {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 41;
+  width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 6px 6px;
+  background: rgba(28, 24, 20, 0.9);
+  color: #f3ebe0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  user-select: none;
+}
+
+.music-hud.is-collapsed {
+  width: auto;
+  min-width: 0;
+}
+
+.hud-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+  cursor: grab;
+  touch-action: none;
+  font-weight: 700;
+}
+
+.hud-head:active {
+  cursor: grabbing;
+}
+
+.hud-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.hud-drag,
+.hud-collapse,
+.hud-open,
+.slot-play {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.hud-drag:active {
+  cursor: grabbing;
+}
+
+.hud-drag .material-icons,
+.hud-collapse .material-icons,
+.hud-open .material-icons,
+.slot-play .material-icons {
+  font-size: 16px;
+}
+
+.mini-plays {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 2.8em minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 1px 2px 1px 4px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  transition: background 120ms ease, outline 120ms ease;
+}
+
+.slot-row.is-playing {
+  background: rgba(90, 138, 74, 0.22);
+  border-left-color: #7cbc68;
+}
+
+.slot-row.is-drop-target {
+  outline: 2px solid #e8b86d;
+  outline-offset: -2px;
+  background: rgba(232, 184, 109, 0.22);
+}
+
+.slot-badge {
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  text-align: left;
+  padding: 0 2px;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.2;
+}
+
+.slot-name:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.slot-name:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.slot-play.is-on {
+  background: rgba(124, 188, 104, 0.35);
+  border-color: rgba(124, 188, 104, 0.55);
+}
+
+.slot-play.is-empty:not(.is-on) {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.slot-play:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
