@@ -25,14 +25,20 @@ export class MusicHudComponent implements OnInit, OnDestroy {
 
   readonly slotCount = MUSIC_HUD_SLOT_COUNT;
   left = 12;
+  /** Placeholder until placeDefaultAlignMapHud(); matches map-action-hud vertical band. */
   top = 72;
-  collapsed = false;
+  /** Default collapsed so bar height matches map-action-hud (~44px). */
+  collapsed = true;
   dropSlotIndex: number | null = null;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
   private positionedDefault = false;
+
+  /** Collapsed bar outer height: map-action-hud.is-collapsed = 4+4 padding + 36 chrome. */
+  private static readonly BAR_HEIGHT = 44;
+  private static readonly HUD_WIDTH = 220;
 
   get visible(): boolean { return MusicHudComponent.isVisible; }
   get isGuest(): boolean { return Network.GuestMode(); }
@@ -71,7 +77,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
         this.clampToViewport();
         this.changeDetector.markForCheck();
       } else {
-        this.placeDefaultTopRight();
+        this.placeDefaultAlignMapHud();
       }
     });
     localForage.getItem(MusicHudComponent.COLLAPSED_KEY).then(v => {
@@ -276,13 +282,25 @@ export class MusicHudComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  private placeDefaultTopRight() {
+  /** Same vertical band as .map-action-hud (bottom chrome + 10px), right-aligned. */
+  private placeDefaultAlignMapHud() {
     if (this.positionedDefault) return;
     this.positionedDefault = true;
-    const width = 220;
+    const width = MusicHudComponent.HUD_WIDTH;
+    const bottomChrome = this.readCssPx('--udon-bottom-chrome', 56);
+    const bottomGap = 10; // matches .map-action-hud { bottom: calc(... + 10px) }
     this.left = Math.max(8, window.innerWidth - width - 12);
-    this.top = 72;
+    this.top = Math.max(
+      8,
+      window.innerHeight - bottomChrome - bottomGap - MusicHudComponent.BAR_HEIGHT
+    );
     this.clampToViewport();
+  }
+
+  private readCssPx(varName: string, fallback: number): number {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : fallback;
   }
 
   private onPointerMove = (event: PointerEvent) => {
@@ -300,7 +318,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   };
 
   private onResize = () => {
-    if (!this.positionedDefault) this.placeDefaultTopRight();
+    if (!this.positionedDefault) this.placeDefaultAlignMapHud();
     this.clampToViewport();
     this.changeDetector.markForCheck();
   };

@@ -221,6 +221,7 @@ export const zhTW_ui: I18nDictionary = {
   'hud.move': '移動 HUD',
   'hud.collapse': '收起 HUD',
   'hud.expand': '展開 HUD',
+  'hud.resizeSheet': '拖曳調整高度',
   'menu.settings.showGrid': '一律顯示格線',
   'menu.settings.gridSnap': '移動時對齊格線',
   'menu.settings.noticeSound': '新訊息提示音',

@@ -220,6 +220,7 @@ export const en_ui: I18nDictionary = {
   'hud.move': 'Move HUD',
   'hud.collapse': 'Collapse HUD',
   'hud.expand': 'Expand HUD',
+  'hud.resizeSheet': 'Drag to resize height',
   'menu.settings.showGrid': 'Always show grid',
   'menu.settings.gridSnap': 'Snap to grid on move',
   'menu.settings.noticeSound': 'New message sound',

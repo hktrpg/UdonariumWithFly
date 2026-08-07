@@ -139,8 +139,10 @@ td.altitude {
 }
 
 input.altitude {
-  writing-mode: bt-lr;   
-  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: none;
+  -webkit-appearance: none;
   width: 8px;
   height: 100%;
   padding: 3px;
@@ -288,21 +290,55 @@ input.altitude {
   top: auto !important;
   bottom: calc(var(--udon-bottom-chrome, 56px)) !important;
   max-width: none;
-  max-height: min(56dvh, 480px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  /* Height set by JS (saved custom or default ~56dvh); keep a CSS fallback. */
+  height: min(56dvh, 480px);
+  max-height: calc(100dvh - var(--udon-bottom-chrome, 56px) - 8px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   white-space: normal;
   border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
   border-bottom: none;
   padding-bottom: 2px;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet.is-sheet-resizing {
+  transition: none;
+  touch-action: none;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-resize-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .title {
   max-width: none;
   font-size: 12px;
-  padding: 6px 12px 4px;
+  padding: 4px 12px 4px;
   text-align: left;
+  flex: 0 0 auto;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul {

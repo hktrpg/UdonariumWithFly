@@ -220,6 +220,7 @@ export const ja_ui: I18nDictionary = {
   'hud.move': 'HUDを移動',
   'hud.collapse': 'HUDを折りたたむ',
   'hud.expand': 'HUDを展開',
+  'hud.resizeSheet': 'ドラッグで高さを調整',
   'menu.settings.showGrid': 'グリッドを常に表示',
   'menu.settings.gridSnap': '移動時にグリッド吸着',
   'menu.settings.noticeSound': '新着メッセージ音',

@@ -220,6 +220,7 @@ export const zhCN_ui: I18nDictionary = {
   'hud.move': '移动 HUD',
   'hud.collapse': '收起 HUD',
   'hud.expand': '展开 HUD',
+  'hud.resizeSheet': '拖曳调整高度',
   'menu.settings.showGrid': '一律显示格线',
   'menu.settings.gridSnap': '移动时对齐格线',
   'menu.settings.noticeSound': '新消息提示音',

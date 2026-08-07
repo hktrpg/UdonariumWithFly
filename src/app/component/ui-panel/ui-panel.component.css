@@ -155,8 +155,8 @@
   flex: 0 0 auto;
   flex-direction: column;
   height: auto;
-  min-height: 25px;
-  padding-top: 10px;
+  min-height: 36px;
+  padding-top: 18px;
 }
 
 .draggable-panel.is-mobile-sheet .title .title-text,
@@ -170,23 +170,34 @@
   text-align: left;
 }
 
+.draggable-panel.is-mobile-sheet .sheet-resize-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 48px; /* leave room for − / × */
+  height: 22px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.draggable-panel.is-mobile-sheet .sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
 .draggable-panel.is-mobile-sheet .title .title-button {
   position: absolute;
   top: 14px;
   right: 4px;
   width: auto;
-}
-
-.draggable-panel.is-mobile-sheet .sheet-handle {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.35);
-  pointer-events: none;
+  z-index: 5;
 }
 
 .draggable-panel.is-mobile-sheet .scrollable-panel {
