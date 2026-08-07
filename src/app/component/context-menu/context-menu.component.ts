@@ -395,7 +395,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   showSubMenu(action: ContextMenuAction, opts?: { fromClick?: boolean }) {
     if (this.GuestMode()) return;
-    if (action.subActions == null || action.subActions.length < 1) return;
 
     const host = this.rootElementRef?.nativeElement;
     const mobileSheet = !!(host?.classList?.contains('is-mobile-action-sheet')
@@ -406,30 +405,41 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     clearTimeout(this.showSubMenuTimer);
 
-    // Second tap on the same row collapses the inline submenu.
-    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
-      clearTimeout(this.hideSubMenuTimer);
-      this.parentMenu = null;
-      this.subMenu = null;
-      this.changeDetector.detectChanges();
+    // First-level row without a submenu: close any open second-level menu immediately.
+    if (action.subActions == null || action.subActions.length < 1) {
+      this.clearSubMenuNow();
       return;
     }
 
-    this.hideSubMenu();
-    const delay = mobileSheet ? 0 : 250;
+    // Second tap on the same row collapses the inline submenu.
+    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
+      this.clearSubMenuNow();
+      return;
+    }
+
+    // Switching to another first-level item: drop the previous submenu before opening the next.
+    clearTimeout(this.hideSubMenuTimer);
+    const delay = mobileSheet ? 0 : (this.parentMenu === action ? 0 : 120);
     this.showSubMenuTimer = setTimeout(() => {
       this.parentMenu = action;
       this.subMenu = action.subActions;
-      clearTimeout(this.hideSubMenuTimer);
       this.changeDetector.detectChanges();
     }, delay);
   }
 
   hideSubMenu() {
     clearTimeout(this.hideSubMenuTimer);
-    this.hideSubMenuTimer = setTimeout(() => {
-      this.subMenu = null;
-    }, 1200);
+    // Short grace so the pointer can move into a floating submenu without it vanishing.
+    this.hideSubMenuTimer = setTimeout(() => this.clearSubMenuNow(), 280);
+  }
+
+  private clearSubMenuNow() {
+    clearTimeout(this.hideSubMenuTimer);
+    clearTimeout(this.showSubMenuTimer);
+    if (!this.subMenu && !this.parentMenu) return;
+    this.parentMenu = null;
+    this.subMenu = null;
+    this.changeDetector.detectChanges();
   }
 
   close() {

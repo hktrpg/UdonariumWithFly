@@ -174,7 +174,7 @@ input.altitude {
   direction: rtl;
   appearance: slider-vertical;
   -webkit-appearance: slider-vertical;
-  accent-color: #2563eb;
+  accent-color: #4b5563;
   width: 8px;
   height: 100%;
   padding: 3px;
