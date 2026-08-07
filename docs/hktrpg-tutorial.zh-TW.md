@@ -361,6 +361,10 @@ HKTRPG Bot／聊天平台骰子：https://bothelp.hktrpg.com/guide
 
 在角色卡數值欄旁可一鍵把數值送到**目前聊天頻道**，交由 BCDice 結算。
 
+### 角色 JSON {#character-json}
+
+JSON 方便匯入／匯出，兼容 CCFOLIA 格式。桌面 **Ctrl＋V** 可貼上；角色詳情可匯出（檔名如 `hktrpg_角色_日期時間.json`）。
+
 ### 聊天面板（Chat Palette） {#chat-palette}
 
 角色右鍵 →「顯示聊天面板…」，可放常用指令與台詞，點一下就送出。
@@ -757,7 +761,7 @@ A. 到 **設定\*** 開啟「無聊天視窗時有人發言則自動開啟」（
 | WASD／方向鍵 | 移動 |
 | Shift＋WASD | 面向 |
 | Delete | 刪除（角色→回收區） |
-| Ctrl＋C／X／V | 複製／剪下／貼上（貼在游標處） |
+| Ctrl＋C／X／V | 複製／剪下／貼上（貼在游標處；系統剪貼簿若為 CCFOLIA 角色 JSON 則匯入 Token） |
 | Ctrl＋Z／Y（或 Ctrl＋Shift＋Z） | 復原／重做 |
 | [ / ] | 後層／前層 |
 | Alt＋滾輪 | 旋轉面向約 3°（有選取時） |

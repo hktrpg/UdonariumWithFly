@@ -87,6 +87,7 @@
 | 備份可略過音樂 | ZIP／資料夾備份可選不含音樂檔（彈窗＋個人設定＊）；自動備份套用預設 |
 | Esc 關閉視窗 | Esc 先關選單／對話框與取消選取，再關最前可關視窗 |
 | 手機 UX | 聊天工具列與地圖 HUD／工具箱互斥；滑過教學提示僅桌面 |
+| 角色 JSON | JSON 方便匯入／匯出，兼容 CCFOLIA 格式（桌面 Ctrl＋V；角色詳情匯出） |
 
 繼承自 With Fly：高度、聊天文字顏色、立繪（Stand）、Cut-in、骰子機器人表、SkyWay 2023（`@skyway-sdk`）等。本 fork 使用自架 backend（請勿指向 WithFly 公開 Workers）。
 

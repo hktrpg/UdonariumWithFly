@@ -265,7 +265,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `ccfolia_${safeName}.json`;
+    anchor.download = `hktrpg_${safeName}_${this.formatExportTimestamp()}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -275,6 +275,12 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     } catch {
       // Download already succeeded; clipboard may be denied without focus/permission.
     }
+  }
+
+  /** `YYYY-MM-DD_HHmm` for export filenames. */
+  private formatExportTimestamp(date: Date = new Date()): string {
+    const pad = (n: number) => ('00' + n).slice(-2);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}`;
   }
 
   setLocation(locationName: string) {

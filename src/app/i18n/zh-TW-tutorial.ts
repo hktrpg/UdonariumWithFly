@@ -171,6 +171,8 @@ export const zhTW_tutorial: I18nDictionary = {
 ・資料夾播放佇列與隨機／順序偏好；讀取房間 hover 可更改／斷開備份資料夾
 ・ZIP／資料夾備份可選是否含音樂（彈窗＋個人設定＊；略過時檔案較小）
 ・Esc：有選取時先取消選取；否則關選單／對話框／草稿後，再關閉最前可關視窗`,
+  'changelog.2026json': `2026/08/08 角色 JSON
+・JSON 方便匯入／匯出，兼容 CCFOLIA 格式（桌面 Ctrl＋V 貼上；角色詳情可匯出）`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教學：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
