@@ -19,9 +19,13 @@
 }
 
 .music-hud.is-collapsed {
-  width: auto;
-  min-width: 0;
-  padding: 3px 4px;
+  /* Keep same width as expanded so collapse/expand doesn’t jump horizontally. */
+  padding: 3px 6px;
+}
+
+.music-hud.is-collapsed .hud-row {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .hud-row {

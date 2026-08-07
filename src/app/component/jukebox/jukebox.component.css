@@ -315,6 +315,8 @@
   border: 1px solid var(--jb-line);
   border-radius: 3px;
   background: var(--jb-paper);
+  position: relative;
+  user-select: none;
 }
 
 .jb-lib-list {
@@ -333,6 +335,7 @@
   background: var(--jb-paper);
   position: relative;
   transition: background 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  cursor: default;
 }
 
 .jb-lib-row[draggable="true"] {
@@ -378,20 +381,24 @@
   background: #fff4e0;
 }
 
+/* Only outline the block chrome — avoid repainting the whole song list (flicker). */
 .jb-folder-block.is-drop-target {
   outline: 2px solid var(--jb-accent);
   outline-offset: -2px;
-  background: #fffaf0;
 }
 
-.jb-folder-block.is-drop-target .jb-folder-body {
-  background: #fff8ee;
+.jb-folder-block.is-drop-target > .jb-folder-head {
+  background: #fff4e0;
 }
 
-.jb-library-scroll.is-file-drop {
+.jb-folder-block.is-file-drop {
   outline: 2px dashed var(--jb-accent);
-  outline-offset: -4px;
+  outline-offset: -2px;
   background: #fff8ee;
+}
+
+.jb-folder-block.is-file-drop > .jb-folder-head {
+  background: #fff4e0;
 }
 
 .jb-drag-hint {
@@ -402,9 +409,10 @@
 }
 
 .jb-folder-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 2px;
+  column-gap: 4px;
   min-height: var(--jb-row);
   padding: 0 4px;
   font-size: 11px;
@@ -413,6 +421,8 @@
   user-select: none;
   background: #f3ebe0;
   border-bottom: 1px solid #e2d3bf;
+  position: relative;
+  z-index: 1;
 }
 
 .jb-folder-head:hover {
@@ -427,7 +437,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -438,6 +448,8 @@
   font-weight: 700;
   cursor: pointer;
   text-align: left;
+  position: relative;
+  z-index: 0;
 }
 
 .jb-folder-head .material-icons {
@@ -461,18 +473,18 @@
 
 .jb-folder-acts {
   display: inline-flex;
-  flex: 0 0 auto;
-  margin-left: 2px;
   align-items: center;
   gap: 0;
+  flex: 0 0 auto;
   position: relative;
-  z-index: 2;
-  isolation: isolate;
+  z-index: 6;
+  pointer-events: auto;
 }
 
 .jb-folder-acts .jb-icon-act {
   position: relative;
   z-index: 1;
+  pointer-events: auto;
 }
 
 .jb-track-pick {
@@ -500,6 +512,18 @@
 
 .jb-folder-drop-pad {
   min-height: 20px;
+  position: relative;
+}
+
+.jb-folder-drop-pad.is-drop-end::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  height: 2px;
+  background: var(--jb-accent);
+  border-radius: 1px;
 }
 
 .jb-mode-select {
@@ -512,6 +536,14 @@
 
 .jb-lib-row:hover {
   background: #faf4ea;
+}
+
+.jb-lib-row.is-selected {
+  background: #e8f0fa;
+}
+
+.jb-lib-row.is-selected:hover {
+  background: #dde8f6;
 }
 
 .jb-lib-row.is-bgm {
@@ -531,6 +563,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: inherit;
 }
 
 .jb-lib-link-icon {
@@ -563,39 +596,6 @@
   font-size: 11px;
   color: var(--jb-muted);
   text-align: center;
-}
-
-.jb-add-bar {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 22px 22px;
-  align-items: center;
-  gap: 3px;
-  min-height: var(--jb-row);
-  padding: 1px 2px;
-}
-
-.jb-add-bar > .material-icons {
-  font-size: 16px;
-  color: var(--jb-accent);
-}
-
-.jb-add-bar input {
-  min-width: 0;
-  width: 100%;
-  height: 22px;
-  padding: 0 5px;
-  border: 1px solid #c9b28e;
-  border-radius: 3px;
-  background: #fffdf8;
-  font-size: 11px;
-  color: #4a3828;
-}
-
-.jb-link-error {
-  margin: 0 4px 2px;
-  font-size: 10px;
-  color: #a33;
-  line-height: 1.2;
 }
 
 @media (max-width: 360px) {

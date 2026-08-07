@@ -230,12 +230,16 @@ export class MusicHudComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'link';
+      // Must match jukebox effectAllowed ('copyMove') — 'link' was rejected by browsers.
+      event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'move';
     }
     this.dropSlotIndex = index;
   }
 
-  onSlotDragLeave(index: number) {
+  onSlotDragLeave(event: DragEvent, index: number) {
+    const related = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement | null;
+    if (current && related && current.contains(related)) return;
     if (this.dropSlotIndex === index) this.dropSlotIndex = null;
   }
 
@@ -266,7 +270,10 @@ export class MusicHudComponent implements OnInit, OnDestroy {
 
   private isAudioDrag(event: DragEvent): boolean {
     const types = Array.from(event.dataTransfer?.types || []);
-    return types.includes(JUKEBOX_AUDIO_DRAG_MIME);
+    if (types.includes(JUKEBOX_AUDIO_DRAG_MIME)) return true;
+    // Same payload often only exposes text/plain across panels.
+    if (types.includes('text/plain') && !types.includes('Files')) return true;
+    return false;
   }
 
   private placeDefaultTopRight() {

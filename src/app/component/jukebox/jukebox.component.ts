@@ -1,6 +1,6 @@
-import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
-import { AudioLibrary, AudioLibraryFolder, JUKEBOX_AUDIO_DRAG_MIME } from '@udonarium/audio-library';
+import { AudioLibrary, AudioLibraryFolder, JUKEBOX_AUDIO_DRAG_LIST_MIME, JUKEBOX_AUDIO_DRAG_MIME } from '@udonarium/audio-library';
 import { AudioFile, AudioState } from '@udonarium/core/file-storage/audio-file';
 import { AudioPlayer, VolumeType } from '@udonarium/core/file-storage/audio-player';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
@@ -32,16 +32,29 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   playLoop = true;
   showHelp = false;
   showMixer = true;
-  onlineUrl = '';
-  onlineName = '';
   linkError = '';
   expandedFolders: { [folderId: string]: boolean } = { '': true };
   /** HTML5 DnD visual state */
   draggingAudioId: string = '';
+  /** Identifiers moved together when dragging a multi-selection. */
+  dragAudioIds: string[] = [];
   dropFolderId: string | null = null;
   dropTrackIndex: number | null = null;
-  dropBeforeAudioId: string | null = null;
-  dropOnLibraryFiles = false;
+  /** Insert index in folder list (before removal); null = not in reorder mode. */
+  dropInsertIndex: number | null = null;
+  dropReorderFolderId: string | null = null;
+  /** OS file drop target folder (null = none). */
+  dropFileFolderId: string | null = null;
+
+  /** Library multi-select (Ctrl = toggle, Shift = range). */
+  selectedAudioIds = new Set<string>();
+  selectionAnchorId: string | null = null;
+  /** Folder of the selection anchor (Shift-range stays in one folder). */
+  selectionAnchorFolderId: string | null = null;
+
+  @ViewChild('libraryScroll', { static: false }) libraryScroll?: ElementRef<HTMLElement>;
+
+  get selectedCount(): number { return this.selectedAudioIds.size; }
 
   readonly audioDragMime = JUKEBOX_AUDIO_DRAG_MIME;
 
@@ -182,7 +195,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private ngZone: NgZone,
     private contextMenuService: ContextMenuService,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private hostRef: ElementRef<HTMLElement>
   ) {
     this.soundTestPlayer.volumeType = VolumeType.SOUND_EFFECT;
     this.noticeTestPlayer.volumeType = VolumeType.NOTICE;
@@ -292,10 +306,6 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return this.library.folderTrackType(folderId || '') % this.trackCount;
   }
 
-  folderPlayLoop(folderId: string): boolean {
-    return this.library.folderPlayLoop(folderId || '');
-  }
-
   trackShortName(index: number): string {
     if (index === 0) return 'BGM';
     if (index === 1) return 'Amb';
@@ -325,14 +335,6 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event?.preventDefault();
     if (this.GuestMode() || !audio) return;
     this.library.setPlayLoop(audio.identifier, !this.isPlayLoop(audio, folderId));
-  }
-
-  toggleFolderPlayMode(folderId: string, event?: Event) {
-    event?.stopPropagation();
-    event?.preventDefault();
-    if (this.GuestMode()) return;
-    this.library.setFolderPlayLoop(folderId || '', !this.folderPlayLoop(folderId));
-    this.ngZone.run(() => { });
   }
 
   /** Put this audio on its effective track and play (or stop if already playing). */
@@ -404,33 +406,241 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.expandedFolders[folder.id] = true;
   }
 
-  playFolderShuffleLoop(folderId: string, event?: Event) {
+  /** Toggle folder order mode: shuffle vs sequential (same pattern as LOOP). */
+  toggleFolderShuffleMode(folderId: string, event?: Event) {
     event?.stopPropagation();
     event?.preventDefault();
-    if (this.GuestMode() || !this.jukebox) return;
-    const ids = this.audiosIn(folderId).filter(a => a.isReady).map(a => a.identifier);
-    if (ids.length < 1) return;
-    this.jukebox.playQueue(this.folderTrackType(folderId), ids, 'shuffle-loop');
-  }
-
-  playFolderOneShot(folderId: string, event?: Event) {
-    event?.stopPropagation();
-    event?.preventDefault();
-    if (this.GuestMode() || !this.jukebox) return;
-    const ready = this.audiosIn(folderId).filter(a => a.isReady);
-    if (ready.length < 1) return;
-    const pick = ready[Math.floor(Math.random() * ready.length)];
-    const track = this.library.effectiveTrackType(pick.identifier, folderId) % this.trackCount;
-    const loop = this.library.effectivePlayLoop(pick.identifier, folderId);
-    this.jukebox.playTrack(track, pick.identifier, loop);
-  }
-
-  handleFileSelect(event: Event) {
     if (this.GuestMode()) return;
-    let input = <HTMLInputElement>event.target;
-    let files = input.files;
-    if (files.length) FileArchiver.instance.load(files);
+    const fid = folderId || '';
+    this.library.setFolderShuffle(fid, !this.folderShuffle(fid));
+    this.ngZone.run(() => { });
+  }
+
+  /** Play / stop folder queue using folder shuffle preference. */
+  playFolderQueue(folderId: string, event?: Event) {
+    event?.stopPropagation();
+    event?.preventDefault();
+    if (this.GuestMode() || !this.jukebox) return;
+    const fid = folderId || '';
+    const track = this.folderTrackType(fid);
+    if (this.isFolderPlaying(fid)) {
+      this.jukebox.stopTrack(track);
+      this.ngZone.run(() => { });
+      return;
+    }
+    const ids = this.audiosIn(fid).filter(a => a.isReady).map(a => a.identifier);
+    if (ids.length < 1) return;
+    const shuffle = this.folderShuffle(fid);
+    const mode = shuffle ? 'shuffle-loop' as const : 'queue-loop' as const;
+    this.jukebox.playQueue(track, ids, mode);
+    this.ngZone.run(() => { });
+  }
+
+  /** @deprecated use playFolderQueue */
+  playFolderShuffleLoop(folderId: string, event?: Event) {
+    this.playFolderQueue(folderId, event);
+  }
+
+  isFolderPlaying(folderId: string): boolean {
+    if (!this.jukebox) return false;
+    const trackIndex = this.folderTrackType(folderId);
+    const t = this.tracks[trackIndex];
+    if (!t?.isPlaying) return false;
+    const inFolder = new Set(this.audiosIn(folderId || '').map(a => a.identifier));
+    if (t.audioIdentifier && inFolder.has(t.audioIdentifier)) return true;
+    return Array.isArray(t.queue) && t.queue.length > 0 && t.queue.every(id => inFolder.has(id));
+  }
+
+  folderShuffle(folderId: string): boolean {
+    return this.library.folderShuffle(folderId || '');
+  }
+
+  handleFolderFileSelect(event: Event, folderId: string) {
+    if (this.GuestMode()) return;
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (files?.length) void this.importFilesToFolder(folderId || '', files);
     input.value = '';
+  }
+
+  promptFolderLink(folderId: string, event?: Event) {
+    event?.stopPropagation();
+    if (this.GuestMode()) return;
+    const url = (window.prompt(this.i18n.t('jukebox.linkUrlPlaceholder'), '') || '').trim();
+    if (!url) return;
+    this.linkError = '';
+    if (!StringUtil.validUrl(url)) {
+      this.linkError = this.i18n.t('jukebox.linkInvalid');
+      window.alert(this.linkError);
+      return;
+    }
+    const name = this.displayNameFromUrl(url);
+    AudioStorage.instance.add({
+      identifier: url,
+      name,
+      type: '',
+      blob: null,
+      url
+    });
+    this.library.ensureListed(url, folderId || '');
+    this.expandedFolders[folderId || ''] = true;
+  }
+
+  async importFilesToFolder(folderId: string, files: FileList | File[]) {
+    if (this.GuestMode() || !files?.length) return;
+    const fid = folderId || '';
+    this.library.importFolderId = fid;
+    this.expandedFolders[fid] = true;
+    try {
+      await FileArchiver.instance.load(Array.from(files));
+    } finally {
+      this.library.importFolderId = null;
+    }
+  }
+
+  // —— Library selection ——————————————————————————————————————————
+
+  isAudioSelected(audioId: string): boolean {
+    return !!audioId && this.selectedAudioIds.has(audioId);
+  }
+
+  clearSelection() {
+    if (this.selectedAudioIds.size < 1 && !this.selectionAnchorId) return;
+    this.selectedAudioIds = new Set();
+    this.selectionAnchorId = null;
+    this.selectionAnchorFolderId = null;
+  }
+
+  /**
+   * Pointer down: Explorer-style — keep multi-selection when starting a drag from
+   * an already-selected row; otherwise select only this row so a drag moves one item.
+   * Ctrl/Shift selection is handled on click.
+   */
+  onAudioRowPointerDown(event: PointerEvent, audio: AudioFile, folderId: string) {
+    if (this.GuestMode() || !audio || event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('.jb-lib-actions, button, input, label, a')) return;
+    if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (this.isAudioSelected(audio.identifier) && this.selectedAudioIds.size > 1) return;
+    this.selectedAudioIds = new Set([audio.identifier]);
+    this.selectionAnchorId = audio.identifier;
+    this.selectionAnchorFolderId = folderId || '';
+  }
+
+  onAudioRowClick(event: MouseEvent, audio: AudioFile, folderId: string) {
+    if (this.GuestMode() || !audio) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('.jb-lib-actions, button, input, label, a')) return;
+    const fid = folderId || '';
+    const mod = event.ctrlKey || event.metaKey;
+
+    if (event.shiftKey) {
+      const anchor = (this.selectionAnchorFolderId === fid && this.selectionAnchorId)
+        ? this.selectionAnchorId
+        : audio.identifier;
+      this.selectRangeInFolder(fid, anchor, audio.identifier, mod);
+      return;
+    }
+    if (mod) {
+      this.toggleAudioSelection(audio.identifier, fid);
+      return;
+    }
+    this.selectedAudioIds = new Set([audio.identifier]);
+    this.selectionAnchorId = audio.identifier;
+    this.selectionAnchorFolderId = fid;
+  }
+
+  onLibraryBackgroundPointerDown(event: PointerEvent) {
+    if (this.GuestMode() || event.button !== 0) return;
+    if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('.jb-lib-row, .jb-folder-acts, .jb-folder-toggle, button, input, label, a')) return;
+    this.clearSelection();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeyDown(event: KeyboardEvent) {
+    if (this.GuestMode()) return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+    const root = this.hostRef?.nativeElement;
+    const scroll = this.libraryScroll?.nativeElement;
+    const active = document.activeElement as Node | null;
+    const inPanel = !!(root && (root.contains(active) || root.matches(':hover') || scroll?.matches(':hover')));
+    if (!inPanel) return;
+    const mod = event.ctrlKey || event.metaKey;
+    if (mod && !event.altKey && !event.shiftKey && (event.code === 'KeyA' || event.key === 'a' || event.key === 'A')) {
+      event.preventDefault();
+      this.selectAllVisible();
+      return;
+    }
+    if (!mod && !event.altKey && !event.shiftKey && event.code === 'Escape') {
+      if (this.selectedAudioIds.size > 0) {
+        event.preventDefault();
+        this.clearSelection();
+      }
+      return;
+    }
+    if (!mod && !event.altKey && (event.code === 'Delete' || event.key === 'Delete'
+      || event.code === 'Backspace' || event.key === 'Backspace')) {
+      if (this.selectedAudioIds.size > 0) {
+        event.preventDefault();
+        this.removeSelectedAudios();
+      }
+    }
+  }
+
+  private toggleAudioSelection(audioId: string, folderId: string) {
+    const next = new Set(this.selectedAudioIds);
+    if (next.has(audioId)) next.delete(audioId);
+    else next.add(audioId);
+    this.selectedAudioIds = next;
+    this.selectionAnchorId = audioId;
+    this.selectionAnchorFolderId = folderId || '';
+  }
+
+  private selectRangeInFolder(folderId: string, fromId: string, toId: string, additive: boolean) {
+    const list = this.audiosIn(folderId || '');
+    const ids = list.map(a => a.identifier);
+    let a = ids.indexOf(fromId);
+    let b = ids.indexOf(toId);
+    if (a < 0) a = b;
+    if (b < 0) b = a;
+    if (a < 0 || b < 0) {
+      this.selectedAudioIds = new Set([toId]);
+      this.selectionAnchorId = toId;
+      this.selectionAnchorFolderId = folderId || '';
+      return;
+    }
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const next = additive ? new Set(this.selectedAudioIds) : new Set<string>();
+    for (let i = lo; i <= hi; i++) next.add(ids[i]);
+    this.selectedAudioIds = next;
+    if (!this.selectionAnchorId || this.selectionAnchorFolderId !== (folderId || '')) {
+      this.selectionAnchorId = fromId;
+      this.selectionAnchorFolderId = folderId || '';
+    }
+  }
+
+  private selectAllVisible() {
+    const next = new Set(this.visibleAudioIdsInOrder());
+    this.selectedAudioIds = next;
+    this.selectionAnchorId = next.size ? Array.from(next)[0] : null;
+    this.selectionAnchorFolderId = null;
+  }
+
+  private visibleAudioIdsInOrder(): string[] {
+    const ids: string[] = [];
+    for (const a of this.audiosIn('')) ids.push(a.identifier);
+    for (const folder of this.folders) {
+      for (const a of this.audiosIn(folder.id)) ids.push(a.identifier);
+    }
+    return ids;
+  }
+
+  private orderedSelectedIds(): string[] {
+    return this.visibleAudioIdsInOrder().filter(id => this.selectedAudioIds.has(id));
   }
 
   // —— Drag & drop ————————————————————————————————————————————————
@@ -440,15 +650,39 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       event.preventDefault();
       return;
     }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('.jb-lib-actions, button, input, label, a')) {
+      event.preventDefault();
+      return;
+    }
+    // Ctrl/Shift+drag reserved for selection gestures — do not start HTML5 drag.
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      return;
+    }
+
     this.draggingAudioId = audio.identifier;
-    event.dataTransfer.setData(JUKEBOX_AUDIO_DRAG_MIME, audio.identifier);
-    event.dataTransfer.setData('text/plain', audio.identifier);
+    if (this.isAudioSelected(audio.identifier) && this.selectedAudioIds.size > 1) {
+      this.dragAudioIds = this.orderedSelectedIds();
+    } else {
+      this.dragAudioIds = [audio.identifier];
+      this.selectedAudioIds = new Set([audio.identifier]);
+      this.selectionAnchorId = audio.identifier;
+    }
+
+    const ids = this.dragAudioIds;
+    event.dataTransfer.setData(JUKEBOX_AUDIO_DRAG_MIME, ids[0] || audio.identifier);
+    event.dataTransfer.setData(JUKEBOX_AUDIO_DRAG_LIST_MIME, JSON.stringify(ids));
+    event.dataTransfer.setData('text/plain', ids.join('\n'));
     event.dataTransfer.effectAllowed = 'copyMove';
     try {
       const ghost = document.createElement('div');
       ghost.className = 'jb-drag-ghost';
-      ghost.textContent = this.displayName(audio);
-      ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;padding:4px 8px;background:#3a2f24;color:#fff;border-radius:4px;font-size:12px;';
+      const label = ids.length > 1
+        ? this.i18n.t('jukebox.selectedCount', { count: ids.length })
+        : this.displayName(audio);
+      ghost.textContent = label;
+      ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;padding:4px 8px;background:#3a2f24;color:#fff;border-radius:4px;font-size:12px;pointer-events:none;';
       document.body.appendChild(ghost);
       event.dataTransfer.setDragImage(ghost, 12, 12);
       setTimeout(() => ghost.remove(), 0);
@@ -456,60 +690,132 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   }
 
   onAudioDragEnd() {
-    this.clearDropState();
+    const snapshot = this.draggingAudioId;
+    setTimeout(() => {
+      if (this.draggingAudioId === snapshot) this.clearDropState();
+    }, 50);
   }
 
   onFolderDragOver(event: DragEvent, folderId: string) {
+    if (this.isOsFileDrag(event)) {
+      this.setOsFileDropFolder(event, folderId);
+      return;
+    }
     if (!this.isAudioDrag(event)) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('.jb-lib-row, .jb-folder-acts')) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     const id = folderId || '';
-    // Avoid thrashing CD / highlight flicker on every dragover pixel.
+    if (this.dropFileFolderId !== null) this.dropFileFolderId = null;
     if (this.dropFolderId !== id) this.dropFolderId = id;
     if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
-    if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
+    if (this.dropInsertIndex !== null) this.dropInsertIndex = null;
+    if (this.dropReorderFolderId !== null) this.dropReorderFolderId = null;
   }
 
   onFolderDrop(event: DragEvent, folderId: string) {
+    if (this.isOsFileDrag(event)) {
+      void this.acceptOsFileDrop(event, folderId);
+      return;
+    }
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
-    const id = this.readAudioDragId(event);
+    const ids = this.readDragAudioIds(event);
     this.clearDropState();
-    if (!id || this.GuestMode()) return;
-    this.library.moveToFolder(id, folderId || '');
+    if (ids.length < 1 || this.GuestMode()) return;
+    this.library.moveMany(ids, folderId || '', null);
     this.expandedFolders[folderId || ''] = true;
   }
 
-  onLibRowDragOver(event: DragEvent, folderId: string, beforeAudio: AudioFile) {
+  onLibRowDragOver(event: DragEvent, folderId: string, rowAudio: AudioFile) {
+    if (this.isOsFileDrag(event)) {
+      this.setOsFileDropFolder(event, folderId);
+      return;
+    }
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    const dragId = this.peekDraggingId(event);
-    const folder = folderId || '';
-    if (this.dropFolderId !== folder) this.dropFolderId = folder;
+
+    const row = event.currentTarget as HTMLElement;
+    const insertIndex = this.resolveRowInsertIndex(folderId || '', rowAudio, event.clientY, row);
+    if (this.dropFileFolderId !== null) this.dropFileFolderId = null;
+    if (this.dropFolderId !== null) this.dropFolderId = null;
     if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
-    if (dragId && beforeAudio && dragId === beforeAudio.identifier) {
-      if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
-      return;
-    }
-    const beforeId = beforeAudio?.identifier || null;
-    if (this.dropBeforeAudioId !== beforeId) this.dropBeforeAudioId = beforeId;
+    const fid = folderId || '';
+    if (this.dropReorderFolderId !== fid) this.dropReorderFolderId = fid;
+    if (this.dropInsertIndex !== insertIndex) this.dropInsertIndex = insertIndex;
   }
 
-  onLibRowDrop(event: DragEvent, folderId: string, beforeAudio: AudioFile) {
+  onLibRowDrop(event: DragEvent, folderId: string, rowAudio: AudioFile) {
+    if (this.isOsFileDrag(event)) {
+      void this.acceptOsFileDrop(event, folderId);
+      return;
+    }
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
-    const id = this.readAudioDragId(event);
-    const beforeId = beforeAudio?.identifier || null;
+    const ids = this.readDragAudioIds(event);
+    const row = event.currentTarget as HTMLElement;
+    // Always resolve from the drop event — cached dragover index can lag behind the pointer.
+    const insertIndex = this.resolveRowInsertIndex(folderId || '', rowAudio, event.clientY, row);
     this.clearDropState();
-    if (!id || this.GuestMode()) return;
-    if (beforeId && id === beforeId) return;
-    this.library.reorder(id, folderId || '', beforeId);
+    if (ids.length < 1 || this.GuestMode()) return;
+    this.library.moveManyAt(ids, folderId || '', insertIndex);
     this.expandedFolders[folderId || ''] = true;
+  }
+
+  onFolderEndDragOver(event: DragEvent, folderId: string) {
+    if (this.isOsFileDrag(event)) {
+      this.setOsFileDropFolder(event, folderId);
+      return;
+    }
+    if (!this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    const fid = folderId || '';
+    const insertIndex = this.library.orderedIdsInFolder(fid).length;
+    if (this.dropFileFolderId !== null) this.dropFileFolderId = null;
+    if (this.dropFolderId !== null) this.dropFolderId = null;
+    if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
+    if (this.dropReorderFolderId !== fid) this.dropReorderFolderId = fid;
+    if (this.dropInsertIndex !== insertIndex) this.dropInsertIndex = insertIndex;
+  }
+
+  onFolderEndDrop(event: DragEvent, folderId: string) {
+    if (this.isOsFileDrag(event)) {
+      void this.acceptOsFileDrop(event, folderId);
+      return;
+    }
+    if (!this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const ids = this.readDragAudioIds(event);
+    const fid = folderId || '';
+    const insertIndex = this.library.orderedIdsInFolder(fid).length;
+    this.clearDropState();
+    if (ids.length < 1 || this.GuestMode()) return;
+    this.library.moveManyAt(ids, fid, insertIndex);
+    this.expandedFolders[fid] = true;
+  }
+
+  /** Index to insert before in the current folder list (pre-removal). */
+  private resolveRowInsertIndex(
+    folderId: string,
+    rowAudio: AudioFile,
+    clientY: number,
+    rowEl: HTMLElement
+  ): number {
+    const list = this.library.orderedIdsInFolder(folderId || '');
+    const idx = list.indexOf(rowAudio.identifier);
+    if (idx < 0) return list.length;
+    const rect = rowEl.getBoundingClientRect();
+    const after = clientY > rect.top + rect.height * 0.5;
+    return after ? idx + 1 : idx;
   }
 
   onTrackDragOver(event: DragEvent, trackIndex: number) {
@@ -517,14 +823,18 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'link';
+      event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'move';
     }
     if (this.dropTrackIndex !== trackIndex) this.dropTrackIndex = trackIndex;
     if (this.dropFolderId !== null) this.dropFolderId = null;
-    if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
+    if (this.dropInsertIndex !== null) this.dropInsertIndex = null;
+    if (this.dropReorderFolderId !== null) this.dropReorderFolderId = null;
   }
 
-  onTrackDragLeave(trackIndex: number) {
+  onTrackDragLeave(event: DragEvent, trackIndex: number) {
+    const related = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement | null;
+    if (current && related && current.contains(related)) return;
     if (this.dropTrackIndex === trackIndex) this.dropTrackIndex = null;
   }
 
@@ -532,9 +842,10 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
-    const id = this.readAudioDragId(event);
+    const ids = this.readDragAudioIds(event);
     const playNow = event.altKey;
     this.clearDropState();
+    const id = ids[0];
     if (!id || this.GuestMode() || !this.jukebox) return;
     const audio = AudioStorage.instance.get(id);
     if (!audio?.isReady) return;
@@ -545,21 +856,25 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   onLibraryScrollDragOver(event: DragEvent) {
     if (this.isAudioDrag(event)) {
-      // Gaps between folder blocks: clear stale folder highlight so UI matches drop.
       if (event.target === event.currentTarget) {
         event.preventDefault();
         if (this.dropFolderId !== null) this.dropFolderId = null;
-        if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
+        if (this.dropInsertIndex !== null) this.dropInsertIndex = null;
+        if (this.dropReorderFolderId !== null) this.dropReorderFolderId = null;
       }
       return;
     }
-    this.onLibraryFilesDragOver(event);
+    if (this.isOsFileDrag(event) && event.target === event.currentTarget) {
+      // Bare scroll chrome is not a drop target — must aim at a folder.
+      event.preventDefault();
+      event.stopPropagation();
+      if (this.dropFileFolderId !== null) this.dropFileFolderId = null;
+    }
   }
 
   onLibraryScrollDrop(event: DragEvent) {
     if (this.isAudioDrag(event)) {
-      // Honor highlighted folder if drop lands on scroll chrome/gap after a folder hover.
-      if (this.dropFolderId !== null && this.dropBeforeAudioId == null) {
+      if (this.dropFolderId !== null && this.dropInsertIndex == null) {
         this.onFolderDrop(event, this.dropFolderId);
         return;
       }
@@ -568,103 +883,163 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       this.clearDropState();
       return;
     }
-    this.onLibraryFilesDrop(event);
-  }
-
-  onLibraryFilesDragOver(event: DragEvent) {
-    if (this.GuestMode()) return;
-    const files = event.dataTransfer?.types;
-    if (!files) return;
-    const list = Array.from(files);
-    if (!list.includes('Files')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    this.dropOnLibraryFiles = true;
+    if (this.isOsFileDrag(event)) {
+      // Ignore drops outside a folder so body FileArchiver does not steal them into root.
+      event.preventDefault();
+      event.stopPropagation();
+      this.dropFileFolderId = null;
+    }
   }
 
   onLibraryFilesDragLeave(event: DragEvent) {
     const related = event.relatedTarget as Node | null;
     const current = event.currentTarget as HTMLElement | null;
     if (current && related && current.contains(related)) return;
-    this.dropOnLibraryFiles = false;
+    this.dropFileFolderId = null;
   }
 
-  onLibraryFilesDrop(event: DragEvent) {
-    this.dropOnLibraryFiles = false;
-    if (this.GuestMode()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const files = event.dataTransfer?.files;
-    if (files?.length) FileArchiver.instance.load(files);
-  }
-
-  /** Whole folder block highlight while this folder is the drop destination. */
+  /** Whole folder block highlight while this folder is the audio-move drop destination. */
   isDropFolder(folderId: string): boolean {
     return this.dropFolderId !== null && this.dropFolderId === (folderId || '');
   }
 
-  isDropBefore(audioId: string): boolean {
-    return !!this.dropBeforeAudioId && this.dropBeforeAudioId === audioId;
+  /** Folder highlight while OS files are dragged over it. */
+  isFileDropFolder(folderId: string): boolean {
+    return this.dropFileFolderId !== null && this.dropFileFolderId === (folderId || '');
+  }
+
+  isDropBefore(audioId: string, folderId: string): boolean {
+    if (this.dropInsertIndex == null || this.dropReorderFolderId !== (folderId || '')) return false;
+    const list = this.library.orderedIdsInFolder(folderId || '');
+    if (this.dropInsertIndex < 0 || this.dropInsertIndex >= list.length) return false;
+    return list[this.dropInsertIndex] === audioId;
+  }
+
+  isDropAtFolderEnd(folderId: string): boolean {
+    if (this.dropInsertIndex == null || this.dropReorderFolderId !== (folderId || '')) return false;
+    return this.dropInsertIndex >= this.library.orderedIdsInFolder(folderId || '').length;
+  }
+
+  isDragRow(audioId: string): boolean {
+    if (!this.draggingAudioId) return false;
+    if (this.dragAudioIds.length > 1) return this.dragAudioIds.includes(audioId);
+    return this.draggingAudioId === audioId;
+  }
+
+  trackFolderId(_index: number, folder: AudioLibraryFolder): string {
+    return folder?.id || '';
+  }
+
+  trackAudioId(_index: number, audio: AudioFile): string {
+    return audio?.identifier || '';
+  }
+
+  private isOsFileDrag(event: DragEvent): boolean {
+    if (this.GuestMode()) return false;
+    return Array.from(event.dataTransfer?.types || []).includes('Files');
+  }
+
+  private setOsFileDropFolder(event: DragEvent, folderId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    const id = folderId || '';
+    if (this.dropFileFolderId !== id) this.dropFileFolderId = id;
+    if (this.dropFolderId !== null) this.dropFolderId = null;
+    if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
+    if (this.dropInsertIndex !== null) this.dropInsertIndex = null;
+    if (this.dropReorderFolderId !== null) this.dropReorderFolderId = null;
+  }
+
+  private async acceptOsFileDrop(event: DragEvent, folderId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const files = event.dataTransfer?.files;
+    this.clearDropState();
+    if (files?.length) await this.importFilesToFolder(folderId || '', files);
   }
 
   private isAudioDrag(event: DragEvent): boolean {
     if (this.GuestMode()) return false;
+    if (this.draggingAudioId || this.dragAudioIds.length) return true;
     const types = Array.from(event.dataTransfer?.types || []);
-    return types.includes(JUKEBOX_AUDIO_DRAG_MIME) || (!!this.draggingAudioId && types.includes('text/plain'));
-  }
-
-  private peekDraggingId(event: DragEvent): string {
-    return this.draggingAudioId || '';
+    if (types.includes(JUKEBOX_AUDIO_DRAG_MIME) || types.includes(JUKEBOX_AUDIO_DRAG_LIST_MIME)) return true;
+    if (types.includes('text/plain') && !types.includes('Files')) return true;
+    return false;
   }
 
   private readAudioDragId(event: DragEvent): string {
-    const typed = event.dataTransfer?.getData(JUKEBOX_AUDIO_DRAG_MIME)
+    const ids = this.readDragAudioIds(event);
+    return ids[0] || '';
+  }
+
+  private readDragAudioIds(event: DragEvent): string[] {
+    if (this.dragAudioIds.length) return this.dragAudioIds.slice();
+    try {
+      const raw = event.dataTransfer?.getData(JUKEBOX_AUDIO_DRAG_LIST_MIME) || '';
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((id: any) => typeof id === 'string' && id);
+        }
+      }
+    } catch { /* ignore */ }
+    const typed = (event.dataTransfer?.getData(JUKEBOX_AUDIO_DRAG_MIME)
       || event.dataTransfer?.getData('text/plain')
       || this.draggingAudioId
-      || '';
-    return typed.trim();
+      || '').trim();
+    if (!typed) return [];
+    if (typed.includes('\n')) return typed.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    return [typed];
   }
 
   private clearDropState() {
     this.draggingAudioId = '';
+    this.dragAudioIds = [];
     this.dropFolderId = null;
     this.dropTrackIndex = null;
-    this.dropBeforeAudioId = null;
-    this.dropOnLibraryFiles = false;
+    this.dropInsertIndex = null;
+    this.dropReorderFolderId = null;
+    this.dropFileFolderId = null;
   }
 
   isUrlAudio(audio: AudioFile): boolean {
     return !!audio && audio.state === AudioState.URL;
   }
 
-  addOnlineLink() {
-    if (this.GuestMode()) return;
-    const url = (this.onlineUrl || '').trim();
-    this.linkError = '';
-    if (!StringUtil.validUrl(url)) {
-      this.linkError = this.i18n.t('jukebox.linkInvalid');
-      return;
-    }
-    const name = (this.onlineName || '').trim() || this.displayNameFromUrl(url);
-    AudioStorage.instance.add({
-      identifier: url,
-      name,
-      type: '',
-      blob: null,
-      url
-    });
-    this.library.ensureListed(url);
-    this.onlineUrl = '';
-    this.onlineName = '';
-  }
-
   onAudioContextMenu(event: MouseEvent, audio: AudioFile) {
     event.preventDefault();
     event.stopPropagation();
     if (this.GuestMode() || !audio) return;
+    if (!this.isAudioSelected(audio.identifier)) {
+      this.selectedAudioIds = new Set([audio.identifier]);
+      this.selectionAnchorId = audio.identifier;
+      this.selectionAnchorFolderId = this.library.folderOf(audio.identifier) || '';
+    }
+    const selectedIds = this.orderedSelectedIds();
+    const multi = selectedIds.length > 1;
     const t = (key: string, params?: any) => this.i18n.t(key, params);
     const position = { x: event.pageX, y: event.pageY };
+
+    if (multi) {
+      const folderMoves: ContextMenuAction[] = [
+        { name: t('jukebox.moveToRoot'), action: () => this.moveSelectedToFolder('') }
+      ];
+      for (const folder of this.folders) {
+        folderMoves.push({
+          name: folder.name,
+          action: () => this.moveSelectedToFolder(folder.id)
+        });
+      }
+      const menu: ContextMenuAction[] = [
+        { name: t('jukebox.moveToFolder'), subActions: folderMoves },
+        ContextMenuSeparator,
+        { name: t('jukebox.removeSelected'), action: () => this.removeSelectedAudios() },
+      ];
+      this.contextMenuService.open(position, menu, t('jukebox.selectedCount', { count: selectedIds.length }));
+      return;
+    }
+
     const folderMoves: ContextMenuAction[] = [
       { name: t('jukebox.moveToRoot'), action: () => this.library.moveToFolder(audio.identifier, '') }
     ];
@@ -705,8 +1080,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const t = (key: string) => this.i18n.t(key);
     const position = { x: event.pageX, y: event.pageY };
     const menu: ContextMenuAction[] = [
-      { name: t('jukebox.folderShuffleLoop'), action: () => this.playFolderShuffleLoop(folder.id) },
-      { name: t('jukebox.folderOneShot'), action: () => this.playFolderOneShot(folder.id) },
+      { name: t('jukebox.folderPlayQueue'), action: () => this.playFolderQueue(folder.id) },
       ContextMenuSeparator,
       { name: t('jukebox.rename'), action: () => this.renameFolder(folder) },
       { name: t('jukebox.deleteFolder'), action: () => this.deleteFolder(folder) },
@@ -734,6 +1108,35 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   private removeAudio(audio: AudioFile) {
     if (!window.confirm(this.i18n.t('jukebox.removeConfirm', { name: this.displayName(audio) }))) return;
+    this.removeAudioImmediate(audio);
+    this.selectedAudioIds.delete(audio.identifier);
+    this.selectedAudioIds = new Set(this.selectedAudioIds);
+  }
+
+  private moveSelectedToFolder(folderId: string) {
+    const ids = this.orderedSelectedIds();
+    if (ids.length < 1 || this.GuestMode()) return;
+    this.library.moveMany(ids, folderId || '', null);
+    this.expandedFolders[folderId || ''] = true;
+  }
+
+  private removeSelectedAudios() {
+    const ids = this.orderedSelectedIds();
+    if (ids.length < 1) return;
+    if (!window.confirm(this.i18n.t('jukebox.removeSelectedConfirm', { count: ids.length }))) return;
+    for (const id of ids) {
+      const audio = AudioStorage.instance.get(id);
+      if (audio) this.removeAudioImmediate(audio);
+      else {
+        this.library.removeAudioMeta(id);
+        AudioStorage.instance.delete(id);
+      }
+    }
+    AudioStorage.instance.lazySynchronize(100);
+    this.clearSelection();
+  }
+
+  private removeAudioImmediate(audio: AudioFile) {
     this.stopBGM(audio);
     if (this.auditionPlayer.audio === audio) this.stop();
     this.library.removeAudioMeta(audio.identifier);

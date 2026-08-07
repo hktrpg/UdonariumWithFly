@@ -9,7 +9,12 @@ import { AudioLibrary } from './audio-library';
 export const JUKEBOX_TRACK_COUNT = 4;
 export const MUSIC_HUD_SLOT_COUNT = 3;
 
-export type JukeboxQueueMode = 'single' | 'shuffle-loop' | 'shuffle-once';
+export type JukeboxQueueMode =
+  | 'single'
+  | 'shuffle-loop'
+  | 'shuffle-once'
+  | 'queue-loop'
+  | 'queue-once';
 
 export interface JukeboxTrackState {
   audioIdentifier: string;
@@ -34,7 +39,11 @@ function emptyTrack(): JukeboxTrackState {
 }
 
 function normalizeQueueMode(raw: any): JukeboxQueueMode {
-  if (raw === 'shuffle-loop' || raw === 'shuffle-once' || raw === 'single') return raw;
+  if (
+    raw === 'shuffle-loop' || raw === 'shuffle-once'
+    || raw === 'queue-loop' || raw === 'queue-once'
+    || raw === 'single'
+  ) return raw;
   return 'single';
 }
 
@@ -178,8 +187,8 @@ export class Jukebox extends GameObject {
 
   /**
    * Play a list on a track.
-   * - shuffle-loop: shuffle and repeat forever
-   * - shuffle-once: shuffle once through then stop
+   * - shuffle-loop / shuffle-once: shuffled order
+   * - queue-loop / queue-once: library order
    * - single: play first id only (use playTrack for normal once/loop)
    */
   playQueue(index: number, identifiers: string[], mode: JukeboxQueueMode, isLoopSingle = false) {
@@ -192,11 +201,13 @@ export class Jukebox extends GameObject {
 
     this.ensureMigrated();
     const next = this.tracks;
-    if (mode === 'shuffle-loop' || mode === 'shuffle-once') {
-      const queue = shuffleIds(ids);
-      const startIndex = AudioLibrary.instance.effectiveTrackType(queue[0]) % JUKEBOX_TRACK_COUNT;
-      next[startIndex] = {
-        ...next[startIndex],
+    if (mode === 'shuffle-loop' || mode === 'shuffle-once'
+      || mode === 'queue-loop' || mode === 'queue-once') {
+      const queue = (mode === 'shuffle-loop' || mode === 'shuffle-once')
+        ? shuffleIds(ids)
+        : ids.slice();
+      next[index] = {
+        ...next[index],
         audioIdentifier: queue[0],
         isPlaying: true,
         isLoop: false,
@@ -205,7 +216,7 @@ export class Jukebox extends GameObject {
       };
       this.tracks = next;
       this.syncLegacyFields();
-      this._playTrack(startIndex);
+      this._playTrack(index);
       return;
     } else {
       next[index] = {
@@ -416,7 +427,10 @@ export class Jukebox extends GameObject {
     const track = this.tracks[index];
     if (!track || !track.isPlaying) return;
 
-    if (track.queueMode === 'shuffle-loop' || track.queueMode === 'shuffle-once') {
+    if (
+      track.queueMode === 'shuffle-loop' || track.queueMode === 'shuffle-once'
+      || track.queueMode === 'queue-loop' || track.queueMode === 'queue-once'
+    ) {
       const queue = track.queue.slice();
       if (queue.length < 1) {
         this.stopTrack(index);
@@ -426,23 +440,14 @@ export class Jukebox extends GameObject {
       let nextIdx = queue.indexOf(cur) + 1;
       let nextQueue = queue;
       if (nextIdx >= queue.length) {
-        if (track.queueMode === 'shuffle-once') {
+        if (track.queueMode === 'shuffle-once' || track.queueMode === 'queue-once') {
           this.stopTrack(index);
           return;
         }
-        nextQueue = shuffleIds(queue);
+        if (track.queueMode === 'shuffle-loop') nextQueue = shuffleIds(queue);
         nextIdx = 0;
       }
       const nextId = nextQueue[nextIdx];
-      const target = AudioLibrary.instance.effectiveTrackType(nextId) % JUKEBOX_TRACK_COUNT;
-      if (target !== index) {
-        // Finish current slot; continue the remaining queue on the preferred track.
-        const remaining = nextQueue.slice(nextIdx);
-        const mode = track.queueMode;
-        this.stopTrack(index);
-        this.playQueue(target, remaining, mode);
-        return;
-      }
       const next = this.tracks;
       next[index] = {
         ...next[index],
@@ -450,6 +455,7 @@ export class Jukebox extends GameObject {
         audioIdentifier: nextId,
         isPlaying: true,
         isLoop: false,
+        queueMode: track.queueMode,
       };
       this.tracks = next;
       this.syncLegacyFields();

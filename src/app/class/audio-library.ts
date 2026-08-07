@@ -7,6 +7,8 @@ import { InnerXml } from './core/synchronize-object/object-serializer';
 
 /** HTML5 DnD MIME for library ↔ track / HUD drops. */
 export const JUKEBOX_AUDIO_DRAG_MIME = 'application/x-udonarium-jukebox-audio';
+/** JSON string[] of audio ids when dragging a multi-selection. */
+export const JUKEBOX_AUDIO_DRAG_LIST_MIME = 'application/x-udonarium-jukebox-audio-list';
 
 export interface AudioLibraryFolder {
   id: string;
@@ -29,6 +31,8 @@ export interface AudioLibraryData {
   folderTrackTypes: { [folderId: string]: number };
   /** folderId -> default LOOP for folder playback */
   folderPlayLoops: { [folderId: string]: boolean };
+  /** folderId -> true = shuffle order, false/unset = sequential */
+  folderShuffles: { [folderId: string]: boolean };
 }
 
 function emptyData(): AudioLibraryData {
@@ -41,6 +45,7 @@ function emptyData(): AudioLibraryData {
     playLoops: {},
     folderTrackTypes: {},
     folderPlayLoops: {},
+    folderShuffles: {},
   };
 }
 
@@ -97,6 +102,11 @@ function normalizeData(raw: any): AudioLibraryData {
       data.folderPlayLoops[key] = !!raw.folderPlayLoops[key];
     }
   }
+  if (raw.folderShuffles && typeof raw.folderShuffles === 'object') {
+    for (const key of Object.keys(raw.folderShuffles)) {
+      if (raw.folderShuffles[key]) data.folderShuffles[key] = true;
+    }
+  }
   return data;
 }
 
@@ -133,6 +143,9 @@ export class AudioLibrary extends GameObject implements InnerXml {
     AudioLibrary._instance.initialize();
     return AudioLibrary._instance;
   }
+
+  /** Target folder for the next FileArchiver audio import (null = root / unchanged). */
+  importFolderId: string | null = null;
 
   get data(): AudioLibraryData {
     try {
@@ -174,6 +187,15 @@ export class AudioLibrary extends GameObject implements InnerXml {
     });
   }
 
+  /**
+   * Full folder order as shown in the UI (membership ∩ order, not the raw orders[] alone).
+   * Raw `orders` can be shorter than the visible list — never use it alone for insert indices.
+   */
+  orderedIdsInFolder(folderId: string): string[] {
+    const audios = AudioStorage.instance.audios.filter(a => !a.isHidden);
+    return this.audiosInFolder(folderId || '', audios).map(a => a.identifier);
+  }
+
   createFolder(name: string): AudioLibraryFolder {
     const data = this.data;
     const folder: AudioLibraryFolder = {
@@ -201,6 +223,7 @@ export class AudioLibrary extends GameObject implements InnerXml {
     delete data.orders[folderId];
     delete data.folderTrackTypes[folderId];
     delete data.folderPlayLoops[folderId];
+    delete data.folderShuffles[folderId];
     const root = ensureOrderList(data, '');
     for (const id of Object.keys(data.membership)) {
       if (data.membership[id] === folderId) {
@@ -214,27 +237,73 @@ export class AudioLibrary extends GameObject implements InnerXml {
     this.data = data;
   }
 
-  moveToFolder(audioId: string, folderId: string, beforeAudioId: string | null = null) {
-    if (!audioId) return;
+  /**
+   * Move/reorder many audios as one block (preserves `audioIds` order).
+   * `insertIndex` is the destination index in the *visible* folder list before removal.
+   */
+  moveManyAt(audioIds: string[], folderId: string, insertIndex: number) {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const id of audioIds || []) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+    }
+    if (ids.length < 1) return;
+
     const data = this.data;
     if (folderId && !data.folders.some(f => f.id === folderId)) folderId = '';
     const dest = folderId || '';
-    data.membership[audioId] = dest;
-    removeFromAllOrders(data, audioId);
-    const list = ensureOrderList(data, dest);
-    if (beforeAudioId && list.includes(beforeAudioId)) {
-      const idx = list.indexOf(beforeAudioId);
-      list.splice(idx, 0, audioId);
-    } else {
-      list.push(audioId);
+
+    // Must match UI order (audiosIn), not the possibly-incomplete orders[].
+    const current = this.orderedIdsInFolder(dest);
+    const raw = Number(insertIndex);
+    let index = Number.isFinite(raw)
+      ? Math.max(0, Math.min(Math.floor(raw), current.length))
+      : current.length;
+
+    for (const id of ids) {
+      const at = current.indexOf(id);
+      if (at >= 0 && at < index) index--;
     }
+
+    for (const id of ids) {
+      data.membership[id] = dest;
+      removeFromAllOrders(data, id);
+    }
+
+    const remaining = current.filter(id => !seen.has(id));
+    index = Math.max(0, Math.min(index, remaining.length));
+    remaining.splice(index, 0, ...ids);
+    // Persist the full visible order so later inserts stay aligned with the UI.
+    data.orders[dest] = remaining;
     this.data = data;
+  }
+
+  /**
+   * Move/reorder many audios as one block before `beforeAudioId` (or append when null).
+   */
+  moveMany(audioIds: string[], folderId: string, beforeAudioId: string | null = null) {
+    if (folderId && !this.data.folders.some(f => f.id === folderId)) folderId = '';
+    const dest = folderId || '';
+    const current = this.orderedIdsInFolder(dest);
+    let insertIndex = current.length;
+    if (beforeAudioId) {
+      const at = current.indexOf(beforeAudioId);
+      if (at >= 0) insertIndex = at;
+    }
+    this.moveManyAt(audioIds, dest, insertIndex);
+  }
+
+  moveToFolder(audioId: string, folderId: string, beforeAudioId: string | null = null) {
+    if (!audioId) return;
+    this.moveMany([audioId], folderId, beforeAudioId);
   }
 
   /** Reorder within the same folder (or move+insert when folder differs). */
   reorder(audioId: string, folderId: string, beforeAudioId: string | null) {
     if (!audioId || audioId === beforeAudioId) return;
-    this.moveToFolder(audioId, folderId || '', beforeAudioId);
+    this.moveMany([audioId], folderId || '', beforeAudioId);
   }
 
   renameAudio(audioId: string, name: string) {
@@ -341,6 +410,19 @@ export class AudioLibrary extends GameObject implements InnerXml {
     this.data = data;
   }
 
+  /** Whether folder playback uses shuffle order (default: sequential). */
+  folderShuffle(folderId: string): boolean {
+    return !!this.data.folderShuffles[folderId || ''];
+  }
+
+  setFolderShuffle(folderId: string, shuffle: boolean) {
+    const data = this.data;
+    const fid = folderId || '';
+    if (shuffle) data.folderShuffles[fid] = true;
+    else delete data.folderShuffles[fid];
+    this.data = data;
+  }
+
   /** Effective LOOP: audio override if set, otherwise folder default. */
   effectivePlayLoop(audioId: string, folderId?: string): boolean {
     if (this.hasPlayLoop(audioId)) return this.playLoopOf(audioId);
@@ -348,17 +430,24 @@ export class AudioLibrary extends GameObject implements InnerXml {
     return this.folderPlayLoop(fid);
   }
 
-  /** Ensure newly added audio appears in root order. */
-  ensureListed(audioId: string) {
+  /**
+   * Ensure newly added audio appears in a folder order.
+   * Prefer explicit folderId, else pending importFolderId for new items, else keep/root.
+   */
+  ensureListed(audioId: string, folderId?: string) {
     if (!audioId) return;
     const data = this.data;
-    if (data.membership[audioId] == null) data.membership[audioId] = '';
-    const fid = data.membership[audioId] || '';
-    const list = ensureOrderList(data, fid);
-    if (!list.includes(audioId)) {
-      list.push(audioId);
-      this.data = data;
-    }
+    const hasMembership = Object.prototype.hasOwnProperty.call(data.membership, audioId);
+    let dest: string;
+    if (folderId !== undefined) dest = folderId || '';
+    else if (!hasMembership && this.importFolderId != null) dest = this.importFolderId || '';
+    else if (hasMembership) dest = data.membership[audioId] || '';
+    else dest = '';
+    data.membership[audioId] = dest;
+    removeFromAllOrders(data, audioId);
+    const list = ensureOrderList(data, dest);
+    if (!list.includes(audioId)) list.push(audioId);
+    this.data = data;
   }
 
   innerXml(): string { return ''; }

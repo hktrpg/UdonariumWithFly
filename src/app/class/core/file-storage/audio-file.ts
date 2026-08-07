@@ -62,13 +62,13 @@ export class AudioFile {
     }
   }
 
-  static async createAsync(file: File): Promise<AudioFile>
-  static async createAsync(blob: Blob): Promise<AudioFile>
-  static async createAsync(arg: any): Promise<AudioFile> {
+  static async createAsync(file: File, displayName?: string): Promise<AudioFile>
+  static async createAsync(blob: Blob, displayName?: string): Promise<AudioFile>
+  static async createAsync(arg: any, displayName?: string): Promise<AudioFile> {
     if (arg instanceof File) {
-      return await AudioFile._createAsync(arg, arg.name);
+      return await AudioFile._createAsync(arg, displayName != null ? displayName : arg.name);
     } else if (arg instanceof Blob) {
-      return await AudioFile._createAsync(arg);
+      return await AudioFile._createAsync(arg, displayName);
     }
   }
 
@@ -77,7 +77,12 @@ export class AudioFile {
 
     let audio = new AudioFile();
     audio.context.identifier = await FileReaderUtil.calcSHA256Async(arrayBuffer);
-    audio.context.name = name;
+    let display = (name || '').trim();
+    // File.name includes extension — strip for nicer library labels.
+    if (display && /\.[a-z0-9]{1,8}$/i.test(display)) {
+      display = display.replace(/\.[^.]+$/, '') || display;
+    }
+    audio.context.name = display;
     audio.context.blob = new Blob([arrayBuffer], { type: blob.type });
     audio.context.type = audio.context.blob.type;
     audio.context.url = window.URL.createObjectURL(audio.context.blob);

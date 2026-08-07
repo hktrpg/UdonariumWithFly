@@ -110,11 +110,23 @@
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder</i>
       {{ (folderBackup.status === 'needAuth' || folderBackup.hasError ? 'menu.folderBackup.reauth' : 'menu.folderBackup.bind') | i18n }}
     </button>
-    <button type="button" *ngIf="networkService.peer.isRoom && folderBackup.isReady" (click)="saveFolderBackup()"
-      [disabled]="folderBackup.status === 'writing'">
-      <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
-      {{ 'menu.folderBackup.saveRoom' | i18n }}
-    </button>
+    <div class="save-folder-wrap" *ngIf="networkService.peer.isRoom && folderBackup.isReady">
+      <button type="button" (click)="saveFolderBackup()"
+        [disabled]="folderBackup.status === 'writing'">
+        <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
+        {{ 'menu.folderBackup.saveRoom' | i18n }}
+      </button>
+      <div class="save-folder-flyout" role="menu">
+        <button type="button" role="menuitem" (click)="changeFolderBackup()">
+          <i class="material-icons" aria-hidden="true">create_new_folder</i>
+          {{ 'menu.folderBackup.changeFolder' | i18n }}
+        </button>
+        <button type="button" role="menuitem" (click)="unbindFolderBackup()">
+          <i class="material-icons" aria-hidden="true">link_off</i>
+          {{ 'menu.folderBackup.disconnectFolder' | i18n }}
+        </button>
+      </div>
+    </div>
     <button type="button" *ngIf="folderBackup.canLoadFromFolder" (click)="loadFolderBackup()"
       [disabled]="!canLoadRoom"
       [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">

@@ -1,6 +1,7 @@
 import { BlobReader, BlobWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 import { saveAs } from 'file-saver';
 
+import { AudioLibrary } from '@udonarium/audio-library';
 import { EventSystem } from '../system';
 import { StringUtil } from '../system/util/string-util';
 import { XmlUtil } from '../system/util/xml-util';
@@ -8,6 +9,7 @@ import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageStorage } from './image-storage';
 import { MimeType } from './mime-type';
+import { AudioImportNameService } from 'service/audio-import-name.service';
 
 type MetaData = { percent: number, currentFile: string };
 type UpdateCallback = (metadata: MetaData) => void;
@@ -82,13 +84,19 @@ export class FileArchiver {
     if (!files) return;
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
-    for (let file of loadFiles) {
-      await this.handleImage(file);
-      await this.handleAudio(file);
-      await this.handleAudioUrlManifest(file);
-      await this.handleText(file);
-      await this.handleZip(file);
-      EventSystem.trigger('FILE_LOADED', { file: file });
+    const nameService = AudioImportNameService.instance;
+    nameService?.beginBatch();
+    try {
+      for (let file of loadFiles) {
+        await this.handleImage(file);
+        await this.handleAudio(file);
+        await this.handleAudioUrlManifest(file);
+        await this.handleText(file);
+        await this.handleZip(file);
+        EventSystem.trigger('FILE_LOADED', { file: file });
+      }
+    } finally {
+      nameService?.endBatch();
     }
   }
 
@@ -112,6 +120,7 @@ export class FileArchiver {
           blob: null,
           url
         });
+        AudioLibrary.instance.ensureListed(identifier);
       }
     } catch (reason) {
       console.warn(reason);
@@ -135,7 +144,15 @@ export class FileArchiver {
       return;
     }
     console.log(file.name + ' type:' + file.type);
-    await AudioStorage.instance.addAsync(file);
+    const nameService = AudioImportNameService.instance;
+    const displayName = nameService
+      ? await nameService.resolveDisplayName(file)
+      : undefined;
+    const audio = await AudioStorage.instance.addAsync(file, displayName);
+    if (audio) {
+      if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+      AudioLibrary.instance.ensureListed(audio.identifier);
+    }
   }
 
   private async handleText(file: File): Promise<void> {

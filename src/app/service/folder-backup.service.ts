@@ -194,6 +194,8 @@ export class FolderBackupService implements OnDestroy {
       await localForage.setItem(FolderBackupService.STORAGE_KEY, handle);
       this.lastError = '';
       this.setStatus('ready');
+      // Ask once whether auto-backup should include music files (can be large).
+      await this.saveDataService.askIncludeAudio('folder');
       void this.onNetworkOpen();
       return true;
     } catch (e) {

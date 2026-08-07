@@ -25,29 +25,100 @@ import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AudioLibrary } from '@udonarium/audio-library';
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { I18nService } from './i18n.service';
+import { ModalService } from './modal.service';
 import saveAs from 'file-saver';
+import * as localForage from 'localforage';
 
 type UpdateCallback = (percent: number) => void;
+
+export type SaveIncludeAudioAskContext = 'zip' | 'folder';
 
 @Injectable({
   providedIn: 'root'
 })
 export class SaveDataService {
   private static queue: PromiseQueue = new PromiseQueue('SaveDataServiceQueue');
+  static readonly INCLUDE_AUDIO_STORAGE_KEY = 'udonarium.save.includeAudio';
+
+  /** Cached preference (default true until loaded). */
+  private includeAudioCache: boolean | undefined;
 
   constructor(
     private ngZone: NgZone,
     private chatMessageService: ChatMessageService,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private modalService: ModalService
   ) { }
 
-  saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
+  /** Sync view of preference for settings toggles (defaults to true before load). */
+  get includeAudio(): boolean {
+    return this.includeAudioCache !== false;
+  }
+
+  async initializeIncludeAudioPreference(): Promise<void> {
+    await this.getIncludeAudio();
+  }
+
+  async getIncludeAudio(): Promise<boolean> {
+    if (this.includeAudioCache !== undefined) return this.includeAudioCache;
+    try {
+      const v = await localForage.getItem<boolean | string>(SaveDataService.INCLUDE_AUDIO_STORAGE_KEY);
+      this.includeAudioCache = !(v === false || v === 'false');
+    } catch {
+      this.includeAudioCache = true;
+    }
+    return this.includeAudioCache;
+  }
+
+  async setIncludeAudio(include: boolean): Promise<void> {
+    this.includeAudioCache = !!include;
+    try {
+      await localForage.setItem(SaveDataService.INCLUDE_AUDIO_STORAGE_KEY, this.includeAudioCache);
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * Ask whether to pack music files into a room save.
+   * Returns include flag, or null if cancelled.
+   * Folder bind always writes the choice as the local default; ZIP uses remember checkbox.
+   */
+  async askIncludeAudio(context: SaveIncludeAudioAskContext): Promise<boolean | null> {
+    if (!ModalService.defaultParentViewContainerRef) {
+      return this.getIncludeAudio();
+    }
+    const current = await this.getIncludeAudio();
+    const result = await this.modalService.open<{ choice: string; remember: boolean } | false>(ConfirmationComponent, {
+      title: this.i18n.t('save.includeAudio.title'),
+      text: this.i18n.t(context === 'folder' ? 'save.includeAudio.textFolder' : 'save.includeAudio.textZip'),
+      help: this.i18n.t('save.includeAudio.help'),
+      materialIcon: 'library_music',
+      type: ConfirmationType.OK_CANCEL,
+      okLabel: this.i18n.t('confirm.ok'),
+      cancelLabel: this.i18n.t('confirm.cancel'),
+      choices: [
+        { id: 'include', label: this.i18n.t('save.includeAudio.include') },
+        { id: 'exclude', label: this.i18n.t('save.includeAudio.exclude') },
+      ],
+      choiceValue: current ? 'include' : 'exclude',
+      rememberLabel: context === 'zip' ? this.i18n.t('save.includeAudio.remember') : '',
+      rememberValue: context === 'zip',
+    });
+    if (!result) return null;
+    const include = result.choice === 'include';
+    if (context === 'folder' || result.remember) {
+      await this.setIncludeAudio(include);
+    }
+    return include;
+  }
+
+  saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback, includeAudio?: boolean): Promise<void> {
     const name = fileName ?? this.i18n.t('save.roomFilePrefix');
     this.chatMessageService.sendOperationLog(this.i18n.t('save.roomDownloaded', { file: name }));
-    return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(name, updateCallback)));
+    return SaveDataService.queue.add((resolve, reject) => resolve(this._saveRoomAsync(name, updateCallback, includeAudio)));
   }
 
   saveRoomToDirectoryAsync(
@@ -64,14 +135,15 @@ export class SaveDataService {
         iv: string;
         data: string;
       };
-    }
+    },
+    includeAudio?: boolean
   ): Promise<void> {
     return SaveDataService.queue.add((resolve, reject) =>
-      resolve(this._saveRoomToDirectoryAsync(dirHandle, roomId, displayName, updateCallback, auth))
+      resolve(this._saveRoomToDirectoryAsync(dirHandle, roomId, displayName, updateCallback, auth, includeAudio))
     );
   }
 
-  buildRoomFiles(): File[] {
+  buildRoomFiles(includeAudio = true): File[] {
     let files: File[] = [];
     let roomXml = this.convertToXml(new Room());
     let chatXml = this.convertToXml(ChatTabList.instance);
@@ -108,29 +180,32 @@ export class SaveDataService {
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
 
     // User-uploaded BGM / SE (preset asset sounds are isHidden and omitted).
-    const urlAudioManifest: { identifier: string; name: string; url: string }[] = [];
-    for (const audio of AudioStorage.instance.audios) {
-      if (audio.isHidden) continue;
-      if (audio.state === AudioState.COMPLETE && audio.blob) {
-        const ext = MimeType.extension(audio.blob.type) || 'mp3';
-        files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
-      } else if (audio.state === AudioState.URL && StringUtil.validUrl(audio.url)) {
-        urlAudioManifest.push({
-          identifier: audio.identifier,
-          name: audio.name,
-          url: audio.url
-        });
+    if (includeAudio) {
+      const urlAudioManifest: { identifier: string; name: string; url: string }[] = [];
+      for (const audio of AudioStorage.instance.audios) {
+        if (audio.isHidden) continue;
+        if (audio.state === AudioState.COMPLETE && audio.blob) {
+          const ext = MimeType.extension(audio.blob.type) || 'mp3';
+          files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
+        } else if (audio.state === AudioState.URL && StringUtil.validUrl(audio.url)) {
+          urlAudioManifest.push({
+            identifier: audio.identifier,
+            name: audio.name,
+            url: audio.url
+          });
+        }
       }
-    }
-    if (urlAudioManifest.length > 0) {
-      files.push(new File([JSON.stringify(urlAudioManifest)], 'fly_audioUrls.json', { type: 'application/json' }));
+      if (urlAudioManifest.length > 0) {
+        files.push(new File([JSON.stringify(urlAudioManifest)], 'fly_audioUrls.json', { type: 'application/json' }));
+      }
     }
     return files;
   }
 
-  private _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback): Promise<void> {
+  private async _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback, includeAudio?: boolean): Promise<void> {
     fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
-    return this.saveAsync(this.buildRoomFiles(), this.appendTimestamp(fileName), updateCallback);
+    const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
+    return this.saveAsync(this.buildRoomFiles(packAudio), this.appendTimestamp(fileName), updateCallback);
   }
 
   private async _saveRoomToDirectoryAsync(
@@ -147,9 +222,11 @@ export class SaveDataService {
         iv: string;
         data: string;
       };
-    }
+    },
+    includeAudio?: boolean
   ): Promise<void> {
-    const files = this.buildRoomFiles();
+    const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
+    const files = this.buildRoomFiles(packAudio);
     let progresPercent = -1;
     const zipBlob = await FileArchiver.instance.createZipBlobAsync(files, meta => {
       if (!updateCallback) return;
@@ -165,6 +242,7 @@ export class SaveDataService {
       displayName,
       savedAt: new Date().toISOString(),
       zipFile,
+      includeAudio: packAudio,
     };
     if (auth) {
       meta.allowUser = !!auth.allowUser;

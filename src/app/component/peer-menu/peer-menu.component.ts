@@ -357,6 +357,16 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     void this.folderBackup.ensureBound();
   }
 
+  changeFolderBackup() {
+    if (this.GuestMode()) return;
+    void this.folderBackup.bindFolder();
+  }
+
+  unbindFolderBackup() {
+    if (this.GuestMode()) return;
+    void this.folderBackup.unbindFolder();
+  }
+
   async saveFolderBackup() {
     if (this.GuestMode() || !this.networkService.peer?.isRoom) return;
     if (!(await this.folderBackup.ensureBound())) return;
@@ -370,6 +380,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
 
   async downloadZip() {
     if (this.GuestMode() || !this.networkService.peer?.isRoom || this.isDownloadingZip) return;
+    const includeAudio = await this.saveDataService.askIncludeAudio('zip');
+    if (includeAudio == null) return;
     this.isDownloadingZip = true;
     this.downloadZipPercent = 0;
     const roomName = 0 < this.networkService.peer.roomName.length
@@ -378,7 +390,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     try {
       await this.saveDataService.saveRoomAsync(roomName, percent => {
         this.downloadZipPercent = percent;
-      });
+      }, includeAudio);
     } finally {
       setTimeout(() => {
         this.isDownloadingZip = false;

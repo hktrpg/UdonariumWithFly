@@ -41,6 +41,7 @@ import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
+import { AudioImportNameService } from 'service/audio-import-name.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SaveDataService } from 'service/save-data.service';
@@ -198,6 +199,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
+    _audioImportName: AudioImportNameService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -205,6 +207,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       Network;
       FileArchiver.instance.initialize();
       void this.folderBackup.initialize();
+      void this.saveDataService.initializeIncludeAudioPreference();
       ImageSharingSystem.instance.initialize();
       ImageStorage.instance;
       AudioSharingSystem.instance.initialize();
@@ -824,7 +827,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'JukeboxComponent':
         component = JukeboxComponent;
-        option = { width: 300, height: 520, title: this.i18n.t('jukebox.title') };
+        option = {
+          width: 300,
+          height: Math.max(200, window.innerHeight),
+          top: 0,
+          title: this.i18n.t('jukebox.title'),
+        };
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
@@ -889,9 +897,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             && typeof saved.left === 'number' && Number.isFinite(saved.left)
             && typeof saved.top === 'number' && Number.isFinite(saved.top));
           if (!hasSavedPos) {
-            option.top = (this.openPanelCount % 10 + 1) * 20;
-            option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-            this.openPanelCount = this.openPanelCount + 1;
+            if (componentName === 'JukeboxComponent') {
+              // Full-viewport height from the top (default size).
+              option.top = 0;
+              option.height = Math.max(200, window.innerHeight);
+              if (option.left == null) option.left = 100;
+            } else {
+              option.top = (this.openPanelCount % 10 + 1) * 20;
+              option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+              this.openPanelCount = this.openPanelCount + 1;
+            }
           }
         }
       } else {
@@ -1036,6 +1051,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async save() {
     if (this.isSaveing || this.GuestMode()) return;
+    const includeAudio = await this.saveDataService.askIncludeAudio('zip');
+    if (includeAudio == null) return;
     this.isSaveing = true;
     this.progresPercent = 0;
     let roomName = 0 < Network.peer.roomName.length
@@ -1043,7 +1060,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'HKTRPG';
     await this.saveDataService.saveRoomAsync(roomName, percent => {
       this.progresPercent = percent;
-    });
+    }, includeAudio);
 
     setTimeout(() => {
       this.isSaveing = false;
@@ -1586,6 +1603,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => MusicHudComponent.setVisible(v),
         on: `☑${this.i18n.t('menu.settings.musicHud')}`,
         off: `☐${this.i18n.t('menu.settings.musicHud')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => this.saveDataService.includeAudio,
+        set: (v) => { void this.saveDataService.setIncludeAudio(v); },
+        on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
+        off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
       contextMenuToggleCheck({
         get: () => PanelService.singleNonChatWindow,

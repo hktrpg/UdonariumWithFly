@@ -48,7 +48,7 @@
         [class.is-playing]="isPlaying(i)"
         [class.is-drop-target]="dropSlotIndex === i"
         (dragover)="onSlotDragOver($event, i)"
-        (dragleave)="onSlotDragLeave(i)"
+        (dragleave)="onSlotDragLeave($event, i)"
         (drop)="onSlotDrop($event, i)"
         (contextmenu)="onSlotContextMenu(i, $event)"
         [attr.title]="canControl ? (('musicHud.dropHint' | i18n)) : null"
