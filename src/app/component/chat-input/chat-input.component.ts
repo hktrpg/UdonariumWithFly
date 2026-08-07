@@ -957,6 +957,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           { name: this.i18n.t('chat.ctx.connection'), action: () => {
             this.panelService.open(PeerMenuComponent, {
               width: 520, height: 600, top: position.y - 100, left: position.x - 100,
+              tourPanelId: 'menu.connection',
               mobileSheet: 'half',
             });
           } }

@@ -98,10 +98,16 @@ export class ObjectSynchronizer {
       console.warn(context.aliasName + ' is Unknown...?', context);
       return null;
     }
-    // Add before apply so ObjectStore.get works when onChildAdded fires MESSAGE_ADDED
-    // (e.g. ChatMessage). tableIdentifier broadcast is deferred in TabletopObject.onStoreAdded.
-    ObjectStore.instance.add(newObject, false);
-    newObject.apply(context);
+    // Suppress SyncVar update() during add→apply so onStoreAdded cannot broadcast
+    // default 0,0 poses before real syncData is applied (multi-tab top-left drift).
+    // Add before apply so ObjectStore.get works when onChildAdded fires MESSAGE_ADDED.
+    newObject.syncSuppressed = true;
+    try {
+      ObjectStore.instance.add(newObject, false);
+      newObject.apply(context);
+    } finally {
+      newObject.syncSuppressed = false;
+    }
     return newObject;
   }
 

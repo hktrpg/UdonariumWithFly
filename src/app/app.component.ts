@@ -141,14 +141,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Total unread chat messages (viewable tabs). */
   get chatUnreadCount(): number { return ChatTabList.instance.unreadLength; }
-  /** Badge label: cap at 99+ so the bubble stays a tidy pill. */
-  get chatUnreadBadgeLabel(): string {
-    const n = this.chatUnreadCount;
-    return n > 99 ? '99+' : String(n);
-  }
-  /** Badge on menu chat icon only while no chat panel is open. */
-  get showChatUnreadBadge(): boolean {
-    return this.chatUnreadCount > 0 && !PanelService.isTourPanelOpen('menu.chat');
+  /**
+   * Cached badge state — do not read PanelService / unread live in the template
+   * (causes NG0100 when chat opens or messages arrive mid-CD).
+   */
+  showChatUnreadBadge = false;
+  chatUnreadBadgeLabel = '0';
+
+  private syncChatUnreadBadge() {
+    const n = ChatTabList.instance.unreadLength;
+    this.showChatUnreadBadge = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
+    this.chatUnreadBadgeLabel = n > 99 ? '99+' : String(n);
   }
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
@@ -727,6 +730,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
+    this.syncChatUnreadBadge();
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
@@ -925,6 +929,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Network.isOpen && !Network.peer?.isRoom) {
       this.openLobbyIfNeeded();
     }
+    this.syncChatUnreadBadge();
   }
 
   /** Show lobby once on cold start when not already in a room / invite join. */
@@ -1062,6 +1067,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.lazyUpdateTimer);
           this.lazyUpdateTimer = null;
         }
+        // Sync before CD so template bindings stay stable within the check.
+        this.syncChatUnreadBadge();
         this.ngZone.run(() => { });
       }, 0);
     } else {
@@ -1072,6 +1079,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.immediateUpdateTimer);
           this.immediateUpdateTimer = null;
         }
+        this.syncChatUnreadBadge();
         this.ngZone.run(() => { });
       }, 100);
     }

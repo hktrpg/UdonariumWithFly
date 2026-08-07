@@ -59,9 +59,15 @@ export class PanelService {
 
   /**
    * Personal setting: opening a non-chat panel closes other non-chat panels.
-   * Default off. Desktop only (mobile sheets already replace each other).
+   * Default on. Desktop only (mobile sheets already replace each other).
+   * Exception: Connection + Lobby are one group and may stay open together.
    */
-  static singleNonChatWindow = false;
+  static singleNonChatWindow = true;
+
+  /** Tour / geometry ids that share one exclusive slot (do not close each other). */
+  private static readonly NON_CHAT_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+    ['menu.connection', 'menu.lobby'],
+  ];
 
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
@@ -243,25 +249,49 @@ export class PanelService {
 
   static loadSingleNonChatFromStorage() {
     localForage.getItem(PanelService.SINGLE_NON_CHAT_KEY).then(v => {
-      PanelService.singleNonChatWindow = !!v;
+      // Missing key → default ON. Explicit false turns it off.
+      if (v === null || v === undefined) {
+        PanelService.singleNonChatWindow = true;
+      } else {
+        PanelService.singleNonChatWindow = v !== false && v !== 0 && v !== '0';
+      }
     }).catch(() => {});
   }
 
   static setSingleNonChatWindow(v: boolean) {
     PanelService.singleNonChatWindow = !!v;
-    if (v) {
-      localForage.setItem(PanelService.SINGLE_NON_CHAT_KEY, true).catch(() => {});
-    } else {
-      localForage.removeItem(PanelService.SINGLE_NON_CHAT_KEY).catch(() => {});
-    }
+    // Always persist so “off” is distinct from “never set” (default on).
+    localForage.setItem(PanelService.SINGLE_NON_CHAT_KEY, !!v).catch(() => {});
   }
 
-  /** Close every closable non-chat panel (optionally keep one instance). */
-  static closeOtherNonChatPanels(except: PanelService = null) {
+  static panelExclusiveId(panel: { tourPanelId?: string; geometryKey?: string } | null): string {
+    if (!panel) return '';
+    const raw = (panel.tourPanelId || panel.geometryKey || '').trim();
+    // Auto geometry keys when tourPanelId was omitted.
+    if (raw === 'panel.peer-menu') return 'menu.connection';
+    if (raw === 'panel.lobby') return 'menu.lobby';
+    return raw;
+  }
+
+  /** True when two non-chat panels may coexist under single-window mode (e.g. Connection + Lobby). */
+  static areCompatibleNonChatPanels(aId: string, bId: string): boolean {
+    if (!aId || !bId || aId === bId) return false;
+    for (const group of PanelService.NON_CHAT_COMPAT_GROUPS) {
+      if (group.includes(aId) && group.includes(bId)) return true;
+    }
+    return false;
+  }
+
+  /** Close every closable non-chat panel (optionally keep one instance + its compat group). */
+  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+    const openingId = PanelService.panelExclusiveId(opening || except);
     for (const panel of Array.from(PanelService.openPanels)) {
       if (!panel.isAbleCloseButton) continue;
       if (PanelService.isChatPanel(panel)) continue;
       if (except && panel === except) continue;
+      if (openingId && PanelService.areCompatibleNonChatPanels(PanelService.panelExclusiveId(panel), openingId)) {
+        continue;
+      }
       panel.close();
     }
   }
@@ -564,8 +594,9 @@ export class PanelService {
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
       }
       // Personal setting: one non-chat window at a time (chat windows stay).
+      // Connection + Lobby share a group and do not close each other.
       if (PanelService.singleNonChatWindow && !isChat) {
-        PanelService.closeOtherNonChatPanels(childPanelService);
+        PanelService.closeOtherNonChatPanels(childPanelService, resolved);
       }
     }
     if (resolved.title) childPanelService.title = resolved.title;

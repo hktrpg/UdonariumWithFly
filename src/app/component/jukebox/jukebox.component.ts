@@ -464,18 +464,11 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    this.dropFolderId = folderId || '';
-    this.dropTrackIndex = null;
-    this.dropBeforeAudioId = null;
-  }
-
-  onFolderDragLeave(event: DragEvent, folderId: string) {
-    const related = event.relatedTarget as Node | null;
-    const current = event.currentTarget as HTMLElement | null;
-    if (current && related && current.contains(related)) return;
-    if (this.dropFolderId === (folderId || '') && this.dropBeforeAudioId == null) {
-      this.dropFolderId = null;
-    }
+    const id = folderId || '';
+    // Avoid thrashing CD / highlight flicker on every dragover pixel.
+    if (this.dropFolderId !== id) this.dropFolderId = id;
+    if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
+    if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
   }
 
   onFolderDrop(event: DragEvent, folderId: string) {
@@ -494,14 +487,16 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    const id = this.peekDraggingId(event);
-    if (id && beforeAudio && id === beforeAudio.identifier) {
-      this.dropBeforeAudioId = null;
+    const dragId = this.peekDraggingId(event);
+    const folder = folderId || '';
+    if (this.dropFolderId !== folder) this.dropFolderId = folder;
+    if (this.dropTrackIndex !== null) this.dropTrackIndex = null;
+    if (dragId && beforeAudio && dragId === beforeAudio.identifier) {
+      if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
       return;
     }
-    this.dropFolderId = folderId || '';
-    this.dropBeforeAudioId = beforeAudio?.identifier || null;
-    this.dropTrackIndex = null;
+    const beforeId = beforeAudio?.identifier || null;
+    if (this.dropBeforeAudioId !== beforeId) this.dropBeforeAudioId = beforeId;
   }
 
   onLibRowDrop(event: DragEvent, folderId: string, beforeAudio: AudioFile) {
@@ -524,9 +519,9 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'link';
     }
-    this.dropTrackIndex = trackIndex;
-    this.dropFolderId = null;
-    this.dropBeforeAudioId = null;
+    if (this.dropTrackIndex !== trackIndex) this.dropTrackIndex = trackIndex;
+    if (this.dropFolderId !== null) this.dropFolderId = null;
+    if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
   }
 
   onTrackDragLeave(trackIndex: number) {
@@ -553,8 +548,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       // Gaps between folder blocks: clear stale folder highlight so UI matches drop.
       if (event.target === event.currentTarget) {
         event.preventDefault();
-        this.dropFolderId = null;
-        this.dropBeforeAudioId = null;
+        if (this.dropFolderId !== null) this.dropFolderId = null;
+        if (this.dropBeforeAudioId !== null) this.dropBeforeAudioId = null;
       }
       return;
     }
@@ -604,8 +599,9 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     if (files?.length) FileArchiver.instance.load(files);
   }
 
+  /** Whole folder block highlight while this folder is the drop destination. */
   isDropFolder(folderId: string): boolean {
-    return this.dropFolderId !== null && this.dropFolderId === (folderId || '') && this.dropBeforeAudioId == null;
+    return this.dropFolderId !== null && this.dropFolderId === (folderId || '');
   }
 
   isDropBefore(audioId: string): boolean {

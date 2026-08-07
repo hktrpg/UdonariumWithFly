@@ -140,42 +140,33 @@
       (dragleave)="onLibraryFilesDragLeave($event)"
       (drop)="onLibraryScrollDrop($event)">
       <!-- Root -->
-      <div class="jb-folder-block jb-folder-root">
-        <div class="jb-folder-head"
-          [class.is-drop-target]="isDropFolder('')"
-          (click)="toggleFolder('')"
-          (dragover)="onFolderDragOver($event, '')"
-          (dragleave)="onFolderDragLeave($event, '')"
-          (drop)="onFolderDrop($event, '')">
+      <div class="jb-folder-block jb-folder-root"
+        [class.is-drop-target]="isDropFolder('')"
+        (dragover)="onFolderDragOver($event, '')"
+        (drop)="onFolderDrop($event, '')">
+        <div class="jb-folder-head" (click)="toggleFolder('')">
           <i class="material-icons">{{ isFolderExpanded('') ? 'expand_more' : 'chevron_right' }}</i>
           <span>{{ 'jukebox.rootFolder' | i18n }}</span>
         </div>
-        <div class="jb-folder-body" *ngIf="isFolderExpanded('')"
-          [class.is-drop-target]="isDropFolder('')"
-          (dragover)="onFolderDragOver($event, '')"
-          (dragleave)="onFolderDragLeave($event, '')"
-          (drop)="onFolderDrop($event, '')">
+        <div class="jb-folder-body" *ngIf="isFolderExpanded('')">
           <ng-container *ngTemplateOutlet="audioList; context: { folderId: '' }"></ng-container>
           <div class="jb-folder-drop-pad" aria-hidden="true"></div>
         </div>
       </div>
 
       <!-- Folders -->
-      <div *ngFor="let folder of folders" class="jb-folder-block">
+      <div *ngFor="let folder of folders" class="jb-folder-block"
+        [class.is-drop-target]="isDropFolder(folder.id)"
+        (dragover)="onFolderDragOver($event, folder.id)"
+        (drop)="onFolderDrop($event, folder.id)">
         <div class="jb-folder-head"
-          [class.is-drop-target]="isDropFolder(folder.id)"
-          (contextmenu)="onFolderContextMenu($event, folder)"
-          (dragover)="onFolderDragOver($event, folder.id)"
-          (dragleave)="onFolderDragLeave($event, folder.id)"
-          (drop)="onFolderDrop($event, folder.id)">
+          (contextmenu)="onFolderContextMenu($event, folder)">
           <button type="button" class="jb-folder-toggle" (click)="toggleFolder(folder.id)">
             <i class="material-icons">{{ isFolderExpanded(folder.id) ? 'expand_more' : 'chevron_right' }}</i>
             <i class="material-icons jb-folder-ico">folder</i>
             <span class="jb-folder-name">{{ folder.name }}</span>
           </button>
-          <div class="jb-folder-acts" *ngIf="!GuestMode()"
-            (pointerdown)="$event.stopPropagation()"
-            (click)="$event.stopPropagation()">
+          <div class="jb-folder-acts" *ngIf="!GuestMode()">
             <button
               type="button"
               class="jb-icon-act jb-track-pick"
@@ -203,11 +194,7 @@
             </button>
           </div>
         </div>
-        <div class="jb-folder-body" *ngIf="isFolderExpanded(folder.id)"
-          [class.is-drop-target]="isDropFolder(folder.id)"
-          (dragover)="onFolderDragOver($event, folder.id)"
-          (dragleave)="onFolderDragLeave($event, folder.id)"
-          (drop)="onFolderDrop($event, folder.id)">
+        <div class="jb-folder-body" *ngIf="isFolderExpanded(folder.id)">
           <ng-container *ngTemplateOutlet="audioList; context: { folderId: folder.id }"></ng-container>
           <div class="jb-folder-drop-pad" aria-hidden="true"></div>
         </div>

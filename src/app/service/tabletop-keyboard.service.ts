@@ -22,6 +22,7 @@ import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchr
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
 import { CoordinateService } from './coordinate.service';
+import { PanelService } from './panel.service';
 import { SceneToolService } from './scene-tool.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
 import { TokenPathMoveService } from './token-path-move.service';
@@ -156,12 +157,24 @@ export class TabletopKeyboardService {
       }
     }
 
+    // C: close all closable desktop panels (same as toolbox「清空桌面視窗」).
+    // Ctrl/Cmd+C remains copy. Ignored in INPUT/TEXTAREA via shouldIgnore.
+    if (!mod && !this.altHeld && !e.shiftKey && code === 'KeyC') {
+      PanelService.closeAllPanels();
+      this.consume(e);
+      return;
+    }
+
     if (Network.GuestMode()) return;
 
     // Path draft: Space commits movement along existing waypoints.
+    // Else GM toggles room PAUSE watermark (non-blocking).
     if (code === 'Space' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
         void this.tokenPath.commit();
+        this.consume(e);
+      } else if (PeerCursor.myCursor?.isGMMode) {
+        TableSelecter.instance.togglePaused();
         this.consume(e);
       }
       // Always stop here so Space does not fall through to WASD / other handlers.

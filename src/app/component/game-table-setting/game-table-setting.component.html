@@ -24,17 +24,21 @@
   <div class="table-body" *ngIf="!isEmpty || selectedTable">
     <header class="table-toolbar">
       <ng-container *ngIf="!isDeleted">
+        <button type="button" class="btn btn-sm" *ngIf="canActivate" (click)="toggleSelectedInHud()" [disabled]="!selectedTable" [attr.title]="'table.showInNavigation' | i18n">
+          <i class="material-icons">{{ tableShowInNavigation ? 'visibility' : 'visibility_off' }}</i>
+          {{ tableShowInNavigation ? ('table.hideFromHud' | i18n) : ('table.showInHud' | i18n) }}
+        </button>
         <button type="button" class="btn btn-sm" (click)="cloneGameTable()" [disabled]="!selectedTable">{{ 'table.clone' | i18n }}</button>
         <button type="button" class="btn btn-sm btn-danger" (click)="delete()" [disabled]="getGameTables().length <= 1">{{ 'table.delete' | i18n }}</button>
       </ng-container>
       <ng-container *ngIf="isDeleted">
         <button type="button" class="btn btn-sm" (click)="restore()">{{ 'table.restore' | i18n }}</button>
       </ng-container>
-      <button type="button" class="btn btn-sm" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
+      <button type="button" class="btn btn-sm" *ngIf="canActivate" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
         <i class="material-icons">theaters</i>{{ 'scenePreset.saveAsScene' | i18n }}
       </button>
-      <button type="button" class="btn btn-sm btn-primary" (click)="confirm()">{{ 'table.confirm' | i18n }}</button>
-      <span class="local-note"><sup class="self-only">*</sup>{{ 'table.localOnly' | i18n }}</span>
+      <span class="local-note" *ngIf="isActiveSelected">{{ 'table.activeHint' | i18n }}</span>
+      <span class="local-note" *ngIf="!isActiveSelected && isViewingSelected">{{ 'table.viewingHint' | i18n }}</span>
     </header>
 
     <div class="table-scroll">
@@ -174,6 +178,16 @@
               [max]="maxSize"
               [disabled]="!isEditable"
             >
+          </label>
+        </div>
+        <div class="compact-row" *ngIf="canActivate">
+          <label class="inline-field">
+            <input type="checkbox" [(ngModel)]="tableShowInNavigation" [disabled]="!isEditable" />
+            <span>{{ 'table.showInNavigation' | i18n }}</span>
+          </label>
+          <label class="inline-field">
+            <input type="checkbox" [(ngModel)]="tablePlayerCanView" [disabled]="!isEditable" />
+            <span>{{ 'table.playerCanView' | i18n }}</span>
           </label>
         </div>
         <div class="slider-row slim">

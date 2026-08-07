@@ -408,6 +408,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit() {
     EventSystem.register(this)
+      .on('SELECT_GAME_TABLE', -10, event => {
+        // After TabletopService refreshes object caches for the new viewed table.
+        this.ngZone.run(() => queueMicrotask(() => this.applyViewedTable()));
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
         console.log('UPDATE_GAME_OBJECT GameTableComponent ' + this.currentTable.identifier);
@@ -1341,6 +1345,34 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.changeDetector.markForCheck();
   }
 
+  /** Apply local View / Activate: bg, grid, weather, lighting, token list for current viewed table. */
+  private applyViewedTable() {
+    // Drop image caches first so getters rebuild against the new viewed table.
+    this._currentTable = null;
+    this._currentTableImage = null;
+    this._currentBackgroundImage = null;
+    this._currentBackgroundImage2 = null;
+    this._currentTableImageUrl = '';
+    this._currentBackgroundImageUrl = '';
+    this._currentBackgroundImageUrl2 = '';
+    this._currentBackgroundImageCss = '';
+    this.isBackgroundImageLoaded = false;
+    this.isBackgroundImageLoaded2 = false;
+
+    const table = this.tableSelecter.viewTable;
+    if (!table) return;
+    this.setGameTableGrid(
+      table.width,
+      table.height,
+      table.gridSize,
+      table.gridType,
+      table.gridColor,
+      table.isShowNumber,
+    );
+    this.refreshFx();
+    this.changeDetector.detectChanges();
+  }
+
   /** Characters / masks / terrains that cast shadows into lights & vision (default on). */
   private collectLightOccluders(): LightOccluder[] {
     const table = this.currentTable;
@@ -1648,7 +1680,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         // Selected tokens ignore self UPDATE in MovableDirective — clear first, then force pose sync.
         this.selectionService.remove(ch);
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-        ch.addToTable(undefined, { x, y, posZ: ch.posZ });
+        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, true);
         MovableDirective.syncPoseFromUndo(ch, x, y, ch.posZ);
         placedChars.push(ch);
       }

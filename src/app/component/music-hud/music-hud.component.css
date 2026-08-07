@@ -21,6 +21,20 @@
 .music-hud.is-collapsed {
   width: auto;
   min-width: 0;
+  padding: 3px 4px;
+}
+
+.hud-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.hud-row:active {
+  cursor: grabbing;
 }
 
 .hud-head {
@@ -78,14 +92,6 @@
 .hud-open .material-icons,
 .slot-play .material-icons {
   font-size: 16px;
-}
-
-.mini-plays {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
 }
 
 .slot-list {

@@ -44,6 +44,11 @@ export class GameTable extends ObjectNode {
   @SyncVar() weatherIntensity: number = 0.5;
   @SyncVar() visionEnabled: boolean = false;
 
+  /** Show this table in the top scene navigation bar. */
+  @SyncVar() showInNavigation: boolean = true;
+  /** Non-GM players may View this table (Foundry-style scene access). */
+  @SyncVar() playerCanView: boolean = true;
+
   gridHeight: number = 0;
   gridClipRect: {top: number, right: number, bottom: number, left: number} = null;
 
@@ -78,6 +83,9 @@ export class GameTable extends ObjectNode {
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
-    if (this.selected) EventSystem.trigger('SELECT_GAME_TABLE', { identifier: this.identifier });
+    if (this.selected) {
+      // Catalog / local rehydrate only — TableSelecter must NOT broadcast Activate.
+      EventSystem.trigger('SELECT_GAME_TABLE', { identifier: this.identifier, _fromCatalog: true });
+    }
   }
 }
