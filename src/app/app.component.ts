@@ -1231,6 +1231,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         name: this.i18n.t('toolbox.closeAllPanels'),
         materialIcon: 'close_fullscreen',
         selfOnly: true,
+        hotkey: 'C',
         action: () => PanelService.closeAllPanels()
       });
     }

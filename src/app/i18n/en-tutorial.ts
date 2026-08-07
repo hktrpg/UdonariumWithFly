@@ -47,6 +47,7 @@ Drag images or music into the browser to import.`,
 　　　　F = flip card/coin or roll dice
 　　　　L = lock/unlock
 　　　　H = hide/reveal selected characters (GM only)
+　　　　T = gather selected objects to mouse position
 　　　　Delete = delete (characters go to trash)
 　　　　Ctrl+C　Ctrl+X　Ctrl+V = copy / cut / paste (paste at cursor; text selection still copies text)
 　　　　[ = send back
@@ -55,8 +56,9 @@ Drag images or music into the browser to import.`,
 　　　　Alt+Shift+wheel = roll ±3°
 　　　　Ctrl+Shift+wheel = facing ±45°
 　　　　Hold Shift on drop = temporary no grid snap
-　　　　Esc = clear selection
-<Keyboard (general)> Ctrl+Z = undo
+　　　　Esc = close menu/dialog → clear draft/selection (before closing panels) → close frontmost panel
+<Keyboard (general)> C = close all desktop panels
+　　　　Ctrl+Z = undo
 　　　　Ctrl+Y　Ctrl+Shift+Z = redo
 　　　　(move / rotate / delete / cut-paste / layer; scene create / delete / nudge)
 　　　　Guest mode cannot use edit shortcuts; in text fields Ctrl+Z stays with the browser.`,
@@ -128,8 +130,9 @@ Upgraded to 1.13.2`,
   'changelog.2026ops': `2026/08/03 Controls update
 ・Selection highlight; left-drag empty box select; Shift+click/drag multi-select; right-drag pan map
 ・Double-click opens details (flip / draw / roll via right-click)
-・Keyboard (with selection): WASD move, Shift+WASD face, Q/E rotate, R reset all angles, PageUp/Down altitude, F flip, L lock, H hide (GM), Delete, Ctrl+C　Ctrl+X　Ctrl+V, Ctrl+Z/Y
+・Keyboard (with selection): WASD move, Shift+WASD face, Q/E rotate, R reset all angles, PageUp/Down altitude, F flip, L lock, H hide (GM), T gather to mouse, Delete, Ctrl+C　Ctrl+X　Ctrl+V, Ctrl+Z/Y
 ・Chat: 1–9 switch viewable tab (opens chat; no selection required)
+・C = close all panels; context menu shows shortcut hints (T) (L) etc.
 ・[ / ] layer order; Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
 ・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
@@ -162,6 +165,12 @@ Upgraded to 1.13.2`,
 ・GM can kick peers; V3 mesh-lock when every enabled role has a password
 ・Menu/load ZIP perms, 20MB audio cap, chat unread badge; Connection panel PWA update hint
 ・Mobile: chat toolbar & map HUD/toolbox mutual exclusivity; hover teaching tips desktop-only`,
+  'changelog.2026audio': `2026/08/07 Jukebox・backup・windows
+・Library multi-select (Ctrl/Shift), row drag to move/reorder; Delete removes selection
+・Per-folder add-link / upload; OS file drops highlight the target folder (not always root)
+・Folder play queue & shuffle/sequential preference; Load room hover → change / disconnect backup folder
+・ZIP / folder backup can omit music (prompt + Settings*; smaller files when skipped)
+・Esc: clear selection first when selected; otherwise dismiss menu/dialog/draft, then close the frontmost closable window`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

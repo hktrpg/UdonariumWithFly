@@ -47,6 +47,7 @@ export const zhCN_tutorial: I18nDictionary = {
 　　　　F＝翻面（卡／硬币）或掷骰
 　　　　L＝锁定／解锁
 　　　　H＝显隐选取角色（仅 GM）
+　　　　T＝集中已选物件到鼠标位置
 　　　　Delete＝删除（角色进回收区）
 　　　　Ctrl＋C　Ctrl＋X　Ctrl＋V＝复制／剪切／粘贴（贴在光标处；选取文字时仍可复制文字）
 　　　　[＝送到后层
@@ -55,8 +56,9 @@ export const zhCN_tutorial: I18nDictionary = {
 　　　　Alt＋Shift＋滚轮＝立绘倾角（roll）±3°
 　　　　Ctrl＋Shift＋滚轮＝面向 ±45°
 　　　　拖曳放开时按住 Shift＝暂时不吸附格线
-　　　　Esc＝取消选取
-＜键盘（一般）＞Ctrl＋Z＝撤销
+　　　　Esc＝关菜单／对话框 → 取消草稿／选取（优先于关窗口）→ 关闭最前窗口
+＜键盘（一般）＞C＝清空桌面窗口
+　　　　Ctrl＋Z＝撤销
 　　　　Ctrl＋Y　Ctrl＋Shift＋Z＝重做
 　　　　（移动／旋转／删除／剪切粘贴／图层；场景工具创建／删除／微移）
 　　　　访客模式无法使用编辑类快捷键；输入框内 Ctrl＋Z 仍由浏览器处理文字。`,
@@ -128,8 +130,9 @@ export const zhCN_tutorial: I18nDictionary = {
   'changelog.2026ops': `2026/08/03 操作更新
 ・桌面选取高亮；左键空白框选；Shift＋点／拖曳多选；右键拖曳平移地图
 ・双击物件开启详情（翻面／抽牌／掷骰改右键菜单）
-・键盘（选取后）：WASD 移动、Shift＋WASD 面向、Q／E 旋转、R 重置全部角度、PageUp／Down 高度、F 翻面、L 锁定、H 显隐（GM）、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
+・键盘（选取后）：WASD 移动、Shift＋WASD 面向、Q／E 旋转、R 重置全部角度、PageUp／Down 高度、F 翻面、L 锁定、H 显隐（GM）、T 集中到鼠标、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
 ・聊天：1–9 切换可检视频道（并开启聊天；不需选取物件）
+・C＝清空桌面窗口；右键选单显示快捷键提示（T）（L）等
 ・[ / ] 调整前后层；Alt＋滚轮（选取＝面向 3°／无选取＝视角左右）；Alt＋Shift＋滚轮（选取＝roll／无选取＝俯仰）；Ctrl＋Shift＋滚轮 45°
 ・Ctrl＋Shift＋D：DEBUG pose（视角／选取姿态）；浮动预览可钉选固定
 ・Shift＋滚轮左右移动画面；Ctrl＋滚轮上下移动画面
@@ -162,6 +165,12 @@ export const zhCN_tutorial: I18nDictionary = {
 ・GM 可踢出参加者；全角色设密码时启用 V3 网络锁（mesh-lock）
 ・菜单／读 ZIP 权限、音频每档 20MB、聊天未读标记；连线面板提示 PWA 更新
 ・手机：聊天工具栏与地图 HUD／工具箱互斥；滑过教学提示仅桌面`,
+  'changelog.2026audio': `2026/08/07 曲库・备份・窗口
+・曲库：多选（Ctrl／Shift）、整列拖曳搬移／排序；Delete 移除选取
+・各文件夹旁可加链接／上传；从电脑拖文件时高亮目标文件夹（不再一律进根目录）
+・文件夹播放队列与随机／顺序偏好；读取房间 hover 可更改／断开备份文件夹
+・ZIP／文件夹备份可选是否含音乐（弹窗＋个人设置＊；跳过时文件较小）
+・Esc：有选取时先取消选取；否则关菜单／对话框／草稿后，再关闭最前可关窗口`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教学：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

@@ -5,6 +5,7 @@ import { AudioLibrary } from '@udonarium/audio-library';
 import { EventSystem } from '../system';
 import { StringUtil } from '../system/util/string-util';
 import { XmlUtil } from '../system/util/xml-util';
+import { AudioFile } from './audio-file';
 import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageStorage } from './image-storage';
@@ -148,11 +149,18 @@ export class FileArchiver {
     const displayName = nameService
       ? await nameService.resolveDisplayName(file)
       : undefined;
-    const audio = await AudioStorage.instance.addAsync(file, displayName);
-    if (audio) {
-      if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+    const created = await AudioFile.createAsync(file, displayName);
+    const existed = !!AudioStorage.instance.get(created.identifier);
+    const audio = AudioStorage.instance.add(created);
+    if (!audio) return;
+    if (existed) {
+      // Same bytes — list again in the target folder (settings can differ per folder).
+      console.log(`list existing audio in folder: ${file.name} → ${audio.identifier}`);
       AudioLibrary.instance.ensureListed(audio.identifier);
+      return;
     }
+    if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+    AudioLibrary.instance.ensureListed(audio.identifier);
   }
 
   private async handleText(file: File): Promise<void> {

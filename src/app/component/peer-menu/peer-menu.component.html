@@ -110,11 +110,17 @@
       <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder</i>
       {{ (folderBackup.status === 'needAuth' || folderBackup.hasError ? 'menu.folderBackup.reauth' : 'menu.folderBackup.bind') | i18n }}
     </button>
-    <div class="save-folder-wrap" *ngIf="networkService.peer.isRoom && folderBackup.isReady">
-      <button type="button" (click)="saveFolderBackup()"
-        [disabled]="folderBackup.status === 'writing'">
-        <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
-        {{ 'menu.folderBackup.saveRoom' | i18n }}
+    <button type="button" *ngIf="networkService.peer.isRoom && folderBackup.isReady" (click)="saveFolderBackup()"
+      [disabled]="folderBackup.status === 'writing'">
+      <i class="material-icons" style="font-size: 1em; vertical-align: middle">save</i>
+      {{ 'menu.folderBackup.saveRoom' | i18n }}
+    </button>
+    <div class="save-folder-wrap" *ngIf="folderBackup.canLoadFromFolder">
+      <button type="button" (click)="loadFolderBackup()"
+        [disabled]="!canLoadRoom"
+        [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">
+        <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
+        {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
       </button>
       <div class="save-folder-flyout" role="menu">
         <button type="button" role="menuitem" (click)="changeFolderBackup()">
@@ -127,12 +133,6 @@
         </button>
       </div>
     </div>
-    <button type="button" *ngIf="folderBackup.canLoadFromFolder" (click)="loadFolderBackup()"
-      [disabled]="!canLoadRoom"
-      [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">
-      <i class="material-icons" style="font-size: 1em; vertical-align: middle">folder_open</i>
-      {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
-    </button>
     <button type="button" *ngIf="networkService.peer.isRoom" (click)="loadZip()"
       [disabled]="!canLoadZip"
       [title]="canLoadZip ? ('menu.loadZip' | i18n) : ('peer.loadData.gmOnly' | i18n)">

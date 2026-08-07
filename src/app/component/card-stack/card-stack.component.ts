@@ -452,7 +452,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       y: this.cardStack.location.y + (size * this.gridSize) / 2,
       z: this.cardStack.posZ
     };
-    actions.push({ name: this.i18n.t('stack.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('stack.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isMultiSelectedStacks()) {
       let selectedCardStacks = () => this.selectedCardStacks();
@@ -510,6 +510,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
         },
         on: this.i18n.t('stack.menu.7'),
         off: this.i18n.t('stack.menu.8'),
+        hotkey: 'L',
       }),
       ContextMenuSeparator,
       {
@@ -584,13 +585,15 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
           this.cardStack.faceUp();
           SoundEffect.play(PresetSound.cardDraw);
         },
-        disabled: this.cards.length == 0
+        disabled: this.cards.length == 0,
+        hotkey: 'F',
       } : {
         name: this.i18n.t('stack.menu.12'), action: () => {
           this.cardStack.faceDown();
           SoundEffect.play(PresetSound.cardDraw);
         },
-        disabled: this.cards.length == 0
+        disabled: this.cards.length == 0,
+        hotkey: 'F',
       }),
       ContextMenuSeparator,
       {
@@ -715,7 +718,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
           this.cardStack.setLocation('graveyard');
           this.cardStack.destroy();
           SoundEffect.play(PresetSound.sweep);
-        }
+        },
+        hotkey: 'Del',
       },
     ];
 

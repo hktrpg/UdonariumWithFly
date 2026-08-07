@@ -126,6 +126,55 @@ function removeFromAllOrders(data: AudioLibraryData, audioId: string) {
   }
 }
 
+function removeFromOrder(data: AudioLibraryData, folderId: string, audioId: string) {
+  const key = folderId || '';
+  data.orders[key] = (data.orders[key] || []).filter(id => id !== audioId);
+}
+
+/** Per-folder item setting key (legacy keys are bare audioId). */
+function itemSettingKey(folderId: string, audioId: string): string {
+  return (folderId || '') + '\n' + audioId;
+}
+
+function folderIdsContaining(data: AudioLibraryData, audioId: string): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const key of Object.keys(data.orders)) {
+    if ((data.orders[key] || []).includes(audioId) && !seen.has(key)) {
+      seen.add(key);
+      found.push(key);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(data.membership, audioId)) {
+    const m = data.membership[audioId] || '';
+    if (!seen.has(m)) found.push(m);
+  }
+  return found;
+}
+
+function clearItemSettingsForAudio(data: AudioLibraryData, audioId: string) {
+  delete data.names[audioId];
+  delete data.trackTypes[audioId];
+  delete data.playLoops[audioId];
+  const suffix = '\n' + audioId;
+  for (const key of Object.keys(data.trackTypes)) {
+    if (key.endsWith(suffix)) delete data.trackTypes[key];
+  }
+  for (const key of Object.keys(data.playLoops)) {
+    if (key.endsWith(suffix)) delete data.playLoops[key];
+  }
+}
+
+function clearItemSettingsForFolder(data: AudioLibraryData, folderId: string) {
+  const prefix = (folderId || '') + '\n';
+  for (const key of Object.keys(data.trackTypes)) {
+    if (key.startsWith(prefix)) delete data.trackTypes[key];
+  }
+  for (const key of Object.keys(data.playLoops)) {
+    if (key.startsWith(prefix)) delete data.playLoops[key];
+  }
+}
+
 @SyncObject('audio-library')
 export class AudioLibrary extends GameObject implements InnerXml {
   @SyncVar() dataJson: string = JSON.stringify(emptyData());
@@ -170,21 +219,50 @@ export class AudioLibrary extends GameObject implements InnerXml {
   }
 
   folderOf(audioId: string): string {
-    return this.data.membership[audioId] || '';
+    if (!audioId) return '';
+    if (Object.prototype.hasOwnProperty.call(this.data.membership, audioId)) {
+      return this.data.membership[audioId] || '';
+    }
+    const folders = folderIdsContaining(this.data, audioId);
+    return folders.length ? folders[0] : '';
+  }
+
+  /** Folders that currently list this audio (same blob may appear in several). */
+  foldersOf(audioId: string): string[] {
+    if (!audioId) return [];
+    return folderIdsContaining(this.data, audioId);
+  }
+
+  isInFolder(audioId: string, folderId: string): boolean {
+    if (!audioId) return false;
+    const fid = folderId || '';
+    if ((this.data.orders[fid] || []).includes(audioId)) return true;
+    const inAnyOrder = Object.keys(this.data.orders).some(k => (this.data.orders[k] || []).includes(audioId));
+    if (inAnyOrder) return false;
+    return (this.data.membership[audioId] || '') === fid;
   }
 
   audiosInFolder(folderId: string, audios: AudioFile[]): AudioFile[] {
     const fid = folderId || '';
-    const inFolder = audios.filter(a => (this.data.membership[a.identifier] || '') === fid);
+    const byId = new Map(audios.map(a => [a.identifier, a]));
     const order = this.data.orders[fid] || [];
-    if (order.length < 1) return inFolder;
-    const rank = new Map(order.map((id, i) => [id, i]));
-    return inFolder.slice().sort((a, b) => {
-      const ra = rank.has(a.identifier) ? rank.get(a.identifier)! : Number.MAX_SAFE_INTEGER;
-      const rb = rank.has(b.identifier) ? rank.get(b.identifier)! : Number.MAX_SAFE_INTEGER;
-      if (ra !== rb) return ra - rb;
-      return (a.name || '').localeCompare(b.name || '');
-    });
+    const result: AudioFile[] = [];
+    const seen = new Set<string>();
+    for (const id of order) {
+      const a = byId.get(id);
+      if (!a || seen.has(id)) continue;
+      result.push(a);
+      seen.add(id);
+    }
+    // Legacy: membership-only rows not yet written into orders[].
+    for (const a of audios) {
+      if (seen.has(a.identifier)) continue;
+      if ((this.data.membership[a.identifier] || '') === fid) {
+        result.push(a);
+        seen.add(a.identifier);
+      }
+    }
+    return result;
   }
 
   /**
@@ -224,15 +302,23 @@ export class AudioLibrary extends GameObject implements InnerXml {
     delete data.folderTrackTypes[folderId];
     delete data.folderPlayLoops[folderId];
     delete data.folderShuffles[folderId];
+    clearItemSettingsForFolder(data, folderId);
     const root = ensureOrderList(data, '');
-    for (const id of Object.keys(data.membership)) {
-      if (data.membership[id] === folderId) {
+    for (const id of moved) {
+      const others = folderIdsContaining(data, id).filter(fid => fid !== folderId);
+      if (others.length < 1) {
         data.membership[id] = '';
         if (!root.includes(id)) root.push(id);
+      } else if ((data.membership[id] || '') === folderId) {
+        data.membership[id] = others[0];
       }
     }
-    for (const id of moved) {
-      if (!root.includes(id)) root.push(id);
+    for (const id of Object.keys(data.membership)) {
+      if (data.membership[id] === folderId) {
+        const others = folderIdsContaining(data, id);
+        data.membership[id] = others.length ? others[0] : '';
+        if (!others.length && !root.includes(id)) root.push(id);
+      }
     }
     this.data = data;
   }
@@ -330,36 +416,68 @@ export class AudioLibrary extends GameObject implements InnerXml {
     if (!audioId) return;
     const data = this.data;
     delete data.membership[audioId];
-    delete data.names[audioId];
-    delete data.trackTypes[audioId];
-    delete data.playLoops[audioId];
+    clearItemSettingsForAudio(data, audioId);
     removeFromAllOrders(data, audioId);
     this.data = data;
   }
 
-  /** Whether this audio has an explicit track override. */
-  hasTrackType(audioId: string): boolean {
-    return !!audioId && Object.prototype.hasOwnProperty.call(this.data.trackTypes, audioId);
+  /**
+   * Remove audio from one folder only. Returns true if the audio is no longer listed anywhere
+   * (caller may delete the blob from AudioStorage).
+   */
+  removeFromFolder(audioId: string, folderId: string): boolean {
+    if (!audioId) return true;
+    const data = this.data;
+    const fid = folderId || '';
+    removeFromOrder(data, fid, audioId);
+    delete data.trackTypes[itemSettingKey(fid, audioId)];
+    delete data.playLoops[itemSettingKey(fid, audioId)];
+    const remaining = folderIdsContaining(data, audioId).filter(id => id !== fid);
+    if (remaining.length < 1) {
+      delete data.membership[audioId];
+      clearItemSettingsForAudio(data, audioId);
+      this.data = data;
+      return true;
+    }
+    if ((data.membership[audioId] || '') === fid) data.membership[audioId] = remaining[0];
+    this.data = data;
+    return false;
+  }
+
+  /** Whether this audio has an explicit track override (folder-scoped when folderId given). */
+  hasTrackType(audioId: string, folderId?: string): boolean {
+    if (!audioId) return false;
+    if (folderId != null) {
+      if (Object.prototype.hasOwnProperty.call(this.data.trackTypes, itemSettingKey(folderId, audioId))) return true;
+    }
+    return Object.prototype.hasOwnProperty.call(this.data.trackTypes, audioId);
   }
 
   /** Raw preferred track index (0 if unset). Prefer effectiveTrackType(). */
-  trackTypeOf(audioId: string): number {
+  trackTypeOf(audioId: string, folderId?: string): number {
     if (!audioId) return 0;
+    if (folderId != null) {
+      const scoped = this.data.trackTypes[itemSettingKey(folderId, audioId)];
+      if (Number.isFinite(scoped) && scoped >= 0) return Math.floor(scoped);
+    }
     const v = this.data.trackTypes[audioId];
     return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
   }
 
-  setTrackType(audioId: string, trackIndex: number) {
+  setTrackType(audioId: string, trackIndex: number, folderId?: string) {
     if (!audioId) return;
     const data = this.data;
-    data.trackTypes[audioId] = Math.max(0, Math.floor(trackIndex) || 0);
+    const value = Math.max(0, Math.floor(trackIndex) || 0);
+    if (folderId != null) data.trackTypes[itemSettingKey(folderId, audioId)] = value;
+    else data.trackTypes[audioId] = value;
     this.data = data;
   }
 
-  clearTrackType(audioId: string) {
+  clearTrackType(audioId: string, folderId?: string) {
     if (!audioId) return;
     const data = this.data;
-    delete data.trackTypes[audioId];
+    if (folderId != null) delete data.trackTypes[itemSettingKey(folderId, audioId)];
+    else delete data.trackTypes[audioId];
     this.data = data;
   }
 
@@ -375,28 +493,42 @@ export class AudioLibrary extends GameObject implements InnerXml {
   }
 
   /**
-   * Effective track: audio override if set, otherwise folder default.
+   * Effective track: folder-scoped override > legacy audio override > folder default.
    */
   effectiveTrackType(audioId: string, folderId?: string): number {
-    if (this.hasTrackType(audioId)) return this.trackTypeOf(audioId);
     const fid = folderId != null ? folderId : this.folderOf(audioId);
+    if (fid != null && Object.prototype.hasOwnProperty.call(this.data.trackTypes, itemSettingKey(fid, audioId))) {
+      return this.trackTypeOf(audioId, fid);
+    }
+    if (Object.prototype.hasOwnProperty.call(this.data.trackTypes, audioId)) {
+      return this.trackTypeOf(audioId);
+    }
     return this.folderTrackType(fid);
   }
 
-  hasPlayLoop(audioId: string): boolean {
-    return !!audioId && Object.prototype.hasOwnProperty.call(this.data.playLoops, audioId);
+  hasPlayLoop(audioId: string, folderId?: string): boolean {
+    if (!audioId) return false;
+    if (folderId != null) {
+      if (Object.prototype.hasOwnProperty.call(this.data.playLoops, itemSettingKey(folderId, audioId))) return true;
+    }
+    return Object.prototype.hasOwnProperty.call(this.data.playLoops, audioId);
   }
 
   /** Raw play-loop flag (default true if unset). Prefer effectivePlayLoop(). */
-  playLoopOf(audioId: string): boolean {
+  playLoopOf(audioId: string, folderId?: string): boolean {
     if (!audioId) return true;
+    if (folderId != null) {
+      const key = itemSettingKey(folderId, audioId);
+      if (Object.prototype.hasOwnProperty.call(this.data.playLoops, key)) return this.data.playLoops[key] !== false;
+    }
     return this.data.playLoops[audioId] !== false;
   }
 
-  setPlayLoop(audioId: string, isLoop: boolean) {
+  setPlayLoop(audioId: string, isLoop: boolean, folderId?: string) {
     if (!audioId) return;
     const data = this.data;
-    data.playLoops[audioId] = !!isLoop;
+    if (folderId != null) data.playLoops[itemSettingKey(folderId, audioId)] = !!isLoop;
+    else data.playLoops[audioId] = !!isLoop;
     this.data = data;
   }
 
@@ -423,30 +555,41 @@ export class AudioLibrary extends GameObject implements InnerXml {
     this.data = data;
   }
 
-  /** Effective LOOP: audio override if set, otherwise folder default. */
+  /** Effective LOOP: folder-scoped override > legacy audio override > folder default. */
   effectivePlayLoop(audioId: string, folderId?: string): boolean {
-    if (this.hasPlayLoop(audioId)) return this.playLoopOf(audioId);
     const fid = folderId != null ? folderId : this.folderOf(audioId);
+    if (folderId != null && Object.prototype.hasOwnProperty.call(this.data.playLoops, itemSettingKey(folderId, audioId))) {
+      return this.playLoopOf(audioId, folderId);
+    }
+    if (Object.prototype.hasOwnProperty.call(this.data.playLoops, audioId)) {
+      return this.playLoopOf(audioId);
+    }
     return this.folderPlayLoop(fid);
   }
 
   /**
-   * Ensure newly added audio appears in a folder order.
-   * Prefer explicit folderId, else pending importFolderId for new items, else keep/root.
+   * Ensure audio appears in a folder order.
+   * Same content may be listed in multiple folders (does not remove other memberships).
    */
   ensureListed(audioId: string, folderId?: string) {
     if (!audioId) return;
     const data = this.data;
-    const hasMembership = Object.prototype.hasOwnProperty.call(data.membership, audioId);
     let dest: string;
     if (folderId !== undefined) dest = folderId || '';
-    else if (!hasMembership && this.importFolderId != null) dest = this.importFolderId || '';
-    else if (hasMembership) dest = data.membership[audioId] || '';
-    else dest = '';
-    data.membership[audioId] = dest;
-    removeFromAllOrders(data, audioId);
+    else if (this.importFolderId != null) dest = this.importFolderId || '';
+    else if (Object.prototype.hasOwnProperty.call(data.membership, audioId)) {
+      dest = data.membership[audioId] || '';
+      const existing = ensureOrderList(data, dest);
+      if (!existing.includes(audioId)) existing.push(audioId);
+      this.data = data;
+      return;
+    } else dest = '';
+
     const list = ensureOrderList(data, dest);
     if (!list.includes(audioId)) list.push(audioId);
+    if (!Object.prototype.hasOwnProperty.call(data.membership, audioId)) {
+      data.membership[audioId] = dest;
+    }
     this.data = data;
   }
 

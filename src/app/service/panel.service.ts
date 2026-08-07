@@ -243,6 +243,26 @@ export class PanelService {
     }
   }
 
+  /** Close the frontmost closable panel (highest z-index). Returns true if one closed. */
+  static closeFrontmostPanel(): boolean {
+    let best: PanelService = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (!panel.isAbleCloseButton || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el?.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!best || zSafe >= bestZ) {
+        best = panel;
+        bestZ = zSafe;
+      }
+    }
+    if (!best) return false;
+    best.close();
+    return true;
+  }
+
   static isChatPanel(panel: PanelService): boolean {
     return panel.tourPanelId === 'menu.chat' || panel.geometryKey === 'menu.chat';
   }

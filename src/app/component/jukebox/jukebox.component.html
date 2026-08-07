@@ -167,6 +167,18 @@
             <button
               type="button"
               class="jb-icon-act"
+              (click)="promptFolderLink('', $event)"
+              [title]="'jukebox.addLink' | i18n"
+            >
+              <i class="material-icons" aria-hidden="true">add</i>
+            </button>
+            <label class="jb-icon-act jb-file-btn" [title]="('jukebox.dropMusic' | i18n) + ' · ' + ('jukebox.maxFileSize' | i18n)">
+              <i class="material-icons" aria-hidden="true">upload_file</i>
+              <input type="file" hidden (change)="handleFolderFileSelect($event, '')" multiple accept="audio/*" />
+            </label>
+            <button
+              type="button"
+              class="jb-icon-act"
               [class.is-on]="folderShuffle('')"
               (click)="toggleFolderShuffleMode('', $event)"
               [title]="folderShuffle('') ? ('jukebox.modeShuffle' | i18n) : ('jukebox.modeSequential' | i18n)"
@@ -182,18 +194,6 @@
             >
               <i class="material-icons" aria-hidden="true">{{ isFolderPlaying('') ? 'stop' : 'play_arrow' }}</i>
             </button>
-            <button
-              type="button"
-              class="jb-icon-act"
-              (click)="promptFolderLink('', $event)"
-              [title]="'jukebox.addLink' | i18n"
-            >
-              <i class="material-icons" aria-hidden="true">add</i>
-            </button>
-            <label class="jb-icon-act jb-file-btn" [title]="('jukebox.dropMusic' | i18n) + ' · ' + ('jukebox.maxFileSize' | i18n)">
-              <i class="material-icons" aria-hidden="true">upload_file</i>
-              <input type="file" hidden (change)="handleFolderFileSelect($event, '')" multiple accept="audio/*" />
-            </label>
           </div>
         </div>
         <div class="jb-folder-body" *ngIf="isFolderExpanded('')">
@@ -235,6 +235,18 @@
             <button
               type="button"
               class="jb-icon-act"
+              (click)="promptFolderLink(folder.id, $event)"
+              [title]="'jukebox.addLink' | i18n"
+            >
+              <i class="material-icons" aria-hidden="true">add</i>
+            </button>
+            <label class="jb-icon-act jb-file-btn" [title]="('jukebox.dropMusic' | i18n) + ' · ' + ('jukebox.maxFileSize' | i18n)">
+              <i class="material-icons" aria-hidden="true">upload_file</i>
+              <input type="file" hidden (change)="handleFolderFileSelect($event, folder.id)" multiple accept="audio/*" />
+            </label>
+            <button
+              type="button"
+              class="jb-icon-act"
               [class.is-on]="folderShuffle(folder.id)"
               (click)="toggleFolderShuffleMode(folder.id, $event)"
               [title]="folderShuffle(folder.id) ? ('jukebox.modeShuffle' | i18n) : ('jukebox.modeSequential' | i18n)"
@@ -250,18 +262,6 @@
             >
               <i class="material-icons" aria-hidden="true">{{ isFolderPlaying(folder.id) ? 'stop' : 'play_arrow' }}</i>
             </button>
-            <button
-              type="button"
-              class="jb-icon-act"
-              (click)="promptFolderLink(folder.id, $event)"
-              [title]="'jukebox.addLink' | i18n"
-            >
-              <i class="material-icons" aria-hidden="true">add</i>
-            </button>
-            <label class="jb-icon-act jb-file-btn" [title]="('jukebox.dropMusic' | i18n) + ' · ' + ('jukebox.maxFileSize' | i18n)">
-              <i class="material-icons" aria-hidden="true">upload_file</i>
-              <input type="file" hidden (change)="handleFolderFileSelect($event, folder.id)" multiple accept="audio/*" />
-            </label>
           </div>
         </div>
         <div class="jb-folder-body" *ngIf="isFolderExpanded(folder.id)">
@@ -296,7 +296,7 @@
     (dragend)="onAudioDragEnd()"
     (dragover)="onLibRowDragOver($event, folderId, audio)"
     (drop)="onLibRowDrop($event, folderId, audio)"
-    (contextmenu)="onAudioContextMenu($event, audio)">
+    (contextmenu)="onAudioContextMenu($event, audio, folderId)">
     <i
       *ngIf="!GuestMode()"
       class="material-icons jb-drag-handle"
@@ -326,7 +326,7 @@
       <button
         type="button"
         class="jb-icon-act jb-track-pick"
-        [class.is-on]="hasOwnTrackType(audio)"
+        [class.is-on]="hasOwnTrackType(audio, folderId)"
         (click)="cycleTrackType(audio, folderId, $event)"
         [disabled]="!audio.isReady"
         [title]="('jukebox.playToTrack' | i18n) + ': ' + trackName(trackTypeOf(audio, folderId))"

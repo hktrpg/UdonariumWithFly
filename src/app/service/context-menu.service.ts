@@ -61,6 +61,7 @@ export function contextMenuToggleCheck(options: {
   tip?: string;
   level?: number;
   selfOnly?: boolean;
+  hotkey?: string;
 }): ContextMenuAction {
   const nameUpdate = () => (options.get() ? options.on : options.off);
   return {
@@ -76,6 +77,7 @@ export function contextMenuToggleCheck(options: {
     tip: options.tip,
     level: options.level,
     selfOnly: options.selfOnly,
+    hotkey: options.hotkey,
   };
 }
 

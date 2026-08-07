@@ -390,7 +390,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       y: this.card.location.y + (this.card.size * this.gridSize) / 2,
       z: this.card.posZ
     };
-    actions.push({ name: this.i18n.t('card.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('card.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isMultiSelectedCards()) {
       let selectedCards = () => this.selectedCards();
@@ -468,6 +468,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       },
       on: this.i18n.t('card.menu.6'),
       off: this.i18n.t('card.menu.7'),
+      hotkey: 'L',
     }));
     actions.push(ContextMenuSeparator);
     actions.push(!this.isVisible || this.isHand
@@ -478,13 +479,15 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
             name: this.card.name == '' ? this.i18n.t('card.unnamed') : this.card.name
           }));
           SoundEffect.play(PresetSound.cardDraw);
-        }, default: !this.isLocked && (!this.ownerIsOnline || this.isHand)
+        }, default: !this.isLocked && (!this.ownerIsOnline || this.isHand),
+        hotkey: 'F',
       }
       : {
         name: this.i18n.t('card.menu.8'), action: () => {
           this.card.faceDown();
           SoundEffect.play(PresetSound.cardDraw);
-        }, default: !this.card.isLocked && (!this.ownerIsOnline || this.isHand)
+        }, default: !this.card.isLocked && (!this.ownerIsOnline || this.isHand),
+        hotkey: 'F',
       });
     actions.push(this.isHand
       ? {
@@ -533,7 +536,6 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         name: this.i18n.t('card.menu.14'), action: () => {
           this.horizontal();
         },
-        hotkey: 'T',
         disabled: !this.card.isVisible || this.isLocked || this.card.rotate == 90
       });
     }
@@ -585,7 +587,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       name: this.i18n.t('card.menu.19'), action: () => {
         this.card.destroy();
         SoundEffect.play(PresetSound.sweep);
-      }
+      },
+      hotkey: 'Del',
     });
 
     return actions;

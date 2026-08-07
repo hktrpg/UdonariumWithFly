@@ -47,6 +47,7 @@ export const ja_tutorial: I18nDictionary = {
 　　　　F＝裏表反転（カード／コイン）またはダイス
 　　　　L＝ロック／解除
 　　　　H＝選択キャラの表示／秘匿（GM のみ）
+　　　　T＝選択オブジェクトをマウス位置へ集める
 　　　　Delete＝削除（キャラはゴミ箱）
 　　　　Ctrl＋C　Ctrl＋X　Ctrl＋V＝コピー／切取／貼付（カーソル位置；文字選択時は文字コピー可）
 　　　　[＝背面へ
@@ -55,8 +56,9 @@ export const ja_tutorial: I18nDictionary = {
 　　　　Alt＋Shift＋ホイール＝傾き（roll）±3°
 　　　　Ctrl＋Shift＋ホイール＝向き±45°
 　　　　ドロップ時 Shift＝一時グリッド非吸着
-　　　　Esc＝選択解除
-＜キーボード（一般）＞Ctrl＋Z＝元に戻す
+　　　　Esc＝メニュー／ダイアログ閉じ → 下書き／選択解除（パネル閉じより先）→ 最前面パネル閉じ
+＜キーボード（一般）＞C＝パネルをすべて閉じる
+　　　　Ctrl＋Z＝元に戻す
 　　　　Ctrl＋Y　Ctrl＋Shift＋Z＝やり直し
 　　　　（移動／回転／削除／切取貼付／レイヤ；シーン作成／削除／微移動）
 　　　　ゲストは編集系ショートカット不可；入力欄の Ctrl＋Z はブラウザの文字 Undo。`,
@@ -128,8 +130,9 @@ export const ja_tutorial: I18nDictionary = {
   'changelog.2026ops': `2026/08/03 操作更新
 ・選択ハイライト；空白左ドラッグ枠選択；Shift＋クリック／ドラッグで複数選択；右ドラッグでパン
 ・ダブルクリックで詳細（裏返し／ドロー／ロールは右クリック）
-・キーボード（選択中）：WASD 移動、Shift＋WASD 向き、Q／E 回転、R 全角度リセット、PageUp／Down 高さ、F 裏表、L ロック、H 秘匿（GM）、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
+・キーボード（選択中）：WASD 移動、Shift＋WASD 向き、Q／E 回転、R 全角度リセット、PageUp／Down 高さ、F 裏表、L ロック、H 秘匿（GM）、T マウス位置へ集める、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
 ・チャット：1–9 で閲覧可能タブ切替（チャットを開く；選択不要）
+・C＝パネルをすべて閉じる；右クリックにショートカット表示（T）（L）など
 ・[ / ] 前後層；Alt＋ホイール（選択＝向き3°／未選択＝左右）；Alt＋Shift＋ホイール（選択＝roll／未選択＝上下）；Ctrl＋Shift＋ホイール 45°
 ・Ctrl＋Shift＋D：DEBUG pose（視点／選択姿勢）；ホバー概要はピン留め可
 ・Shift＋ホイール左右パン；Ctrl＋ホイール上下パン
@@ -162,6 +165,12 @@ export const ja_tutorial: I18nDictionary = {
 ・GM が参加者をキック可；全ロールにパスワード時は V3 メッシュロック
 ・メニュー／ZIP 読込権限、音声 20MB／ファイル、未読バッジ；接続パネルで PWA 更新通知
 ・モバイル：チャットツールバーとマップ HUD／ツール箱の排他；ホバーTips はデスクトップのみ`,
+  'changelog.2026audio': `2026/08/07 ジュークボックス・バックアップ・ウィンドウ
+・曲庫：複数選択（Ctrl／Shift）、行ドラッグで移動／並べ替え；Delete で選択削除
+・フォルダごとにリンク追加／アップロード；OS ファイルドロップは対象フォルダをハイライト（常にルートではない）
+・フォルダ再生キューとシャッフル／順再生；部屋読込ホバーでバックアップフォルダ変更／切断
+・ZIP／フォルダバックアップで音楽を含めない選択可（ダイアログ＋個人設定＊；省略時は軽量）
+・Esc：選択中は先に選択解除；それ以外はメニュー／ダイアログ／下書きの後、最前面の閉じられるウィンドウを閉じる`,
   'changelog.links': `サイト：https://z01.hktrpg.com
 ガイド：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

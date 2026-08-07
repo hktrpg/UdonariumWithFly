@@ -22,6 +22,8 @@ import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchr
 import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchronizer';
 
 import { CoordinateService } from './coordinate.service';
+import { ContextMenuService } from './context-menu.service';
+import { ModalService } from './modal.service';
 import { PanelService } from './panel.service';
 import { SceneToolService } from './scene-tool.service';
 import { TabletopSelectionService } from './tabletop-selection.service';
@@ -69,6 +71,7 @@ export class TabletopKeyboardService {
     private sceneTools: SceneToolService,
     private undoService: UndoService,
     private tokenPath: TokenPathMoveService,
+    private contextMenu: ContextMenuService,
   ) { }
 
   initialize() {
@@ -99,15 +102,23 @@ export class TabletopKeyboardService {
   }
 
   private handleKeyDown(e: KeyboardEvent) {
-    if (this.shouldIgnore(e)) return;
-
     const code = e.code;
     if (code === 'AltLeft' || code === 'AltRight') {
+      if (this.shouldIgnore(e)) return;
       this.altHeld = true;
       // Stop Windows/Chrome from focusing the menu bar (breaks WASD after Alt+wheel).
       if (e.cancelable) e.preventDefault();
       return;
     }
+
+    // Esc: menu/modal → cancel drafts/selection → close frontmost window.
+    // Handled before shouldIgnore so a focused chat input does not block clearing selection.
+    if (code === 'Escape' && !e.ctrlKey && !e.metaKey && !this.altHeld && !e.shiftKey) {
+      this.handleEscape(e);
+      return;
+    }
+
+    if (this.shouldIgnore(e)) return;
 
     if (MOVE_CODES.has(code)) this.pressed.add(code);
 
@@ -181,24 +192,6 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (code === 'Escape' && !mod && !this.altHeld && !e.shiftKey) {
-      if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
-        this.tokenPath.cancelDraft();
-        this.consume(e);
-        return;
-      }
-      if (this.sceneTools.selectionCount > 0) {
-        this.sceneTools.clearSelection();
-        this.consume(e);
-        return;
-      }
-      if (this.selectionService.size > 0) {
-        this.selectionService.clear();
-        this.consume(e);
-      }
-      return;
-    }
-
     if (code === 'Delete' && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) {
         if (this.sceneTools.deleteSelection()) this.consume(e);
@@ -266,6 +259,14 @@ export class TabletopKeyboardService {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
       if (this.toggleLockSelection()) this.consume(e);
+      return;
+    }
+
+    // T: congregate selected tokens to the current mouse / pointer position on the table.
+    if (code === 'KeyT' && !mod && !this.altHeld && !e.shiftKey) {
+      if (this.sceneTools.selectionCount > 0) return;
+      if (this.selectionService.size < 1) return;
+      if (this.congregateSelectionToPointer()) this.consume(e);
       return;
     }
 
@@ -432,6 +433,44 @@ export class TabletopKeyboardService {
     return !!target.closest('[contenteditable="true"], [contenteditable=""]');
   }
 
+  /**
+   * Esc priority: context menu → modal → path/scene draft → clear selection → close frontmost panel.
+   * Selection clears before panels so box-selected tokens are not left selected while a window closes.
+   * Selection/draft clear is allowed even when focus is in a text field; closing panels is not.
+   */
+  private handleEscape(e: KeyboardEvent) {
+    if (this.contextMenu.isShow) {
+      this.contextMenu.close();
+      this.consume(e);
+      return;
+    }
+    if (ModalService.dismissTop()) {
+      this.consume(e);
+      return;
+    }
+    if (!Network.GuestMode()) {
+      if (this.tokenPath.hasDraft && !this.tokenPath.isAnimating) {
+        this.tokenPath.cancelDraft();
+        this.consume(e);
+        return;
+      }
+      if (this.sceneTools.selectionCount > 0) {
+        this.sceneTools.clearSelection();
+        this.consume(e);
+        return;
+      }
+      if (this.selectionService.size > 0) {
+        this.selectionService.clear();
+        this.consume(e);
+        return;
+      }
+    }
+    if (this.shouldIgnore(e)) return;
+    if (PanelService.closeFrontmostPanel()) {
+      this.consume(e);
+    }
+  }
+
   private hasTextSelection(): boolean {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount < 1 || sel.isCollapsed) return false;
@@ -548,6 +587,15 @@ export class TabletopKeyboardService {
   private cutSelection(): boolean {
     if (!this.copySelection()) return false;
     return this.deleteSelection();
+  }
+
+  private congregateSelectionToPointer(): boolean {
+    if (Network.GuestMode()) return false;
+    if (this.selectionService.size < 1) return false;
+    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
+    this.selectionService.congregate(pointer);
+    SoundEffect.play(PresetSound.piecePut);
+    return true;
   }
 
   private pasteClipboard(): boolean {

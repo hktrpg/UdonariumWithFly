@@ -285,8 +285,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return this.library.effectiveTrackType(audio.identifier, folderId) % this.trackCount;
   }
 
-  hasOwnTrackType(audio: AudioFile): boolean {
-    return !!audio && this.library.hasTrackType(audio.identifier);
+  hasOwnTrackType(audio: AudioFile, folderId?: string): boolean {
+    return !!audio && this.library.hasTrackType(audio.identifier, folderId);
   }
 
   isPlayingOnTrack(audio: AudioFile): boolean {
@@ -298,8 +298,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return this.library.effectivePlayLoop(audio.identifier, folderId);
   }
 
-  hasOwnPlayLoop(audio: AudioFile): boolean {
-    return !!audio && this.library.hasPlayLoop(audio.identifier);
+  hasOwnPlayLoop(audio: AudioFile, folderId?: string): boolean {
+    return !!audio && this.library.hasPlayLoop(audio.identifier, folderId);
   }
 
   folderTrackType(folderId: string): number {
@@ -318,7 +318,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event?.preventDefault();
     if (this.GuestMode() || !audio) return;
     const next = (this.trackTypeOf(audio, folderId) + 1) % this.trackCount;
-    this.library.setTrackType(audio.identifier, next);
+    this.library.setTrackType(audio.identifier, next, folderId || '');
   }
 
   cycleFolderTrackType(folderId: string, event?: Event) {
@@ -334,7 +334,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event?.stopPropagation();
     event?.preventDefault();
     if (this.GuestMode() || !audio) return;
-    this.library.setPlayLoop(audio.identifier, !this.isPlayLoop(audio, folderId));
+    this.library.setPlayLoop(audio.identifier, !this.isPlayLoop(audio, folderId), folderId || '');
   }
 
   /** Put this audio on its effective track and play (or stop if already playing). */
@@ -585,7 +585,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       || event.code === 'Backspace' || event.key === 'Backspace')) {
       if (this.selectedAudioIds.size > 0) {
         event.preventDefault();
-        this.removeSelectedAudios();
+        this.removeSelectedAudios(this.selectionAnchorFolderId || '');
       }
     }
   }
@@ -1007,14 +1007,15 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return !!audio && audio.state === AudioState.URL;
   }
 
-  onAudioContextMenu(event: MouseEvent, audio: AudioFile) {
+  onAudioContextMenu(event: MouseEvent, audio: AudioFile, folderId: string = '') {
     event.preventDefault();
     event.stopPropagation();
     if (this.GuestMode() || !audio) return;
+    const fid = folderId || '';
     if (!this.isAudioSelected(audio.identifier)) {
       this.selectedAudioIds = new Set([audio.identifier]);
       this.selectionAnchorId = audio.identifier;
-      this.selectionAnchorFolderId = this.library.folderOf(audio.identifier) || '';
+      this.selectionAnchorFolderId = fid;
     }
     const selectedIds = this.orderedSelectedIds();
     const multi = selectedIds.length > 1;
@@ -1034,7 +1035,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       const menu: ContextMenuAction[] = [
         { name: t('jukebox.moveToFolder'), subActions: folderMoves },
         ContextMenuSeparator,
-        { name: t('jukebox.removeSelected'), action: () => this.removeSelectedAudios() },
+        { name: t('jukebox.removeSelected'), action: () => this.removeSelectedAudios(fid) },
       ];
       this.contextMenuService.open(position, menu, t('jukebox.selectedCount', { count: selectedIds.length }));
       return;
@@ -1059,8 +1060,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     }));
     const menu: ContextMenuAction[] = [
       { name: t('jukebox.audition'), action: () => this.play(audio), selfOnly: true },
-      { name: t('jukebox.playOnce'), action: () => { this.library.setPlayLoop(audio.identifier, false); this.playFormal(audio); } },
-      { name: t('jukebox.playLoop'), action: () => { this.library.setPlayLoop(audio.identifier, true); this.playFormal(audio); } },
+      { name: t('jukebox.playOnce'), action: () => { this.library.setPlayLoop(audio.identifier, false, fid); this.playFormal(audio, fid); } },
+      { name: t('jukebox.playLoop'), action: () => { this.library.setPlayLoop(audio.identifier, true, fid); this.playFormal(audio, fid); } },
       ContextMenuSeparator,
       { name: t('jukebox.assignTrack'), subActions: assignTracks },
       { name: t('jukebox.playToTrack'), subActions: playTracks },
@@ -1068,7 +1069,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       { name: t('jukebox.rename'), action: () => this.renameAudio(audio) },
       { name: t('jukebox.moveToFolder'), subActions: folderMoves },
       ContextMenuSeparator,
-      { name: t('jukebox.removeFromLibrary'), action: () => this.removeAudio(audio) },
+      { name: t('jukebox.removeFromLibrary'), action: () => this.removeAudio(audio, fid) },
     ];
     this.contextMenuService.open(position, menu, this.displayName(audio));
   }
@@ -1106,9 +1107,9 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.library.deleteFolder(folder.id);
   }
 
-  private removeAudio(audio: AudioFile) {
+  private removeAudio(audio: AudioFile, folderId: string = '') {
     if (!window.confirm(this.i18n.t('jukebox.removeConfirm', { name: this.displayName(audio) }))) return;
-    this.removeAudioImmediate(audio);
+    this.removeAudioImmediate(audio, folderId || '');
     this.selectedAudioIds.delete(audio.identifier);
     this.selectedAudioIds = new Set(this.selectedAudioIds);
   }
@@ -1120,28 +1121,31 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.expandedFolders[folderId || ''] = true;
   }
 
-  private removeSelectedAudios() {
+  private removeSelectedAudios(folderId: string = '') {
     const ids = this.orderedSelectedIds();
     if (ids.length < 1) return;
     if (!window.confirm(this.i18n.t('jukebox.removeSelectedConfirm', { count: ids.length }))) return;
+    const fid = folderId || this.selectionAnchorFolderId || '';
     for (const id of ids) {
       const audio = AudioStorage.instance.get(id);
-      if (audio) this.removeAudioImmediate(audio);
+      if (audio) this.removeAudioImmediate(audio, fid);
       else {
-        this.library.removeAudioMeta(id);
-        AudioStorage.instance.delete(id);
+        const gone = this.library.removeFromFolder(id, fid);
+        if (gone) AudioStorage.instance.delete(id);
       }
     }
     AudioStorage.instance.lazySynchronize(100);
     this.clearSelection();
   }
 
-  private removeAudioImmediate(audio: AudioFile) {
+  private removeAudioImmediate(audio: AudioFile, folderId: string = '') {
     this.stopBGM(audio);
     if (this.auditionPlayer.audio === audio) this.stop();
-    this.library.removeAudioMeta(audio.identifier);
-    AudioStorage.instance.delete(audio.identifier);
-    AudioStorage.instance.lazySynchronize(100);
+    const gone = this.library.removeFromFolder(audio.identifier, folderId || '');
+    if (gone) {
+      AudioStorage.instance.delete(audio.identifier);
+      AudioStorage.instance.lazySynchronize(100);
+    }
   }
 
   private displayNameFromUrl(url: string): string {

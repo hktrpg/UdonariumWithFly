@@ -867,6 +867,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (0 < this.selectionService.size) {
       extraActions.push({
         name: this.i18n.t('gt.congregate'),
+        hotkey: 'T',
         action: () => {
           this.selectionService.congregate(objectPosition);
         },

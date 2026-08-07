@@ -498,7 +498,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: this.i18n.t('mask.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('mask.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isMultiSelectedMasks()) {
       let selectedGameTableMasks = () => this.selectedMasks();
@@ -571,6 +571,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         on: this.i18n.t('mask.menu.11'),
         off: this.i18n.t('mask.menu.12'),
         disabled: this.isScratching,
+        hotkey: 'L',
       }),
       (this.isLock ? null : { name: this.i18n.t('mask.menu.13'), action: null, subActions: [
         {
@@ -797,7 +798,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
           this.chatMessageService.sendOperationLog(this.i18n.t('mask.deleted', { name: this.maskDisplayName() }));
           this.gameTableMask.destroy();
           SoundEffect.play(PresetSound.sweep);
-        }
+        },
+        hotkey: 'Del',
       },
       ContextMenuSeparator,
       { name: this.i18n.t('mask.menu.34'), action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }

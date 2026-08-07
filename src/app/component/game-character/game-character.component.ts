@@ -715,7 +715,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       z: this.gameCharacter.posZ
     };
     return [
-      { name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) },
+      { name: this.i18n.t('char.congregate'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) },
       ContextMenuSeparator,
     ];
   }
@@ -730,7 +730,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     };
 
     return [
-      { name: this.i18n.t('char.congregate'), action: () => this.selectionService.congregate(objectPosition) },
+      { name: this.i18n.t('char.congregate'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) },
       ContextMenuSeparator,
       this.characterFxMenu.makeCombatMenu(this.gameCharacter),
       ContextMenuSeparator,
@@ -797,6 +797,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       },
       {
         name: this.i18n.t('char.deleteAllToGraveyard'),
+        hotkey: 'Del',
         action: () => {
           selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'graveyard'));
           SoundEffect.play(PresetSound.sweep);
@@ -821,6 +822,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       [
         {
           name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
+          hotkey: 'H',
           action: () => {
             if (this.isHideIn) {
               this.gameCharacter.owner = '';
@@ -1064,6 +1066,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           name: this.gameCharacter.isTemporaryCopy
             ? this.i18n.t('char.deleteTemporaryCopy')
             : this.i18n.t('char.deleteToGraveyard'),
+          hotkey: 'Del',
           action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.selectionService.remove(this.gameCharacter);
