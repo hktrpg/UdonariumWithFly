@@ -58,6 +58,47 @@
   max-height: 100%;
   max-width: 100%;
 }
+
+.sheet-body {
+  display: flex;
+  align-items: stretch;
+  /* Desktop: size to content — do not flex-grow or the floating menu fills the viewport. */
+  flex: 0 1 auto;
+  /* Cap body so long menus scroll inside .sheet-actions instead of stretching. */
+  max-height: min(320px, calc(100vh - 64px));
+  min-height: 0;
+}
+
+.sheet-body.is-sheet-fill {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+.sheet-body > .altitude {
+  flex: 0 0 22px;
+  width: 22px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.sheet-body > .altitude.ruler {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 2.4em;
+  overflow: hidden;
+  display: flex;
+}
+
+.sheet-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: visible;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .title{
   overflow: hidden;
   white-space: nowrap;

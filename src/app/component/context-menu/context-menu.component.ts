@@ -218,9 +218,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       panel.style.bottom = '';
       this.applySavedSheetHeight(panel);
       this.changeDetector.detectChanges();
-      if (this.altitudeSlider) {
-        this.altitudeSlider.nativeElement.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
-      }
+      this.syncAltitudeSliderHeight(panel);
       return;
     }
 
@@ -228,6 +226,9 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     panel.classList.remove('is-mobile-action-sheet');
     panel.style.height = '';
     panel.style.maxHeight = '';
+
+    // Size altitude slider from list content before measuring position (avoids viewport-tall menus).
+    this.syncAltitudeSliderHeight(panel);
 
     // Nudge away from the cursor so the menu does not cover the target token.
     const OFFSET_X = 20;
@@ -263,9 +264,24 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     panel.style.left = panel.offsetLeft + diffLeft + 'px';
     panel.style.top = panel.offsetTop + diffTop + 'px';
 
-    if (this.altitudeSlider) {
-      this.altitudeSlider.nativeElement.style.height = (panel.clientHeight - 72) + 'px';
+    // Re-sync after position clamp (list viewport height may change).
+    this.syncAltitudeSliderHeight(panel);
+  }
+
+  /** Keep altitude range matched to the action list, not the full viewport. */
+  private syncAltitudeSliderHeight(panel: HTMLElement) {
+    if (!this.altitudeSlider) return;
+    const slider = this.altitudeSlider.nativeElement;
+    if (this.isMobileActionSheet) {
+      slider.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
+      return;
     }
+    const actions = panel.querySelector('.sheet-actions') as HTMLElement | null;
+    const listH = actions?.scrollHeight || 0;
+    const bodyMax = Math.min(320, Math.max(96, window.innerHeight - 64));
+    // Match visible list column; never inflate the floating menu to viewport height.
+    const h = Math.max(96, Math.min(listH || 160, bodyMax));
+    slider.style.height = `${h}px`;
   }
 
   private adjustPositionSub() {
