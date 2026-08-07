@@ -114,7 +114,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          [disabled]="!canSubmit"
+          [disabled]="!canSubmit || connectionBusy.busy"
           (click)="createRoom()"
         >
           {{ (isResume ? 'room.resume' : 'room.create') | i18n }}

@@ -34,6 +34,8 @@ export const zhTW_ui: I18nDictionary = {
   'peer.healthGood': '良好',
   'peer.healthBad': '不良',
   'peer.connecting': '[連線中]',
+  'peer.connectingRoom': '正在連線到房間…',
+  'peer.creatingRoom': '正在建立房間…',
   'peer.sessionStatus': '連線狀態',
   'peer.targetIdPlaceholder': '對方的 ID',
   'peer.privateConnect': '私人連線',

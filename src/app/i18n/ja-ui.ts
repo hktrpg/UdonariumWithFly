@@ -33,6 +33,8 @@ export const ja_ui: I18nDictionary = {
   'peer.healthGood': '良好',
   'peer.healthBad': '不良',
   'peer.connecting': '[接続中]',
+  'peer.connectingRoom': '部屋に接続しています…',
+  'peer.creatingRoom': '部屋を作成しています…',
   'peer.sessionStatus': '接続状態',
   'peer.targetIdPlaceholder': '相手の ID',
   'peer.privateConnect': 'プライベート接続',

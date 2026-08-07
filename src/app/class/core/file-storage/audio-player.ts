@@ -58,7 +58,9 @@ export class AudioPlayer {
   static get volume(): number { return AudioPlayer._volume; }
   static set volume(volume: number) {
     AudioPlayer._volume = volume;
-    AudioPlayer.masterGainNode.gain.setTargetAtTime(AudioPlayer.isMute ? 0 : AudioPlayer._volume, AudioPlayer.audioContext.currentTime, 0.01);
+    if (AudioPlayer._masterGainNode) {
+      AudioPlayer._masterGainNode.gain.setTargetAtTime(AudioPlayer.isMute ? 0 : AudioPlayer._volume, AudioPlayer.audioContext.currentTime, 0.01);
+    }
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -73,7 +75,9 @@ export class AudioPlayer {
   static get auditionVolume(): number { return AudioPlayer._auditionVolume; }
   static set auditionVolume(auditionVolume: number) {
     AudioPlayer._auditionVolume = auditionVolume;
-    AudioPlayer.auditionGainNode.gain.setTargetAtTime(AudioPlayer.isAuditionMute ? 0 : AudioPlayer._auditionVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    if (AudioPlayer._auditionGainNode) {
+      AudioPlayer._auditionGainNode.gain.setTargetAtTime(AudioPlayer.isAuditionMute ? 0 : AudioPlayer._auditionVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    }
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -88,7 +92,9 @@ export class AudioPlayer {
   static get soundEffectVolume(): number { return AudioPlayer._soundEffectVolume; }
   static set soundEffectVolume(soundEffectVolume: number) {
     AudioPlayer._soundEffectVolume = soundEffectVolume;
-    AudioPlayer.soundEffectGainNode.gain.setTargetAtTime(AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer._soundEffectVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    if (AudioPlayer._soundEffectGainNode) {
+      AudioPlayer._soundEffectGainNode.gain.setTargetAtTime(AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer._soundEffectVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    }
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -103,7 +109,9 @@ export class AudioPlayer {
   static get noticeVolume(): number { return AudioPlayer._noticeVolume; }
   static set noticeVolume(noticeVolume: number) {
     AudioPlayer._noticeVolume = noticeVolume;
-    AudioPlayer.noticeGainNode.gain.setTargetAtTime(AudioPlayer.isNoticeMute ? 0 : AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    if (AudioPlayer._noticeGainNode) {
+      AudioPlayer._noticeGainNode.gain.setTargetAtTime(AudioPlayer.isNoticeMute ? 0 : AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    }
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -118,7 +126,9 @@ export class AudioPlayer {
   static get ambientVolume(): number { return AudioPlayer._ambientVolume; }
   static set ambientVolume(ambientVolume: number) {
     AudioPlayer._ambientVolume = ambientVolume;
-    AudioPlayer.ambientGainNode.gain.setTargetAtTime(AudioPlayer.isAmbientMute ? 0 : AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    if (AudioPlayer._ambientGainNode) {
+      AudioPlayer._ambientGainNode.gain.setTargetAtTime(AudioPlayer.isAmbientMute ? 0 : AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime, 0.01);
+    }
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -292,6 +302,7 @@ export class AudioPlayer {
     this.stop();
     this.audio = audio;
     if (!this.audio) return;
+    AudioPlayer.ensureContextRunning();
 
     let url = this.audio.url;
     const remoteCrossOrigin = audio.state === AudioState.URL && AudioPlayer.isCrossOriginHttpUrl(url);
@@ -401,6 +412,7 @@ export class AudioPlayer {
   }
 
   private static async playBufferAsyncBase(audioNode: AudioNode, audio: AudioFile, volume: number = 1.0) {
+    AudioPlayer.ensureContextRunning();
     let source = await AudioPlayer.createBufferSourceAsync(audio);
     if (!source) return;
 
@@ -486,15 +498,31 @@ export class AudioPlayer {
     return cache;
   }
 
+  /**
+   * Browsers block AudioContext until a user gesture. Do not create/resume here —
+   * only unlock on the first pointer/key interaction.
+   */
   static resumeAudioContext() {
-    AudioPlayer.audioContext.resume();
-    let callback = () => {
-      AudioPlayer.audioContext.resume();
-      document.removeEventListener('touchstart', callback, true);
-      document.removeEventListener('mousedown', callback, true);
-      console.log('resumeAudioContext');
-    }
-    document.addEventListener('touchstart', callback, true);
-    document.addEventListener('mousedown', callback, true);
+    if (AudioPlayer._unlockBound) return;
+    AudioPlayer._unlockBound = true;
+    const unlock = () => {
+      AudioPlayer.ensureContextRunning();
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('touchstart', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('touchstart', unlock, true);
+    document.addEventListener('keydown', unlock, true);
   }
+
+  /** Create context if needed and resume when suspended (call from user gestures / play). */
+  static ensureContextRunning() {
+    try {
+      const ctx = AudioPlayer.audioContext;
+      if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+    } catch { /* ignore */ }
+  }
+
+  private static _unlockBound = false;
 }

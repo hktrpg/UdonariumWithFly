@@ -88,6 +88,7 @@ import { CharacterResourceHudComponent } from './component/character-resource-hu
 import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { PauseOverlayComponent } from './component/pause-overlay/pause-overlay.component';
+import { ConnectionBusyOverlayComponent } from './component/connection-busy-overlay/connection-busy-overlay.component';
 import { SceneNavComponent } from './component/scene-nav/scene-nav.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
 import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
@@ -170,6 +171,7 @@ import '@udonarium/table-fx/combat-tracker';
     CombatTrackerComponent,
     CombatAnnounceComponent,
     PauseOverlayComponent,
+    ConnectionBusyOverlayComponent,
     SceneNavComponent,
     TeachingTipDirective,
     TeachingTipComponent,

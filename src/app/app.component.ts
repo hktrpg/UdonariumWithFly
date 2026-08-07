@@ -83,6 +83,7 @@ import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { ConnectionBusyService } from 'service/connection-busy.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -200,6 +201,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
     _audioImportName: AudioImportNameService,
+    _connectionBusy: ConnectionBusyService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {

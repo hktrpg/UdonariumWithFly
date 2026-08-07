@@ -33,6 +33,8 @@ export const zhCN_ui: I18nDictionary = {
   'peer.healthGood': '良好',
   'peer.healthBad': '不良',
   'peer.connecting': '[连接中]',
+  'peer.connectingRoom': '正在连接到房间…',
+  'peer.creatingRoom': '正在创建房间…',
   'peer.sessionStatus': '连接状态',
   'peer.targetIdPlaceholder': '对方的 ID',
   'peer.privateConnect': '私人连接',

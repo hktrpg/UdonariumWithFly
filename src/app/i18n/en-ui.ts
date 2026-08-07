@@ -33,6 +33,8 @@ export const en_ui: I18nDictionary = {
   'peer.healthGood': 'Good',
   'peer.healthBad': 'Poor',
   'peer.connecting': '[Connecting]',
+  'peer.connectingRoom': 'Connecting to room…',
+  'peer.creatingRoom': 'Creating room…',
   'peer.sessionStatus': 'Status',
   'peer.targetIdPlaceholder': 'Their ID',
   'peer.privateConnect': 'Private connect',

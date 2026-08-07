@@ -5,7 +5,7 @@
       <button type="button" class="btn" (click)="reload()" [disabled]="isReloading">
         <i class="material-icons">refresh</i>{{ 'lobby.refresh' | i18n }}
       </button>
-      <button type="button" class="btn btn-primary" (click)="showRoomSetting()">
+      <button type="button" class="btn btn-primary" (click)="showRoomSetting()" [disabled]="connectionBusy.busy">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
       </button>
       <button type="button" class="btn" *ngIf="canShowLoadRoom" (click)="loadFolderBackup()"
@@ -35,11 +35,11 @@
             <td>{{ 'lobby.peerCount' | i18n:{ count: room.peers.length } }}</td>
             <td class="room-actions">
               <ng-container *ngIf="isRoleAuthRoom(room)">
-                <button type="button" class="btn btn-sm btn-primary" [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" (click)="connect(room)">{{ 'lobby.joinWithRole' | i18n }}</button>
+                <button type="button" class="btn btn-sm btn-primary" [disabled]="connectionBusy.busy || room.id === currentRoom" *ngIf="0 < room.id.length" (click)="connect(room)">{{ 'lobby.joinWithRole' | i18n }}</button>
               </ng-container>
               <ng-container *ngIf="!isRoleAuthRoom(room)">
-                <button type="button" class="btn btn-sm btn-primary" [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length" (click)="connect(room, false)">{{ 'lobby.connect' | i18n }}</button>
-                <button type="button" class="btn btn-sm" [disabled]="room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" (click)="connect(room, true)">{{ 'lobby.guest' | i18n }}</button>
+                <button type="button" class="btn btn-sm btn-primary" [disabled]="connectionBusy.busy || room.id === currentRoom" *ngIf="0 < room.id.length" (click)="connect(room, false)">{{ 'lobby.connect' | i18n }}</button>
+                <button type="button" class="btn btn-sm" [disabled]="connectionBusy.busy || room.id === currentRoom" *ngIf="0 < room.id.length && isAllowGuest(room)" (click)="connect(room, true)">{{ 'lobby.guest' | i18n }}</button>
               </ng-container>
             </td>
           </tr>
