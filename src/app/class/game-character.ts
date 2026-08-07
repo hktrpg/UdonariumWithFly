@@ -259,6 +259,32 @@ export class GameCharacter extends TabletopObject {
     return gameCharacter;
   }
 
+  /** Minimal character sheet (no sample resources/skills). Used by CCFOLIA clipboard import. */
+  static createEmpty(name: string, size: number = 1): GameCharacter {
+    const gameCharacter = new GameCharacter();
+    gameCharacter.createDataElements();
+    gameCharacter.initialize();
+
+    gameCharacter.commonDataElement.appendChild(
+      DataElement.create('name', name, {}, 'name_' + gameCharacter.identifier)
+    );
+    gameCharacter.commonDataElement.appendChild(
+      DataElement.create('size', size, {}, 'size_' + gameCharacter.identifier)
+    );
+    gameCharacter.commonDataElement.appendChild(
+      DataElement.create('height', 0, { currentValue: '' }, 'height_' + gameCharacter.identifier)
+    );
+    gameCharacter.commonDataElement.appendChild(
+      DataElement.create('altitude', 0, {}, 'altitude_' + gameCharacter.identifier)
+    );
+
+    const standList = new StandList('StandList_' + gameCharacter.identifier);
+    standList.initialize();
+    gameCharacter.appendChild(standList);
+
+    return gameCharacter;
+  }
+
   get isHideIn(): boolean { return !!this.owner; }
   get isVisible(): boolean { return !this.owner || Network.peer.userId === this.owner; }
 

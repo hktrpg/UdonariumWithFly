@@ -5,6 +5,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
+import { stringifyCcfoliaClipboard } from '@udonarium/ccfolia-clipboard';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ModalService } from 'service/modal.service';
@@ -253,6 +254,27 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
       this.isSaveing = false;
       this.progresPercent = 0;
     }, 500);
+  }
+
+  /** Export CCFOLIA Clipboard API JSON (download + system clipboard). */
+  async exportCcfoliaJson() {
+    if (!(this.tabletopObject instanceof GameCharacter)) return;
+    const json = stringifyCcfoliaClipboard(this.tabletopObject);
+    const safeName = (this.tabletopObjectName || 'character').replace(/[\\/:*?"<>|]/g, '_');
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `ccfolia_${safeName}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    try {
+      await navigator.clipboard.writeText(json);
+    } catch {
+      // Download already succeeded; clipboard may be denied without focus/permission.
+    }
   }
 
   setLocation(locationName: string) {
