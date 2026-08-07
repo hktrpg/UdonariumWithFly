@@ -227,14 +227,14 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     panel.style.height = '';
     panel.style.maxHeight = '';
 
-    // Size altitude slider from list content before measuring position (avoids viewport-tall menus).
-    this.syncAltitudeSliderHeight(panel);
-
     // Nudge away from the cursor so the menu does not cover the target token.
     const OFFSET_X = 20;
     const OFFSET_Y = 4;
     panel.style.left = (this.contextMenuService.position.x + OFFSET_X) + 'px';
     panel.style.top = (this.contextMenuService.position.y + OFFSET_Y) + 'px';
+
+    // Match altitude slider to full item list height before measuring clamp.
+    this.syncAltitudeSliderHeight(panel);
 
     let panelBox = panel.getBoundingClientRect();
 
@@ -263,12 +263,9 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     panel.style.left = panel.offsetLeft + diffLeft + 'px';
     panel.style.top = panel.offsetTop + diffTop + 'px';
-
-    // Re-sync after position clamp (list viewport height may change).
-    this.syncAltitudeSliderHeight(panel);
   }
 
-  /** Keep altitude range matched to the action list, not the full viewport. */
+  /** Desktop: altitude track follows all menu items. Mobile sheet: fill panel body. */
   private syncAltitudeSliderHeight(panel: HTMLElement) {
     if (!this.altitudeSlider) return;
     const slider = this.altitudeSlider.nativeElement;
@@ -278,10 +275,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     const actions = panel.querySelector('.sheet-actions') as HTMLElement | null;
     const listH = actions?.scrollHeight || 0;
-    const bodyMax = Math.min(320, Math.max(96, window.innerHeight - 64));
-    // Match visible list column; never inflate the floating menu to viewport height.
-    const h = Math.max(96, Math.min(listH || 160, bodyMax));
-    slider.style.height = `${h}px`;
+    slider.style.height = `${Math.max(96, listH || Math.max(96, panel.clientHeight - 72))}px`;
   }
 
   private adjustPositionSub() {

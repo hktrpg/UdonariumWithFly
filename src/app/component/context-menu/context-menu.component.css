@@ -40,6 +40,7 @@
   position: absolute;
   left: calc(100% - 4px);
   top: -16px;
+  z-index: 2;
 }
 .icons-panel {
   padding-bottom: 2px;
@@ -55,48 +56,35 @@
   pointer-events: none;
 }
 .is-max-limit {
-  max-height: 100%;
+  /* Width only — do not clamp height to the viewport or long menus get cut / submenus clip. */
   max-width: 100%;
 }
 
+/* Desktop: size to all items; never flex-grow (that stretched menus to the viewport). */
 .sheet-body {
   display: flex;
-  align-items: stretch;
-  /* Desktop: size to content — do not flex-grow or the floating menu fills the viewport. */
-  flex: 0 1 auto;
-  /* Cap body so long menus scroll inside .sheet-actions instead of stretching. */
-  max-height: min(320px, calc(100vh - 64px));
-  min-height: 0;
+  align-items: center;
+  flex: 0 0 auto;
+  /* Keep overflow visible so nested submenus are not clipped. */
+  overflow: visible;
 }
 
+/* Mobile action sheet only: fill sheet height and scroll the action list. */
 .sheet-body.is-sheet-fill {
   flex: 1 1 auto;
-  max-height: none;
-}
-
-.sheet-body > .altitude {
-  flex: 0 0 22px;
-  width: 22px;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.sheet-body > .altitude.ruler {
-  flex: 0 0 auto;
-  width: auto;
-  max-width: 2.4em;
-  overflow: hidden;
-  display: flex;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .sheet-actions {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: visible;
+}
+
+.sheet-body.is-sheet-fill .sheet-actions {
   min-height: 0;
-  overflow-x: visible;
-  overflow-y: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 .title{
@@ -180,10 +168,13 @@ td.altitude {
 }
 
 input.altitude {
+  /* Native vertical slider (colored). appearance:none previously blanked it white. */
+  writing-mode: bt-lr;
   writing-mode: vertical-lr;
   direction: rtl;
-  appearance: none;
-  -webkit-appearance: none;
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
+  accent-color: #2563eb;
   width: 8px;
   height: 100%;
   padding: 3px;
