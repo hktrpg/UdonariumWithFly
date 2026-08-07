@@ -171,6 +171,8 @@ export const ja_tutorial: I18nDictionary = {
 ・フォルダ再生キューとシャッフル／順再生；部屋読込ホバーでバックアップフォルダ変更／切断
 ・ZIP／フォルダバックアップで音楽を含めない選択可（ダイアログ＋個人設定＊；省略時は軽量）
 ・Esc：選択中は先に選択解除；それ以外はメニュー／ダイアログ／下書きの後、最前面の閉じられるウィンドウを閉じる`,
+  'changelog.2026json': `2026/08/08 キャラクター JSON
+・JSON で手軽にインポート／エクスポート。CCFOLIA 形式互換（卓上 Ctrl＋V；詳細から書き出し）`,
   'changelog.links': `サイト：https://z01.hktrpg.com
 ガイド：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

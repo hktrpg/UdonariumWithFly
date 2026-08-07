@@ -218,9 +218,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       panel.style.bottom = '';
       this.applySavedSheetHeight(panel);
       this.changeDetector.detectChanges();
-      if (this.altitudeSlider) {
-        this.altitudeSlider.nativeElement.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
-      }
+      this.syncAltitudeSliderHeight(panel);
       return;
     }
 
@@ -234,6 +232,9 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     const OFFSET_Y = 4;
     panel.style.left = (this.contextMenuService.position.x + OFFSET_X) + 'px';
     panel.style.top = (this.contextMenuService.position.y + OFFSET_Y) + 'px';
+
+    // Match altitude slider to full item list height before measuring clamp.
+    this.syncAltitudeSliderHeight(panel);
 
     let panelBox = panel.getBoundingClientRect();
 
@@ -262,10 +263,19 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     panel.style.left = panel.offsetLeft + diffLeft + 'px';
     panel.style.top = panel.offsetTop + diffTop + 'px';
+  }
 
-    if (this.altitudeSlider) {
-      this.altitudeSlider.nativeElement.style.height = (panel.clientHeight - 72) + 'px';
+  /** Desktop: altitude track follows all menu items. Mobile sheet: fill panel body. */
+  private syncAltitudeSliderHeight(panel: HTMLElement) {
+    if (!this.altitudeSlider) return;
+    const slider = this.altitudeSlider.nativeElement;
+    if (this.isMobileActionSheet) {
+      slider.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
+      return;
     }
+    const actions = panel.querySelector('.sheet-actions') as HTMLElement | null;
+    const listH = actions?.scrollHeight || 0;
+    slider.style.height = `${Math.max(96, listH || Math.max(96, panel.clientHeight - 72))}px`;
   }
 
   private adjustPositionSub() {
@@ -311,7 +321,12 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     submenu.style.top = submenu.offsetTop + diffTop + 'px';
   }
 
-  doAction(action: ContextMenuAction) {
+  doAction(action: ContextMenuAction, event?: Event) {
+    // Nested <context-menu> items sit inside the parent <li>; without this, a
+    // checkbox click bubbles up and the parent treats it as a second tap that
+    // collapses the submenu (status / aura / ring toggles close immediately).
+    event?.stopPropagation();
+
     this.showSubMenu(action, { fromClick: true });
     if (action.action == null) return;
 
@@ -385,7 +400,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   showSubMenu(action: ContextMenuAction, opts?: { fromClick?: boolean }) {
     if (this.GuestMode()) return;
-    if (action.subActions == null || action.subActions.length < 1) return;
 
     const host = this.rootElementRef?.nativeElement;
     const mobileSheet = !!(host?.classList?.contains('is-mobile-action-sheet')
@@ -396,30 +410,44 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     clearTimeout(this.showSubMenuTimer);
 
-    // Second tap on the same row collapses the inline submenu.
-    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
-      clearTimeout(this.hideSubMenuTimer);
-      this.parentMenu = null;
-      this.subMenu = null;
-      this.changeDetector.detectChanges();
+    // Row without a submenu: close any open nested menu (e.g. left a flyout parent).
+    // Checkbox/radio rows still call this from doAction; clearing nested menus is fine,
+    // and stopPropagation prevents the parent row from treating it as a collapse tap.
+    if (action.subActions == null || action.subActions.length < 1) {
+      this.clearSubMenuNow();
       return;
     }
 
-    this.hideSubMenu();
-    const delay = mobileSheet ? 0 : 250;
+    // Already open: on desktop hover already expanded it — a click must not collapse.
+    // Mobile sheets have no reliable hover; second tap toggles closed.
+    if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
+      if (mobileSheet) this.clearSubMenuNow();
+      return;
+    }
+
+    // Switching to another first-level item: drop the previous submenu before opening the next.
+    clearTimeout(this.hideSubMenuTimer);
+    const delay = (mobileSheet || opts?.fromClick || this.parentMenu === action) ? 0 : 120;
     this.showSubMenuTimer = setTimeout(() => {
       this.parentMenu = action;
       this.subMenu = action.subActions;
-      clearTimeout(this.hideSubMenuTimer);
       this.changeDetector.detectChanges();
     }, delay);
   }
 
   hideSubMenu() {
     clearTimeout(this.hideSubMenuTimer);
-    this.hideSubMenuTimer = setTimeout(() => {
-      this.subMenu = null;
-    }, 1200);
+    // Short grace so the pointer can move into a floating submenu without it vanishing.
+    this.hideSubMenuTimer = setTimeout(() => this.clearSubMenuNow(), 280);
+  }
+
+  private clearSubMenuNow() {
+    clearTimeout(this.hideSubMenuTimer);
+    clearTimeout(this.showSubMenuTimer);
+    if (!this.subMenu && !this.parentMenu) return;
+    this.parentMenu = null;
+    this.subMenu = null;
+    this.changeDetector.detectChanges();
   }
 
   close() {

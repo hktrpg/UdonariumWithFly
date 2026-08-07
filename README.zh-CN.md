@@ -84,6 +84,7 @@
 | V3 网络锁 | 启用中的角色皆设密码时，SkyWay 频道使用 mesh-lock |
 | PWA 更新提示 | 连线面板显示有新版本可重新加载 |
 | 手机 UX | 聊天工具栏与地图 HUD／工具箱互斥；悬停教学提示仅桌面 |
+| 角色 JSON | JSON 方便导入／导出，兼容 CCFOLIA 格式（桌面 Ctrl＋V；角色详情导出） |
 
 继承自 With Fly：高度、聊天文字颜色、立绘（Stand）、Cut-in、骰子机器人表、SkyWay 2023（`@skyway-sdk`）等。本 fork 使用自建 backend（请勿指向 WithFly 公开 Workers）。
 

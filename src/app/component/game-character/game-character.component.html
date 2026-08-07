@@ -52,17 +52,19 @@
             <div *ngIf="0 < name.length || statusEntries.length" class="name-tag is-black-background is-3d" [ngClass]="{'is-hide-in-tag': isHideIn, 'has-status-icons': statusEntries.length}"
               [style.max-width.px]="nameTagMaxWidth"
               [ngStyle]="{'transform': 'translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateX(' + nameTagRotate + 'deg)'}">
-              <div class="fornt-tag is-3d name-tag-row">
+              <div class="fornt-tag is-3d name-tag-stack">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)"
+                    (contextmenu)="onStatusBadgeContextMenu($event, s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
                 <span class="has-length-limit name-text" *ngIf="0 < name.length">{{name}}</span>
               </div>
-              <div class="back-tag is-3d name-tag-row">
+              <div class="back-tag is-3d name-tag-stack">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
-                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)">
+                  <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)"
+                    (contextmenu)="onStatusBadgeContextMenu($event, s.id)">
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>

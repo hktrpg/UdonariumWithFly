@@ -84,6 +84,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | V3 mesh-lock | When every enabled role has a password, SkyWay channel uses sealed mesh lock |
 | PWA update hint | Connection panel shows when a new version is ready to reload |
 | Mobile UX | Chat toolbar & map HUD/toolbox exclusivity; hover teaching tips desktop-only |
+| Character JSON | JSON for easy import/export; CCFOLIA-compatible (Ctrl+V on table; export from character sheet) |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 

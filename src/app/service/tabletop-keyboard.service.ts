@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { ChatTabList } from '@udonarium/chat-tab-list';
+import {
+  CharacterClipboardData,
+  createGameCharacterFromCcfolia,
+  tryParseCcfoliaCharacter,
+} from '@udonarium/ccfolia-clipboard';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -59,6 +64,7 @@ export class TabletopKeyboardService {
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
   private readonly onWheel = (e: WheelEvent) => this.handleWheel(e);
   private readonly onPointerDown = (e: PointerEvent) => this.handlePointerDown(e);
+  private readonly onPaste = (e: ClipboardEvent) => this.handlePaste(e);
   private readonly onBlur = () => {
     this.pressed.clear();
     this.wheelAcc = 0;
@@ -85,6 +91,7 @@ export class TabletopKeyboardService {
     document.addEventListener('keydown', this.onKeyDown, true);
     document.addEventListener('keyup', this.onKeyUp, true);
     document.addEventListener('pointerdown', this.onPointerDown, true);
+    document.addEventListener('paste', this.onPaste, true);
     document.addEventListener('wheel', this.onWheel, { capture: true, passive: false });
     window.addEventListener('blur', this.onBlur);
     this.listening = true;
@@ -95,6 +102,7 @@ export class TabletopKeyboardService {
     document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('keyup', this.onKeyUp, true);
     document.removeEventListener('pointerdown', this.onPointerDown, true);
+    document.removeEventListener('paste', this.onPaste, true);
     document.removeEventListener('wheel', this.onWheel, true);
     window.removeEventListener('blur', this.onBlur);
     this.pressed.clear();
@@ -144,7 +152,7 @@ export class TabletopKeyboardService {
         return;
       }
       if (code === 'KeyV') {
-        if (this.pasteClipboard()) this.consume(e);
+        // Paste is handled in handlePaste so OS CCFOLIA JSON can take priority.
         return;
       }
       if (code === 'KeyA') {
@@ -607,6 +615,42 @@ export class TabletopKeyboardService {
     if (this.selectionService.size < 1) return false;
     const pointer = this.coordinateService.calcTabletopLocalCoordinate();
     this.selectionService.congregate(pointer);
+    SoundEffect.play(PresetSound.piecePut);
+    return true;
+  }
+
+  /**
+   * OS clipboard paste: CCFOLIA character JSON first, then in-app XML clipboard.
+   * Skips INPUT/TEXTAREA so chat and forms keep normal paste.
+   */
+  private handlePaste(e: ClipboardEvent) {
+    if (this.shouldIgnore(e)) return;
+    if (Network.GuestMode()) return;
+
+    const text = e.clipboardData?.getData('text/plain') ?? '';
+    const ccfolia = tryParseCcfoliaCharacter(text);
+    if (ccfolia) {
+      if (this.pasteCcfoliaCharacter(ccfolia)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
+
+    if (this.clipboardXml.length < 1) return;
+    if (this.pasteClipboard()) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+
+  private pasteCcfoliaCharacter(clipboard: CharacterClipboardData): boolean {
+    if (Network.GuestMode()) return false;
+    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
+    const character = createGameCharacterFromCcfolia(clipboard, pointer);
+    this.selectionService.clear();
+    this.selectionService.add(character);
+    this.undoService.recordCreated([character], 'paste');
     SoundEffect.play(PresetSound.piecePut);
     return true;
   }

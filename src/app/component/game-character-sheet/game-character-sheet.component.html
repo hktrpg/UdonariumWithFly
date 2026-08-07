@@ -33,6 +33,7 @@
     <div *ngIf="isSaveing" class="progress">{{progresPercent}}%</div>
   </div>
 </button>
+<button *ngIf="tabletopObject?.aliasName === 'character'" (click)="exportCcfoliaJson()">{{ 'sheet.exportCcfoliaJson' | i18n }}</button>
 <ng-container *ngIf="tabletopObject?.aliasName === 'character'">
   <select #select *ngIf="tabletopObject" (change)="setLocation(select.value)" [ngModel]="tabletopObject.location.name">
     <option value="table">{{ 'sheet.location.table' | i18n }}</option>

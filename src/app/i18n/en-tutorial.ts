@@ -171,6 +171,8 @@ Upgraded to 1.13.2`,
 ・Folder play queue & shuffle/sequential preference; Load room hover → change / disconnect backup folder
 ・ZIP / folder backup can omit music (prompt + Settings*; smaller files when skipped)
 ・Esc: clear selection first when selected; otherwise dismiss menu/dialog/draft, then close the frontmost closable window`,
+  'changelog.2026json': `2026/08/08 Character JSON
+・JSON for easy import/export; CCFOLIA-compatible (Ctrl+V on the table; export from character sheet)`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

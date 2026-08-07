@@ -32,7 +32,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
-import { getStatusDef } from '@udonarium/table-fx/character-status';
+import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { I18nService } from 'service/i18n.service';
 
@@ -173,6 +173,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     const name = this.i18n.t(`fx.status.${id}`);
     const entry = this.statusEntries.find(s => s.id === id);
     return entry?.level ? `${name} ${entry.level}` : name;
+  }
+
+  /** Right-click a head status badge to clear it without opening the token menu. */
+  onStatusBadgeContextMenu(e: Event, id: CharacterStatusId) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (this.GuestMode()) return;
+    this.characterFxMenu.clearStatus(this.gameCharacter, id);
+    this.changeDetector.markForCheck();
   }
 
   get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
