@@ -443,8 +443,8 @@ export class DiceBot extends GameObject {
     // Stand reaction to dicebot
     const gameCharacter = ObjectStore.instance.get(originalMessage.characterIdentifier);
     if (gameCharacter instanceof GameCharacter) {
-      const standInfo = gameCharacter.standList.matchStandInfo(result, originalMessage.imageIdentifier);
-      if (!isSecret && !originalMessage.standName && originalMessage.isUseStandImage) {
+      const standInfo = gameCharacter.standList?.matchStandInfo(result, originalMessage.imageIdentifier);
+      if (standInfo && !isSecret && !originalMessage.standName && originalMessage.isUseStandImage) {
         if (standInfo.farewell) {
           const sendObj = {
             characterIdentifier: gameCharacter.identifier
@@ -482,13 +482,13 @@ export class DiceBot extends GameObject {
           }
         }
       }
-      matchMostLongText = standInfo.matchMostLongText;
+      if (standInfo) matchMostLongText = standInfo.matchMostLongText;
     }
 
     const chatTab = ObjectStore.instance.get<ChatTab>(originalMessage.tabIdentifier);
     // Cut-in triggered by dice
     const cutInInfo = CutInList.instance.matchCutInInfo(result);
-    if (!isSecret && chatTab.isUseStandImage && cutInInfo) {
+    if (!isSecret && chatTab?.isUseStandImage && cutInInfo) {
       for (const identifier of cutInInfo.identifiers) {
         const sendObj = {
           identifier: identifier,
@@ -518,7 +518,7 @@ export class DiceBot extends GameObject {
     }
 
     // trim
-    if (matchMostLongText.length < cutInInfo.matchMostLongText.length) matchMostLongText = cutInInfo.matchMostLongText;
+    if (cutInInfo && matchMostLongText.length < cutInInfo.matchMostLongText.length) matchMostLongText = cutInInfo.matchMostLongText;
     if (matchMostLongText && diceBotMessage.text) {
       diceBotMessage.text = diceBotMessage.text.slice(0, diceBotMessage.text.length - matchMostLongText.length);
     }

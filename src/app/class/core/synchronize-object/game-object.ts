@@ -20,10 +20,16 @@ export class GameObject {
     syncData: {}
   }
 
+  /** When true, SyncVar setters / update() do not version-bump or broadcast. */
+  private _syncSuppressed = false;
+
   static get aliasName() { return ObjectFactory.instance.getAlias(this); }
   get aliasName() { return this.context.aliasName; }
   get identifier() { return this.context.identifier; }
   get version() { return this.context.majorVersion + this.context.minorVersion; }
+
+  get syncSuppressed(): boolean { return this._syncSuppressed; }
+  set syncSuppressed(value: boolean) { this._syncSuppressed = !!value; }
 
   constructor(identifier: string = UUID.generateUuid()) {
     this.context.identifier = identifier;
@@ -43,7 +49,19 @@ export class GameObject {
   // GameObject Lifecycle
   onStoreRemoved() { }
 
+  /** Run SyncVar writes without network UPDATE (map hydrate / inbound create). */
+  withSyncSuppressed(fn: () => void) {
+    const prev = this._syncSuppressed;
+    this._syncSuppressed = true;
+    try {
+      fn();
+    } finally {
+      this._syncSuppressed = prev;
+    }
+  }
+
   update() {
+    if (this._syncSuppressed) return;
     this.versionUp();
     ObjectStore.instance.update(this.identifier);
   }

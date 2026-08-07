@@ -33,9 +33,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
   static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
   static readonly CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-skip-empty-quotes-local-storage';
-  /** Designed defaults: 700×265, bottom-left beside the main menu (not fixed 100,450). */
+  /** Designed defaults: 700×530, bottom-left beside the main menu (not fixed 100,450). */
   static readonly DEFAULT_WIDTH = 700;
-  static readonly DEFAULT_HEIGHT = 265;
+  static readonly DEFAULT_HEIGHT = 530;
   /** Fallback when viewport/menu not available yet (≈ menu width 100 + gap). */
   static readonly DEFAULT_LEFT = 108;
   /** Fallback only; prefer computeDefaultTop(). */

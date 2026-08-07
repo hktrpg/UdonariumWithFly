@@ -33,6 +33,12 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   inputValue: string = '';
   inputPlaceholder: string = '';
 
+  /** Optional radio choices; OK resolves `{ choice, remember }` when set. */
+  choices: { id: string; label: string }[] = [];
+  choiceValue: string = '';
+  rememberLabel: string = '';
+  rememberValue: boolean = false;
+
   constructor(
     private panelService: PanelService,
     private modalService: ModalService,
@@ -56,6 +62,12 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.inputLabel = modalService.option.inputLabel ? modalService.option.inputLabel : '';
     this.inputValue = modalService.option.inputValue != null ? String(modalService.option.inputValue) : '';
     this.inputPlaceholder = modalService.option.inputPlaceholder ? modalService.option.inputPlaceholder : '';
+    this.choices = Array.isArray(modalService.option.choices) ? modalService.option.choices : [];
+    this.choiceValue = modalService.option.choiceValue != null
+      ? String(modalService.option.choiceValue)
+      : (this.choices[0]?.id || '');
+    this.rememberLabel = modalService.option.rememberLabel ? modalService.option.rememberLabel : '';
+    this.rememberValue = !!modalService.option.rememberValue;
   }
 
   ngOnInit() {
@@ -87,7 +99,12 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   }
 
   ok() {
-    if (this.hasInput) {
+    if (this.choices.length) {
+      this.modalService.resolve({
+        choice: this.choiceValue,
+        remember: !!this.rememberValue,
+      });
+    } else if (this.hasInput) {
       this.modalService.resolve(this.inputValue);
     } else {
       this.modalService.resolve(true);

@@ -348,7 +348,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       y: this.diceSymbol.location.y + (this.diceSymbol.size * this.gridSize) / 2,
       z: this.diceSymbol.posZ
     };
-    actions.push({ name: this.i18n.t('dice.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('dice.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isMultiSelectedDice()) {
       let selectedDiceSymbols = () => this.selectedDiceSymbols();
@@ -442,7 +442,8 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
           this.diceRoll();
         },
         disabled: !this.isVisible,
-        default: this.isVisible
+        default: this.isVisible,
+        hotkey: 'F',
       });
     //}
     actions.push(ContextMenuSeparator);
@@ -478,6 +479,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       on: this.i18n.t('dice.menu.5'),
       off: this.i18n.t('dice.menu.6'),
       disabled: this.hasOwner && !this.isVisible,
+      hotkey: 'L',
     }));
     if (this.isVisible) {
       let subActions: ContextMenuAction[] = [];
@@ -559,7 +561,8 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       name: this.i18n.t('dice.menu.12'), action: () => {
         this.diceSymbol.destroy();
         SoundEffect.play(PresetSound.sweep);
-      }
+      },
+      hotkey: 'Del',
     });
     return actions;
   }

@@ -24,17 +24,21 @@
   <div class="table-body" *ngIf="!isEmpty || selectedTable">
     <header class="table-toolbar">
       <ng-container *ngIf="!isDeleted">
+        <button type="button" class="btn btn-sm" *ngIf="canActivate" (click)="toggleSelectedInHud()" [disabled]="!selectedTable" [attr.title]="'table.showInNavigation' | i18n">
+          <i class="material-icons">{{ tableShowInNavigation ? 'visibility' : 'visibility_off' }}</i>
+          {{ tableShowInNavigation ? ('table.hideFromHud' | i18n) : ('table.showInHud' | i18n) }}
+        </button>
         <button type="button" class="btn btn-sm" (click)="cloneGameTable()" [disabled]="!selectedTable">{{ 'table.clone' | i18n }}</button>
         <button type="button" class="btn btn-sm btn-danger" (click)="delete()" [disabled]="getGameTables().length <= 1">{{ 'table.delete' | i18n }}</button>
       </ng-container>
       <ng-container *ngIf="isDeleted">
         <button type="button" class="btn btn-sm" (click)="restore()">{{ 'table.restore' | i18n }}</button>
       </ng-container>
-      <button type="button" class="btn btn-sm" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
+      <button type="button" class="btn btn-sm" *ngIf="canActivate" (click)="saveAsScene()" [disabled]="!selectedTable || isDeleted">
         <i class="material-icons">theaters</i>{{ 'scenePreset.saveAsScene' | i18n }}
       </button>
-      <button type="button" class="btn btn-sm btn-primary" (click)="confirm()">{{ 'table.confirm' | i18n }}</button>
-      <span class="local-note"><sup class="self-only">*</sup>{{ 'table.localOnly' | i18n }}</span>
+      <span class="local-note" *ngIf="isActiveSelected">{{ 'table.activeHint' | i18n }}</span>
+      <span class="local-note" *ngIf="!isActiveSelected && isViewingSelected">{{ 'table.viewingHint' | i18n }}</span>
     </header>
 
     <div class="table-scroll">
@@ -176,6 +180,16 @@
             >
           </label>
         </div>
+        <div class="compact-row" *ngIf="canActivate">
+          <label class="inline-field">
+            <input type="checkbox" [(ngModel)]="tableShowInNavigation" [disabled]="!isEditable" />
+            <span>{{ 'table.showInNavigation' | i18n }}</span>
+          </label>
+          <label class="inline-field">
+            <input type="checkbox" [(ngModel)]="tablePlayerCanView" [disabled]="!isEditable" />
+            <span>{{ 'table.playerCanView' | i18n }}</span>
+          </label>
+        </div>
         <div class="slider-row slim">
           <span class="slider-label">W</span>
           <input
@@ -242,10 +256,10 @@
         <div class="block-head"><span>{{ 'table.atmosphere' | i18n }}</span></div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.darkness' | i18n }}</span>
-          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable">
+          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable || !canControlDayNight">
           <span class="val">{{ tableDarkness | number:'1.0-2' }}</span>
-          <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable">{{ 'table.day' | i18n }}</button>
-          <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable">{{ 'table.night' | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.day' | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.night' | i18n }}</button>
         </div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.globalIllumination' | i18n }}</span>
@@ -255,7 +269,7 @@
         <div class="compact-row wrap">
           <label class="inline-field">
             <span>{{ 'table.weather' | i18n }}</span>
-            <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable">
+            <select [(ngModel)]="tableWeatherType" [disabled]="!isEditable || !canControlWeather">
               <option value="none">{{ 'table.none' | i18n }}</option>
               <option value="rain">{{ 'table.rain' | i18n }}</option>
               <option value="thunderstorm">{{ 'table.thunderstorm' | i18n }}</option>
@@ -278,7 +292,7 @@
               max="1"
               step="0.05"
               [(ngModel)]="tableWeatherIntensity"
-              [disabled]="!isEditable || tableWeatherType === 'none'"
+              [disabled]="!isEditable || !canControlWeather || tableWeatherType === 'none'"
             >
           </label>
           <label class="check" [title]="'table.visionHint' | i18n">

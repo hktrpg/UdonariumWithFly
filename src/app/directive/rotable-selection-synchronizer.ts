@@ -167,6 +167,64 @@ export class RotableSelectionSynchronizer {
     return RotableSelectionSynchronizer.applyAngle(targets, 'rotate', () => angle);
   }
 
+  /** Reset facing (`rotate`) and character tilt (`roll`) to 0° in one undo step. */
+  static resetAngles(targets: TabletopObject[]): boolean {
+    const before = new Map<string, TransformPose>();
+    for (const object of targets) {
+      if (!('rotate' in object) && !('roll' in object)) continue;
+      if ((object as any).isLocked || (object as any).isLock) continue;
+      if (object instanceof GameCharacter && object.isLockedByPlayerOwner) continue;
+      const pose = poseFromObjectAngles(object);
+      const rotate = pose.rotate ?? 0;
+      const roll = pose.roll ?? 0;
+      if (rotate === 0 && roll === 0) continue;
+      before.set(object.identifier, pose);
+    }
+    if (before.size < 1) return false;
+
+    let reset = false;
+    for (const object of targets) {
+      if (!before.has(object.identifier)) continue;
+      const rotables = RotableSelectionSynchronizer.rotablesMap.get(object);
+
+      const applyProp = (property: 'rotate' | 'roll') => {
+        if (!(property in object)) return;
+        if (rotables == null || rotables.size < 1) {
+          (object as any)[property] = 0;
+          reset = true;
+          return;
+        }
+        let hit = false;
+        for (const rotable of rotables) {
+          if (rotable.isDisable) continue;
+          if (rotable.targetPropertyName !== property) continue;
+          rotable.setAnimatedTransition(false);
+          rotable.stopTransition(0);
+          rotable.rotate = 0;
+          hit = true;
+          reset = true;
+        }
+        if (!hit) {
+          (object as any)[property] = 0;
+          reset = true;
+        }
+      };
+
+      applyProp('rotate');
+      applyProp('roll');
+    }
+
+    if (reset) {
+      const after = new Map<string, TransformPose>();
+      for (const id of before.keys()) {
+        const object = targets.find(t => t.identifier === id);
+        if (object) after.set(id, poseFromObjectAngles(object));
+      }
+      UndoService.instance?.recordTransform('reset', before, after, 'reset');
+    }
+    return reset;
+  }
+
   private static applyAngle(
     targets: TabletopObject[],
     property: 'rotate' | 'roll',

@@ -32,10 +32,10 @@ export class AudioStorage {
     }
   }
 
-  async addAsync(file: File): Promise<AudioFile>
-  async addAsync(blob: Blob): Promise<AudioFile>
-  async addAsync(arg: any): Promise<AudioFile> {
-    let audio: AudioFile = await AudioFile.createAsync(arg);
+  async addAsync(file: File, displayName?: string): Promise<AudioFile>
+  async addAsync(blob: Blob, displayName?: string): Promise<AudioFile>
+  async addAsync(arg: any, displayName?: string): Promise<AudioFile> {
+    let audio: AudioFile = await AudioFile.createAsync(arg, displayName);
 
     return this._add(audio);
   }

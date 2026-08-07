@@ -95,6 +95,8 @@ export const en: I18nDictionary = {
   'peer.loadDataPermTitle': 'Room data load permissions (players)',
   'peer.loadDataPermHelp': 'GM-only by default for Load ZIP / Load room. Check to allow players; guests cannot use these.',
   'peer.loadData.gmOnly': 'GM only',
+  'peer.atmospherePermTitle': 'Atmosphere permissions (players)',
+  'peer.atmospherePermHelp': 'Allowed by default. Controls weather / day-night in the toolbox and map settings. GM unrestricted; guests cannot use these.',
   'peer.menuPermTitle': 'Menu items (players)',
   'peer.menuPermAll': 'All menu items',
   'peer.menuPermHelp': 'Unchecked items are hidden from players. Connection / Chat / Combat / Settings / Disconnect stay visible. Guests are unaffected.',

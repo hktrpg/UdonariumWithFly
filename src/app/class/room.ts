@@ -12,6 +12,7 @@ import { RangeArea } from './range';
 import { AuraNameConfig } from './table-fx/aura-name-config';
 import { CombatTracker } from './table-fx/combat-tracker';
 import { SceneToolPermission } from './table-fx/scene-tool-permission';
+import { TableSelecter } from './table-selecter';
 import { TabletopObject } from './tabletop-object';
 import { Terrain } from './terrain';
 import { TextNote } from './text-note';
@@ -64,5 +65,6 @@ export class Room extends GameObject implements InnerXml {
     }
     // Legacy rooms (no syncId): tableIdentifier still points at pre-save UUIDs.
     TabletopObject.repairOrphanedPieceBindings();
+    TableSelecter.instance.ensureActiveOrFirst();
   }
 }

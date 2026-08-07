@@ -521,8 +521,8 @@
 }
 
 .view-zoom-range {
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
+  appearance: none;
+  -webkit-appearance: none;
   writing-mode: vertical-lr;
   direction: rtl;
   width: 28px;

@@ -59,9 +59,15 @@ export class PanelService {
 
   /**
    * Personal setting: opening a non-chat panel closes other non-chat panels.
-   * Default off. Desktop only (mobile sheets already replace each other).
+   * Default on. Desktop only (mobile sheets already replace each other).
+   * Exception: Connection + Lobby are one group and may stay open together.
    */
-  static singleNonChatWindow = false;
+  static singleNonChatWindow = true;
+
+  /** Tour / geometry ids that share one exclusive slot (do not close each other). */
+  private static readonly NON_CHAT_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+    ['menu.connection', 'menu.lobby'],
+  ];
 
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
@@ -237,31 +243,75 @@ export class PanelService {
     }
   }
 
+  /** Close the frontmost closable panel (highest z-index). Returns true if one closed. */
+  static closeFrontmostPanel(): boolean {
+    let best: PanelService = null;
+    let bestZ = -Infinity;
+    for (const panel of PanelService.openPanels) {
+      if (!panel.isAbleCloseButton || !panel.panelComponentRef) continue;
+      const el = panel.panelComponentRef.instance?.draggablePanel?.nativeElement as HTMLElement | undefined;
+      if (!el?.isConnected) continue;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!best || zSafe >= bestZ) {
+        best = panel;
+        bestZ = zSafe;
+      }
+    }
+    if (!best) return false;
+    best.close();
+    return true;
+  }
+
   static isChatPanel(panel: PanelService): boolean {
     return panel.tourPanelId === 'menu.chat' || panel.geometryKey === 'menu.chat';
   }
 
   static loadSingleNonChatFromStorage() {
     localForage.getItem(PanelService.SINGLE_NON_CHAT_KEY).then(v => {
-      PanelService.singleNonChatWindow = !!v;
+      // Missing key → default ON. Explicit false turns it off.
+      if (v === null || v === undefined) {
+        PanelService.singleNonChatWindow = true;
+      } else {
+        PanelService.singleNonChatWindow = v !== false && v !== 0 && v !== '0';
+      }
     }).catch(() => {});
   }
 
   static setSingleNonChatWindow(v: boolean) {
     PanelService.singleNonChatWindow = !!v;
-    if (v) {
-      localForage.setItem(PanelService.SINGLE_NON_CHAT_KEY, true).catch(() => {});
-    } else {
-      localForage.removeItem(PanelService.SINGLE_NON_CHAT_KEY).catch(() => {});
-    }
+    // Always persist so “off” is distinct from “never set” (default on).
+    localForage.setItem(PanelService.SINGLE_NON_CHAT_KEY, !!v).catch(() => {});
   }
 
-  /** Close every closable non-chat panel (optionally keep one instance). */
-  static closeOtherNonChatPanels(except: PanelService = null) {
+  static panelExclusiveId(panel: { tourPanelId?: string; geometryKey?: string } | null): string {
+    if (!panel) return '';
+    const raw = (panel.tourPanelId || panel.geometryKey || '').trim();
+    // Auto geometry keys when tourPanelId was omitted.
+    if (raw === 'panel.peer-menu') return 'menu.connection';
+    if (raw === 'panel.lobby') return 'menu.lobby';
+    return raw;
+  }
+
+  /** True when two non-chat panels may coexist under single-window mode (e.g. Connection + Lobby). */
+  static areCompatibleNonChatPanels(aId: string, bId: string): boolean {
+    if (!aId || !bId || aId === bId) return false;
+    for (const group of PanelService.NON_CHAT_COMPAT_GROUPS) {
+      if (group.includes(aId) && group.includes(bId)) return true;
+    }
+    return false;
+  }
+
+  /** Close every closable non-chat panel (optionally keep one instance + its compat group). */
+  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+    const openingId = PanelService.panelExclusiveId(opening || except);
     for (const panel of Array.from(PanelService.openPanels)) {
       if (!panel.isAbleCloseButton) continue;
       if (PanelService.isChatPanel(panel)) continue;
       if (except && panel === except) continue;
+      if (openingId && PanelService.areCompatibleNonChatPanels(PanelService.panelExclusiveId(panel), openingId)) {
+        continue;
+      }
       panel.close();
     }
   }
@@ -564,8 +614,9 @@ export class PanelService {
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
       }
       // Personal setting: one non-chat window at a time (chat windows stay).
+      // Connection + Lobby share a group and do not close each other.
       if (PanelService.singleNonChatWindow && !isChat) {
-        PanelService.closeOtherNonChatPanels(childPanelService);
+        PanelService.closeOtherNonChatPanels(childPanelService, resolved);
       }
     }
     if (resolved.title) childPanelService.title = resolved.title;
@@ -580,12 +631,38 @@ export class PanelService {
 
     if (this.mobileLayout.isMobile) {
       childPanelService.isAbleRotateButton = false;
-      childPanelService.isAbleMinimizeButton = false;
       childPanelService.isAbleFullScreenButton = false;
+      const isChat = geoKey === 'menu.chat' || resolved.tourPanelId === 'menu.chat';
       const panelInst = panelComponentRef.instance as any;
-      if (panelInst) {
+      if (isChat) {
+        // Floating chat on mobile: drag, resize, minimize (−), close (×).
+        // Bottom-sheet peek often hid the message list behind the composer.
+        childPanelService.isAbleMinimizeButton = true;
+        if (panelInst) panelInst.isMobileSheet = false;
+        // adaptPanelOption wiped position — restore saved geometry, then clamp into chrome.
+        PanelService.applySavedGeometry(resolved, { includePosition: true });
+        const leftChrome = this.mobileLayout.leftChromePx;
+        const bottomChrome = this.mobileLayout.bottomChromePx;
+        const vw = this.mobileLayout.viewportWidth;
+        const vh = this.mobileLayout.viewportHeight;
+        const maxW = Math.max(200, vw - leftChrome - 16);
+        const maxH = Math.max(200, vh - bottomChrome - 24);
+        const w = Math.min(Math.max(resolved.width ?? 360, 280), maxW);
+        const h = Math.min(Math.max(resolved.height ?? Math.round(maxH * 0.55), 240), maxH);
+        const defaultLeft = leftChrome + 8;
+        const defaultTop = Math.max(8, vh - h - bottomChrome - 8);
+        let left = typeof resolved.left === 'number' && Number.isFinite(resolved.left) ? resolved.left : defaultLeft;
+        let top = typeof resolved.top === 'number' && Number.isFinite(resolved.top) ? resolved.top : defaultTop;
+        left = Math.max(leftChrome, Math.min(left, leftChrome + maxW - w));
+        top = Math.max(8, Math.min(top, vh - bottomChrome - h - 8));
+        childPanelService.width = w;
+        childPanelService.height = h;
+        childPanelService.left = left;
+        childPanelService.top = top;
+      } else if (panelInst) {
+        childPanelService.isAbleMinimizeButton = true;
         panelInst.isMobileSheet = true;
-        // Only two heights: peek / half (never fullscreen).
+        // Only two snap heights: peek / half (never fullscreen); resize can override.
         const sheet = this.mobileLayout.resolveSheetSnap(resolved.mobileSheet);
         panelInst.isMobileSheetHalf = true;
         panelInst.mobileSheetSnap = sheet;

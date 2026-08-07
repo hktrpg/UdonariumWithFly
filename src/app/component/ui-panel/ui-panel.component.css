@@ -18,7 +18,7 @@
   width: 300px;
   max-height: 100%;
   max-width: 100%;
-  cursor: grab;
+  cursor: default;
 }
 
 .scrollable-panel {
@@ -43,6 +43,7 @@
   background-color: #555;
   color: #CCC;
   user-select: none;
+  cursor: grab;
 
   display: flex;
 }
@@ -70,6 +71,7 @@
   border-radius: 0;
   outline: none;
   color: #CCC;
+  cursor: pointer;
 }
 
 .pointer-events-none {
@@ -117,7 +119,7 @@
 
 /* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets.
    Width uses left/right (not 100vw) so content never overflows the visual viewport.
-   Heights come from --udon-sheet-* (set by MobileLayoutService.sheetHeightPx). */
+   Height is driven by Angular [style.height.px] (peek/half snaps or custom resize). */
 .draggable-panel.is-mobile-sheet {
   left: var(--udon-left-chrome, 0px) !important;
   right: 0 !important;
@@ -125,9 +127,7 @@
   bottom: var(--udon-bottom-chrome, 56px) !important;
   width: auto !important;
   max-width: none;
-  /* Default to half; peek/half classes override. Never fullscreen. */
-  height: var(--udon-sheet-half, 48dvh) !important;
-  max-height: var(--udon-sheet-half, 48dvh) !important;
+  max-height: calc(100dvh - var(--udon-bottom-chrome, 56px) - 8px);
   cursor: default;
   border-radius: var(--udon-chrome-radius, 12px) var(--udon-chrome-radius, 12px) 0 0;
   z-index: 12000;
@@ -155,8 +155,8 @@
   flex: 0 0 auto;
   flex-direction: column;
   height: auto;
-  min-height: 25px;
-  padding-top: 10px;
+  min-height: 36px;
+  padding-top: 18px;
 }
 
 .draggable-panel.is-mobile-sheet .title .title-text,
@@ -166,8 +166,30 @@
 }
 
 .draggable-panel.is-mobile-sheet .title .title-text {
-  padding: 2px 36px 6px 12px;
+  padding: 2px 56px 6px 12px;
   text-align: left;
+}
+
+.draggable-panel.is-mobile-sheet .sheet-resize-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 48px; /* leave room for − / × */
+  height: 22px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.draggable-panel.is-mobile-sheet .sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
 }
 
 .draggable-panel.is-mobile-sheet .title .title-button {
@@ -175,18 +197,7 @@
   top: 14px;
   right: 4px;
   width: auto;
-}
-
-.draggable-panel.is-mobile-sheet .sheet-handle {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.35);
-  pointer-events: none;
+  z-index: 5;
 }
 
 .draggable-panel.is-mobile-sheet .scrollable-panel {
@@ -209,16 +220,9 @@
   background: linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1));
 }
 
-/* Two heights only: peek ↔ half (peek must come last to win over half). */
-.draggable-panel.is-mobile-sheet.is-mobile-sheet-half,
-.draggable-panel.is-mobile-sheet.is-snap-half {
-  height: var(--udon-sheet-half, 48dvh) !important;
-  max-height: var(--udon-sheet-half, 48dvh) !important;
-}
-
-.draggable-panel.is-mobile-sheet.is-snap-peek {
-  height: var(--udon-sheet-peek, 22dvh) !important;
-  max-height: var(--udon-sheet-peek, 22dvh) !important;
+/* Custom resize: no height transition fighting the pointer. */
+.draggable-panel.is-mobile-sheet.is-sheet-custom {
+  transition: none;
 }
 
 html.udon-tablet-landscape .draggable-panel.is-mobile-sheet {

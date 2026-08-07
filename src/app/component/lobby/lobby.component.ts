@@ -16,6 +16,7 @@ import { I18nService } from 'service/i18n.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { RoomInviteService } from 'service/room-invite.service';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+import { ConnectionBusyService } from 'service/connection-busy.service';
 
 @Component({
   selector: 'lobby',
@@ -92,6 +93,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     public folderBackup: FolderBackupService,
     private roomInvite: RoomInviteService,
     private ngZone: NgZone,
+    public connectionBusy: ConnectionBusyService,
   ) { }
 
   ngOnInit() {
@@ -191,6 +193,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   async connect(room: IRoomInfo, asGuest: boolean = false) {
+    if (this.connectionBusy.busy) return;
     if (RoomAuth.isRoleAuthRoom(room.name)) {
       await this.connectWithRole(room);
       return;
@@ -245,6 +248,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   async showRoomSetting() {
+    if (this.connectionBusy.busy) return;
     let isCreate = await this.modalService.open(RoomSettingComponent, { width: 690, height: 600, left: 0, top: 80 });
     if (isCreate) this.dismissLobby();
     this.help = this.i18n.t('lobby.helpInitial');

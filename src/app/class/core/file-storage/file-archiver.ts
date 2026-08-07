@@ -1,12 +1,16 @@
 import { BlobReader, BlobWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 import { saveAs } from 'file-saver';
 
+import { AudioLibrary } from '@udonarium/audio-library';
 import { EventSystem } from '../system';
+import { StringUtil } from '../system/util/string-util';
 import { XmlUtil } from '../system/util/xml-util';
+import { AudioFile } from './audio-file';
 import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageStorage } from './image-storage';
 import { MimeType } from './mime-type';
+import { AudioImportNameService } from 'service/audio-import-name.service';
 
 type MetaData = { percent: number, currentFile: string };
 type UpdateCallback = (metadata: MetaData) => void;
@@ -81,12 +85,46 @@ export class FileArchiver {
     if (!files) return;
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
-    for (let file of loadFiles) {
-      await this.handleImage(file);
-      await this.handleAudio(file);
-      await this.handleText(file);
-      await this.handleZip(file);
-      EventSystem.trigger('FILE_LOADED', { file: file });
+    const nameService = AudioImportNameService.instance;
+    nameService?.beginBatch();
+    try {
+      for (let file of loadFiles) {
+        await this.handleImage(file);
+        await this.handleAudio(file);
+        await this.handleAudioUrlManifest(file);
+        await this.handleText(file);
+        await this.handleZip(file);
+        EventSystem.trigger('FILE_LOADED', { file: file });
+      }
+    } finally {
+      nameService?.endBatch();
+    }
+  }
+
+  private async handleAudioUrlManifest(file: File) {
+    const baseName = file.name.split(/[\\/]/).pop();
+    if (baseName !== 'fly_audioUrls.json') return;
+    try {
+      const text = await FileReaderUtil.readAsTextAsync(file);
+      const list = JSON.parse(text);
+      if (!Array.isArray(list)) return;
+      for (const item of list) {
+        if (!item || typeof item.url !== 'string') continue;
+        const url = item.url.trim();
+        if (!StringUtil.validUrl(url)) continue;
+        const name = (typeof item.name === 'string' && item.name.trim()) ? item.name.trim() : url;
+        const identifier = (typeof item.identifier === 'string' && item.identifier.trim()) ? item.identifier.trim() : url;
+        AudioStorage.instance.add({
+          identifier,
+          name,
+          type: '',
+          blob: null,
+          url
+        });
+        AudioLibrary.instance.ensureListed(identifier);
+      }
+    } catch (reason) {
+      console.warn(reason);
     }
   }
 
@@ -107,7 +145,22 @@ export class FileArchiver {
       return;
     }
     console.log(file.name + ' type:' + file.type);
-    await AudioStorage.instance.addAsync(file);
+    const nameService = AudioImportNameService.instance;
+    const displayName = nameService
+      ? await nameService.resolveDisplayName(file)
+      : undefined;
+    const created = await AudioFile.createAsync(file, displayName);
+    const existed = !!AudioStorage.instance.get(created.identifier);
+    const audio = AudioStorage.instance.add(created);
+    if (!audio) return;
+    if (existed) {
+      // Same bytes — list again in the target folder (settings can differ per folder).
+      console.log(`list existing audio in folder: ${file.name} → ${audio.identifier}`);
+      AudioLibrary.instance.ensureListed(audio.identifier);
+      return;
+    }
+    if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+    AudioLibrary.instance.ensureListed(audio.identifier);
   }
 
   private async handleText(file: File): Promise<void> {

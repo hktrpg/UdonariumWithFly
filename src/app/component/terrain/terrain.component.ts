@@ -317,7 +317,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: this.i18n.t('terrain.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('terrain.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
 
     if (this.isMultiSelectedTerrains()) {
       let selectedGameTableMasks = () => this.selectedTerrains();
@@ -366,6 +366,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         },
         on: this.i18n.t('terrain.menu.5'),
         off: this.i18n.t('terrain.menu.6'),
+        hotkey: 'L',
       }),
       (this.isLocked ? null : { name: this.i18n.t('terrain.overlapOrder', { flatOnly: this.height === 0 ? '' : this.i18n.t('terrain.dynamic.1') }), action: null, subActions: [
         {
@@ -529,7 +530,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         name: this.i18n.t('terrain.menu.23'), action: () => {
           this.terrain.destroy();
           SoundEffect.play(PresetSound.sweep);
-        }
+        },
+        hotkey: 'Del',
       },
       ContextMenuSeparator,
       { name: this.i18n.t('terrain.menu.24'), action: null, subActions: this.tabletopActionService.makeDefaultContextMenuActions(objectPosition) }

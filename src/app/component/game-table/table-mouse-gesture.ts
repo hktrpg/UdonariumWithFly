@@ -103,8 +103,9 @@ export class TableMouseGesture {
 
     let event = TableMouseGestureEvent.DRAG;
 
-    // Middle-drag = rotate view; right-drag (and other non-rotate buttons) = pan.
-    if (this.buttonCode === 1) {
+    // Middle-drag, or Ctrl+right-drag = rotate view; plain right-drag = pan.
+    const mod = !!(ev && (ev.ctrlKey || ev.metaKey));
+    if (this.buttonCode === 1 || (this.buttonCode === 2 && mod)) {
       event = TableMouseGestureEvent.ROTATE;
       rotateZ = -deltaX / 5;
       rotateX = -deltaY / 5;

@@ -5,6 +5,12 @@
   pointer-events: none;
 }
 
+/* Running tour only: sit below mobile nav (12500) so spotlight targets stay tappable.
+   Welcome dialog stays at 13000 so Start/Skip are above the bottom bar. */
+.guided-tour-root.mobile-running {
+  z-index: 12400;
+}
+
 .guided-tour-scrim,
 .gt-shade {
   position: fixed;

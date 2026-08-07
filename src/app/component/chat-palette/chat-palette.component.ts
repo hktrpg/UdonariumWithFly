@@ -36,7 +36,9 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   get palette(): ChatPalette {
-    return this.character ? this.character.chatPalette : null;
+    // Find-only: do not auto-create on every template read (that broadcast empty
+    // palettes and could win version races so peers never saw real edits).
+    return this.character ? this.character.findChatPalette() : null;
   }
   
   paletteCache: string[] = [];
@@ -119,6 +121,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     EventSystem.unregister(this);
     clearInterval(this.paletteRenewIntervalId);
+    // Persist in-progress edits when the panel closes (confirm path).
     if (this.isEdit) this.toggleEditMode();
   }
 
@@ -245,12 +248,15 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   toggleEditMode() {
-    if (!this.palette) return;
+    if (!this.character) return;
     this.isEdit = this.isEdit ? false : true;
     if (this.isEdit) {
-      this.editPalette = this.palette.value + '';
+      const existing = this.character.findChatPalette();
+      this.editPalette = existing ? (existing.value + '') : '';
     } else {
-      this.palette.setPalette(this.editPalette);
+      // Create-with-content if missing so the first sync is not an empty palette.
+      const palette = this.character.ensureChatPalette(this.editPalette);
+      palette.setPalette(this.editPalette);
     }
   }
 

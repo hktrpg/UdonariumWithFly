@@ -24,8 +24,40 @@ import { setZeroTimeout } from '@udonarium/core/system/util/zero-timeout';
 
 import { PanelService } from 'service/panel.service';
 import { I18nService } from 'service/i18n.service';
+import {
+  TutorialLineView,
+  TutorialSeg,
+  buildTutorialLineView,
+  isBulletLine,
+  linkifyPlainText,
+  tokenizeTutorialLine,
+  expandPackedActionLines,
+} from '@udonarium/tutorial-format';
+import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { OpenUrlComponent } from 'component/open-url/open-url.component';
+import { ModalService } from 'service/modal.service';
 
 type ScrollPosition = { top: number, bottom: number, clientHeight: number, scrollHeight: number, };
+type TutorialCardId = 'ops' | 'scene' | 'changelog';
+
+interface TutorialBlock {
+  titleSegs: TutorialSeg[];
+  lines: TutorialLineView[];
+}
+
+interface TutorialHelpCard {
+  id: TutorialCardId;
+  title: string;
+  hint: string;
+  icon: string;
+  blocks: TutorialBlock[];
+}
+
+const TUTORIAL_CARD_META: Record<TutorialCardId, { icon: string; hintKey: string }> = {
+  ops: { icon: 'touch_app', hintKey: 'tutorial.card.ops.hint' },
+  scene: { icon: 'map', hintKey: 'tutorial.card.scene.hint' },
+  changelog: { icon: 'history', hintKey: 'tutorial.card.changelog.hint' },
+};
 
 const ua = window.navigator.userAgent.toLowerCase();
 const isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf('macintosh') > -1 && 'ontouchend' in document;
@@ -40,8 +72,14 @@ const isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf
 export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges, AfterViewChecked {
   @Input() compact: boolean = false;
   @Input() leftOnly: boolean = false;
-  
-  sampleMessages: ChatMessage[] = [];
+
+  tutorialWelcome = '';
+  tutorialWelcomeTitle = '';
+  tutorialWelcomeSegs: TutorialSeg[] = [];
+  tutorialCards: TutorialHelpCard[] = [];
+  cardExpandLabel = '';
+  cardCollapseLabel = '';
+  private openTutorialCards = new Set<TutorialCardId>();
 
   private topTimestamp = 0;
   private botomTimestamp = 0;
@@ -120,6 +158,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
     private i18n: I18nService,
+    private modalService: ModalService,
   ) {
     this.rebuildSampleMessages();
   }
@@ -431,38 +470,123 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   private rebuildSampleMessages() {
     const t = (key: string) => this.i18n.t(key);
-    const tutorial = t('tutorial.name');
-    const link = t('tutorial.linkName');
-    this.sampleMessages = [
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.welcome'), 'mine', 0),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.view'), 'mine', 0),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.keyboard'), 'mine', 0),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.chat'), 'mine', 0),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, tutorial, null, t('tutorial.scene'), 'mine', 0),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.v1132'), 'mine', 1615253220000),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.v1133b'), 'mine', 1615253220000),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.vF'), 'mine', 1635253220000),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026base'), 'mine', Date.UTC(2026, 7, 3, 0, 0, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026ops'), 'mine', Date.UTC(2026, 7, 3, 1, 0, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026scene'), 'mine', Date.UTC(2026, 7, 3, 1, 30, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026fx'), 'mine', Date.UTC(2026, 7, 3, 1, 45, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026chat'), 'mine', Date.UTC(2026, 7, 5, 0, 0, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.2026map'), 'mine', Date.UTC(2026, 7, 6, 0, 0, 0)),
-      this.makeSampleMessage(t('tutorial.systemFrom'), null, link, null, t('changelog.links'), 'mine', Date.UTC(2026, 7, 6, 1, 0, 0)),
+    this.tutorialWelcome = t('tutorial.welcome');
+    this.tutorialWelcomeTitle = t('tutorial.name');
+    this.tutorialWelcomeSegs = linkifyPlainText(this.tutorialWelcome);
+    this.cardExpandLabel = t('tutorial.card.expand');
+    this.cardCollapseLabel = t('tutorial.card.collapse');
+    this.tutorialCards = [
+      this.buildTutorialCard('ops', [
+        t('tutorial.view'),
+        t('tutorial.keyboard'),
+        t('tutorial.chat'),
+      ]),
+      this.buildTutorialCard('scene', [t('tutorial.scene')]),
+      this.buildTutorialCard('changelog', [
+        t('changelog.v1132'),
+        t('changelog.v1133b'),
+        t('changelog.vF'),
+        t('changelog.2026base'),
+        t('changelog.2026ops'),
+        t('changelog.2026scene'),
+        t('changelog.2026fx'),
+        t('changelog.2026chat'),
+        t('changelog.2026map'),
+        t('changelog.2026audio'),
+        t('changelog.links'),
+      ], true),
     ];
   }
 
-  private makeSampleMessage(from: string, to: string, name: string, toName: string, text: string, tag = 'mine', timestamp = 0): ChatMessage {
-    let message = new ChatMessage();
-    message.from = from;
-    message.to = to;
-    message.name = name;
-    message.toName = toName;
-    message.color = '#444444';
-    message.toColor = toName ? '#444444' : null;
-    message.tag = tag;
-    message.value = text;
-    message.setAttribute('timestamp', timestamp);
-    return message;
+  private buildTutorialCard(id: TutorialCardId, texts: string[], changelogStyle = false): TutorialHelpCard {
+    const t = (key: string) => this.i18n.t(key);
+    const meta = TUTORIAL_CARD_META[id];
+    const blocks: TutorialBlock[] = [];
+    for (const text of texts) {
+      if (changelogStyle) {
+        blocks.push(...this.parseChangelogBlocks(text));
+      } else {
+        blocks.push(...this.parseMarkedBlocks(text));
+      }
+    }
+    return {
+      id,
+      title: t(`tutorial.card.${id}`),
+      hint: t(meta.hintKey),
+      icon: meta.icon,
+      blocks,
+    };
+  }
+
+  /** Split ＜Title＞… sections into titled blocks. */
+  private parseMarkedBlocks(text: string): TutorialBlock[] {
+    const normalized = (text || '').replace(/\r\n/g, '\n').trim();
+    if (!normalized) return [];
+    const parts = normalized.split(/(?=＜[^＞\n]+＞|<[^>\n]+>)/);
+    const blocks: TutorialBlock[] = [];
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const match = trimmed.match(/^[＜<]([^＞>]+)[＞>]\s*([\s\S]*)$/);
+      if (match) {
+        blocks.push(this.toBlock(match[1].trim(), match[2]));
+      } else {
+        blocks.push(this.toBlock('', trimmed));
+      }
+    }
+    return blocks;
+  }
+
+  /** First line = title; remaining lines = body (changelog entries). */
+  private parseChangelogBlocks(text: string): TutorialBlock[] {
+    const normalized = (text || '').replace(/\r\n/g, '\n').trim();
+    if (!normalized) return [];
+    const nl = normalized.indexOf('\n');
+    if (nl < 0) {
+      return [this.toBlock(normalized, '')];
+    }
+    return [this.toBlock(normalized.slice(0, nl).trim(), normalized.slice(nl + 1))];
+  }
+
+  private toBlock(title: string, body: string): TutorialBlock {
+    const rawLines = this.splitContentLines(body);
+    return {
+      titleSegs: title ? tokenizeTutorialLine(title) : [],
+      lines: rawLines.map(line => buildTutorialLineView(line, isBulletLine(line))),
+    };
+  }
+
+  private splitContentLines(text: string): string[] {
+    return (text || '')
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map(line => line.replace(/^[　\s]+/, '').trimEnd())
+      .filter(line => line.length > 0)
+      .flatMap(line => expandPackedActionLines(line));
+  }
+
+  isCardOpen(id: TutorialCardId): boolean {
+    return this.openTutorialCards.has(id);
+  }
+
+  toggleTutorialCard(id: TutorialCardId) {
+    if (this.openTutorialCards.has(id)) {
+      this.openTutorialCards.delete(id);
+    } else {
+      this.openTutorialCards.add(id);
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  onTutorialLinkClick(event: MouseEvent, href: string) {
+    event.stopPropagation();
+    if (!href || !StringUtil.validUrl(href)) {
+      event.preventDefault();
+      return;
+    }
+    if (!StringUtil.sameOrigin(href)) {
+      event.preventDefault();
+      this.modalService.open(OpenUrlComponent, { url: href });
+    }
   }
 }

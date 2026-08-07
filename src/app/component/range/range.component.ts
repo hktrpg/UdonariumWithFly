@@ -524,7 +524,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     let menuArray = [];
 
     if (this.selectionService.objects.length) {
-      menuArray.push({ name: this.i18n.t('range.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+      menuArray.push({ name: this.i18n.t('range.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
       menuArray.push(ContextMenuSeparator);
     }
 
@@ -536,6 +536,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       },
       on: this.i18n.t('range.menu.2'),
       off: this.i18n.t('range.menu.3'),
+      hotkey: 'L',
     }));
     menuArray.push(
       {
@@ -690,7 +691,8 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
         name: this.i18n.t('range.menu.23'), action: () => {
           this.range.destroy();
           SoundEffect.play(PresetSound.sweep);
-        }
+        },
+        hotkey: 'Del',
       }
     );
     menuArray.push( ContextMenuSeparator );

@@ -24,6 +24,10 @@ nav ul > li {
   cursor: -webkit-pointer;
   cursor: pointer;
   white-space: nowrap;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 nav ul > li:hover {
@@ -106,6 +110,10 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   padding: 0px;
   height: 100%;
   width: 300px;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .networkIndicator {
@@ -212,6 +220,10 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   touch-action: pan-x;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .mobile-bottom-nav ul {

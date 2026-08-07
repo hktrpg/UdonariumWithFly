@@ -16,6 +16,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
 import { DiceBot } from '@udonarium/dice-bot';
 import { Jukebox } from '@udonarium/Jukebox';
+import { AudioLibrary } from '@udonarium/audio-library';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -40,6 +41,7 @@ import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
+import { AudioImportNameService } from 'service/audio-import-name.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SaveDataService } from 'service/save-data.service';
@@ -58,6 +60,7 @@ import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component
 import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
 import { CharacterResourceHudComponent } from 'component/character-resource-hud/character-resource-hud.component';
+import { MusicHudComponent } from 'component/music-hud/music-hud.component';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
@@ -80,6 +83,7 @@ import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { ConnectionBusyService } from 'service/connection-busy.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -139,14 +143,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Total unread chat messages (viewable tabs). */
   get chatUnreadCount(): number { return ChatTabList.instance.unreadLength; }
-  /** Badge label: cap at 99+ so the bubble stays a tidy pill. */
-  get chatUnreadBadgeLabel(): string {
-    const n = this.chatUnreadCount;
-    return n > 99 ? '99+' : String(n);
-  }
-  /** Badge on menu chat icon only while no chat panel is open. */
-  get showChatUnreadBadge(): boolean {
-    return this.chatUnreadCount > 0 && !PanelService.isTourPanelOpen('menu.chat');
+  /**
+   * Cached badge state — do not read PanelService / unread live in the template
+   * (causes NG0100 when chat opens or messages arrive mid-CD).
+   */
+  showChatUnreadBadge = false;
+  chatUnreadBadgeLabel = '0';
+
+  private syncChatUnreadBadge() {
+    const n = ChatTabList.instance.unreadLength;
+    this.showChatUnreadBadge = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
+    this.chatUnreadBadgeLabel = n > 99 ? '99+' : String(n);
   }
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
@@ -193,6 +200,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
+    _audioImportName: AudioImportNameService,
+    _connectionBusy: ConnectionBusyService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -200,6 +209,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       Network;
       FileArchiver.instance.initialize();
       void this.folderBackup.initialize();
+      void this.saveDataService.initializeIncludeAudioPreference();
       ImageSharingSystem.instance.initialize();
       ImageStorage.instance;
       AudioSharingSystem.instance.initialize();
@@ -222,6 +232,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
     let jukebox: Jukebox = new Jukebox('Jukebox');
     jukebox.initialize();
+    AudioLibrary.instance;
 
     let soundEffect: SoundEffect = new SoundEffect('SoundEffect');
     soundEffect.initialize();
@@ -562,6 +573,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       .on('CHAT_PANEL_CHANGED', () => {
         this.lazyNgZoneUpdate(true);
       })
+      .on('OPEN_OR_TOGGLE_PANEL', event => {
+        const name = typeof event.data === 'string' ? event.data : event.data?.component;
+        if (name) this.ngZone.run(() => this.openOrToggle(name));
+      })
       .on('PLAY_CUT_IN', -1000, event => {
         let cutIn = ObjectStore.instance.get<CutIn>(event.data.identifier);
         this.cutInService.play(cutIn, event.data.secret ? event.data.secret : false, event.data.test ? event.data.test : false, event.data.sender);
@@ -720,6 +735,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
+    this.syncChatUnreadBadge();
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
@@ -813,8 +829,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'JukeboxComponent':
         component = JukeboxComponent;
-        option.height = 480;
-        option.title = this.i18n.t('jukebox.title');
+        option = {
+          width: 300,
+          height: Math.max(200, window.innerHeight),
+          top: 0,
+          title: this.i18n.t('jukebox.title'),
+        };
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
@@ -879,9 +899,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             && typeof saved.left === 'number' && Number.isFinite(saved.left)
             && typeof saved.top === 'number' && Number.isFinite(saved.top));
           if (!hasSavedPos) {
-            option.top = (this.openPanelCount % 10 + 1) * 20;
-            option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
-            this.openPanelCount = this.openPanelCount + 1;
+            if (componentName === 'JukeboxComponent') {
+              // Full-viewport height from the top (default size).
+              option.top = 0;
+              option.height = Math.max(200, window.innerHeight);
+              if (option.left == null) option.left = 100;
+            } else {
+              option.top = (this.openPanelCount % 10 + 1) * 20;
+              option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
+              this.openPanelCount = this.openPanelCount + 1;
+            }
           }
         }
       } else {
@@ -919,6 +946,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Network.isOpen && !Network.peer?.isRoom) {
       this.openLobbyIfNeeded();
     }
+    this.syncChatUnreadBadge();
   }
 
   /** Show lobby once on cold start when not already in a room / invite join. */
@@ -1025,6 +1053,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async save() {
     if (this.isSaveing || this.GuestMode()) return;
+    const includeAudio = await this.saveDataService.askIncludeAudio('zip');
+    if (includeAudio == null) return;
     this.isSaveing = true;
     this.progresPercent = 0;
     let roomName = 0 < Network.peer.roomName.length
@@ -1032,7 +1062,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'HKTRPG';
     await this.saveDataService.saveRoomAsync(roomName, percent => {
       this.progresPercent = percent;
-    });
+    }, includeAudio);
 
     setTimeout(() => {
       this.isSaveing = false;
@@ -1056,6 +1086,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.lazyUpdateTimer);
           this.lazyUpdateTimer = null;
         }
+        // Sync before CD so template bindings stay stable within the check.
+        this.syncChatUnreadBadge();
         this.ngZone.run(() => { });
       }, 0);
     } else {
@@ -1066,6 +1098,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.immediateUpdateTimer);
           this.immediateUpdateTimer = null;
         }
+        this.syncChatUnreadBadge();
         this.ngZone.run(() => { });
       }, 100);
     }
@@ -1200,6 +1233,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         name: this.i18n.t('toolbox.closeAllPanels'),
         materialIcon: 'close_fullscreen',
         selfOnly: true,
+        hotkey: 'C',
         action: () => PanelService.closeAllPanels()
       });
     }
@@ -1256,8 +1290,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       menu.push(ContextMenuSeparator);
     }
-    menu.push(this.makeWeatherToolboxMenu());
-    menu.push(this.makeDayNightToolboxMenu());
+    if (SceneToolPermission.instance.canControlWeather()) {
+      menu.push(this.makeWeatherToolboxMenu());
+    }
+    if (SceneToolPermission.instance.canControlDayNight()) {
+      menu.push(this.makeDayNightToolboxMenu());
+    }
     if (!compact) {
       menu.push(ContextMenuSeparator);
       menu.push({ name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') });
@@ -1562,6 +1600,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => CharacterResourceHudComponent.setVisible(v),
         on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
         off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => MusicHudComponent.isVisible,
+        set: (v) => MusicHudComponent.setVisible(v),
+        on: `☑${this.i18n.t('menu.settings.musicHud')}`,
+        off: `☐${this.i18n.t('menu.settings.musicHud')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => this.saveDataService.includeAudio,
+        set: (v) => { void this.saveDataService.setIncludeAudio(v); },
+        on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
+        off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
       contextMenuToggleCheck({
         get: () => PanelService.singleNonChatWindow,

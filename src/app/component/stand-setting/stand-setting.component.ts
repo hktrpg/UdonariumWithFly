@@ -138,8 +138,8 @@ export class StandSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   add() {
-    if (!this.character || !this.character.standList) return;
-    this.character.standList.add(this.character.imageFile.identifier);
+    if (!this.character) return;
+    this.character.ensureStandList().add(this.character.imageFile.identifier);
     this.standSettingXML = '';
   }
 

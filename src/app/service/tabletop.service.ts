@@ -27,6 +27,8 @@ import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
 import { CoordinateService } from './coordinate.service';
+import { BatchService } from './batch.service';
+import { TabletopSelectionService } from './tabletop-selection.service';
 
 type ObjectIdentifier = string;
 type ObjecNodeIndex = number;
@@ -45,6 +47,7 @@ export class TabletopService {
   private parentMap: Map<ObjectIdentifier, ObjectIdentifier> = new Map();
   private indexMap: Map<ObjectIdentifier, ObjecNodeIndex> = new Map();
   private tableIdMap: Map<ObjectIdentifier, string> = new Map();
+  private placementsMap: Map<ObjectIdentifier, string> = new Map();
   private characterCache = new TabletopCache<GameCharacter>(() => ObjectStore.instance.getObjects(GameCharacter).filter(obj => obj.isVisibleOnTable));
   private cardCache = new TabletopCache<Card>(() => ObjectStore.instance.getObjects(Card).filter(obj => obj.isVisibleOnTable));
   private cardStackCache = new TabletopCache<CardStack>(() => ObjectStore.instance.getObjects(CardStack).filter(obj => obj.isVisibleOnTable));
@@ -71,7 +74,9 @@ export class TabletopService {
   get peerCursors(): PeerCursor[] { return ObjectStore.instance.getObjects<PeerCursor>(PeerCursor); }
 
   constructor(
-    private coordinateService: CoordinateService
+    private coordinateService: CoordinateService,
+    private batchService: BatchService,
+    private selectionService: TabletopSelectionService,
   ) {
     this.initialize();
   }
@@ -80,8 +85,16 @@ export class TabletopService {
     this.refreshCacheAll();
     TabletopObject.migrateUnboundTablePieces();
     EventSystem.register(this)
+      .on('BEFORE_VIEW_TABLE_CHANGE', () => {
+        // Run deferred drag writes first; MovableDirective then pins _pos → placements.
+        this.batchService.flushNow();
+      })
+      .on('PREPARE_VIEW_TABLE_CHANGE', () => {
+        // Selected tokens skip self-hydrate UPDATEs — must clear before applying the new map pose.
+        this.selectionService.clear();
+      })
       .on('SELECT_GAME_TABLE', event => {
-        TabletopObject.migrateUnboundTablePieces(event.data?.identifier);
+        // Do not migrateUnbound here — rebinding to the new view corrupted per-map poses.
         this.refreshCacheAll();
       })
       .on('UPDATE_GAME_OBJECT', event => {
@@ -183,6 +196,7 @@ export class TabletopService {
     return this.locationMap.get(object.identifier) !== object.location.name
       || this.parentMap.get(object.identifier) !== object.parentId
       || this.tableIdMap.get(object.identifier) !== object.tableIdentifier
+      || this.placementsMap.get(object.identifier) !== object.tablePlacements
       || (object.isVisibleOnTable && this.indexMap.get(object.identifier) !== object.index);
   }
 
@@ -191,6 +205,7 @@ export class TabletopService {
     this.parentMap.set(object.identifier, object.parentId);
     this.indexMap.set(object.identifier, object.index);
     this.tableIdMap.set(object.identifier, object.tableIdentifier);
+    this.placementsMap.set(object.identifier, object.tablePlacements);
   }
 
   private clearMap() {
@@ -198,6 +213,7 @@ export class TabletopService {
     this.parentMap.clear();
     this.indexMap.clear();
     this.tableIdMap.clear();
+    this.placementsMap.clear();
   }
 
   private placeToTabletop(gameObject: TabletopObject) {

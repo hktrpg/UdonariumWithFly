@@ -264,6 +264,8 @@ export class TabletopActionService {
     gameTable.initialize();
 
     TableSelecter.instance.viewTableIdentifier = gameTable.identifier;
+    TableSelecter.instance.viewedTableIdentifier = gameTable.identifier;
+    gameTable.selected = true;
     EventSystem.trigger('SELECT_GAME_TABLE', { identifier: gameTable.identifier });
   }
 

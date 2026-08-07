@@ -95,6 +95,8 @@ export const zhCN: I18nDictionary = {
   'peer.loadDataPermTitle': '房间数据读取权限（玩家）',
   'peer.loadDataPermHelp': '默认仅 GM 可读取 ZIP／房间。勾选后允许玩家操作；访客不可使用。',
   'peer.loadData.gmOnly': '仅 GM',
+  'peer.atmospherePermTitle': '气氛控制权限（玩家）',
+  'peer.atmospherePermHelp': '默认允许。控制工具箱与地图设置中的天气／日夜。GM 不受限；访客不可使用。',
   'peer.menuPermTitle': '菜单项目（玩家）',
   'peer.menuPermAll': '全部菜单',
   'peer.menuPermHelp': '取消勾选后，玩家菜单会隐藏该项。连接／聊天／战斗／设定／离开始终可见。访客不受此设定影响。',

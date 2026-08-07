@@ -5,6 +5,7 @@ import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
+import { ConnectionBusyService } from 'service/connection-busy.service';
 
 /**
  * Shared room join: reopen as a room peer and mesh-connect to targets.
@@ -15,7 +16,10 @@ export class RoomConnectHelper {
    * Resolves true if at least one peer connected; false if all attempts failed
    * (and the local peer was reset out of the room).
    */
+  private static readonly CONNECT_TIMEOUT_MS = 45000;
+
   static openAndConnect(room: IRoomInfo, password: string, targetPeers: IPeerContext[]): Promise<boolean> {
+    ConnectionBusyService.instance?.show('peer.connectingRoom');
     return new Promise(resolve => {
       const userId = Network.peer.userId;
       Network.open(userId, room.id, room.name, password);
@@ -23,11 +27,18 @@ export class RoomConnectHelper {
 
       const triedPeer: string[] = [];
       let settled = false;
+      const timeoutId = setTimeout(() => {
+        console.warn('RoomConnectHelper connect timeout');
+        RoomConnectHelper.resetIfAlone();
+        finish(false);
+      }, RoomConnectHelper.CONNECT_TIMEOUT_MS);
 
       const finish = (ok: boolean) => {
         if (settled) return;
         settled = true;
+        clearTimeout(timeoutId);
         EventSystem.unregister(triedPeer);
+        ConnectionBusyService.instance?.hide();
         resolve(ok);
       };
 
@@ -57,12 +68,24 @@ export class RoomConnectHelper {
           console.log('RoomConnectHelper OPEN_PEER', event.data.peerId);
           EventSystem.unregister(triedPeer);
           ObjectStore.instance.clearDeleteHistory();
+          if (targetPeers.length < 1) {
+            finish(true);
+            return;
+          }
           for (const peer of targetPeers) {
             if (!Network.connect(peer) && onDisconnect(peer.peerId)) return;
           }
           EventSystem.register(triedPeer)
             .on('CONNECT_PEER', event => onConnect(event.data.peerId))
-            .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId));
+            .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId))
+            .on('NETWORK_ERROR', () => {
+              RoomConnectHelper.resetIfAlone();
+              finish(false);
+            });
+        })
+        .on('NETWORK_ERROR', () => {
+          RoomConnectHelper.resetIfAlone();
+          finish(false);
         });
     });
   }

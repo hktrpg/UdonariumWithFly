@@ -1,0 +1,344 @@
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+
+import { AudioLibrary, JUKEBOX_AUDIO_DRAG_MIME } from '@udonarium/audio-library';
+import { AudioFile } from '@udonarium/core/file-storage/audio-file';
+import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { EventSystem, Network } from '@udonarium/core/system';
+import { Jukebox, MUSIC_HUD_SLOT_COUNT } from '@udonarium/Jukebox';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
+
+import * as localForage from 'localforage';
+
+@Component({
+  selector: 'music-hud',
+  templateUrl: './music-hud.component.html',
+  styleUrls: ['./music-hud.component.css'],
+  standalone: false
+})
+export class MusicHudComponent implements OnInit, OnDestroy {
+  static readonly VISIBLE_KEY = 'udonanaumu-music-hud-visible';
+  static readonly POS_KEY = 'udonanaumu-music-hud-pos';
+  static readonly COLLAPSED_KEY = 'udonanaumu-music-hud-collapsed';
+  static isVisible = true;
+
+  readonly slotCount = MUSIC_HUD_SLOT_COUNT;
+  left = 12;
+  /** Placeholder until placeDefaultAlignMapHud(); matches map-action-hud vertical band. */
+  top = 72;
+  /** Default collapsed so bar height matches map-action-hud (~44px). */
+  collapsed = true;
+  dropSlotIndex: number | null = null;
+  private dragOffsetX = 0;
+  private dragOffsetY = 0;
+  private dragging = false;
+  private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
+  private positionedDefault = false;
+
+  /** Collapsed bar outer height: map-action-hud.is-collapsed = 4+4 padding + 36 chrome. */
+  private static readonly BAR_HEIGHT = 44;
+  private static readonly HUD_WIDTH = 220;
+
+  get visible(): boolean { return MusicHudComponent.isVisible; }
+  get isGuest(): boolean { return Network.GuestMode(); }
+  get canControl(): boolean { return !this.isGuest; }
+
+  get jukebox(): Jukebox {
+    return ObjectStore.instance.get<Jukebox>('Jukebox');
+  }
+
+  get slotIndexes(): number[] {
+    return Array.from({ length: this.slotCount }, (_, i) => i);
+  }
+
+  get libraryAudios(): AudioFile[] {
+    return AudioStorage.instance.audios.filter(a => !a.isHidden);
+  }
+
+  constructor(
+    private changeDetector: ChangeDetectorRef,
+    private i18n: I18nService,
+    private contextMenuService: ContextMenuService
+  ) {}
+
+  ngOnInit() {
+    localForage.getItem(MusicHudComponent.VISIBLE_KEY).then(v => {
+      if (typeof v === 'boolean') {
+        MusicHudComponent.isVisible = v;
+        this.changeDetector.markForCheck();
+      }
+    });
+    localForage.getItem<{ left: number; top: number }>(MusicHudComponent.POS_KEY).then(pos => {
+      if (pos && typeof pos.left === 'number' && typeof pos.top === 'number') {
+        this.left = pos.left;
+        this.top = pos.top;
+        this.positionedDefault = true;
+        this.clampToViewport();
+        this.changeDetector.markForCheck();
+      } else {
+        this.placeDefaultAlignMapHud();
+      }
+    });
+    localForage.getItem(MusicHudComponent.COLLAPSED_KEY).then(v => {
+      if (typeof v === 'boolean') {
+        this.collapsed = v;
+        this.changeDetector.markForCheck();
+      }
+    });
+    EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', () => this.lazyNgZoneUpdate())
+      .on('UPDATE_AUDIO_RESOURE', () => this.lazyNgZoneUpdate())
+      .on('FILE_LOADED', () => this.lazyNgZoneUpdate());
+    document.addEventListener('pointermove', this.onPointerMove);
+    document.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('resize', this.onResize);
+  }
+
+  ngOnDestroy() {
+    EventSystem.unregister(this);
+    document.removeEventListener('pointermove', this.onPointerMove);
+    document.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('resize', this.onResize);
+  }
+
+  static setVisible(v: boolean) {
+    MusicHudComponent.isVisible = v;
+    localForage.setItem(MusicHudComponent.VISIBLE_KEY, v).catch(() => {});
+  }
+
+  trackName(index: number): string {
+    if (index === 0) return this.i18n.t('jukebox.trackBgm');
+    if (index === 1) return this.i18n.t('jukebox.trackAmbient');
+    return this.i18n.t('jukebox.trackN', { n: index + 1 });
+  }
+
+  audioAt(index: number): AudioFile {
+    return this.jukebox?.audioAt(index) || null;
+  }
+
+  displayName(index: number): string {
+    const audio = this.audioAt(index);
+    if (!audio) return this.i18n.t('musicHud.empty');
+    return AudioLibrary.instance.displayName(audio);
+  }
+
+  isPlaying(index: number): boolean {
+    return !!this.jukebox?.tracks[index]?.isPlaying;
+  }
+
+  hasAudio(index: number): boolean {
+    return !!this.jukebox?.tracks[index]?.audioIdentifier;
+  }
+
+  togglePlay(index: number, event?: MouseEvent) {
+    if (!this.canControl) return;
+    const jb = this.jukebox;
+    if (!jb) return;
+    const track = jb.tracks[index];
+    if (!track?.audioIdentifier) {
+      this.openAudioPicker(index, event);
+      return;
+    }
+    if (track.isPlaying) {
+      jb.stopTrack(index);
+    } else {
+      const loop = AudioLibrary.instance.effectivePlayLoop(track.audioIdentifier);
+      jb.playTrack(index, track.audioIdentifier, loop);
+    }
+  }
+
+  onNameClick(index: number, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canControl) return;
+    this.openAudioPicker(index, event);
+  }
+
+  /** Right-click: open picker to change assigned music (assign only unless already playing). */
+  onSlotContextMenu(index: number, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canControl) return;
+    this.openAudioPicker(index, event, false);
+  }
+
+  /**
+   * @param playOnPick when true, selecting a track also starts playback
+   */
+  openAudioPicker(index: number, event?: MouseEvent, playOnPick = true) {
+    if (!this.canControl || !this.jukebox) return;
+    const audios = this.libraryAudios;
+    const position = event
+      ? { x: event.pageX, y: event.pageY }
+      : { x: this.left + 8, y: this.top + 40 };
+    const t = (key: string) => this.i18n.t(key);
+    const title = `${t('musicHud.pickAudio')} · ${this.trackName(index)}`;
+
+    if (audios.length < 1) {
+      this.contextMenuService.open(position, [
+        { name: t('jukebox.empty'), disabled: true },
+        ContextMenuSeparator,
+        { name: t('musicHud.openLibrary'), action: () => this.openLibrary(), materialIcon: 'library_music' },
+      ], title);
+      return;
+    }
+
+    const currentId = this.jukebox.tracks[index]?.audioIdentifier || '';
+    const wasPlaying = !!this.jukebox.tracks[index]?.isPlaying;
+    const menu: ContextMenuAction[] = audios.map(audio => ({
+      name: AudioLibrary.instance.displayName(audio),
+      disabled: !audio.isReady,
+      default: audio.identifier === currentId,
+      materialIcon: audio.identifier === currentId ? 'check' : undefined,
+      action: () => this.assignAudio(index, audio, playOnPick || wasPlaying),
+    }));
+
+    if (currentId) {
+      menu.push(ContextMenuSeparator);
+      menu.push({
+        name: t('musicHud.clearSlot'),
+        materialIcon: 'clear',
+        action: () => this.clearSlot(index),
+      });
+    }
+
+    this.contextMenuService.open(position, menu, title);
+  }
+
+  assignAudio(index: number, audio: AudioFile, playNow = false) {
+    if (!this.canControl || !this.jukebox || !audio?.isReady) return;
+    AudioLibrary.instance.setTrackType(audio.identifier, index);
+    if (playNow) {
+      const loop = AudioLibrary.instance.effectivePlayLoop(audio.identifier);
+      this.jukebox.playTrack(index, audio.identifier, loop);
+    } else {
+      this.jukebox.setTrackAudio(index, audio.identifier);
+    }
+  }
+
+  clearSlot(index: number) {
+    if (!this.canControl || !this.jukebox) return;
+    this.jukebox.clearTrack(index);
+  }
+
+  openLibrary() {
+    EventSystem.trigger('OPEN_OR_TOGGLE_PANEL', 'JukeboxComponent');
+  }
+
+  toggleCollapsed() {
+    this.collapsed = !this.collapsed;
+    localForage.setItem(MusicHudComponent.COLLAPSED_KEY, this.collapsed).catch(() => {});
+  }
+
+  onSlotDragOver(event: DragEvent, index: number) {
+    if (!this.canControl || !this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) {
+      // Must match jukebox effectAllowed ('copyMove') — 'link' was rejected by browsers.
+      event.dataTransfer.dropEffect = event.altKey ? 'copy' : 'move';
+    }
+    this.dropSlotIndex = index;
+  }
+
+  onSlotDragLeave(event: DragEvent, index: number) {
+    const related = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement | null;
+    if (current && related && current.contains(related)) return;
+    if (this.dropSlotIndex === index) this.dropSlotIndex = null;
+  }
+
+  onSlotDrop(event: DragEvent, index: number) {
+    if (!this.canControl || !this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const id = (event.dataTransfer?.getData(JUKEBOX_AUDIO_DRAG_MIME)
+      || event.dataTransfer?.getData('text/plain')
+      || '').trim();
+    const playNow = event.altKey;
+    this.dropSlotIndex = null;
+    if (!id || !this.jukebox) return;
+    const audio = AudioStorage.instance.get(id);
+    if (!audio?.isReady) return;
+    this.assignAudio(index, audio, playNow);
+  }
+
+  startDrag(event: PointerEvent) {
+    if ((event.target as HTMLElement).closest('button.hud-collapse, button.hud-open, button.slot-play, .slot-name, .mini-plays')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging = true;
+    this.dragOffsetX = event.clientX - this.left;
+    this.dragOffsetY = event.clientY - this.top;
+    (event.currentTarget as HTMLElement)?.setPointerCapture?.(event.pointerId);
+  }
+
+  private isAudioDrag(event: DragEvent): boolean {
+    const types = Array.from(event.dataTransfer?.types || []);
+    if (types.includes(JUKEBOX_AUDIO_DRAG_MIME)) return true;
+    // Same payload often only exposes text/plain across panels.
+    if (types.includes('text/plain') && !types.includes('Files')) return true;
+    return false;
+  }
+
+  /** Same vertical band as .map-action-hud (bottom chrome + 10px), right-aligned. */
+  private placeDefaultAlignMapHud() {
+    if (this.positionedDefault) return;
+    this.positionedDefault = true;
+    const width = MusicHudComponent.HUD_WIDTH;
+    const bottomChrome = this.readCssPx('--udon-bottom-chrome', 56);
+    const bottomGap = 10; // matches .map-action-hud { bottom: calc(... + 10px) }
+    this.left = Math.max(8, window.innerWidth - width - 12);
+    this.top = Math.max(
+      8,
+      window.innerHeight - bottomChrome - bottomGap - MusicHudComponent.BAR_HEIGHT
+    );
+    this.clampToViewport();
+  }
+
+  private readCssPx(varName: string, fallback: number): number {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  private onPointerMove = (event: PointerEvent) => {
+    if (!this.dragging) return;
+    this.left = event.clientX - this.dragOffsetX;
+    this.top = event.clientY - this.dragOffsetY;
+    this.clampToViewport();
+    this.changeDetector.detectChanges();
+  };
+
+  private onPointerUp = () => {
+    if (!this.dragging) return;
+    this.dragging = false;
+    this.persistPosition();
+  };
+
+  private onResize = () => {
+    if (!this.positionedDefault) this.placeDefaultAlignMapHud();
+    this.clampToViewport();
+    this.changeDetector.markForCheck();
+  };
+
+  private clampToViewport() {
+    const maxLeft = Math.max(0, window.innerWidth - 48);
+    const maxTop = Math.max(0, window.innerHeight - 40);
+    this.left = Math.min(maxLeft, Math.max(0, this.left));
+    this.top = Math.min(maxTop, Math.max(0, this.top));
+  }
+
+  private persistPosition() {
+    localForage.setItem(MusicHudComponent.POS_KEY, { left: this.left, top: this.top }).catch(() => {});
+  }
+
+  private lazyNgZoneUpdate() {
+    if (this.lazyUpdateTimer !== null) return;
+    this.lazyUpdateTimer = setTimeout(() => {
+      this.lazyUpdateTimer = null;
+      this.changeDetector.markForCheck();
+    }, 80);
+  }
+}

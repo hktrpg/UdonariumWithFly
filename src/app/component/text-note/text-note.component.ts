@@ -269,7 +269,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = { x: this.textNote.location.x, y: this.textNote.location.y, z: this.textNote.posZ };
-    actions.push({ name: this.i18n.t('textNote.menu.1'), action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({ name: this.i18n.t('textNote.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
     actions.push(ContextMenuSeparator);
 
     return actions;
@@ -291,7 +291,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
           SoundEffect.play(this.isLocked ? PresetSound.lock : PresetSound.unlock);
           this.changeDetector.markForCheck();
         },
-        checkBox: 'check'
+        checkBox: 'check',
+        hotkey: 'L',
       },
       ContextMenuSeparator,
       {
@@ -435,7 +436,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy {
         name: this.i18n.t('textNote.menu.16'), action: () => {
           this.textNote.destroy();
           SoundEffect.play(PresetSound.sweep);
-        }
+        },
+        hotkey: 'Del',
       },
       ContextMenuSeparator,
       {

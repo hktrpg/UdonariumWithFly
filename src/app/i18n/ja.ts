@@ -95,6 +95,8 @@ export const ja: I18nDictionary = {
   'peer.loadDataPermTitle': '部屋データ読込権限（プレイヤー）',
   'peer.loadDataPermHelp': '既定は ZIP／部屋の読込は GM のみ。チェックでプレイヤー許可。ゲストは不可。',
   'peer.loadData.gmOnly': 'GMのみ',
+  'peer.atmospherePermTitle': '雰囲気操作権限（プレイヤー）',
+  'peer.atmospherePermHelp': '既定は許可。ツールボックス／マップ設定の天気・昼夜を制御。GM は制限なし。ゲストは不可。',
   'peer.menuPermTitle': 'メニュー項目（プレイヤー）',
   'peer.menuPermAll': 'すべてのメニュー',
   'peer.menuPermHelp': 'チェックを外すとプレイヤーのメニューから隠れます。接続／チャット／戦闘／設定／退出は常に表示。ゲストには影響しません。',

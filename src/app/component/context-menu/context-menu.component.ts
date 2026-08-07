@@ -50,6 +50,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
+  /** Root mobile bottom action sheet (More / toolbox / token menu). */
+  isMobileActionSheet = false;
+  sheetResizing = false;
+  private static readonly SHEET_HEIGHT_KEY = 'udon.actionSheet.height';
+  private sheetResizeStartY = 0;
+  private sheetResizeStartH = 0;
+  private readonly onSheetResizeMove = (e: PointerEvent) => this.moveSheetResize(e);
+  private readonly onSheetResizeUp = () => this.endSheetResize();
+
   /** Mobile dark chrome: skip default #444 so CSS muted title shows; keep custom peer colors. */
   get titleColorStyle(): string | null {
     if (!this.titleColor) return null;
@@ -92,6 +101,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy() {
     document.removeEventListener('touchstart', this.callbackOnOutsideClick, true);
     document.removeEventListener('mousedown', this.callbackOnOutsideClick, true);
+    this.endSheetResize();
   }
 
   onOutsideClick(event) {
@@ -113,6 +123,86 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.GuestMode()) return;
   }
 
+  /** Menu labels must not be text-selectable while clicking / dragging. */
+  @HostListener('selectstart', ['$event'])
+  onSelectStart(e: Event) {
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+  }
+
+  startSheetResize(e: PointerEvent) {
+    if (!this.isMobileActionSheet || this.isSubmenu || e.button === 2) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const panel = this.rootElementRef.nativeElement;
+    this.sheetResizing = true;
+    this.sheetResizeStartY = e.clientY;
+    this.sheetResizeStartH = panel.getBoundingClientRect().height;
+    document.addEventListener('pointermove', this.onSheetResizeMove, { capture: true });
+    document.addEventListener('pointerup', this.onSheetResizeUp, { capture: true });
+    document.addEventListener('pointercancel', this.onSheetResizeUp, { capture: true });
+  }
+
+  private moveSheetResize(e: PointerEvent) {
+    if (!this.sheetResizing) return;
+    e.preventDefault();
+    const panel = this.rootElementRef.nativeElement;
+    const dy = this.sheetResizeStartY - e.clientY; // drag up → taller
+    const next = this.clampSheetHeight(this.sheetResizeStartH + dy);
+    panel.style.height = `${next}px`;
+    panel.style.maxHeight = `${next}px`;
+  }
+
+  private endSheetResize() {
+    if (!this.sheetResizing) {
+      document.removeEventListener('pointermove', this.onSheetResizeMove, true);
+      document.removeEventListener('pointerup', this.onSheetResizeUp, true);
+      document.removeEventListener('pointercancel', this.onSheetResizeUp, true);
+      return;
+    }
+    this.sheetResizing = false;
+    document.removeEventListener('pointermove', this.onSheetResizeMove, true);
+    document.removeEventListener('pointerup', this.onSheetResizeUp, true);
+    document.removeEventListener('pointercancel', this.onSheetResizeUp, true);
+    const panel = this.rootElementRef?.nativeElement;
+    if (!panel) return;
+    const h = this.clampSheetHeight(panel.getBoundingClientRect().height);
+    panel.style.height = `${h}px`;
+    panel.style.maxHeight = `${h}px`;
+    try {
+      sessionStorage.setItem(ContextMenuComponent.SHEET_HEIGHT_KEY, String(Math.round(h)));
+    } catch { /* ignore */ }
+    this.changeDetector.markForCheck();
+  }
+
+  private applySavedSheetHeight(panel: HTMLElement) {
+    const max = this.sheetMaxHeight();
+    const min = this.sheetMinHeight();
+    let h = Math.min(max, Math.round(window.innerHeight * 0.56));
+    try {
+      const raw = sessionStorage.getItem(ContextMenuComponent.SHEET_HEIGHT_KEY);
+      const saved = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(saved)) h = saved;
+    } catch { /* ignore */ }
+    h = Math.max(min, Math.min(max, h));
+    panel.style.height = `${h}px`;
+    panel.style.maxHeight = `${h}px`;
+  }
+
+  private clampSheetHeight(h: number): number {
+    return Math.max(this.sheetMinHeight(), Math.min(this.sheetMaxHeight(), Math.round(h)));
+  }
+
+  private sheetMinHeight(): number {
+    return 140;
+  }
+
+  private sheetMaxHeight(): number {
+    const bottom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--udon-bottom-chrome')) || 56;
+    return Math.max(this.sheetMinHeight(), Math.round(window.innerHeight - bottom - 8));
+  }
+
   private adjustPositionRoot() {
     let panel: HTMLElement = this.rootElementRef.nativeElement;
     const isMobile = document.body.classList.contains('udon-mobile-layout');
@@ -120,18 +210,24 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     // Mobile: bottom action sheet (same chrome family as chat half-sheet / nav).
     // Icon grids (faces etc.) stay floating near the pointer.
     if (isMobile && !this.isIconsMenu) {
+      this.isMobileActionSheet = true;
       panel.classList.add('is-mobile-action-sheet');
       panel.style.left = '';
       panel.style.top = '';
       panel.style.right = '';
       panel.style.bottom = '';
+      this.applySavedSheetHeight(panel);
+      this.changeDetector.detectChanges();
       if (this.altitudeSlider) {
         this.altitudeSlider.nativeElement.style.height = Math.max(120, panel.clientHeight - 72) + 'px';
       }
       return;
     }
 
+    this.isMobileActionSheet = false;
     panel.classList.remove('is-mobile-action-sheet');
+    panel.style.height = '';
+    panel.style.maxHeight = '';
 
     // Nudge away from the cursor so the menu does not cover the target token.
     const OFFSET_X = 20;
