@@ -243,8 +243,8 @@ export class PanelService {
     }
   }
 
-  /** Close the frontmost closable panel (highest z-index). Returns true if one closed. */
-  static closeFrontmostPanel(): boolean {
+  /** Frontmost closable panel (highest z-index), or null. */
+  static findFrontmostClosable(): PanelService | null {
     let best: PanelService = null;
     let bestZ = -Infinity;
     for (const panel of PanelService.openPanels) {
@@ -258,8 +258,60 @@ export class PanelService {
         bestZ = zSafe;
       }
     }
+    return best;
+  }
+
+  /** Close the frontmost closable panel (highest z-index). Returns true if one closed. */
+  static closeFrontmostPanel(): boolean {
+    const best = PanelService.findFrontmostClosable();
     if (!best) return false;
     best.close();
+    return true;
+  }
+
+  /**
+   * Scale the frontmost closable desktop panel by `factor` (e.g. 1.1 / ~0.91).
+   * Skips minimized / fullscreen / mobile sheets. Returns true if size changed.
+   */
+  static scaleFrontmostPanel(factor: number): boolean {
+    if (!Number.isFinite(factor) || factor <= 0) return false;
+    const panel = PanelService.findFrontmostClosable();
+    if (!panel?.panelComponentRef) return false;
+    const inst = panel.panelComponentRef.instance as {
+      isMinimized?: boolean;
+      isFullScreen?: boolean;
+      isMobileSheet?: boolean;
+      draggablePanel?: { nativeElement?: HTMLElement };
+      onPanelGeometryEnd?: () => void;
+    };
+    if (!inst || inst.isMinimized || inst.isFullScreen || inst.isMobileSheet) return false;
+
+    const min = 100;
+    const maxW = Math.max(min, window.innerWidth);
+    const maxH = Math.max(min, window.innerHeight);
+    const nextW = Math.max(min, Math.min(maxW, Math.round(panel.width * factor)));
+    const nextH = Math.max(min, Math.min(maxH, Math.round(panel.height * factor)));
+    if (nextW === panel.width && nextH === panel.height) return false;
+
+    panel.width = nextW;
+    panel.height = nextH;
+    // Keep on-screen: clamp top-left after growth.
+    panel.left = Math.max(0, Math.min(panel.left, Math.max(0, window.innerWidth - nextW)));
+    panel.top = Math.max(0, Math.min(panel.top, Math.max(0, window.innerHeight - nextH)));
+
+    const el = inst.draggablePanel?.nativeElement;
+    if (el) {
+      el.style.width = nextW + 'px';
+      el.style.height = nextH + 'px';
+      el.style.left = panel.left + 'px';
+      el.style.top = panel.top + 'px';
+    }
+    if (typeof inst.onPanelGeometryEnd === 'function') {
+      inst.onPanelGeometryEnd();
+    } else {
+      const key = panel.geometryKey || panel.tourPanelId;
+      if (key) PanelService.saveGeometry(key, nextW, nextH, panel.left, panel.top);
+    }
     return true;
   }
 

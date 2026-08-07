@@ -176,6 +176,19 @@ export class TabletopKeyboardService {
       return;
     }
 
+    // = / +: enlarge frontmost window, else zoom map in.
+    // - : shrink frontmost window, else zoom map out.
+    if (!mod && !this.altHeld && (code === 'Equal' || code === 'NumpadAdd' || code === 'Minus' || code === 'NumpadSubtract')) {
+      const enlarge = code === 'Equal' || code === 'NumpadAdd';
+      if (PanelService.scaleFrontmostPanel(enlarge ? 1.1 : 1 / 1.1)) {
+        this.consume(e);
+        return;
+      }
+      EventSystem.trigger('TABLE_VIEW_ZOOM', { deltaZ: enlarge ? 150 : -150 });
+      this.consume(e);
+      return;
+    }
+
     if (Network.GuestMode()) return;
 
     // Path draft: Space commits movement along existing waypoints.

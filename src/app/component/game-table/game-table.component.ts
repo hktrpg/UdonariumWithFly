@@ -453,6 +453,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         }, 50);
         this.removeFocus();
       })
+      .on('TABLE_VIEW_ZOOM', event => {
+        // Keyboard = / - : zoom regardless of selection / focus (see TabletopKeyboardService).
+        if (this.mobileLayout.isMobile) return;
+        let transformZ = Number(event.data?.deltaZ) || 0;
+        if (!transformZ) return;
+        if (750 < transformZ + this.viewPotisonZ) transformZ += 750 - (transformZ + this.viewPotisonZ);
+        if (transformZ + this.viewPotisonZ < -750) transformZ += -750 - (transformZ + this.viewPotisonZ);
+        if (!transformZ) return;
+        this.removeFocus();
+        this.setTransform(0, 0, transformZ, 0, 0, 0);
+      })
       .on('FOCUS_TABLETOP_OBJECT', event => {
         setTimeout(() => {
           //console.log(`move table to focus (${event.data.x}, ${event.data.y})`);
