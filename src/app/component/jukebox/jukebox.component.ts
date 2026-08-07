@@ -469,6 +469,15 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.dropBeforeAudioId = null;
   }
 
+  onFolderDragLeave(event: DragEvent, folderId: string) {
+    const related = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement | null;
+    if (current && related && current.contains(related)) return;
+    if (this.dropFolderId === (folderId || '') && this.dropBeforeAudioId == null) {
+      this.dropFolderId = null;
+    }
+  }
+
   onFolderDrop(event: DragEvent, folderId: string) {
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
@@ -537,6 +546,34 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.library.setTrackType(id, trackIndex);
     if (playNow) this.jukebox.playTrack(trackIndex, id, this.library.playLoopOf(id));
     else this.jukebox.setTrackAudio(trackIndex, id);
+  }
+
+  onLibraryScrollDragOver(event: DragEvent) {
+    if (this.isAudioDrag(event)) {
+      // Gaps between folder blocks: clear stale folder highlight so UI matches drop.
+      if (event.target === event.currentTarget) {
+        event.preventDefault();
+        this.dropFolderId = null;
+        this.dropBeforeAudioId = null;
+      }
+      return;
+    }
+    this.onLibraryFilesDragOver(event);
+  }
+
+  onLibraryScrollDrop(event: DragEvent) {
+    if (this.isAudioDrag(event)) {
+      // Honor highlighted folder if drop lands on scroll chrome/gap after a folder hover.
+      if (this.dropFolderId !== null && this.dropBeforeAudioId == null) {
+        this.onFolderDrop(event, this.dropFolderId);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      this.clearDropState();
+      return;
+    }
+    this.onLibraryFilesDrop(event);
   }
 
   onLibraryFilesDragOver(event: DragEvent) {

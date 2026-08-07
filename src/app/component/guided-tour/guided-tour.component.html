@@ -1,4 +1,7 @@
-<div class="guided-tour-root" *ngIf="state.phase === 'welcome' || state.phase === 'running'">
+<div class="guided-tour-root"
+  [class.mobile]="state.isMobile"
+  [class.mobile-running]="state.isMobile && state.phase === 'running'"
+  *ngIf="state.phase === 'welcome' || state.phase === 'running'">
   <div class="guided-tour-scrim" *ngIf="state.phase === 'welcome'"></div>
 
   <ng-container *ngIf="state.phase === 'running'">

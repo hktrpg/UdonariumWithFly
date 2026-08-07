@@ -89,6 +89,8 @@ export class UIPanelComponent implements OnInit {
   isMobileSheetHalf: boolean = false;
   /** peek | half — only meaningful when isMobileSheet (no fullscreen). */
   mobileSheetSnap: 'peek' | 'half' = 'half';
+  /** True after user drags sheet height away from peek/half snaps. */
+  isSheetCustomHeight: boolean = false;
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
@@ -117,7 +119,16 @@ export class UIPanelComponent implements OnInit {
   }
 
   toggleMinimize(e: Event = null) {
-    if (this.isMobileSheet) return;
+    if (this.isMobileSheet) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      // − collapses to peek; restore expands to half (same as title snap).
+      const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' && !this.isSheetCustomHeight ? 'half' : 'peek';
+      this.applyMobileSheetSnap(next);
+      return;
+    }
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -145,17 +156,6 @@ export class UIPanelComponent implements OnInit {
     }
     this.isMinimized = !this.isMinimized;
     this.isFullScreen = false;
-
-    /*
-    if (this.isMinimized) {
-      this.isMinimized = false;
-      //this.height = this.preHeight;
-    } else {
-      //this.preHeight = panel.offsetHeight;
-      this.isMinimized = true;
-      //this.height = this.titleBar.nativeElement.offsetHeight;
-    }
-    */
   }
 
   toggleFullScreen(e: Event = null) {
@@ -286,21 +286,43 @@ export class UIPanelComponent implements OnInit {
     const t = e.target as HTMLElement | null;
     if (t?.closest('button')) return;
     e.stopPropagation();
-    const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' ? 'half' : 'peek';
+    const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' && !this.isSheetCustomHeight ? 'half' : 'peek';
+    this.applyMobileSheetSnap(next);
+  }
+
+  private applyMobileSheetSnap(next: 'peek' | 'half') {
+    this.isSheetCustomHeight = false;
     this.mobileSheetSnap = next;
     this.isMobileSheetHalf = true;
     this.mobileLayout.rememberSheetSnap(next);
-    // Keep panelService height in sync with --udon-sheet-* CSS vars (painted size).
     const h = this.mobileLayout.sheetHeightPx(next);
     this.height = h;
     this.top = Math.max(0, this.mobileLayout.viewportHeight - h - this.mobileLayout.bottomChromePx);
   }
 
+  /** Enter custom-height mode before drag so snap CSS !important does not block resize. */
+  onPanelResizeStart() {
+    if (!this.isMobileSheet) return;
+    const panel = this.draggablePanel?.nativeElement;
+    if (panel) this.height = panel.offsetHeight;
+    this.isSheetCustomHeight = true;
+  }
+
   /** Sync Angular bindings after drag/resize so CD does not snap size back; persist panel geometry. */
   onPanelGeometryEnd() {
-    if (this.isMinimized || this.isFullScreen || this.isMobileSheet) return;
+    if (this.isMinimized || this.isFullScreen) return;
     const panel = this.draggablePanel?.nativeElement;
     if (!panel) return;
+    if (this.isMobileSheet) {
+      const h = panel.offsetHeight;
+      const minH = this.mobileLayout.sheetHeightPx('peek');
+      const maxH = Math.max(minH, this.mobileLayout.viewportHeight - this.mobileLayout.bottomChromePx - 8);
+      const clamped = Math.max(minH, Math.min(maxH, h));
+      this.isSheetCustomHeight = true;
+      this.height = clamped;
+      this.top = Math.max(0, this.mobileLayout.viewportHeight - clamped - this.mobileLayout.bottomChromePx);
+      return;
+    }
     this.left = panel.offsetLeft;
     this.top = panel.offsetTop;
     this.width = panel.offsetWidth;

@@ -4,6 +4,7 @@ import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { MathUtil } from './core/system/util/math-util';
+import { setZeroTimeout } from './core/system/util/zero-timeout';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 
@@ -330,9 +331,16 @@ export class TabletopObject extends ObjectNode {
     super.onStoreAdded();
     // Only bind table id here. Do not seed placements yet — create flows set
     // location.x/y after initialize(), then call setLocation('table').
+    // Defer SyncVar write so createObject.apply() can load real coords first;
+    // otherwise a 0,0 + tableIdentifier broadcast drifts peers on join.
     if (this.location.name === 'table' && !this.tableIdentifier) {
       const viewId = TabletopObject.resolveViewTableIdentifier();
-      if (viewId) this.tableIdentifier = viewId;
+      if (!viewId) return;
+      setZeroTimeout(() => {
+        if (this.location.name === 'table' && !this.tableIdentifier) {
+          this.tableIdentifier = viewId;
+        }
+      });
     }
   }
 

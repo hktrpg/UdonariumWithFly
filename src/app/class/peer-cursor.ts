@@ -37,7 +37,7 @@ export class PeerCursor extends GameObject {
     return `${PeerCursor.CHAT_DEFAULT_NAME}${String(n).padStart(4, '0')}`;
   }
 
-  /** If name is empty, assign a random-suffixed default and persist it. */
+  /** If name is empty on first cursor create, assign a random-suffixed default and persist it. */
   static async ensureDefaultName(): Promise<void> {
     if (!PeerCursor.myCursor) return;
     if ((PeerCursor.myCursor.name || '').trim()) return;

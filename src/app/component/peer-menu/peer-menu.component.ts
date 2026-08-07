@@ -80,13 +80,14 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     return PeerCursor.myCursor.name;
   }
   set myPeerName(name: string) {
-    if (PeerCursor.myCursor) {
-      const trimmed = (name ?? '').trim();
-      if (!trimmed) {
-        PeerCursor.myCursor.name = PeerCursor.generateDefaultName();
-      } else {
-        PeerCursor.myCursor.name = name;
-      }
+    if (!PeerCursor.myCursor) return;
+    // Never auto-fill while editing. Default name is only assigned once at
+    // createMyCursor() when no saved nickname exists (first visit).
+    PeerCursor.myCursor.name = name ?? '';
+    const trimmed = PeerCursor.myCursor.name.trim();
+    if (!trimmed) {
+      localForage.removeItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    } else {
       localForage.setItem(PeerCursor.CHAT_MY_NAME_LOCAL_STORAGE_KEY, PeerCursor.myCursor.name).catch(e => console.log(e));
     }
   }

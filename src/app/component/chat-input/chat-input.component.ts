@@ -246,8 +246,11 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   set paletteColor(color: string) {
-    if (!this.character?.chatPalette) return;
-    this.character.chatPalette.color = color ? color : PeerCursor.CHAT_TRANSPARENT_COLOR;
+    if (!this.character) return;
+    // Do not create an empty palette just to set color (sync race).
+    const palette = this.character.findChatPalette();
+    if (!palette) return;
+    palette.color = color ? color : PeerCursor.CHAT_TRANSPARENT_COLOR;
   }
 
   get myColor(): string {
@@ -330,6 +333,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       .on('MESSAGE_ADDED', event => {
         if (event.data.tabIdentifier !== this.chatTabidentifier) return;
         let message = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
+        if (!message) return;
         let peerCursor = ObjectStore.instance.getObjects<PeerCursor>(PeerCursor).find(obj => obj.userId === message.from);
         let sendFrom = peerCursor ? peerCursor.peerId : '?';
         if (this.writingPeers.has(sendFrom)) {
@@ -587,7 +591,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       } else if (text != '' && StringUtil.toHalfWidth(text).startsWith(':')) {
         if (!targetCharacter) {
           this.chatMessageService.sendOperationLog(this.i18n.t('chat.op.notCharacter'));
-        } else {
+        } else if (targetCharacter.chatPalette) {
           const commandsInfo = StringUtil.parseCommands(targetCharacter.chatPalette.evaluate(text.substring(1), targetCharacter.rootDataElement));
           text = commandsInfo.endString;
           if (commandsInfo.commands.length) {
@@ -793,8 +797,10 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           }
         }
       }
-      if (targetCharacter) {
+      if (targetCharacter?.chatPalette) {
         text = targetCharacter.chatPalette.evaluate(text, targetCharacter.rootDataElement, delayRefs);
+      }
+      if (targetCharacter) {
         // 立繪（stand）
         // 曾考慮空字串也觸發立繪較方便，但送出訊息後再按 Enter 易誤觸，故僅在有指定時觸發
         if (StringUtil.cr(text).trim() || standName) {

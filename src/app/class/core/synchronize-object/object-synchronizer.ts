@@ -98,6 +98,8 @@ export class ObjectSynchronizer {
       console.warn(context.aliasName + ' is Unknown...?', context);
       return null;
     }
+    // Add before apply so ObjectStore.get works when onChildAdded fires MESSAGE_ADDED
+    // (e.g. ChatMessage). tableIdentifier broadcast is deferred in TabletopObject.onStoreAdded.
     ObjectStore.instance.add(newObject, false);
     newObject.apply(context);
     return newObject;

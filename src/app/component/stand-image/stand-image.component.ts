@@ -358,7 +358,7 @@ export class StandImageComponent implements OnInit, OnDestroy {
   get position(): number {
     if (!this.gameCharacter) return 0;
     let elm = this.standElement.getFirstElementByName('position');
-    return elm && elm.currentValue ? +elm.value :this.gameCharacter.standList.position;
+    return elm && elm.currentValue ? +elm.value : (this.gameCharacter.standList?.position ?? 0);
   }
 
   get adjustY(): number {

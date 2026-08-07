@@ -157,11 +157,36 @@ export class GameCharacter extends TabletopObject {
     return Number.isNaN(num) ? 0 : num;
   }
 
-  get chatPalette(): ChatPalette {
+  /**
+   * Chat palette child. Does not auto-create — accidental empty creates during
+   * sync races were blanking palettes room-wide. Use {@link ensureChatPalette}
+   * when opening/editing the palette UI.
+   */
+  get chatPalette(): ChatPalette | null {
+    return this.findChatPalette();
+  }
+
+  /** Existing palette on this character or already in ObjectStore (sync race safe). */
+  findChatPalette(): ChatPalette | null {
     for (let child of this.children) {
       if (child instanceof ChatPalette) return child;
     }
-    let palette = new ChatPalette('ChatPalette_' + this.identifier);
+    const existing = ObjectStore.instance.get<ChatPalette>('ChatPalette_' + this.identifier);
+    if (existing instanceof ChatPalette) {
+      if (existing.parent !== this) this.appendChild(existing);
+      return existing;
+    }
+    return null;
+  }
+
+  /** Create a palette only when the UI explicitly needs one (e.g. confirm edit). */
+  ensureChatPalette(initialValue?: string): ChatPalette {
+    const found = this.findChatPalette();
+    if (found) return found;
+    const palette = new ChatPalette('ChatPalette_' + this.identifier);
+    // Seed content before initialize(): SyncVar update() is a no-op until the
+    // object is in ObjectStore, so the first broadcast includes text (not empty).
+    if (initialValue != null) palette.setPalette(initialValue);
     palette.initialize();
     this.appendChild(palette);
     return palette;
@@ -195,11 +220,31 @@ export class GameCharacter extends TabletopObject {
     return owner ? `${name} (${owner})` : name;
   }
   
-  get standList(): StandList {
+  /**
+   * Stand list child. Does not auto-create — same sync-race class as chatPalette.
+   * Use {@link ensureStandList} when the stand-setting UI needs one.
+   */
+  get standList(): StandList | null {
+    return this.findStandList();
+  }
+
+  findStandList(): StandList | null {
     for (let child of this.children) {
       if (child instanceof StandList) return child;
     }
-    let standList = new StandList('StandList_' + this.identifier);
+    const existing = ObjectStore.instance.get<StandList>('StandList_' + this.identifier);
+    if (existing instanceof StandList) {
+      if (existing.parent !== this) this.appendChild(existing);
+      return existing;
+    }
+    return null;
+  }
+
+  /** Create an empty stand list only when the UI explicitly needs one. */
+  ensureStandList(): StandList {
+    const found = this.findStandList();
+    if (found) return found;
+    const standList = new StandList('StandList_' + this.identifier);
     standList.initialize();
     this.appendChild(standList);
     return standList;

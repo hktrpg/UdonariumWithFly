@@ -154,7 +154,7 @@ export class ChatMessageService {
   private findObjectColor(identifier: string): string {
     let object = ObjectStore.instance.get(identifier);
     if (object instanceof GameCharacter) {
-      return object.chatPalette.color;
+      return object.chatPalette?.color ?? null;
     } else if (object instanceof PeerCursor) {
       return object.color;
     }
