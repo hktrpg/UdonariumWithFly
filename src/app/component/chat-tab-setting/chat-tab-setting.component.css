@@ -4,6 +4,10 @@
   min-height: 160px;
 }
 
+:host-context(html.udon-mobile-layout) .settings-list {
+  min-height: 88px;
+}
+
 .field-row {
   margin-top: 0;
 }

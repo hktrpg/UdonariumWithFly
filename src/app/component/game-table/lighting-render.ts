@@ -76,7 +76,7 @@ export class LightingRender {
 
     if (baseAlpha > 0.001) {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.92, baseAlpha)})`;
+      ctx.fillStyle = this.darknessOverlayFill(darkness, baseAlpha);
       ctx.fillRect(0, 0, width, height);
 
       ctx.globalCompositeOperation = 'destination-out';
@@ -108,6 +108,20 @@ export class LightingRender {
         giActive,
       );
     }
+  }
+
+  /**
+   * Warm amber at dusk (~0.4); fades toward near-black by night.
+   * Pure black looked too cool for the dusk preset.
+   */
+  private darknessOverlayFill(darkness: number, alpha: number): string {
+    const duskCenter = 0.4;
+    const warmth = Math.max(0, 1 - Math.abs(darkness - duskCenter) / 0.42);
+    const a = Math.min(0.92, alpha);
+    const r = Math.round(8 + 220 * warmth);
+    const g = Math.round(4 + 140 * warmth);
+    const b = Math.round(12 + 8 * warmth);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
   private collectLightSources(

@@ -259,6 +259,7 @@
           <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableDarkness" [disabled]="!isEditable || !canControlDayNight">
           <span class="val">{{ tableDarkness | number:'1.0-2' }}</span>
           <button type="button" class="btn btn-sm" (click)="transitionDay()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.day' | i18n }}</button>
+          <button type="button" class="btn btn-sm" (click)="transitionDusk()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.dusk' | i18n }}</button>
           <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.night' | i18n }}</button>
         </div>
         <div class="slider-row slim">
@@ -313,9 +314,17 @@
               [disabled]="!isEditable || !canControlWeather || tableWeatherType === 'none'"
             >
           </label>
+          <label class="check">
+            <input type="checkbox" [(ngModel)]="weatherSeEnabled" />
+            {{ 'table.weatherSe' | i18n }}<sup class="self-only">*</sup>
+          </label>
           <label class="check" [title]="'table.visionHint' | i18n">
             <input type="checkbox" [(ngModel)]="tableVisionEnabled" [disabled]="!isEditable">
             {{ 'table.enableVision' | i18n }}
+          </label>
+          <label class="check" [title]="'table.mode2dHint' | i18n">
+            <input type="checkbox" [(ngModel)]="tableIs2DMode" [disabled]="!isEditable">
+            {{ 'table.mode2d' | i18n }}
           </label>
         </div>
       </section>

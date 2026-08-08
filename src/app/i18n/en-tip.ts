@@ -36,10 +36,10 @@ export const en_tip: I18nDictionary = {
 
   'tip.chat.notice.title': 'Notice sound',
   'tip.chat.notice.body': 'Play a sound when new chat arrives (this device only).',
-  'tip.chat.compact.title': 'Compact toolbar',
-  'tip.chat.compact.body': 'Hide tabs/toolbar and keep the input. Use the small button to restore.',
-  'tip.chat.clarify.title': 'Clarify mode',
-  'tip.chat.clarify.body': 'List-style messages instead of bubbles for easier reading.',
+  'tip.chat.compact.title': 'List mode',
+  'tip.chat.compact.body': 'List-style messages instead of bubbles for easier reading.',
+  'tip.chat.clarify.title': 'Compact toolbar',
+  'tip.chat.clarify.body': 'Hide tabs/toolbar and keep the input. Use the small button to restore.',
 
   'tour.welcome.title': 'Welcome — guided tour',
   'tour.welcome.body': 'Read each intro, then open / try the main features once.\nYou can skip anytime. Hover tips stay available afterward.\nDesktop Chrome recommended. Save (ZIP or folder backup) before leaving.',

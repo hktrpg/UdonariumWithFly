@@ -1,6 +1,7 @@
 import { Component, ElementRef, Input, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChatPalette } from '@udonarium/chat-palette';
 import { ChatTab } from '@udonarium/chat-tab';
+import { ChatTabList } from '@udonarium/chat-tab-list';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -128,6 +129,12 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   updatePanelTitle() {
     if (!this.character) return;
     this.panelService.title = this.i18n.t('palette.title', { name: this.character.name });
+  }
+
+  /** Local display label — does not write SyncVar. */
+  tabLabel(tab: ChatTab): string {
+    if (!tab || tab.name === '') return this.i18n.t('palette.unnamedTab');
+    return ChatTabList.localizedName(tab);
   }
 
   /** Double-click a chat tab: open / bring chat window forward and show that tab. */

@@ -59,6 +59,11 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   }
 
   get chatTabs(): ChatTab[] { return this.chatMessageService.chatTabs; }
+  /** Local display label — edit field still uses synced `tabName`. */
+  tabLabel(tab: ChatTab): string {
+    if (!tab || tab.name === '') return this.i18n.t('chatTab.untitled');
+    return ChatTabList.localizedName(tab);
+  }
   get isEmpty(): boolean { return this.chatMessageService.chatTabs.length < 1 }
   get isDeleted(): boolean { return this.selectedTab ? ObjectStore.instance.get(this.selectedTab.identifier) == null : false; }
   get isEditable(): boolean { return !this.isEmpty && !this.isDeleted; }

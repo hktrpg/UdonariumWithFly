@@ -216,6 +216,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   background: var(--udon-chrome-bg, rgba(36, 36, 36, 0.96));
   border-top: 1px solid var(--udon-chrome-border, #555);
   overflow-x: auto;
+  -webkit-touch-callout: none;
+  user-select: none;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
@@ -311,6 +313,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   border-right: 1px solid var(--udon-chrome-border, #555);
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-touch-callout: none;
+  user-select: none;
   -webkit-overflow-scrolling: touch;
 }
 

@@ -635,3 +635,32 @@ button.link {
   padding-left: 6px;
   border-left: 2px dotted #8a7358;
 }
+
+/* Mobile: denser inventory chrome */
+:host-context(html.udon-mobile-layout) .inv-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 2px;
+}
+
+:host-context(html.udon-mobile-layout) .inv-tab span {
+  padding: 3px 6px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+:host-context(html.udon-mobile-layout) .view-summary {
+  flex-wrap: nowrap;
+  gap: 6px;
+  font-size: 11px;
+  overflow-x: auto;
+}
+
+:host-context(html.udon-mobile-layout) .field-row.wrap {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+:host-context(html.udon-mobile-layout) .multi-hint {
+  display: none;
+}

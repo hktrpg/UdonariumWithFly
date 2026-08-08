@@ -2,7 +2,7 @@
   pointer-events: none;
 }
 
-/* Match map-action-hud chrome sizing; width fixed so collapse/expand doesn’t jump. */
+/* Match map HUD chrome sizing; width fixed so collapse/expand doesn’t jump. */
 .music-hud {
   pointer-events: auto;
   position: fixed;

@@ -213,6 +213,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   trackName(index: number): string {
     if (index === 0) return this.i18n.t('jukebox.trackBgm');
     if (index === 1) return this.i18n.t('jukebox.trackAmbient');
+    if (index === 4) return this.i18n.t('jukebox.trackWeather');
     return this.i18n.t('jukebox.trackN', { n: index + 1 });
   }
 

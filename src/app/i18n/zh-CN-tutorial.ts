@@ -4,8 +4,10 @@ export const zhCN_tutorial: I18nDictionary = {
   'tutorial.name': '教学',
   'tutorial.linkName': '链接:',
   'tutorial.welcome': `欢迎使用 HKTRPG 乌冬桌（基于 Udonarium with Fly）。
+Discord：https://support.hktrpg.com
+Patreon：https://www.patreon.com/HKTRPG
 地图是 2.5D；数据在玩家之间互传，服务器不长期保管棋子与图片。
-★ 离开前请「下载 ZIP」；下次「读取 ZIP」。不存就会消失。
+★ 保管数据可以用「绑定备份文件夹」(自动)或「下载 ZIP」(手动)；下次「读取 ZIP」。不存就会消失。
 建议桌面版 Chrome。输入第一则聊天后，此教学会自动隐藏。
 完整说明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜视角＞右键拖曳＝平移地图

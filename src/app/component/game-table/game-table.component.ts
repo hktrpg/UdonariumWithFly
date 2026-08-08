@@ -235,18 +235,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Public -100..100 zoom control (synced from pinch / wheel / slider). */
   zoomSliderValue = 0;
 
-  /** Mobile map HUD: free position + collapse (session). */
-  private static readonly MAP_HUD_POS_KEY = 'udon.mapHud.pos';
-  private static readonly MAP_HUD_COLLAPSED_KEY = 'udon.mapHud.collapsed';
-  mapHudCollapsed = sessionStorage.getItem(GameTableComponent.MAP_HUD_COLLAPSED_KEY) === '1';
-  mapHudLeft: number | null = null;
-  mapHudTop: number | null = null;
-  private mapHudDragging = false;
-  private mapHudDragOffsetX = 0;
-  private mapHudDragOffsetY = 0;
-  private readonly onMapHudPointerMove = (e: PointerEvent) => this.moveMapHudDrag(e);
-  private readonly onMapHudPointerUp = () => this.endMapHudDrag();
-
   private viewRotateX: number = GameTableComponent.DEFAULT_VIEW_ROT_X;
   private viewRotateY: number = GameTableComponent.DEFAULT_VIEW_ROT_Y;
   private viewRotateZ: number = GameTableComponent.DEFAULT_VIEW_ROT_Z;
@@ -385,7 +373,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.tokenPath.hasDraft || this.tokenPath.isAnimating;
   }
   get showViewZoomControl(): boolean {
-    return false; // zoom lives inside map-action-hud
+    return false; // zoom lives inside map-zoom-hud
   }
   get showMapActionHud(): boolean {
     return this.mobileLayout.isMobile;
@@ -422,6 +410,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
 
         this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor, this.currentTable.isShowNumber);
+        this.sync2DModeCamera();
         this.refreshFx();
         this.ensureFxTimer();
       })
@@ -451,7 +440,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           setTimeout(() => {
             this.gameTable.nativeElement.style.transition = null;
           }, 100);
-          if (event && event.data == 'top') {
+          if ((event && event.data == 'top') || this.currentTable?.is2DMode) {
             this.setTransform(0, 0, 0, 0, 0, 0, true);
           } else {
             this.applyDefaultPointOfView();
@@ -522,6 +511,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Initial / reset camera: mobile uses a tighter frame for bottom chrome. */
   private applyDefaultPointOfView() {
+    if (this.currentTable?.is2DMode) {
+      this.setTransform(0, 0, 0, 0, 0, 0, true);
+      return;
+    }
     if (this.mobileLayout.isMobile) {
       this.setTransform(
         GameTableComponent.MOBILE_DEFAULT_VIEW_POS_X,
@@ -543,6 +536,30 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       GameTableComponent.DEFAULT_VIEW_ROT_Z,
       true,
     );
+  }
+
+  private _last2DMode: boolean | null = null;
+  /** When room enters 2D mode, snap all clients to top-down; leaving restores default pitch. */
+  private sync2DModeCamera() {
+    const on = !!this.currentTable?.is2DMode;
+    if (this._last2DMode === on) return;
+    const prev = this._last2DMode;
+    this._last2DMode = on;
+    if (prev === null && !on) return; // first observe while already 3D — keep current view
+    if (on) {
+      // Entering 2D (or first observe already in 2D): top-down + zero all tip/tilt SyncVars.
+      this.setTransform(this.viewPotisonX, this.viewPotisonY, this.viewPotisonZ, 0, 0, 0, true);
+      this.zeroAllCharacterRolls();
+    } else if (prev === true) {
+      this.applyDefaultPointOfView();
+    }
+  }
+
+  /** 2D mode: any non-zero tip/tilt (roll) is written to 0 (synced). */
+  private zeroAllCharacterRolls() {
+    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
+      if (ch && ch.roll !== 0) ch.roll = 0;
+    }
   }
 
   ngAfterViewInit() {
@@ -569,9 +586,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.startDebugPoseRefresh();
       queueMicrotask(() => this.refreshDebugPoseDom());
     }
-    this.restoreMapHudLayout();
-    document.addEventListener('pointermove', this.onMapHudPointerMove);
-    document.addEventListener('pointerup', this.onMapHudPointerUp);
   }
 
   ngOnDestroy() {
@@ -588,8 +602,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.lightingRender) this.lightingRender.release();
     this.clearPingHold();
     this.clearDrawDragState();
-    document.removeEventListener('pointermove', this.onMapHudPointerMove);
-    document.removeEventListener('pointerup', this.onMapHudPointerUp);
     if (this._currentTableImageUrl) URL.revokeObjectURL(this._currentTableImageUrl);
     if (this._currentBackgroundImageUrl) URL.revokeObjectURL(this._currentBackgroundImageUrl);
     if (this._currentBackgroundImageUrl2) URL.revokeObjectURL(this._currentBackgroundImageUrl2);
@@ -688,8 +700,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     let scale = (1000 + Math.abs(this.viewPotisonZ)) / 1000;
     transformX *= scale;
     transformY *= scale;
-    if (80 < rotateX + this.viewRotateX) rotateX += 80 - (rotateX + this.viewRotateX);
-    if (rotateX + this.viewRotateX < 0) rotateX += 0 - (rotateX + this.viewRotateX);
+    if (this.currentTable?.is2DMode) {
+      rotateX = -this.viewRotateX; // force pitch to 0
+    } else {
+      if (80 < rotateX + this.viewRotateX) rotateX += 80 - (rotateX + this.viewRotateX);
+      if (rotateX + this.viewRotateX < 0) rotateX += 0 - (rotateX + this.viewRotateX);
+    }
     if (750 < transformZ + this.viewPotisonZ) transformZ += 750 - (transformZ + this.viewPotisonZ);
 
     this.setTransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ);
@@ -776,6 +792,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       transformY *= scale;
     }
 
+    if (this.currentTable?.is2DMode) {
+      rotateX = -this.viewRotateX; // keep pitch locked top-down
+    }
+
     this.setTransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ);
     this.isTableTransformed = true;
   }
@@ -838,6 +858,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: any) {
+    // Chrome HUD (zoom slider etc.): never show the browser context menu.
+    const target = e?.target as Element | null;
+    if (target?.closest?.('.map-zoom-hud, .map-action-hud')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     // Mobile empty-table: add-menu is HUD-only; long-press is reserved for ping.
     if (this.mobileLayout.isMobile && !this.isTouchOnTableObject(e)) {
       e.preventDefault();
@@ -872,8 +899,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (!document.activeElement.contains(this.gameObjects.nativeElement)) return;
+    // Always suppress the browser menu on the table host; early-outs only skip the app menu.
     e.preventDefault();
+    if (!document.activeElement?.contains?.(this.gameObjects.nativeElement)) return;
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     if (this.GuestMode()) return;
@@ -1041,6 +1069,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('document:contextmenu', ['$event'])
   onDocumentContextMenu(e: MouseEvent) {
+    const target = e.target as Element | null;
+    // Fixed chrome / HUDs sit above the table — never show the browser menu there.
+    if (target?.closest?.(
+      '.map-zoom-hud, .map-action-hud, .music-hud, .resource-hud, .path-move-hud, .debug-pose, .mobile-bottom-nav, .mobile-side-rail, .is-mobile-action-sheet',
+    )) {
+      e.preventDefault();
+      return;
+    }
     if (this.isTableTransformed && !this.pointerDeviceService.isAllowedToOpenContextMenu) e.preventDefault();
   }
 
@@ -1174,107 +1210,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   resetZoomSlider() {
     this.zoomSliderValue = 0;
     this.setTransform(this.viewPotisonX, this.viewPotisonY, 0, this.viewRotateX, this.viewRotateY, this.viewRotateZ, true);
-  }
-
-  /** Map HUD: open chat half-sheet. */
-  hudOpenChat() {
-    EventSystem.trigger('OPEN_CHAT', null);
-  }
-
-  /** Map HUD: toggle toolbox (open / close). Outside-click ignores .map-action-hud. */
-  hudOpenAddMenu(ev: Event) {
-    ev.stopPropagation();
-    // Same pattern as More / Settings: HUD is excluded from outside-click dismiss,
-    // so re-tap must close here (do not rely on title match — open() can leave stale titles).
-    if (this.contextMenuService.isShow) {
-      this.contextMenuService.close();
-      return;
-    }
-    const tablePos = this.coordinateService.calcTabletopLocalCoordinate();
-    const rect = (ev.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-    const x = rect ? rect.left + rect.width / 2 : (this.pointerDeviceService.pointers[0]?.x ?? window.innerWidth / 2);
-    const y = rect ? rect.top : (this.pointerDeviceService.pointers[0]?.y ?? window.innerHeight / 2);
-    EventSystem.trigger('OPEN_TOOLBOX', {
-      x,
-      y,
-      extraActions: this.tabletopActionService.makeDefaultContextMenuActions(tablePos),
-    });
-  }
-
-  /** Map HUD: ping at current pointer / table focus. */
-  hudPing(warning = false) {
-    const pos = this.coordinateService.calcTabletopLocalCoordinate();
-    this.broadcastPing(pos.x, pos.y, warning ? 'warning' : 'basic');
-  }
-
-  toggleMapHudCollapsed() {
-    this.mapHudCollapsed = !this.mapHudCollapsed;
-    try {
-      sessionStorage.setItem(GameTableComponent.MAP_HUD_COLLAPSED_KEY, this.mapHudCollapsed ? '1' : '0');
-    } catch { /* ignore */ }
-    this.changeDetector.markForCheck();
-  }
-
-  startMapHudDrag(ev: PointerEvent) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const host = (ev.currentTarget as HTMLElement)?.closest?.('.map-action-hud') as HTMLElement
-      || document.querySelector('.map-action-hud') as HTMLElement;
-    if (!host) return;
-    const rect = host.getBoundingClientRect();
-    if (this.mapHudLeft == null || this.mapHudTop == null) {
-      this.mapHudLeft = rect.left;
-      this.mapHudTop = rect.top;
-    }
-    this.mapHudDragging = true;
-    this.mapHudDragOffsetX = ev.clientX - this.mapHudLeft;
-    this.mapHudDragOffsetY = ev.clientY - this.mapHudTop;
-    (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId);
-  }
-
-  private moveMapHudDrag(ev: PointerEvent) {
-    if (!this.mapHudDragging || this.mapHudLeft == null || this.mapHudTop == null) return;
-    this.mapHudLeft = ev.clientX - this.mapHudDragOffsetX;
-    this.mapHudTop = ev.clientY - this.mapHudDragOffsetY;
-    this.clampMapHudPosition();
-    this.changeDetector.detectChanges();
-  }
-
-  private endMapHudDrag() {
-    if (!this.mapHudDragging) return;
-    this.mapHudDragging = false;
-    this.persistMapHudLayout();
-  }
-
-  private restoreMapHudLayout() {
-    try {
-      const raw = sessionStorage.getItem(GameTableComponent.MAP_HUD_POS_KEY);
-      if (!raw) return;
-      const pos = JSON.parse(raw) as { left?: number; top?: number };
-      if (typeof pos.left === 'number' && typeof pos.top === 'number') {
-        this.mapHudLeft = pos.left;
-        this.mapHudTop = pos.top;
-        this.clampMapHudPosition();
-      }
-    } catch { /* ignore */ }
-  }
-
-  private persistMapHudLayout() {
-    if (this.mapHudLeft == null || this.mapHudTop == null) return;
-    try {
-      sessionStorage.setItem(
-        GameTableComponent.MAP_HUD_POS_KEY,
-        JSON.stringify({ left: this.mapHudLeft, top: this.mapHudTop }),
-      );
-    } catch { /* ignore */ }
-  }
-
-  private clampMapHudPosition() {
-    if (this.mapHudLeft == null || this.mapHudTop == null) return;
-    const maxLeft = Math.max(0, window.innerWidth - 56);
-    const maxTop = Math.max(0, window.innerHeight - 40);
-    this.mapHudLeft = Math.min(maxLeft, Math.max(0, this.mapHudLeft));
-    this.mapHudTop = Math.min(maxTop, Math.max(0, this.mapHudTop));
   }
 
   private setGameTableGrid(width: number, height: number, gridSize: number = 50, gridType: GridType = GridType.SQUARE, gridColor: string = '#000000e6', isShowNumber = true) {

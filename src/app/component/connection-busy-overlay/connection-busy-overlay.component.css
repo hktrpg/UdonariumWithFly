@@ -1,8 +1,8 @@
 .connection-busy {
   position: fixed;
   inset: 0;
-  /* Above modal (1899999) so create-room dialog is covered while connecting. */
-  z-index: 1900000;
+  /* Above modal (2500000) so create-room dialog is covered while connecting. */
+  z-index: 2600000;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -14,7 +14,8 @@
 </ui-panel>
 
 <!-- Phone / tablet portrait: Play or Edit bottom nav -->
-<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
+<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'"
+  (contextmenu)="$event.preventDefault()">
   <ul *ngIf="!isMobileEdit || GuestMode()">
     <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
@@ -38,6 +39,12 @@
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons icon-size">folder_shared</i></div>
         <div>{{ 'menu.inventory' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons icon-size">note</i></div>
+        <div>{{ 'menu.notes' | i18n }}</div>
       </a>
     </li>
     <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
@@ -82,7 +89,8 @@
 </nav>
 
 <!-- Tablet landscape: left icon rail (Play / Edit) -->
-<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'">
+<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'"
+  (contextmenu)="$event.preventDefault()">
   <ul *ngIf="!isMobileEdit || GuestMode()">
     <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
@@ -106,6 +114,12 @@
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
         <div><i class="material-icons">folder_shared</i></div>
         <div>{{ 'menu.inventory' | i18n }}</div>
+      </a>
+    </li>
+    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
+      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
+        <div><i class="material-icons">note</i></div>
+        <div>{{ 'menu.notes' | i18n }}</div>
       </a>
     </li>
     <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">

@@ -18,6 +18,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { DiceSettingsComponent } from 'component/dice-settings/dice-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -127,6 +128,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   get name(): string { return this.diceSymbol.name; }
   set name(name: string) { this.diceSymbol.name = name; }
   get size(): number { return MathUtil.clampMin(this.diceSymbol.size); }
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
 
   get faces(): string[] { return this.diceSymbol.faces; }
   get nothingFaces(): string[] { return this.diceSymbol.nothingFaces; }
@@ -243,6 +245,12 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.diceSymbol?.identifier}`, event => {
         this.changeDetector.markForCheck();
+      })
+      .on('UPDATE_GAME_OBJECT', event => {
+        const tableId = TableSelecter.instance?.viewTable?.identifier;
+        if (tableId && event.data?.identifier === tableId) {
+          this.changeDetector.markForCheck();
+        }
       })
       .on('SYNCHRONIZE_FILE_LIST', event => {
         this.changeDetector.markForCheck();

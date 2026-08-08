@@ -16,10 +16,10 @@
       <option
         *ngFor="let chatTab of chatTabs"
         [value]="chatTab.identifier"
-        [title]="chatTab.name"
+        [title]="tabLabel(chatTab)"
         [class.is-unnamed]="chatTab.name == ''"
       >
-        {{ chatTab.name == '' ? ('chatTab.untitled' | i18n) : chatTab.name }}{{ chatTab.isPrivate ? ' 🔒' : '' }}
+        {{ tabLabel(chatTab) }}{{ chatTab.isPrivate ? ' 🔒' : '' }}
       </option>
     </select>
   </aside>

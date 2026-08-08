@@ -36,10 +36,10 @@ export const ja_tip: I18nDictionary = {
 
   'tip.chat.notice.title': '通知音',
   'tip.chat.notice.body': '新着チャットで通知音（この端末のみ）。',
-  'tip.chat.compact.title': 'コンパクト',
-  'tip.chat.compact.body': 'タブ／ツールバーを隠し入力のみ。小さなボタンで復帰。',
-  'tip.chat.clarify.title': 'リスト表示',
-  'tip.chat.clarify.body': '吹き出しではなくリスト形式で読みやすく表示。',
+  'tip.chat.compact.title': 'リスト表示',
+  'tip.chat.compact.body': '吹き出しではなくリスト形式で読みやすく表示。',
+  'tip.chat.clarify.title': 'コンパクト',
+  'tip.chat.clarify.body': 'タブ／ツールバーを隠し入力のみ。小さなボタンで復帰。',
 
   'tour.welcome.title': 'ようこそ — ガイドツアー',
   'tour.welcome.body': '各機能の説明を読んでから、開く／一度試します。\nいつでもスキップ可。以後はホバーで教學 BOX が出ます。\nデスクトップ版 Chrome 推奨。退出前に保存（ZIP またはフォルダバックアップ）。',

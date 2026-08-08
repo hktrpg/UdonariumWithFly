@@ -31,6 +31,7 @@ import { StandSettingComponent } from 'component/stand-setting/stand-setting.com
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
@@ -106,13 +107,38 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get altitude(): number { return this.gameCharacter.altitude; }
   set altitude(altitude: number) { this.gameCharacter.altitude = altitude; }
   get height(): number { return MathUtil.clampMin(this.gameCharacter.height); }
+  /** Room 2D mode: face-up token centered on the pedestal (top-down). */
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
+  get uprightTransform(): string {
+    if (this.is2DMode) {
+      // Face parallel to the table, slight Z lift above pedestal/grid.
+      // Do not use note tip-over (hinge at bottom) — that parks tall art above the base.
+      return `translateZ(${this.altitude * this.gridSize + 1}px)`;
+    }
+    const alt = (-this.altitude) * this.gridSize;
+    return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
+  }
 
   
   get imageFile(): ImageFile { return this.gameCharacter.imageFile; }
   get rotate(): number { return this.gameCharacter.rotate; }
   set rotate(rotate: number) { this.gameCharacter.rotate = rotate; }
-  get roll(): number { return this.gameCharacter.roll; }
-  set roll(roll: number) { this.gameCharacter.roll = roll; }
+  /** 2D mode: roll SyncVar is forced to 0 (no tip/tilt). */
+  get roll(): number { return this.is2DMode ? 0 : this.gameCharacter.roll; }
+  set roll(roll: number) {
+    if (this.is2DMode) {
+      if (this.gameCharacter.roll !== 0) this.gameCharacter.roll = 0;
+      return;
+    }
+    this.gameCharacter.roll = roll;
+  }
+  get isRollLocked(): boolean { return this.is2DMode || this.isMoveLocked; }
+
+  /** Write stored roll → 0 while room is in 2D (covers tokens that already had a non-zero tip). */
+  private enforce2DRollZero() {
+    if (!this.is2DMode || !this.gameCharacter) return;
+    if (this.gameCharacter.roll !== 0) this.gameCharacter.roll = 0;
+  }
   get isDropShadow(): boolean { return this.gameCharacter.isDropShadow; }
   set isDropShadow(isDropShadow: boolean) { this.gameCharacter.isDropShadow = isDropShadow; }
   get isAltitudeIndicate(): boolean { return this.gameCharacter.isAltitudeIndicate; }
@@ -559,6 +585,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.applySyncedChatDialog();
         this.changeDetector.markForCheck();
       })
+      .on('UPDATE_GAME_OBJECT', event => {
+        const tableId = TableSelecter.instance?.viewTable?.identifier;
+        if (tableId && event.data?.identifier === tableId) {
+          this.enforce2DRollZero();
+          this.changeDetector.markForCheck();
+        }
+      })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameCharacter?.identifier}`, event => {
         if (this.gameCharacter.imageFiles.length <= 0) {
           this.naturalImageHeight = 0;
@@ -614,6 +647,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.changeDetector.markForCheck();
       });
     this.applySyncedChatDialog();
+    this.enforce2DRollZero();
     this.movableOption = {
       tabletopObject: this.gameCharacter,
       transformCssOffset: 'translateZ(1.0px)',

@@ -36,10 +36,10 @@ export const zhCN_tip: I18nDictionary = {
 
   'tip.chat.notice.title': '提示音',
   'tip.chat.notice.body': '有新消息时播放提示音（仅本机）。',
-  'tip.chat.compact.title': '精简工具栏',
-  'tip.chat.compact.body': '收起标签与工具栏，只留输入区；可用小按钮还原。',
-  'tip.chat.clarify.title': '列表模式',
-  'tip.chat.clarify.body': '以列表显示消息，便于阅读（相对气泡）。',
+  'tip.chat.compact.title': '列表模式',
+  'tip.chat.compact.body': '以列表显示消息，便于阅读（相对气泡）。',
+  'tip.chat.clarify.title': '精简工具栏',
+  'tip.chat.clarify.body': '收起标签与工具栏，只留输入区；可用小按钮还原。',
 
   'tour.welcome.title': '欢迎 — 引导教学',
   'tour.welcome.body': '请先阅读说明，再打开／尝试各主要功能。\n可随时跳过。之后滑过按钮仍会立刻显示教学 BOX。\n建议桌面版 Chrome。离开前请存档（ZIP 或文件夹备份）。',

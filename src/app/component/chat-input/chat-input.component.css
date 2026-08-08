@@ -159,6 +159,16 @@
   vertical-align: bottom;
 }
 
+/* ClarifyMode: compact toolbar — keep the composer short. */
+.chat-input.is-clarify,
+:host-context(.sticky-bottom.is-clarify) .chat-input {
+  height: calc(1em + 2px);
+  min-height: calc(1em + 2px);
+  max-height: calc(2em + 4px);
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
 .chat-composer {
   display: block;
 }
@@ -520,6 +530,12 @@ button.is-active .material-icons {
   font-size: 14px;
   line-height: 1.35;
   resize: none;
+}
+
+:host-context(html.udon-mobile-layout) .chat-input.is-clarify {
+  min-height: 32px;
+  max-height: calc(2em + 12px);
+  padding: 6px 10px;
 }
 
 :host-context(html.udon-mobile-layout) .send-btn {

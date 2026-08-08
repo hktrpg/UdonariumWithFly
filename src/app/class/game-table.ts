@@ -55,6 +55,8 @@ export class GameTable extends ObjectNode {
   @SyncVar() weatherType: WeatherType = 'none';
   @SyncVar() weatherIntensity: number = 0.5;
   @SyncVar() visionEnabled: boolean = false;
+  /** Room-wide top-down view: lock camera pitch and lay tokens flat (note-like). */
+  @SyncVar() is2DMode: boolean = false;
 
   /** Show this table in the top scene navigation bar. */
   @SyncVar() showInNavigation: boolean = true;
