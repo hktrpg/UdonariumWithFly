@@ -88,6 +88,7 @@ import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
+import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -204,6 +205,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
+    private maskTokenFx: MaskTokenFxService,
     _audioImportName: AudioImportNameService,
     _connectionBusy: ConnectionBusyService,
   ) {
@@ -741,6 +743,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.maskTokenFx.start();
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
     this.syncChatUnreadBadge();

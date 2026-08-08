@@ -128,18 +128,31 @@ export class TextNote extends TabletopObject {
     return (this.videoUrl || '').trim();
   }
 
-  get isSelfOnly(): boolean { return !this.isVisible; }
+  private get myUserId(): string {
+    return Network.peer?.userId || PeerCursor.myCursor?.userId || '';
+  }
 
+  /** Self-only is driven by visibleOwner (isVisible kept for room XML compat). */
+  get isSelfOnly(): boolean {
+    return !!this.visibleOwner || this.isVisible === false;
+  }
+
+  /** True for public notes, or self-only notes owned by this peer. */
   get canSeeSelfOnly(): boolean {
-    if (this.isVisible) return true;
-    const myId = Network.peer?.userId || PeerCursor.myCursor?.userId || '';
-    return !!myId && this.visibleOwner === myId;
+    if (!this.isSelfOnly) return true;
+    const owner = this.visibleOwner;
+    if (!owner) return true; // avoid vanishing if owner was never recorded
+    const me = this.myUserId;
+    return !!me && owner === me;
   }
 
   setSelfOnly(selfOnly: boolean) {
     if (selfOnly) {
+      const id = this.myUserId;
+      if (!id) return;
+      // Set owner before flipping isVisible so cache refresh never drops the note for self.
+      this.visibleOwner = id;
       this.isVisible = false;
-      this.visibleOwner = Network.peer?.userId || PeerCursor.myCursor?.userId || '';
     } else {
       this.isVisible = true;
       this.visibleOwner = '';

@@ -340,12 +340,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         checkBox: 'check',
         hotkey: 'L',
       },
-      contextMenuToggleCheck({
-        get: () => !this.textNote.isSelfOnly,
-        set: v => { this.textNote.setSelfOnly(!v); },
-        on: this.i18n.t('note.visible'),
-        off: this.i18n.t('note.selfOnly'),
-      }),
+      {
+        name: this.textNote.isSelfOnly
+          ? this.i18n.t('note.showEveryone')
+          : this.i18n.t('note.selfOnly'),
+        nameUpdate: () => this.textNote.isSelfOnly
+          ? this.i18n.t('note.showEveryone')
+          : this.i18n.t('note.selfOnly'),
+        action: () => {
+          this.textNote.setSelfOnly(!this.textNote.isSelfOnly);
+          this.changeDetector.markForCheck();
+        },
+      },
       contextMenuToggleCheck({
         get: () => this.textNote.isFlipped,
         set: v => { this.textNote.isFlipped = v; },

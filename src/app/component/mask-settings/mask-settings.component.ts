@@ -1,17 +1,33 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
+import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { CutInList } from '@udonarium/cut-in-list';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { JUKEBOX_TRACK_COUNT } from '@udonarium/Jukebox';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
-import { TabletopClickAction } from '@udonarium/tabletop-click-action';
+import {
+  emptyMaskAppearanceSnap,
+  emptyMaskTokenFxConfig,
+  MaskAppearanceSnap,
+  MaskTokenFxConfig,
+} from '@udonarium/table-fx/mask-appearance';
+import { TabletopClickAction, TabletopClickTabMode } from '@udonarium/tabletop-click-action';
+import { TextNote } from '@udonarium/text-note';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
+import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
+
+type TokenFxFlag = keyof Pick<
+  MaskTokenFxConfig,
+  'isInverse' | 'isHollow' | 'isBlackPaint' | 'isGrayscale' | 'isSepia' | 'isWhitePaint' | 'isMatrix' | 'isFlipVertical' | 'isContrast'
+>;
 
 @Component({
   selector: 'mask-settings',
@@ -25,12 +41,34 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
   @Input() embedded = false;
 
   isDragOver = false;
+  /** Collapsed state for each enabled action panel (default: expanded). Persisted per mask. */
+  private panelCollapsed: { [id: string]: boolean } = {};
+  private static readonly PANEL_COLLAPSE_KEY = 'udonarium-mask-action-panel-collapsed';
+
+  readonly trackIndexes = Array.from({ length: JUKEBOX_TRACK_COUNT }, (_, i) => i);
 
   readonly actions: { id: TabletopClickAction; icon: string; labelKey: string }[] = [
     { id: 'none', icon: 'block', labelKey: 'note.actionNone' },
     { id: 'chat', icon: 'chat', labelKey: 'note.actionChat' },
+    { id: 'music', icon: 'music_note', labelKey: 'mask.actionMusic' },
+    { id: 'cutin', icon: 'movie', labelKey: 'mask.actionCutin' },
+    { id: 'note', icon: 'description', labelKey: 'mask.actionNote' },
     { id: 'table', icon: 'map', labelKey: 'note.actionTable' },
     { id: 'preset', icon: 'bookmark', labelKey: 'note.actionPreset' },
+    { id: 'toggleAppearance', icon: 'flip', labelKey: 'mask.actionToggleAppearance' },
+    { id: 'tokenFx', icon: 'auto_fix', labelKey: 'mask.actionTokenFx' },
+  ];
+
+  readonly fxFlags: { key: TokenFxFlag; labelKey: string }[] = [
+    { key: 'isInverse', labelKey: 'mask.fx.inverse' },
+    { key: 'isFlipVertical', labelKey: 'mask.fx.flipVertical' },
+    { key: 'isHollow', labelKey: 'mask.fx.blur' },
+    { key: 'isGrayscale', labelKey: 'mask.fx.grayscale' },
+    { key: 'isSepia', labelKey: 'mask.fx.sepia' },
+    { key: 'isMatrix', labelKey: 'mask.fx.matrix' },
+    { key: 'isContrast', labelKey: 'mask.fx.contrast' },
+    { key: 'isBlackPaint', labelKey: 'mask.fx.blackSilhouette' },
+    { key: 'isWhitePaint', labelKey: 'mask.fx.whiteSilhouette' },
   ];
 
   readonly blendOptions = [
@@ -47,11 +85,30 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   get tables(): GameTable[] { return ObjectStore.instance.getObjects(GameTable); }
   get presets() { return ScenePresetList.instance.presets; }
+  get chatTabs() { return this.chatMessageService.chatTabs; }
+  get audios() { return AudioStorage.instance.audios.filter(a => !a.isHidden); }
+  get cutIns() { return CutInList.instance.cutIns; }
+  get notes(): TextNote[] { return ObjectStore.instance.getObjects(TextNote); }
+
+  get altSnap(): MaskAppearanceSnap {
+    return this.mask ? this.mask.appearanceAlt : emptyMaskAppearanceSnap();
+  }
+
+  get tokenFx(): MaskTokenFxConfig {
+    return this.mask ? this.mask.tokenFxConfig : emptyMaskTokenFxConfig();
+  }
+
+  get altImageUrl(): string {
+    const id = this.altSnap.imageIdentifier;
+    if (!id) return '';
+    return ImageStorage.instance.get(id)?.url || '';
+  }
 
   constructor(
     private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
     private panelService: PanelService,
+    private chatMessageService: ChatMessageService,
     private i18n: I18nService
   ) { }
 
@@ -69,14 +126,19 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
           this.changeDetector.markForCheck();
         }
       })
-      .on('UPDATE_FILE_RESOURE', () => this.changeDetector.markForCheck());
-    if (this.mask) this.mask.complement();
+      .on('UPDATE_FILE_RESOURE', () => this.changeDetector.markForCheck())
+      .on('SYNCHRONIZE_FILE_LIST', () => this.changeDetector.markForCheck());
+    if (this.mask) {
+      this.mask.complement();
+      this.loadPanelCollapsed();
+    }
     this.refreshTitle();
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['mask'] && this.mask) {
       this.mask.complement();
+      this.loadPanelCollapsed();
       this.refreshTitle();
     }
   }
@@ -85,9 +147,78 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     EventSystem.unregister(this);
   }
 
+  isActionOn(action: TabletopClickAction): boolean {
+    return !!this.mask && this.mask.hasClickActionKind(action);
+  }
+
+  isPanelExpanded(action: TabletopClickAction): boolean {
+    return !this.panelCollapsed[action];
+  }
+
+  togglePanel(action: TabletopClickAction, e?: Event) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    this.panelCollapsed[action] = !this.panelCollapsed[action];
+    this.savePanelCollapsed();
+    this.changeDetector.markForCheck();
+  }
+
+  /** Multi-select toggle. "none" clears all. */
   setClickAction(action: TabletopClickAction) {
     if (!this.mask || this.GuestMode()) return;
-    this.mask.clickAction = action;
+    if (action === 'none') {
+      this.mask.setEnabledClickActions([]);
+    } else {
+      const wasOn = this.isActionOn(action);
+      this.mask.toggleClickAction(action);
+      if (!wasOn) {
+        this.panelCollapsed[action] = false;
+        this.savePanelCollapsed();
+      }
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  private loadPanelCollapsed() {
+    const maskId = this.mask?.identifier;
+    if (!maskId) {
+      this.panelCollapsed = {};
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(MaskSettingsComponent.PANEL_COLLAPSE_KEY);
+      if (!raw) {
+        this.panelCollapsed = {};
+        return;
+      }
+      const all = JSON.parse(raw);
+      const entry = all && typeof all === 'object' ? all[maskId] : null;
+      this.panelCollapsed = entry && typeof entry === 'object' ? { ...entry } : {};
+    } catch {
+      this.panelCollapsed = {};
+    }
+  }
+
+  private savePanelCollapsed() {
+    const maskId = this.mask?.identifier;
+    if (!maskId) return;
+    try {
+      let all: { [maskId: string]: { [action: string]: boolean } } = {};
+      const raw = localStorage.getItem(MaskSettingsComponent.PANEL_COLLAPSE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') all = parsed;
+      }
+      all[maskId] = { ...this.panelCollapsed };
+      localStorage.setItem(MaskSettingsComponent.PANEL_COLLAPSE_KEY, JSON.stringify(all));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
+  setTabMode(mode: TabletopClickTabMode) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.clickTabMode = mode;
     this.changeDetector.markForCheck();
   }
 
@@ -100,6 +231,34 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
   setBorderType(value: number) {
     if (!this.mask || this.GuestMode()) return;
     this.mask.borderType = value;
+    this.changeDetector.markForCheck();
+  }
+
+  patchAlt(partial: Partial<MaskAppearanceSnap>) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.appearanceAlt = { ...this.altSnap, ...partial };
+    this.changeDetector.markForCheck();
+  }
+
+  patchTokenFx(partial: Partial<MaskTokenFxConfig>) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.tokenFxConfig = { ...this.tokenFx, ...partial };
+    this.changeDetector.markForCheck();
+  }
+
+  setTokenFxFlag(key: TokenFxFlag, checked: boolean) {
+    this.patchTokenFx({ [key]: !!checked } as Partial<MaskTokenFxConfig>);
+  }
+
+  setTokenFxPassive(checked: boolean) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.tokenFxPassive = !!checked;
+    this.changeDetector.markForCheck();
+  }
+
+  copyCurrentToAlt() {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.appearanceAlt = this.mask.captureAppearanceSnap();
     this.changeDetector.markForCheck();
   }
 
@@ -116,10 +275,26 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
+  openAltImage() {
+    if (!this.mask || this.GuestMode()) return;
+    const current = this.altSnap.imageIdentifier || '';
+    this.modalService.open<string>(FileSelecterComponent, {
+      isAllowedEmpty: true,
+      currentImageIdentifires: current ? [current] : []
+    }).then(value => {
+      if (value == null) return;
+      this.patchAlt({ imageIdentifier: value || '' });
+    });
+  }
+
   clearImage() {
     if (!this.mask || this.GuestMode()) return;
     this.mask.setImage('');
     this.changeDetector.markForCheck();
+  }
+
+  clearAltImage() {
+    this.patchAlt({ imageIdentifier: '' });
   }
 
   onDragOver(e: DragEvent) {

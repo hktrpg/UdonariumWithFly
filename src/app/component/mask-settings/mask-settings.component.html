@@ -89,9 +89,13 @@
   </section>
 
   <section class="card card-dense">
-    <div class="mode-tabs action-tabs" role="tablist" [attr.title]="'mask.clickHint' | i18n">
+    <header class="action-head">
+      <span class="action-title">{{ 'mask.clickAction' | i18n }}</span>
+      <span class="hint action-hint">{{ 'mask.clickHint' | i18n }}</span>
+    </header>
+    <div class="mode-tabs action-tabs" role="group" [attr.title]="'mask.clickHint' | i18n">
       <button type="button" class="mode-tab" *ngFor="let action of actions"
-        [class.is-active]="mask.clickAction === action.id"
+        [class.is-active]="action.id === 'none' ? !mask.hasAnyClickAction : isActionOn(action.id)"
         [disabled]="GuestMode()"
         (click)="setClickAction(action.id)">
         <i class="material-icons">{{ action.icon }}</i>
@@ -99,30 +103,273 @@
       </button>
     </div>
 
-    <label class="field" *ngIf="mask.clickAction === 'chat'">
-      <span>{{ 'note.clickChatText' | i18n }}</span>
-      <textarea class="text-body" rows="1" [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()"></textarea>
-    </label>
-    <div class="field-row nowrap" *ngIf="mask.clickAction === 'chat'">
-      <label class="field grow">
-        <span>{{ 'note.clickGameType' | i18n }}</span>
-        <input type="text" [(ngModel)]="mask.clickGameType" [disabled]="GuestMode()" />
-      </label>
+    <div class="action-panels" *ngIf="mask.hasAnyClickAction">
+      <!-- chat -->
+      <ng-container *ngIf="isActionOn('chat')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('chat')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('chat', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('chat') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">chat</i>
+            <span>{{ 'note.actionChat' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('chat')">
+            <label class="field">
+              <span>{{ 'note.clickChatText' | i18n }}</span>
+              <textarea class="text-body" rows="1" [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()"></textarea>
+            </label>
+            <div class="field-row nowrap">
+              <label class="field grow">
+                <span>{{ 'note.clickGameType' | i18n }}</span>
+                <input type="text" [(ngModel)]="mask.clickGameType" [disabled]="GuestMode()" />
+              </label>
+            </div>
+            <div class="field-row nowrap">
+              <label class="field grow">
+                <span>{{ 'mask.clickTabMode' | i18n }}</span>
+                <select [ngModel]="mask.clickTabMode" (ngModelChange)="setTabMode($event)" [disabled]="GuestMode()">
+                  <option value="current">{{ 'mask.clickTabCurrent' | i18n }}</option>
+                  <option value="specified">{{ 'mask.clickTabSpecified' | i18n }}</option>
+                </select>
+              </label>
+              <label class="field grow" *ngIf="mask.clickTabMode === 'specified'">
+                <span>{{ 'mask.clickTab' | i18n }}</span>
+                <select [(ngModel)]="mask.clickTabId" [disabled]="GuestMode()">
+                  <option value="">{{ 'mask.pickChatTab' | i18n }}</option>
+                  <option *ngFor="let tab of chatTabs" [ngValue]="tab.identifier">{{ tab.name }}</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- music -->
+      <ng-container *ngIf="isActionOn('music')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('music')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('music', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('music') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">music_note</i>
+            <span>{{ 'mask.actionMusic' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('music')">
+            <label class="field">
+              <span>{{ 'mask.clickMusic' | i18n }}</span>
+              <select [(ngModel)]="mask.clickMusicId" [disabled]="GuestMode()">
+                <option value="">{{ 'mask.pickMusic' | i18n }}</option>
+                <option *ngFor="let audio of audios" [ngValue]="audio.identifier">{{ audio.name }}</option>
+              </select>
+            </label>
+            <div class="field-row nowrap">
+              <label class="field grow">
+                <span>{{ 'jukebox.tracks' | i18n }}</span>
+                <select [(ngModel)]="mask.clickMusicTrack" [disabled]="GuestMode()">
+                  <option *ngFor="let i of trackIndexes" [ngValue]="i">{{ i + 1 }}</option>
+                </select>
+              </label>
+              <label class="check-inline">
+                <input type="checkbox" [(ngModel)]="mask.clickMusicLoop" [disabled]="GuestMode()" />
+                {{ 'jukebox.modeLoop' | i18n }}
+              </label>
+            </div>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- cutin -->
+      <ng-container *ngIf="isActionOn('cutin')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('cutin')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('cutin', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('cutin') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">movie</i>
+            <span>{{ 'mask.actionCutin' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('cutin')">
+            <label class="field">
+              <span>{{ 'mask.clickCutin' | i18n }}</span>
+              <select [(ngModel)]="mask.clickCutinId" [disabled]="GuestMode()">
+                <option value="">{{ 'mask.pickCutin' | i18n }}</option>
+                <option *ngFor="let cutIn of cutIns" [ngValue]="cutIn.identifier">{{ cutIn.name || cutIn.identifier }}</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- note -->
+      <ng-container *ngIf="isActionOn('note')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('note')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('note', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('note') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">description</i>
+            <span>{{ 'mask.actionNote' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('note')">
+            <label class="field">
+              <span>{{ 'mask.clickNote' | i18n }}</span>
+              <select [(ngModel)]="mask.clickNoteId" [disabled]="GuestMode()">
+                <option value="">{{ 'mask.pickNote' | i18n }}</option>
+                <option *ngFor="let note of notes" [ngValue]="note.identifier">{{ note.title || note.identifier }}</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- table -->
+      <ng-container *ngIf="isActionOn('table')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('table')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('table', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('table') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">map</i>
+            <span>{{ 'note.actionTable' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('table')">
+            <label class="field">
+              <span>{{ 'note.clickTable' | i18n }}</span>
+              <select [(ngModel)]="mask.clickTableId" [disabled]="GuestMode()">
+                <option value="">{{ 'note.pickTable' | i18n }}</option>
+                <option *ngFor="let table of tables" [ngValue]="table.identifier">{{ table.name }}</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- preset -->
+      <ng-container *ngIf="isActionOn('preset')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('preset')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('preset', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('preset') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">bookmark</i>
+            <span>{{ 'note.actionPreset' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('preset')">
+            <label class="field">
+              <span>{{ 'note.clickPreset' | i18n }}</span>
+              <select [(ngModel)]="mask.clickPresetId" [disabled]="GuestMode()">
+                <option value="">{{ 'note.pickPreset' | i18n }}</option>
+                <option *ngFor="let preset of presets" [ngValue]="preset.identifier">{{ preset.title || preset.identifier }}</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- toggle appearance -->
+      <ng-container *ngIf="isActionOn('toggleAppearance')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('toggleAppearance')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('toggleAppearance', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('toggleAppearance') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">flip</i>
+            <span>{{ 'mask.actionToggleAppearance' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('toggleAppearance')">
+            <p class="hint action-hint">
+              {{ 'mask.appearanceState' | i18n }}:
+              <strong>{{ (mask.appearanceIsAlt ? 'mask.appearanceAlt' : 'mask.appearanceDefault') | i18n }}</strong>
+            </p>
+            <div class="field-row">
+              <button type="button" class="btn btn-sm" (click)="copyCurrentToAlt()" [disabled]="GuestMode()">
+                {{ 'mask.copyToAlt' | i18n }}
+              </button>
+            </div>
+            <div class="alt-block">
+              <span class="action-title">{{ 'mask.appearanceAltEdit' | i18n }}</span>
+              <div class="image-row">
+                <button type="button" class="image-frame image-frame-sm" [class.image-frame-empty]="!altImageUrl"
+                  (click)="openAltImage()" [disabled]="GuestMode()">
+                  <img *ngIf="altImageUrl" [src]="altImageUrl | safe: 'resourceUrl'" alt="" />
+                  <i *ngIf="!altImageUrl" class="material-icons">add_photo_alternate</i>
+                </button>
+                <div class="image-actions">
+                  <button type="button" class="btn btn-sm" (click)="openAltImage()" [disabled]="GuestMode()">
+                    {{ 'mask.changeImage' | i18n }}
+                  </button>
+                  <button type="button" class="btn btn-sm" (click)="clearAltImage()" [disabled]="GuestMode() || !altSnap.imageIdentifier">
+                    {{ 'mask.clearImage' | i18n }}
+                  </button>
+                </div>
+              </div>
+              <div class="field-row nowrap metrics">
+                <label class="field">
+                  <span>{{ 'note.fieldWidth' | i18n }}</span>
+                  <input type="number" min="0.5" step="0.5" [ngModel]="altSnap.width"
+                    (ngModelChange)="patchAlt({ width: +$event })" [disabled]="GuestMode()" />
+                </label>
+                <label class="field">
+                  <span>{{ 'note.fieldHeight' | i18n }}</span>
+                  <input type="number" min="0.5" step="0.5" [ngModel]="altSnap.height"
+                    (ngModelChange)="patchAlt({ height: +$event })" [disabled]="GuestMode()" />
+                </label>
+                <label class="field">
+                  <span>{{ 'mask.fieldOpacity' | i18n }}</span>
+                  <input type="number" min="0" max="100" step="1" [ngModel]="altSnap.opacityPercent"
+                    (ngModelChange)="patchAlt({ opacityPercent: +$event })" [disabled]="GuestMode()" />
+                </label>
+                <label class="field">
+                  <span>{{ 'mask.fieldAltitude' | i18n }}</span>
+                  <input type="number" step="0.5" [ngModel]="altSnap.altitude"
+                    (ngModelChange)="patchAlt({ altitude: +$event })" [disabled]="GuestMode()" />
+                </label>
+                <label class="field">
+                  <span>{{ 'note.fieldFontSize' | i18n }}</span>
+                  <input type="number" min="1" step="1" [ngModel]="altSnap.fontsize"
+                    (ngModelChange)="patchAlt({ fontsize: +$event })" [disabled]="GuestMode()" />
+                </label>
+                <label class="field color-field">
+                  <span>{{ 'mask.fieldTextColor' | i18n }}</span>
+                  <input type="color" [ngModel]="altSnap.color"
+                    (ngModelChange)="patchAlt({ color: $event })" [disabled]="GuestMode()" />
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- token FX -->
+      <ng-container *ngIf="isActionOn('tokenFx')">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('tokenFx')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('tokenFx', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('tokenFx') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">auto_fix</i>
+            <span>{{ 'mask.actionTokenFx' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('tokenFx')">
+            <p class="hint action-hint">{{ 'mask.tokenFxHint' | i18n }}</p>
+            <label class="check-inline">
+              <input type="checkbox" [ngModel]="mask.tokenFxPassive"
+                (ngModelChange)="setTokenFxPassive($event)"
+                [disabled]="GuestMode()" />
+              {{ 'mask.tokenFxPassive' | i18n }}
+            </label>
+            <div class="fx-grid">
+              <label *ngFor="let fx of fxFlags" class="fx-item">
+                <input type="checkbox" [ngModel]="!!tokenFx[fx.key]"
+                  (ngModelChange)="setTokenFxFlag(fx.key, $event)" [disabled]="GuestMode()" />
+                <span>{{ fx.labelKey | i18n }}</span>
+              </label>
+            </div>
+            <div class="field-row token-fx-altitude">
+              <label class="field grow">
+                <span>{{ 'mask.tokenFxAltitudeMode' | i18n }}</span>
+                <select [ngModel]="tokenFx.altitudeMode || 'none'"
+                  (ngModelChange)="patchTokenFx({ altitudeMode: $event })" [disabled]="GuestMode()">
+                  <option value="none">{{ 'mask.altitudeNone' | i18n }}</option>
+                  <option value="set">{{ 'mask.altitudeSet' | i18n }}</option>
+                  <option value="delta">{{ 'mask.altitudeDelta' | i18n }}</option>
+                </select>
+              </label>
+              <label class="field" *ngIf="(tokenFx.altitudeMode || 'none') !== 'none'">
+                <span>{{ 'mask.fieldAltitude' | i18n }}</span>
+                <input type="number" step="0.5" [ngModel]="tokenFx.altitude || 0"
+                  (ngModelChange)="patchTokenFx({ altitude: +$event })" [disabled]="GuestMode()" />
+              </label>
+            </div>
+          </div>
+        </section>
+      </ng-container>
     </div>
-    <label class="field" *ngIf="mask.clickAction === 'table'">
-      <span>{{ 'note.clickTable' | i18n }}</span>
-      <select [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()">
-        <option value="">{{ 'note.pickTable' | i18n }}</option>
-        <option *ngFor="let table of tables" [ngValue]="table.identifier">{{ table.name }}</option>
-      </select>
-    </label>
-    <label class="field" *ngIf="mask.clickAction === 'preset'">
-      <span>{{ 'note.clickPreset' | i18n }}</span>
-      <select [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()">
-        <option value="">{{ 'note.pickPreset' | i18n }}</option>
-        <option *ngFor="let preset of presets" [ngValue]="preset.identifier">{{ preset.title || preset.identifier }}</option>
-      </select>
-    </label>
   </section>
 
   <section class="card card-dense opts-card">

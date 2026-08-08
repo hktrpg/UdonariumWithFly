@@ -57,6 +57,7 @@ import { GameObjectInventoryService } from 'service/game-object-inventory.servic
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { TabletopService } from 'service/tabletop.service';
 
 import { AppComponent } from './app.component';
@@ -219,6 +220,7 @@ import '@udonarium/table-fx/combat-tracker';
     PanelService,
     PointerDeviceService,
     TabletopService,
+    MaskTokenFxService,
     StandImageService,
   ],
   bootstrap: [AppComponent]

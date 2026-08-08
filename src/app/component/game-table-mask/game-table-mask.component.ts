@@ -71,11 +71,8 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
 export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewInit {
   @Input() gameTableMask: GameTableMask = null;
   @Input() is3D: boolean = false;
-  private dragStarted = false;
-  private clickArmed = false;
-
   get name(): string { return this.gameTableMask.name; }
-  get hasClickAction(): boolean { return !!this.gameTableMask && this.gameTableMask.clickAction !== 'none'; }
+  get hasClickAction(): boolean { return !!this.gameTableMask && this.gameTableMask.hasAnyClickAction; }
   get width(): number { return MathUtil.clampMin(this.gameTableMask.width); }
   get height(): number { return MathUtil.clampMin(this.gameTableMask.height); }
   get opacity(): number { return this.gameTableMask.opacity; }
@@ -320,8 +317,6 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onInputStart(e: any) {
-    this.dragStarted = false;
-    this.clickArmed = !this.isScratching && e?.button === 0;
     if (!this.isScratching || !this.gameTableMask.isMine) { 
       this.input.cancel();
     } else if (!window.PointerEvent && e.button < 2 && e.buttons < 2) {
@@ -332,19 +327,6 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     if ((this.isLock && !this.isScratching) || (this.isScratching && !this.gameTableMask.isMine)) {
       EventSystem.trigger('DRAG_LOCKED_OBJECT', { srcEvent: e });
     }
-  }
-
-  @HostListener('mouseup', ['$event'])
-  onPointerUp(e: MouseEvent) {
-    if (!this.clickArmed || this.dragStarted || this.isScratching) return;
-    if (e.button !== 0) return;
-    if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
-    this.clickArmed = false;
-    // Require Alt+left click so normal select / nudge does not fire actions.
-    if (!e.altKey || !this.hasClickAction) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.ngZone.run(() => executeTabletopClickAction(this.gameTableMask, this.chatMessageService));
   }
 
   @HostListener('pointerdown', ['$event'])
@@ -451,13 +433,11 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onMove() {
-    this.dragStarted = true;
     this.contextMenuService.close();
     SoundEffect.play(PresetSound.cardPick);
   }
 
   onMoved() {
-    this.clickArmed = false;
     SoundEffect.play(PresetSound.cardPut);
   }
 
@@ -841,6 +821,13 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
 
   onDoubleClick(e: Event) {
     e.stopPropagation();
+    e.preventDefault();
+    const me = e as MouseEvent;
+    // Alt+double-click runs mask actions and must not open settings.
+    if (me?.altKey && this.hasClickAction) {
+      this.ngZone.run(() => executeTabletopClickAction(this.gameTableMask, this.chatMessageService));
+      return;
+    }
     this.showDetail(this.gameTableMask);
   }
 
