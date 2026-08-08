@@ -58,18 +58,29 @@ export class PanelService {
   static geometryReady: Promise<void> = Promise.resolve();
 
   /**
-   * Personal setting: opening a non-chat panel closes other non-chat panels.
+   * Personal setting: opening a main-menu panel closes other main-menu panels.
+   * Chat is never exclusive. Object sheets (character / note / mask / …), palettes,
+   * stands, and other non-menu windows are not affected.
    * Default on. Desktop only (mobile sheets already replace each other).
-   * Exceptions: Connection+Lobby; Character sheet+palette+stand; Card-stack settings+list;
-   * Character inventory+sheets; Note inventory+notes; multiple character/note sheets.
+   * Exception: Connection + Lobby may stay open together.
    */
   static singleNonChatWindow = true;
 
-  /** Tour / geometry ids that share one exclusive slot (do not close each other). */
-  private static readonly NON_CHAT_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+  /** Menu tour ids that may coexist under single-menu-window mode. */
+  private static readonly MENU_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
     ['menu.connection', 'menu.lobby'],
-    ['panel.card-stack-settings', 'panel.card-stack-list'],
   ];
+
+  /**
+   * Toolbox editors opened from the menu without a `menu.*` tour id yet
+   * (kept for exclusivity; prefer assigning tourPanelId when opening).
+   */
+  private static readonly MENU_EXCLUSIVE_EXTRA_IDS: ReadonlySet<string> = new Set([
+    'panel.dice-roll-table-setting',
+    'panel.app-cut-in-setting',
+    'menu.diceTable',
+    'menu.cutIn',
+  ]);
 
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
@@ -347,81 +358,47 @@ export class PanelService {
     return raw;
   }
 
-  /** True when two non-chat panels may coexist under single-window mode (e.g. Connection + Lobby). */
-  static areCompatibleNonChatPanels(aId: string, bId: string): boolean {
-    if (!aId || !bId) return false;
-    // Character / note sheets: multiple instances of the same type may stay open.
-    if (PanelService.isMultiInstanceNonChatPanel(aId) && PanelService.isMultiInstanceNonChatPanel(bId)
-      && PanelService.multiInstanceKind(aId) === PanelService.multiInstanceKind(bId)) {
-      return true;
-    }
-    if (aId === bId) return false;
-    for (const group of PanelService.NON_CHAT_COMPAT_GROUPS) {
+  /**
+   * True for main-menu panels that participate in single-window exclusivity.
+   * Chat / main chrome / object sheets are never exclusive.
+   */
+  static isMenuExclusivePanel(id: string): boolean {
+    if (!id) return false;
+    if (id === 'menu.chat' || id === 'menu.main') return false;
+    if (id.startsWith('menu.')) return true;
+    return PanelService.MENU_EXCLUSIVE_EXTRA_IDS.has(id);
+  }
+
+  /** True when two menu panels may coexist (e.g. Connection + Lobby). */
+  static areCompatibleMenuPanels(aId: string, bId: string): boolean {
+    if (!aId || !bId || aId === bId) return false;
+    for (const group of PanelService.MENU_COMPAT_GROUPS) {
       if (group.includes(aId) && group.includes(bId)) return true;
     }
-    // Character sheet + chat palette + stand settings may stay open together.
-    // Two palettes (or two stands) still replace each other.
-    if (PanelService.isCharacterCompanionPanel(aId, bId)) return true;
-    // Character inventory ↔ character cards; note inventory ↔ note settings.
-    if (PanelService.isInventorySheetPair(aId, bId)) return true;
     return false;
   }
 
-  /** Panels that may open multiple copies under single-window mode. */
-  private static isMultiInstanceNonChatPanel(id: string): boolean {
-    return PanelService.multiInstanceKind(id) !== '';
-  }
-
-  private static multiInstanceKind(id: string): 'character-sheet' | 'note-sheet' | '' {
-    if (PanelService.isCharacterSheetId(id)) return 'character-sheet';
-    if (PanelService.isNoteSheetId(id)) return 'note-sheet';
-    return '';
-  }
-
-  private static isCharacterSheetId(id: string): boolean {
-    return id === 'sheet.character'
-      || id === 'panel.character-settings'
-      || id === 'panel.game-character-sheet';
-  }
-
-  private static isNoteSheetId(id: string): boolean {
-    return id === 'panel.note-settings'
-      || id === 'sheet.text-note';
-  }
-
-  /** menu.inventory ↔ character sheet; menu.notes ↔ note settings. */
-  private static isInventorySheetPair(aId: string, bId: string): boolean {
-    const pair = (inv: string, sheet: (id: string) => boolean) =>
-      (aId === inv && sheet(bId)) || (bId === inv && sheet(aId));
-    return pair('menu.inventory', PanelService.isCharacterSheetId)
-      || pair('menu.notes', PanelService.isNoteSheetId);
-  }
-
-  /** Character sheet ↔ palette ↔ stand (cross-type only). */
-  private static isCharacterCompanionPanel(aId: string, bId: string): boolean {
-    const kind = (id: string): 'sheet' | 'palette' | 'stand' | '' => {
-      if (PanelService.isCharacterSheetId(id)) return 'sheet';
-      if (id.startsWith('char.palette.') || id === 'panel.chat-palette') return 'palette';
-      if (id.startsWith('char.stand.') || id === 'panel.app-stand-setting') return 'stand';
-      return '';
-    };
-    const a = kind(aId);
-    const b = kind(bId);
-    return !!a && !!b && a !== b;
-  }
-
-  /** Close every closable non-chat panel (optionally keep one instance + its compat group). */
-  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+  /**
+   * Close other exclusive menu panels when opening a menu panel.
+   * No-op when the opening panel is not a menu exclusive (character card, etc.).
+   */
+  static closeOtherMenuPanels(except: PanelService = null, opening: PanelOption = null) {
     const openingId = PanelService.panelExclusiveId(opening || except);
+    if (!PanelService.isMenuExclusivePanel(openingId)) return;
+
     for (const panel of Array.from(PanelService.openPanels)) {
       if (!panel.isAbleCloseButton) continue;
-      if (PanelService.isChatPanel(panel)) continue;
       if (except && panel === except) continue;
-      if (openingId && PanelService.areCompatibleNonChatPanels(PanelService.panelExclusiveId(panel), openingId)) {
-        continue;
-      }
+      const id = PanelService.panelExclusiveId(panel);
+      if (!PanelService.isMenuExclusivePanel(id)) continue;
+      if (PanelService.areCompatibleMenuPanels(id, openingId)) continue;
       panel.close();
     }
+  }
+
+  /** @deprecated Use closeOtherMenuPanels */
+  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+    PanelService.closeOtherMenuPanels(except, opening);
   }
 
   /**
@@ -721,10 +698,9 @@ export class PanelService {
         if ((resolved.width ?? 0) < 620) resolved.width = 620;
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
       }
-      // Personal setting: one non-chat window at a time (chat windows stay).
-      // Connection + Lobby share a group and do not close each other.
-      if (PanelService.singleNonChatWindow && !isChat) {
-        PanelService.closeOtherNonChatPanels(childPanelService, resolved);
+      // Personal setting: one main-menu window at a time (chat / object sheets stay).
+      if (PanelService.singleNonChatWindow) {
+        PanelService.closeOtherMenuPanels(childPanelService, resolved);
       }
     }
     if (resolved.title) childPanelService.title = resolved.title;

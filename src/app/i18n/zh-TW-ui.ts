@@ -233,7 +233,7 @@ export const zhTW_ui: I18nDictionary = {
   'menu.settings.resourceHud': '顯示資源 HUD',
   'menu.settings.musicHud': '顯示音樂 HUD',
   'menu.settings.includeAudioInSave': '備份／ZIP 含音樂',
-  'menu.settings.singleNonChat': '非聊天只開一窗',
+  'menu.settings.singleNonChat': '選單只開一窗（不含聊天）',
   'menu.settings.showStand': '顯示立繪',
   'menu.settings.showNameTag': '顯示名稱標籤',
   'menu.settings.standAutoExit': '立繪自動淡出退場',

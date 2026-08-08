@@ -232,7 +232,7 @@ export const zhCN_ui: I18nDictionary = {
   'menu.settings.resourceHud': '显示资源 HUD',
   'menu.settings.musicHud': '显示音乐 HUD',
   'menu.settings.includeAudioInSave': '备份／ZIP 含音乐',
-  'menu.settings.singleNonChat': '非聊天只开一窗',
+  'menu.settings.singleNonChat': '菜单只开一窗（不含聊天）',
   'menu.settings.showStand': '显示立绘',
   'menu.settings.showNameTag': '显示名称标签',
   'menu.settings.standAutoExit': '立绘自动淡出退场',

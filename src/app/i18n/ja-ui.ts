@@ -232,7 +232,7 @@ export const ja_ui: I18nDictionary = {
   'menu.settings.resourceHud': 'リソースHUDを表示',
   'menu.settings.musicHud': '音楽HUDを表示',
   'menu.settings.includeAudioInSave': 'バックアップ／ZIPに音楽を含める',
-  'menu.settings.singleNonChat': 'チャット以外は1窓のみ',
+  'menu.settings.singleNonChat': 'メニューは1窓のみ（チャット除く）',
   'menu.settings.showStand': '立ち絵を表示',
   'menu.settings.showNameTag': 'ネームタグを表示',
   'menu.settings.standAutoExit': '立ち絵を自動退場',

@@ -232,7 +232,7 @@ export const en_ui: I18nDictionary = {
   'menu.settings.resourceHud': 'Show resource HUD',
   'menu.settings.musicHud': 'Show music HUD',
   'menu.settings.includeAudioInSave': 'Include music in backup / ZIP',
-  'menu.settings.singleNonChat': 'One non-chat window',
+  'menu.settings.singleNonChat': 'One menu window (not chat)',
   'menu.settings.showStand': 'Show stands',
   'menu.settings.showNameTag': 'Show name tags',
   'menu.settings.standAutoExit': 'Auto-fade stands',

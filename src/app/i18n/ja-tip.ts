@@ -26,7 +26,7 @@ export const ja_tip: I18nDictionary = {
   'tip.menu.notes.title': 'メモ',
   'tip.menu.notes.body': 'メモ倉庫：テキスト／画像／動画／PDF。裏返し、非表示、クリック動作、プレイヤー提示に対応。',
   'tip.menu.settings.title': '設定',
-  'tip.menu.settings.body': 'ローカル設定：グリッド、スナップ、音、チャット自動表示、単一窓、パネル再配置、スタンド、言語、チュートリアル。',
+  'tip.menu.settings.body': 'ローカル設定：グリッド、スナップ、音、チャット自動表示、メニュー単一窓、パネル再配置、スタンド、言語、チュートリアル。',
   'tip.menu.more.title': 'その他',
   'tip.menu.more.body': 'プレイ：ツール箱・メモ・編集へ。編集：テーブル／画像／音楽／メモが主列。',
   'tip.menu.mode.edit.title': '編集モード',

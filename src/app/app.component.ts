@@ -985,6 +985,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'ScenarioTextComponent': return 'menu.scenarioText';
       case 'GameObjectInventoryComponent': return 'menu.inventory';
       case 'NoteInventoryComponent': return 'menu.notes';
+      case 'DiceRollTableSettingComponent': return 'menu.diceTable';
+      case 'CutInSettingComponent': return 'menu.cutIn';
       default: return null;
     }
   }
