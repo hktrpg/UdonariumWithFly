@@ -3,7 +3,7 @@
 .combat-tracker {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .enc-nav {
@@ -24,8 +24,8 @@
 }
 
 .tool-actions {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px solid #e2d3bf;
 }
 
@@ -36,7 +36,7 @@
 
 .current-body {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: stretch;
 }
 
