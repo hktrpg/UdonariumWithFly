@@ -7,7 +7,7 @@ import { I18nService } from 'service/i18n.service';
 @Component({
     selector: 'app-confirmation',
     templateUrl: './confirmation.component.html',
-    styleUrls: ['./confirmation.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './confirmation.component.css'],
     standalone: false
 })
 export class ConfirmationComponent implements OnInit, OnDestroy {

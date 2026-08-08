@@ -488,15 +488,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   sendChat(value: { text: string, gameType: string, sendFrom: string, sendTo: string,
-    color?: string, isInverse?:boolean, isHollow?: boolean, isBlackPaint?: boolean, imageFx?: string, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName?: string, isUseStandImage?: boolean }) {
+    color?: string, isInverse?:boolean, isHollow?: boolean, isBlackPaint?: boolean, imageFx?: string, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName?: string, isUseStandImage?: boolean, attachedImageIdentifiers?: string[] }) {
     if (this.chatTab) {
       this.chatMessageService.sendMessage(
-        this.chatTab, 
-        value.text, 
-        value.gameType, 
-        value.sendFrom, 
+        this.chatTab,
+        value.text,
+        value.gameType,
+        value.sendFrom,
         value.sendTo,
-        value.color, 
+        value.color,
         value.isInverse,
         value.isHollow,
         value.isBlackPaint,
@@ -506,7 +506,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
         value.standIdentifier,
         value.standName,
         value.isUseStandImage,
-        value.imageFx
+        value.imageFx,
+        value.attachedImageIdentifiers
       );
     }
   }

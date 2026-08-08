@@ -350,20 +350,27 @@ export class SaveDataService {
       if (shadowIdentifier) images[shadowIdentifier] = ImageStorage.instance.get(shadowIdentifier);
     }
 
-    imageElements = xmlElement.ownerDocument.querySelectorAll('*[imageIdentifier], *[toImageIdentifier], *[backgroundImageIdentifier], *[backgroundImageIdentifier2]');
+    imageElements = xmlElement.ownerDocument.querySelectorAll('*[imageIdentifier], *[toImageIdentifier], *[backgroundImageIdentifier], *[backgroundImageIdentifier2], *[attachedImageIdentifiers]');
 
     for (let i = 0; i < imageElements.length; i++) {
       let identifier = imageElements[i].getAttribute('imageIdentifier');
       if (identifier) images[identifier] = ImageStorage.instance.get(identifier);
 
       let toIdentifier = imageElements[i].getAttribute('toImageIdentifier');
-      if (toIdentifier) images[identifier] = ImageStorage.instance.get(toIdentifier);
+      if (toIdentifier) images[toIdentifier] = ImageStorage.instance.get(toIdentifier);
 
       let backgroundImageIdentifier = imageElements[i].getAttribute('backgroundImageIdentifier');
       if (backgroundImageIdentifier) images[backgroundImageIdentifier] = ImageStorage.instance.get(backgroundImageIdentifier);
 
       let backgroundImageIdentifier2 = imageElements[i].getAttribute('backgroundImageIdentifier2');
       if (backgroundImageIdentifier2) images[backgroundImageIdentifier2] = ImageStorage.instance.get(backgroundImageIdentifier2);
+
+      const attached = imageElements[i].getAttribute('attachedImageIdentifiers');
+      if (attached) {
+        for (const id of attached.trim().split(/\s+/)) {
+          if (id) images[id] = ImageStorage.instance.get(id);
+        }
+      }
     }
     for (let identifier in images) {
       let image = images[identifier];

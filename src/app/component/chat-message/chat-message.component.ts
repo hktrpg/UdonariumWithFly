@@ -73,6 +73,10 @@ export class ChatMessageComponent implements OnInit {
     return this.chatMessage.isGMMode;
   }
 
+  get attachedImages(): ImageFile[] {
+    return this.chatMessage?.attachedImages || [];
+  }
+
   constructor(
     private modalService: ModalService,
     private changeDetector: ChangeDetectorRef,
@@ -98,6 +102,9 @@ export class ChatMessageComponent implements OnInit {
     })
     .on('LOCALE_CHANGED', () => {
       this.changeDetector.markForCheck();
+    })
+    .on('UPDATE_FILE_RESOURE', () => {
+      if (this.chatMessage?.attachedImageIdentifiers) this.changeDetector.markForCheck();
     });
 
     let file: ImageFile = this.chatMessage.image;

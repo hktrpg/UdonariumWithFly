@@ -23,6 +23,8 @@ export interface ChatMessageContext {
   dicebot?: string;
   imageIdentifier?: string;
   toImageIdentifier?: string;
+  /** Space-separated ImageStorage identifiers for images attached to the message body. */
+  attachedImageIdentifiers?: string;
   color?: string;
   toColor?: string;
   isInverseIcon?: number;
@@ -47,6 +49,7 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   @SyncVar() dicebot: string;
   @SyncVar() imageIdentifier: string;
   @SyncVar() toImageIdentifier: string = '';
+  @SyncVar() attachedImageIdentifiers: string = '';
   @SyncVar() color: string;
   @SyncVar() toColor: string = '';
   @SyncVar() isInverseIcon: number;
@@ -103,6 +106,16 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
 
   get image(): ImageFile { return ImageStorage.instance.get(this.imageIdentifier); }
   get toImage(): ImageFile { return ImageStorage.instance.get(this.toImageIdentifier); }
+
+  get attachedImages(): ImageFile[] {
+    if (!this.attachedImageIdentifiers || !this.attachedImageIdentifiers.trim()) return [];
+    const out: ImageFile[] = [];
+    for (const id of this.attachedImageIdentifiers.trim().split(/\s+/)) {
+      const image = ImageStorage.instance.get(id);
+      if (image) out.push(image);
+    }
+    return out;
+  }
 
   get index(): number { return this.minorIndex + this.timestamp; }
   get isDirect(): boolean { return 0 < this.sendTo.length || -1 < this.tags.indexOf('direct') ? true : false; }
@@ -168,6 +181,10 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
       (dateFormat == '') ? translate('chat.editedParen') : translate('chat.editedParenWithTime', { time: formatDate(new Date(this.lastUpdate), dateFormat, this.locale) });
     let text = StringUtil.rubyToText(this.text);
     if (this.isDicebot) text = text.replace(/###(.+?)###/g, '*$1').replace(/\~\~\~(.+?)\~\~\~/g, '~$1');
+    const attachedCount = this.attachedImages.length;
+    if (attachedCount > 0 && !(this.isSecret && !this.isSendFromSelf)) {
+      text += (text ? ' ' : '') + translate('chat.attachedImageCount', { count: attachedCount });
+    }
     if (text.lastIndexOf('\n') == text.length - 1 && !lastUpdateStr) {
       // Adjust the last line
       text += "\n";
@@ -239,6 +256,17 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
       if (this.isDicebot) textAutoLinkedHtml = ChatMessage.decorationDiceResult(textAutoLinkedHtml);
     }
 
+    let attachedImagesHtml = '';
+    if (!(this.isSecret && !this.isSendFromSelf) && this.attachedImageIdentifiers && imageDict) {
+      const parts: string[] = [];
+      for (const id of this.attachedImageIdentifiers.trim().split(/\s+/)) {
+        const src = imageDict[id];
+        if (!src) continue;
+        parts.push(`<a class="msg-attached-link" href="${StringUtil.escapeHtml(src)}" target="_blank" rel="noopener noreferrer"><img class="msg-attached" src="${StringUtil.escapeHtml(src)}" alt=""></a>`);
+      }
+      if (parts.length) attachedImagesHtml = `<div class="msg-attached-list">${parts.join('')}</div>`;
+    }
+
     let lastUpdateHtml = '';
     if (this.isEdited) {
       if (dateFormat == '') {
@@ -290,13 +318,13 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   </div>
   <div class="msg-body">
     <div><span class="msg-name">${ nameHtml }</span></div>
-    <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
+    <div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ attachedImagesHtml }${ lastUpdateHtml }</div>
   </div>
 </div>`
     } else {
       return `<div class="${ messageClassNames.join(' ') }" style="border-left-color: ${ color }">
 <div class="msg-header">${ tabNameHtml }${ dateHtml }：<span class="msg-name">${ nameHtml }</span>：</div>
-<div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ lastUpdateHtml }</div>
+<div class="${ messageTextClassNames.join(' ') }"><span${ this.isSpecialColor ? '' : colorStyle }>${ textAutoLinkedHtml }</span>${ attachedImagesHtml }${ lastUpdateHtml }</div>
 </div>`;
     }
   }
@@ -478,6 +506,23 @@ hr {
 .msg-text {
   white-space: pre-wrap;
   width: 100%
+}
+.msg-attached-list {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.msg-attached-link {
+  display: inline-block;
+  line-height: 0;
+}
+img.msg-attached {
+  max-width: min(320px, 100%);
+  max-height: 240px;
+  object-fit: contain;
+  vertical-align: bottom;
+  border-radius: 4px;
 }
 .is-edited {
   margin-left: 2px;

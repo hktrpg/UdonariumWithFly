@@ -82,14 +82,23 @@
       </span>
       <button style="margin-left: 0.6em; font-size: smaller;" type="button" (click)="farewellStand()">{{ 'chat.standExit' | i18n }}</button>
     </div>
-    <div class="composer-row">
+    <div class="composer-row" [class.is-drag-over]="isDragOverAttach"
+      (dragover)="onDragOverAttach($event)" (dragleave)="onDragLeaveAttach($event)" (drop)="onDropAttach($event)">
+      <div class="attach-preview" *ngIf="pendingAttachedImages.length || isAttachingImages">
+        <div class="attach-thumb" *ngFor="let img of pendingAttachedImages">
+          <img *ngIf="img?.url" [src]="img.url | safe: 'resourceUrl'" alt="" draggable="false" />
+          <button type="button" class="attach-remove" (click)="removePendingAttachment(img.identifier)" [attr.aria-label]="'chat.removeAttachment' | i18n" [title]="'chat.removeAttachment' | i18n">×</button>
+        </div>
+        <span class="attach-loading" *ngIf="isAttachingImages">{{ 'chat.attaching' | i18n }}</span>
+      </div>
       <form class="chat-composer">
         <input *ngIf="onlyCharacters" type="color" class="palette-color" style="width:1em; margin-left: 3px" [(ngModel)]="paletteColor" [ngModelOptions]="{standalone: true}">
         <textarea class="chat-input" [placeholder]="(!onlyCharacters ? 'chat.placeholderDefault' : 'chat.placeholderCharacter') | i18n" [(ngModel)]="text"
           [ngModelOptions]="{standalone: true}" (input)="onInput()" (keydown.enter)="sendChat($event)" (focus)="isFilterTextUpdate = true" (blur)="isFilterTextUpdate = false"
+          (paste)="onPaste($event)"
           (keydown.control.arrowup)="moveHistory($event, 1)" (keydown.control.arrowdown)="moveHistory($event, -1)" (keydown.arrowdown)="moveTo($event)" [disabled]="!isAllowsChat"
           #textArea></textarea>
-        <button type="submit" class="send-btn" (click)="sendChat(null)" [disabled]="!isAllowsChat" [attr.aria-label]="'chat.send' | i18n">
+        <button type="submit" class="send-btn" (click)="sendChat(null)" [disabled]="!isAllowsChat || isAttachingImages" [attr.aria-label]="'chat.send' | i18n">
           <b class="send-label">{{ 'chat.send' | i18n }}</b>
           <i class="material-icons send-icon" aria-hidden="true">send</i>
         </button>

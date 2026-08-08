@@ -33,6 +33,7 @@ import { PanelService } from 'service/panel.service';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SceneToolService } from 'service/scene-tool.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { TabletopFileDropService } from 'service/tabletop-file-drop.service';
 import { TabletopKeyboardService } from 'service/tabletop-keyboard.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopService } from 'service/tabletop.service';
@@ -364,6 +365,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private imageService: ImageService,
     private tabletopService: TabletopService,
     private tabletopActionService: TabletopActionService,
+    private tabletopFileDrop: TabletopFileDropService,
     private selectionService: TabletopSelectionService,
     private tabletopKeyboardService: TabletopKeyboardService,
     private modalService: ModalService,
@@ -1650,18 +1652,46 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   @HostListener('dragover', ['$event'])
-  onInventoryCharacterDragOver(e: DragEvent) {
-    if (!this.readInventoryCharacterDragIds(e).length) return;
-    e.preventDefault();
-    if (e.dataTransfer) {
-      const types = Array.from(e.dataTransfer.types || []);
-      e.dataTransfer.dropEffect = types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME) ? 'copy' : 'move';
+  onTableDragOver(e: DragEvent) {
+    const inventoryIds = this.readInventoryCharacterDragIds(e);
+    if (inventoryIds.length) {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        const types = Array.from(e.dataTransfer.types || []);
+        e.dataTransfer.dropEffect = types.includes(GameCharacter.INVENTORY_TEMP_COPY_MIME) ? 'copy' : 'move';
+      }
+      return;
+    }
+    if (this.tabletopFileDrop.hasFileDrag(e) && !GuestSession.isGuest && !Network.GuestMode()) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     }
   }
 
   @HostListener('drop', ['$event'])
-  onInventoryCharacterDrop(e: DragEvent) {
+  onTableDrop(e: DragEvent) {
     const ids = this.readInventoryCharacterDragIds(e);
+    if (ids.length) {
+      this.onInventoryCharacterDrop(e, ids);
+      return;
+    }
+    // Prefer files[] on drop — some browsers clear types/items while files remain.
+    const files = e.dataTransfer?.files?.length
+      ? Array.from(e.dataTransfer.files)
+      : [];
+    if (!files.length && !this.tabletopFileDrop.hasFileDrag(e)) return;
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (GuestSession.isGuest || Network.GuestMode()) return;
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: e.clientX, y: e.clientY, z: 0 },
+      this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
+    );
+    this.ngZone.run(() => this.tabletopFileDrop.handleDrop(files, pos));
+  }
+
+  private onInventoryCharacterDrop(e: DragEvent, ids: string[]) {
     if (!ids.length || ids[0] === '__pending__') return;
     e.preventDefault();
     e.stopPropagation();

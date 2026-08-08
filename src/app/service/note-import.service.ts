@@ -5,16 +5,35 @@ import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { TextNote } from '@udonarium/text-note';
 
+import { PointerCoordinate } from 'service/pointer-device.service';
+
+const MEGA = 1024 * 1024;
+
 @Injectable({ providedIn: 'root' })
 export class NoteImportService {
-  async importFiles(files: FileList | File[], options?: { addToTable?: boolean }): Promise<TextNote[]> {
+  async importFiles(files: FileList | File[], options?: {
+    addToTable?: boolean;
+    position?: PointerCoordinate;
+  }): Promise<TextNote[]> {
     const list = Array.from(files || []);
     const created: TextNote[] = [];
+    let placed = 0;
     for (const file of list) {
       const note = await this.importOne(file);
       if (!note) continue;
-      if (options?.addToTable !== false) note.addToTable();
-      else note.setLocation('common');
+      if (options?.addToTable !== false) {
+        if (options?.position) {
+          const col = placed % 5;
+          const row = Math.floor(placed / 5);
+          note.location.x = options.position.x + col * 50;
+          note.location.y = options.position.y + row * 50;
+          note.posZ = options.position.z;
+          placed++;
+        }
+        note.addToTable();
+      } else {
+        note.setLocation('common');
+      }
       created.push(note);
     }
     return created;
@@ -27,6 +46,7 @@ export class NoteImportService {
     const lower = (file.name || '').toLowerCase();
 
     if (type === 'application/pdf' || lower.endsWith('.pdf')) {
+      if (file.size > 20 * MEGA) return null;
       const pdf = await PdfStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 4, 5);
       note.setPdf(pdf.identifier);
@@ -34,13 +54,15 @@ export class NoteImportService {
     }
 
     if (type.indexOf('video/') === 0 || /\.(mp4|webm|mov|m4v|ogv)$/i.test(lower)) {
+      if (file.size > 50 * MEGA) return null;
       const video = await VideoStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 5, 4);
       note.setVideo(video.identifier);
       return note;
     }
 
-    if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(lower)) {
+    if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(lower)) {
+      if (file.size > 2 * MEGA) return null;
       const image = await ImageStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 3, 3);
       note.setFrontImage(image.identifier);
@@ -48,7 +70,11 @@ export class NoteImportService {
       return note;
     }
 
-    if (type.indexOf('text/') === 0 || /\.(txt|md|csv)$/i.test(lower)) {
+    if (
+      type.indexOf('text/') === 0
+      || type === 'application/json'
+      || /\.(txt|md|csv|json|html?|xml)$/i.test(lower)
+    ) {
       const text = await file.text();
       return TextNote.create(name, text.slice(0, 20000), 14, 3, 3);
     }
