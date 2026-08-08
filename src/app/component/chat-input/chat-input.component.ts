@@ -1,6 +1,7 @@
-import { Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
@@ -122,7 +123,15 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     characterIdentifier?: string, 
     standIdentifier?: string, 
     standName?: string,
-    isUseStandImage?: boolean }>();
+    isUseStandImage?: boolean,
+    attachedImageIdentifiers?: string[] }>();
+
+  /** Pending chat attachments (not yet sent). */
+  pendingAttachedImages: ImageFile[] = [];
+  isDragOverAttach = false;
+  isAttachingImages = false;
+  private static readonly MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
+  private static readonly MAX_PENDING_ATTACHMENTS = 8;
 
   get isDirect(): boolean { return this.sendTo != null && this.sendTo.length ? true : false }
   gameHelp: string|string[] = '';
@@ -319,6 +328,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
 
   constructor(
     private ngZone: NgZone,
+    private changeDetector: ChangeDetectorRef,
     public chatMessageService: ChatMessageService,
     private batchService: BatchService,
     private panelService: PanelService,
@@ -549,7 +559,11 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     //if (!this.text.length) return;
     if (event && event.keyCode !== 13) return;
     if (!this.isAllowsChat) return;
+    if (this.isAttachingImages) return;
     if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
+
+    const attachedImageIdentifiers = this.pendingAttachedImages.map(img => img.identifier);
+    if (!StringUtil.cr(this.text).trim() && attachedImageIdentifiers.length === 0) return;
     
     let text = this.text;
     let targetCharacter = this.character;
@@ -573,6 +587,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     this.text = '';
+    this.pendingAttachedImages = [];
     this.previousWritingLength = this.text.length;
     const textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
     if (textArea) textArea.value = '';
@@ -887,7 +902,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
         EventSystem.trigger('CHANGE_GM_MODE', null);
       }
 
-      if (StringUtil.cr(text).trim()) {
+      if (StringUtil.cr(text).trim() || attachedImageIdentifiers.length > 0) {
         this.chat.emit({
           text: text,
           gameType: gameType,
@@ -903,10 +918,112 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           characterIdentifier: targetCharacter ? targetCharacter.identifier : null,
           standIdentifier: standIdentifier,
           standName: standName,
-          isUseStandImage: (isUseStandImage && isUseStandImageOnChatTab)
+          isUseStandImage: (isUseStandImage && isUseStandImageOnChatTab),
+          attachedImageIdentifiers
         });
       }
     })();
+  }
+
+  async onPaste(e: ClipboardEvent) {
+    if (!this.isAllowsChat || !e.clipboardData) return;
+    const files = this.imageFilesFromDataTransfer(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    await this.attachImageFiles(files);
+  }
+
+  onDragOverAttach(e: DragEvent) {
+    if (!this.isAllowsChat || !this.hasImageInDataTransfer(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOverAttach = true;
+  }
+
+  onDragLeaveAttach(e: DragEvent) {
+    e.preventDefault();
+    this.isDragOverAttach = false;
+  }
+
+  async onDropAttach(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOverAttach = false;
+    if (!this.isAllowsChat || !e.dataTransfer) return;
+    const files = this.imageFilesFromDataTransfer(e.dataTransfer);
+    if (!files.length) return;
+    await this.attachImageFiles(files);
+  }
+
+  removePendingAttachment(identifier: string) {
+    this.pendingAttachedImages = this.pendingAttachedImages.filter(img => img.identifier !== identifier);
+  }
+
+  private hasImageInDataTransfer(dt: DataTransfer | null): boolean {
+    if (!dt) return false;
+    if (dt.items) {
+      for (let i = 0; i < dt.items.length; i++) {
+        if (dt.items[i].kind === 'file' && (dt.items[i].type || '').startsWith('image/')) return true;
+      }
+    }
+    if (dt.files) {
+      for (let i = 0; i < dt.files.length; i++) {
+        if ((dt.files[i].type || '').startsWith('image/')) return true;
+      }
+    }
+    return false;
+  }
+
+  private imageFilesFromDataTransfer(dt: DataTransfer): File[] {
+    const out: File[] = [];
+    const seen = new Set<string>();
+    if (dt.items) {
+      for (let i = 0; i < dt.items.length; i++) {
+        const item = dt.items[i];
+        if (item.kind !== 'file' || !(item.type || '').startsWith('image/')) continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(file);
+      }
+    }
+    if (!out.length && dt.files) {
+      for (let i = 0; i < dt.files.length; i++) {
+        const file = dt.files[i];
+        if ((file.type || '').startsWith('image/')) out.push(file);
+      }
+    }
+    return out;
+  }
+
+  private async attachImageFiles(files: File[]) {
+    if (!files.length) return;
+    this.isAttachingImages = true;
+    try {
+      for (const file of files) {
+        if (this.pendingAttachedImages.length >= ChatInputComponent.MAX_PENDING_ATTACHMENTS) {
+          console.warn(this.i18n.t('chat.attachLimit', { count: ChatInputComponent.MAX_PENDING_ATTACHMENTS }));
+          break;
+        }
+        if (file.size > ChatInputComponent.MAX_CHAT_IMAGE_BYTES) {
+          console.warn(this.i18n.t('file.maxSize'), file.name);
+          continue;
+        }
+        try {
+          const image = await ImageStorage.instance.addAsync(file);
+          if (!this.pendingAttachedImages.some(img => img.identifier === image.identifier)) {
+            this.pendingAttachedImages = [...this.pendingAttachedImages, image];
+          }
+        } catch (err) {
+          console.warn('chat image attach failed', err);
+        }
+      }
+    } finally {
+      this.isAttachingImages = false;
+      this.ngZone.run(() => this.changeDetector.markForCheck());
+    }
   }
 
   calcFitHeight() {

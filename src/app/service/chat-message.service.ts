@@ -81,9 +81,12 @@ export class ChatMessageService {
     return Math.floor(this.timeOffset + (performance.now() - this.performanceOffset));
   }
 
-  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean, imageFx?: string): ChatMessage {
+  sendMessage(chatTab: ChatTab, text: string, gameType: string, sendFrom: string, sendTo?: string, color? :string, isInverseIcon? :boolean, isHollowIcon? :boolean, isBlackPaint? :boolean, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName? :string, isUseStandImage?: boolean, imageFx?: string, attachedImageIdentifiers?: string | string[]): ChatMessage {
     // TODO: 再整理一下
     let effective = !(isUseFaceIcon && this.findFaceIconIdentifier(sendFrom));
+    const attached = Array.isArray(attachedImageIdentifiers)
+      ? attachedImageIdentifiers.filter(id => !!id).join(' ')
+      : (attachedImageIdentifiers || '').trim();
     let chatMessage: ChatMessageContext = {
       from: Network.peer.userId,
       to: ChatMessageService.findId(sendTo),
@@ -92,6 +95,7 @@ export class ChatMessageService {
       toName: sendTo ? this.findObjectName(sendTo) : '',
       imageIdentifier: this.findImageIdentifier(sendFrom, isUseFaceIcon),
       toImageIdentifier: sendTo ? this.findImageIdentifier(sendTo) : '',
+      attachedImageIdentifiers: attached,
       timestamp: this.calcTimeStamp(chatTab),
       tag: effective ? `${gameType} noface` : gameType,
       text: StringUtil.cr(text),

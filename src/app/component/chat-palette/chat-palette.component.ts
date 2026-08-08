@@ -218,16 +218,16 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
 
   sendChat(value: { text: string, gameType: string, sendFrom: string, sendTo: string,
-    color?: string, isInverse?:boolean, isHollow?: boolean, isBlackPaint?: boolean, imageFx?: string, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName?: string, isUseStandImage?: boolean }) {
+    color?: string, isInverse?:boolean, isHollow?: boolean, isBlackPaint?: boolean, imageFx?: string, aura?: number, isUseFaceIcon?: boolean, characterIdentifier?: string, standIdentifier?: string, standName?: string, isUseStandImage?: boolean, attachedImageIdentifiers?: string[] }) {
     if (!this.chatTab || !this.character || !this.palette) return;
     let text = this.palette.evaluate(value.text, this.character.rootDataElement);
     this.chatMessageService.sendMessage(
-      this.chatTab, 
-      text, 
-      value.gameType, 
-      value.sendFrom, 
+      this.chatTab,
+      text,
+      value.gameType,
+      value.sendFrom,
       value.sendTo,
-      value.color, 
+      value.color,
       value.isInverse,
       value.isHollow,
       value.isBlackPaint,
@@ -237,7 +237,8 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
       value.standIdentifier,
       value.standName,
       value.isUseStandImage,
-      value.imageFx
+      value.imageFx,
+      value.attachedImageIdentifiers
     );
     this.filterText = '';
   }
