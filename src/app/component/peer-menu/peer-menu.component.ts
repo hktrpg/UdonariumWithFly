@@ -1,4 +1,4 @@
-import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -50,7 +50,7 @@ import * as localForage from 'localforage';
     ],
     standalone: false
 })
-export class PeerMenuComponent implements OnInit, OnDestroy {
+export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   targetUserId: string = '';
   networkService = Network
   gameRoomService = ObjectStore.instance;
@@ -72,7 +72,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   private _timeOutId4: NodeJS.Timeout;
   private _timeOutIdInvite: NodeJS.Timeout;
 
-  private interval: NodeJS.Timeout;
+  private interval: NodeJS.Timeout = null;
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
 
   get myPeerName(): string {
@@ -210,11 +210,29 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
   ngAfterViewInit() {
     EventSystem.register(this)
       .on('OPEN_NETWORK', event => {
-        this.ngZone.run(() => { });
+        this.ngZone.run(() => this.syncPeerHealthPoll());
       })
+      .on('CONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
+      .on('DISCONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))
-      .on('APP_UPDATE_READY', () => this.ngZone.run(() => { }));
-    this.interval = setInterval(() => { }, 1000);
+      .on('APP_UPDATE_READY', () => this.ngZone.run(() => this.syncPeerHealthPoll()));
+    this.syncPeerHealthPoll();
+  }
+
+  /** Peer health/ping stats need a 1s CD tick only while peers are present. */
+  private syncPeerHealthPoll() {
+    const need = (this.networkService.peers?.length || 0) > 0;
+    if (need) {
+      if (this.interval) return;
+      this.ngZone.runOutsideAngular(() => {
+        this.interval = setInterval(() => {
+          this.ngZone.run(() => { });
+        }, 1000);
+      });
+    } else if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
   }
 
   ngOnDestroy() {
@@ -224,7 +242,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     clearTimeout(this._timeOutId4);
     clearTimeout(this._timeOutIdInvite);
     EventSystem.unregister(this);
-    clearInterval(this.interval);
+    if (this.interval) clearInterval(this.interval);
   }
 
   isInviteRoleAvailable(role: RoomRole): boolean {

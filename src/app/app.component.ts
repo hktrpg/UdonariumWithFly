@@ -175,6 +175,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
  
   notice(audioIdentifier=PresetSound.puyon) {
+    if (AudioPlayer.isNoticeMute || !ChatWindowComponent.isNoticeOn) return;
     const audio = AudioStorage.instance.get(audioIdentifier);
     if (audio && audio.isReady) {
       EventSystem.unregister(this, 'UPDATE_AUDIO_RESOURE');
@@ -301,7 +302,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAmbientMute = !!isMute);
       localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
         // Default ON when unset; honor explicit boolean from storage.
-        ChatWindowComponent.isNoticeOn = isNoticeOn == null ? true : !!isNoticeOn;
+        // Keep chat notice toggle and AudioPlayer notice mute in sync.
+        const on = isNoticeOn == null ? !AudioPlayer.isNoticeMute : !!isNoticeOn;
+        ChatWindowComponent.isNoticeOn = on;
+        AudioPlayer.isNoticeMute = !on;
       });
       localForage.getItem(ChatWindowComponent.CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY).then(isLeftOnly => {
         // Default ON (always left) when unset; honor explicit boolean from storage.

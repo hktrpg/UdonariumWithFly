@@ -1,5 +1,5 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 
@@ -57,7 +57,7 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform, unpackImag
     standalone: false
 })
 
-export class ChatMessageComponent implements OnInit {
+export class ChatMessageComponent implements OnInit, OnDestroy {
   @Input() chatMessage: ChatMessage;
   @Input() compact: boolean = false;
   @Input() leftOnly: boolean = false; // TODO: 之後改為可切換
@@ -112,6 +112,10 @@ export class ChatMessageComponent implements OnInit {
     file = this.chatMessage.toImage;
     if (file) this.toImageFile = file;
     //if (this.chatMessageService.getTime() - 10 * 1000 < this.chatMessage.timestamp) this.animeState = 'active';
+  }
+
+  ngOnDestroy() {
+    EventSystem.unregister(this);
   }
 
   get isMine(): boolean {

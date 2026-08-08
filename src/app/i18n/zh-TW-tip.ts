@@ -141,7 +141,7 @@ export const zhTW_tip: I18nDictionary = {
   'tour.step.controlsPing.bodyMobile': '在空白地圖長按約半秒發送 Ping。請試一次長按。',
   'tour.step.saveGuide.bodyMobile': '更多說明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\n可在「更多 → 設定」重播教學。離開前請 ZIP 存檔。',
   'tip.pathMove.hud': '路徑移動：Ctrl＋點路點 → 左鍵點終點或 Space 開始　右鍵撤銷最後路點　Esc 取消（僅單一 Token）',
-  'tip.vision.noCharacter': '已啟用視野，但尚未設定「我的視野角色」。請右鍵角色 → 作為我的視野角色。',
+  'tip.vision.noCharacter': '已啟用視野，但尚未設定「我的視野角色」。請到角色倉庫右鍵角色 → 作為我的視野角色。',
   'combat.emptyHint': '尚無參戰者。先在桌面選取角色，按「加入選取」或「加入全部」，再擲先攻並開始。',
   'peer.confirm.switchIdentity.helpGuest': '訪客限制：無法 ZIP 下載／讀取、資料夾備份、編輯筆記、圖片／音樂庫、地圖／工具箱編輯，以及多數編輯快捷鍵。主要可觀看與受限聊天。',
 };

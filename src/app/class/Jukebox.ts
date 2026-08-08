@@ -131,7 +131,6 @@ export class Jukebox extends GameObject {
 
   onStoreAdded() {
     super.onStoreAdded();
-    this.ensurePlayers();
     this.ensureMigrated();
     this.unlockAfterUserInteraction();
   }
@@ -332,7 +331,6 @@ export class Jukebox extends GameObject {
   }
 
   apply(context: ObjectContext) {
-    this.ensurePlayers();
     const prev = this.tracks;
     const prevJson = this.tracksJson;
     const prevLegacyPlaying = this.isPlaying;
@@ -352,20 +350,23 @@ export class Jukebox extends GameObject {
         } else if (now.isPlaying && was.roomGain !== now.roomGain) {
           this.applyRoomGain(i);
         } else if (now.isPlaying && was.isLoop !== now.isLoop) {
+          this.ensurePlayer(i);
           this.audioPlayers[i].loop = now.isLoop;
         }
       }
     }
   }
 
-  private ensurePlayers() {
-    if (this.audioPlayers.length === JUKEBOX_TRACK_COUNT) return;
-    this.audioPlayers = [];
-    this.waitingFileUpdate = [];
-    for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) {
+  /** Create AudioPlayers lazily up to index (classic rooms stay player-free until first play). */
+  private ensurePlayer(index: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    while (this.audioPlayers.length <= index) {
+      const i = this.audioPlayers.length;
       const player = new AudioPlayer();
       player.volumeType = i === 0 ? VolumeType.MASTER : VolumeType.AMBIENT;
       this.audioPlayers.push(player);
+    }
+    while (this.waitingFileUpdate.length <= index) {
       this.waitingFileUpdate.push(false);
     }
   }
@@ -408,7 +409,7 @@ export class Jukebox extends GameObject {
   }
 
   private _playTrack(index: number) {
-    this.ensurePlayers();
+    this.ensurePlayer(index);
     this._stopTrack(index, false);
     const track = this.tracks[index];
     const audio = track.audioIdentifier ? AudioStorage.instance.get(track.audioIdentifier) : null;
@@ -472,7 +473,6 @@ export class Jukebox extends GameObject {
   }
 
   private _stopTrack(index: number, unregister = true) {
-    this.ensurePlayers();
     if (unregister) this.unregisterFileWait(index);
     if (this.audioPlayers[index]) {
       this.audioPlayers[index].endedAction = null;
@@ -485,7 +485,7 @@ export class Jukebox extends GameObject {
   }
 
   private applyRoomGain(index: number) {
-    this.ensurePlayers();
+    this.ensurePlayer(index);
     const track = this.tracks[index];
     if (this.audioPlayers[index]) {
       this.audioPlayers[index].volume = track.roomGain;
@@ -493,6 +493,7 @@ export class Jukebox extends GameObject {
   }
 
   private playAfterFileUpdate(index: number) {
+    this.ensurePlayer(index);
     if (this.waitingFileUpdate[index]) return;
     this.waitingFileUpdate[index] = true;
     const key = `jukebox-track-${index}`;
@@ -511,7 +512,9 @@ export class Jukebox extends GameObject {
   }
 
   private unregisterFileWait(index: number) {
-    this.waitingFileUpdate[index] = false;
+    if (index >= 0 && index < this.waitingFileUpdate.length) {
+      this.waitingFileUpdate[index] = false;
+    }
     EventSystem.unregister(`jukebox-track-${index}`, 'UPDATE_AUDIO_RESOURE');
   }
 
@@ -519,10 +522,11 @@ export class Jukebox extends GameObject {
     const callback = () => {
       document.body.removeEventListener('touchstart', callback, true);
       document.body.removeEventListener('mousedown', callback, true);
-      this.ensurePlayers();
       for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) {
+        if (!this.tracks[i]?.isPlaying) continue;
+        this.ensurePlayer(i);
         this.audioPlayers[i].stop();
-        if (this.tracks[i]?.isPlaying) this._playTrack(i);
+        this._playTrack(i);
       }
     };
     document.body.addEventListener('touchstart', callback, true);

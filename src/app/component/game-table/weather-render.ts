@@ -131,27 +131,42 @@ export class WeatherRender {
   setEnabled(enabled: boolean) {
     if (enabled && !this.running) {
       this.running = true;
+      // Paint immediately so enable does not flash an empty oversized canvas for one frame.
+      this.tick();
       const loop = () => {
         if (!this.running) return;
         this.tick();
         this.rafId = requestAnimationFrame(loop);
       };
       this.rafId = requestAnimationFrame(loop);
-    } else if (!enabled && this.running) {
+    } else if (!enabled && (this.running || this.lastW > 0 || this.lastH > 0)) {
       this.running = false;
       cancelAnimationFrame(this.rafId);
+      this.rafId = 0;
       this.flash = 0;
       this.flashCooldown = 0;
       this.bolt = [];
+      this.lastW = 0;
+      this.lastH = 0;
+      this.lastIntensity = -1;
       for (const layer of this.layers) {
-        const ctx = layer.canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
         layer.particles = [];
+        // Release GPU/CPU backing store while weather is off.
+        if (layer.canvas.width !== 0) layer.canvas.width = 0;
+        if (layer.canvas.height !== 0) layer.canvas.height = 0;
       }
     }
   }
 
   sync(table: GameTable) {
+    const type = table.weatherType || 'none';
+    const intensity = Math.max(0, Math.min(1, table.weatherIntensity ?? 0.5));
+    if (type === 'none' || intensity <= 0) {
+      this.setEnabled(false);
+      this.lastType = type;
+      return;
+    }
+
     const tableW = table.width * table.gridSize;
     const tableH = table.height * table.gridSize;
     const pad = WeatherRender.marginFor(tableW, tableH);
@@ -160,14 +175,6 @@ export class WeatherRender {
     for (const layer of this.layers) {
       if (layer.canvas.width !== width) layer.canvas.width = width;
       if (layer.canvas.height !== height) layer.canvas.height = height;
-    }
-
-    const type = table.weatherType || 'none';
-    const intensity = Math.max(0, Math.min(1, table.weatherIntensity ?? 0.5));
-    if (type === 'none' || intensity <= 0) {
-      this.setEnabled(false);
-      this.lastType = type;
-      return;
     }
 
     if (type !== this.lastType || intensity !== this.lastIntensity || width !== this.lastW || height !== this.lastH) {
@@ -348,7 +355,43 @@ export class WeatherRender {
         }
         this.drawParticle(ctx, type, p, depth);
       }
+      this.applyEdgeFade(ctx, width, height);
     }
+  }
+
+  /** Soften the hard rectangular weather volume so edges dissolve instead of clipping. */
+  private applyEdgeFade(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const fade = Math.max(72, Math.round(Math.min(width, height) * 0.16));
+    const f = Math.min(fade, Math.floor(width / 2), Math.floor(height / 2));
+    if (f < 8) return;
+
+    const fx = f / width;
+    const fy = f / height;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-in';
+
+    const gx = ctx.createLinearGradient(0, 0, width, 0);
+    gx.addColorStop(0, 'rgba(0,0,0,0)');
+    gx.addColorStop(fx * 0.45, 'rgba(0,0,0,0.4)');
+    gx.addColorStop(fx, 'rgba(0,0,0,1)');
+    gx.addColorStop(1 - fx, 'rgba(0,0,0,1)');
+    gx.addColorStop(1 - fx * 0.45, 'rgba(0,0,0,0.4)');
+    gx.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gx;
+    ctx.fillRect(0, 0, width, height);
+
+    // Product of H×V fades gives soft corners (not a second hard box).
+    const gy = ctx.createLinearGradient(0, 0, 0, height);
+    gy.addColorStop(0, 'rgba(0,0,0,0)');
+    gy.addColorStop(fy * 0.45, 'rgba(0,0,0,0.4)');
+    gy.addColorStop(fy, 'rgba(0,0,0,1)');
+    gy.addColorStop(1 - fy, 'rgba(0,0,0,1)');
+    gy.addColorStop(1 - fy * 0.45, 'rgba(0,0,0,0.4)');
+    gy.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gy;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
   }
 
   private updateFlash(type: WeatherType, intensity: number, width: number, height: number) {

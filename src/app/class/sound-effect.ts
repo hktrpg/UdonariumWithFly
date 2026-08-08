@@ -37,6 +37,7 @@ export class SoundEffect extends GameObject {
     super.onStoreAdded();
     EventSystem.register(this)
       .on<string>('SOUND_EFFECT', event => {
+        // Playback only — each peer honors its own chat/jukebox SE mute.
         AudioPlayer.playSoundEffect(AudioStorage.instance.get(event.data));
       })
       .on('SEND_MESSAGE', event => {
@@ -74,7 +75,9 @@ export class SoundEffect extends GameObject {
     SoundEffect._play(identifier);
   }
 
+  /** Broadcast to room. Never gated by local mute (mute is playback-only per peer). */
   private static _play(identifier: string) {
+    if (!identifier) return;
     EventSystem.call('SOUND_EFFECT', identifier);
   }
 
@@ -90,7 +93,9 @@ export class SoundEffect extends GameObject {
     SoundEffect._playLocal(identifier);
   }
 
+  /** This client only. Still respects local SE mute on playback. */
   private static _playLocal(identifier: string) {
+    if (!identifier) return;
     EventSystem.trigger('SOUND_EFFECT', identifier);
   }
 }

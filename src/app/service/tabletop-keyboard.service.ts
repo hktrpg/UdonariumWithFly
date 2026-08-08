@@ -300,7 +300,8 @@ export class TabletopKeyboardService {
       if (!sceneDelta) return;
       const sceneGrid = TableSelecter.instance.viewTable?.gridSize ?? 50;
       if (this.sceneTools.nudgeSelection(sceneDelta.dx * sceneGrid, sceneDelta.dy * sceneGrid)) {
-        if (!e.repeat) SoundEffect.play(PresetSound.piecePut);
+        // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
+        if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
         this.consume(e);
       }
       return;
@@ -321,7 +322,8 @@ export class TabletopKeyboardService {
     if (!delta) return;
     const gridSize = TableSelecter.instance.viewTable?.gridSize ?? 50;
     if (MovableSelectionSynchronizer.nudge(this.selectionService.objects, delta.dx * gridSize, delta.dy * gridSize)) {
-      if (!e.repeat) SoundEffect.play(PresetSound.piecePut);
+      // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
+      if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
       this.consume(e);
     }
   }
@@ -793,7 +795,7 @@ export class TabletopKeyboardService {
       object.altitude = next;
       changed = true;
     }
-    if (changed) SoundEffect.play(PresetSound.piecePut);
+    if (changed) SoundEffect.playLocal(PresetSound.piecePut);
     return changed;
   }
 

@@ -92,6 +92,31 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableDarkness(v: number) { if (this.isEditable && this.canControlDayNight) this.selectedTable.darkness = Number(v); }
   get tableGlobalIllumination(): number { return this.selectedTable?.globalIllumination ?? 1; }
   set tableGlobalIllumination(v: number) { if (this.isEditable) this.selectedTable.globalIllumination = Number(v); }
+  get tableGlobalIlluminationEnabled(): boolean { return this.selectedTable?.globalIlluminationEnabled !== false; }
+  set tableGlobalIlluminationEnabled(v: boolean) {
+    if (this.isEditable) this.selectedTable.globalIlluminationEnabled = !!v;
+  }
+  get tableGlobalIlluminationThresholdEnabled(): boolean {
+    return (this.selectedTable?.globalIlluminationThreshold ?? -1) >= 0;
+  }
+  set tableGlobalIlluminationThresholdEnabled(v: boolean) {
+    if (!this.isEditable || !this.selectedTable) return;
+    if (v) {
+      const cur = this.selectedTable.globalIlluminationThreshold;
+      this.selectedTable.globalIlluminationThreshold = cur >= 0 ? cur : 0.75;
+    } else {
+      this.selectedTable.globalIlluminationThreshold = -1;
+    }
+  }
+  get tableGlobalIlluminationThreshold(): number {
+    const t = this.selectedTable?.globalIlluminationThreshold ?? -1;
+    return t < 0 ? 0.75 : t;
+  }
+  set tableGlobalIlluminationThreshold(v: number) {
+    if (!this.isEditable || !this.selectedTable) return;
+    if ((this.selectedTable.globalIlluminationThreshold ?? -1) < 0) return;
+    this.selectedTable.globalIlluminationThreshold = Math.max(0, Math.min(1, Number(v)));
+  }
   get tableWeatherType(): WeatherType { return this.selectedTable?.weatherType || 'none'; }
   set tableWeatherType(v: WeatherType) { if (this.isEditable && this.canControlWeather) this.selectedTable.weatherType = v; }
   get tableWeatherIntensity(): number { return this.selectedTable?.weatherIntensity ?? 0.5; }

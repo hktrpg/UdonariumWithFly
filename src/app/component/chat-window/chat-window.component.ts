@@ -106,11 +106,19 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.savedTop = ChatWindowComponent.computeDefaultTop(ChatWindowComponent.DEFAULT_HEIGHT);
   }
 
-  /** Default ON: play notice when someone chats. */
+  /** Default ON: play notice when someone chats. Synced with AudioPlayer.isNoticeMute. */
   static isNoticeOn = true;
   static setChatNotice(isNoticeOn: boolean) {
-    localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, !!isNoticeOn).catch(e => console.log(e));
-    ChatWindowComponent.isNoticeOn = !!isNoticeOn;
+    const on = !!isNoticeOn;
+    localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, on).catch(e => console.log(e));
+    ChatWindowComponent.isNoticeOn = on;
+    AudioPlayer.isNoticeMute = !on;
+    if (!on) {
+      localForage.setItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY, true).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    }
+    EventSystem.trigger('CHANGE_JUKEBOX_VOLUME', null);
   }
   get isNoticeOn(): boolean {
     return ChatWindowComponent.isNoticeOn;
@@ -202,16 +210,24 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     ChatWindowComponent.ClarifyMode = !ChatWindowComponent.ClarifyMode;
   }
 
-  /** Default ON = BGM audible. OFF = mute BGM. */
+  /** Default ON = BGM/ambient audible. OFF = mute music channels. */
   get isMusicOn(): boolean {
     return !AudioPlayer.isMute;
   }
 
   toggleMusic() {
-    this.setMute(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY, 'isMute', !AudioPlayer.isMute);
+    const muted = !AudioPlayer.isMute;
+    this.setMute(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY, 'isMute', muted);
+    // Ambient jukebox tracks count as "music" for the chat toolbar.
+    AudioPlayer.isAmbientMute = muted;
+    if (muted) {
+      localForage.setItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY, true).catch(e => console.log(e));
+    } else {
+      localForage.removeItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).catch(e => console.log(e));
+    }
   }
 
-  /** Default ON = SE audible. OFF = mute sound effects. */
+  /** Default ON = SE audible. OFF = mute sound effects (token move, dice, cards, …). */
   get isSoundEffectOn(): boolean {
     return !AudioPlayer.isSoundEffectMute;
   }

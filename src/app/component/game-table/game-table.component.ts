@@ -47,6 +47,8 @@ import { LightOccluder, LightingRender } from './lighting-render';
 import { TableMouseGesture } from './table-mouse-gesture';
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
+import { collectFootprintWalls } from './footprint-walls';
+import { isCharacterRevealedToViewer } from './vision-math';
 import { WeatherRender } from './weather-render';
 
 /** Formal touch interaction mode (mobile gesture state machine). */
@@ -87,6 +89,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   readonly Math = Math;
   pings: TablePingView[] = [];
   offscreenArrows: { x: number; y: number; deg: number; color: string }[] = [];
+  /** Character identifiers currently revealed by FoW for this client (players only). */
+  private visionRevealedIds = new Set<string>();
 
   private lightingRender: LightingRender = null;
   private weatherRender: WeatherRender = null;
@@ -416,10 +420,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
-        console.log('UPDATE_GAME_OBJECT GameTableComponent ' + this.currentTable.identifier);
 
         this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor, this.currentTable.isShowNumber);
         this.refreshFx();
+        this.ensureFxTimer();
       })
       .on('TABLE_PING', event => {
         this.ngZone.run(() => this.spawnPing(event.data));
@@ -560,7 +564,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.weatherCanvasHigh.nativeElement,
     ]);
     this.refreshFx();
-    this.fxTimer = setInterval(() => this.refreshFx(), 200);
+    this.ensureFxTimer();
     if (this.showDebugPose) {
       this.startDebugPoseRefresh();
       queueMicrotask(() => this.refreshDebugPoseDom());
@@ -578,9 +582,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.tabletopKeyboardService.destroy();
     this.touchLayoutSub?.unsubscribe();
     this.touchLayoutSub = null;
-    if (this.fxTimer) clearInterval(this.fxTimer);
+    this.stopFxTimer();
     if (this.debugPoseTimer) clearInterval(this.debugPoseTimer);
     if (this.weatherRender) this.weatherRender.destroy();
+    if (this.lightingRender) this.lightingRender.release();
     this.clearPingHold();
     this.clearDrawDragState();
     document.removeEventListener('pointermove', this.onMapHudPointerMove);
@@ -1342,6 +1347,33 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sceneTools.isLightSelected(l);
   }
 
+  /** Darkness / vision need a tick while tokens move; pings need arrow follow. Weather has its own RAF. */
+  private needsPeriodicFx(): boolean {
+    const table = this.currentTable;
+    if (!table) return this.pings.length > 0;
+    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
+    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
+    const baseAlpha = darkness * (1 - globalLight * 0.35);
+    return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0;
+  }
+
+  private ensureFxTimer() {
+    if (this.needsPeriodicFx()) {
+      if (this.fxTimer) return;
+      this.ngZone.runOutsideAngular(() => {
+        this.fxTimer = setInterval(() => this.refreshFx(), 200);
+      });
+    } else {
+      this.stopFxTimer();
+    }
+  }
+
+  private stopFxTimer() {
+    if (!this.fxTimer) return;
+    clearInterval(this.fxTimer);
+    this.fxTimer = null;
+  }
+
   private refreshFx() {
     if (!this.lightingRender || !this.currentTable) return;
     const onTable = this.characters.filter(c => c.location?.name === 'table');
@@ -1353,10 +1385,70 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       onTable,
       this.collectLightOccluders(),
       this.isGMMode,
+      collectFootprintWalls(this.currentTable, this.tableMasks, this.terrains),
     );
     this.weatherRender?.sync(this.currentTable);
-    this.updateOffscreenArrows();
-    this.changeDetector.markForCheck();
+    const revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId);
+    let needMark = revealedChanged;
+    if (this.pings.length > 0) {
+      const prev = this.offscreenArrows;
+      this.updateOffscreenArrows();
+      if (!this.arrowsEqual(prev, this.offscreenArrows)) needMark = true;
+    } else if (this.offscreenArrows.length) {
+      this.offscreenArrows = [];
+      needMark = true;
+    }
+    if (needMark) {
+      this.ngZone.run(() => this.changeDetector.markForCheck());
+    }
+  }
+
+  /** Update which tokens players may see under FoW; returns true if the set changed. */
+  private refreshVisionRevealed(
+    onTable: GameCharacter[],
+    visionChars: GameCharacter[],
+    userId: string,
+  ): boolean {
+    const next = new Set<string>();
+    const table = this.currentTable;
+    if (!table?.visionEnabled || this.isGMMode) {
+      // Empty set means “no restriction” when checked via isTokenRevealedByVision.
+      if (this.visionRevealedIds.size === 0) return false;
+      this.visionRevealedIds = next;
+      return true;
+    }
+    for (const ch of onTable) {
+      if (!ch) continue;
+      if (isCharacterRevealedToViewer(ch, table, visionChars, onTable, userId, this.tableMasks, this.terrains)) {
+        next.add(ch.identifier);
+      }
+    }
+    if (next.size === this.visionRevealedIds.size && [...next].every(id => this.visionRevealedIds.has(id))) {
+      return false;
+    }
+    this.visionRevealedIds = next;
+    return true;
+  }
+
+  /** Players with FoW: hide tokens outside vision (and lit area when GI is off). */
+  isTokenRevealedByVision(character: GameCharacter): boolean {
+    if (!character) return false;
+    if (this.isGMMode || !this.currentTable?.visionEnabled) return true;
+    return this.visionRevealedIds.has(character.identifier);
+  }
+
+  private arrowsEqual(
+    a: { x: number; y: number; deg: number; color: string }[],
+    b: { x: number; y: number; deg: number; color: string }[],
+  ): boolean {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i].x !== b[i].x || a[i].y !== b[i].y || a[i].deg !== b[i].deg || a[i].color !== b[i].color) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Apply local View / Activate: bg, grid, weather, lighting, token list for current viewed table. */
@@ -1384,10 +1476,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       table.isShowNumber,
     );
     this.refreshFx();
+    this.ensureFxTimer();
     this.changeDetector.detectChanges();
   }
 
-  /** Characters / masks / terrains that cast shadows into lights & vision (default on). */
+  /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */
   private collectLightOccluders(): LightOccluder[] {
     const table = this.currentTable;
     if (!table) return [];
@@ -1398,23 +1491,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (ch.location?.name !== 'table') continue;
       const s = Math.max(grid * 0.35, (ch.size || 1) * grid);
       out.push({ id: ch.identifier, points: this.rectOccluder(ch.location.x, ch.location.y, s, s) });
-    }
-    for (const mask of this.tableMasks) {
-      if (mask.location?.name !== 'table') continue;
-      if (mask.affectsLight === false) continue;
-      const w = Math.max(1, (mask.width || 1) * grid);
-      const h = Math.max(1, (mask.height || 1) * grid);
-      out.push({ id: mask.identifier, points: this.rectOccluder(mask.location.x, mask.location.y, w, h) });
-    }
-    for (const terrain of this.terrains) {
-      if (terrain.location?.name !== 'table') continue;
-      if (terrain.affectsLight === false) continue;
-      const w = Math.max(1, (terrain.width || 1) * grid);
-      const d = Math.max(1, (terrain.depth || 1) * grid);
-      out.push({
-        id: terrain.identifier,
-        points: this.rectOccluder(terrain.location.x, terrain.location.y, w, d, terrain.rotate || 0),
-      });
     }
     return out;
   }
@@ -2246,8 +2322,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     setTimeout(() => {
       this.pings = this.pings.filter(p => p.id !== ping.id);
       this.updateOffscreenArrows();
+      this.ensureFxTimer();
+      this.changeDetector.markForCheck();
     }, 2800);
     this.updateOffscreenArrows();
+    this.ensureFxTimer();
   }
 
   private updateOffscreenArrows() {

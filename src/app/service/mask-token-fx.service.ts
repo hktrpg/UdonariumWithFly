@@ -71,6 +71,7 @@ export class MaskTokenFxService implements OnDestroy {
   }
 
   private scheduleRefresh() {
+    if (this.active.size === 0 && !this.hasPassiveMask()) return;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = null;
@@ -78,8 +79,17 @@ export class MaskTokenFxService implements OnDestroy {
     }, 80);
   }
 
+  private hasPassiveMask(): boolean {
+    const masks = this.tabletopService.tableMasks || [];
+    for (const m of masks) {
+      if (m?.tokenFxPassive) return true;
+    }
+    return false;
+  }
+
   private refresh() {
     if (Network.GuestMode()) return;
+    if (this.active.size === 0 && !this.hasPassiveMask()) return;
     const characters = this.tabletopService.characters || [];
     const masks = (this.tabletopService.tableMasks || []).filter(m => m?.tokenFxPassive);
     const seen = new Set<string>();
