@@ -328,7 +328,7 @@ export const zhCN_obj: I18nDictionary = {
   'cutin.preventOutOfBounds': '防止超出画面', 'cutin.size': '尺寸（宽和高都为 0 时保持原图片）', 'cutin.width': '宽度（0＝未指定）', 'cutin.height': '高度（0＝未指定）',
   'cutin.audio': '音乐文件', 'cutin.videoUrl': '视频网址', 'cutin.save': '保存', 'cutin.delete': '删除', 'cutin.restore': '还原',
   'diceTable.title': '骰子机器人表设置', 'diceTable.add': '新增骰子机器人表', 'diceTable.unnamed': '（无名骰子机器人表）', 'diceTable.name': '名称', 'diceTable.command': '命令', 'diceTable.save': '保存', 'diceTable.delete': '删除',
-  'file.title': '图片库', 'file.drop': '将图片拖放到这里', 'file.orClick': '或点击这里选择', 'file.maxSize': '每个文件最大 2MB', 'file.noTag': '无标签', 'file.or': '符合任一（OR）', 'file.and': '符合全部（AND）', 'file.sort': '排序',
+  'file.title': '图片库', 'file.drop': '将图片拖放到这里', 'file.orClick': '或点击这里选择', 'file.maxSize': '来源最大 20MB；导入后自动缩图至约 2MB／2048px', 'file.noTag': '无标签', 'file.or': '符合任一（OR）', 'file.and': '符合全部（AND）', 'file.sort': '排序',
   'file.current': '设置中', 'file.noImage': '无图片\n/解除设置', 'file.show': '将选中的图片设为显示', 'file.hide': '将选中的图片设为隐藏', 'file.cancelSelection': '取消选择（已选 {{count}}）', 'file.addTag': '新增标签 ➡',
   'url.title': '打开参考网址', 'url.confirm': '要打开此 URL 吗？（在新窗口中打开，请允许弹出窗口）', 'url.invalid': '⚠️网址无效。', 'url.open': '打开',
   'pass.title': '密码〈{{title}}〉', 'pass.label': '密码', 'pass.submit': '进入房间', 'pass.invalid': '密码错误',

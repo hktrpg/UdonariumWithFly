@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -130,7 +131,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   pendingAttachedImages: ImageFile[] = [];
   isDragOverAttach = false;
   isAttachingImages = false;
-  private static readonly MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
+  private static readonly MAX_CHAT_IMAGE_BYTES = IMAGE_SOURCE_MAX_BYTES;
   private static readonly MAX_PENDING_ATTACHMENTS = 8;
 
   get isDirect(): boolean { return this.sendTo != null && this.sendTo.length ? true : false }

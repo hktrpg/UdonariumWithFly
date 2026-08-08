@@ -8,6 +8,7 @@ import { XmlUtil } from '../system/util/xml-util';
 import { AudioFile } from './audio-file';
 import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
+import { IMAGE_SOURCE_MAX_BYTES } from './image-normalize';
 import { ImageStorage } from './image-storage';
 import { MimeType } from './mime-type';
 import { PdfStorage } from './pdf-storage';
@@ -26,7 +27,8 @@ export class FileArchiver {
     return FileArchiver._instance;
   }
 
-  private maxImageSize = 2 * MEGA_BYTE;
+  /** Source accept cap; stored size is enforced by normalizeImageBlob (≤2MB). */
+  private maxImageSize = IMAGE_SOURCE_MAX_BYTES;
   private maxAudioeSize = 20 * MEGA_BYTE;
   private maxPdfSize = 20 * MEGA_BYTE;
   private maxVideoSize = 50 * MEGA_BYTE;
@@ -141,7 +143,11 @@ export class FileArchiver {
       return;
     }
     console.log(file.name + ' type:' + file.type);
-    await ImageStorage.instance.addAsync(file);
+    try {
+      await ImageStorage.instance.addAsync(file);
+    } catch (e) {
+      console.warn(`Image import failed (normalize/store). -> ${file.name}`, e);
+    }
   }
 
   private async handleAudio(file: File) {

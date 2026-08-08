@@ -331,7 +331,7 @@ export const ja_obj: I18nDictionary = {
   'cutin.preventOutOfBounds': '画面外に出さない', 'cutin.size': 'サイズ（幅・高さがともに 0 の場合は元画像を維持）', 'cutin.width': '幅（0＝未指定）', 'cutin.height': '高さ（0＝未指定）',
   'cutin.audio': '音声ファイル', 'cutin.videoUrl': '動画 URL', 'cutin.save': '保存', 'cutin.delete': '削除', 'cutin.restore': '復元',
   'diceTable.title': 'ダイスボット表設定', 'diceTable.add': 'ダイスボット表を追加', 'diceTable.unnamed': '（無名のダイスボット表）', 'diceTable.name': '名前', 'diceTable.command': 'コマンド', 'diceTable.save': '保存', 'diceTable.delete': '削除',
-  'file.title': '画像ライブラリ', 'file.drop': 'ここに画像をドロップ', 'file.orClick': 'またはクリックして選択', 'file.maxSize': 'ファイルごとに最大 2MB', 'file.noTag': 'タグなし', 'file.or': 'いずれかに一致（OR）', 'file.and': 'すべてに一致（AND）', 'file.sort': '並び替え',
+  'file.title': '画像ライブラリ', 'file.drop': 'ここに画像をドロップ', 'file.orClick': 'またはクリックして選択', 'file.maxSize': '元ファイル最大 20MB／取込後に自動で約 2MB・2048px に縮小', 'file.noTag': 'タグなし', 'file.or': 'いずれかに一致（OR）', 'file.and': 'すべてに一致（AND）', 'file.sort': '並び替え',
   'file.current': '設定中', 'file.noImage': '画像なし\n/設定解除', 'file.show': '選択画像を表示', 'file.hide': '選択画像を隠す', 'file.cancelSelection': '選択解除（{{count}}件選択）', 'file.addTag': 'タグを追加 ➡',
   'url.title': '参照 URL を開く', 'url.confirm': 'この URL を新しいウィンドウで開きますか？ ポップアップを許可してください。', 'url.invalid': '⚠️ URL が無効です。', 'url.open': '開く',
   'pass.title': 'パスワード〈{{title}}〉', 'pass.label': 'パスワード', 'pass.submit': '入室', 'pass.invalid': 'パスワードが違います',

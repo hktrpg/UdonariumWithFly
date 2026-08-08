@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
@@ -20,12 +21,14 @@ import { NoteImportService } from 'service/note-import.service';
 import { PointerCoordinate } from 'service/pointer-device.service';
 
 const MEGA = 1024 * 1024;
-const MAX_IMAGE = 2 * MEGA;
+const MAX_IMAGE = IMAGE_SOURCE_MAX_BYTES;
 const MAX_PDF = 20 * MEGA;
 const MAX_VIDEO = 50 * MEGA;
 
 type DropKind = 'image' | 'pdf' | 'video' | 'text';
-type DropChoice = 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'mask' | 'coin' | 'library';
+type DropChoice =
+  | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'mask' | 'coin' | 'library'
+  | 'tableMap' | 'tableBackground';
 
 @Injectable({ providedIn: 'root' })
 export class TabletopFileDropService {
@@ -87,6 +90,21 @@ export class TabletopFileDropService {
   private buildChoices(imageCount: number, noteCount: number, totalCount: number): DropCreateChoice[] {
     const choices: DropCreateChoice[] = [];
     if (imageCount > 0) {
+      // Single image: allow replacing the current table map / background.
+      if (imageCount === 1 && TableSelecter.instance.viewTable) {
+        choices.push({
+          id: 'tableMap',
+          label: this.i18n.t('dropCreate.tableMap'),
+          icon: 'map',
+          hint: this.i18n.t('dropCreate.hint.tableMap'),
+        });
+        choices.push({
+          id: 'tableBackground',
+          label: this.i18n.t('dropCreate.tableBackground'),
+          icon: 'wallpaper',
+          hint: this.i18n.t('dropCreate.hint.tableBackground'),
+        });
+      }
       choices.push({
         id: 'token',
         label: this.i18n.t('dropCreate.token', { count: imageCount }),
@@ -169,11 +187,29 @@ export class TabletopFileDropService {
         return this.createMasks(images, position);
       case 'coin':
         return this.createCoin(images, position);
+      case 'tableMap':
+        return this.replaceTableImage(images, 'map');
+      case 'tableBackground':
+        return this.replaceTableImage(images, 'background');
       case 'library':
         return this.importToLibrary(accepted);
       default:
         return false;
     }
+  }
+
+  /** Replace current viewed table's map or background with the dropped image. */
+  private async replaceTableImage(files: File[], slot: 'map' | 'background'): Promise<boolean> {
+    if (!files.length) return false;
+    const table = TableSelecter.instance.viewTable;
+    if (!table) return false;
+    const image = await ImageStorage.instance.addAsync(files[0]);
+    if (slot === 'map') {
+      table.imageIdentifier = image.identifier;
+    } else {
+      table.backgroundImageIdentifier = image.identifier;
+    }
+    return true;
   }
 
   /** Media → FileArchiver; text/json/xml/html → note inventory (or room XML via archiver). */

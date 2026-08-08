@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 
+import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
@@ -62,7 +63,7 @@ export class NoteImportService {
     }
 
     if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(lower)) {
-      if (file.size > 2 * MEGA) return null;
+      if (file.size > IMAGE_SOURCE_MAX_BYTES) return null;
       const image = await ImageStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 3, 3);
       note.setFrontImage(image.identifier);
