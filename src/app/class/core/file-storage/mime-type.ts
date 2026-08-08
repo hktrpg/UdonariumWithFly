@@ -25,6 +25,7 @@ export namespace MimeType {
     json: 'application/json',
     map: 'application/json',
     zip: 'application/zip',
+    pdf: 'application/pdf',
     mp3: 'audio/mp3',
     wav: 'audio/wav',
     m4a: 'audio/aac',

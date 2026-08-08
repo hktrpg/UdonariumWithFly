@@ -8,11 +8,13 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
+import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
+import { I18nService } from 'service/i18n.service';
+import { NoteImportService } from 'service/note-import.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
-import { I18nService } from 'service/i18n.service';
 
 type NoteFilterId = 'all' | 'table' | 'other';
 
@@ -27,6 +29,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   selectFilter: NoteFilterId = 'all';
   selectedIdentifier: string = '';
   expandedId: string = '';
+  isDragOver = false;
+  get isGM(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
 
   readonly filters: { id: NoteFilterId, label: string }[] = [
     { id: 'all', label: '' },
@@ -36,12 +40,17 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote));
   get textNotes(): TextNote[] { return this.textNoteCache.objects; }
+  get selected(): TextNote {
+    const obj = ObjectStore.instance.get(this.selectedIdentifier);
+    return obj instanceof TextNote ? obj : null;
+  }
 
   constructor(
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
+    private noteImport: NoteImportService,
     private i18n: I18nService,
   ) { }
 
@@ -50,7 +59,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // Defer panel title — UIPanel already CD-checked with default untitled (NG0100).
     Promise.resolve().then(() => this.refreshLabels());
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', -1000, event => {
@@ -60,18 +68,10 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
           this.changeDetector.markForCheck();
         }
       })
-      .on('SELECT_GAME_TABLE', event => {
-        this.refresh();
-      })
-      .on('UPDATE_INVENTORY', event => {
-        this.refresh();
-      })
-      .on('UPDATE_GAME_OBJECT', event => {
-        this.refresh();
-      })
-      .on('DISCONNECT_PEER', event => {
-        this.changeDetector.markForCheck();
-      })
+      .on('SELECT_GAME_TABLE', () => this.refresh())
+      .on('UPDATE_INVENTORY', () => this.refresh())
+      .on('UPDATE_GAME_OBJECT', () => this.refresh())
+      .on('DISCONNECT_PEER', () => this.changeDetector.markForCheck())
       .on('LOCALE_CHANGED', () => {
         this.refreshLabels();
         this.changeDetector.markForCheck();
@@ -82,7 +82,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     EventSystem.unregister(this);
   }
 
-  /** Blank area: block browser menu (item menus call stopPropagation). */
   @HostListener('contextmenu', ['$event'])
   onHostContextMenu(e: Event) {
     e.preventDefault();
@@ -97,7 +96,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const notes = this.textNotes || [];
     switch (this.selectFilter) {
       case 'table':
-        // All notes bound to any map (not just the current view).
         return notes.filter(n => n.location?.name === 'table');
       case 'other':
         return notes.filter(n => n.location?.name !== 'table');
@@ -120,7 +118,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
 
   settotable(gameObject: TextNote) {
     if (this.GuestMode()) return;
-    // Multi-map: add to current view without removing other maps.
     gameObject.addToTable();
     this.refresh();
   }
@@ -129,12 +126,10 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     return gameObject.title || this.i18n.t('note.untitled');
   }
 
-  /** On the current view table (not another map, not inventory). */
   isittable(note: TextNote) {
     return note.isVisibleOnTable;
   }
 
-  /** On some table but not the current map — offer "also place on current map". */
   isOnOtherTable(note: TextNote): boolean {
     return note.location?.name === 'table' && !note.isVisibleOnTable;
   }
@@ -171,7 +166,6 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     }
 
     const location = gameObject.location?.name || '';
-    const onTable = location === 'table';
     const onCurrentMap = gameObject.isVisibleOnTable;
     const onOtherMap = this.isOnOtherTable(gameObject);
     const actions: ContextMenuAction[] = [
@@ -226,6 +220,15 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
       ContextMenuSeparator,
       { name: this.i18n.t('note.edit'), action: () => { this.showDetail(gameObject); } },
       {
+        name: this.i18n.t('note.showPlayers'),
+        action: () => this.showToPlayers(gameObject),
+        disabled: !this.isGM
+      },
+      {
+        name: this.i18n.t('note.previewSelf'),
+        action: () => this.previewSelf(gameObject)
+      },
+      {
         name: this.i18n.t('note.clone'),
         action: () => {
           const cloneObject = gameObject.clone();
@@ -248,15 +251,71 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     this.contextMenuService.open(position, actions, this.showgameObject(gameObject));
   }
 
+  onDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    this.isDragOver = false;
+  }
+
+  async onDrop(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOver = false;
+    if (this.GuestMode()) return;
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    await this.noteImport.importFiles(files, { addToTable: true });
+    this.refresh();
+  }
+
+  pickImport() {
+    if (this.GuestMode()) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*,video/*,application/pdf,text/plain,.md,.txt,.pdf,.mp4,.webm,.mov';
+    input.onchange = async () => {
+      if (!input.files?.length) return;
+      await this.noteImport.importFiles(input.files, { addToTable: true });
+      this.refresh();
+    };
+    input.click();
+  }
+
+  private showToPlayers(note: TextNote) {
+    if (!this.isGM || !note) return;
+    const data = buildNoteHandoutPayload(note, this.i18n.t('note.untitled'));
+    if (!data.imageUrl && !data.pdfIdentifier && !data.videoUrl && !data.videoIdentifier && !data.text) {
+      data.text = note.title || this.i18n.t('note.untitled');
+    }
+    EventSystem.call('SHOW_NOTE_HANDOUT', data);
+    EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
+  }
+
+  private previewSelf(note: TextNote) {
+    if (!note) return;
+    const data = buildNoteHandoutPayload(note, this.i18n.t('note.untitled'));
+    if (!data.imageUrl && !data.pdfIdentifier && !data.videoUrl && !data.videoIdentifier && !data.text) {
+      data.text = note.title || this.i18n.t('note.untitled');
+    }
+    EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
+  }
+
   private showDetail(gameObject: TextNote) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
-    const option: PanelOption = { title: title, left: coordinate.x - 350, top: coordinate.y - 200, width: 560, height: 470 };
-    const component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 520 };
+    const component = this.panelService.open<NoteSettingsComponent>(NoteSettingsComponent, option);
+    component.note = gameObject;
+    component.embedded = false;
   }
 
   trackByGameObject(index: number, gameObject: TextNote) {
@@ -283,9 +342,7 @@ class TabletopCache<T extends TabletopObject> {
     return this._objects;
   }
 
-  constructor(readonly refreshCollector: () => T[]) { }
+  constructor(private refreshCollector: () => T[]) { }
 
-  refresh() {
-    this.needsRefresh = true;
-  }
+  refresh() { this.needsRefresh = true; }
 }

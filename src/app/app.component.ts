@@ -6,6 +6,10 @@ import { AudioSharingSystem } from '@udonarium/core/file-storage/audio-sharing-s
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { PdfSharingSystem } from '@udonarium/core/file-storage/pdf-sharing-system';
+import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
+import { VideoSharingSystem } from '@udonarium/core/file-storage/video-sharing-system';
+import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory';
@@ -214,6 +218,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       ImageStorage.instance;
       AudioSharingSystem.instance.initialize();
       AudioStorage.instance;
+      PdfSharingSystem.instance.initialize();
+      PdfStorage.instance;
+      VideoSharingSystem.instance.initialize();
+      VideoStorage.instance;
       ObjectFactory.instance;
       ObjectSerializer.instance;
       ObjectStore.instance;

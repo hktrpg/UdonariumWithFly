@@ -2,6 +2,91 @@
   display: block;
 }
 
+.is-ghosted {
+  opacity: 0.35;
+}
+
+.has-action {
+  cursor: pointer;
+}
+
+.pdf-wrap,
+.video-wrap,
+.image-wrap {
+  position: relative;
+  width: 100%;
+  min-height: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  pointer-events: auto;
+}
+
+.note-video {
+  width: 100%;
+  max-height: 100%;
+  display: block;
+  background: #000;
+  pointer-events: auto;
+}
+
+.note-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.media-loading {
+  padding: 12px;
+  color: #666;
+  font-size: 14px;
+}
+
+.pdf-canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}
+
+.pdf-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.pdf-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  width: 28px;
+  height: 24px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pdf-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pdf-page {
+  font-size: 12px;
+  min-width: 48px;
+  text-align: center;
+}
+
 .is-grab {
   cursor: -moz-grab;
   cursor: -webkit-grab;
@@ -170,15 +255,16 @@
   backface-visibility: hidden;
   position: absolute;
   box-sizing: border-box;
-  height: 100%;
+  height: 6px;
   width: 100%;
-  top: 0;
   left: 0;
-  background-color: hsla(200, 100%, 75%, 0.6);
+  bottom: 0;
+  top: auto;
+  background-color: hsla(200, 100%, 60%, 0.9);
 }
 
 .selected-highlight.is-magnetic {
-  background-color: hsla(60, 100%, 75%, 0.6);
+  background-color: hsla(60, 100%, 55%, 0.9);
 }
 
 .rotate-grab {

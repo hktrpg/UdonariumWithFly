@@ -2,6 +2,7 @@ import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { Network } from './core/system';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
+import { TabletopClickAction } from './tabletop-click-action';
 import { TabletopObject } from './tabletop-object';
 
 @SyncObject('table-mask')
@@ -20,13 +21,39 @@ export class GameTableMask extends TabletopObject {
   /** When true (default), footprint blocks light and vision. */
   @SyncVar() affectsLight: boolean = true;
 
+  @SyncVar() clickAction: TabletopClickAction = 'none';
+  @SyncVar() clickPayload: string = '';
+  @SyncVar() clickGameType: string = 'DiceBot';
+
   get name(): string { return this.getCommonValue('name', ''); }
+  set name(name: string) { this.setCommonValue('name', name); }
   get width(): number { return this.getCommonValue('width', 1); }
+  set width(width: number) { this.setCommonValue('width', width); }
   get height(): number { return this.getCommonValue('height', 1); }
+  set height(height: number) { this.setCommonValue('height', height); }
   get opacity(): number {
     let element = this.getElement('opacity', this.commonDataElement);
     let num = element ? <number>element.currentValue / <number>element.value : 1;
     return Number.isNaN(num) ? 1 : num;
+  }
+  /** UI percent 0–100 (numberResource currentValue). */
+  get opacityPercent(): number {
+    const element = this.getElement('opacity', this.commonDataElement);
+    if (!element) return 100;
+    const n = Number(element.currentValue);
+    return Number.isNaN(n) ? 100 : n;
+  }
+  set opacityPercent(percent: number) {
+    const element = this.getElement('opacity', this.commonDataElement);
+    if (!element) return;
+    const max = Number(element.value) || 100;
+    const n = Math.max(0, Math.min(max, Number(percent)));
+    element.currentValue = Number.isNaN(n) ? max : n;
+  }
+
+  setImage(identifier: string) {
+    const element = this.getElement('imageIdentifier', this.imageDataElement);
+    if (element) element.value = identifier || '';
   }
   
   get fontsize(): number { 

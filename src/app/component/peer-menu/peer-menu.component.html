@@ -1,8 +1,11 @@
+<div class="settings-ui dense peer-menu">
+<div class="card card-dense lang-card">
 <div class="lang-row">
   <label class="lang-label">{{ 'peer.language' | i18n }}</label>
   <select class="lang-select" [ngModel]="i18n.locale" (ngModelChange)="onLocaleChange($event)">
     <option *ngFor="let loc of i18n.locales" [value]="loc.id">{{ loc.nativeLabel }}</option>
   </select>
+</div>
 </div>
 <div *ngIf="myPeer">
   <div style="display: flex; align-items: flex-end; margin-bottom: 4px">
@@ -221,4 +224,5 @@
     (keydown.space)="confirmApplyUpdate($event)"
     [attr.title]="'update.readyHint' | i18n"
     [attr.aria-label]="'update.readyHint' | i18n">system_update</i>
+</div>
 </div>

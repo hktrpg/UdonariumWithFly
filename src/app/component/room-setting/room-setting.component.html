@@ -1,4 +1,4 @@
-<div class="settings-ui" *ngIf="editMode || !isConnected; else other_content">
+<div class="settings-ui dense" *ngIf="editMode || !isConnected; else other_content">
   <section class="card">
     <header class="card-head"><h3>{{ (editMode ? 'room.editTitle' : (isResume ? 'room.resumeTitle' : 'room.title')) | i18n }}</h3></header>
     <p class="hint" *ngIf="isResume">{{ 'room.resumeHint' | i18n:{ id: preferredRoomId } }}</p>

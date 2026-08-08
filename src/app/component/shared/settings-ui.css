@@ -9,6 +9,43 @@
   color: #3a2f24;
 }
 
+/* Compact density for settings panels (default content fits default height). */
+.settings-ui.dense .card {
+  padding: 5px 7px;
+}
+
+.settings-ui.dense .card + .card {
+  margin-top: 4px;
+}
+
+.settings-ui.dense .field {
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.settings-ui.dense .field-row {
+  margin-top: 4px;
+  gap: 4px;
+}
+
+.settings-ui.dense .hint,
+.settings-ui.dense .empty-hint {
+  margin: 3px 0 0;
+  font-size: 11px;
+}
+
+.settings-ui.dense .section-title {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5c4630;
+  letter-spacing: 0.03em;
+}
+
+.settings-ui.dense .section-title:first-child {
+  margin-top: 0;
+}
+
 /* Keep list + form side-by-side; stack only when the panel itself is narrow. */
 .settings-layout {
   display: flex;

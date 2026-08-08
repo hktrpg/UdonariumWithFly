@@ -16,7 +16,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { MaskSettingsComponent } from 'component/mask-settings/mask-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
@@ -27,6 +27,7 @@ import { CoordinateService } from 'service/coordinate.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { executeTabletopClickAction } from '@udonarium/tabletop-click-action';
 import { UUID } from '@udonarium/core/system/util/uuid';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -70,8 +71,11 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
 export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewInit {
   @Input() gameTableMask: GameTableMask = null;
   @Input() is3D: boolean = false;
+  private dragStarted = false;
+  private clickArmed = false;
 
   get name(): string { return this.gameTableMask.name; }
+  get hasClickAction(): boolean { return !!this.gameTableMask && this.gameTableMask.clickAction !== 'none'; }
   get width(): number { return MathUtil.clampMin(this.gameTableMask.width); }
   get height(): number { return MathUtil.clampMin(this.gameTableMask.height); }
   get opacity(): number { return this.gameTableMask.opacity; }
@@ -316,6 +320,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onInputStart(e: any) {
+    this.dragStarted = false;
+    this.clickArmed = !this.isScratching && e?.button === 0;
     if (!this.isScratching || !this.gameTableMask.isMine) { 
       this.input.cancel();
     } else if (!window.PointerEvent && e.button < 2 && e.buttons < 2) {
@@ -326,6 +332,16 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     if ((this.isLock && !this.isScratching) || (this.isScratching && !this.gameTableMask.isMine)) {
       EventSystem.trigger('DRAG_LOCKED_OBJECT', { srcEvent: e });
     }
+  }
+
+  @HostListener('mouseup', ['$event'])
+  onPointerUp(e: MouseEvent) {
+    if (!this.clickArmed || this.dragStarted || this.isScratching) return;
+    if (e.button !== 0) return;
+    if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.clickArmed = false;
+    if (!this.hasClickAction) return;
+    this.ngZone.run(() => executeTabletopClickAction(this.gameTableMask, this.chatMessageService));
   }
 
   @HostListener('pointerdown', ['$event'])
@@ -432,11 +448,13 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onMove() {
+    this.dragStarted = true;
     this.contextMenuService.close();
     SoundEffect.play(PresetSound.cardPick);
   }
 
   onMoved() {
+    this.clickArmed = false;
     SoundEffect.play(PresetSound.cardPut);
   }
 
@@ -760,6 +778,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         altitudeDisabled: this.isScratching
       },
       ContextMenuSeparator,
+      {
+        name: this.i18n.t('mask.clickSettings'),
+        action: () => this.showClickSettings(this.gameTableMask),
+        disabled: this.isScratching
+      },
+      ContextMenuSeparator,
       { name: this.i18n.t('mask.menu.30'), action: () => { this.showDetail(this.gameTableMask); } },
       (this.gameTableMask.getUrls().length <= 0 ? null : {
         name: this.i18n.t('mask.menu.31'), action: null,
@@ -819,12 +843,17 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
 
   private showDetail(gameObject: GameTableMask) {
     if (this.GuestMode()) return;
-    let coordinate = this.pointerDeviceService.pointers[0];
+    const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('mask.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 200, top: coordinate.y - 150, width: 400, height: 530 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    const option: PanelOption = { title, left: coordinate.x - 200, top: coordinate.y - 140, width: 400, height: 420 };
+    const component = this.panelService.open<MaskSettingsComponent>(MaskSettingsComponent, option);
+    component.mask = gameObject;
+    component.embedded = false;
+  }
+
+  private showClickSettings(gameObject: GameTableMask) {
+    this.showDetail(gameObject);
   }
   
   identify(index, gridInfo){

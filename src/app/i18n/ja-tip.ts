@@ -24,7 +24,7 @@ export const ja_tip: I18nDictionary = {
   'tip.menu.inventory.title': 'インベントリ',
   'tip.menu.inventory.body': 'キャラクター倉庫：テーブル／共有／個人／墓場。表示中マップに紐付け；複数選択配置；Ctrl＋ドラッグで一時コピー。',
   'tip.menu.notes.title': 'メモ',
-  'tip.menu.notes.body': 'メモ倉庫：テーブル／共有／個人／ゴミ箱。',
+  'tip.menu.notes.body': 'メモ倉庫：テキスト／画像／動画／PDF。裏返し、非表示、クリック動作、プレイヤー提示に対応。',
   'tip.menu.settings.title': '設定',
   'tip.menu.settings.body': 'ローカル設定：グリッド、スナップ、音、チャット自動表示、単一窓、パネル再配置、スタンド、言語、チュートリアル。',
   'tip.menu.more.title': 'その他',

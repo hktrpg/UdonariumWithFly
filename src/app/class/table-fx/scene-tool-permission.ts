@@ -207,6 +207,7 @@ export class SceneToolPermission extends GameObject implements InnerXml {
     }
   }
 
+
   /** Treat absent SyncVar as {@link defaultOn} (older hosts may omit new keys). */
   private menuFlag(value: boolean | undefined | null, defaultOn: boolean): boolean {
     return value == null ? defaultOn : !!value;

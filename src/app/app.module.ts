@@ -84,6 +84,9 @@ import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
 import { ScenePresetComponent } from './component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from './component/scenario-text/scenario-text.component';
+import { NoteHandoutComponent } from './component/note-handout/note-handout.component';
+import { NoteSettingsComponent } from './component/note-settings/note-settings.component';
+import { MaskSettingsComponent } from './component/mask-settings/mask-settings.component';
 import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
 import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
@@ -166,6 +169,9 @@ import '@udonarium/table-fx/combat-tracker';
     SceneToolsComponent,
     ScenePresetComponent,
     ScenarioTextComponent,
+    NoteHandoutComponent,
+    NoteSettingsComponent,
+    MaskSettingsComponent,
     CharacterResourceHudComponent,
     MusicHudComponent,
     CombatTrackerComponent,

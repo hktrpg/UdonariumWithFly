@@ -24,7 +24,7 @@ export const zhTW_tip: I18nDictionary = {
   'tip.menu.inventory.title': '倉庫',
   'tip.menu.inventory.body': '角色庫：桌面／公用／私人／回收區。依目前地圖綁定；可多選放置；Ctrl＋拖曳＝暫存複本。',
   'tip.menu.notes.title': '筆記',
-  'tip.menu.notes.body': '筆記倉庫：桌面／公用／私人／回收區。',
+  'tip.menu.notes.body': '筆記倉庫：文字／圖片／影片／PDF。Ctrl+懸停可預覽；可翻面、隱藏、點擊動作、出示給玩家。',
   'tip.menu.settings.title': '設定',
   'tip.menu.settings.body': '本機選項：格線、吸附、提示音、聊天自動開啟、單視窗、重排面板、Stand、語系、教學。',
   'tip.menu.more.title': '更多',

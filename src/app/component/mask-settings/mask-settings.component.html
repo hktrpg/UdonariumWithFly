@@ -1,0 +1,156 @@
+<div class="settings-ui dense mask-settings" *ngIf="mask; else emptyBlock" [class.is-embedded]="embedded"
+  [class.is-dragover]="isDragOver"
+  (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+  <section class="card card-dense">
+    <div class="title-row">
+      <label class="field grow">
+        <span>{{ 'mask.fieldName' | i18n }}</span>
+        <input type="text" [(ngModel)]="mask.name" [disabled]="GuestMode()" />
+      </label>
+      <button type="button" class="thumb-btn" [class.has-image]="!!mask.imageFile?.url"
+        (click)="openImage()" [disabled]="GuestMode()" [title]="'mask.changeImage' | i18n">
+        <img *ngIf="mask.imageFile?.url" [src]="mask.imageFile.url | safe: 'resourceUrl'" alt="" />
+        <i *ngIf="!mask.imageFile?.url" class="material-icons">image</i>
+      </button>
+    </div>
+
+    <div class="image-row">
+      <button type="button" class="image-frame image-frame-sm" [class.image-frame-empty]="!mask.imageFile?.url"
+        (click)="openImage()" [disabled]="GuestMode()" [title]="'mask.changeImage' | i18n">
+        <img *ngIf="mask.imageFile?.url" [src]="mask.imageFile.url | safe: 'resourceUrl'" alt="" />
+        <ng-container *ngIf="!mask.imageFile?.url">
+          <i class="material-icons">add_photo_alternate</i>
+        </ng-container>
+      </button>
+      <div class="image-actions">
+        <button type="button" class="btn btn-sm btn-primary" (click)="openImage()" [disabled]="GuestMode()">
+          <i class="material-icons">image</i>{{ 'mask.changeImage' | i18n }}
+        </button>
+        <button type="button" class="btn btn-sm" (click)="clearImage()" [disabled]="GuestMode() || !mask.imageFile?.url">
+          {{ 'mask.clearImage' | i18n }}
+        </button>
+        <span class="hint">{{ 'mask.dropImageHint' | i18n }}</span>
+      </div>
+    </div>
+
+    <div class="field-row nowrap metrics">
+      <label class="field">
+        <span>{{ 'note.fieldWidth' | i18n }}</span>
+        <input type="number" min="0.5" step="0.5" [(ngModel)]="mask.width" [disabled]="GuestMode()" />
+      </label>
+      <label class="field">
+        <span>{{ 'note.fieldHeight' | i18n }}</span>
+        <input type="number" min="0.5" step="0.5" [(ngModel)]="mask.height" [disabled]="GuestMode()" />
+      </label>
+      <label class="field">
+        <span>{{ 'mask.fieldOpacity' | i18n }}</span>
+        <input type="number" min="0" max="100" step="1" [(ngModel)]="mask.opacityPercent" [disabled]="GuestMode()" />
+      </label>
+      <label class="field">
+        <span>{{ 'mask.fieldAltitude' | i18n }}</span>
+        <input type="number" step="0.5" [(ngModel)]="mask.altitude" [disabled]="GuestMode()" />
+      </label>
+      <label class="field">
+        <span>{{ 'note.fieldFontSize' | i18n }}</span>
+        <input type="number" min="1" step="1" [(ngModel)]="mask.fontsize" [disabled]="GuestMode()" />
+      </label>
+    </div>
+
+    <div class="field-row nowrap color-row">
+      <label class="field color-field">
+        <span>{{ 'mask.fieldTextColor' | i18n }}</span>
+        <input type="color" [(ngModel)]="mask.color" [disabled]="GuestMode()" />
+      </label>
+      <label class="field color-field">
+        <span>{{ 'mask.fieldBgColor' | i18n }}</span>
+        <input type="color" [(ngModel)]="mask.bgcolor" [disabled]="GuestMode()" />
+      </label>
+      <button type="button" class="btn btn-sm" (click)="resetColors()" [disabled]="GuestMode()">
+        {{ 'mask.menu.26' | i18n }}
+      </button>
+      <label class="field grow">
+        <span>{{ 'mask.fieldBlend' | i18n }}</span>
+        <select [ngModel]="mask.blendType" (ngModelChange)="setBlendType(+$event)" [disabled]="GuestMode()">
+          <option *ngFor="let opt of blendOptions" [ngValue]="opt.value">{{ opt.labelKey | i18n }}</option>
+        </select>
+      </label>
+      <label class="field grow">
+        <span>{{ 'mask.fieldBorder' | i18n }}</span>
+        <select [ngModel]="mask.borderType" (ngModelChange)="setBorderType(+$event)" [disabled]="GuestMode()">
+          <option *ngFor="let opt of borderOptions" [ngValue]="opt.value">{{ opt.labelKey | i18n }}</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="field">
+      <span>{{ 'mask.fieldText' | i18n }}</span>
+      <textarea class="text-body" rows="1" [(ngModel)]="mask.text" [disabled]="GuestMode()"></textarea>
+    </label>
+  </section>
+
+  <section class="card card-dense">
+    <div class="mode-tabs action-tabs" role="tablist" [attr.title]="'mask.clickHint' | i18n">
+      <button type="button" class="mode-tab" *ngFor="let action of actions"
+        [class.is-active]="mask.clickAction === action.id"
+        [disabled]="GuestMode()"
+        (click)="setClickAction(action.id)">
+        <i class="material-icons">{{ action.icon }}</i>
+        <span>{{ action.labelKey | i18n }}</span>
+      </button>
+    </div>
+
+    <label class="field" *ngIf="mask.clickAction === 'chat'">
+      <span>{{ 'note.clickChatText' | i18n }}</span>
+      <textarea class="text-body" rows="1" [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()"></textarea>
+    </label>
+    <div class="field-row nowrap" *ngIf="mask.clickAction === 'chat'">
+      <label class="field grow">
+        <span>{{ 'note.clickGameType' | i18n }}</span>
+        <input type="text" [(ngModel)]="mask.clickGameType" [disabled]="GuestMode()" />
+      </label>
+    </div>
+    <label class="field" *ngIf="mask.clickAction === 'table'">
+      <span>{{ 'note.clickTable' | i18n }}</span>
+      <select [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()">
+        <option value="">{{ 'note.pickTable' | i18n }}</option>
+        <option *ngFor="let table of tables" [ngValue]="table.identifier">{{ table.name }}</option>
+      </select>
+    </label>
+    <label class="field" *ngIf="mask.clickAction === 'preset'">
+      <span>{{ 'note.clickPreset' | i18n }}</span>
+      <select [(ngModel)]="mask.clickPayload" [disabled]="GuestMode()">
+        <option value="">{{ 'note.pickPreset' | i18n }}</option>
+        <option *ngFor="let preset of presets" [ngValue]="preset.identifier">{{ preset.title || preset.identifier }}</option>
+      </select>
+    </label>
+  </section>
+
+  <section class="card card-dense opts-card">
+    <div class="check-row tight">
+      <label>
+        <input type="checkbox" [(ngModel)]="mask.isLock" [disabled]="GuestMode()" />
+        {{ 'note.lock' | i18n }}
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="mask.isTransparentOnGMMode" [disabled]="GuestMode()" />
+        {{ 'mask.optGmSeeThrough' | i18n }}
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="mask.affectsLight" [disabled]="GuestMode()" />
+        {{ 'mask.optAffectsLight' | i18n }}
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="mask.isAltitudeIndicate" [disabled]="GuestMode()" />
+        {{ 'mask.optShowAltitude' | i18n }}
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="mask.isScratchPreviewOnGMMode" [disabled]="GuestMode()" />
+        {{ 'mask.optScratchPreview' | i18n }}
+      </label>
+    </div>
+  </section>
+</div>
+
+<ng-template #emptyBlock>
+  <div class="settings-ui empty-hint">{{ 'mask.settingsEmpty' | i18n }}</div>
+</ng-template>

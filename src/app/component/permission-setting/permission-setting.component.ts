@@ -9,7 +9,7 @@ import { PanelService } from 'service/panel.service';
 @Component({
   selector: 'permission-setting',
   templateUrl: './permission-setting.component.html',
-  styleUrls: ['./permission-setting.component.css'],
+  styleUrls: ['../shared/settings-ui.css', './permission-setting.component.css'],
   standalone: false
 })
 export class PermissionSettingComponent implements OnInit, OnDestroy {
