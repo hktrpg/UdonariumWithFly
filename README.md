@@ -46,7 +46,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Role invite links | Copy deep links for each role; join with password prompt when needed |
 | Guest mode | Restricted guest UI (no save, limited menus); legacy “allow guest” still supported |
 | Clarify mode | Compact chat toolbar toggle |
-| Note inventory | Notes by tabletop / shared / private / trash |
+| Note inventory | Table / shared / private / trash; text／image／video／PDF, handout, self-only (like tokens) |
+| Map-mask actions | Alt+double-click (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX |
 | Quick roll | Send character-sheet fields to chat for BCDice in one click |
 | Keyboard token controls | Select → WASD/arrows move; Shift+WASD face; Delete; Ctrl+C/X/V; Ctrl+Z undo / Ctrl+Y (or Ctrl+Shift+Z) redo; `[`/`]` layer; Alt(+Shift)/Ctrl+Shift+wheel rotate; Ctrl+Shift+D toggles DEBUG pose; Shift drop skips snap |
 | Hover overview pin | Hover token shows preview; pin keeps it open; fades out ~0.5s after leave; closes on delete/trash |
