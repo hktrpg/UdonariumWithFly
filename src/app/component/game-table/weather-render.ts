@@ -131,6 +131,8 @@ export class WeatherRender {
   setEnabled(enabled: boolean) {
     if (enabled && !this.running) {
       this.running = true;
+      // Paint immediately so enable does not flash an empty oversized canvas for one frame.
+      this.tick();
       const loop = () => {
         if (!this.running) return;
         this.tick();

@@ -2,6 +2,8 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy } from '@angula
 
 import { Network } from '@udonarium/core/system';
 
+const SHOW_THRESHOLD = 3 * 1024;
+
 @Component({
     selector: 'network-indicator',
     templateUrl: './network-indicator.component.html',
@@ -21,11 +23,15 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
     const el = this.elementRef.nativeElement as HTMLElement;
     el.style.display = 'none';
 
+    const isBusy = () =>
+      Network.bandwidthPeak >= SHOW_THRESHOLD || Network.bandwidthUsage >= SHOW_THRESHOLD;
+
     const scheduleHide = () => {
       if (this.hideTimer) clearTimeout(this.hideTimer);
       this.hideTimer = setTimeout(() => {
         this.hideTimer = null;
-        if (Network.bandwidthUsage >= 3 * 1024) {
+        if (isBusy()) {
+          Network.clearBandwidthPeak();
           scheduleHide();
           return;
         }
@@ -33,10 +39,11 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
       }, 650);
     };
 
-    // Sample bandwidth instead of listening to every EventSystem event.
+    // Poll sticky bandwidthPeak (survives brief send/receive queue windows).
     this.ngZone.runOutsideAngular(() => {
       this.pollTimer = setInterval(() => {
-        if (Network.bandwidthUsage < 3 * 1024) return;
+        if (!isBusy()) return;
+        Network.clearBandwidthPeak();
         el.style.display = 'block';
         scheduleHide();
       }, 250);

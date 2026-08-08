@@ -17,6 +17,9 @@ export interface Connection {
   readonly peers: IPeerContext[];
   readonly callback: ConnectionCallback;
   readonly bandwidthUsage: number;
+  /** Sticky high-water mark; survives brief queue windows so UI can poll reliably. */
+  readonly bandwidthPeak: number;
+  clearBandwidthPeak(): void;
 
   configure(config: any)
   open(userId?: string)

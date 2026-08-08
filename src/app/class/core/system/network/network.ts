@@ -25,6 +25,8 @@ export class Network {
 
   readonly callback: ConnectionCallback = new ConnectionCallback();
   get bandwidthUsage(): number { return this.connection ? this.connection.bandwidthUsage : 0; }
+  get bandwidthPeak(): number { return this.connection ? this.connection.bandwidthPeak : 0; }
+  clearBandwidthPeak() { this.connection?.clearBandwidthPeak(); }
 
   private config: any = {}
   private connectionClassPromise: Promise<ConnectionClass>;

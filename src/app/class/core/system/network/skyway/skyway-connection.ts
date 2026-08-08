@@ -29,6 +29,14 @@ export class SkyWayConnection implements Connection {
 
   readonly callback: ConnectionCallback = new ConnectionCallback();
   bandwidthUsage: number = 0;
+  bandwidthPeak: number = 0;
+
+  clearBandwidthPeak() { this.bandwidthPeak = 0; }
+
+  private addBandwidth(byteLength: number) {
+    this.bandwidthUsage += byteLength;
+    if (this.bandwidthUsage > this.bandwidthPeak) this.bandwidthPeak = this.bandwidthUsage;
+  }
 
   private key: string = '';
   private skyWay: Peer;
@@ -132,7 +140,7 @@ export class SkyWayConnection implements Connection {
     }
 
     let byteLength = container.data.byteLength;
-    this.bandwidthUsage += byteLength;
+    this.addBandwidth(byteLength);
     this.outboundQueue = this.outboundQueue.then(() => new Promise<void>((resolve, reject) => {
       setZeroTimeout(async () => {
         if (1 * 1024 < container.data.byteLength && Array.isArray(data) && 1 < data.length) {
@@ -302,7 +310,7 @@ export class SkyWayConnection implements Connection {
     if (0 < container.ttl) this.onRelay(conn, container);
     if (!this.callback.onData) return;
     let byteLength = container.data.byteLength;
-    this.bandwidthUsage += byteLength;
+    this.addBandwidth(byteLength);
     this.inboundQueue = this.inboundQueue.then(() => new Promise<void>((resolve, reject) => {
       setZeroTimeout(async () => {
         if (!this.callback.onData) return;
