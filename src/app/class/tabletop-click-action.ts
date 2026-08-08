@@ -10,7 +10,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { ScenePreset } from '@udonarium/scene-preset';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { applyMaskTokenFxToCharacter } from '@udonarium/table-fx/mask-token-fx-apply';
-import { MaskTokenFxConfig } from '@udonarium/table-fx/mask-appearance';
+import { tokenFxConfigHasWork } from '@udonarium/table-fx/mask-appearance';
 import { charactersOnMask } from '@udonarium/table-fx/mask-token-overlap';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote } from '@udonarium/text-note';
@@ -143,14 +143,7 @@ function resolvePresetId(host: TabletopClickActionHost): string {
   return (host.clickPresetId || '').trim() || legacyPayload(host, 'preset');
 }
 
-export function tokenFxConfigHasWork(cfg: MaskTokenFxConfig): boolean {
-  if (!cfg) return false;
-  if (cfg.isInverse || cfg.isHollow || cfg.isBlackPaint || cfg.isGrayscale || cfg.isSepia
-    || cfg.isWhitePaint || cfg.isMatrix || cfg.isFlipVertical || cfg.isContrast) {
-    return true;
-  }
-  return (cfg.altitudeMode || 'none') !== 'none';
-}
+export { tokenFxConfigHasWork } from '@udonarium/table-fx/mask-appearance';
 
 export function resolveActiveChatTab(chatMessageService: ChatMessageService): ChatTab {
   const id = ChatWindowComponent.activeChatTabIdentifier;
@@ -236,7 +229,15 @@ function runOne(
       if (!id) return false;
       const note = ObjectStore.instance.get<TextNote>(id);
       if (!(note instanceof TextNote)) return false;
+      // Never hand out notes this peer cannot see (other players' self-only).
+      if (!note.canSeeSelfOnly) return false;
       const data = buildNoteHandoutPayload(note, note.title || '');
+      if (!data.imageUrl && !data.pdfIdentifier && !data.videoUrl && !data.videoIdentifier && !data.text) return false;
+      // Self-only content must not be broadcast to the room.
+      if (note.isSelfOnly) {
+        EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
+        return true;
+      }
       EventSystem.call('SHOW_NOTE_HANDOUT', data);
       EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
       return true;
@@ -255,6 +256,10 @@ function runOne(
       for (const ch of targets) {
         applyMaskTokenFxToCharacter(ch, cfg);
       }
+      // Keep leave-restore in sync on all peers so walking off won't undo click FX.
+      const adopt = { characterIds: targets.map(ch => ch.identifier) };
+      EventSystem.call('MASK_TOKEN_FX_ADOPT', adopt);
+      EventSystem.trigger('MASK_TOKEN_FX_ADOPT', adopt);
       return true;
     }
     default:

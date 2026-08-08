@@ -1,5 +1,5 @@
 <div class="component is-3d is-pointer-events-none"
-  [ngClass]="{'is-grab': !isLocked && !GuestMode(), 'is-ghosted': isGhosted}"
+  [ngClass]="{'is-grab': !isLocked && !GuestMode()}"
   appMovable [movable.option]="movableOption" [movable.disable]="isEditorSelected || isLocked || GuestMode()"
   (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="is-3d" appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked || GuestMode()"
@@ -10,7 +10,7 @@
         [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
           <div class="upright-transform is-3d is-bg-color is-front is-bg-texture chrome-smooth-image-trick"
-            [ngClass]="{'is-bg-filter': isWhiteOut && isTextContent}"
+            [ngClass]="{'is-bg-filter': isWhiteOut && isTextContent, 'is-ghosted': isGhosted}"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
             <div *ngIf="isShowTitle && title.length" class="title is-3d is-black-background is-pointer-events-none">{{title}}</div>
@@ -52,6 +52,7 @@
             <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
           </div>
           <div class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
+            [ngClass]="{'is-ghosted': isGhosted}"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
             <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>

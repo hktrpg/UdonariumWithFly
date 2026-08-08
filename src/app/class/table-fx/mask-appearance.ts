@@ -93,6 +93,16 @@ export function stringifyMaskTokenFxConfig(cfg: MaskTokenFxConfig): string {
   return JSON.stringify(cfg || emptyMaskTokenFxConfig());
 }
 
+/** True when config would change image FX flags and/or altitude. */
+export function tokenFxConfigHasWork(cfg: MaskTokenFxConfig): boolean {
+  if (!cfg) return false;
+  if (cfg.isInverse || cfg.isHollow || cfg.isBlackPaint || cfg.isGrayscale || cfg.isSepia
+    || cfg.isWhitePaint || cfg.isMatrix || cfg.isFlipVertical || cfg.isContrast) {
+    return true;
+  }
+  return (cfg.altitudeMode || 'none') !== 'none';
+}
+
 function num(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;

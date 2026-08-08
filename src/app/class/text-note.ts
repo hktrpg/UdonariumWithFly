@@ -26,9 +26,12 @@ export class TextNote extends TabletopObject {
 
   /** When true, width/height edits are blocked in the inventory editor. */
   @SyncVar() isSizeLocked: boolean = false;
-  /** When false, only visibleOwner can see this note on the table. */
+  /**
+   * Legacy room-XML flag only (kept in sync by setSelfOnly).
+   * Do NOT use for render gating — same as GameCharacter: stealth is driven by owner id.
+   */
   @SyncVar() isVisible: boolean = true;
-  /** userId of the peer who hid the note (self-only visibility). */
+  /** Self-only stealth owner (userId). Empty = public. Same role as GameCharacter.owner. */
   @SyncVar() visibleOwner: string = '';
   @SyncVar() isFlipped: boolean = false;
   /** room = across maps; scene = tablePlacements only. */
@@ -128,43 +131,30 @@ export class TextNote extends TabletopObject {
     return (this.videoUrl || '').trim();
   }
 
-  private get myUserId(): string {
-    return Network.peer?.userId || PeerCursor.myCursor?.userId || '';
-  }
-
-  /** Self-only is driven by visibleOwner (isVisible kept for room XML compat). */
+  /** Like GameCharacter.isHideIn — stealth when an owner is set. */
   get isSelfOnly(): boolean {
-    return !!this.visibleOwner || this.isVisible === false;
+    return !!this.visibleOwner;
   }
 
-  /** True for public notes, or self-only notes owned by this peer. */
+  /**
+   * Like GameCharacter.isVisible:
+   * public, or self-only and local Network.peer.userId owns it.
+   * GM sees via template (`canSeeSelfOnly || isGMMode`), not here.
+   */
   get canSeeSelfOnly(): boolean {
-    if (!this.isSelfOnly) return true;
-    const owner = this.visibleOwner;
-    if (!owner) return true; // avoid vanishing if owner was never recorded
-    const me = this.myUserId;
-    return !!me && owner === me;
+    return !this.visibleOwner || Network.peer.userId === this.visibleOwner;
   }
 
+  /** Same toggle as character stealth: owner = Network.peer.userId. */
   setSelfOnly(selfOnly: boolean) {
     if (selfOnly) {
-      const id = this.myUserId;
-      if (!id) return;
-      // Set owner before flipping isVisible so cache refresh never drops the note for self.
-      this.visibleOwner = id;
-      this.isVisible = false;
+      // Match game-character.component: assign owner only (no intermediate hide flag).
+      this.visibleOwner = Network.peer.userId;
+      this.isVisible = false; // legacy XML only
     } else {
-      this.isVisible = true;
       this.visibleOwner = '';
+      this.isVisible = true;
     }
-  }
-
-  /** Self-only notes render only for the hider. */
-  get shouldRenderOnView(): boolean {
-    if (this.location.name !== 'table') return false;
-    if (!this.canSeeSelfOnly) return false;
-    if (this.scope === 'room') return true;
-    return super.isVisibleOnTable;
   }
 
   override get isVisibleOnTable(): boolean {
@@ -173,9 +163,9 @@ export class TextNote extends TabletopObject {
     return super.isVisibleOnTable;
   }
 
-  /** Soft cue for self-only notes (owner view). */
+  /** Soft cue for self-only notes (owner / GM view). */
   get isGhosted(): boolean {
-    return this.isSelfOnly && this.canSeeSelfOnly;
+    return this.isSelfOnly && (this.canSeeSelfOnly || !!PeerCursor.myCursor?.isGMMode);
   }
 
   setFrontImage(imageIdentifier: string) {

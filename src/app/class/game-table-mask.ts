@@ -229,6 +229,8 @@ export class GameTableMask extends TabletopObject {
 
   /** Toggle between locked default appearance and appearanceAltJson. */
   toggleAppearanceSets(): boolean {
+    // Switching to B requires a configured alt set (avoid applying empty 1×1 defaults).
+    if (!this.appearanceIsAlt && !this.appearanceAltJson) return false;
     if (!this.appearanceDefaultJson) {
       this.appearanceDefaultJson = stringifyMaskAppearanceSnap(this.captureAppearanceSnap());
     }

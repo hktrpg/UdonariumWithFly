@@ -8,7 +8,9 @@ import {
   applyMaskTokenFxToCharacter,
   MaskTokenFxSnapshot,
   restoreMaskTokenFxSnapshot,
+  snapshotCharacterTokenFx,
 } from '@udonarium/table-fx/mask-token-fx-apply';
+import { tokenFxConfigHasWork } from '@udonarium/table-fx/mask-appearance';
 import { pickTopPassiveMask } from '@udonarium/table-fx/mask-token-overlap';
 
 import { TabletopService } from './tabletop.service';
@@ -16,6 +18,8 @@ import { TabletopService } from './tabletop.service';
 interface ActiveZone {
   maskId: string;
   snap: MaskTokenFxSnapshot;
+  /** Mask tokenFxJson at time of apply; used to detect config edits. */
+  configKey: string;
 }
 
 /**
@@ -36,7 +40,10 @@ export class MaskTokenFxService implements OnDestroy {
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', () => this.scheduleRefresh())
       .on('DELETE_GAME_OBJECT', () => this.scheduleRefresh())
-      .on('UPDATE_OBJECT_CHILDREN', () => this.scheduleRefresh());
+      .on('UPDATE_OBJECT_CHILDREN', () => this.scheduleRefresh())
+      .on<{ characterIds?: string[] }>('MASK_TOKEN_FX_ADOPT', event => {
+        this.adoptCurrentAsRestorePoint(event.data?.characterIds || []);
+      });
     this.scheduleRefresh();
   }
 
@@ -44,6 +51,23 @@ export class MaskTokenFxService implements OnDestroy {
     EventSystem.unregister(this);
     if (this.timer) clearTimeout(this.timer);
     this.started = false;
+  }
+
+  /**
+   * After Alt+double-click (or other external) FX changes, update the leave-restore
+   * snapshot so walking off the mask does not undo those changes.
+   */
+  adoptCurrentAsRestorePoint(characterIds: string[]) {
+    if (!characterIds?.length) return;
+    for (const id of characterIds) {
+      const zone = this.active.get(id);
+      if (!zone) continue;
+      const ch = ObjectStore.instance.get<GameCharacter>(id);
+      if (!ch) continue;
+      const altitudeTouched = zone.snap.altitudeTouched;
+      zone.snap = snapshotCharacterTokenFx(ch);
+      zone.snap.altitudeTouched = altitudeTouched;
+    }
   }
 
   private scheduleRefresh() {
@@ -75,14 +99,28 @@ export class MaskTokenFxService implements OnDestroy {
         continue;
       }
 
-      if (prev && prev.maskId === top.identifier) continue;
+      const cfg = top.tokenFxConfig;
+      const hasWork = tokenFxConfigHasWork(cfg);
+      const configKey = top.tokenFxJson || '';
+
+      if (prev && prev.maskId === top.identifier) {
+        if (prev.configKey === configKey) continue;
+        // Same mask, config edited while standing — re-apply from original snap.
+        restoreMaskTokenFxSnapshot(ch, prev.snap);
+        this.active.delete(chId);
+        if (!hasWork) continue;
+        const snap = applyMaskTokenFxToCharacter(ch, cfg);
+        this.active.set(chId, { maskId: top.identifier, snap, configKey });
+        continue;
+      }
 
       if (prev) {
         restoreMaskTokenFxSnapshot(ch, prev.snap);
         this.active.delete(chId);
       }
-      const snap = applyMaskTokenFxToCharacter(ch, top.tokenFxConfig);
-      this.active.set(chId, { maskId: top.identifier, snap });
+      if (!hasWork) continue;
+      const snap = applyMaskTokenFxToCharacter(ch, cfg);
+      this.active.set(chId, { maskId: top.identifier, snap, configKey });
     }
 
     for (const chId of Array.from(this.active.keys())) {

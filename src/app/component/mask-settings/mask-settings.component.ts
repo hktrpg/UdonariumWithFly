@@ -8,6 +8,7 @@ import { CutInList } from '@udonarium/cut-in-list';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { JUKEBOX_TRACK_COUNT } from '@udonarium/Jukebox';
+import { PeerCursor } from '@udonarium/peer-cursor';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import {
   emptyMaskAppearanceSnap,
@@ -88,7 +89,10 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
   get chatTabs() { return this.chatMessageService.chatTabs; }
   get audios() { return AudioStorage.instance.audios.filter(a => !a.isHidden); }
   get cutIns() { return CutInList.instance.cutIns; }
-  get notes(): TextNote[] { return ObjectStore.instance.getObjects(TextNote); }
+  get notes(): TextNote[] {
+    const gm = !!PeerCursor.myCursor?.isGMMode;
+    return ObjectStore.instance.getObjects(TextNote).filter(n => n?.canSeeSelfOnly || gm);
+  }
 
   get altSnap(): MaskAppearanceSnap {
     return this.mask ? this.mask.appearanceAlt : emptyMaskAppearanceSnap();
@@ -168,9 +172,14 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     if (!this.mask || this.GuestMode()) return;
     if (action === 'none') {
       this.mask.setEnabledClickActions([]);
+      // Passive checkbox lives under Token FX; clear so it cannot keep running hidden.
+      this.mask.tokenFxPassive = false;
     } else {
       const wasOn = this.isActionOn(action);
       this.mask.toggleClickAction(action);
+      if (wasOn && action === 'tokenFx') {
+        this.mask.tokenFxPassive = false;
+      }
       if (!wasOn) {
         this.panelCollapsed[action] = false;
         this.savePanelCollapsed();

@@ -92,8 +92,14 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  /** Hide other players' self-only notes (owner + GM can see — same as tokens). */
+  private visibleNotes(notes: TextNote[]): TextNote[] {
+    const gm = this.isGM;
+    return (notes || []).filter(n => n?.canSeeSelfOnly || gm);
+  }
+
   filteredNotes(): TextNote[] {
-    const notes = this.textNotes || [];
+    const notes = this.visibleNotes(this.textNotes);
     switch (this.selectFilter) {
       case 'table':
         return notes.filter(n => n.location?.name === 'table');
@@ -105,7 +111,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   countByFilter(filterId: NoteFilterId): number {
-    const notes = this.textNotes || [];
+    const notes = this.visibleNotes(this.textNotes);
     switch (filterId) {
       case 'table':
         return notes.filter(n => n.location?.name === 'table').length;

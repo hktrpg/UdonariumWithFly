@@ -1,12 +1,11 @@
-import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, PDFPageProxy, version as pdfjsVersion } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 
 let workerReady = false;
 
 function ensureWorker() {
   if (workerReady) return;
-  // Use CDN worker matching the installed pdfjs-dist major/minor.
-  GlobalWorkerOptions.workerSrc =
-    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`;
+  // Bundled via angular.json assets from node_modules/pdfjs-dist/build.
+  GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
   workerReady = true;
 }
 
