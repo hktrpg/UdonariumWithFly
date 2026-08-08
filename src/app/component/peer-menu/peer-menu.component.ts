@@ -39,7 +39,7 @@ import * as localForage from 'localforage';
 @Component({
     selector: 'peer-menu',
     templateUrl: './peer-menu.component.html',
-    styleUrls: ['./peer-menu.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './peer-menu.component.css'],
     animations: [
         trigger('fadeInOut', [
             transition('false => true', [

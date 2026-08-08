@@ -19,7 +19,7 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { DiceSettingsComponent } from 'component/dice-settings/dice-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
@@ -611,9 +611,9 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('dice.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 300, top: coordinate.y - 300, width: 600, height: 490 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 180, width: 420, height: 400 };
+    let component = this.panelService.open<DiceSettingsComponent>(DiceSettingsComponent, option);
+    component.dice = gameObject;
   }
 
   private startIconHiddenTimer() {

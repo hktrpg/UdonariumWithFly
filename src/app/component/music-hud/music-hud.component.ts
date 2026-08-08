@@ -25,8 +25,8 @@ export class MusicHudComponent implements OnInit, OnDestroy {
 
   readonly slotCount = MUSIC_HUD_SLOT_COUNT;
   left = 12;
-  /** Placeholder until placeDefaultAlignMapHud(); matches map-action-hud vertical band. */
-  top = 72;
+  /** Placeholder until placeDefaultTopRight(). */
+  top = 12;
   /** Default collapsed so bar height matches map-action-hud (~44px). */
   collapsed = true;
   dropSlotIndex: number | null = null;
@@ -77,7 +77,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
         this.clampToViewport();
         this.changeDetector.markForCheck();
       } else {
-        this.placeDefaultAlignMapHud();
+        this.placeDefaultTopRight();
       }
     });
     localForage.getItem(MusicHudComponent.COLLAPSED_KEY).then(v => {
@@ -282,25 +282,15 @@ export class MusicHudComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  /** Same vertical band as .map-action-hud (bottom chrome + 10px), right-aligned. */
-  private placeDefaultAlignMapHud() {
+  /** Default: top-right corner with a small margin. */
+  private placeDefaultTopRight() {
     if (this.positionedDefault) return;
     this.positionedDefault = true;
     const width = MusicHudComponent.HUD_WIDTH;
-    const bottomChrome = this.readCssPx('--udon-bottom-chrome', 56);
-    const bottomGap = 10; // matches .map-action-hud { bottom: calc(... + 10px) }
-    this.left = Math.max(8, window.innerWidth - width - 12);
-    this.top = Math.max(
-      8,
-      window.innerHeight - bottomChrome - bottomGap - MusicHudComponent.BAR_HEIGHT
-    );
+    const margin = 12;
+    this.left = Math.max(margin, window.innerWidth - width - margin);
+    this.top = margin;
     this.clampToViewport();
-  }
-
-  private readCssPx(varName: string, fallback: number): number {
-    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    const n = parseFloat(raw);
-    return Number.isFinite(n) ? n : fallback;
   }
 
   private onPointerMove = (event: PointerEvent) => {
@@ -318,7 +308,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   };
 
   private onResize = () => {
-    if (!this.positionedDefault) this.placeDefaultAlignMapHud();
+    if (!this.positionedDefault) this.placeDefaultTopRight();
     this.clampToViewport();
     this.changeDetector.markForCheck();
   };

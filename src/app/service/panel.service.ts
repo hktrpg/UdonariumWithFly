@@ -58,16 +58,29 @@ export class PanelService {
   static geometryReady: Promise<void> = Promise.resolve();
 
   /**
-   * Personal setting: opening a non-chat panel closes other non-chat panels.
+   * Personal setting: opening a main-menu panel closes other main-menu panels.
+   * Chat is never exclusive. Object sheets (character / note / mask / …), palettes,
+   * stands, and other non-menu windows are not affected.
    * Default on. Desktop only (mobile sheets already replace each other).
-   * Exception: Connection + Lobby are one group and may stay open together.
+   * Exception: Connection + Lobby may stay open together.
    */
   static singleNonChatWindow = true;
 
-  /** Tour / geometry ids that share one exclusive slot (do not close each other). */
-  private static readonly NON_CHAT_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+  /** Menu tour ids that may coexist under single-menu-window mode. */
+  private static readonly MENU_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
     ['menu.connection', 'menu.lobby'],
   ];
+
+  /**
+   * Toolbox editors opened from the menu without a `menu.*` tour id yet
+   * (kept for exclusivity; prefer assigning tourPanelId when opening).
+   */
+  private static readonly MENU_EXCLUSIVE_EXTRA_IDS: ReadonlySet<string> = new Set([
+    'panel.dice-roll-table-setting',
+    'panel.app-cut-in-setting',
+    'menu.diceTable',
+    'menu.cutIn',
+  ]);
 
   private panelComponentRef: ComponentRef<any>
   title: string = 'Untitled panel';
@@ -345,27 +358,47 @@ export class PanelService {
     return raw;
   }
 
-  /** True when two non-chat panels may coexist under single-window mode (e.g. Connection + Lobby). */
-  static areCompatibleNonChatPanels(aId: string, bId: string): boolean {
+  /**
+   * True for main-menu panels that participate in single-window exclusivity.
+   * Chat / main chrome / object sheets are never exclusive.
+   */
+  static isMenuExclusivePanel(id: string): boolean {
+    if (!id) return false;
+    if (id === 'menu.chat' || id === 'menu.main') return false;
+    if (id.startsWith('menu.')) return true;
+    return PanelService.MENU_EXCLUSIVE_EXTRA_IDS.has(id);
+  }
+
+  /** True when two menu panels may coexist (e.g. Connection + Lobby). */
+  static areCompatibleMenuPanels(aId: string, bId: string): boolean {
     if (!aId || !bId || aId === bId) return false;
-    for (const group of PanelService.NON_CHAT_COMPAT_GROUPS) {
+    for (const group of PanelService.MENU_COMPAT_GROUPS) {
       if (group.includes(aId) && group.includes(bId)) return true;
     }
     return false;
   }
 
-  /** Close every closable non-chat panel (optionally keep one instance + its compat group). */
-  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+  /**
+   * Close other exclusive menu panels when opening a menu panel.
+   * No-op when the opening panel is not a menu exclusive (character card, etc.).
+   */
+  static closeOtherMenuPanels(except: PanelService = null, opening: PanelOption = null) {
     const openingId = PanelService.panelExclusiveId(opening || except);
+    if (!PanelService.isMenuExclusivePanel(openingId)) return;
+
     for (const panel of Array.from(PanelService.openPanels)) {
       if (!panel.isAbleCloseButton) continue;
-      if (PanelService.isChatPanel(panel)) continue;
       if (except && panel === except) continue;
-      if (openingId && PanelService.areCompatibleNonChatPanels(PanelService.panelExclusiveId(panel), openingId)) {
-        continue;
-      }
+      const id = PanelService.panelExclusiveId(panel);
+      if (!PanelService.isMenuExclusivePanel(id)) continue;
+      if (PanelService.areCompatibleMenuPanels(id, openingId)) continue;
       panel.close();
     }
+  }
+
+  /** @deprecated Use closeOtherMenuPanels */
+  static closeOtherNonChatPanels(except: PanelService = null, opening: PanelOption = null) {
+    PanelService.closeOtherMenuPanels(except, opening);
   }
 
   /**
@@ -665,10 +698,9 @@ export class PanelService {
         if ((resolved.width ?? 0) < 620) resolved.width = 620;
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
       }
-      // Personal setting: one non-chat window at a time (chat windows stay).
-      // Connection + Lobby share a group and do not close each other.
-      if (PanelService.singleNonChatWindow && !isChat) {
-        PanelService.closeOtherNonChatPanels(childPanelService, resolved);
+      // Personal setting: one main-menu window at a time (chat / object sheets stay).
+      if (PanelService.singleNonChatWindow) {
+        PanelService.closeOtherMenuPanels(childPanelService, resolved);
       }
     }
     if (resolved.title) childPanelService.title = resolved.title;
@@ -766,9 +798,89 @@ export class PanelService {
   }
 
   close() {
+    this.cancelFitToContent();
     if (this.panelComponentRef) {
       this.panelComponentRef.destroy();
       this.panelComponentRef = null;
     }
+  }
+
+  private fitToken = 0;
+
+  /** Cancel any in-flight scheduleFitToContent retries for this panel. */
+  cancelFitToContent() {
+    this.fitToken++;
+  }
+
+  /**
+   * Fit this panel's height to `host` content (title + padding included).
+   * Temporarily probes tall so measurement is not clipped by a short viewport.
+   * @returns applied height, or 0 if skipped
+   */
+  fitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): number {
+    if (!host?.isConnected) return 0;
+    const panelEl = host.closest('.draggable-panel') as HTMLElement | null;
+    const scrollEl = panelEl?.querySelector('.scrollable-panel') as HTMLElement | null;
+    if (!panelEl || !scrollEl) return 0;
+
+    const minH = opts?.minHeight ?? 200;
+    const maxH = opts?.maxHeight ?? (window.innerHeight - 16);
+    const save = opts?.save !== false;
+
+    const probe = Math.min(window.innerHeight - 8, 1600);
+    panelEl.style.height = `${probe}px`;
+    this.height = probe;
+
+    const style = getComputedStyle(scrollEl);
+    const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    const contentH = Math.max(
+      host.scrollHeight,
+      host.offsetHeight,
+      Math.ceil(host.getBoundingClientRect().height),
+    );
+    if (!(contentH > 40)) return 0;
+
+    let next = Math.max(minH, Math.min(maxH, Math.ceil(contentH + 25 + padY + 6)));
+    this.height = next;
+    panelEl.style.height = `${next}px`;
+
+    if (scrollEl.scrollHeight > scrollEl.clientHeight + 2) {
+      next = Math.max(next, Math.min(maxH, Math.ceil(25 + scrollEl.scrollHeight + 4)));
+      this.height = next;
+      panelEl.style.height = `${next}px`;
+    }
+
+    if (save) {
+      const key = this.geometryKey || this.tourPanelId;
+      if (key) PanelService.saveGeometry(key, this.width, next, this.left, this.top);
+    }
+    return next;
+  }
+
+  /**
+   * Retry fit until layout stabilizes (nested OnPush / async content).
+   */
+  scheduleFitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): void {
+    if (!host) return;
+    const token = ++this.fitToken;
+    let attempts = 0;
+    let lastNext = -1;
+    const tick = () => {
+      if (token !== this.fitToken || !host.isConnected) return;
+      const next = this.fitToContent(host, opts);
+      attempts++;
+      if (next > 0 && next !== lastNext && attempts < 10) {
+        lastNext = next;
+        requestAnimationFrame(tick);
+        return;
+      }
+      if (attempts < 12) {
+        setTimeout(() => {
+          if (token !== this.fitToken || !host.isConnected) return;
+          this.fitToContent(host, opts);
+        }, 80);
+      }
+    };
+    queueMicrotask(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
   }
 }

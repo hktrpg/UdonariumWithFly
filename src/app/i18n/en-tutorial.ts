@@ -76,7 +76,7 @@ Drag images or music into the browser to import.`,
 　　　　Every enabled role has a password = V3 mesh-lock
 　　　　When a new build is ready = Connection shows a PWA update hint — confirm to reload
 <Guest> Rooms can “allow guests”; guests are limited. Passwords still apply
-<Notes> Menu → Note inventory for table / shared / private / trash notes
+<Notes> Menu → Note inventory: text／image／video／PDF; drag-import; self-only (like tokens); GM show-to-players; Ctrl+hover preview
 <Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone
 <Settings*> Optional “Auto-open chat when someone speaks (if closed)” (default off)
 　　　　Cold start not in a room = lobby as a normal window
@@ -99,6 +99,8 @@ Drag images or music into the browser to import.`,
 　　　　Status icons = stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
 　　　　Image effects = right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
 　　　　Base rings = right-click “Ring”
+<Map masks> Alt+double-click = configured actions (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX
+　　　　Token FX can auto-apply while standing (restore on leave); manual apply is not undone by leaving
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
 　　　　After select: WASD/arrows = move
 　　　　Delete = remove
@@ -173,6 +175,16 @@ Upgraded to 1.13.2`,
 ・Esc: clear selection first when selected; otherwise dismiss menu/dialog/draft, then close the frontmost closable window`,
   'changelog.2026json': `2026/08/08 Character JSON
 ・JSON for easy import/export; CCFOLIA-compatible (Ctrl+V on the table; export from character sheet)`,
+  'changelog.2026note': `2026/08/08 Shared notes・map-mask actions
+・Shared notes: text / image / video (≤50MB mp4・webm) / PDF (≤20MB); drag-import and switch content type
+・Note inventory opens a dedicated settings panel (front/back, scope: this map / all maps, lock, flip, etc.)
+・“Self only” matches token stealth (owner-bound); hidden from others’ table/inventory; ghosted for owner, visible to GM
+・GM “Show to players” full-screen handout (optional targets); self-only notes are never room-broadcast
+・Ctrl+hover a table note to preview; PDF pages wrap first↔last
+・Map-mask actions: Alt+double-click (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX & altitude
+・Token FX can auto-apply while standing on the mask (restore on leave); manual apply is not undone by leaving
+・Characters/cards/dice/terrain/masks/notes use dedicated settings panels; denser settings UI
+・Old rooms: hide flag without owner is not private; owner id may not match after reload (GM sees it — same as tokens); re-check “Self only”`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

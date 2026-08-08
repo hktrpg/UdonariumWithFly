@@ -18,7 +18,7 @@ import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
 import { ContextMenuSeparator, ContextMenuService, ContextMenuAction, contextMenuToggleCheck } from 'service/context-menu.service';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -956,7 +956,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
         [
           { name: this.i18n.t('chat.ctx.connection'), action: () => {
             this.panelService.open(PeerMenuComponent, {
-              width: 520, height: 600, top: position.y - 100, left: position.x - 100,
+              width: 520, height: 450, top: position.y - 100, left: position.x - 100,
               tourPanelId: 'menu.connection',
               mobileSheet: 'half',
             });
@@ -1087,11 +1087,11 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     let title = this.i18n.t('chat.characterSheet');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = {
-      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 690, height: 560,
+      title: title, left: coordinate.x - 270, top: coordinate.y - 240, width: 540, height: 480,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);
+    component.character = gameObject;
   }
 
   private showChatPalette(gameObject: GameCharacter) {

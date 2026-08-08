@@ -2,6 +2,23 @@
   display: block;
 }
 
+.sheet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.sheet-toolbar select {
+  height: var(--udon-control-height, 26px);
+  font-size: 12px;
+}
+
+.sheet-download-label {
+  position: relative;
+}
+
 .main-image-box {
   /* position: absolute;
   top: 0px;
@@ -150,7 +167,7 @@
 }
 .flex-item {
   margin: 5px 0px;
-  padding: 10px;
+  padding: 6px;
   -webkit-flex: 1 0 auto; /* Safari */
   flex: 1 0 auto;
   /*border: 1px solid #999;*/

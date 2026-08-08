@@ -6,6 +6,10 @@ import { AudioState } from '@udonarium/core/file-storage/audio-file';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { PdfState } from '@udonarium/core/file-storage/pdf-file';
+import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
+import { VideoState } from '@udonarium/core/file-storage/video-file';
+import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { PromiseQueue } from '@udonarium/core/system/util/promise-queue';
@@ -197,6 +201,35 @@ export class SaveDataService {
       }
       if (urlAudioManifest.length > 0) {
         files.push(new File([JSON.stringify(urlAudioManifest)], 'fly_audioUrls.json', { type: 'application/json' }));
+      }
+    }
+
+    // PDFs attached to notes (referenced by pdfIdentifier in room XML).
+    const pdfIds = new Set<string>();
+    const pdfIdMatches = roomXml.matchAll(/pdfIdentifier[=:][\s"]*([a-f0-9]{64})/gi);
+    for (const m of pdfIdMatches) pdfIds.add(m[1]);
+    for (const pdf of PdfStorage.instance.pdfs) {
+      if (pdf.state === PdfState.COMPLETE && pdf.blob) pdfIds.add(pdf.identifier);
+    }
+    for (const id of pdfIds) {
+      const pdf = PdfStorage.instance.get(id);
+      if (pdf && pdf.state === PdfState.COMPLETE && pdf.blob) {
+        files.push(new File([pdf.blob], pdf.identifier + '.pdf', { type: 'application/pdf' }));
+      }
+    }
+
+    // Videos attached to notes.
+    const videoIds = new Set<string>();
+    const videoIdMatches = roomXml.matchAll(/videoIdentifier[=:][\s"]*([a-f0-9]{64})/gi);
+    for (const m of videoIdMatches) videoIds.add(m[1]);
+    for (const video of VideoStorage.instance.videos) {
+      if (video.state === VideoState.COMPLETE && video.blob) videoIds.add(video.identifier);
+    }
+    for (const id of videoIds) {
+      const video = VideoStorage.instance.get(id);
+      if (video && video.state === VideoState.COMPLETE && video.blob) {
+        const ext = MimeType.extension(video.blob.type) || 'mp4';
+        files.push(new File([video.blob], video.identifier + '.' + ext, { type: video.blob.type || 'video/mp4' }));
       }
     }
     return files;

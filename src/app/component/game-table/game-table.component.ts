@@ -896,7 +896,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       extraActions.push({
         name: this.i18n.t('gt.mapSettings'), action: () => {
           this.panelService.open(GameTableSettingComponent, this.mobileLayout.adaptPanelOption({
-            width: 610, height: 540, left: 100,
+            width: 620, height: 520, left: 100,
             mobileReplace: true,
             tourPanelId: 'menu.table',
             title: this.i18n.t('table.title'),
@@ -945,7 +945,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private ensureSceneToolsPanel() {
     if (this.sceneTools.isPanelOpen) return;
     this.panelService.open(SceneToolsComponent, this.mobileLayout.adaptPanelOption({
-      width: 380, height: 560, left: 100,
+      width: 380, height: 520, left: 100,
       mobileReplace: true,
       tourPanelId: 'menu.sceneTools',
       title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),

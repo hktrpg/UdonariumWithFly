@@ -299,6 +299,8 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
       for (const obj of ObjectStore.instance.getObjects(type as any) as TabletopObject[]) {
         if (obj.location.name !== 'table') continue;
         if (obj.parentIsAssigned && !obj.parentIsDestroyed) continue;
+        // Room-scope notes stay shared across all tables.
+        if (obj instanceof TextNote && obj.scope === 'room') continue;
         if (!obj.hasPlacement(sourceId) && obj.tableIdentifier !== sourceId) {
           if (obj.tableIdentifier || obj.tablePlacements) continue;
           if (TabletopObject.resolveViewTableIdentifier() !== sourceId) continue;

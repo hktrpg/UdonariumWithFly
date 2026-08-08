@@ -6,6 +6,10 @@ import { AudioSharingSystem } from '@udonarium/core/file-storage/audio-sharing-s
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { PdfSharingSystem } from '@udonarium/core/file-storage/pdf-sharing-system';
+import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
+import { VideoSharingSystem } from '@udonarium/core/file-storage/video-sharing-system';
+import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory';
@@ -84,6 +88,7 @@ import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
+import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -200,6 +205,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private guidedTour: GuidedTourService,
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
+    private maskTokenFx: MaskTokenFxService,
     _audioImportName: AudioImportNameService,
     _connectionBusy: ConnectionBusyService,
   ) {
@@ -214,6 +220,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       ImageStorage.instance;
       AudioSharingSystem.instance.initialize();
       AudioStorage.instance;
+      PdfSharingSystem.instance.initialize();
+      PdfStorage.instance;
+      VideoSharingSystem.instance.initialize();
+      VideoStorage.instance;
       ObjectFactory.instance;
       ObjectSerializer.instance;
       ObjectStore.instance;
@@ -733,6 +743,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.maskTokenFx.start();
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
     this.syncChatUnreadBadge();
@@ -800,7 +811,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     switch (componentName) {
       case 'PeerMenuComponent':
         option.width = 520;
-        option.height = 480;
+        option.height = 450;
         option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
         // Keep map visible — connection is a half sheet, not full-screen.
@@ -820,7 +831,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'FileStorageComponent':
         component = FileStorageComponent;
         option.width = 690;
-        option.height = 540;
+        option.height = 500;
         option.title = this.i18n.t('file.title');
         break;
       case 'GameCharacterSheetComponent':
@@ -831,30 +842,30 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = JukeboxComponent;
         option = {
           width: 300,
-          height: Math.max(200, window.innerHeight),
+          height: Math.min(520, Math.max(320, window.innerHeight - 48)),
           top: 0,
           title: this.i18n.t('jukebox.title'),
         };
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
-        option.title = this.i18n.t('inv.title');
+        option = { width: 420, height: 480, left: 100, title: this.i18n.t('inv.title') };
         break;
       case 'NoteInventoryComponent':
         component = NoteInventoryComponent;
-        option.title = this.i18n.t('note.title');
+        option = { width: 420, height: 480, left: 100, title: this.i18n.t('note.title') };
         break;
       case 'DiceRollTableSettingComponent':
         component = DiceRollTableSettingComponent;
-        option = { width: 645, height: 475, title: this.i18n.t('diceTable.title') };
+        option = { width: 645, height: 450, title: this.i18n.t('diceTable.title') };
         break;
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
-        option = { width: 690, height: 540, title: this.i18n.t('cutin.title') };
+        option = { width: 690, height: 480, title: this.i18n.t('cutin.title') };
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 560, left: 100, title: this.i18n.t('combat.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':
@@ -869,11 +880,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'ScenePresetComponent':
         component = ScenePresetComponent;
-        option = { width: 520, height: 520, left: 100, title: this.i18n.t('scenePreset.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('scenePreset.title') };
         break;
       case 'ScenarioTextComponent':
         component = ScenarioTextComponent;
-        option = { width: 520, height: 520, left: 100, title: this.i18n.t('scenarioText.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('scenarioText.title') };
         break;
     }
     if (component) {
@@ -977,6 +988,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'ScenarioTextComponent': return 'menu.scenarioText';
       case 'GameObjectInventoryComponent': return 'menu.inventory';
       case 'NoteInventoryComponent': return 'menu.notes';
+      case 'DiceRollTableSettingComponent': return 'menu.diceTable';
+      case 'CutInSettingComponent': return 'menu.cutIn';
       default: return null;
     }
   }

@@ -88,6 +88,7 @@ export class TabletopActionService {
     return textNote;
   }
 
+
   createDiceSymbol(position: PointerCoordinate, name: string, diceType: DiceType, imagePathPrefix: string): DiceSymbol {
     if (this.GuestMode()) return;
     let diceSymbol = DiceSymbol.create(name, diceType, 1);
@@ -337,7 +338,7 @@ export class TabletopActionService {
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {
     if (this.GuestMode()) return [];
-    return [
+    const actions: ContextMenuAction[] = [
       this.getCreateCharacterMenu(position),
       this.getCreateTableMaskMenu(position),
       this.getCreateTerrainMenu(position),
@@ -347,6 +348,7 @@ export class TabletopActionService {
       this.getCreateDiceSymbolMenu(position),
       this.getCreateRangeMenu(position),
     ];
+    return actions;
   }
 
   private getCreateCharacterMenu(position: PointerCoordinate): ContextMenuAction {
@@ -385,6 +387,7 @@ export class TabletopActionService {
       }
     }
   }
+
 
   private getCreateBlankCardMenu(position: PointerCoordinate): ContextMenuAction {
     return {

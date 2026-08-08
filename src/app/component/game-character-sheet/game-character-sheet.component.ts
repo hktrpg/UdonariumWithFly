@@ -31,7 +31,7 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@ud
 @Component({
     selector: 'game-character-sheet',
     templateUrl: './game-character-sheet.component.html',
-    styleUrls: ['./game-character-sheet.component.css'],
+    styleUrls: ['../shared/settings-ui.css', './game-character-sheet.component.css'],
     animations: [
         trigger('switchImage', [
             transition(':increment, :decrement', [

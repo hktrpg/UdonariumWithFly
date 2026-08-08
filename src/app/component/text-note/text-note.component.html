@@ -1,33 +1,65 @@
-<div class="component is-3d is-pointer-events-none" [ngClass]="{'is-grab': !isLocked}"
-  appMovable [movable.option]="movableOption" [movable.disable]="isEditorSelected || isLocked" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
-  <div class="is-3d" appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
+<div class="component is-3d is-pointer-events-none"
+  [ngClass]="{'is-grab': !isLocked && !GuestMode()}"
+  appMovable [movable.option]="movableOption" [movable.disable]="isEditorSelected || isLocked || GuestMode()"
+  (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
+  <div class="is-3d" appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked || GuestMode()"
+    (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
     <div class="component-content is-3d is-pointer-events-auto" (dblclick)="onDoubleClick($event)"
       [style.width.px]="width * gridSize">
-      <div class="is-3d" [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}" [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
+      <div class="is-3d" [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
+        [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
-          <div class="upright-transform is-3d is-bg-color is-front is-bg-texture chrome-smooth-image-trick" [ngClass]="{'is-bg-filter': isWhiteOut}"
-            [style.background-image]="'url(' + imageFile?.url + ')' | safe: 'style'" [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
+          <div class="upright-transform is-3d is-bg-color is-front is-bg-texture chrome-smooth-image-trick"
+            [ngClass]="{'is-bg-filter': isWhiteOut && isTextContent, 'is-ghosted': isGhosted}"
+            [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
+            [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
             <div *ngIf="isShowTitle && title.length" class="title is-3d is-black-background is-pointer-events-none">{{title}}</div>
-            <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d" [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
-              [style.font-size.px]="fontSize + 9" [(ngModel)]="text" spellcheck="false"></textarea>
-            <div class="is-3d is-outline-text note-text" style="margin-top:-18px" [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
-              [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss" [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
-              <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
+
+            <ng-container [ngSwitch]="contentKind">
+              <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
+                <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
+                <div class="pdf-nav is-3d" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                  <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
+                  <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
+                  <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
+                    [disabled]="textNote.pdfPageCount <= 1">›</button>
+                </div>
+              </div>
+
+              <div *ngSwitchCase="'video'" class="video-wrap is-3d"
+                (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                <video *ngIf="videoSrc" class="note-video is-3d" [src]="videoSrc | safe: 'resourceUrl'"
+                  controls playsinline preload="metadata"
+                  (click)="$event.stopPropagation()"></video>
+                <div *ngIf="!videoSrc" class="media-loading is-3d">…</div>
+              </div>
+
+              <div *ngSwitchCase="'image'" class="image-wrap is-3d">
+                <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+              </div>
+
+              <ng-container *ngSwitchDefault>
+                <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
+                  [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
+                  [style.font-size.px]="fontSize + 9" [(ngModel)]="text" spellcheck="false"></textarea>
+                <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
+                  [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
+                  [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
+                  [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
+              </ng-container>
+            </ng-container>
+
+            <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
           </div>
           <div class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
-            [style.background-image]="'url(' + imageFile?.url + ')' | safe: 'style'" [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
+            [ngClass]="{'is-ghosted': isGhosted}"
+            [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
+            [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
             <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
-            <div class="is-3d is-pointer-events-none" style="visibility: hidden">
-              <div *ngIf="isShowTitle && title.length" class="title is-3d is-black-background is-pointer-events-none">{{title}}</div>
-              <textarea class="textarea is-3d hide-area is-pointer-events-none"
-                [style.font-size.px]="fontSize + 9" [(ngModel)]="text" spellcheck="false" readonly></textarea>
-              <div class="is-3d is-outline-text note-text is-pointer-events-none" style="margin-top:-18px"
-                [style.font-size.px]="fontSize + 9" [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
-            </div>
           </div>
         </div>
       </div>
-      <div *ngIf="!isLocked" [ngClass]="{'is-grab': !isLocked}" class="grand-grabing-area" style="position: absolute"
+      <div *ngIf="!isLocked && !GuestMode()" [ngClass]="{'is-grab': !isLocked}" class="grand-grabing-area" style="position: absolute"
         [ngStyle]="{'transform': 'translateX(' + gridSize / 2 + 'px) translateY(' + (-gridSize / 4) + 'px)'}"
         [style.width.px]="(width - 1) * gridSize"
         [style.min-height.px]="gridSize / 2"></div>
@@ -39,7 +71,7 @@
           <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">{{ isLocked ? 'lock' : 'autorenew' }}</i>
         </div>
       </div>
-      <div *ngIf="!isLocked">
+      <div *ngIf="!isLocked && !GuestMode()">
         <div class="rotate-grab of-left-top">
           <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">autorenew</i>
         </div>

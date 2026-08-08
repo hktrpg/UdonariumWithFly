@@ -7,7 +7,7 @@
 .file-storage {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .drop-zone-wrap {

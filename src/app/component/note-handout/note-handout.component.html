@@ -1,0 +1,31 @@
+<div *ngIf="isOpen" class="handout-backdrop is-fill" [class.is-preview]="isPreview"
+  (click)="onBackdropClick()" [@fadeInOut]="'in'">
+  <div class="handout-chrome" (click)="$event.stopPropagation()">
+    <div class="handout-bar">
+      <span class="handout-title">
+        <span *ngIf="isPreview" class="preview-badge">{{ 'note.previewBadge' | i18n }}</span>
+        {{ title }}
+      </span>
+      <div class="handout-actions">
+        <ng-container *ngIf="isPdf">
+          <button type="button" class="nav-btn" (click)="prevPage($event)" [disabled]="pdfPageCount <= 1">
+            <i class="material-icons">chevron_left</i>
+          </button>
+          <span class="page-label">{{ pdfPage }}{{ pdfPageCount ? ' / ' + pdfPageCount : '' }}</span>
+          <button type="button" class="nav-btn" (click)="nextPage($event)"
+            [disabled]="pdfPageCount <= 1">
+            <i class="material-icons">chevron_right</i>
+          </button>
+        </ng-container>
+        <button type="button" class="close-btn" (click)="close()" [attr.aria-label]="'note.closeHandout' | i18n">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+    </div>
+    <img *ngIf="!isPdf && !isVideo && imageUrl" class="handout-image" [src]="imageUrl | safe: 'resourceUrl'" draggable="false" (click)="close()" />
+    <video *ngIf="isVideo" class="handout-video" [src]="resolvedVideoUrl | safe: 'resourceUrl'"
+      controls playsinline [attr.autoplay]="isPreview ? null : ''"></video>
+    <canvas *ngIf="isPdf" #pdfCanvas class="handout-pdf" (click)="close()"></canvas>
+    <pre *ngIf="isText" class="handout-text" (click)="close()">{{ text }}</pre>
+  </div>
+</div>

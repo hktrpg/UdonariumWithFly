@@ -10,6 +10,8 @@ import { AudioStorage } from './audio-storage';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageStorage } from './image-storage';
 import { MimeType } from './mime-type';
+import { PdfStorage } from './pdf-storage';
+import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
 
 type MetaData = { percent: number, currentFile: string };
@@ -26,6 +28,8 @@ export class FileArchiver {
 
   private maxImageSize = 2 * MEGA_BYTE;
   private maxAudioeSize = 20 * MEGA_BYTE;
+  private maxPdfSize = 20 * MEGA_BYTE;
+  private maxVideoSize = 50 * MEGA_BYTE;
 
   private callbackOnDragEnter;
   private callbackOnDragOver;
@@ -91,6 +95,8 @@ export class FileArchiver {
       for (let file of loadFiles) {
         await this.handleImage(file);
         await this.handleAudio(file);
+        await this.handlePdf(file);
+        await this.handleVideo(file);
         await this.handleAudioUrlManifest(file);
         await this.handleText(file);
         await this.handleZip(file);
@@ -161,6 +167,29 @@ export class FileArchiver {
     }
     if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
     AudioLibrary.instance.ensureListed(audio.identifier);
+  }
+
+  private async handlePdf(file: File) {
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!isPdf) return;
+    if (this.maxPdfSize < file.size) {
+      console.warn(`PDF size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      return;
+    }
+    console.log(file.name + ' type:' + (file.type || 'application/pdf'));
+    await PdfStorage.instance.addAsync(file);
+  }
+
+  private async handleVideo(file: File) {
+    const isVideo = (file.type && file.type.indexOf('video/') === 0)
+      || /\.(mp4|webm|mov|m4v|ogv)$/i.test(file.name);
+    if (!isVideo) return;
+    if (this.maxVideoSize < file.size) {
+      console.warn(`Video size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      return;
+    }
+    console.log(file.name + ' type:' + (file.type || 'video/mp4'));
+    await VideoStorage.instance.addAsync(file);
   }
 
   private async handleText(file: File): Promise<void> {

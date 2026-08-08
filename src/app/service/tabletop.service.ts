@@ -60,6 +60,7 @@ export class TabletopService {
     let viewTable = this.tableSelecter.viewTable;
     return viewTable ? viewTable.terrains : [];
   });
+  // Same as characters: location cache only; self-only filtered in game-table template.
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote).filter(obj => obj.isVisibleOnTable));
   private diceSymbolCache = new TabletopCache<DiceSymbol>(() => ObjectStore.instance.getObjects(DiceSymbol).filter(obj => obj.isVisibleOnTable));
 
@@ -107,7 +108,7 @@ export class TabletopService {
         let object = ObjectStore.instance.get(event.data.identifier);
         if (!object || !(object instanceof TabletopObject)) {
           this.refreshCache(event.data.aliasName);
-        } else if (this.shouldRefreshCache(object)) {
+        } else if (object instanceof TextNote || this.shouldRefreshCache(object)) {
           this.refreshCache(event.data.aliasName);
           this.updateMap(object);
         }
