@@ -25,6 +25,12 @@ interface PointLightSource {
 export class LightingRender {
   constructor(readonly canvasElement: HTMLCanvasElement) {}
 
+  /** Free the canvas buffer while lighting/vision are unused. */
+  release() {
+    if (this.canvasElement.width !== 0) this.canvasElement.width = 0;
+    if (this.canvasElement.height !== 0) this.canvasElement.height = 0;
+  }
+
   render(
     table: GameTable,
     visionCharacters: GameCharacter[],
@@ -32,6 +38,14 @@ export class LightingRender {
     occluders: LightOccluder[],
     isGM: boolean,
   ) {
+    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
+    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
+    const baseAlpha = darkness * (1 - globalLight * 0.35);
+    if (baseAlpha <= 0.001 && !table.visionEnabled) {
+      this.release();
+      return;
+    }
+
     const width = table.width * table.gridSize;
     const height = table.height * table.gridSize;
     if (this.canvasElement.width !== width) this.canvasElement.width = width;
@@ -39,11 +53,6 @@ export class LightingRender {
 
     const ctx = this.canvasElement.getContext('2d');
     ctx.clearRect(0, 0, width, height);
-
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - globalLight * 0.35);
-    if (baseAlpha <= 0.001 && !table.visionEnabled) return;
 
     const wallsLight = (table.walls || []).filter(w => w.blocksLight);
     const occluderList = (occluders || []).slice(0, MAX_OCCLUDERS);

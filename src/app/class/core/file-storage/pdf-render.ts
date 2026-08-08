@@ -1,22 +1,31 @@
-import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 
+type PdfjsModule = typeof import('pdfjs-dist');
+
+let pdfjsPromise: Promise<PdfjsModule> | null = null;
 let workerReady = false;
 
-function ensureWorker() {
-  if (workerReady) return;
-  // Bundled via angular.json assets from node_modules/pdfjs-dist/build.
-  GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
-  workerReady = true;
+async function ensurePdfjs(): Promise<PdfjsModule> {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('pdfjs-dist');
+  }
+  const pdfjs = await pdfjsPromise;
+  if (!workerReady) {
+    // Bundled via angular.json assets from node_modules/pdfjs-dist/build.
+    pdfjs.GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
+    workerReady = true;
+  }
+  return pdfjs;
 }
 
 const docCache = new Map<string, Promise<PDFDocumentProxy>>();
 
 export async function loadPdfDocument(url: string, cacheKey?: string): Promise<PDFDocumentProxy> {
-  ensureWorker();
+  const pdfjs = await ensurePdfjs();
   const key = cacheKey || url;
   let pending = docCache.get(key);
   if (!pending) {
-    pending = getDocument({ url, withCredentials: false }).promise;
+    pending = pdfjs.getDocument({ url, withCredentials: false }).promise;
     docCache.set(key, pending);
     pending.catch(() => docCache.delete(key));
   }
