@@ -74,6 +74,13 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     private changeDetector: ChangeDetectorRef,
   ) { }
 
+  /** Mobile sheet: stack for drill-down (Weather / Cut-in / …) instead of nested flyouts. */
+  private drillStack: { title: string; actions: ContextMenuAction[] }[] = [];
+
+  get canDrillBack(): boolean {
+    return this.isMobileActionSheet && this.drillStack.length > 0;
+  }
+
   GuestMode() {
     return Network.GuestMode();
   }
@@ -283,11 +290,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     let submenu: HTMLElement = this.rootElementRef.nativeElement;
     const isMobile = document.body.classList.contains('udon-mobile-layout');
 
-    // Inside mobile action sheet: expand inline (no floating sub-panel).
+    // Inside mobile action sheet: expand inline (never re-apply full sheet chrome).
     if (isMobile && parent?.closest?.('.is-mobile-action-sheet')) {
-      submenu.classList.add('is-mobile-action-sheet');
+      submenu.classList.add('is-mobile-inline-submenu');
       submenu.style.left = '';
       submenu.style.top = '';
+      submenu.style.right = '';
+      submenu.style.bottom = '';
+      submenu.style.width = '';
+      submenu.style.height = '';
       return;
     }
 
@@ -399,10 +410,11 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   showSubMenu(action: ContextMenuAction, opts?: { fromClick?: boolean }) {
-    if (this.GuestMode()) return;
-
+    // Guest menus only list allowed items — do not block expand (e.g. local view reset).
     const host = this.rootElementRef?.nativeElement;
-    const mobileSheet = !!(host?.classList?.contains('is-mobile-action-sheet')
+    const mobileSheet = !!(this.isMobileActionSheet
+      || host?.classList?.contains('is-mobile-action-sheet')
+      || host?.classList?.contains('is-mobile-inline-submenu')
       || host?.closest?.('.is-mobile-action-sheet'));
 
     // Touch action sheets synthesize sticky hover — only expand/collapse from click.
@@ -410,22 +422,24 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     clearTimeout(this.showSubMenuTimer);
 
-    // Row without a submenu: close any open nested menu (e.g. left a flyout parent).
-    // Checkbox/radio rows still call this from doAction; clearing nested menus is fine,
-    // and stopPropagation prevents the parent row from treating it as a collapse tap.
     if (action.subActions == null || action.subActions.length < 1) {
       this.clearSubMenuNow();
       return;
     }
 
+    // Mobile root sheet: push a full-page level (Settings-style), not a side/inline nest.
+    if (opts?.fromClick && this.isMobileActionSheet && !this.isSubmenu) {
+      this.drillInto(action);
+      return;
+    }
+
     // Already open: on desktop hover already expanded it — a click must not collapse.
-    // Mobile sheets have no reliable hover; second tap toggles closed.
+    // Mobile nested (legacy) sheets: second tap toggles closed.
     if (opts?.fromClick && this.parentMenu === action && this.subMenu) {
       if (mobileSheet) this.clearSubMenuNow();
       return;
     }
 
-    // Switching to another first-level item: drop the previous submenu before opening the next.
     clearTimeout(this.hideSubMenuTimer);
     const delay = (mobileSheet || opts?.fromClick || this.parentMenu === action) ? 0 : 120;
     this.showSubMenuTimer = setTimeout(() => {
@@ -433,6 +447,35 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       this.subMenu = action.subActions;
       this.changeDetector.detectChanges();
     }, delay);
+  }
+
+  /** Replace sheet contents with submenu; Back restores previous level. */
+  drillInto(action: ContextMenuAction) {
+    if (!action?.subActions?.length) return;
+    this.drillStack.push({ title: this.title, actions: this.actions });
+    this.title = action.name || '';
+    this.actions = action.subActions;
+    this.clearSubMenuNow();
+    this.changeDetector.detectChanges();
+    queueMicrotask(() => this.scrollSheetActionsToTop());
+  }
+
+  drillBack(event?: Event) {
+    event?.stopPropagation();
+    event?.preventDefault();
+    const prev = this.drillStack.pop();
+    if (!prev) return;
+    this.title = prev.title;
+    this.actions = prev.actions;
+    this.clearSubMenuNow();
+    this.changeDetector.detectChanges();
+    queueMicrotask(() => this.scrollSheetActionsToTop());
+  }
+
+  private scrollSheetActionsToTop() {
+    const host = this.rootElementRef?.nativeElement;
+    const scroller = host?.querySelector?.('.sheet-actions') as HTMLElement | null;
+    if (scroller) scroller.scrollTop = 0;
   }
 
   hideSubMenu() {

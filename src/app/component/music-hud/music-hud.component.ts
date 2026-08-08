@@ -8,6 +8,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { Jukebox, MUSIC_HUD_SLOT_COUNT } from '@udonarium/Jukebox';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 
 import * as localForage from 'localforage';
 
@@ -35,12 +36,16 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
   private positionedDefault = false;
+  private mobileSub: { unsubscribe: () => void } | null = null;
 
   /** Collapsed bar outer height: map-action-hud.is-collapsed = 4+4 padding + 36 chrome. */
   private static readonly BAR_HEIGHT = 44;
   private static readonly HUD_WIDTH = 220;
 
-  get visible(): boolean { return MusicHudComponent.isVisible; }
+  /** Forced off on mobile — use jukebox panel instead. */
+  get visible(): boolean {
+    return MusicHudComponent.isVisible && !this.mobileLayout.isMobile;
+  }
   get isGuest(): boolean { return Network.GuestMode(); }
   get canControl(): boolean { return !this.isGuest; }
 
@@ -59,10 +64,12 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   constructor(
     private changeDetector: ChangeDetectorRef,
     private i18n: I18nService,
-    private contextMenuService: ContextMenuService
+    private contextMenuService: ContextMenuService,
+    private mobileLayout: MobileLayoutService,
   ) {}
 
   ngOnInit() {
+    this.mobileSub = this.mobileLayout.isMobile$.subscribe(() => this.changeDetector.markForCheck());
     localForage.getItem(MusicHudComponent.VISIBLE_KEY).then(v => {
       if (typeof v === 'boolean') {
         MusicHudComponent.isVisible = v;
@@ -96,6 +103,8 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.mobileSub?.unsubscribe();
+    this.mobileSub = null;
     EventSystem.unregister(this);
     document.removeEventListener('pointermove', this.onPointerMove);
     document.removeEventListener('pointerup', this.onPointerUp);

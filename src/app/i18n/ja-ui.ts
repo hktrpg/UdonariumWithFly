@@ -213,6 +213,7 @@ export const ja_ui: I18nDictionary = {
   'menu.folderBackup.status.error': 'フォルダバックアップエラー',
   'menu.disconnect': '切断',
   'menu.more': 'その他',
+  'menu.back': '戻る',
   'menu.mode.enterEdit': '編集モードへ',
   'menu.mode.exitEdit': 'プレイモードへ戻る',
   'menu.selfOnly': '自分のみ',

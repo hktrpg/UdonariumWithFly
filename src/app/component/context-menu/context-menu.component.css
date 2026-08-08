@@ -99,6 +99,14 @@
   color: #444;
   border-bottom: 1px solid #AAA;
 }
+
+.title-row {
+  display: contents;
+}
+
+.title-row .title {
+  /* desktop: same as lone .title */
+}
 .menu-title {
   display: inline-block;
   cursor: pointer;
@@ -361,10 +369,48 @@ input.altitude {
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .title {
   max-width: none;
-  font-size: 12px;
-  padding: 4px 12px 4px;
+  font-size: 14px;
+  padding: 8px 12px;
   text-align: left;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: none;
+  margin: 0;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   flex: 0 0 auto;
+  gap: 2px;
+  border-bottom: 1px solid var(--udon-chrome-border, #555);
+  padding: 0 4px 0 2px;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-back {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--udon-chrome-text, #e8e8e8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-back:active {
+  background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-back .material-icons {
+  font-size: 22px;
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sheet-body {
@@ -382,6 +428,23 @@ input.altitude {
   font-size: 13px;
   min-height: 34px;
   line-height: 1.25;
+  /* Title + arrow on first row; nested submenu wraps to full width (avoid side squeeze/deform). */
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul > li > .menu-title {
+  flex: 1 1 auto;
+  width: auto !important;
+  max-width: calc(100% - 28px);
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul > li > context-menu {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  min-width: 0;
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet ul > li:has(> hr.separator) {
@@ -401,23 +464,69 @@ input.altitude {
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .sub-menu-arrow {
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  flex: 0 0 auto;
+  margin-left: 4px;
+  transform: none;
 }
 
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .menu-title:not(.icon-menu) {
   max-width: none;
 }
 
+:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .menu-check {
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  accent-color: #8ab4f8;
+}
+
+/* Nested submenu inside a sheet: accordion row, not a second docked sheet. */
 :host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet .submenu-panel,
-:host-context(html.udon-mobile-layout) .component.is-mobile-action-sheet.submenu-panel {
-  position: static;
-  left: auto;
-  top: auto;
-  width: 100%;
-  max-height: none;
+:host-context(html.udon-mobile-layout) .component.is-mobile-inline-submenu,
+:host-context(html.udon-mobile-layout) .component.submenu-panel.is-mobile-inline-submenu {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block;
   box-shadow: none;
   border: none;
   border-top: 1px solid var(--udon-chrome-border, #555);
   border-radius: 0;
+  padding: 0;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-inline-submenu .title {
+  max-width: none;
+  text-align: left;
+  padding: 6px 12px 2px;
+  font-size: 11px;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-inline-submenu .sheet-body {
+  flex: 0 0 auto;
+  overflow: visible;
+  width: 100%;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-inline-submenu ul > li {
+  padding-left: 28px;
+  flex-wrap: wrap;
+}
+
+:host-context(html.udon-mobile-layout) .component.is-mobile-inline-submenu ul > li > context-menu {
+  flex: 1 1 100%;
+  width: 100%;
+  display: block;
 }

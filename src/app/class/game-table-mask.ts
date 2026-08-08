@@ -36,8 +36,8 @@ export class GameTableMask extends TabletopObject {
   @SyncVar() isPreview = false;
 
   @SyncVar() borderType = 1; // 0:不顯示 1:僅未鎖定時顯示 2:一律顯示
-  /** When true (default), footprint blocks light and vision. */
-  @SyncVar() affectsLight: boolean = true;
+  /** When true, footprint blocks light and vision (opt-in; floors stay open by default). */
+  @SyncVar() affectsLight: boolean = false;
 
   /** Legacy single action; kept in sync with clickActionsJson[0] or 'none'. */
   @SyncVar() clickAction: TabletopClickAction = 'none';

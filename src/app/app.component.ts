@@ -43,7 +43,7 @@ import { TextViewComponent } from 'component/text-view/text-view.component';
 import { UIPanelComponent } from 'component/ui-panel/ui-panel.component';
 import { AppConfig, AppConfigService } from 'service/app-config.service';
 import { ChatMessageService } from 'service/chat-message.service';
-import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, ContextMenuType, contextMenuToggleCheck } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
 import { AudioImportNameService } from 'service/audio-import-name.service';
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -1158,13 +1158,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       y: Math.max(8, window.pageYOffset + clientRect.top - this.mobileLayout.bottomChromePx),
     };
     const menu: ContextMenuAction[] = [];
+    const pushSep = () => {
+      if (menu.length && menu[menu.length - 1]?.type !== ContextMenuType.SEPARATOR) {
+        menu.push(ContextMenuSeparator);
+      }
+    };
+
     if (this.isMobileEdit) {
       menu.push({
         name: this.i18n.t('menu.mode.exitEdit'),
         materialIcon: 'sports_esports',
         action: () => this.setMobileUiMode('play'),
       });
-      menu.push(ContextMenuSeparator);
+      pushSep();
       if (this.canShowMenu('menu.toolbox')) {
         menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
       }
@@ -1184,7 +1190,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           materialIcon: 'edit',
           action: () => this.setMobileUiMode('edit'),
         });
-        menu.push(ContextMenuSeparator);
+        pushSep();
         if (this.canShowMenu('menu.toolbox')) {
           menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
         }
@@ -1196,9 +1202,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
       }
     }
-    menu.push(ContextMenuSeparator);
+    pushSep();
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
-    menu.push(ContextMenuSeparator);
+    pushSep();
     // Force-open: standSetteings() would toggle-close while More is still showing.
     menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.openSettingsAt(position) });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
@@ -1229,17 +1235,31 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Local view helpers — never gated by toolbox menu permission. */
   private buildAlwaysAvailableViewActions(): ContextMenuAction[] {
-    const menu: ContextMenuAction[] = [{
-      name: this.i18n.t('menu.viewReset'),
-      materialIcon: 'remove_red_eye',
-      selfOnly: true,
-      subActions: [
-        { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-        { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-      ]
-    }];
-    // Desktop only — mobile sheets replace each other via bottom nav.
-    if (!this.mobileLayout.isMobile) {
+    const menu: ContextMenuAction[] = [];
+    // Mobile sheets: flatten — nested submenus used to inherit full sheet chrome and break layout.
+    if (this.mobileLayout.isMobile) {
+      menu.push({
+        name: this.i18n.t('menu.viewReset.default'),
+        materialIcon: 'remove_red_eye',
+        selfOnly: true,
+        action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null),
+      });
+      menu.push({
+        name: this.i18n.t('menu.viewReset.top'),
+        materialIcon: 'vertical_align_top',
+        selfOnly: true,
+        action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top'),
+      });
+    } else {
+      menu.push({
+        name: this.i18n.t('menu.viewReset'),
+        materialIcon: 'remove_red_eye',
+        selfOnly: true,
+        subActions: [
+          { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+          { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+        ]
+      });
       menu.push({
         name: this.i18n.t('toolbox.rearrangePanels'),
         materialIcon: 'dashboard',
@@ -1611,31 +1631,35 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
       }),
       ContextMenuSeparator,
-      // Desktop UI
-      contextMenuToggleCheck({
-        get: () => CharacterResourceHudComponent.isVisible,
-        set: (v) => CharacterResourceHudComponent.setVisible(v),
-        on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
-        off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
-      }),
-      contextMenuToggleCheck({
-        get: () => MusicHudComponent.isVisible,
-        set: (v) => MusicHudComponent.setVisible(v),
-        on: `☑${this.i18n.t('menu.settings.musicHud')}`,
-        off: `☐${this.i18n.t('menu.settings.musicHud')}`,
-      }),
+      // Desktop UI (music / resource floats are forced off on mobile)
+      ...(this.mobileLayout.isMobile ? [] : [
+        contextMenuToggleCheck({
+          get: () => CharacterResourceHudComponent.isVisible,
+          set: (v) => CharacterResourceHudComponent.setVisible(v),
+          on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
+          off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
+        }),
+        contextMenuToggleCheck({
+          get: () => MusicHudComponent.isVisible,
+          set: (v) => MusicHudComponent.setVisible(v),
+          on: `☑${this.i18n.t('menu.settings.musicHud')}`,
+          off: `☐${this.i18n.t('menu.settings.musicHud')}`,
+        }),
+      ]),
       contextMenuToggleCheck({
         get: () => this.saveDataService.includeAudio,
         set: (v) => { void this.saveDataService.setIncludeAudio(v); },
         on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
         off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
-      contextMenuToggleCheck({
-        get: () => PanelService.singleNonChatWindow,
-        set: (v) => PanelService.setSingleNonChatWindow(v),
-        on: `☑${this.i18n.t('menu.settings.singleNonChat')}`,
-        off: `☐${this.i18n.t('menu.settings.singleNonChat')}`,
-      }),
+      ...(this.mobileLayout.isMobile ? [] : [
+        contextMenuToggleCheck({
+          get: () => PanelService.singleNonChatWindow,
+          set: (v) => PanelService.setSingleNonChatWindow(v),
+          on: `☑${this.i18n.t('menu.settings.singleNonChat')}`,
+          off: `☐${this.i18n.t('menu.settings.singleNonChat')}`,
+        }),
+      ]),
       {
         name: this.i18n.t('menu.settings.clearPanelGeometry'),
         materialIcon: 'restart_alt',

@@ -558,7 +558,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       : null),
       (this.isGMMode ? ContextMenuSeparator : null),
       contextMenuToggleCheck({
-        get: () => this.gameTableMask.affectsLight !== false,
+        get: () => !!this.gameTableMask.affectsLight,
         set: (v) => { this.gameTableMask.affectsLight = v; },
         on: this.i18n.t('mask.menu.9'),
         off: this.i18n.t('mask.menu.10'),

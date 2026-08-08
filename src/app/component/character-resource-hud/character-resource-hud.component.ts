@@ -5,6 +5,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 
 import * as localForage from 'localforage';
 
@@ -29,8 +30,12 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   private dragOffsetY = 0;
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
+  private mobileSub: { unsubscribe: () => void } | null = null;
 
-  get visible(): boolean { return CharacterResourceHudComponent.isVisible; }
+  /** Forced off on mobile — use character sheet instead. */
+  get visible(): boolean {
+    return CharacterResourceHudComponent.isVisible && !this.mobileLayout.isMobile;
+  }
   get showAllForGm(): boolean { return CharacterResourceHudComponent.showAllForGm; }
   get isGm(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
   get isGuest(): boolean { return Network.GuestMode(); }
@@ -48,9 +53,13 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     return mine ? [mine] : [];
   }
 
-  constructor(private changeDetector: ChangeDetectorRef) {}
+  constructor(
+    private changeDetector: ChangeDetectorRef,
+    private mobileLayout: MobileLayoutService,
+  ) {}
 
   ngOnInit() {
+    this.mobileSub = this.mobileLayout.isMobile$.subscribe(() => this.changeDetector.markForCheck());
     localForage.getItem(CharacterResourceHudComponent.VISIBLE_KEY).then(v => {
       if (typeof v === 'boolean') {
         CharacterResourceHudComponent.isVisible = v;
@@ -86,6 +95,8 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.mobileSub?.unsubscribe();
+    this.mobileSub = null;
     EventSystem.unregister(this);
     document.removeEventListener('pointermove', this.onPointerMove);
     document.removeEventListener('pointerup', this.onPointerUp);

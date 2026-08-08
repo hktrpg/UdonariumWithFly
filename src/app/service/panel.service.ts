@@ -719,30 +719,15 @@ export class PanelService {
       const isChat = geoKey === 'menu.chat' || resolved.tourPanelId === 'menu.chat';
       const panelInst = panelComponentRef.instance as any;
       if (isChat) {
-        // Floating chat on mobile: drag, resize, minimize (−), close (×).
-        // Bottom-sheet peek often hid the message list behind the composer.
+        // Bottom sheet like other mobile panels (floating chrome looked like desktop UI).
+        // Sticky composer CSS in chat-window keeps the input pinned above the nav.
         childPanelService.isAbleMinimizeButton = true;
-        if (panelInst) panelInst.isMobileSheet = false;
-        // adaptPanelOption wiped position — restore saved geometry, then clamp into chrome.
-        PanelService.applySavedGeometry(resolved, { includePosition: true });
-        const leftChrome = this.mobileLayout.leftChromePx;
-        const bottomChrome = this.mobileLayout.bottomChromePx;
-        const vw = this.mobileLayout.viewportWidth;
-        const vh = this.mobileLayout.viewportHeight;
-        const maxW = Math.max(200, vw - leftChrome - 16);
-        const maxH = Math.max(200, vh - bottomChrome - 24);
-        const w = Math.min(Math.max(resolved.width ?? 360, 280), maxW);
-        const h = Math.min(Math.max(resolved.height ?? Math.round(maxH * 0.55), 240), maxH);
-        const defaultLeft = leftChrome + 8;
-        const defaultTop = Math.max(8, vh - h - bottomChrome - 8);
-        let left = typeof resolved.left === 'number' && Number.isFinite(resolved.left) ? resolved.left : defaultLeft;
-        let top = typeof resolved.top === 'number' && Number.isFinite(resolved.top) ? resolved.top : defaultTop;
-        left = Math.max(leftChrome, Math.min(left, leftChrome + maxW - w));
-        top = Math.max(8, Math.min(top, vh - bottomChrome - h - 8));
-        childPanelService.width = w;
-        childPanelService.height = h;
-        childPanelService.left = left;
-        childPanelService.top = top;
+        if (panelInst) {
+          panelInst.isMobileSheet = true;
+          const sheet = this.mobileLayout.resolveSheetSnap(resolved.mobileSheet);
+          panelInst.isMobileSheetHalf = true;
+          panelInst.mobileSheetSnap = sheet;
+        }
       } else if (panelInst) {
         childPanelService.isAbleMinimizeButton = true;
         panelInst.isMobileSheet = true;

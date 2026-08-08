@@ -38,8 +38,9 @@ export function rectToClosedWall(
 }
 
 /**
- * Map masks & terrains with affectsLight: each footprint's four sides act as walls
- * for light and vision (same as scene-tool walls).
+ * Map masks & terrains with affectsLight opted in: each footprint's four sides
+ * act as walls for light and vision (same as scene-tool walls).
+ * Default is off so floor/decor footprints do not seal LoS.
  */
 export function collectFootprintWalls(
   table: GameTable,
@@ -52,14 +53,14 @@ export function collectFootprintWalls(
 
   for (const mask of masks || []) {
     if (mask.location?.name !== 'table') continue;
-    if (mask.affectsLight === false) continue;
+    if (!mask.affectsLight) continue;
     const w = Math.max(1, (mask.width || 1) * grid);
     const h = Math.max(1, (mask.height || 1) * grid);
     out.push(rectToClosedWall(mask.location.x, mask.location.y, w, h));
   }
   for (const terrain of terrains || []) {
     if (terrain.location?.name !== 'table') continue;
-    if (terrain.affectsLight === false) continue;
+    if (!terrain.affectsLight) continue;
     const w = Math.max(1, (terrain.width || 1) * grid);
     const d = Math.max(1, (terrain.depth || 1) * grid);
     out.push(rectToClosedWall(terrain.location.x, terrain.location.y, w, d, terrain.rotate || 0));

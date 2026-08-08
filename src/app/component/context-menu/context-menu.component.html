@@ -6,7 +6,17 @@
     [attr.aria-label]="'hud.resizeSheet' | i18n">
     <div class="sheet-handle" aria-hidden="true"></div>
   </div>
-  <div *ngIf="(!isIconsMenu && 0 < title.length) || altitudeHande"><div class="title" [style.color]="titleColorStyle" [style.font-weight]="titleBold ? 'bolder' : 'normal'">{{title}}<span style="font-size: small;" *ngIf="altitudeHande"> ({{ 'common.altitude' | i18n }} <input type="number" step="0.1" style="font-size: small; width:3.6em; text-align:right" [(ngModel)]="altitudeHande.altitude" [disabled]="!altitudeHande.isHaveAltitude || isAltitudeDisabled">)</span></div></div>
+  <div *ngIf="(!isIconsMenu && 0 < title.length) || altitudeHande || canDrillBack" class="title-row">
+    <button *ngIf="canDrillBack" type="button" class="sheet-back"
+      (click)="drillBack($event)"
+      [attr.title]="'menu.back' | i18n"
+      [attr.aria-label]="'menu.back' | i18n">
+      <i class="material-icons">arrow_back</i>
+    </button>
+    <div class="title" [style.color]="titleColorStyle" [style.font-weight]="titleBold ? 'bolder' : 'normal'">
+      {{title}}<span style="font-size: small;" *ngIf="altitudeHande"> ({{ 'common.altitude' | i18n }} <input type="number" step="0.1" style="font-size: small; width:3.6em; text-align:right" [(ngModel)]="altitudeHande.altitude" [disabled]="!altitudeHande.isHaveAltitude || isAltitudeDisabled">)</span>
+    </div>
+  </div>
   <!-- is-sheet-fill only for mobile action sheets; desktop sizes to all items and keeps overflow visible for submenus. -->
   <div class="sheet-body" [class.is-sheet-fill]="isMobileActionSheet">
     <div *ngIf="altitudeHande" class="altitude ruler" style="display: flex; align-self: stretch; flex-direction: column; align-content: center"><div style="margin-top: 2em;">{{ 'common.altitudeHigh' | i18n }}</div><div style="align-self: center; margin-top: auto; margin-bottom: auto">0</div><div style="margin-bottom: 2em;">{{ 'common.altitudeLow' | i18n }}</div></div>
@@ -45,9 +55,10 @@
       <i *ngIf="action.isOuterLink" class="material-icons" style="font-size: 1rem">open_in_new</i>
     </div>
     <div *ngIf="action.subActions && !action.disabled" class="sub-menu-arrow">
-      <i class="material-icons" style="font-size: 1em; vertical-align: bottom;">arrow_forward_ios</i>
+      <i class="material-icons" style="font-size: 1em; vertical-align: bottom;">{{ isMobileActionSheet ? 'chevron_right' : 'arrow_forward_ios' }}</i>
     </div>
-    <context-menu *ngIf="subMenu && parentMenu === action" [title]="action.name" [actions]="subMenu" [isSubmenu]="true"></context-menu>
+    <!-- Desktop / floating: nested flyout. Mobile sheet uses drillInto instead. -->
+    <context-menu *ngIf="!isMobileActionSheet && subMenu && parentMenu === action" [title]="action.name" [actions]="subMenu" [isSubmenu]="true"></context-menu>
   </li>
 </ng-template>
 <ng-template #separator let-action="action">

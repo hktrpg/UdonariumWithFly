@@ -468,7 +468,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       ContextMenuSeparator,
       */
       contextMenuToggleCheck({
-        get: () => this.terrain.affectsLight !== false,
+        get: () => !!this.terrain.affectsLight,
         set: (v) => { this.terrain.affectsLight = v; },
         on: this.i18n.t('terrain.menu.13'),
         off: this.i18n.t('terrain.menu.14'),
