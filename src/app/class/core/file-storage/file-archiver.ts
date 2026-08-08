@@ -193,8 +193,14 @@ export class FileArchiver {
   }
 
   private async handleText(file: File): Promise<void> {
-    if (file.type.indexOf('text/') < 0) return;
-    console.log(file.name + ' type:' + file.type);
+    const type = (file.type || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    const isTextish = type.indexOf('text/') === 0
+      || type === 'application/xml'
+      || type === 'application/json'
+      || /\.(xml|html?|txt|json|csv|md)$/i.test(name);
+    if (!isTextish) return;
+    console.log(file.name + ' type:' + (file.type || '(by extension)'));
     try {
       let xmlElement: Element = XmlUtil.xml2element(await FileReaderUtil.readAsTextAsync(file));
       if (xmlElement) EventSystem.trigger('XML_LOADED', { xmlElement: xmlElement });
