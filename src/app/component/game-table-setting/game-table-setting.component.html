@@ -262,9 +262,27 @@
           <button type="button" class="btn btn-sm" (click)="transitionNight()" [disabled]="!isEditable || !canControlDayNight">{{ 'table.night' | i18n }}</button>
         </div>
         <div class="slider-row slim">
-          <span class="slider-label">{{ 'table.globalIllumination' | i18n }}</span>
+          <span class="slider-label">{{ 'table.ambientLight' | i18n }}</span>
           <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable">
           <span class="val">{{ tableGlobalIllumination | number:'1.0-2' }}</span>
+        </div>
+        <div class="compact-row wrap" style="gap:10px;align-items:center">
+          <label class="check" [title]="'table.globalIlluminationHint' | i18n">
+            <input type="checkbox" [(ngModel)]="tableGlobalIlluminationEnabled" [disabled]="!isEditable || !tableVisionEnabled">
+            {{ 'table.globalIllumination' | i18n }}
+          </label>
+          <label class="check" [class.disabled]="!tableGlobalIlluminationEnabled || !tableVisionEnabled">
+            <input type="checkbox" [(ngModel)]="tableGlobalIlluminationThresholdEnabled"
+              [disabled]="!isEditable || !tableGlobalIlluminationEnabled || !tableVisionEnabled">
+            {{ 'table.globalIlluminationThreshold' | i18n }}
+          </label>
+          <label class="inline-field grow" *ngIf="tableGlobalIlluminationThresholdEnabled && tableGlobalIlluminationEnabled"
+            [class.disabled]="!tableVisionEnabled">
+            <span>{{ 'table.threshold' | i18n }}</span>
+            <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIlluminationThreshold"
+              [disabled]="!isEditable || !tableVisionEnabled">
+            <span class="val">{{ tableGlobalIlluminationThreshold | number:'1.0-2' }}</span>
+          </label>
         </div>
         <div class="compact-row wrap">
           <label class="inline-field">

@@ -10,6 +10,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { Jukebox, JUKEBOX_TRACK_COUNT, JukeboxTrackState } from '@udonarium/Jukebox';
 import { PresetSound } from '@udonarium/sound-effect';
+import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 
 import { ModalService } from 'service/modal.service';
@@ -147,6 +148,9 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   get isNoticeMute() { return AudioPlayer.isNoticeMute; }
   set isNoticeMute(isNoticeMute: boolean) {
     AudioPlayer.isNoticeMute = isNoticeMute;
+    // Keep chat toolbar notice toggle in sync.
+    ChatWindowComponent.isNoticeOn = !isNoticeMute;
+    localForage.setItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY, !isNoticeMute).catch(e => console.log(e));
     if (!isNoticeMute) {
       localForage.removeItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).catch(e => console.log(e));
     } else {

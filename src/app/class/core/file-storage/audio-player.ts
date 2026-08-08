@@ -58,9 +58,7 @@ export class AudioPlayer {
   static get volume(): number { return AudioPlayer._volume; }
   static set volume(volume: number) {
     AudioPlayer._volume = volume;
-    if (AudioPlayer._masterGainNode) {
-      AudioPlayer._masterGainNode.gain.setTargetAtTime(AudioPlayer.isMute ? 0 : AudioPlayer._volume, AudioPlayer.audioContext.currentTime, 0.01);
-    }
+    AudioPlayer.applyGain(AudioPlayer._masterGainNode, AudioPlayer.isMute, AudioPlayer._volume);
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -75,9 +73,7 @@ export class AudioPlayer {
   static get auditionVolume(): number { return AudioPlayer._auditionVolume; }
   static set auditionVolume(auditionVolume: number) {
     AudioPlayer._auditionVolume = auditionVolume;
-    if (AudioPlayer._auditionGainNode) {
-      AudioPlayer._auditionGainNode.gain.setTargetAtTime(AudioPlayer.isAuditionMute ? 0 : AudioPlayer._auditionVolume, AudioPlayer.audioContext.currentTime, 0.01);
-    }
+    AudioPlayer.applyGain(AudioPlayer._auditionGainNode, AudioPlayer.isAuditionMute, AudioPlayer._auditionVolume);
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -92,9 +88,7 @@ export class AudioPlayer {
   static get soundEffectVolume(): number { return AudioPlayer._soundEffectVolume; }
   static set soundEffectVolume(soundEffectVolume: number) {
     AudioPlayer._soundEffectVolume = soundEffectVolume;
-    if (AudioPlayer._soundEffectGainNode) {
-      AudioPlayer._soundEffectGainNode.gain.setTargetAtTime(AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer._soundEffectVolume, AudioPlayer.audioContext.currentTime, 0.01);
-    }
+    AudioPlayer.applyGain(AudioPlayer._soundEffectGainNode, AudioPlayer.isSoundEffectMute, AudioPlayer._soundEffectVolume);
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -109,9 +103,7 @@ export class AudioPlayer {
   static get noticeVolume(): number { return AudioPlayer._noticeVolume; }
   static set noticeVolume(noticeVolume: number) {
     AudioPlayer._noticeVolume = noticeVolume;
-    if (AudioPlayer._noticeGainNode) {
-      AudioPlayer._noticeGainNode.gain.setTargetAtTime(AudioPlayer.isNoticeMute ? 0 : AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime, 0.01);
-    }
+    AudioPlayer.applyGain(AudioPlayer._noticeGainNode, AudioPlayer.isNoticeMute, AudioPlayer._noticeVolume);
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -126,17 +118,32 @@ export class AudioPlayer {
   static get ambientVolume(): number { return AudioPlayer._ambientVolume; }
   static set ambientVolume(ambientVolume: number) {
     AudioPlayer._ambientVolume = ambientVolume;
-    if (AudioPlayer._ambientGainNode) {
-      AudioPlayer._ambientGainNode.gain.setTargetAtTime(AudioPlayer.isAmbientMute ? 0 : AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime, 0.01);
-    }
+    AudioPlayer.applyGain(AudioPlayer._ambientGainNode, AudioPlayer.isAmbientMute, AudioPlayer._ambientVolume);
     AudioPlayer.refreshElementDirectVolumes();
+  }
+
+  /** Initial / target linear gain for a channel (respect mute set before the GainNode exists). */
+  private static channelGain(muted: boolean, volume: number): number {
+    return muted ? 0 : Math.max(0, Math.min(1, volume));
+  }
+
+  /** Immediate mute/unmute (avoid setTargetAtTime lag on one-shot SE). */
+  private static applyGain(node: GainNode | undefined, muted: boolean, volume: number) {
+    if (!node) return;
+    node.gain.setValueAtTime(
+      AudioPlayer.channelGain(muted, volume),
+      AudioPlayer.audioContext.currentTime,
+    );
   }
 
   private static _masterGainNode: GainNode
   private static get masterGainNode(): GainNode {
     if (!AudioPlayer._masterGainNode) {
       let masterGain = AudioPlayer.audioContext.createGain();
-      masterGain.gain.setValueAtTime(AudioPlayer._volume, AudioPlayer.audioContext.currentTime);
+      masterGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isMute, AudioPlayer._volume),
+        AudioPlayer.audioContext.currentTime,
+      );
       masterGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._masterGainNode = masterGain;
     }
@@ -147,7 +154,10 @@ export class AudioPlayer {
   private static get auditionGainNode(): GainNode {
     if (!AudioPlayer._auditionGainNode) {
       let auditionGain = AudioPlayer.audioContext.createGain();
-      auditionGain.gain.setValueAtTime(AudioPlayer._auditionVolume, AudioPlayer.audioContext.currentTime);
+      auditionGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isAuditionMute, AudioPlayer._auditionVolume),
+        AudioPlayer.audioContext.currentTime,
+      );
       auditionGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._auditionGainNode = auditionGain;
     }
@@ -158,7 +168,10 @@ export class AudioPlayer {
   private static get soundEffectGainNode(): GainNode {
     if (!AudioPlayer._soundEffectGainNode) {
       let soundEffectGain = AudioPlayer.audioContext.createGain();
-      soundEffectGain.gain.setValueAtTime(AudioPlayer._soundEffectVolume, AudioPlayer.audioContext.currentTime);
+      soundEffectGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isSoundEffectMute, AudioPlayer._soundEffectVolume),
+        AudioPlayer.audioContext.currentTime,
+      );
       soundEffectGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._soundEffectGainNode = soundEffectGain;
     }
@@ -169,7 +182,10 @@ export class AudioPlayer {
   private static get noticeGainNode(): GainNode {
     if (!AudioPlayer._noticeGainNode) {
       let noticeGain = AudioPlayer.audioContext.createGain();
-      noticeGain.gain.setValueAtTime(AudioPlayer._noticeVolume, AudioPlayer.audioContext.currentTime);
+      noticeGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isNoticeMute, AudioPlayer._noticeVolume),
+        AudioPlayer.audioContext.currentTime,
+      );
       noticeGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._noticeGainNode = noticeGain;
     }
@@ -180,7 +196,10 @@ export class AudioPlayer {
   private static get ambientGainNode(): GainNode {
     if (!AudioPlayer._ambientGainNode) {
       let ambientGain = AudioPlayer.audioContext.createGain();
-      ambientGain.gain.setValueAtTime(AudioPlayer._ambientVolume, AudioPlayer.audioContext.currentTime);
+      ambientGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isAmbientMute, AudioPlayer._ambientVolume),
+        AudioPlayer.audioContext.currentTime,
+      );
       ambientGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._ambientGainNode = ambientGain;
     }
@@ -256,11 +275,31 @@ export class AudioPlayer {
   }
 
   static play(audio: AudioFile, volume: number = 1.0) {
+    if (AudioPlayer.isMute || AudioPlayer.volume <= 0) return;
     this.playBufferAsync(audio, volume);
   }
 
   static playSoundEffect(audio: AudioFile, volume: number = 1.0) {
-    this.playBufferAsyncBase(AudioPlayer.soundEffectNode, audio, volume);
+    if (AudioPlayer.isSoundEffectMute || AudioPlayer.soundEffectVolume <= 0) return;
+    // Touch gain node so a pre-first-play mute is applied before audio starts.
+    void AudioPlayer.soundEffectNode;
+    this.playBufferAsyncBase(
+      AudioPlayer.soundEffectNode,
+      audio,
+      volume,
+      () => AudioPlayer.isSoundEffectMute || AudioPlayer.soundEffectVolume <= 0,
+    );
+  }
+
+  static playNotice(audio: AudioFile, volume: number = 1.0) {
+    if (AudioPlayer.isNoticeMute || AudioPlayer.noticeVolume <= 0) return;
+    void AudioPlayer.noticeNode;
+    this.playBufferAsyncBase(
+      AudioPlayer.noticeNode,
+      audio,
+      volume,
+      () => AudioPlayer.isNoticeMute || AudioPlayer.noticeVolume <= 0,
+    );
   }
 
   private static isCrossOriginHttpUrl(url: string): boolean {
@@ -277,15 +316,15 @@ export class AudioPlayer {
   private getChannelLinearVolume(): number {
     switch (this.volumeType) {
       case VolumeType.AUDITION:
-        return AudioPlayer.isAuditionMute ? 0 : AudioPlayer.auditionVolume;
+        return AudioPlayer.channelGain(AudioPlayer.isAuditionMute, AudioPlayer.auditionVolume);
       case VolumeType.SOUND_EFFECT:
-        return AudioPlayer.isSoundEffectMute ? 0 : AudioPlayer.soundEffectVolume;
+        return AudioPlayer.channelGain(AudioPlayer.isSoundEffectMute, AudioPlayer.soundEffectVolume);
       case VolumeType.NOTICE:
-        return AudioPlayer.isNoticeMute ? 0 : AudioPlayer.noticeVolume;
+        return AudioPlayer.channelGain(AudioPlayer.isNoticeMute, AudioPlayer.noticeVolume);
       case VolumeType.AMBIENT:
-        return AudioPlayer.isAmbientMute ? 0 : AudioPlayer.ambientVolume;
+        return AudioPlayer.channelGain(AudioPlayer.isAmbientMute, AudioPlayer.ambientVolume);
       default:
-        return AudioPlayer.isMute ? 0 : AudioPlayer.volume;
+        return AudioPlayer.channelGain(AudioPlayer.isMute, AudioPlayer.volume);
     }
   }
 
@@ -302,6 +341,9 @@ export class AudioPlayer {
     this.stop();
     this.audio = audio;
     if (!this.audio) return;
+    // Ensure channel GainNode exists with current mute. Still start the element when
+    // muted (gain 0) so local unmute restores BGM without depending on room sync.
+    void this.getConnectingAudioNode();
     AudioPlayer.ensureContextRunning();
 
     let url = this.audio.url;
@@ -411,10 +453,20 @@ export class AudioPlayer {
     */
   }
 
-  private static async playBufferAsyncBase(audioNode: AudioNode, audio: AudioFile, volume: number = 1.0) {
+  private static async playBufferAsyncBase(
+    audioNode: AudioNode,
+    audio: AudioFile,
+    volume: number = 1.0,
+    isCancelled?: () => boolean,
+  ) {
     AudioPlayer.ensureContextRunning();
     let source = await AudioPlayer.createBufferSourceAsync(audio);
     if (!source) return;
+    // Re-check after async decode — mute is per-client and may flip while loading.
+    if (isCancelled?.()) {
+      source.buffer = null;
+      return;
+    }
 
     let gain = AudioPlayer.audioContext.createGain();
     gain.gain.setValueAtTime(volume, AudioPlayer.audioContext.currentTime);

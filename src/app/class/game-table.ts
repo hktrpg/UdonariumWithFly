@@ -39,7 +39,19 @@ export class GameTable extends ObjectNode {
   @SyncVar() isShowNumber: boolean = true;
 
   @SyncVar() darkness: number = 0;
+  /** Ambient fill that softens the darkness overlay (0–1). Not Foundry GI. */
   @SyncVar() globalIllumination: number = 1;
+  /**
+   * Foundry-style Global Illumination: when true (and threshold allows), tokens with
+   * vision see everything in line-of-sight as brightly lit without needing lights.
+   * When false, vision only reveals areas that are also illuminated.
+   */
+  @SyncVar() globalIlluminationEnabled: boolean = true;
+  /**
+   * Auto-disable GI when darkness >= this value. Negative = threshold off
+   * (GI follows globalIlluminationEnabled only).
+   */
+  @SyncVar() globalIlluminationThreshold: number = -1;
   @SyncVar() weatherType: WeatherType = 'none';
   @SyncVar() weatherIntensity: number = 0.5;
   @SyncVar() visionEnabled: boolean = false;
