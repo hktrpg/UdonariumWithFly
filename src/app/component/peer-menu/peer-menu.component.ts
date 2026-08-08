@@ -183,7 +183,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy {
     const result = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('update.title'),
       text: this.i18n.t('update.text'),
-      help: this.i18n.t('update.help'),
+      // update.help contains HTML; Confirmation uses helpHtml + safe pipe.
+      helpHtml: this.i18n.t('update.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'system_update',
       okLabel: this.i18n.t('update.restart'),
