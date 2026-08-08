@@ -497,7 +497,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.ctrlHoverHint': '提示：在桌面筆記上按住 Ctrl 並懸停可預覽。',
   'note.settingsEmpty': '請選擇要編輯的筆記。',
   'note.selfOnly': '僅自己可見', 'note.importFile': '匯入檔案', 'note.dropHint': '拖曳文字／圖片／影片／PDF 到此處即可匯入。',
-  'mask.clickAction': '點擊動作', 'mask.clickSettings': '點擊動作設定', 'mask.clickHint': '點擊地圖遮罩時觸發（聊天／骰子、切地圖、套用預設）。',
+  'mask.clickAction': '點擊動作', 'mask.clickSettings': '點擊動作設定', 'mask.clickHint': '按住 Alt 再左鍵點擊地圖遮罩時觸發（聊天／骰子、切地圖、套用預設）。',
   'mask.fieldName': '名稱', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': '文字',
   'mask.fieldTextColor': '文字色', 'mask.fieldBgColor': '背景色', 'mask.fieldBlend': '混色', 'mask.fieldBorder': '邊框',
   'mask.changeImage': '變更圖片', 'mask.clearImage': '清除圖片', 'mask.dropImageHint': '可拖曳圖片到此處套用。',

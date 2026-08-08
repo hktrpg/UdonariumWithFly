@@ -486,7 +486,7 @@ export const en_ui: I18nDictionary = {
   'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.ctrlHoverHint': 'Tip: hold Ctrl and hover a note on the table to preview.',
   'note.settingsEmpty': 'Select a note to edit.',
   'note.selfOnly': 'Self only', 'note.importFile': 'Import file', 'note.dropHint': 'Drop text / image / video / PDF here to import.',
-  'mask.clickAction': 'On click', 'mask.clickSettings': 'Click action settings', 'mask.clickHint': 'Triggered when the map mask is clicked (chat/dice, switch map, apply preset).',
+  'mask.clickAction': 'On click', 'mask.clickSettings': 'Click action settings', 'mask.clickHint': 'Hold Alt and left-click the map mask to trigger (chat/dice, switch map, apply preset).',
   'mask.fieldName': 'Name', 'mask.fieldOpacity': 'Opacity', 'mask.fieldAltitude': 'Altitude', 'mask.fieldText': 'Text',
   'mask.fieldTextColor': 'Text color', 'mask.fieldBgColor': 'Background', 'mask.fieldBlend': 'Blend', 'mask.fieldBorder': 'Border',
   'mask.changeImage': 'Change image', 'mask.clearImage': 'Clear image', 'mask.dropImageHint': 'Drop an image here to apply.',

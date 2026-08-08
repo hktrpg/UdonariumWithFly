@@ -486,7 +486,7 @@ export const ja_ui: I18nDictionary = {
   'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.ctrlHoverHint': 'ヒント：卓上メモに Ctrl を押しながらホバーでプレビュー。',
   'note.settingsEmpty': '編集するメモを選択してください。',
   'note.selfOnly': '自分のみ表示', 'note.importFile': 'ファイル読込', 'note.dropHint': 'テキスト／画像／動画／PDF をここにドロップして取り込み。',
-  'mask.clickAction': 'クリック動作', 'mask.clickSettings': 'クリック動作設定', 'mask.clickHint': 'マップマスクをクリックしたときに発動（チャット／ダイス、マップ切替、プリセット）。',
+  'mask.clickAction': 'クリック動作', 'mask.clickSettings': 'クリック動作設定', 'mask.clickHint': 'Alt を押しながらマップマスクを左クリックで発動（チャット／ダイス、マップ切替、プリセット）。',
   'mask.fieldName': '名前', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': 'テキスト',
   'mask.fieldTextColor': '文字色', 'mask.fieldBgColor': '背景色', 'mask.fieldBlend': '合成', 'mask.fieldBorder': '枠線',
   'mask.changeImage': '画像を変更', 'mask.clearImage': '画像をクリア', 'mask.dropImageHint': '画像をここにドロップして適用。',

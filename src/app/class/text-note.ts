@@ -227,13 +227,18 @@ export class TextNote extends TabletopObject {
 
   nextPdfPage() {
     if (!this.hasPdf) return;
-    const max = this.pdfPageCount > 0 ? this.pdfPageCount : this.pdfPage + 1;
-    if (this.pdfPage < max) this.pdfPage = this.pdfPage + 1;
+    const max = this.pdfPageCount > 0 ? this.pdfPageCount : 0;
+    if (max <= 0) return;
+    // Wrap: last → first
+    this.pdfPage = this.pdfPage >= max ? 1 : this.pdfPage + 1;
   }
 
   prevPdfPage() {
     if (!this.hasPdf) return;
-    if (this.pdfPage > 1) this.pdfPage = this.pdfPage - 1;
+    const max = this.pdfPageCount > 0 ? this.pdfPageCount : 0;
+    if (max <= 0) return;
+    // Wrap: first → last
+    this.pdfPage = this.pdfPage <= 1 ? max : this.pdfPage - 1;
   }
 
   toTopmost() {

@@ -201,17 +201,19 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   prevPage(e?: Event) {
     e?.stopPropagation();
     const page = Math.max(1, Math.floor(Number(this.pdfPage)) || 1);
-    if (page <= 1) return; // stay on first — no wrap to last
-    this.goToPage(page - 1);
+    const max = Math.max(0, Math.floor(Number(this.pdfPageCount)) || 0);
+    if (max <= 0) return;
+    // Wrap: first → last
+    this.goToPage(page <= 1 ? max : page - 1);
   }
 
   nextPage(e?: Event) {
     e?.stopPropagation();
     const page = Math.max(1, Math.floor(Number(this.pdfPage)) || 1);
     const max = Math.max(0, Math.floor(Number(this.pdfPageCount)) || 0);
-    // Block until page count is known, and never advance past last (no wrap to first).
-    if (max <= 0 || page >= max) return;
-    this.goToPage(page + 1);
+    if (max <= 0) return;
+    // Wrap: last → first
+    this.goToPage(page >= max ? 1 : page + 1);
   }
 
   private goToPage(page: number) {

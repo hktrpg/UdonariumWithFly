@@ -340,7 +340,10 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     if (e.button !== 0) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     this.clickArmed = false;
-    if (!this.hasClickAction) return;
+    // Require Alt+left click so normal select / nudge does not fire actions.
+    if (!e.altKey || !this.hasClickAction) return;
+    e.preventDefault();
+    e.stopPropagation();
     this.ngZone.run(() => executeTabletopClickAction(this.gameTableMask, this.chatMessageService));
   }
 

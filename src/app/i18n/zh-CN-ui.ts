@@ -486,7 +486,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.ctrlHoverHint': '提示：在桌面笔记上按住 Ctrl 并悬停可预览。',
   'note.settingsEmpty': '请选择要编辑的笔记。',
   'note.selfOnly': '仅自己可见', 'note.importFile': '导入文件', 'note.dropHint': '拖入文字／图片／视频／PDF 即可导入。',
-  'mask.clickAction': '点击动作', 'mask.clickSettings': '点击动作设置', 'mask.clickHint': '点击地图遮罩时触发（聊天／骰子、切地图、应用预设）。',
+  'mask.clickAction': '点击动作', 'mask.clickSettings': '点击动作设置', 'mask.clickHint': '按住 Alt 再左键点击地图遮罩时触发（聊天／骰子、切地图、应用预设）。',
   'mask.fieldName': '名称', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': '文字',
   'mask.fieldTextColor': '文字色', 'mask.fieldBgColor': '背景色', 'mask.fieldBlend': '混色', 'mask.fieldBorder': '边框',
   'mask.changeImage': '更改图片', 'mask.clearImage': '清除图片', 'mask.dropImageHint': '可拖入图片到此处套用。',

@@ -8,12 +8,12 @@
       </span>
       <div class="handout-actions">
         <ng-container *ngIf="isPdf">
-          <button type="button" class="nav-btn" (click)="prevPage($event)" [disabled]="pdfPage <= 1">
+          <button type="button" class="nav-btn" (click)="prevPage($event)" [disabled]="pdfPageCount <= 1">
             <i class="material-icons">chevron_left</i>
           </button>
           <span class="page-label">{{ pdfPage }}{{ pdfPageCount ? ' / ' + pdfPageCount : '' }}</span>
           <button type="button" class="nav-btn" (click)="nextPage($event)"
-            [disabled]="pdfPageCount > 0 && pdfPage >= pdfPageCount">
+            [disabled]="pdfPageCount <= 1">
             <i class="material-icons">chevron_right</i>
           </button>
         </ng-container>
