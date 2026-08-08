@@ -60,13 +60,15 @@ export class PanelService {
   /**
    * Personal setting: opening a non-chat panel closes other non-chat panels.
    * Default on. Desktop only (mobile sheets already replace each other).
-   * Exception: Connection + Lobby are one group and may stay open together.
+   * Exceptions: Connection+Lobby; Character sheet+palette+stand; Card-stack settings+list;
+   * Character inventory+sheets; Note inventory+notes; multiple character/note sheets.
    */
   static singleNonChatWindow = true;
 
   /** Tour / geometry ids that share one exclusive slot (do not close each other). */
   private static readonly NON_CHAT_COMPAT_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
     ['menu.connection', 'menu.lobby'],
+    ['panel.card-stack-settings', 'panel.card-stack-list'],
   ];
 
   private panelComponentRef: ComponentRef<any>
@@ -347,11 +349,65 @@ export class PanelService {
 
   /** True when two non-chat panels may coexist under single-window mode (e.g. Connection + Lobby). */
   static areCompatibleNonChatPanels(aId: string, bId: string): boolean {
-    if (!aId || !bId || aId === bId) return false;
+    if (!aId || !bId) return false;
+    // Character / note sheets: multiple instances of the same type may stay open.
+    if (PanelService.isMultiInstanceNonChatPanel(aId) && PanelService.isMultiInstanceNonChatPanel(bId)
+      && PanelService.multiInstanceKind(aId) === PanelService.multiInstanceKind(bId)) {
+      return true;
+    }
+    if (aId === bId) return false;
     for (const group of PanelService.NON_CHAT_COMPAT_GROUPS) {
       if (group.includes(aId) && group.includes(bId)) return true;
     }
+    // Character sheet + chat palette + stand settings may stay open together.
+    // Two palettes (or two stands) still replace each other.
+    if (PanelService.isCharacterCompanionPanel(aId, bId)) return true;
+    // Character inventory ↔ character cards; note inventory ↔ note settings.
+    if (PanelService.isInventorySheetPair(aId, bId)) return true;
     return false;
+  }
+
+  /** Panels that may open multiple copies under single-window mode. */
+  private static isMultiInstanceNonChatPanel(id: string): boolean {
+    return PanelService.multiInstanceKind(id) !== '';
+  }
+
+  private static multiInstanceKind(id: string): 'character-sheet' | 'note-sheet' | '' {
+    if (PanelService.isCharacterSheetId(id)) return 'character-sheet';
+    if (PanelService.isNoteSheetId(id)) return 'note-sheet';
+    return '';
+  }
+
+  private static isCharacterSheetId(id: string): boolean {
+    return id === 'sheet.character'
+      || id === 'panel.character-settings'
+      || id === 'panel.game-character-sheet';
+  }
+
+  private static isNoteSheetId(id: string): boolean {
+    return id === 'panel.note-settings'
+      || id === 'sheet.text-note';
+  }
+
+  /** menu.inventory ↔ character sheet; menu.notes ↔ note settings. */
+  private static isInventorySheetPair(aId: string, bId: string): boolean {
+    const pair = (inv: string, sheet: (id: string) => boolean) =>
+      (aId === inv && sheet(bId)) || (bId === inv && sheet(aId));
+    return pair('menu.inventory', PanelService.isCharacterSheetId)
+      || pair('menu.notes', PanelService.isNoteSheetId);
+  }
+
+  /** Character sheet ↔ palette ↔ stand (cross-type only). */
+  private static isCharacterCompanionPanel(aId: string, bId: string): boolean {
+    const kind = (id: string): 'sheet' | 'palette' | 'stand' | '' => {
+      if (PanelService.isCharacterSheetId(id)) return 'sheet';
+      if (id.startsWith('char.palette.') || id === 'panel.chat-palette') return 'palette';
+      if (id.startsWith('char.stand.') || id === 'panel.app-stand-setting') return 'stand';
+      return '';
+    };
+    const a = kind(aId);
+    const b = kind(bId);
+    return !!a && !!b && a !== b;
   }
 
   /** Close every closable non-chat panel (optionally keep one instance + its compat group). */
@@ -766,9 +822,89 @@ export class PanelService {
   }
 
   close() {
+    this.cancelFitToContent();
     if (this.panelComponentRef) {
       this.panelComponentRef.destroy();
       this.panelComponentRef = null;
     }
+  }
+
+  private fitToken = 0;
+
+  /** Cancel any in-flight scheduleFitToContent retries for this panel. */
+  cancelFitToContent() {
+    this.fitToken++;
+  }
+
+  /**
+   * Fit this panel's height to `host` content (title + padding included).
+   * Temporarily probes tall so measurement is not clipped by a short viewport.
+   * @returns applied height, or 0 if skipped
+   */
+  fitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): number {
+    if (!host?.isConnected) return 0;
+    const panelEl = host.closest('.draggable-panel') as HTMLElement | null;
+    const scrollEl = panelEl?.querySelector('.scrollable-panel') as HTMLElement | null;
+    if (!panelEl || !scrollEl) return 0;
+
+    const minH = opts?.minHeight ?? 200;
+    const maxH = opts?.maxHeight ?? (window.innerHeight - 16);
+    const save = opts?.save !== false;
+
+    const probe = Math.min(window.innerHeight - 8, 1600);
+    panelEl.style.height = `${probe}px`;
+    this.height = probe;
+
+    const style = getComputedStyle(scrollEl);
+    const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    const contentH = Math.max(
+      host.scrollHeight,
+      host.offsetHeight,
+      Math.ceil(host.getBoundingClientRect().height),
+    );
+    if (!(contentH > 40)) return 0;
+
+    let next = Math.max(minH, Math.min(maxH, Math.ceil(contentH + 25 + padY + 6)));
+    this.height = next;
+    panelEl.style.height = `${next}px`;
+
+    if (scrollEl.scrollHeight > scrollEl.clientHeight + 2) {
+      next = Math.max(next, Math.min(maxH, Math.ceil(25 + scrollEl.scrollHeight + 4)));
+      this.height = next;
+      panelEl.style.height = `${next}px`;
+    }
+
+    if (save) {
+      const key = this.geometryKey || this.tourPanelId;
+      if (key) PanelService.saveGeometry(key, this.width, next, this.left, this.top);
+    }
+    return next;
+  }
+
+  /**
+   * Retry fit until layout stabilizes (nested OnPush / async content).
+   */
+  scheduleFitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): void {
+    if (!host) return;
+    const token = ++this.fitToken;
+    let attempts = 0;
+    let lastNext = -1;
+    const tick = () => {
+      if (token !== this.fitToken || !host.isConnected) return;
+      const next = this.fitToContent(host, opts);
+      attempts++;
+      if (next > 0 && next !== lastNext && attempts < 10) {
+        lastNext = next;
+        requestAnimationFrame(tick);
+        return;
+      }
+      if (attempts < 12) {
+        setTimeout(() => {
+          if (token !== this.fitToken || !host.isConnected) return;
+          this.fitToContent(host, opts);
+        }, 80);
+      }
+    };
+    queueMicrotask(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
   }
 }

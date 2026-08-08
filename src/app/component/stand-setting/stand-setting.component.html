@@ -1,4 +1,4 @@
-<div class="settings-ui dense" *ngIf="character">
+<div class="settings-ui dense" *ngIf="character" appFitPanel [fitMinHeight]="320" [fitMaxHeight]="620">
   <section class="card">
     <header class="card-head">
       <h3>{{ 'stand.common' | i18n }}</h3>

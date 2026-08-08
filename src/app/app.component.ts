@@ -807,8 +807,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let option: PanelOption = { width: 450, height: 560, left: 100 }
     switch (componentName) {
       case 'PeerMenuComponent':
-        option.width = 480;
-        option.height = 440;
+        option.width = 520;
+        option.height = 450;
         option.title = this.i18n.t('peer.title');
         component = PeerMenuComponent;
         // Keep map visible — connection is a half sheet, not full-screen.
@@ -839,30 +839,30 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = JukeboxComponent;
         option = {
           width: 300,
-          height: Math.max(200, window.innerHeight),
+          height: Math.min(520, Math.max(320, window.innerHeight - 48)),
           top: 0,
           title: this.i18n.t('jukebox.title'),
         };
         break;
       case 'GameObjectInventoryComponent':
         component = GameObjectInventoryComponent;
-        option = { width: 420, height: 520, left: 100, title: this.i18n.t('inv.title') };
+        option = { width: 420, height: 480, left: 100, title: this.i18n.t('inv.title') };
         break;
       case 'NoteInventoryComponent':
         component = NoteInventoryComponent;
-        option = { width: 420, height: 520, left: 100, title: this.i18n.t('note.title') };
+        option = { width: 420, height: 480, left: 100, title: this.i18n.t('note.title') };
         break;
       case 'DiceRollTableSettingComponent':
         component = DiceRollTableSettingComponent;
-        option = { width: 645, height: 475, title: this.i18n.t('diceTable.title') };
+        option = { width: 645, height: 450, title: this.i18n.t('diceTable.title') };
         break;
       case 'CutInSettingComponent':
         component = CutInSettingComponent;
-        option = { width: 690, height: 500, title: this.i18n.t('cutin.title') };
+        option = { width: 690, height: 480, title: this.i18n.t('cutin.title') };
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 500, left: 100, title: this.i18n.t('combat.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':
@@ -870,18 +870,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         component = SceneToolsComponent;
         option = {
           width: 380,
-          height: 480,
+          height: 520,
           left: 100,
           title: this.i18n.t(PeerCursor.myCursor?.isGMMode ? 'scene.titleGm' : 'scene.title'),
         };
         break;
       case 'ScenePresetComponent':
         component = ScenePresetComponent;
-        option = { width: 520, height: 480, left: 100, title: this.i18n.t('scenePreset.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('scenePreset.title') };
         break;
       case 'ScenarioTextComponent':
         component = ScenarioTextComponent;
-        option = { width: 520, height: 480, left: 100, title: this.i18n.t('scenarioText.title') };
+        option = { width: 520, height: 420, left: 100, title: this.i18n.t('scenarioText.title') };
         break;
     }
     if (component) {

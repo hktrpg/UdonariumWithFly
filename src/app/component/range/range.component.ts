@@ -24,7 +24,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { RangeSettingsComponent } from 'component/range-settings/range-settings.component';
 
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
@@ -736,9 +736,9 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('range.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 200, top: coordinate.y - 150, width: 400, height: 390 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 180, width: 420, height: 400 };
+    let component = this.panelService.open<RangeSettingsComponent>(RangeSettingsComponent, option);
+    component.range = gameObject;
   }
 
   private setRange() {

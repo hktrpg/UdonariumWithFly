@@ -42,6 +42,7 @@ import { TextNoteComponent } from 'component/text-note/text-note.component';
 import { TextViewComponent } from 'component/text-view/text-view.component';
 import { UIPanelComponent } from 'component/ui-panel/ui-panel.component';
 import { DraggableDirective } from 'directive/draggable.directive';
+import { FitPanelDirective } from 'directive/fit-panel.directive';
 import { MovableDirective } from 'directive/movable.directive';
 import { ResizableDirective } from 'directive/resizable.directive';
 import { RotableDirective } from 'directive/rotable.directive';
@@ -87,6 +88,12 @@ import { ScenarioTextComponent } from './component/scenario-text/scenario-text.c
 import { NoteHandoutComponent } from './component/note-handout/note-handout.component';
 import { NoteSettingsComponent } from './component/note-settings/note-settings.component';
 import { MaskSettingsComponent } from './component/mask-settings/mask-settings.component';
+import { TerrainSettingsComponent } from './component/terrain-settings/terrain-settings.component';
+import { CardSettingsComponent } from './component/card-settings/card-settings.component';
+import { CardStackSettingsComponent } from './component/card-stack-settings/card-stack-settings.component';
+import { DiceSettingsComponent } from './component/dice-settings/dice-settings.component';
+import { RangeSettingsComponent } from './component/range-settings/range-settings.component';
+import { CharacterSettingsComponent } from './component/character-settings/character-settings.component';
 import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
 import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
@@ -151,6 +158,7 @@ import '@udonarium/table-fx/combat-tracker';
     DiceSymbolComponent,
     TooltipDirective,
     DraggableDirective,
+    FitPanelDirective,
     ResizableDirective,
     ChatInputComponent,
     OpenUrlComponent,
@@ -172,6 +180,12 @@ import '@udonarium/table-fx/combat-tracker';
     NoteHandoutComponent,
     NoteSettingsComponent,
     MaskSettingsComponent,
+    TerrainSettingsComponent,
+    CardSettingsComponent,
+    CardStackSettingsComponent,
+    DiceSettingsComponent,
+    RangeSettingsComponent,
+    CharacterSettingsComponent,
     CharacterResourceHudComponent,
     MusicHudComponent,
     CombatTrackerComponent,

@@ -21,7 +21,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { CardSettingsComponent } from 'component/card-settings/card-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
@@ -631,8 +631,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('card.panelTitle');
     if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : this.i18n.t('card.back'));
-    let option: PanelOption = { title: title, left: coordinate.x - 300, top: coordinate.y - 300, width: 600, height: 490 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 160, width: 420, height: 360 };
+    let component = this.panelService.open<CardSettingsComponent>(CardSettingsComponent, option);
+    component.card = gameObject;
   }
 }

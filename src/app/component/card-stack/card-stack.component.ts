@@ -21,7 +21,7 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { CardStackListComponent } from 'component/card-stack-list/card-stack-list.component';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { CardStackSettingsComponent } from 'component/card-stack-settings/card-stack-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
 import { MovableOption } from 'directive/movable.directive';
@@ -730,15 +730,15 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     return this.cardStack.name == '' ? this.i18n.t('stack.unnamed') : this.cardStack.name;
   }
 
-    private showDetail(gameObject: CardStack) {
+  private showDetail(gameObject: CardStack) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('stack.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 300, top: coordinate.y - 300, width: 600, height: 490 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 140, width: 420, height: 320 };
+    let component = this.panelService.open<CardStackSettingsComponent>(CardStackSettingsComponent, option);
+    component.cardStack = gameObject;
   }
 
   private showStackList(gameObject: CardStack) {
@@ -746,7 +746,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
 
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 200, top: coordinate.y - 300, width: 400, height: 600 };
+    let option: PanelOption = { left: coordinate.x - 200, top: coordinate.y - 260, width: 400, height: 520 };
 
     this.cardStack.owner = Network.peer.userId;
     let component = this.panelService.open<CardStackListComponent>(CardStackListComponent, option);

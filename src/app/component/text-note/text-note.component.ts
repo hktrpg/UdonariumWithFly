@@ -555,7 +555,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
-    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 520 };
+    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440 };
     const component = this.panelService.open<NoteSettingsComponent>(NoteSettingsComponent, option);
     component.note = gameObject;
     component.embedded = false;

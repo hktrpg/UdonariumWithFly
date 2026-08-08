@@ -1,4 +1,4 @@
-<div class="settings-ui dense mask-settings" *ngIf="mask; else emptyBlock" [class.is-embedded]="embedded"
+<div class="settings-ui dense mask-settings" *ngIf="mask; else emptyBlock" appFitPanel [fitMinHeight]="260" [class.is-embedded]="embedded"
   [class.is-dragover]="isDragOver"
   (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
   <section class="card card-dense">

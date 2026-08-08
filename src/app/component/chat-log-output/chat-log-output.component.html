@@ -1,4 +1,4 @@
-<div class="settings-ui dense settings-layout" *ngIf="!GuestMode()">
+<div class="settings-ui dense settings-layout" *ngIf="!GuestMode()" appFitPanel [fitMinHeight]="220" [fitMaxHeight]="480">
   <aside class="settings-aside">
     <select
       #select

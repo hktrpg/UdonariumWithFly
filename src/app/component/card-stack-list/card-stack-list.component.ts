@@ -6,7 +6,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { I18nService } from 'service/i18n.service';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { CardSettingsComponent } from 'component/card-settings/card-settings.component';
 import { ChatMessageService } from 'service/chat-message.service';
 
 import { PanelOption, PanelService } from 'service/panel.service';
@@ -130,9 +130,9 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
     };
     let title = this.i18n.t('cardList.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 600, height: 600 };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let option: PanelOption = { title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 420, height: 360 };
+    let component = this.panelService.open<CardSettingsComponent>(CardSettingsComponent, option);
+    component.card = gameObject;
   }
 
   trackByCard(index: number, card: Card) {

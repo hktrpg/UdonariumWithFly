@@ -1,4 +1,4 @@
-<div class="settings-ui dense settings-layout">
+<div class="settings-ui dense settings-layout" appFitPanel [fitMinHeight]="240" [fitMaxHeight]="520">
   <aside class="settings-aside">
     <button type="button" class="btn btn-primary btn-block" (click)="create()">
       <i class="material-icons">add</i>{{ 'chatTab.create' | i18n }}

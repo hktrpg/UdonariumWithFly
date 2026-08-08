@@ -15,7 +15,7 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
-import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
+import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
 import { ContextMenuAction, ContextMenuService, ContextMenuSeparator, contextMenuToggleCheck } from 'service/context-menu.service';
@@ -689,11 +689,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
     let option: PanelOption = {
-      title: title, left: coordinate.x - 400, top: coordinate.y - 300, width: 690, height: 560,
+      title: title, left: coordinate.x - 270, top: coordinate.y - 240, width: 540, height: 480,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
-    let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
-    component.tabletopObject = gameObject;
+    let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);
+    component.character = gameObject;
   }
 
   private showChatPalette(gameObject: GameCharacter) {

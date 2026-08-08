@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
 import { ChatTab } from '@udonarium/chat-tab';
 import { EventSystem } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -27,6 +27,10 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   @Input() isHideText: boolean = false;
   @Input() isNoLogging: boolean = false;
   @Input() descriptionType: string;
+  /** Compact single-line value controls (character settings sheet). */
+  @Input() dense: boolean = false;
+
+  @HostBinding('class.dense') get denseClass(): boolean { return this.dense; }
 
   stringUtil = StringUtil;
 
