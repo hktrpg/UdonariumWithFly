@@ -4,8 +4,10 @@ export const en_tutorial: I18nDictionary = {
   'tutorial.name': 'Tutorial',
   'tutorial.linkName': 'Notes:',
   'tutorial.welcome': `Welcome to HKTRPG Udon (based on Udonarium with Fly).
+Discord: https://support.hktrpg.com
+Patreon: https://www.patreon.com/HKTRPG
 The map is 2.5D. Data is shared peer-to-peer; the server does not keep your tokens or images long-term.
-★ Before leaving, Download ZIP; next time Load ZIP. Without saving, everything vanishes.
+★ Keep data with “Bind backup folder” (auto) or “Download ZIP” (manual); next time Load ZIP. Without saving, everything vanishes.
 Desktop Chrome recommended. This tutorial hides after your first chat message.
 Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `<View> Right-drag = pan

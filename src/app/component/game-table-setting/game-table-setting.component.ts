@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -8,6 +9,7 @@ import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { FilterType, GameTable, GridType, WeatherType } from '@udonarium/game-table';
+import { fitGameTableSizeToImage } from '@udonarium/game-table-fit';
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageTag } from '@udonarium/image-tag';
 import { RangeArea } from '@udonarium/range';
@@ -25,6 +27,7 @@ import { ImageService } from 'service/image.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
+import { WeatherSeService } from 'service/weather-se.service';
 
 @Component({
     selector: 'game-table-setting',
@@ -123,10 +126,16 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableWeatherIntensity(v: number) { if (this.isEditable && this.canControlWeather) this.selectedTable.weatherIntensity = Number(v); }
   get tableVisionEnabled(): boolean { return !!this.selectedTable?.visionEnabled; }
   set tableVisionEnabled(v: boolean) { if (this.isEditable) this.selectedTable.visionEnabled = !!v; }
+  get tableIs2DMode(): boolean { return !!this.selectedTable?.is2DMode; }
+  set tableIs2DMode(v: boolean) { if (this.isEditable) this.selectedTable.is2DMode = !!v; }
 
   transitionDay() {
     if (!this.isEditable || !this.canControlDayNight) return;
     this.animateDarkness(0);
+  }
+  transitionDusk() {
+    if (!this.isEditable || !this.canControlDayNight) return;
+    this.animateDarkness(0.4);
   }
   transitionNight() {
     if (!this.isEditable || !this.canControlDayNight) return;
@@ -169,6 +178,13 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     return SceneToolPermission.instance.canControlDayNight();
   }
 
+  get weatherSeEnabled(): boolean {
+    return this.weatherSe.isEnabled;
+  }
+  set weatherSeEnabled(v: boolean) {
+    this.weatherSe.setEnabled(!!v);
+  }
+
   constructor(
     private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
@@ -176,6 +192,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
     private i18n: I18nService,
+    private weatherSe: WeatherSeService,
   ) { }
 
   GuestMode() {
@@ -362,9 +379,12 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     if (this.isDeleted) return;
     let currentImageIdentifires: string[] = [];
     if (this.selectedTable && this.selectedTable.imageIdentifier) currentImageIdentifires = [this.selectedTable.imageIdentifier];
-    this.modalService.open<string>(FileSelecterComponent, { currentImageIdentifires: currentImageIdentifires }).then(value => {
+    this.modalService.open<string>(FileSelecterComponent, { currentImageIdentifires: currentImageIdentifires }).then(async value => {
       if (!this.selectedTable || !value) return;
       this.selectedTable.imageIdentifier = value;
+      const image = ImageStorage.instance.get(value);
+      if (image) await fitGameTableSizeToImage(this.selectedTable, image, { min: this.minSize, max: this.maxSize });
+      this.changeDetector.markForCheck();
     });
   }
 

@@ -249,6 +249,37 @@ export class PanelService {
     localForage.removeItem(PanelService.LEGACY_CHAT_GEOMETRY_KEY).catch(() => {});
   }
 
+  /**
+   * Immediately snap currently open panels after clearSavedGeometry:
+   * apply chat default size (if provided), then rearrange all open panels.
+   */
+  static resetOpenPanelGeometry(chatDefault?: { width: number; height: number }) {
+    for (const panel of Array.from(PanelService.openPanels)) {
+      if (!panel.isAbleCloseButton || !panel.panelComponentRef) continue;
+      const inst = panel.panelComponentRef.instance as {
+        isFullScreen?: boolean;
+        isMinimized?: boolean;
+        toggleFullScreen?: (e?: Event) => void;
+        toggleMinimize?: (e?: Event) => void;
+        draggablePanel?: { nativeElement?: HTMLElement };
+      } | null;
+      if (inst?.isFullScreen && typeof inst.toggleFullScreen === 'function') inst.toggleFullScreen();
+      if (inst?.isMinimized && typeof inst.toggleMinimize === 'function') inst.toggleMinimize();
+      if (chatDefault && PanelService.isChatPanel(panel)) {
+        const w = Math.max(100, chatDefault.width);
+        const h = Math.max(100, chatDefault.height);
+        panel.width = w;
+        panel.height = h;
+        const el = inst?.draggablePanel?.nativeElement;
+        if (el) {
+          el.style.width = w + 'px';
+          el.style.height = h + 'px';
+        }
+      }
+    }
+    PanelService.rearrangePanels();
+  }
+
   /** Close all closable desktop UI panels opened via PanelService.open(). */
   static closeAllPanels() {
     for (const panel of Array.from(PanelService.openPanels)) {
@@ -807,6 +838,8 @@ export class PanelService {
     const panelEl = host.closest('.draggable-panel') as HTMLElement | null;
     const scrollEl = panelEl?.querySelector('.scrollable-panel') as HTMLElement | null;
     if (!panelEl || !scrollEl) return 0;
+    // Mobile bottom sheets use peek/half snaps; content-fit would jump height on list refresh (lobby etc.).
+    if (panelEl.classList.contains('is-mobile-sheet')) return 0;
 
     const minH = opts?.minHeight ?? 200;
     const maxH = opts?.maxHeight ?? (window.innerHeight - 16);

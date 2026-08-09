@@ -135,7 +135,7 @@
                 <span>{{ 'mask.clickTab' | i18n }}</span>
                 <select [(ngModel)]="mask.clickTabId" [disabled]="GuestMode()">
                   <option value="">{{ 'mask.pickChatTab' | i18n }}</option>
-                  <option *ngFor="let tab of chatTabs" [ngValue]="tab.identifier">{{ tab.name }}</option>
+                  <option *ngFor="let tab of chatTabs" [ngValue]="tab.identifier">{{ tabLabel(tab) }}</option>
                 </select>
               </label>
             </div>

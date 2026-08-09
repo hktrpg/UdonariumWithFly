@@ -28,7 +28,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   left = 12;
   /** Placeholder until placeDefaultTopRight(). */
   top = 12;
-  /** Default collapsed so bar height matches map-action-hud (~44px). */
+  /** Default collapsed so bar height matches map-zoom-hud chrome. */
   collapsed = true;
   dropSlotIndex: number | null = null;
   private dragOffsetX = 0;
@@ -38,7 +38,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   private positionedDefault = false;
   private mobileSub: { unsubscribe: () => void } | null = null;
 
-  /** Collapsed bar outer height: map-action-hud.is-collapsed = 4+4 padding + 36 chrome. */
+  /** Collapsed bar outer height (compact chrome). */
   private static readonly BAR_HEIGHT = 44;
   private static readonly HUD_WIDTH = 220;
 
@@ -162,6 +162,11 @@ export class MusicHudComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     if (!this.canControl) return;
     this.openAudioPicker(index, event);
+  }
+
+  /** Block browser menu on chrome / empty HUD areas (slots open the picker). */
+  onHudContextMenu(event: MouseEvent) {
+    event.preventDefault();
   }
 
   /** Right-click: open picker to change assigned music (assign only unless already playing). */

@@ -1,5 +1,6 @@
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChatTab } from '@udonarium/chat-tab';
+import { ChatTabList } from '@udonarium/chat-tab-list';
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -323,6 +324,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('LOCALE_CHANGED', () => {
         this.updatePanelTitle();
+        this.changeDetector.markForCheck();
       })
       .on('SELECT_CHAT_TAB', event => {
         const id = event.data?.tabIdentifier as string | undefined;
@@ -463,9 +465,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  /** Local display label — does not write SyncVar. */
+  tabLabel(tab: ChatTab): string {
+    if (!tab || tab.name === '') return this.i18n.t('chat.unnamedTab');
+    return ChatTabList.localizedName(tab);
+  }
+
   updatePanelTitle() {
     if (this.chatTab && this.chatTab.name !== '') {
-      this.panelService.title = this.i18n.t('chat.titleWithTab', { tabName: this.chatTab.name });
+      this.panelService.title = this.i18n.t('chat.titleWithTab', { tabName: ChatTabList.localizedName(this.chatTab) });
     } else {
       this.panelService.title = this.i18n.t('chat.title');
     }

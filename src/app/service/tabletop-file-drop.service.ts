@@ -8,6 +8,7 @@ import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { fitGameTableSizeToImage } from '@udonarium/game-table-fit';
 import { Network } from '@udonarium/core/system';
 import { ImageTag } from '@udonarium/image-tag';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
@@ -206,6 +207,8 @@ export class TabletopFileDropService {
     const image = await ImageStorage.instance.addAsync(files[0]);
     if (slot === 'map') {
       table.imageIdentifier = image.identifier;
+      // Match grid cells to image pixels at current gridSize (aspect-preserving clamp).
+      await fitGameTableSizeToImage(table, image);
     } else {
       table.backgroundImageIdentifier = image.identifier;
     }

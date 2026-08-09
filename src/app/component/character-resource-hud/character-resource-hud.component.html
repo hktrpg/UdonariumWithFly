@@ -1,4 +1,5 @@
-<div class="resource-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top">
+<div class="resource-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top"
+  (contextmenu)="$event.preventDefault()">
   <header class="hud-head" (pointerdown)="startDrag($event)">
     <button type="button" class="hud-drag" [attr.title]="'resourceHud.move' | i18n" [attr.aria-label]="'resourceHud.move' | i18n">
       <i class="material-icons">drag_indicator</i>

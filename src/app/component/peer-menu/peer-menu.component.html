@@ -17,7 +17,6 @@
           <span class="identity-label">{{ 'peer.currentRole' | i18n }}<b>{{ currentRoleLabel }}</b></span>
           <button type="button" class="btn btn-sm" (click)="switchIdentity()">{{ 'peer.switchIdentity' | i18n }}</button>
         </div>
-        <button type="button" class="btn btn-sm" (click)="changeIcon()">{{ 'peer.changeIcon' | i18n }}</button>
       </div>
     </div>
     <div class="field-row wrap name-row">
@@ -29,8 +28,6 @@
         </span>
       </label>
     </div>
-    <p class="hint">{{ 'peer.saveHint' | i18n }}</p>
-    <p class="hint">{{ 'peer.whiteColorHint' | i18n }}</p>
   </section>
 
   <section class="card card-dense">
@@ -187,7 +184,6 @@
     <p class="hint" *ngIf="help">{{ help }}</p>
     <ng-container *ngIf="!networkService.peer.isRoom">
       <p class="hint" *ngIf="networkService.peers.length < 1 && canUsePrivateSession && !isGMMode && !isGMHold">{{ 'peer.helpPrivateShare' | i18n }}</p>
-      <p class="hint" *ngIf="networkService.peers.length < 1">{{ 'peer.helpSoloTest' | i18n }}</p>
       <p class="hint" *ngIf="(isGMMode || isGMHold) && canUsePrivateSession">{{ 'peer.helpGmNoConnect' | i18n }}</p>
     </ng-container>
     <ng-container *ngIf="networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">

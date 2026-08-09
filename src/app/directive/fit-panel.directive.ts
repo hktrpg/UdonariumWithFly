@@ -51,7 +51,10 @@ export class FitPanelDirective implements AfterViewInit, OnDestroy {
     const host = this.hostRef.nativeElement;
     if (!host?.isConnected) return;
     if (host.classList.contains('is-embedded')) return;
-    if (!host.closest('.draggable-panel')) return;
+    const panel = host.closest('.draggable-panel');
+    if (!panel) return;
+    // Mobile sheets keep snap height; MutationObserver must not resize on lobby list updates.
+    if (panel.classList.contains('is-mobile-sheet')) return;
     const maxHeight = this.fitMaxHeight > 0
       ? this.fitMaxHeight
       : Math.max(200, window.innerHeight - 16);

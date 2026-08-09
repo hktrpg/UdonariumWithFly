@@ -1,5 +1,5 @@
 <div class="table" [ngClass]="{ 'direct-message': isDirect }">
-  <div class="table-cell imagebox" [ngClass]="{'not-allow-chat': !isAllowsChat}" (contextmenu)="onContextMenu($event)" style="cursor: context-menu; padding-left: 4px; padding-right: 2px">
+  <div class="table-cell imagebox" [ngClass]="{'not-allow-chat': !isAllowsChat}" (click)="onImageboxClick($event)" (contextmenu)="onContextMenu($event)" style="cursor: pointer; padding-left: 4px; padding-right: 2px">
     <div *ngIf="!character; else isCharacter" class="imagebox">
       <img *ngIf="0 < imageFile.url.length" class="image face-icon" [src]="imageFile.url | safe: 'resourceUrl'" />
     </div>
@@ -93,7 +93,7 @@
       </div>
       <form class="chat-composer">
         <input *ngIf="onlyCharacters" type="color" class="palette-color" style="width:1em; margin-left: 3px" [(ngModel)]="paletteColor" [ngModelOptions]="{standalone: true}">
-        <textarea class="chat-input" [placeholder]="(!onlyCharacters ? 'chat.placeholderDefault' : 'chat.placeholderCharacter') | i18n" [(ngModel)]="text"
+        <textarea class="chat-input" [class.is-clarify]="ClarifyMode()" [rows]="ClarifyMode() ? 1 : 2" [placeholder]="(!onlyCharacters ? 'chat.placeholderDefault' : 'chat.placeholderCharacter') | i18n" [(ngModel)]="text"
           [ngModelOptions]="{standalone: true}" (input)="onInput()" (keydown.enter)="sendChat($event)" (focus)="isFilterTextUpdate = true" (blur)="isFilterTextUpdate = false"
           (paste)="onPaste($event)"
           (keydown.control.arrowup)="moveHistory($event, 1)" (keydown.control.arrowdown)="moveHistory($event, -1)" (keydown.arrowdown)="moveTo($event)" [disabled]="!isAllowsChat"

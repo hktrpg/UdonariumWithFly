@@ -22,7 +22,10 @@ import { translate } from 'i18n';
 export interface DiceBotInfo {
   id: string;
   game: string;
+  /** Localized optgroup label (empty for Japanese / untagged). */
   lang?: string;
+  /** Stable BCDice lang suffix for sorting (not translated). */
+  langCode?: string;
   sort_key?: string;
 }
 
@@ -901,7 +904,8 @@ export class DiceBot extends GameObject {
 }
 
 function initializeDiceBotQueue(): PromiseQueue {
-  const langSortOrder = ['English', '正體中文', '简体中文', '한국어', 'Other'];
+  // Stable lang codes (not translated labels): zh-TW → zh-CN → en → ja (untagged) → ko → Other
+  const langSortOrder = ['ChineseTraditional', 'SimplifiedChinese', 'English', 'Japanese', 'Korean', 'Other'];
   let queue = new PromiseQueue('DiceBotQueue');
   queue.add(async () => {
     loader = new (await import(
@@ -923,18 +927,37 @@ function initializeDiceBotQueue(): PromiseQueue {
     })
     .map<DiceBotInfo>(gameSystemInfo => {
       const lang = /.+\:(.+)/.exec(gameSystemInfo.id);
-      let langName;
+      let langCode = 'Japanese';
+      let langName: string | undefined;
       if (lang && lang[1]) {
-        langName = (lang[1] == 'ChineseTraditional') ? translate('lang.zhTW')
-          : (lang[1] == 'English') ? translate('lang.en')
-          : (lang[1] == 'Korean') ? translate('lang.ko')
-          : (lang[1] == 'SimplifiedChinese') ? translate('lang.zhCN')
-          : translate('lang.other');
+        switch (lang[1]) {
+          case 'ChineseTraditional':
+            langCode = 'ChineseTraditional';
+            langName = translate('lang.zhTW');
+            break;
+          case 'SimplifiedChinese':
+            langCode = 'SimplifiedChinese';
+            langName = translate('lang.zhCN');
+            break;
+          case 'English':
+            langCode = 'English';
+            langName = translate('lang.en');
+            break;
+          case 'Korean':
+            langCode = 'Korean';
+            langName = translate('lang.ko');
+            break;
+          default:
+            langCode = 'Other';
+            langName = translate('lang.other');
+            break;
+        }
       }
       return {
         id: gameSystemInfo.id,
         game: gameSystemInfo.name,
         lang: langName,
+        langCode,
         sort_key: gameSystemInfo.sortKey
       };
     });
@@ -957,27 +980,28 @@ function initializeDiceBotQueue(): PromiseQueue {
         .replace(/([オコソトノホモヨロ])ー+/g, '$1オ')
         .replace(/ン+ー+/g, 'ン')
         .replace(/ン+/g, 'ン');
-      info.sort_key = info.lang ? info.lang : normalize.normalize('NFKD');
-      //return info;
-      //console.log(info.index + ': ' + normalize);
+      // Keep kana sort key for secondary order; lang groups use langCode.
+      info.sort_key = normalize.normalize('NFKD');
     });
     DiceBot.diceBotInfos.sort((a, b) => {
-      if (a.lang && b.lang) {
-        return langSortOrder.indexOf(a.lang) == langSortOrder.indexOf(b.lang) ? 0 
-          : langSortOrder.indexOf(a.lang) < langSortOrder.indexOf(b.lang) ? -1 : 1;
-      } else if (a.lang) {
-        return 1;
-      } else if (b.lang) {
-        return -1;
-      }
-      return a.sort_key == b.sort_key ? 0 
-      : a.sort_key < b.sort_key ? -1 : 1;
+      const aCode = a.langCode || 'Japanese';
+      const bCode = b.langCode || 'Japanese';
+      const aOrder = langSortOrder.indexOf(aCode);
+      const bOrder = langSortOrder.indexOf(bCode);
+      const aIdx = aOrder < 0 ? langSortOrder.length : aOrder;
+      const bIdx = bOrder < 0 ? langSortOrder.length : bOrder;
+      if (aIdx !== bIdx) return aIdx - bIdx;
+      return a.sort_key == b.sort_key ? 0
+        : a.sort_key < b.sort_key ? -1 : 1;
     });
-    let sentinel = DiceBot.diceBotInfos[0].sort_key[0];
+    let sentinel = DiceBot.diceBotInfos[0].lang
+      ? DiceBot.diceBotInfos[0].lang
+      : DiceBot.diceBotInfos[0].sort_key[0];
     let group = { index: sentinel, infos: [] };
     for (let info of DiceBot.diceBotInfos) {
-      if ((info.lang ? info.lang : info.sort_key[0]) !== sentinel) {
-        sentinel = info.lang ? info.lang : info.sort_key[0];
+      const groupKey = info.lang ? info.lang : info.sort_key[0];
+      if (groupKey !== sentinel) {
+        sentinel = groupKey;
         DiceBot.diceBotInfosIndexed.push(group);
         group = { index: sentinel, infos: [] };
       }

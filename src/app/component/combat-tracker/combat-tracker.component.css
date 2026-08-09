@@ -340,27 +340,40 @@
 
 /* —— Mobile Play: denser combat sheet —— */
 :host-context(html.udon-mobile-layout) .combat-tracker {
-  gap: 6px;
+  gap: 4px;
 }
 
 :host-context(html.udon-mobile-layout) .tool-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-  padding-top: 6px;
+  gap: 3px;
+  margin-top: 2px;
+  padding-top: 4px;
 }
 
-:host-context(html.udon-mobile-layout) .tool-actions .btn {
-  min-height: 36px;
-  font-size: 12px;
+:host-context(html.udon-mobile-layout) .tool-actions .btn,
+:host-context(html.udon-mobile-layout) .btn.btn-sm {
+  min-height: 30px;
+  padding: 2px 6px;
+  font-size: 11px;
+  gap: 2px;
 }
 
 :host-context(html.udon-mobile-layout) .field-row {
-  gap: 6px;
+  gap: 4px;
 }
 
 :host-context(html.udon-mobile-layout) .enc-name {
-  min-height: 36px;
-  font-size: 14px;
+  min-height: 30px;
+  font-size: 13px;
+  padding: 2px 5px;
+}
+
+:host-context(html.udon-mobile-layout) .enc-nav {
+  gap: 3px;
+  margin-bottom: 2px;
+}
+
+:host-context(html.udon-mobile-layout) .current-body {
+  gap: 4px;
 }

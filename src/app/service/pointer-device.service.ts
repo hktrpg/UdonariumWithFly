@@ -111,6 +111,24 @@ export class PointerDeviceService {
   private onContextMenu(e: any) {
     this._isAllowedToOpenContextMenu = true;
     this.onPointerUp(e);
+    // Capture-phase: block the browser menu everywhere except free-text editing.
+    // Custom / app menus still receive the event and open as usual.
+    if (!PointerDeviceService.allowsNativeContextMenu(e?.target)) {
+      e.preventDefault();
+    }
+  }
+
+  /** Native browser menu only for text fields (copy/paste). Range/chrome/HUD/table → blocked. */
+  static allowsNativeContextMenu(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el?.closest) return false;
+    if (el.closest('textarea, [contenteditable="true"]')) return true;
+    if (el instanceof HTMLInputElement) {
+      const type = (el.type || 'text').toLowerCase();
+      return type === 'text' || type === 'search' || type === 'password'
+        || type === 'email' || type === 'url' || type === 'tel' || type === 'number';
+    }
+    return false;
   }
 
   private preventContextMenuIfNeeded(pointer: PointerCoordinate, threshold: number = 3) {

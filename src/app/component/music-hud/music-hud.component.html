@@ -1,4 +1,5 @@
-<div class="music-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top">
+<div class="music-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top"
+  (contextmenu)="onHudContextMenu($event)">
   <!-- Chrome row: drag (left) and collapse (right) stay fixed; middle swaps. -->
   <div class="hud-chrome" (pointerdown)="startDrag($event)">
     <button type="button" class="hud-drag" [attr.title]="'musicHud.move' | i18n" [attr.aria-label]="'musicHud.move' | i18n">

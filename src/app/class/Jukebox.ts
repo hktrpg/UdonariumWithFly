@@ -6,7 +6,9 @@ import { GameObject, ObjectContext } from './core/synchronize-object/game-object
 import { EventSystem } from './core/system';
 import { AudioLibrary } from './audio-library';
 
-export const JUKEBOX_TRACK_COUNT = 4;
+export const JUKEBOX_TRACK_COUNT = 5;
+/** Local-only weather SE slot (index 4 / track 5). Does not sync tracksJson. */
+export const JUKEBOX_WEATHER_TRACK = 4;
 export const MUSIC_HUD_SLOT_COUNT = 3;
 
 export type JukeboxQueueMode =
@@ -148,6 +150,41 @@ export class Jukebox extends GameObject {
   /** Compat: stop track 0. */
   stop() {
     this.stopTrack(0);
+  }
+
+  /**
+   * Local-only built-in asset loop (weather SE on track 5).
+   * Does not write tracksJson. Returns false if play could not start.
+   */
+  playBuiltInLocal(index: number, url: string, isLoop: boolean = true): boolean {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT || !url) return false;
+    try {
+      AudioPlayer.ensureContextRunning();
+      this.ensurePlayer(index);
+      this._stopTrack(index, false);
+      const audio = AudioFile.create(url);
+      const player = this.audioPlayers[index];
+      player.loop = !!isLoop;
+      player.volume = 1;
+      player.endedAction = null;
+      player.play(audio);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Stop local built-in playback without clearing synced assignment. */
+  stopBuiltInLocal(index: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    this._stopTrack(index);
+  }
+
+  /** True when the local player for a track is currently audible (not paused). */
+  isLocalPlaying(index: number): boolean {
+    if (index < 0 || index >= this.audioPlayers.length) return false;
+    const player = this.audioPlayers[index];
+    return !!(player && !player.paused);
   }
 
   /** Assign audio to a track without starting playback. */
@@ -372,12 +409,12 @@ export class Jukebox extends GameObject {
   }
 
   private ensureMigrated(fromApply = false) {
-    if (this.migrated && this.tracksJson) return;
     if (this.tracksJson) {
       try {
         const parsed = JSON.parse(this.tracksJson);
         if (Array.isArray(parsed) && parsed.length > 0) {
           this.migrated = true;
+          // Normalize length when room track count differs from JUKEBOX_TRACK_COUNT.
           if (parsed.length !== JUKEBOX_TRACK_COUNT) {
             this.tracksJson = JSON.stringify(normalizeTracks(parsed));
           }
@@ -385,6 +422,7 @@ export class Jukebox extends GameObject {
         }
       } catch { /* fall through */ }
     }
+    if (this.migrated && this.tracksJson) return;
     const migrated = normalizeTracks([]);
     if (this.audioIdentifier || this.isPlaying) {
       migrated[0] = {
@@ -528,6 +566,8 @@ export class Jukebox extends GameObject {
         this.audioPlayers[i].stop();
         this._playTrack(i);
       }
+      // Weather SE is local-only (not tracksJson.isPlaying); ask service to retry.
+      EventSystem.trigger('JUKEBOX_AUDIO_UNLOCKED', null);
     };
     document.body.addEventListener('touchstart', callback, true);
     document.body.addEventListener('mousedown', callback, true);

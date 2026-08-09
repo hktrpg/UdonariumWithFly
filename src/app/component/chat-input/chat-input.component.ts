@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { ChatMessage } from '@udonarium/chat-message';
-import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -13,9 +13,11 @@ import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TextViewComponent } from 'component/text-view/text-view.component';
+import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { BatchService } from 'service/batch.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
+import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -35,6 +37,8 @@ import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DataElement } from '@udonarium/data-element';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { anyImageEffect, clearImageEffects, imageEffectFilter, imageEffectOpacity, imageEffectTransform, packImageFx } from '@udonarium/table-fx/image-effect';
+
+import * as localForage from 'localforage';
 
 interface StandGroup {
   name: string,
@@ -336,6 +340,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private contextMenuService: ContextMenuService,
     private characterFxMenu: CharacterFxMenuService,
+    private modalService: ModalService,
     private i18n: I18nService,
   ) { }
 
@@ -1031,7 +1036,12 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
     let textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
     textArea.style.height = '';
     if (textArea.scrollHeight >= textArea.offsetHeight) {
-      textArea.style.height = textArea.scrollHeight + 'px';
+      let next = textArea.scrollHeight;
+      if (this.ClarifyMode()) {
+        const maxPx = parseFloat(getComputedStyle(textArea).maxHeight);
+        if (Number.isFinite(maxPx) && maxPx > 0) next = Math.min(next, maxPx);
+      }
+      textArea.style.height = next + 'px';
     }
   }
 
@@ -1058,6 +1068,53 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       let textView = this.panelService.open(TextViewComponent, option);
       textView.title = gameName;
       textView.text = this.gameHelp;
+    });
+  }
+
+  /** Left-click avatar: cycle face (character) or open peer icon picker (player). */
+  onImageboxClick(e: Event) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!this.isAllowsChat) return;
+
+    if (!this.character) {
+      this.changePeerIcon();
+      return;
+    }
+
+    if (this.isUseFaceIcon && this.character.faceIcons?.length > 1) {
+      const next = (this.character.currntIconIndex + 1) % this.character.faceIcons.length;
+      this.character.currntIconIndex = next;
+      return;
+    }
+
+    if ((!this.isUseFaceIcon || !this.character.faceIcon) && this.character.imageFiles?.length > 1) {
+      const next = (this.character.currntImageIndex + 1) % this.character.imageFiles.length;
+      this.character.currntImageIndex = next;
+      if (!this.character.isHideIn && this.character.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
+      EventSystem.trigger('UPDATE_INVENTORY', null);
+    }
+  }
+
+  /** Same persistence path as PeerMenuComponent.changeIcon. */
+  private changePeerIcon() {
+    const myPeer = this.myPeer;
+    if (!myPeer) return;
+    let currentImageIdentifires: string[] = [];
+    if (myPeer.imageIdentifier) currentImageIdentifires = [myPeer.imageIdentifier];
+    this.modalService.open<string>(FileSelecterComponent, { currentImageIdentifires: currentImageIdentifires }).then(value => {
+      if (!myPeer || !value) return;
+      myPeer.imageIdentifier = value;
+      const file: ImageFile = ImageStorage.instance.get(value);
+      if (file) {
+        if (file.state === ImageState.COMPLETE) {
+          localForage.setItem(PeerCursor.CHAT_MY_ICON_LOCAL_STORAGE_KEY, file.blob).catch(err => console.log(err));
+        } else if (value === 'none_icon') {
+          localForage.removeItem(PeerCursor.CHAT_MY_ICON_LOCAL_STORAGE_KEY).catch(err => console.log(err));
+        } else {
+          localForage.setItem(PeerCursor.CHAT_MY_ICON_LOCAL_STORAGE_KEY, value).catch(err => console.log(err));
+        }
+      }
     });
   }
 

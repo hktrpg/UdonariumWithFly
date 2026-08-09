@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
+import { ChatTab } from '@udonarium/chat-tab';
+import { ChatTabList } from '@udonarium/chat-tab-list';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -87,6 +89,10 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
   get tables(): GameTable[] { return ObjectStore.instance.getObjects(GameTable); }
   get presets() { return ScenePresetList.instance.presets; }
   get chatTabs() { return this.chatMessageService.chatTabs; }
+  tabLabel(tab: ChatTab): string {
+    if (!tab || tab.name === '') return this.i18n.t('chat.unnamedTab');
+    return ChatTabList.localizedName(tab);
+  }
   get audios() { return AudioStorage.instance.audios.filter(a => !a.isHidden); }
   get cutIns() { return CutInList.instance.cutIns; }
   get notes(): TextNote[] {

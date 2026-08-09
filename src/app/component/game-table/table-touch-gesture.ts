@@ -177,15 +177,11 @@ export class TableTouchGesture {
     this.clearTappedPanTimer();
     if (this.ongesture) this.ongesture(ev.srcEvent);
     if (this.simplePan) {
-      // Mobile two-finger drag = pan map. Pinch / rotate recognizers handle zoom / yaw.
+      // Mobile two-finger drag = middle-mouse free rotate (yaw + pitch). Pinch zooms.
+      const rotateZ = -this.deltaHammerDeltaX / 5;
+      const rotateX = -this.deltaHammerDeltaY / 5;
       if (this.ontransform) {
-        this.ontransform(
-          this.deltaHammerDeltaX,
-          this.deltaHammerDeltaY,
-          0, 0, 0, 0,
-          TableTouchGestureEvent.PAN,
-          ev.srcEvent
-        );
+        this.ontransform(0, 0, 0, rotateX, 0, rotateZ, TableTouchGestureEvent.ROTATE, ev.srcEvent);
       }
       return;
     }
@@ -205,6 +201,8 @@ export class TableTouchGesture {
 
   private onRotateMove(ev: HammerInput) {
     this.clearTappedPanTimer();
+    // Mobile simplePan: 2-finger drag already applies yaw+pitch — skip Hammer yaw-only rotate.
+    if (this.simplePan) return;
     const rotateZ = this.deltaHammerRotation;
     if (this.ongesture) this.ongesture(ev.srcEvent);
     if (this.ontransform) this.ontransform(0, 0, 0, 0, 0, rotateZ, TableTouchGestureEvent.ROTATE, ev.srcEvent);

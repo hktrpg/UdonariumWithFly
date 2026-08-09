@@ -87,6 +87,7 @@ import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
 import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { WeatherSeService } from 'service/weather-se.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
@@ -207,6 +208,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private teachingTips: TeachingTipService,
     private mobileLayout: MobileLayoutService,
     private maskTokenFx: MaskTokenFxService,
+    private weatherSe: WeatherSeService,
     _audioImportName: AudioImportNameService,
     _connectionBusy: ConnectionBusyService,
   ) {
@@ -378,11 +380,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       .on('UPDATE_SELECTION', event => { this.lazyNgZoneUpdate(event.isSendFromSelf); })
       .on('SYNCHRONIZE_AUDIO_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(false); })
       .on('SYNCHRONIZE_FILE_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(false); })
+      .on('LOCALE_CHANGED', () => {
+        // Tab labels use ChatTabList.localizedName() (local display only — do not SyncVar-write).
+        this.ngZone.run(() => this.lazyNgZoneUpdate(false));
+      })
       .on<AppConfig>('LOAD_CONFIG', event => {
         console.log('LOAD_CONFIG !!!', event.data);
         if (event.data.dice && event.data.dice.url) {
           const API_VERSION = event.data.dice.api;
-          const langSortOrder = ['A', 'English', 'ChineseTraditional', 'SimplifiedChinese', 'Korean', 'Other'];
+          // zh-TW → zh-CN → en → ja (untagged 'A') → ko → Other; unknown codes sort last.
+          const langSortOrder = ['ChineseTraditional', 'SimplifiedChinese', 'English', 'A', 'Korean', 'Other'];
+          const langOrder = (code: string) => {
+            const i = langSortOrder.indexOf(code || 'A');
+            return i < 0 ? langSortOrder.length : i;
+          };
           //console.log(api)
           // TODO: 還沒想到合適的 BCDice-API 管理者資訊顯示 UI，暫緩
           //fetch(event.data.dice.url + '/v1/admin', {mode: 'cors'})
@@ -424,9 +435,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
                   return info;
                 })
                 .sort((a, b) => {
-                  return langSortOrder.indexOf(a.lang) < langSortOrder.indexOf(b.lang) ? -1 
-                    : langSortOrder.indexOf(a.lang) > langSortOrder.indexOf(b.lang) ? 1
-                    : a.normalize == b.normalize ? 0 
+                  const ao = langOrder(a.lang);
+                  const bo = langOrder(b.lang);
+                  if (ao !== bo) return ao - bo;
+                  return a.normalize == b.normalize ? 0
                     : a.normalize < b.normalize ? -1 : 1;
                 });
               DiceBot.diceBotInfos = [];
@@ -1172,7 +1184,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       pushSep();
       if (this.canShowMenu('menu.toolbox')) {
-        menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+        // Drill-down (keep More on the stack) so the sheet shows Back + −.
+        menu.push({
+          name: this.i18n.t('menu.toolbox'),
+          materialIcon: 'build',
+          subActions: this.buildToolboxMenuActions(false),
+        });
       }
       if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
@@ -1192,11 +1209,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         });
         pushSep();
         if (this.canShowMenu('menu.toolbox')) {
-          menu.push({ name: this.i18n.t('menu.toolbox'), materialIcon: 'build', action: () => this.openToolboxAt(position) });
+          menu.push({
+            name: this.i18n.t('menu.toolbox'),
+            materialIcon: 'build',
+            subActions: this.buildToolboxMenuActions(false),
+          });
         }
-        if (this.canShowMenu('menu.notes')) {
-          menu.push({ name: this.i18n.t('menu.notes'), materialIcon: 'note', action: () => this.openOrToggle('NoteInventoryComponent') });
-        }
+        // Notes stay on the Play bottom nav — not duplicated in More.
       }
       if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
@@ -1205,8 +1224,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     pushSep();
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     pushSep();
-    // Force-open: standSetteings() would toggle-close while More is still showing.
-    menu.push({ name: this.i18n.t('menu.settings'), materialIcon: 'how_to_reg', action: () => this.openSettingsAt(position) });
+    // Drill into settings (do not replace the sheet — preserves Back to More).
+    menu.push({
+      name: this.i18n.t('menu.settings'),
+      materialIcon: 'how_to_reg',
+      subActions: this.buildSettingsMenuActions(),
+    });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
   }
@@ -1236,30 +1259,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Local view helpers — never gated by toolbox menu permission. */
   private buildAlwaysAvailableViewActions(): ContextMenuAction[] {
     const menu: ContextMenuAction[] = [];
-    // Mobile sheets: flatten — nested submenus used to inherit full sheet chrome and break layout.
-    if (this.mobileLayout.isMobile) {
-      menu.push({
-        name: this.i18n.t('menu.viewReset.default'),
-        materialIcon: 'remove_red_eye',
-        selfOnly: true,
-        action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null),
-      });
-      menu.push({
-        name: this.i18n.t('menu.viewReset.top'),
-        materialIcon: 'vertical_align_top',
-        selfOnly: true,
-        action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top'),
-      });
-    } else {
-      menu.push({
-        name: this.i18n.t('menu.viewReset'),
-        materialIcon: 'remove_red_eye',
-        selfOnly: true,
-        subActions: [
-          { name: this.i18n.t('menu.viewReset.default'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
-          { name: this.i18n.t('menu.viewReset.top'), action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
-        ]
-      });
+    // Keep as subActions so mobile action sheets drill in (do not dump every leaf on the root grid).
+    menu.push({
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), materialIcon: 'remove_red_eye', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), materialIcon: 'vertical_align_top', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') }
+      ]
+    });
+    if (!this.mobileLayout.isMobile) {
       menu.push({
         name: this.i18n.t('toolbox.rearrangePanels'),
         materialIcon: 'dashboard',
@@ -1278,53 +1288,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private buildToolboxMenuActions(compact: boolean = false): ContextMenuAction[] {
+    // Mobile: category tiles only — drill into subActions (avoid dumping every leaf on the root grid).
+    if (this.mobileLayout.isMobile && !compact) {
+      return this.buildMobileToolboxMenuActions();
+    }
     const menu: ContextMenuAction[] = [];
     if (!compact) {
-      const cunIns = CutInList.instance.cutIns;
-      menu.push({ name: this.i18n.t('toolbox.playCutIn'), materialIcon: 'play_arrow',
-        action: null, subActions: cunIns.length === 0 ? [
-          {
-            name: this.i18n.t('toolbox.noCutIn'),
-            disabled: true,
-            center: true
-          }
-        ] : cunIns.map(cutIn => {
-          return {
-            name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
-            subActions: [{
-                name: this.i18n.t('cutin.all'),
-                action: () => {
-                  EventSystem.call('PLAY_CUT_IN', {
-                    identifier: cutIn.identifier,
-                    secret: false,
-                    sender: PeerCursor.myCursor.peerId
-                  });
-                  this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
-                }
-              }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
-              return {
-                name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
-                color: peer.color,
-                default: true,
-                action: () => {
-                  if (peer !== PeerCursor.myCursor) {
-                    EventSystem.call('PLAY_CUT_IN', {
-                      identifier: cutIn.identifier,
-                      secret: true,
-                      sender: PeerCursor.myCursor.peerId
-                    }, peer.peerId);
-                  }
-                  EventSystem.call('PLAY_CUT_IN', {
-                    identifier: cutIn.identifier,
-                    secret: true,
-                    sender: PeerCursor.myCursor.peerId
-                  }, PeerCursor.myCursor.peerId);
-                }
-              }
-            })]
-          };
-        })
-      });
+      menu.push(this.makePlayCutInToolboxMenu());
       menu.push(ContextMenuSeparator);
     }
     if (SceneToolPermission.instance.canControlWeather()) {
@@ -1360,6 +1330,109 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       menu.push(this.makeFolderBackupToolboxMenu());
     }
     return menu;
+  }
+
+  /** Mobile toolbox root: a few category buttons; details live in drill-down sheets. */
+  private buildMobileToolboxMenuActions(): ContextMenuAction[] {
+    const menu: ContextMenuAction[] = [];
+    menu.push(this.makePlayCutInToolboxMenu());
+    if (SceneToolPermission.instance.canControlWeather()) {
+      menu.push(this.makeWeatherToolboxMenu());
+    }
+    if (SceneToolPermission.instance.canControlDayNight()) {
+      menu.push(this.makeDayNightToolboxMenu());
+    }
+    menu.push({
+      name: this.i18n.t('toolbox.groupContent'),
+      materialIcon: 'tune',
+      subActions: [
+        { name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') },
+        { name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') },
+      ]
+    });
+    menu.push({
+      name: this.i18n.t('menu.viewReset'),
+      materialIcon: 'remove_red_eye',
+      selfOnly: true,
+      subActions: [
+        { name: this.i18n.t('menu.viewReset.default'), materialIcon: 'remove_red_eye', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', null) },
+        { name: this.i18n.t('menu.viewReset.top'), materialIcon: 'vertical_align_top', action: () => EventSystem.trigger('RESET_POINT_OF_VIEW', 'top') },
+        { name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() },
+      ]
+    });
+    menu.push({
+      name: this.i18n.t('toolbox.groupData'),
+      materialIcon: 'folder_zip',
+      subActions: [
+        {
+          name: SceneToolPermission.instance.canLoadZip()
+            ? this.i18n.t('menu.loadZip')
+            : `${this.i18n.t('menu.loadZip')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+          materialIcon: 'open_in_browser',
+          disabled: !SceneToolPermission.instance.canLoadZip(),
+          action: () => this.openZipFileSelect()
+        },
+        {
+          name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+          materialIcon: 'sd_storage',
+          disabled: this.isSaveing,
+          action: () => this.save()
+        },
+        this.makeFolderBackupToolboxMenu(),
+      ]
+    });
+    return menu;
+  }
+
+  private makePlayCutInToolboxMenu(): ContextMenuAction {
+    const cunIns = CutInList.instance.cutIns;
+    return {
+      name: this.i18n.t('toolbox.playCutIn'),
+      materialIcon: 'play_arrow',
+      action: null,
+      subActions: cunIns.length === 0 ? [
+        {
+          name: this.i18n.t('toolbox.noCutIn'),
+          disabled: true,
+          center: true
+        }
+      ] : cunIns.map(cutIn => {
+        return {
+          name: `${cutIn.isValidAudio ? '' : '⚠️'}${cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name}`,
+          subActions: [{
+              name: this.i18n.t('cutin.all'),
+              action: () => {
+                EventSystem.call('PLAY_CUT_IN', {
+                  identifier: cutIn.identifier,
+                  secret: false,
+                  sender: PeerCursor.myCursor.peerId
+                });
+                this.chatMessageService.sendOperationLog(this.i18n.t('toolbox.played', { name: cutIn.name == '' ? this.i18n.t('toolbox.unnamedCutIn') : cutIn.name }));
+              }
+            }, ContextMenuSeparator, ...this.otherPeers.map(peer => {
+            return {
+              name: peer.name + (peer === PeerCursor.myCursor ? ' ' + this.i18n.t('cutin.you') : ''),
+              color: peer.color,
+              default: true,
+              action: () => {
+                if (peer !== PeerCursor.myCursor) {
+                  EventSystem.call('PLAY_CUT_IN', {
+                    identifier: cutIn.identifier,
+                    secret: true,
+                    sender: PeerCursor.myCursor.peerId
+                  }, peer.peerId);
+                }
+                EventSystem.call('PLAY_CUT_IN', {
+                  identifier: cutIn.identifier,
+                  secret: true,
+                  sender: PeerCursor.myCursor.peerId
+                }, PeerCursor.myCursor.peerId);
+              }
+            }
+          })]
+        };
+      })
+    };
   }
 
   private makeFolderBackupToolboxMenu(): ContextMenuAction {
@@ -1450,6 +1523,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         checkBox: 'radio' as const,
       };
     };
+    const weatherSeOn = () => this.weatherSe.isEnabled;
     return {
       name: this.i18n.t('table.weather'),
       materialIcon: 'wb_cloudy',
@@ -1465,12 +1539,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             intensityItem(1, 'table.intensityMax'),
           ],
         },
+        {
+          name: `${weatherSeOn() ? '☑' : '☐'} ${this.i18n.t('table.weatherSe')}`,
+          nameUpdate: () => `${weatherSeOn() ? '☑' : '☐'} ${this.i18n.t('table.weatherSe')}`,
+          action: () => this.weatherSe.setEnabled(!this.weatherSe.isEnabled),
+          checkBox: 'check' as const,
+        },
       ],
     };
   }
 
   private makeDayNightToolboxMenu() {
     const DAY_TARGET = 0;
+    const DUSK_TARGET = 0.4;
     const NIGHT_TARGET = 0.85;
     const animateDarkness = (target: number) => {
       const table = TableSelecter.instance.viewTable;
@@ -1486,9 +1567,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       };
       requestAnimationFrame(step);
     };
-    // Mutually exclusive — match backgroundFilterType threshold (no 0.35–0.55 gap).
-    const isNight = () => (TableSelecter.instance.viewTable?.darkness ?? 0) >= 0.5;
-    const isDay = () => !isNight();
+    const darkness = () => TableSelecter.instance.viewTable?.darkness ?? 0;
+    const isDay = () => darkness() < 0.2;
+    const isDusk = () => darkness() >= 0.2 && darkness() < 0.5;
+    const isNight = () => darkness() >= 0.5;
     return {
       name: this.i18n.t('table.dayNight'),
       materialIcon: 'brightness_6',
@@ -1497,6 +1579,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           action: () => animateDarkness(DAY_TARGET),
+          checkBox: 'radio' as const,
+        },
+        {
+          name: `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
+          nameUpdate: () => `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
+          action: () => animateDarkness(DUSK_TARGET),
           checkBox: 'radio' as const,
         },
         {
@@ -1584,7 +1672,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Open settings sheet/menu (replaces any current context menu). */
   private openSettingsAt(position: { x: number; y: number }) {
     this.guidedTour.notifyMenuClick('menu.settings');
-    this.contextMenuService.open(position, [
+    this.contextMenuService.open(position, this.buildSettingsMenuActions(), this.i18n.t('menu.settings'));
+  }
+
+  /** Settings actions — shared by nav open and More drill-down. */
+  private buildSettingsMenuActions(): ContextMenuAction[] {
+    return [
       // View / panels
       ...this.buildAlwaysAvailableViewActions(),
       ContextMenuSeparator,
@@ -1666,6 +1759,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         action: () => {
           PanelService.clearSavedGeometry();
           ChatWindowComponent.resetSavedGeometryToDefaults();
+          PanelService.resetOpenPanelGeometry({
+            width: ChatWindowComponent.DEFAULT_WIDTH,
+            height: ChatWindowComponent.DEFAULT_HEIGHT,
+          });
         },
       },
       ContextMenuSeparator,
@@ -1722,7 +1819,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         materialIcon: 'help_outline',
         action: () => this.openControlsHelp(),
       },
-    ], this.i18n.t('menu.settings'));
+    ];
   }
 
   private openControlsHelp() {

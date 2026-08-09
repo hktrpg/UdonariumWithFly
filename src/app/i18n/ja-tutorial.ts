@@ -4,8 +4,10 @@ export const ja_tutorial: I18nDictionary = {
   'tutorial.name': 'チュートリアル',
   'tutorial.linkName': 'リンク:',
   'tutorial.welcome': `HKTRPG うどん卓へようこそ（Udonarium with Fly ベース）。
+Discord：https://support.hktrpg.com
+Patreon：https://www.patreon.com/HKTRPG
 マップは 2.5D。データはプレイヤー間で共有され、サーバは駒や画像を長期保管しません。
-★ 退出前に「ZIP保存」、次回は「ZIP読込」。保存しないと消えます。
+★ データの保管は「バックアップフォルダを紐付け」(自動)または「ZIP保存」(手動)；次回は「ZIP読込」。保存しないと消えます。
 デスクトップ版 Chrome 推奨。最初のチャット送信後、この案内は自動で隠れます。
 詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜視点＞右ドラッグ＝パン

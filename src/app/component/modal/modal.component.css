@@ -9,7 +9,8 @@
   bottom :0;
   left :0;
   right :0;
-  z-index: 1899999;
+  /* Above context-menu / mobile action sheet (2_000_000) and map HUD (2_000_010). */
+  z-index: 2500000;
 
   display: flex;
   align-items: center;

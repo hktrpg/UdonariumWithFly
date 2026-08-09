@@ -36,10 +36,10 @@ export const zhTW_tip: I18nDictionary = {
 
   'tip.chat.notice.title': '提示音',
   'tip.chat.notice.body': '有新訊息時播放提示音（僅本機）。',
-  'tip.chat.compact.title': '精簡工具列',
-  'tip.chat.compact.body': '收起標籤與工具列，只留輸入區；可用小鈕還原。',
-  'tip.chat.clarify.title': '列表模式',
-  'tip.chat.clarify.body': '改以列表顯示訊息，方便閱讀（相對氣泡）。',
+  'tip.chat.compact.title': '列表模式',
+  'tip.chat.compact.body': '改以列表顯示訊息，方便閱讀（相對氣泡）。',
+  'tip.chat.clarify.title': '精簡工具列',
+  'tip.chat.clarify.body': '收起標籤與工具列，只留輸入區；可用小鈕還原。',
 
   'tour.welcome.title': '歡迎 — 引導教學',
   'tour.welcome.body': '請依序閱讀說明並打開／嘗試各主要功能。\n可隨時略過。之後滑過按鈕仍會立刻顯示教學 BOX。\n建議桌面版 Chrome。離開前請存檔（ZIP 或資料夾備份）。',
