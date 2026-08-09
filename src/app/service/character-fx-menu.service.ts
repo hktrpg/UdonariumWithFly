@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { ClueLink } from '@udonarium/clue-link';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -17,6 +19,14 @@ import {
   anyImageEffect,
   clearImageEffects,
 } from '@udonarium/table-fx/image-effect';
+import {
+  pinAngleFromId,
+  PUSH_PIN_COLORS,
+  randomPinAngle,
+  TOKEN_FRAME_STYLES,
+} from '@udonarium/table-fx/push-pin.util';
+import { TextNote } from '@udonarium/text-note';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { ContextMenuAction, ContextMenuSeparator, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { TabletopSelectionService } from 'service/tabletop-selection.service';
@@ -86,6 +96,128 @@ export class CharacterFxMenuService {
         checkBox: 'radio' as const
       }))
     };
+  }
+
+  makeTokenFrameMenu(character: GameCharacter): ContextMenuAction {
+    return {
+      name: this.i18n.t('fx.tokenFrame'),
+      action: null,
+      subActions: TOKEN_FRAME_STYLES.map(id => ({
+        name: `${character.tokenFrame === id ? '◉' : '○'} ${this.i18n.t(`fx.tokenFrame.${id}`)}`,
+        action: () => {
+          character.tokenFrame = id;
+          if (id === 'polaroid' && !character.tokenFrameCaption) {
+            character.tokenFrameCaption = character.name || '';
+          }
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        },
+        nameUpdate: () => `${character.tokenFrame === id ? '◉' : '○'} ${this.i18n.t(`fx.tokenFrame.${id}`)}`,
+        checkBox: 'radio' as const
+      }))
+    };
+  }
+
+  makePushPinMenu(host: GameCharacter | TextNote): ContextMenuAction {
+    const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    return {
+      name: this.i18n.t('fx.pushPin'),
+      action: null,
+      subActions: [
+        contextMenuToggleCheck({
+          get: () => !!host.pushPin,
+          set: v => {
+            host.pushPin = v;
+            if (host.pushPin && !host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
+          },
+          on: this.i18n.t('fx.pushPin.on'),
+          off: this.i18n.t('fx.pushPin.off'),
+          after,
+        }),
+        {
+          name: this.i18n.t('fx.pushPin.reangle'),
+          action: () => { host.pushPinAngle = randomPinAngle(); host.pushPin = true; after(); },
+        },
+        ContextMenuSeparator,
+        ...PUSH_PIN_COLORS.map(color => ({
+          name: `${host.pushPinColor === color ? '◉' : '○'} ${this.i18n.t(`fx.pushPin.${color}`)}`,
+          action: () => { host.pushPinColor = color; host.pushPin = true; after(); },
+          nameUpdate: () => `${host.pushPinColor === color ? '◉' : '○'} ${this.i18n.t(`fx.pushPin.${color}`)}`,
+          checkBox: 'radio' as const,
+        })),
+      ]
+    };
+  }
+
+  makeClueLinkMenu(from: GameCharacter | TextNote): ContextMenuAction {
+    const viewId = TableSelecter.instance.viewTable?.identifier || '';
+    const targets = this.pinnedEndpointsOnView().filter(t => t.identifier !== from.identifier);
+    const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const onView = (l: ClueLink) => !l.tableIdentifier || l.tableIdentifier === viewId;
+    const isLinked = (t: GameCharacter | TextNote) => ClueLink.all().some(l =>
+      onView(l)
+      && ((l.fromIdentifier === from.identifier && l.toIdentifier === t.identifier)
+        || (l.fromIdentifier === t.identifier && l.toIdentifier === from.identifier)));
+    const linksOf = () => ClueLink.all().filter(l =>
+      onView(l) && (l.fromIdentifier === from.identifier || l.toIdentifier === from.identifier));
+    return {
+      name: this.i18n.t('fx.clueLink'),
+      action: null,
+      subActions: [
+        ...targets.map(t => {
+          const label = this.i18n.t('fx.clueLink.to', { name: this.endpointLabel(t) });
+          return contextMenuToggleCheck({
+            get: () => isLinked(t),
+            set: (on) => {
+              if (on) {
+                if (!from.pushPin) {
+                  from.pushPin = true;
+                  from.pushPinAngle = pinAngleFromId(from.identifier);
+                }
+                if (!t.pushPin) {
+                  t.pushPin = true;
+                  t.pushPinAngle = pinAngleFromId(t.identifier);
+                }
+                if (!isLinked(t)) {
+                  ClueLink.create(from.identifier, t.identifier, { tableIdentifier: viewId });
+                }
+              } else {
+                for (const l of ClueLink.all()) {
+                  if (!onView(l)) continue;
+                  if ((l.fromIdentifier === from.identifier && l.toIdentifier === t.identifier)
+                    || (l.fromIdentifier === t.identifier && l.toIdentifier === from.identifier)) {
+                    l.destroy();
+                  }
+                }
+              }
+            },
+            on: `☑${label}`,
+            off: `☐${label}`,
+            after,
+          });
+        }),
+        ...(targets.length ? [ContextMenuSeparator] : []),
+        {
+          name: this.i18n.t('fx.clueLink.clear'),
+          action: () => {
+            for (const l of linksOf()) l.destroy();
+            after();
+          },
+          disabled: linksOf().length < 1,
+        },
+      ],
+      disabled: GuestSession.isGuest,
+    };
+  }
+
+  private pinnedEndpointsOnView(): Array<GameCharacter | TextNote> {
+    const chars = ObjectStore.instance.getObjects(GameCharacter).filter(c => c.isVisibleOnTable);
+    const notes = ObjectStore.instance.getObjects(TextNote).filter(n => n.isVisibleOnTable);
+    return [...chars, ...notes];
+  }
+
+  private endpointLabel(obj: GameCharacter | TextNote): string {
+    if (obj instanceof GameCharacter) return obj.name || this.i18n.t('fx.unnamed');
+    return obj.title || this.i18n.t('action.noteName');
   }
 
   makeStatusMenu(character: GameCharacter): ContextMenuAction {

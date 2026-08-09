@@ -423,6 +423,8 @@ export const zhTW_obj: I18nDictionary = {
   'char.settings.height': '高度',
   'char.settings.location': '位置',
   'char.settings.sheetEmpty': '尚無自訂資料區，可按「切換編輯」後新增。',
+  'char.settings.showName': '顯示名字',
+  'char.settings.polaroidCaption': '拍立得底欄文字',
   'char.settings.allowsChat': '允許聊天',
   'char.settings.chatBubble': '顯示氣泡台詞',
   'char.settings.inventory': '顯示於倉庫',

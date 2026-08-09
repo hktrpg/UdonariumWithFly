@@ -135,6 +135,14 @@
         <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
           [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
       </div>
+      <svg class="clue-strings-layer is-fill is-pointer-events-none is-3d"
+        [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
+        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.8) + 'px)'}">
+        <path *ngFor="let link of clueLinks; trackBy: trackByGameObject"
+          class="clue-string"
+          [attr.d]="cluePathD(link)"
+          [attr.stroke]="link.color || '#c62828'" />
+      </svg>
       <div *ngIf="pathWaypoints.length" class="path-waypoints is-pointer-events-none is-3d"
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2.3) + 'px)'}">
         <svg class="path-line is-fill" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight">

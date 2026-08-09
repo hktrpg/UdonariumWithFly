@@ -421,6 +421,8 @@ export const en_obj: I18nDictionary = {
   'char.settings.height': 'Height',
   'char.settings.location': 'Location',
   'char.settings.sheetEmpty': 'No custom data yet. Toggle edit to add sections.',
+  'char.settings.showName': 'Show name',
+  'char.settings.polaroidCaption': 'Polaroid caption',
   'char.settings.allowsChat': 'Allow chat',
   'char.settings.chatBubble': 'Show chat bubble',
   'char.settings.inventory': 'Show in inventory',

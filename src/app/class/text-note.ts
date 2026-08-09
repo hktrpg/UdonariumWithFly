@@ -8,6 +8,7 @@ import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
 import { moveToTopmost } from './tabletop-object-util';
+import { a4HeightForWidth, PaperStyle } from './table-fx/push-pin.util';
 
 export type TextNoteScope = 'room' | 'scene';
 /** Display content for the note body. auto = pick video > pdf > image > text. */
@@ -23,6 +24,14 @@ export class TextNote extends TabletopObject {
   @SyncVar() isLocked: boolean = false;
   @SyncVar() isWhiteOut: boolean = false;
   @SyncVar() isShowTitle: boolean = true;
+  /** Title bar background (#rrggbb). Empty = legacy dark bar. */
+  @SyncVar() titleBgColor: string = '#1e1e1e';
+
+  /** Clue-board paper look: none | a4 | sticky */
+  @SyncVar() paperStyle: string = 'none';
+  @SyncVar() pushPin: boolean = false;
+  @SyncVar() pushPinAngle: number = 0;
+  @SyncVar() pushPinColor: string = 'red';
 
   /** When true, width/height edits are blocked in the inventory editor. */
   @SyncVar() isSizeLocked: boolean = false;
@@ -53,9 +62,30 @@ export class TextNote extends TabletopObject {
   @SyncVar() videoUrl: string = '';
 
   get width(): number { return this.getCommonValue('width', 1); }
-  set width(width: number) { if (!this.isSizeLocked) this.setCommonValue('width', width); }
+  set width(width: number) {
+    if (this.isSizeLocked) return;
+    this.setCommonValue('width', width);
+  }
   get height(): number { return this.getCommonValue('height', 1); }
-  set height(height: number) { if (!this.isSizeLocked) this.setCommonValue('height', height); }
+  set height(height: number) {
+    if (this.isSizeLocked) return;
+    this.setCommonValue('height', height);
+  }
+
+  /** Visual paper look only — size stays free (width/height independent). */
+  applyPaperStyle(style: PaperStyle | string) {
+    this.paperStyle = style || 'none';
+    if (this.paperStyle === 'a4') {
+      // Seed A4 proportion once when switching style; later resize stays free.
+      const w = this.width > 0 ? this.width : 4;
+      this.setCommonValue('width', w);
+      this.setCommonValue('height', a4HeightForWidth(w));
+    } else if (this.paperStyle === 'sticky') {
+      const s = Math.min(this.width || 2, this.height || 2, 2.5) || 2;
+      this.setCommonValue('width', s);
+      this.setCommonValue('height', s);
+    }
+  }
   get fontSize(): number { return this.getCommonValue('fontsize', 1); }
   set fontSize(fontSize: number) { this.setCommonValue('fontsize', fontSize); }
   get title(): string { return this.getCommonValue('title', ''); }

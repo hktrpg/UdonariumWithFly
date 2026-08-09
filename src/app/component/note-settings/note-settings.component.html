@@ -14,6 +14,10 @@
         <span>{{ 'note.fieldTitle' | i18n }}</span>
         <input type="text" [(ngModel)]="note.title" [disabled]="GuestMode()" />
       </label>
+      <label class="field title-bg-field">
+        <span>{{ 'note.fieldTitleBg' | i18n }}</span>
+        <input type="color" [(ngModel)]="note.titleBgColor" [disabled]="GuestMode() || !note.isShowTitle" />
+      </label>
       <span class="kind-pill">{{ ('note.kind.' + note.contentKind) | i18n }}</span>
     </div>
 
@@ -57,7 +61,7 @@
       <div class="check-row tight">
         <label><input type="checkbox" [(ngModel)]="note.isShowTitle" [disabled]="GuestMode()" /> {{ 'note.showTitle' | i18n }}</label>
         <label><input type="checkbox" [(ngModel)]="note.isWhiteOut" [disabled]="GuestMode()" /> {{ 'note.whiteOut' | i18n }}</label>
-        <label><input type="checkbox" [(ngModel)]="note.isUpright" [disabled]="GuestMode()" /> {{ 'note.upright' | i18n }}</label>
+        <label *ngIf="!is2DMode"><input type="checkbox" [(ngModel)]="note.isUpright" [disabled]="GuestMode()" /> {{ 'note.upright' | i18n }}</label>
       </div>
       <button type="button" class="thumb-btn" [class.has-image]="!!note.frontImage?.url" (click)="openFrontImage()" [disabled]="GuestMode()"
         [title]="'note.changeFront' | i18n">

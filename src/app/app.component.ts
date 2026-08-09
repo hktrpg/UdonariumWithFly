@@ -52,6 +52,7 @@ import { SaveDataService } from 'service/save-data.service';
 import { StandImageService } from 'service/stand-image.service';
 import { I18nService } from 'service/i18n.service';
 import { AppLocale } from 'i18n';
+import '@udonarium/clue-link';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from '@udonarium/data-element';
 import { StandImageComponent } from 'component/stand-image/stand-image.component';

@@ -70,6 +70,18 @@
   min-width: 0;
 }
 
+.title-row .title-bg-field {
+  flex: 0 0 auto;
+  width: 52px;
+}
+
+.title-row .title-bg-field input[type='color'] {
+  width: 100%;
+  min-height: 22px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
 .kind-pill {
   display: inline-flex;
   align-items: center;
