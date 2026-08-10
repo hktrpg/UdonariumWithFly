@@ -1,10 +1,12 @@
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
+import { InnerXml } from './core/synchronize-object/object-serializer';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem, Network } from './core/system';
 import { GameTable } from './game-table';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
+import { poseDebug } from './table-fx/pose-debug';
 
 /**
  * Foundry-style scene selection:
@@ -12,7 +14,7 @@ import { TabletopObject } from './tabletop-object';
  * - viewed (`viewedTableIdentifier`, local) — canvas currently rendered for this client
  */
 @SyncObject('TableSelecter')
-export class TableSelecter extends GameObject {
+export class TableSelecter extends GameObject implements InnerXml {
   private static _instance: TableSelecter;
   static get instance(): TableSelecter {
     if (!TableSelecter._instance) {
@@ -37,6 +39,116 @@ export class TableSelecter extends GameObject {
   /** Alias for active table id. */
   get activeTableIdentifier(): string { return this.viewTableIdentifier; }
   set activeTableIdentifier(id: string) { this.viewTableIdentifier = id; }
+
+  innerXml(): string { return ''; }
+
+  /** Merge room/ZIP parse into the singleton (AuraNameConfig pattern). */
+  parseInnerXml(_element: Element) {
+    const context = TableSelecter.instance.toContext();
+    context.syncData = this.toContext().syncData;
+    TableSelecter.instance.apply(context);
+    TableSelecter.instance.update();
+    if (this !== TableSelecter.instance) this.destroy();
+  }
+
+  /**
+   * Before Room XML parse: drop stale session view so legacy ZIPs without TableSelecter
+   * fall back to GameTable.selected / first table instead of the previous session's map.
+   */
+  prepareForRoomReload() {
+    this.viewedTableIdentifier = '';
+    this.viewTableIdentifier = '';
+    this.isPaused = false;
+  }
+
+  /**
+   * After Room XML parse: restore active+viewed and hydrate.
+   * Prefer selecter SyncVar (new saves), then GameTable.selected, then tables[0].
+   */
+  restoreAfterRoomLoad() {
+    try {
+      const tables = ObjectStore.instance.getObjects<GameTable>(GameTable);
+      if (tables.length < 1) {
+        poseDebug('restoreAfterRoomLoad abort: no tables');
+        return;
+      }
+
+      const selected = tables.find(t => !!t.selected);
+      const activeObj = this.viewTableIdentifier
+        ? ObjectStore.instance.get<GameTable>(this.viewTableIdentifier)
+        : null;
+
+      let targetId = '';
+      if (activeObj) targetId = this.viewTableIdentifier;
+      else if (selected) targetId = selected.identifier;
+      else targetId = tables[0].identifier;
+
+      const pieces = TabletopObject.getAll().filter(o => o.location.name === 'table');
+      const onTarget = pieces.filter(o => o.hasPlacement(targetId));
+      poseDebug('restoreAfterRoomLoad', {
+        targetId,
+        source: activeObj ? 'selecter' : (selected ? 'GameTable.selected' : 'tables[0]'),
+        tableCount: tables.length,
+        tableIds: tables.map(t => t.identifier),
+        selectedId: selected?.identifier || '',
+        piecesOnTable: pieces.length,
+        piecesOnTarget: onTarget.length,
+        sample: onTarget.slice(0, 5).map(o => ({
+          id: o.identifier,
+          live: `${o.location.x | 0},${o.location.y | 0},${o.posZ | 0}`,
+          pose: (() => {
+            const p = o.getPoseForTable(targetId);
+            return p ? `${p.x | 0},${p.y | 0},${p.posZ | 0}` : '(none)';
+          })(),
+          placements: (o.tablePlacements || '').slice(0, 100),
+        })),
+      });
+
+      for (const t of tables) {
+        t.selected = t.identifier === targetId;
+      }
+      this.viewTableIdentifier = targetId;
+      TabletopObject.migrateUnboundTablePieces(targetId);
+      EventSystem.trigger('PREPARE_VIEW_TABLE_CHANGE', { tableId: targetId });
+      this.viewedTableIdentifier = targetId;
+      TabletopObject.hydrateAllForView(targetId, true);
+      EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: targetId });
+      EventSystem.trigger('SELECT_GAME_TABLE', { identifier: targetId, _fromSelecter: true });
+      // Pieces were destroy+recreate with reused syncIds; force table *ngFor remount.
+      EventSystem.trigger('ROOM_PIECES_REPLACED', { tableId: targetId });
+      this.syncMyViewedPresence();
+      this.schedulePoseVisualSyncAfterLoad(targetId);
+    } catch (e) {
+      console.warn('TableSelecter.restoreAfterRoomLoad failed; falling back', e);
+      this.ensureActiveOrFirst();
+    }
+  }
+
+  /**
+   * Room load destroys/recreates pieces before Angular mounts MovableDirective.
+   * Immediate AFTER_VIEW_TABLE_CHANGE therefore misses them; map-switch works because
+   * components already exist. Retry hydrate + movable sync like scene-preset apply.
+   */
+  private schedulePoseVisualSyncAfterLoad(tableId: string) {
+    const sync = (label: string) => {
+      if (!tableId) return;
+      if (this.viewedTableIdentifier !== tableId && this.viewTableIdentifier !== tableId) {
+        poseDebug(`schedulePose skip (${label})`, {
+          tableId,
+          viewed: this.viewedTableIdentifier,
+          active: this.viewTableIdentifier,
+        });
+        return;
+      }
+      poseDebug(`schedulePose sync (${label})`, { tableId });
+      TabletopObject.hydrateAllForView(tableId, true);
+      EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId });
+    };
+    queueMicrotask(() => sync('microtask'));
+    setTimeout(() => sync('0ms'), 0);
+    setTimeout(() => sync('50ms'), 50);
+    setTimeout(() => sync('200ms'), 200);
+  }
 
   // GameObject Lifecycle
   onStoreAdded() {
@@ -161,6 +273,10 @@ export class TableSelecter extends GameObject {
 
   private applyViewLocal(identifier: string) {
     const prev = this.viewedTableIdentifier;
+    poseDebug('applyViewLocal (map switch)', {
+      from: prev || '(none)',
+      to: identifier,
+    });
     if (prev && prev !== identifier) {
       // Flush movable batches + live poses into placements[prev] before hydrate.
       EventSystem.trigger('BEFORE_VIEW_TABLE_CHANGE', { tableId: prev });

@@ -52,6 +52,7 @@ import { SaveDataService } from 'service/save-data.service';
 import { StandImageService } from 'service/stand-image.service';
 import { I18nService } from 'service/i18n.service';
 import { AppLocale } from 'i18n';
+import '@udonarium/clue-link';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from '@udonarium/data-element';
 import { StandImageComponent } from 'component/stand-image/stand-image.component';
@@ -699,7 +700,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveThenReload() {
     await this.save();
-    const ok = await this.folderBackup.flush({ timeoutMs: 15000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 60000 });
     if (!ok && this.folderBackup.hasFolder) {
       const proceed = await this.confirmFlushFailedReload();
       if (!proceed) return;
@@ -708,7 +709,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async flushFolderThenReload() {
-    const ok = await this.folderBackup.flush({ timeoutMs: 15000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 60000 });
     if (!ok && this.folderBackup.hasFolder && this.isRoom && !this.GuestMode()) {
       const proceed = await this.confirmFlushFailedReload();
       if (!proceed) return;
@@ -1739,6 +1740,23 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           off: `☐${this.i18n.t('menu.settings.musicHud')}`,
         }),
       ]),
+      ContextMenuSeparator,
+      // ZIP save / load
+      {
+        name: this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+        materialIcon: 'sd_storage',
+        disabled: this.isSaveing || this.GuestMode(),
+        action: () => { void this.save(); },
+        nameUpdate: () => this.isSaveing ? `${this.progresPercent}%` : this.i18n.t('menu.downloadZip'),
+      },
+      {
+        name: SceneToolPermission.instance.canLoadZip()
+          ? this.i18n.t('menu.loadZip')
+          : `${this.i18n.t('menu.loadZip')}（${this.i18n.t('peer.loadData.gmOnly')}）`,
+        materialIcon: 'open_in_browser',
+        disabled: !SceneToolPermission.instance.canLoadZip(),
+        action: () => { void this.openZipFileSelect(); },
+      },
       contextMenuToggleCheck({
         get: () => this.saveDataService.includeAudio,
         set: (v) => { void this.saveDataService.setIncludeAudio(v); },

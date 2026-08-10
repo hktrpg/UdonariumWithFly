@@ -88,6 +88,32 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   set fontSize(fontSize: number) { this.gameTableMask.fontsize = fontSize; }
   get text(): string { return this.gameTableMask.text; }
   set text(text: string) { this.gameTableMask.text = text; }
+
+  private static readonly TEXT_POSITIONS = [
+    'top-left', 'top-center', 'top-right',
+    'middle-left', 'middle-center', 'middle-right',
+    'bottom-left', 'bottom-center', 'bottom-right',
+  ] as const;
+
+  get textPosition(): string {
+    const p = this.gameTableMask?.textPosition || 'middle-center';
+    return (GameTableMaskComponent.TEXT_POSITIONS as readonly string[]).includes(p) ? p : 'middle-center';
+  }
+  set textPosition(v: string) {
+    if (!this.gameTableMask) return;
+    this.gameTableMask.textPosition =
+      (GameTableMaskComponent.TEXT_POSITIONS as readonly string[]).includes(v) ? v : 'middle-center';
+  }
+
+  get textPositionClass(): string {
+    return `text-pos-${this.textPosition}`;
+  }
+
+  get textAlignCss(): string {
+    if (this.textPosition.endsWith('-left')) return 'left';
+    if (this.textPosition.endsWith('-right')) return 'right';
+    return 'center';
+  }
   get color(): string { return this.gameTableMask.color; }
   set color(color: string) { this.gameTableMask.color = color; }
   get bgcolor(): string { return this.gameTableMask.bgcolor; }
@@ -732,6 +758,26 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         disabled: this.isScratching
       },
       {
+        name: this.i18n.t('mask.fieldTextAlignH'),
+        subActions: GameTableMask.TEXT_ALIGN_H.map(id => ({
+          name: `${this.gameTableMask.textAlignH === id ? '◉' : '○'} ${this.i18n.t(`mask.textAlign.${id}`)}`,
+          action: () => { this.gameTableMask.textAlignH = id; this.changeDetector.markForCheck(); },
+          nameUpdate: () => `${this.gameTableMask.textAlignH === id ? '◉' : '○'} ${this.i18n.t(`mask.textAlign.${id}`)}`,
+          checkBox: 'radio' as const,
+        })),
+        disabled: this.isScratching || !this.text,
+      },
+      {
+        name: this.i18n.t('mask.fieldTextAlignV'),
+        subActions: GameTableMask.TEXT_ALIGN_V.map(id => ({
+          name: `${this.gameTableMask.textAlignV === id ? '◉' : '○'} ${this.i18n.t(`mask.textAlign.${id}`)}`,
+          action: () => { this.gameTableMask.textAlignV = id; this.changeDetector.markForCheck(); },
+          nameUpdate: () => `${this.gameTableMask.textAlignV === id ? '◉' : '○'} ${this.i18n.t(`mask.textAlign.${id}`)}`,
+          checkBox: 'radio' as const,
+        })),
+        disabled: this.isScratching || !this.text,
+      },
+      {
         name: this.i18n.t('mask.menu.25'),
         subActions: [
           { name: `${this.blendType == 0 ? '◉' : '○'} ${this.i18n.t('mask.dynamic.4')}`,  action: () => { this.blendType = 0; SoundEffect.play(PresetSound.cardDraw) }, checkBox: 'radio' },
@@ -833,10 +879,16 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
 
   private showDetail(gameObject: GameTableMask) {
     if (this.GuestMode()) return;
-    const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('mask.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    const option: PanelOption = { title, left: coordinate.x - 200, top: coordinate.y - 140, width: 400, height: 400 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    const coordinate = this.pointerDeviceService.pointers[0];
+    const option: PanelOption = {
+      title, left: coordinate.x - 200, top: coordinate.y - 140, width: 400, height: 400,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     const component = this.panelService.open<MaskSettingsComponent>(MaskSettingsComponent, option);
     component.mask = gameObject;
     component.embedded = false;

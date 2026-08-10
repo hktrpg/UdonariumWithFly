@@ -35,12 +35,13 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
+import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { I18nService } from 'service/i18n.service';
 
 @Component({
     selector: 'game-character',
     templateUrl: './game-character.component.html',
-    styleUrls: ['./game-character.component.css', '../shared/image-effects.css'],
+    styleUrls: ['./game-character.component.css', '../shared/image-effects.css', '../shared/clue-board.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('switchImage', [
@@ -189,6 +190,41 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get floorRingUrl(): string { return this.characterFxMenu.ringAsset(this.floorRing); }
   get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
   get floorRingColor(): string { return this.gameCharacter.floorRingColor || ''; }
+  get tokenFrame(): string { return this.gameCharacter.tokenFrame || 'none'; }
+  get hasTokenFrame(): boolean { return this.is2DMode && this.tokenFrame !== 'none'; }
+  get isShowName(): boolean { return this.gameCharacter.isShowName !== false; }
+  get tokenFrameCaption(): string { return this.gameCharacter.tokenFrameCaption || this.name || ''; }
+  /** Polaroid film strip: name lives in the white margin (not the floating tag). */
+  get showPolaroidCaption(): boolean {
+    return this.hasTokenFrame && this.tokenFrame === 'polaroid' && this.isShowName && 0 < this.tokenFrameCaption.length;
+  }
+  get showFloatingName(): boolean {
+    return this.isShowName && 0 < this.name.length && !this.showPolaroidCaption;
+  }
+  /** Token footprint size in px (2D cell / 3D image). */
+  get tokenBoxWidthPx(): number {
+    return this.is2DMode ? this.size * this.gridSize : this.characterImageWidth;
+  }
+  get tokenBoxHeightPx(): number {
+    return this.is2DMode ? this.size * this.gridSize : this.characterImageHeight;
+  }
+  /** Polaroid caption strip sits below the photo — grow the box so text never covers art. */
+  private static readonly POLAROID_CAPTION_STRIP_PX = 22;
+  get tokenFrameHeightPx(): number {
+    const h = this.tokenBoxHeightPx;
+    return this.showPolaroidCaption ? h + GameCharacterComponent.POLAROID_CAPTION_STRIP_PX : h;
+  }
+  get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
+  get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
+  get pushPinColor(): string { return this.gameCharacter.pushPinColor || 'red'; }
+  get pushPinSrc(): string {
+    return pushPinAssetUrl(
+      this.pushPinColor,
+      this.pushPinAngle,
+      this.gameCharacter.pushPinStyle,
+      this.gameCharacter.identifier,
+    );
+  }
   get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
   /** Cap name-tag / status icon strip to roughly the token footprint. */
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
@@ -469,6 +505,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
   */
   get nameTagRotate(): number {
+    // Top-down 2D: keep the tag flat on the table (billboard math makes text edge-on).
+    if (this.is2DMode) return 0;
     let x = (this.viewRotateX % 360) - 90;
     let z = (this.viewRotateZ + this.rotate) % 360;
     let roll = this.roll % 360;
@@ -660,11 +698,19 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       tabletopObject: this.gameCharacter,
       targetPropertyName: 'roll',
     };
+    // Room ZIP reuses syncIds; recycled views skip ngAfterViewInit — mark loaded here too.
+    this.markCharacterLoaded();
   }
 
   ngAfterViewInit() {
+    this.markCharacterLoaded();
+  }
+
+  private markCharacterLoaded() {
     queueMicrotask(() => {
+      if (!this.gameCharacter) return;
       this.gameCharacter.isLoaded = true;
+      this.changeDetector.markForCheck();
     });
   }
 
@@ -936,6 +982,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       [
         this.characterFxMenu.makeAuraMenu(this.gameCharacter),
         this.characterFxMenu.makeRingMenu(this.gameCharacter),
+        ...(this.is2DMode ? [
+          this.characterFxMenu.makeTokenFrameMenu(this.gameCharacter),
+          this.characterFxMenu.makePushPinMenu(this.gameCharacter),
+        ] : []),
+        this.characterFxMenu.makeClueLinkMenu(this.gameCharacter),
         this.characterFxMenu.makeVisionMenu(this.gameCharacter),
         this.characterFxMenu.makeStatusMenu(this.gameCharacter),
       ],
@@ -1144,11 +1195,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = {
       title: title, left: coordinate.x - 270, top: coordinate.y - 240, width: 540, height: 480,
+      tourPanelId: tourId,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
     let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);

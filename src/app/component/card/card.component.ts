@@ -628,10 +628,16 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   private showDetail(gameObject: Card) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('card.panelTitle');
     if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : this.i18n.t('card.back'));
-    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 160, width: 420, height: 360 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 210, top: coordinate.y - 160, width: 420, height: 360,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<CardSettingsComponent>(CardSettingsComponent, option);
     component.card = gameObject;
   }

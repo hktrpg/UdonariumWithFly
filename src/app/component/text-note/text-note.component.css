@@ -188,13 +188,18 @@
 }
 
 .title {
+  position: relative;
+  z-index: 1;
   box-sizing: border-box;
   font-size: 15px;
-  padding: 3px 9px;
+  padding: 3px 9px 3px 22px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   backface-visibility: hidden;
+  /* Fallback when SyncVar not yet applied */
+  color: #f2f2f2;
+  background-color: #1e1e1e;
 }
 
 .is-black-background {
@@ -293,11 +298,43 @@
   right: -21px;
 }
 
+.of-right-bottom {
+  bottom: -14px;
+  right: -14px;
+}
+
+.resize-grab {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  cursor: nwse-resize;
+  text-align: center;
+  padding: 2px;
+  background-color: #cccccc;
+  border-radius: 6px;
+  color: #444;
+  font-size: 8px;
+  z-index: 6;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.resize-grab .material-icons {
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(90deg);
+}
+
 .rotate-grab {
   opacity: 0;
 }
 
-.component:hover .rotate-grab {
+.component:hover .rotate-grab,
+.component:hover .resize-grab {
   opacity: 0.5;
 }
 
@@ -305,7 +342,14 @@
   opacity: 0;
 }
 
-.component .rotate-grab:hover, .component .rotate-grab:active {
+.component:active .resize-grab {
+  opacity: 0.35;
+}
+
+.component .rotate-grab:hover,
+.component .rotate-grab:active,
+.component .resize-grab:hover,
+.component .resize-grab:active {
   opacity: 1;
 }
 

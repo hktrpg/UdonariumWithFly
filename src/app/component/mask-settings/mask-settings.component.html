@@ -86,6 +86,24 @@
       <span>{{ 'mask.fieldText' | i18n }}</span>
       <textarea class="text-body" rows="1" [(ngModel)]="mask.text" [disabled]="GuestMode()"></textarea>
     </label>
+    <div class="field-row nowrap" *ngIf="mask.text">
+      <label class="field grow">
+        <span>{{ 'mask.fieldTextAlignH' | i18n }}</span>
+        <select [ngModel]="mask.textAlignH" (ngModelChange)="mask.textAlignH = $event" [disabled]="GuestMode()">
+          <option value="left">{{ 'mask.textAlign.left' | i18n }}</option>
+          <option value="center">{{ 'mask.textAlign.center' | i18n }}</option>
+          <option value="right">{{ 'mask.textAlign.right' | i18n }}</option>
+        </select>
+      </label>
+      <label class="field grow">
+        <span>{{ 'mask.fieldTextAlignV' | i18n }}</span>
+        <select [ngModel]="mask.textAlignV" (ngModelChange)="mask.textAlignV = $event" [disabled]="GuestMode()">
+          <option value="top">{{ 'mask.textAlign.top' | i18n }}</option>
+          <option value="middle">{{ 'mask.textAlign.middle' | i18n }}</option>
+          <option value="bottom">{{ 'mask.textAlign.bottom' | i18n }}</option>
+        </select>
+      </label>
+    </div>
   </section>
 
   <section class="card card-dense">
@@ -95,7 +113,7 @@
     </header>
     <div class="mode-tabs action-tabs" role="group" [attr.title]="'mask.clickHint' | i18n">
       <button type="button" class="mode-tab" *ngFor="let action of actions"
-        [class.is-active]="action.id === 'none' ? !mask.hasAnyClickAction : isActionOn(action.id)"
+        [class.is-active]="isTabActive(action.id)"
         [disabled]="GuestMode()"
         (click)="setClickAction(action.id)">
         <i class="material-icons">{{ action.icon }}</i>
@@ -103,7 +121,7 @@
       </button>
     </div>
 
-    <div class="action-panels" *ngIf="mask.hasAnyClickAction">
+    <div class="action-panels" *ngIf="showActionPanels">
       <!-- chat -->
       <ng-container *ngIf="isActionOn('chat')">
         <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('chat')">
@@ -327,22 +345,53 @@
         </section>
       </ng-container>
 
-      <!-- token FX -->
-      <ng-container *ngIf="isActionOn('tokenFx')">
+      <!-- Standing FX (tokenFxPassiveJson) -->
+      <ng-container *ngIf="isTokenFxStandOn">
+        <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('tokenFxStand')">
+          <button type="button" class="action-panel-head" (click)="togglePanel('tokenFxStand', $event)">
+            <i class="material-icons chevron">{{ isPanelExpanded('tokenFxStand') ? 'expand_more' : 'chevron_right' }}</i>
+            <i class="material-icons">accessibility_new</i>
+            <span>{{ 'mask.actionTokenFxStand' | i18n }}</span>
+          </button>
+          <div class="action-panel-body" *ngIf="isPanelExpanded('tokenFxStand')">
+            <p class="hint action-hint">{{ 'mask.tokenFxStandHint' | i18n }}</p>
+            <div class="fx-grid">
+              <label *ngFor="let fx of fxFlags" class="fx-item">
+                <input type="checkbox" [ngModel]="!!tokenFxStand[fx.key]"
+                  (ngModelChange)="setTokenFxStandFlag(fx.key, $event)" [disabled]="GuestMode()" />
+                <span>{{ fx.labelKey | i18n }}</span>
+              </label>
+            </div>
+            <div class="field-row token-fx-altitude">
+              <label class="field grow">
+                <span>{{ 'mask.tokenFxAltitudeMode' | i18n }}</span>
+                <select [ngModel]="tokenFxStand.altitudeMode || 'none'"
+                  (ngModelChange)="patchTokenFxStand({ altitudeMode: $event })" [disabled]="GuestMode()">
+                  <option value="none">{{ 'mask.altitudeNone' | i18n }}</option>
+                  <option value="set">{{ 'mask.altitudeSet' | i18n }}</option>
+                  <option value="delta">{{ 'mask.altitudeDelta' | i18n }}</option>
+                </select>
+              </label>
+              <label class="field" *ngIf="(tokenFxStand.altitudeMode || 'none') !== 'none'">
+                <span>{{ 'mask.fieldAltitude' | i18n }}</span>
+                <input type="number" step="0.5" [ngModel]="tokenFxStand.altitude || 0"
+                  (ngModelChange)="patchTokenFxStand({ altitude: +$event })" [disabled]="GuestMode()" />
+              </label>
+            </div>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- Click FX (tokenFxJson) -->
+      <ng-container *ngIf="isTokenFxClickOn">
         <section class="action-panel" [class.is-collapsed]="!isPanelExpanded('tokenFx')">
           <button type="button" class="action-panel-head" (click)="togglePanel('tokenFx', $event)">
             <i class="material-icons chevron">{{ isPanelExpanded('tokenFx') ? 'expand_more' : 'chevron_right' }}</i>
-            <i class="material-icons">auto_fix</i>
-            <span>{{ 'mask.actionTokenFx' | i18n }}</span>
+            <i class="material-icons">touch_app</i>
+            <span>{{ 'mask.actionTokenFxClick' | i18n }}</span>
           </button>
           <div class="action-panel-body" *ngIf="isPanelExpanded('tokenFx')">
-            <p class="hint action-hint">{{ 'mask.tokenFxHint' | i18n }}</p>
-            <label class="check-inline">
-              <input type="checkbox" [ngModel]="mask.tokenFxPassive"
-                (ngModelChange)="setTokenFxPassive($event)"
-                [disabled]="GuestMode()" />
-              {{ 'mask.tokenFxPassive' | i18n }}
-            </label>
+            <p class="hint action-hint">{{ 'mask.tokenFxClickHint' | i18n }}</p>
             <div class="fx-grid">
               <label *ngFor="let fx of fxFlags" class="fx-item">
                 <input type="checkbox" [ngModel]="!!tokenFx[fx.key]"

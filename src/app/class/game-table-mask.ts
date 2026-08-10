@@ -36,6 +36,37 @@ export class GameTableMask extends TabletopObject {
   @SyncVar() isPreview = false;
 
   @SyncVar() borderType = 1; // 0:不顯示 1:僅未鎖定時顯示 2:一律顯示
+  /**
+   * Overlay text anchor (Word-style): `{vertical}-{horizontal}`
+   * vertical: top|middle|bottom · horizontal: left|center|right
+   */
+  @SyncVar() textPosition: string = 'middle-center';
+
+  static readonly TEXT_ALIGN_V = ['top', 'middle', 'bottom'] as const;
+  static readonly TEXT_ALIGN_H = ['left', 'center', 'right'] as const;
+
+  get textAlignV(): 'top' | 'middle' | 'bottom' {
+    const v = (this.textPosition || 'middle-center').split('-')[0];
+    return (GameTableMask.TEXT_ALIGN_V as readonly string[]).includes(v)
+      ? v as 'top' | 'middle' | 'bottom'
+      : 'middle';
+  }
+  set textAlignV(v: string) {
+    const vert = (GameTableMask.TEXT_ALIGN_V as readonly string[]).includes(v) ? v : 'middle';
+    this.textPosition = `${vert}-${this.textAlignH}`;
+  }
+
+  get textAlignH(): 'left' | 'center' | 'right' {
+    const parts = (this.textPosition || 'middle-center').split('-');
+    const h = parts[1] || 'center';
+    return (GameTableMask.TEXT_ALIGN_H as readonly string[]).includes(h)
+      ? h as 'left' | 'center' | 'right'
+      : 'center';
+  }
+  set textAlignH(h: string) {
+    const horiz = (GameTableMask.TEXT_ALIGN_H as readonly string[]).includes(h) ? h : 'center';
+    this.textPosition = `${this.textAlignV}-${horiz}`;
+  }
   /** When true, footprint blocks light and vision (opt-in; floors stay open by default). */
   @SyncVar() affectsLight: boolean = false;
 
@@ -63,9 +94,11 @@ export class GameTableMask extends TabletopObject {
   /** True when currently showing the alt appearance. */
   @SyncVar() appearanceIsAlt: boolean = false;
 
-  /** Image FX + altitude applied to tokens on this mask (JSON). */
+  /** Image FX + altitude for Alt+double-click action `tokenFx` (JSON). */
   @SyncVar() tokenFxJson: string = '';
-  /** When true, standing on the mask auto-applies tokenFxJson. */
+  /** Image FX + altitude for standing-on-mask auto apply (JSON). Independent of tokenFxJson. */
+  @SyncVar() tokenFxPassiveJson: string = '';
+  /** When true, standing on the mask auto-applies tokenFxPassiveJson. */
   @SyncVar() tokenFxPassive: boolean = false;
 
   get name(): string { return this.getCommonValue('name', ''); }
@@ -197,11 +230,20 @@ export class GameTableMask extends TabletopObject {
     this.appearanceAltJson = stringifyMaskAppearanceSnap(snap || emptyMaskAppearanceSnap());
   }
 
+  /** Click FX (Alt+double-click). */
   get tokenFxConfig(): MaskTokenFxConfig {
     return parseMaskTokenFxConfig(this.tokenFxJson);
   }
   set tokenFxConfig(cfg: MaskTokenFxConfig) {
     this.tokenFxJson = stringifyMaskTokenFxConfig(cfg || emptyMaskTokenFxConfig());
+  }
+
+  /** Standing FX (auto apply while token is on the mask). */
+  get tokenFxPassiveConfig(): MaskTokenFxConfig {
+    return parseMaskTokenFxConfig(this.tokenFxPassiveJson);
+  }
+  set tokenFxPassiveConfig(cfg: MaskTokenFxConfig) {
+    this.tokenFxPassiveJson = stringifyMaskTokenFxConfig(cfg || emptyMaskTokenFxConfig());
   }
 
   captureAppearanceSnap(): MaskAppearanceSnap {
@@ -262,6 +304,17 @@ export class GameTableMask extends TabletopObject {
       this.commonDataElement.appendChild(DataElement.create('altitude', 0, {}, 'altitude_' + this.identifier));
     }
     this.migrateLegacyClickConfig();
+    this.migrateSharedTokenFxToPassive();
+  }
+
+  /**
+   * Legacy: stand + click shared tokenFxJson. Copy once into tokenFxPassiveJson
+   * when standing FX is enabled so existing rooms keep their stand look.
+   */
+  private migrateSharedTokenFxToPassive() {
+    if (this.tokenFxPassiveJson) return;
+    if (!this.tokenFxPassive || !this.tokenFxJson) return;
+    this.tokenFxPassiveJson = this.tokenFxJson;
   }
 
   /** One-time: single clickAction + shared payload → multi actions + typed ids. */

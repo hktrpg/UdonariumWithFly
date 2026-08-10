@@ -10,10 +10,21 @@
         [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
           <div class="upright-transform is-3d is-bg-color is-front is-bg-texture chrome-smooth-image-trick"
-            [ngClass]="{'is-bg-filter': isWhiteOut && isTextContent, 'is-ghosted': isGhosted}"
+            [ngClass]="{
+              'is-bg-filter': isWhiteOut && isTextContent,
+              'is-ghosted': isGhosted,
+              'paper-a4': paperStyle === 'a4',
+              'paper-sticky': paperStyle === 'sticky'
+            }"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
-            <div *ngIf="isShowTitle && title.length" class="title is-3d is-black-background is-pointer-events-none">{{title}}</div>
+            <img *ngIf="pushPin" class="push-pin is-3d" alt="" draggable="false"
+              [src]="pushPinSrc"
+              [attr.data-clue-pin]="textNote.identifier"
+              [style.transform]="'translateZ(2.5px) rotate(' + pushPinAngle + 'deg)'" />
+            <div *ngIf="isShowTitle && title.length" class="title is-3d is-pointer-events-none"
+              [style.background-color]="titleBgColor"
+              [style.color]="titleFgColor">{{title}}</div>
 
             <ng-container [ngSwitch]="contentKind">
               <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
@@ -41,15 +52,23 @@
               <ng-container *ngSwitchDefault>
                 <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
                   [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
-                  [style.font-size.px]="fontSize + 9" [(ngModel)]="text" spellcheck="false"></textarea>
+                  [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
+                  [(ngModel)]="text" spellcheck="false"></textarea>
                 <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
                   [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
                   [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
+                  [style.text-align]="textAlign"
                   [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
               </ng-container>
             </ng-container>
 
             <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
+            <div *ngIf="!isLocked && !GuestMode() && !textNote.isSizeLocked"
+              #resizeGrab
+              class="resize-grab of-right-bottom is-pointer-events-auto"
+              [attr.title]="'note.resizeHint' | i18n">
+              <i class="material-icons">open_in_full</i>
+            </div>
           </div>
           <div class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
             [ngClass]="{'is-ghosted': isGhosted}"
@@ -63,19 +82,8 @@
         [ngStyle]="{'transform': 'translateX(' + gridSize / 2 + 'px) translateY(' + (-gridSize / 4) + 'px)'}"
         [style.width.px]="(width - 1) * gridSize"
         [style.min-height.px]="gridSize / 2"></div>
-      <div [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px)'}">
+      <div *ngIf="!isLocked && !GuestMode()" [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px)'}">
         <div class="rotate-grab of-left-top">
-          <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">{{ isLocked ? 'lock' : 'autorenew' }}</i>
-        </div>
-        <div class="rotate-grab of-right-top">
-          <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">{{ isLocked ? 'lock' : 'autorenew' }}</i>
-        </div>
-      </div>
-      <div *ngIf="!isLocked && !GuestMode()">
-        <div class="rotate-grab of-left-top">
-          <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">autorenew</i>
-        </div>
-        <div class="rotate-grab of-right-top">
           <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">autorenew</i>
         </div>
       </div>

@@ -21,6 +21,7 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote } from '@udonarium/text-note';
 import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
@@ -28,10 +29,13 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
+import { PAPER_STYLES, pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
+import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
+import { CoordinateService } from 'service/coordinate.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
@@ -39,13 +43,14 @@ import { TabletopActionService } from 'service/tabletop-action.service';
 @Component({
   selector: 'text-note',
   templateUrl: './text-note.component.html',
-  styleUrls: ['./text-note.component.css'],
+  styleUrls: ['./text-note.component.css', '../shared/clue-board.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: false
 })
 export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, AfterViewChecked {
   @ViewChild('textArea') textAreaElementRef: ElementRef<HTMLTextAreaElement>;
   @ViewChild('pdfCanvas') pdfCanvasRef: ElementRef<HTMLCanvasElement>;
+  @ViewChild('resizeGrab') resizeGrabRef: ElementRef<HTMLElement>;
 
   @Input() textNote: TextNote = null;
   @Input() is3D: boolean = false;
@@ -62,6 +67,14 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   get fontSize(): number { this.calcFitHeightIfNeeded(); return this.textNote.fontSize; }
+  get textAlign(): string {
+    const a = this.textNote?.textAlign || 'left';
+    return (a === 'center' || a === 'right' || a === 'justify') ? a : 'left';
+  }
+  set textAlign(v: string) {
+    if (!this.textNote) return;
+    this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+  }
   get imageFile(): ImageFile { return this.textNote.imageFile; }
   get rotate(): number { return this.textNote.rotate; }
   set rotate(rotate: number) { this.textNote.rotate = rotate; }
@@ -79,14 +92,27 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     return +ret.toFixed(1);
   }
 
-  get isUpright(): boolean { return this.textNote.isUpright; }
-  set isUpright(isUpright: boolean) { this.textNote.isUpright = isUpright; }
+  /** Room 2D mode: notes lie flat on the board (no billboard upright). */
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
+  get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
+  set isUpright(isUpright: boolean) {
+    if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps
+    this.textNote.isUpright = isUpright;
+  }
   get isAltitudeIndicate(): boolean { return this.textNote.isAltitudeIndicate; }
   set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.textNote.isAltitudeIndicate = isAltitudeIndicate; }
   get isLocked(): boolean { return this.textNote.isLocked; }
   set isLocked(isLocked: boolean) { this.textNote.isLocked = isLocked; }
   get isShowTitle(): boolean { return this.textNote.isShowTitle; }
   set isShowTitle(isShowTitle: boolean) { this.textNote.isShowTitle = isShowTitle; }
+  get titleBgColor(): string {
+    const c = this.textNote.titleBgColor || '#1e1e1e';
+    return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#1e1e1e';
+  }
+  /** Contrast text on the title bar. */
+  get titleFgColor(): string {
+    return StringUtil.textShadowColor(this.titleBgColor, '#f2f2f2', '#222222');
+  }
   get isWhiteOut(): boolean { return this.textNote.isWhiteOut; }
   set isWhiteOut(isWhiteOut: boolean) { this.textNote.isWhiteOut = isWhiteOut; }
   get isGhosted(): boolean { return !!this.textNote?.isGhosted; }
@@ -96,6 +122,22 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isImageContent(): boolean { return this.contentKind === 'image'; }
   get isTextContent(): boolean { return this.contentKind === 'text'; }
   get videoSrc(): string { return this.textNote?.resolvedVideoUrl || ''; }
+  /** Paper chrome is clue-board only. */
+  get paperStyle(): string {
+    if (!this.is2DMode) return 'none';
+    return this.textNote?.paperStyle || 'none';
+  }
+  get pushPin(): boolean { return !!this.textNote?.pushPin && this.is2DMode; }
+  get pushPinAngle(): number { return this.textNote?.pushPinAngle || 0; }
+  get pushPinColor(): string { return this.textNote?.pushPinColor || 'red'; }
+  get pushPinSrc(): string {
+    return pushPinAssetUrl(
+      this.pushPinColor,
+      this.pushPinAngle,
+      this.textNote?.pushPinStyle,
+      this.textNote?.identifier,
+    );
+  }
 
   get isEditorSelected(): boolean {
     return !!this.textAreaElementRef?.nativeElement && document.activeElement === this.textAreaElementRef.nativeElement;
@@ -114,12 +156,17 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   rotableOption: RotableOption = {};
   viewRotateZ = 10;
   private input: InputHandler = null;
+  private resizeInput: InputHandler = null;
+  private resizeBoundEl: HTMLElement = null;
   private dragStarted = false;
   private needsPdfRender = false;
   private lastPdfKey = '';
   private selfPreviewOpen = false;
   private isHovering = false;
   private ctrlHeld = false;
+  private resizeStartW = 1;
+  private resizeStartH = 1;
+  private resizeStartTable = { x: 0, y: 0 };
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;
@@ -136,6 +183,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     private modalService: ModalService,
     private selectionService: TabletopSelectionService,
     private tabletopActionService: TabletopActionService,
+    private characterFxMenu: CharacterFxMenuService,
+    private coordinateService: CoordinateService,
     private i18n: I18nService
   ) { }
 
@@ -160,13 +209,17 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
           this.changeDetector.markForCheck();
         });
       })
-      .on(`UPDATE_SELECTION/identifier/${this.textNote?.identifier}`, () => this.changeDetector.markForCheck());
+      .on(`UPDATE_SELECTION/identifier/${this.textNote?.identifier}`, () => this.changeDetector.markForCheck())
+      .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck());
     this.movableOption = {
       tabletopObject: this.textNote,
       transformCssOffset: 'translateZ(0.17px)',
       colideLayers: ['terrain']
     };
-    this.rotableOption = { tabletopObject: this.textNote };
+    this.rotableOption = {
+      tabletopObject: this.textNote,
+      grabbingSelecter: '.rotate-grab',
+    };
     this.queuePdfRender();
   }
 
@@ -175,6 +228,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       this.input = new InputHandler(this.elementRef.nativeElement);
     });
     this.input.onStart = this.onInputStart.bind(this);
+    this.bindResizeHandle();
   }
 
   ngAfterViewChecked() {
@@ -182,12 +236,73 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       this.needsPdfRender = false;
       this.renderPdf();
     }
+    this.bindResizeHandle();
   }
 
   ngOnDestroy() {
     this.closeSelfPreview();
     EventSystem.unregister(this);
     this.input?.destroy();
+    this.resizeInput?.destroy();
+    this.resizeInput = null;
+  }
+
+  private bindResizeHandle() {
+    const el = this.resizeGrabRef?.nativeElement || null;
+    if (!el) {
+      this.resizeInput?.destroy();
+      this.resizeInput = null;
+      this.resizeBoundEl = null;
+      return;
+    }
+    if (this.resizeBoundEl === el && this.resizeInput) return;
+    this.resizeInput?.destroy();
+    this.resizeBoundEl = el;
+    this.ngZone.runOutsideAngular(() => {
+      this.resizeInput = new InputHandler(el);
+      this.resizeInput.onStart = (ev) => this.onResizeStart(ev);
+      this.resizeInput.onMove = () => this.onResizeMove();
+      this.resizeInput.onEnd = () => this.onResizeEnd();
+    });
+  }
+
+  private onResizeStart(ev: MouseEvent | TouchEvent) {
+    ev?.stopPropagation?.();
+    if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) {
+      this.resizeInput?.cancel();
+      return;
+    }
+    const table = this.coordinateService.calcTabletopLocalCoordinate();
+    this.resizeStartTable = { x: table.x, y: table.y };
+    this.resizeStartW = this.width;
+    this.resizeStartH = this.height;
+  }
+
+  private onResizeMove() {
+    if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) return;
+    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const dx = cur.x - this.resizeStartTable.x;
+    const dy = cur.y - this.resizeStartTable.y;
+    const rad = (-(this.rotate || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const localDx = dx * cos - dy * sin;
+    // Flat notes tip so paper height grows with table +Y; flip if upright billboard.
+    const localDy = this.isUpright ? -(dx * sin + dy * cos) : (dx * sin + dy * cos);
+    let w = MathUtil.clampMin(this.resizeStartW + localDx / this.gridSize);
+    let h = MathUtil.clampMin(this.resizeStartH + localDy / this.gridSize);
+    w = Math.min(40, Math.max(1, Math.round(w * 2) / 2));
+    h = Math.min(40, Math.max(1, Math.round(h * 2) / 2));
+    this.ngZone.run(() => {
+      // Free width/height — no aspect lock for A4 / sticky.
+      this.textNote.width = w;
+      this.textNote.height = h;
+      this.changeDetector.markForCheck();
+    });
+  }
+
+  private onResizeEnd() {
+    this.changeDetector.markForCheck();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -358,12 +473,31 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         on: this.i18n.t('note.flipped'),
         off: this.i18n.t('note.frontFace'),
       }),
+      ...(this.is2DMode ? [
+        {
+          name: this.i18n.t('fx.paperStyle'),
+          action: null,
+          subActions: PAPER_STYLES.map(id => ({
+            name: `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
+            action: () => {
+              this.textNote.applyPaperStyle(id);
+              this.changeDetector.markForCheck();
+            },
+            nameUpdate: () => `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
+            checkBox: 'radio' as const,
+          })),
+        },
+        this.characterFxMenu.makePushPinMenu(this.textNote),
+      ] : []),
+      this.characterFxMenu.makeClueLinkMenu(this.textNote),
       ContextMenuSeparator,
       {
         name: this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
         nameUpdate: () => this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
         action: () => { this.isUpright = !this.isUpright; this.changeDetector.markForCheck(); },
-        checkBox: 'check'
+        checkBox: 'check',
+        disabled: this.is2DMode,
+        tip: this.is2DMode ? this.i18n.t('note.upright2dLocked') : undefined,
       },
       {
         name: this.isShowTitle ? this.i18n.t('textNote.menu.6') : this.i18n.t('textNote.menu.7'),
@@ -377,6 +511,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         action: () => { this.isWhiteOut = !this.isWhiteOut; this.changeDetector.markForCheck(); },
         checkBox: 'check'
       },
+      ...(this.isTextContent ? [{
+        name: this.i18n.t('note.fieldAlign'),
+        action: null,
+        subActions: (['left', 'center', 'right', 'justify'] as const).map(id => ({
+          name: `${this.textAlign === id ? '◉' : '○'} ${this.i18n.t(`note.align.${id}`)}`,
+          action: () => { this.textAlign = id; this.changeDetector.markForCheck(); },
+          nameUpdate: () => `${this.textAlign === id ? '◉' : '○'} ${this.i18n.t(`note.align.${id}`)}`,
+          checkBox: 'radio' as const,
+        })),
+      }] : []),
       ContextMenuSeparator,
       {
         name: this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
@@ -558,10 +702,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private showDetail(gameObject: TextNote) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
-    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    const coordinate = this.pointerDeviceService.pointers[0];
+    const option: PanelOption = {
+      title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     const component = this.panelService.open<NoteSettingsComponent>(NoteSettingsComponent, option);
     component.note = gameObject;
     component.embedded = false;

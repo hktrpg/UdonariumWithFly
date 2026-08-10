@@ -1,18 +1,21 @@
 import { Injectable } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import { ClueLink } from '@udonarium/clue-link';
 import { ImageContext, ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
-import { GameTable } from '@udonarium/game-table';
+import { GameTable, GridType } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { TokenFrameStyle } from '@udonarium/table-fx/push-pin.util';
 
 import { ContextMenuAction } from './context-menu.service';
 import { I18nService } from './i18n.service';
@@ -20,6 +23,12 @@ import { PointerCoordinate } from './pointer-device.service';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { RangeArea } from '@udonarium/range';
+
+/** Fixed sync ids for the two first-load default maps. */
+export const DEFAULT_TABLE_3D_ID = 'gameTable';
+export const DEFAULT_TABLE_2D_ID = 'gameTable_clue2d';
+export const DEFAULT_BG_3D_IMAGE_ID = 'testTableBackgroundImage_image';
+export const DEFAULT_BG_2D_IMAGE_ID = 'clueBoardBackgroundImage_image';
 
 @Injectable({
   providedIn: 'root'
@@ -84,6 +93,8 @@ export class TabletopActionService {
     textNote.location.x = position.x;
     textNote.location.y = position.y;
     textNote.posZ = position.z;
+    // 2D boards: notes are always face-up on the table (never billboard upright).
+    if (TableSelecter.instance.viewTable?.is2DMode) textNote.isUpright = false;
     textNote.setLocation('table');
     return textNote;
   }
@@ -251,26 +262,75 @@ export class TabletopActionService {
     return range;
   }
 
-  makeDefaultTable() {
-    let gameTable = new GameTable('gameTable');
-    let testBgFile: ImageFile = null;
-    let bgFileContext = ImageFile.createEmpty('testTableBackgroundImage_image').toContext();
-    bgFileContext.url = './assets/images/BG10a_80.jpg';
-    testBgFile = ImageStorage.instance.add(bgFileContext);
-    ImageTag.create(testBgFile.identifier).tag = '*default ' + this.i18n.t('char.table');
-    gameTable.name = this.i18n.t('action.firstTable');
-    gameTable.imageIdentifier = testBgFile.identifier;
-    gameTable.width = 20;
-    gameTable.height = 15;
-    gameTable.initialize();
+  /** Default clue-board surface art (HD). */
+  static readonly CLUE_BOARD_BG_URL = './assets/images/clue-board/redboard.jpg';
 
-    TableSelecter.instance.viewTableIdentifier = gameTable.identifier;
-    TableSelecter.instance.viewedTableIdentifier = gameTable.identifier;
-    gameTable.selected = true;
-    EventSystem.trigger('SELECT_GAME_TABLE', { identifier: gameTable.identifier });
+  /**
+   * Ensure the built-in clue-board image slot points at the current redboard art.
+   * Safe for rooms that still reference the old procedural corkboard URL.
+   */
+  ensureClueBoardBackground() {
+    const redboardUrl = TabletopActionService.CLUE_BOARD_BG_URL;
+    const prev = ImageStorage.instance.get(DEFAULT_BG_2D_IMAGE_ID);
+    if (prev?.url === redboardUrl) return;
+    // Reserved default-map image id — replace legacy corkboard / stale redboard path.
+    if (prev) ImageStorage.instance.delete(DEFAULT_BG_2D_IMAGE_ID);
+    const bg2dCtx = ImageFile.createEmpty(DEFAULT_BG_2D_IMAGE_ID).toContext();
+    bg2dCtx.url = redboardUrl;
+    const bg2d = ImageStorage.instance.add(bg2dCtx);
+    if (!ImageTag.get(bg2d.identifier)) {
+      ImageTag.create(bg2d.identifier).tag = '*default ' + this.i18n.t('sample.clue.tableName');
+    }
+  }
+
+  makeDefaultTable() {
+    // 3D battle map (legacy image id — also used by "create blank table")
+    const bg3dCtx = ImageFile.createEmpty(DEFAULT_BG_3D_IMAGE_ID).toContext();
+    bg3dCtx.url = './assets/images/BG10a_80.jpg';
+    const bg3d = ImageStorage.instance.add(bg3dCtx);
+    ImageTag.create(bg3d.identifier).tag = '*default ' + this.i18n.t('char.table');
+
+    const table3d = new GameTable(DEFAULT_TABLE_3D_ID);
+    table3d.name = this.i18n.t('sample.battle.tableName');
+    table3d.imageIdentifier = bg3d.identifier;
+    table3d.width = 20;
+    table3d.height = 15;
+    table3d.is2DMode = false;
+    table3d.initialize();
+
+    // 2D clue board (HD red-lit corkboard)
+    this.ensureClueBoardBackground();
+    const bg2d = ImageStorage.instance.get(DEFAULT_BG_2D_IMAGE_ID);
+
+    const table2d = new GameTable(DEFAULT_TABLE_2D_ID);
+    table2d.name = this.i18n.t('sample.clue.tableName');
+    table2d.imageIdentifier = bg2d.identifier;
+    table2d.width = 31;
+    table2d.height = 17;
+    table2d.is2DMode = true;
+    table2d.gridType = GridType.NONE;
+    table2d.gridColor = '#3a201880';
+    table2d.isShowNumber = false;
+    table2d.weatherType = 'none';
+    table2d.weatherIntensity = 0.5;
+    table2d.initialize();
+
+    // Initial view: 3D battle map
+    table3d.selected = true;
+    table2d.selected = false;
+    TableSelecter.instance.viewTableIdentifier = table3d.identifier;
+    TableSelecter.instance.viewedTableIdentifier = table3d.identifier;
+    EventSystem.trigger('SELECT_GAME_TABLE', { identifier: table3d.identifier });
   }
 
   makeDefaultTabletopObjects() {
+    // Classic battle tokens on 3D; clue-board demo on 2D (Monster C dual-placed).
+    this.seedClassicBattleObjects(DEFAULT_TABLE_3D_ID);
+    this.seedClueBoardObjects(DEFAULT_TABLE_2D_ID);
+    TabletopObject.migrateUnboundTablePieces(DEFAULT_TABLE_3D_ID);
+  }
+
+  private seedClassicBattleObjects(tableId: string) {
     let testCharacter: GameCharacter = null;
     let testFile: ImageFile = null;
     let fileContext: ImageContext = null;
@@ -284,12 +344,14 @@ export class TabletopActionService {
     testCharacter.location.y = 9 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterA'), 1, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
 
     testCharacter = new GameCharacter('testCharacter_2');
     testCharacter.location.x = 8 * 50;
     testCharacter.location.y = 8 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterB'), 1, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
 
     testCharacter = new GameCharacter('testCharacter_3');
     fileContext = ImageFile.createEmpty('testCharacter_3_image').toContext();
@@ -300,6 +362,7 @@ export class TabletopActionService {
     testCharacter.location.y = 2 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.monsterC'), 3, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
 
     testCharacter = new GameCharacter('testCharacter_4');
     fileContext = ImageFile.createEmpty('testCharacter_4_image').toContext();
@@ -310,6 +373,7 @@ export class TabletopActionService {
     testCharacter.location.y = 11 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.characterA'), 1, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
 
     testCharacter = new GameCharacter('testCharacter_5');
     fileContext = ImageFile.createEmpty('testCharacter_5_image').toContext();
@@ -320,20 +384,157 @@ export class TabletopActionService {
     testCharacter.location.y = 12 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.characterB'), 1, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
 
     testCharacter = new GameCharacter('testCharacter_6');
     fileContext = ImageFile.createEmpty('testCharacter_6_image').toContext();
     fileContext.url = './assets/images/mon_135.gif';
     testFile = ImageStorage.instance.add(fileContext);
-
     ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
-    testCharacter.initialize();
     testCharacter.location.x = 5 * 50;
     testCharacter.location.y = 13 * 50;
     testCharacter.initialize();
     testCharacter.createTestGameDataElement(this.i18n.t('sample.characterC'), 1, testFile.identifier);
+    testCharacter.moveToTableOnly(tableId);
+  }
 
-    TabletopObject.migrateUnboundTablePieces(TableSelecter.instance.viewTableIdentifier);
+  /** Standing-mask fill: darker sticky yellow (ZIP clueMask bgcolor). */
+  static readonly CLUE_STICKY_YELLOW = '#9e811a';
+
+  /**
+   * Default 2D clue-board layout (from HKTRPG_2026-08-10_1009.zip 2D map).
+   * Monster C also sits under the yellow standing mask; rumour stays in common.
+   */
+  private seedClueBoardObjects(tableId: string) {
+    // Dual-map: keep 3D battle pose, add under yellow mask for standing-silhouette demo.
+    const monsterC = ObjectStore.instance.get<GameCharacter>('testCharacter_3');
+    if (monsterC) {
+      monsterC.pushPin = true;
+      monsterC.pushPinAngle = 13;
+      monsterC.pushPinStyle = 2;
+      monsterC.addToTable(tableId, { x: 175, y: 400, posZ: 0 }, false);
+    }
+
+    const clueA = this.seedClueCharacter('clueCharacter_1', './assets/images/mon_150.gif',
+      this.i18n.t('sample.clue.suspectA'), 829, 304, tableId, 'polaroid', -8, 6, -8);
+    const clueB = this.seedClueCharacter('clueCharacter_2', './assets/images/mon_211.gif',
+      this.i18n.t('sample.clue.suspectB'), 573, 373, tableId, 'photo', 12, 6, -7);
+    const clueC = this.seedClueCharacter('clueCharacter_3', './assets/images/mon_135.gif',
+      this.i18n.t('sample.clue.evidence'), 500, 480, tableId, 'card', -15, 2, -6);
+    const clueD = this.seedClueCharacter('clueCharacter_4', './assets/images/mon_052.gif',
+      this.i18n.t('sample.clue.witness'), 655, 632, tableId, 'polaroid', 6, 2, -5);
+
+    const noteA4 = TextNote.create(
+      this.i18n.t('sample.clue.caseTitle'),
+      this.i18n.t('sample.clue.caseBody'),
+      12, 6, 6, 'clueNote_a4');
+    noteA4.location.x = 1225;
+    noteA4.location.y = 625;
+    noteA4.rotate = -4;
+    noteA4.isUpright = false;
+    noteA4.applyPaperStyle('a4');
+    noteA4.pushPin = true;
+    noteA4.pushPinAngle = -22;
+    noteA4.pushPinStyle = 7;
+    noteA4.moveToTableOnly(tableId);
+
+    const sticky = TextNote.create(
+      this.i18n.t('sample.clue.stickyTitle'),
+      this.i18n.t('sample.clue.stickyBody'),
+      14, 2.5, 2.5, 'clueNote_sticky');
+    sticky.location.x = 981;
+    sticky.location.y = 711;
+    sticky.rotate = 7;
+    sticky.isUpright = false;
+    sticky.applyPaperStyle('sticky');
+    sticky.pushPin = true;
+    sticky.pushPinAngle = -25;
+    sticky.pushPinStyle = 6;
+    sticky.moveToTableOnly(tableId);
+
+    // Inventory handout: revealed via mask click (matches ZIP location.name=common).
+    const rumours = TextNote.create(
+      this.i18n.t('sample.clue.rumourTitle'),
+      this.i18n.t('sample.clue.rumourBody'),
+      14, 4, 3, 'clueNote_rumour');
+    rumours.location.x = 1259;
+    rumours.location.y = 698;
+    rumours.rotate = 0;
+    rumours.isUpright = false;
+    rumours.isLocked = true;
+    rumours.textAlign = 'center';
+    rumours.tableIdentifier = tableId;
+    rumours.location.name = 'common';
+    rumours.update();
+
+    const mask = GameTableMask.create(
+      this.i18n.t('sample.clue.maskName'), 5, 7, 100, 'clueMask_org');
+    mask.location.x = 126;
+    mask.location.y = 229;
+    mask.isLock = true;
+    mask.borderType = 0;
+    mask.text = this.i18n.t('sample.clue.maskText');
+    mask.fontsize = 18;
+    mask.textPosition = 'top-center';
+    mask.color = '#555555';
+    mask.bgcolor = TabletopActionService.CLUE_STICKY_YELLOW;
+    mask.tokenFxPassive = true;
+    mask.tokenFxPassiveConfig = {
+      isInverse: false,
+      isHollow: false,
+      isBlackPaint: true,
+      isGrayscale: false,
+      isSepia: false,
+      isWhitePaint: false,
+      isMatrix: false,
+      isFlipVertical: false,
+      isContrast: false,
+      altitudeMode: 'none',
+      altitude: 0,
+    };
+    mask.setEnabledClickActions(['note', 'tokenFx']);
+    mask.clickNoteId = rumours.identifier;
+    mask.moveToTableOnly(tableId);
+    const clueTable = ObjectStore.instance.get<GameTable>(tableId);
+    if (clueTable) clueTable.appendChild(mask);
+
+    ClueLink.create(clueA.identifier, clueB.identifier, { sag: 0.28, tableIdentifier: tableId, identifier: 'clueLink_1' });
+    ClueLink.create(clueB.identifier, clueC.identifier, { sag: 0.2, tableIdentifier: tableId, identifier: 'clueLink_2' });
+    ClueLink.create(clueA.identifier, noteA4.identifier, { sag: 0.32, tableIdentifier: tableId, identifier: 'clueLink_3' });
+    ClueLink.create(clueD.identifier, sticky.identifier, { sag: 0.18, tableIdentifier: tableId, identifier: 'clueLink_4' });
+    ClueLink.create(clueC.identifier, clueD.identifier, { sag: 0.25, tableIdentifier: tableId, identifier: 'clueLink_5' });
+  }
+
+  private seedClueCharacter(
+    id: string,
+    imageUrl: string,
+    name: string,
+    x: number,
+    y: number,
+    tableId: string,
+    frame: TokenFrameStyle,
+    rotate: number,
+    pinStyle: number,
+    pinAngle: number,
+  ): GameCharacter {
+    const fileContext = ImageFile.createEmpty(id + '_image').toContext();
+    fileContext.url = imageUrl;
+    const testFile = ImageStorage.instance.add(fileContext);
+    ImageTag.create(testFile.identifier).tag = '*default ' + this.i18n.t('action.newCharacter');
+    const ch = new GameCharacter(id);
+    ch.location.x = x;
+    ch.location.y = y;
+    ch.rotate = rotate;
+    ch.initialize();
+    ch.createTestGameDataElement(name, 1, testFile.identifier);
+    ch.tokenFrame = frame;
+    ch.tokenFrameCaption = name;
+    ch.isShowName = true;
+    ch.pushPin = true;
+    ch.pushPinAngle = pinAngle;
+    ch.pushPinStyle = pinStyle;
+    ch.moveToTableOnly(tableId);
+    return ch;
   }
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {

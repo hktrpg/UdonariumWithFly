@@ -75,7 +75,8 @@ export class FolderBackupService implements OnDestroy {
   static readonly STORAGE_KEY = 'udonarium.folderBackup.dirHandle';
   private static readonly DEBOUNCE_MS = 5000;
   private static readonly MIN_INTERVAL_MS = 30000;
-  private static readonly DEFAULT_FLUSH_TIMEOUT_MS = 15000;
+  /** Includes time to materialize ./assets URL images into the room zip. */
+  private static readonly DEFAULT_FLUSH_TIMEOUT_MS = 60000;
 
   private dirHandle: FileSystemDirectoryHandle | null = null;
   private listening = false;

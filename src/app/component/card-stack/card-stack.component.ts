@@ -733,10 +733,16 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private showDetail(gameObject: CardStack) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('stack.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 140, width: 420, height: 320 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 210, top: coordinate.y - 140, width: 420, height: 320,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<CardStackSettingsComponent>(CardStackSettingsComponent, option);
     component.cardStack = gameObject;
   }

@@ -3,6 +3,8 @@ import { AudioPlayer, VolumeType } from './core/file-storage/audio-player';
 import { AudioStorage } from './core/file-storage/audio-storage';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject, ObjectContext } from './core/synchronize-object/game-object';
+import { InnerXml } from './core/synchronize-object/object-serializer';
+import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem } from './core/system';
 import { AudioLibrary } from './audio-library';
 
@@ -84,7 +86,7 @@ function shuffleIds(ids: string[]): string[] {
 }
 
 @SyncObject('jukebox')
-export class Jukebox extends GameObject {
+export class Jukebox extends GameObject implements InnerXml {
   /** @deprecated Legacy single-track fields; migrated into tracksJson track0. */
   @SyncVar() audioIdentifier: string = '';
   @SyncVar() startTime: number = 0;
@@ -96,6 +98,24 @@ export class Jukebox extends GameObject {
   private audioPlayers: AudioPlayer[] = [];
   private waitingFileUpdate: boolean[] = [];
   private migrated = false;
+
+  /** Singleton used by ZIP save/load (fly_jukebox.xml). */
+  static get instance(): Jukebox {
+    return ObjectStore.instance.get<Jukebox>('Jukebox') || null;
+  }
+
+  innerXml(): string { return ''; }
+
+  /** Merge ZIP/room parse into the live Jukebox and destroy the temp clone. */
+  parseInnerXml(_element: Element) {
+    const live = Jukebox.instance;
+    if (!live || live === this) return;
+    const context = live.toContext();
+    context.syncData = this.toContext().syncData;
+    live.apply(context);
+    live.update();
+    this.destroy();
+  }
 
   get tracks(): JukeboxTrackState[] {
     this.ensureMigrated();

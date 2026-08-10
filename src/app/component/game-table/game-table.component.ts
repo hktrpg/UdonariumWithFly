@@ -3,6 +3,7 @@ import { Subscription } from 'rxjs';
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import { ClueLink } from '@udonarium/clue-link';
 import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -18,6 +19,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
 import { TableLight } from '@udonarium/table-fx/table-light';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+import { notePinAnchorPx, pinAnchorPx, stringPathD } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
@@ -71,7 +73,7 @@ interface TablePingView {
 @Component({
     selector: 'game-table',
     templateUrl: './game-table.component.html',
-    styleUrls: ['./game-table.component.css'],
+    styleUrls: ['./game-table.component.css', '../shared/clue-board.css'],
     standalone: false
 })
 export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -123,6 +125,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
+
+  /**
+   * Yarn must sit above flat 2D tokens (movable ≈1px + upright ≈1px → ≈2px)
+   * but below push-pin heads (local translateZ on .push-pin).
+   */
+  get clueStringsZ(): number {
+    return this.gridHeight + 2.4;
+  }
 
   /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
   weatherLayerZ(layer: number): number {
@@ -239,6 +249,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private viewRotateY: number = GameTableComponent.DEFAULT_VIEW_ROT_Y;
   private viewRotateZ: number = GameTableComponent.DEFAULT_VIEW_ROT_Z;
 
+  /** Per-table camera (local). Switching maps must not reuse another map's pitch/pan. */
+  private tableViewById = new Map<string, {
+    x: number; y: number; z: number;
+    rotX: number; rotY: number; rotZ: number;
+  }>();
+  /** Table id that the live view* fields currently belong to. */
+  private cameraTableId = '';
+
   private mouseGesture: TableMouseGesture = null;
   private touchGesture: TableTouchGesture = null;
   private pickGesture: TablePickGesture = null;
@@ -250,7 +268,62 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   showDebugPose = sessionStorage.getItem('udon.debugPose') === '1';
   private debugPoseTimer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Room ZIP reuses syncIds; Angular trackBy(identifier) would recycle piece components
+   * bound to destroyed objects (isLoaded stays false → display:none). Bump on archive load
+   * so *ngFor remounts like a map switch.
+   */
+  pieceRenderEpoch = 0;
+
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
+  get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
+
+  /** Prefer live pin DOM position (handles note 3D tip-over); fall back to model math. */
+  cluePathD(link: ClueLink): string {
+    if (!link) return '';
+    const grid = this.currentTable?.gridSize || 50;
+    const p1 = this.resolvePinTablePoint(link.fromIdentifier, grid);
+    const p2 = this.resolvePinTablePoint(link.toIdentifier, grid);
+    if (!p1 || !p2) return '';
+    return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
+  }
+
+  private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
+    if (!id) return null;
+    const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+      ? CSS.escape(id)
+      : id.replace(/["\\]/g, '\\$&');
+    const pinEl = this.gameObjects?.nativeElement?.querySelector(
+      `[data-clue-pin="${esc}"]`
+    ) as HTMLElement | null;
+    if (pinEl) {
+      const rect = pinEl.getBoundingClientRect();
+      // display:none / not laid out → singular transform matrix (invert det=0).
+      if (rect.width > 0.5 && rect.height > 0.5) {
+        // Pointer stack uses page coords; pin head is near the top of .push-pin.
+        const page = {
+          x: rect.left + rect.width * 0.5 + window.pageXOffset,
+          y: rect.top + rect.height * 0.3 + window.pageYOffset,
+          z: 0,
+        };
+        const local = this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
+        if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
+          return { x: local.x, y: local.y };
+        }
+      }
+    }
+    const obj = ObjectStore.instance.get(id);
+    if (obj instanceof GameCharacter) {
+      const s = (obj.size || 1) * gridSize;
+      return pinAnchorPx(obj, s, s);
+    }
+    if (obj instanceof TextNote) {
+      const w = (obj.width || 1) * gridSize;
+      const h = (obj.height || 1) * gridSize;
+      return notePinAnchorPx(obj, w, h);
+    }
+    return null;
+  }
   get tableMasks(): GameTableMask[] { return this.tabletopService.tableMasks; }
   get cards(): Card[] { return this.tabletopService.cards; }
   get cardStacks(): CardStack[] { return this.tabletopService.cardStacks; }
@@ -406,6 +479,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         // After TabletopService refreshes object caches for the new viewed table.
         this.ngZone.run(() => queueMicrotask(() => this.applyViewedTable()));
       })
+      .on('ARCHIVE_LOAD_COMPLETE', () => {
+        // ZIP load replaces tables but keeps this component's in-memory cameras.
+        // Stale pan/tilt (or a singular CSS matrix during hydrate) makes tokens look
+        // "wrong" until the user switches maps — which re-runs applyViewedTable.
+        this.ngZone.run(() => this.refreshAfterRoomArchiveLoad());
+      })
+      .on('ROOM_PIECES_REPLACED', () => {
+        // fly_data.xml finished before images; remount so recycled syncId views are not kept.
+        this.ngZone.run(() => {
+          this.pieceRenderEpoch++;
+          this.changeDetector.detectChanges();
+          MovableDirective.syncAllPosesFromObjects();
+        });
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
 
@@ -444,6 +531,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
             this.setTransform(0, 0, 0, 0, 0, 0, true);
           } else {
             this.applyDefaultPointOfView();
+          }
+          if (this.cameraTableId) {
+            this.tableViewById.set(this.cameraTableId, this.snapshotTableView());
           }
         }, 50);
         this.removeFocus();
@@ -539,19 +629,74 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private _last2DMode: boolean | null = null;
-  /** When room enters 2D mode, snap all clients to top-down; leaving restores default pitch. */
+
+  private snapshotTableView() {
+    return {
+      x: this.viewPotisonX,
+      y: this.viewPotisonY,
+      z: this.viewPotisonZ,
+      rotX: this.viewRotateX,
+      rotY: this.viewRotateY,
+      rotZ: this.viewRotateZ,
+    };
+  }
+
+  private saveCameraForCurrentTable() {
+    if (!this.cameraTableId) return;
+    this.tableViewById.set(this.cameraTableId, this.snapshotTableView());
+  }
+
+  /**
+   * Restore this table's last camera, or apply 2D top-down / 3D default on first visit.
+   * Table switches must call this; do not reuse another map's view.
+   */
+  private applyCameraForTable(table: GameTable) {
+    if (!table) return;
+    this.cameraTableId = table.identifier;
+    this._last2DMode = !!table.is2DMode;
+    if (!this.gameTable?.nativeElement) return;
+
+    const saved = this.tableViewById.get(table.identifier);
+    if (saved) {
+      if (table.is2DMode) {
+        // Keep pan/zoom/yaw; force flat pitch/roll for 2D maps.
+        this.setTransform(saved.x, saved.y, saved.z, 0, 0, saved.rotZ, true);
+        this.zeroAllCharacterRolls();
+      } else {
+        this.setTransform(saved.x, saved.y, saved.z, saved.rotX, saved.rotY, saved.rotZ, true);
+      }
+      return;
+    }
+
+    this.applyDefaultPointOfView();
+    if (table.is2DMode) this.zeroAllCharacterRolls();
+    this.tableViewById.set(table.identifier, this.snapshotTableView());
+  }
+
+  /**
+   * Same-table is2DMode toggle only. Table switches are handled by applyCameraForTable
+   * (viewedTableIdentifier is local and does not always fire UPDATE_GAME_OBJECT).
+   */
   private sync2DModeCamera() {
-    const on = !!this.currentTable?.is2DMode;
+    const table = this.currentTable;
+    if (!table) return;
+    // Avoid clobbering the previous map's saved camera during Activate/View.
+    if (this.cameraTableId && this.cameraTableId !== table.identifier) return;
+
+    const on = !!table.is2DMode;
     if (this._last2DMode === on) return;
     const prev = this._last2DMode;
     this._last2DMode = on;
     if (prev === null && !on) return; // first observe while already 3D — keep current view
     if (on) {
-      // Entering 2D (or first observe already in 2D): top-down + zero all tip/tilt SyncVars.
+      // Entering 2D: top-down + zero all tip/tilt SyncVars.
       this.setTransform(this.viewPotisonX, this.viewPotisonY, this.viewPotisonZ, 0, 0, 0, true);
       this.zeroAllCharacterRolls();
     } else if (prev === true) {
       this.applyDefaultPointOfView();
+    }
+    if (this.cameraTableId === table.identifier) {
+      this.tableViewById.set(table.identifier, this.snapshotTableView());
     }
   }
 
@@ -572,7 +717,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.cancelInput();
 
     this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor);
-    this.applyDefaultPointOfView();
+    // First paint / deferred applyCameraForTable (ViewChild was not ready in ngOnInit).
+    this.tabletopActionService.ensureClueBoardBackground();
+    this.applyCameraForTable(this.currentTable);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
     this.weatherRender = new WeatherRender([
@@ -1246,7 +1393,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   trackByGameObject(index: number, gameObject: GameObject) {
-    return gameObject.identifier;
+    return `${this.pieceRenderEpoch}:${gameObject.identifier}`;
   }
 
   isCursorHidIn(cursor: PeerCursor): boolean {
@@ -1388,6 +1535,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Apply local View / Activate: bg, grid, weather, lighting, token list for current viewed table. */
   private applyViewedTable() {
+    // Persist leaving map's camera before currentTable flips in getters below.
+    this.saveCameraForCurrentTable();
+
     // Drop image caches first so getters rebuild against the new viewed table.
     this._currentTable = null;
     this._currentTableImage = null;
@@ -1410,9 +1560,36 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       table.gridColor,
       table.isShowNumber,
     );
+    this.applyCameraForTable(table);
     this.refreshFx();
     this.ensureFxTimer();
     this.changeDetector.detectChanges();
+  }
+
+  /**
+   * After room ZIP finishes: remount piece views, reset cameras, re-apply grid,
+   * then sync Movable once layout has settled.
+   */
+  private refreshAfterRoomArchiveLoad() {
+    this.pieceRenderEpoch++;
+    this.tableViewById.clear();
+    this.cameraTableId = '';
+    this._last2DMode = null;
+
+    const refresh = () => {
+      this.applyViewedTable();
+      MovableDirective.syncAllPosesFromObjects();
+    };
+
+    // Force *ngFor to see the new trackBy epoch immediately.
+    this.changeDetector.detectChanges();
+
+    queueMicrotask(refresh);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(refresh);
+    });
+    // Late pass: remounted tokens + images may still be settling.
+    setTimeout(refresh, 100);
   }
 
   /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */
@@ -1733,7 +1910,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         // Selected tokens ignore self UPDATE in MovableDirective — clear first, then force pose sync.
         this.selectionService.remove(ch);
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, true);
+        // Keep other-map placements when dragging a token that is already on a table.
+        // Exclusive only for true inventory → table (no existing placements).
+        const exclusive = ch.location.name !== 'table' && ch.placementTableIds.length < 1;
+        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, exclusive);
         MovableDirective.syncPoseFromUndo(ch, x, y, ch.posZ);
         placedChars.push(ch);
       }

@@ -21,6 +21,8 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() roll: number = 0;
   @SyncVar() isDropShadow: boolean = true;
   @SyncVar() isShowChatBubble: boolean = true;
+  /** Show name on token (name-tag, or Polaroid caption when framed). */
+  @SyncVar() isShowName: boolean = true;
   @SyncVar() owner: string = '';
   /**
    * Peer userId that claims this as their PC token (not stealth).
@@ -104,6 +106,16 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() floorRing: string = 'none';
   @SyncVar() floorRingColor: string = '';
   @SyncVar() floorRingSpeed: number = 1;
+
+  /** Clue-board frame overlay: none | polaroid | photo | card */
+  @SyncVar() tokenFrame: string = 'none';
+  @SyncVar() tokenFrameCaption: string = '';
+  @SyncVar() pushPin: boolean = false;
+  @SyncVar() pushPinAngle: number = 0;
+  /** Legacy SyncVar (unused for art; kept for room XML compat). */
+  @SyncVar() pushPinColor: string = 'red';
+  /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
+  @SyncVar() pushPinStyle: number = 0;
   
   text = '';
   dialog = null;

@@ -113,6 +113,20 @@
   </section>
 
   <section class="card card-dense room-actions">
+    <!-- ZIP save/load: always available in a room (not gated by File System Access / folder backup). -->
+    <div class="room-zip-row actions" *ngIf="!GuestMode() && networkService.peer.isRoom">
+      <button type="button" class="btn btn-sm" (click)="downloadZip()"
+        [disabled]="isDownloadingZip">
+        <i class="material-icons">sd_storage</i>
+        {{ isDownloadingZip ? (downloadZipPercent + '%') : ('menu.downloadZip' | i18n) }}
+      </button>
+      <button type="button" class="btn btn-sm" (click)="loadZip()"
+        [disabled]="!canLoadZip"
+        [title]="canLoadZip ? ('menu.loadZip' | i18n) : ('peer.loadData.gmOnly' | i18n)">
+        <i class="material-icons">open_in_browser</i>
+        {{ 'menu.loadZip' | i18n }}<ng-container *ngIf="!canLoadZip">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
+      </button>
+    </div>
     <div class="room-zip-row actions" *ngIf="!GuestMode() && folderBackup.isSupported">
       <button type="button" class="btn btn-sm" *ngIf="folderBackup.needsBind || folderBackup.hasError" (click)="bindFolderBackup()">
         <i class="material-icons">folder</i>
@@ -140,17 +154,6 @@
           </button>
         </div>
       </div>
-      <button type="button" class="btn btn-sm" *ngIf="networkService.peer.isRoom" (click)="loadZip()"
-        [disabled]="!canLoadZip"
-        [title]="canLoadZip ? ('menu.loadZip' | i18n) : ('peer.loadData.gmOnly' | i18n)">
-        <i class="material-icons">open_in_browser</i>
-        {{ 'menu.loadZip' | i18n }}<ng-container *ngIf="!canLoadZip">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
-      </button>
-      <button type="button" class="btn btn-sm" *ngIf="networkService.peer.isRoom" (click)="downloadZip()"
-        [disabled]="isDownloadingZip">
-        <i class="material-icons">sd_storage</i>
-        {{ isDownloadingZip ? (downloadZipPercent + '%') : ('menu.downloadZip' | i18n) }}
-      </button>
       <span class="folder-status" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
         {{ folderBackup.status === 'writing'
           ? ('menu.folderBackup.status.writing' | i18n)

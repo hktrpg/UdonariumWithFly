@@ -120,6 +120,11 @@ export class PanelService {
     return characterId ? `char.stand.${characterId}` : '';
   }
 
+  /** Singleton id for a tabletop object's detail / settings panel (one per object). */
+  static tourIdObjectDetail(objectId: string): string {
+    return objectId ? `obj.detail.${objectId}` : '';
+  }
+
   /** Shared size key for object detail sheets (character / card / note / …). */
   static sheetGeometryKey(aliasName: string): string {
     return `sheet.${aliasName || 'object'}`;
@@ -149,6 +154,8 @@ export class PanelService {
     if (!tourPanelIdOrKey) return '';
     if (tourPanelIdOrKey.startsWith('char.palette.')) return 'char.palette';
     if (tourPanelIdOrKey.startsWith('char.stand.')) return 'char.stand';
+    // Per-object detail panels share one remembered size (type still uses sheetGeometryKey when set).
+    if (tourPanelIdOrKey.startsWith('obj.detail.')) return 'obj.detail';
     return tourPanelIdOrKey;
   }
 
@@ -644,7 +651,7 @@ export class PanelService {
    * Raise the tour panel above other `.draggable-panel` peers (same stacking as appDraggable).
    * Restores minimize if needed. Returns false if no matching panel.
    */
-  static bringTourPanelToFront(tourPanelId: string): boolean {
+  static bringTourPanelToFront(tourPanelId: string, opts?: { title?: string }): boolean {
     if (!tourPanelId) return false;
     let best: PanelService = null;
     let bestEl: HTMLElement = null;
@@ -662,6 +669,8 @@ export class PanelService {
       }
     }
     if (!best || !bestEl) return false;
+
+    if (opts?.title) best.title = opts.title;
 
     const instance = best.panelComponentRef.instance as { isMinimized?: boolean; toggleMinimize?: (e?: Event) => void } | null;
     if (instance?.isMinimized && typeof instance.toggleMinimize === 'function') {

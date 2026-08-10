@@ -10,6 +10,10 @@ export const zhCN_ctx: I18nDictionary = {
   'char.inventoryOn': '☑ 在桌面仓库显示', 'char.inventoryOff': '☐ 在桌面仓库显示', 'char.moveTo': '移动位置', 'char.commonInventory': '公共仓库', 'char.personalInventory': '个人仓库', 'char.graveyard': '回收区', 'char.clone': '建立副本', 'char.createTemporaryCopy': '建立暂存副本', 'char.deleteTemporaryCopy': '删除暂存副本', 'char.cloneNumbered': '建立副本（自动编号）', 'char.deleteToGraveyard': '删除（移至回收区）', 'char.sheetTitle': '角色卡',
 
   'fx.aura': '光环', 'fx.none': '无', 'fx.clearAura': '清除光环', 'fx.ring': '光环特效', 'fx.ring.none': '无', 'fx.ring.fire': '火环', 'fx.ring.magic': '魔法阵', 'fx.ring.tech': '科技环', 'fx.ring.eldritch': '异界环', 'fx.ring.holy': '圣光环', 'fx.status': '状态',
+  'fx.tokenFrame': '外框', 'fx.tokenFrame.none': '无', 'fx.tokenFrame.polaroid': '拍立得', 'fx.tokenFrame.photo': '照片', 'fx.tokenFrame.card': '卡牌',
+  'fx.pushPin': '图钉', 'fx.pushPin.on': '☑ 显示图钉', 'fx.pushPin.off': '☐ 显示图钉', 'fx.pushPin.reangle': '随机图钉角度／样式',
+  'fx.clueLink': '红绳', 'fx.clueLink.to': '连到 {{name}}', 'fx.clueLink.clear': '移除此物件的红绳',
+  'fx.paperStyle': '纸张外形', 'fx.paperStyle.none': '无', 'fx.paperStyle.a4': 'A4 纸', 'fx.paperStyle.sticky': '便利贴',
   'fx.status.blinded': '目盲', 'fx.status.charmed': '魅惑', 'fx.status.deafened': '耳聋', 'fx.status.frightened': '恐慌', 'fx.status.grappled': '被擒', 'fx.status.incapacitated': '失能', 'fx.status.invisible': '隐形', 'fx.status.paralyzed': '麻痹', 'fx.status.petrified': '石化', 'fx.status.poisoned': '中毒', 'fx.status.prone': '倒地', 'fx.status.restrained': '束缚', 'fx.status.stunned': '震慑', 'fx.status.unconscious': '昏迷', 'fx.status.exhaustion': '力竭', 'fx.status.dead': '死亡',
   'fx.myToken': '{{mark}} 作为我的角色', 'fx.myTokenOwned': '{{mark}} 作为我的角色（{{name}}）', 'fx.addToCombat': '加入战斗', 'fx.addToCombatCount': '加入战斗（{{count}}）', 'fx.unnamed': '未命名',
   'fx.visionLighting': '视野／光照（视{{vision}} 亮{{bright}} 暗{{dim}}）', 'fx.rangeLabel': '{{label}}：{{value}} 格', 'fx.rangeOption': '{{mark}} {{value}} 格', 'fx.myVision': '{{mark}} 作为我的视野角色', 'fx.visionRange': '视野距离', 'fx.brightLight': '亮光', 'fx.dimLight': '昏暗光', 'fx.clearLight': '清除发出的光照',

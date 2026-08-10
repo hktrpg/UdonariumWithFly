@@ -453,6 +453,8 @@ export const ja_obj: I18nDictionary = {
   'char.settings.height': '高さ',
   'char.settings.location': '位置',
   'char.settings.sheetEmpty': 'カスタム資料がありません。「編集切替」から追加できます。',
+  'char.settings.showName': '名前を表示',
+  'char.settings.polaroidCaption': 'ポラロイド下の文字',
   'char.settings.allowsChat': 'チャットを許可',
   'char.settings.chatBubble': '吹き出しを表示',
   'char.settings.inventory': '倉庫に表示',

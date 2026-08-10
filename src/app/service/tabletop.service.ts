@@ -3,6 +3,7 @@ import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ChatTabList } from '@udonarium/chat-tab-list';
+import { ClueLink } from '@udonarium/clue-link';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
@@ -25,6 +26,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { poseDebug } from '@udonarium/table-fx/pose-debug';
 
 import { CoordinateService } from './coordinate.service';
 import { BatchService } from './batch.service';
@@ -63,6 +65,8 @@ export class TabletopService {
   // Same as characters: location cache only; self-only filtered in game-table template.
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote).filter(obj => obj.isVisibleOnTable));
   private diceSymbolCache = new TabletopCache<DiceSymbol>(() => ObjectStore.instance.getObjects(DiceSymbol).filter(obj => obj.isVisibleOnTable));
+  private _clueLinks: ClueLink[] = [];
+  private _clueLinksDirty = true;
 
   get characters(): GameCharacter[] { return this.characterCache.objects; }
   get cards(): Card[] { return this.cardCache.objects; }
@@ -72,7 +76,17 @@ export class TabletopService {
   get terrains(): Terrain[] { return this.terrainCache.objects; }
   get textNotes(): TextNote[] { return this.textNoteCache.objects; }
   get diceSymbols(): DiceSymbol[] { return this.diceSymbolCache.objects; }
+  get clueLinks(): ClueLink[] {
+    if (this._clueLinksDirty) {
+      const viewId = this.tableSelecter.viewTable?.identifier || '';
+      this._clueLinks = ObjectStore.instance.getObjects(ClueLink).filter(link => link.isValidOnTable(viewId));
+      this._clueLinksDirty = false;
+    }
+    return this._clueLinks;
+  }
   get peerCursors(): PeerCursor[] { return ObjectStore.instance.getObjects<PeerCursor>(PeerCursor); }
+
+  private refreshClueLinks() { this._clueLinksDirty = true; }
 
   constructor(
     private coordinateService: CoordinateService,
@@ -98,6 +112,30 @@ export class TabletopService {
         // Do not migrateUnbound here — rebinding to the new view corrupted per-map poses.
         this.refreshCacheAll();
       })
+      .on('ARCHIVE_LOAD_COMPLETE', () => {
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        this.refreshCacheAll();
+        const chars = this.characters || [];
+        const visible = chars.filter(c => c.isVisibleOnTable);
+        poseDebug('event ARCHIVE_LOAD_COMPLETE (TabletopService)', {
+          viewId: viewId || '(none)',
+          viewed: this.tableSelecter.viewedTableIdentifier,
+          active: this.tableSelecter.viewTableIdentifier,
+          characterCache: chars.length,
+          visibleOnTable: visible.length,
+          sample: visible.slice(0, 5).map(c => {
+            const p = c.getPoseForView();
+            return {
+              id: c.identifier,
+              live: `${c.location.x | 0},${c.location.y | 0},${c.posZ | 0}`,
+              poseForView: `${p.x | 0},${p.y | 0},${p.posZ | 0}`,
+              placements: (c.tablePlacements || '').slice(0, 100),
+            };
+          }),
+        });
+        if (viewId) TabletopObject.hydrateAllForView(viewId, true);
+        EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: viewId || '' });
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier === this.currentTable.identifier || event.data.identifier === this.tableSelecter.identifier) {
           this.refreshCache(GameTableMask.aliasName);
@@ -114,11 +152,22 @@ export class TabletopService {
         }
       })
       .on('DELETE_GAME_OBJECT', event => {
+        const deletedId = event.data.identifier as string;
+        // Skip self-echo: after ZIP reload, syncIds are reused and cleanup would
+        // destroy newly parsed clue links that still reference those endpoints.
+        if (!event.isSendFromSelf
+          && deletedId
+          && (event.data.aliasName === GameCharacter.aliasName || event.data.aliasName === TextNote.aliasName)) {
+          ClueLink.cleanupFor(deletedId);
+        }
         let aliasName = event.data.aliasName;
         if (!aliasName) {
           this.refreshCacheAll();
         } else {
           this.refreshCache(aliasName);
+          if (aliasName === GameCharacter.aliasName || aliasName === TextNote.aliasName || aliasName === ClueLink.aliasName) {
+            this.refreshClueLinks();
+          }
         }
       })
       .on('XML_LOADED', event => {
@@ -179,6 +228,10 @@ export class TabletopService {
   private refreshCache(aliasName: string) {
     let cache = this.findCache(aliasName);
     if (cache) cache.refresh();
+    // Endpoint moves / pin toggles refresh clue strings.
+    if (aliasName === GameCharacter.aliasName || aliasName === TextNote.aliasName || aliasName === ClueLink.aliasName) {
+      this.refreshClueLinks();
+    }
   }
 
   private refreshCacheAll() {
@@ -190,6 +243,7 @@ export class TabletopService {
     this.textNoteCache.refresh();
     this.diceSymbolCache.refresh();
     this.rangeCache.refresh();
+    this.refreshClueLinks();
     this.clearMap();
   }
 

@@ -454,6 +454,8 @@ export const zhCN_obj: I18nDictionary = {
   'char.settings.height': '高度',
   'char.settings.location': '位置',
   'char.settings.sheetEmpty': '尚无自定义资料区，可按「切换编辑」后新增。',
+  'char.settings.showName': '显示名字',
+  'char.settings.polaroidCaption': '拍立得底栏文字',
   'char.settings.allowsChat': '允许聊天',
   'char.settings.chatBubble': '显示气泡台词',
   'char.settings.inventory': '显示于仓库',

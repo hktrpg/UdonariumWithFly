@@ -36,6 +36,7 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
   ];
 
   get isGM(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   get editMode(): TextNoteContentMode {
     if (!this.note) return 'text';
     return this.note.contentMode === 'auto' ? this.note.contentKind : this.note.contentMode;
@@ -67,7 +68,8 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
       })
       .on('UPDATE_FILE_RESOURE', () => this.changeDetector.markForCheck())
       .on('UPDATE_PDF_RESOURE', () => this.changeDetector.markForCheck())
-      .on('UPDATE_VIDEO_RESOURE', () => this.changeDetector.markForCheck());
+      .on('UPDATE_VIDEO_RESOURE', () => this.changeDetector.markForCheck())
+      .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck());
     this.refreshTitle();
   }
 

@@ -315,10 +315,16 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   private showDetail(gameObject: TextNote) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
-    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    const coordinate = this.pointerDeviceService.pointers[0];
+    const option: PanelOption = {
+      title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     const component = this.panelService.open<NoteSettingsComponent>(NoteSettingsComponent, option);
     component.note = gameObject;
     component.embedded = false;

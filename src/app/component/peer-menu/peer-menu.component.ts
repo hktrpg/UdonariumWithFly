@@ -191,7 +191,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     });
     if (result === false || result == null) return;
     if (this.folderBackup.isReady) {
-      await this.folderBackup.flush({ timeoutMs: 15000 });
+      await this.folderBackup.flush({ timeoutMs: 60000 });
     }
     document.location.reload();
   }
@@ -389,7 +389,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   async saveFolderBackup() {
     if (this.GuestMode() || !this.networkService.peer?.isRoom) return;
     if (!(await this.folderBackup.ensureBound())) return;
-    await this.folderBackup.flush({ timeoutMs: 15000 });
+    await this.folderBackup.flush({ timeoutMs: 60000 });
   }
 
   loadFolderBackup() {
@@ -600,7 +600,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
         void (async () => {
           const prev = this.currentRole;
           if (result.role === 'guest' && prev !== 'guest') {
-            await this.folderBackup.flush({ timeoutMs: 15000 });
+            await this.folderBackup.flush({ timeoutMs: 60000 });
           }
           RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
           this.roomInvite.setRolePassword(result.role, result.password || '');

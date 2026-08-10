@@ -23,6 +23,7 @@ import { UndoService } from 'service/undo.service';
 
 import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
+import { poseDebug } from '@udonarium/table-fx/pose-debug';
 
 type LayerName = string;
 
@@ -121,7 +122,21 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   ngAfterViewInit() {
     MovableDirective.ensurePoseFlushHook();
-    this.batchService.add(() => this.initialize(), this.onstart);
+    this.batchService.add(() => {
+      this.initialize();
+      if (this.tabletopObject) {
+        const before = { x: this._posX, y: this._posY, z: this._posZ };
+        this.setPosition(this.tabletopObject);
+        const data = this.tabletopObject.getPoseForView();
+        if (before.x !== data.x || before.y !== data.y || before.z !== data.posZ) {
+          poseDebug('movable ngAfterViewInit corrected', {
+            id: this.tabletopObject.identifier,
+            before: `${before.x | 0},${before.y | 0},${before.z | 0}`,
+            after: `${data.x | 0},${data.y | 0},${data.posZ | 0}`,
+          });
+        }
+      }
+    }, this.onstart);
   }
 
   ngOnChanges(): void {
@@ -413,26 +428,15 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       // Pin the map id at queue time — resolveViewTableIdentifier() at flush can be a different map.
       const batchViewId = TabletopObject.resolveViewTableIdentifier();
       this.batchService.add(() => {
-        if (this.tabletopObject.location.name === 'table' && batchViewId) {
+        if (this.tabletopObject.location.name === 'table' && batchViewId
+          && this.tabletopObject.hasPlacement(batchViewId)) {
           this.tabletopObject.setPoseForTable(batchViewId, {
             x: this._posX,
             y: this._posY,
             posZ: this._posZ,
           }, true);
-        } else if (this.tabletopObject.location.name === 'table') {
-          const viewId = TabletopObject.resolveViewTableIdentifier();
-          if (viewId) {
-            this.tabletopObject.setPoseForTable(viewId, {
-              x: this._posX,
-              y: this._posY,
-              posZ: this._posZ,
-            }, true);
-          } else {
-            this.tabletopObject.location.x = this._posX;
-            this.tabletopObject.location.y = this._posY;
-            this.tabletopObject.posZ = this._posZ;
-          }
         } else {
+          // Never invent a placement on another map — only refresh live location.
           this.tabletopObject.location.x = this._posX;
           this.tabletopObject.location.y = this._posY;
           this.tabletopObject.posZ = this._posZ;
@@ -476,32 +480,111 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   /** Flush every movable’s live pose before a map switch. */
   static flushAllPosesToTable(tableId?: string) {
+    let n = 0;
     for (const set of MovableDirective.layerMap.values()) {
       for (const movable of set) {
         movable.flushPoseToTable(tableId);
+        n++;
       }
     }
+    poseDebug('flushAllPosesToTable', { tableId: tableId || '(view)', movableCount: n });
   }
 
   /** After hydrate: snap every movable to placements[view] (ignores selection). */
   static syncAllPosesFromObjects() {
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    let n = 0;
+    let driftBefore = 0;
+    let driftAfter = 0;
+    const samples: Array<{
+      id: string;
+      screenBefore: string;
+      data: string;
+      screenAfter: string;
+      visible: boolean;
+      placements: string;
+    }> = [];
     for (const set of MovableDirective.layerMap.values()) {
       for (const movable of set) {
+        const obj = movable.tabletopObject;
+        const screenBefore = { x: movable.posX, y: movable.posY, z: movable.posZ };
+        const data = obj ? obj.getPoseForView() : null;
+        if (obj && data
+          && (screenBefore.x !== data.x || screenBefore.y !== data.y || screenBefore.z !== data.posZ)) {
+          driftBefore++;
+        }
         movable.syncPoseFromObject();
+        n++;
+        if (obj && data) {
+          const screenAfter = { x: movable.posX, y: movable.posY, z: movable.posZ };
+          if (screenAfter.x !== data.x || screenAfter.y !== data.y || screenAfter.z !== data.posZ) {
+            driftAfter++;
+          }
+          if (samples.length < 8) {
+            samples.push({
+              id: obj.identifier,
+              screenBefore: `${screenBefore.x | 0},${screenBefore.y | 0},${screenBefore.z | 0}`,
+              data: `${data.x | 0},${data.y | 0},${data.posZ | 0}`,
+              screenAfter: `${screenAfter.x | 0},${screenAfter.y | 0},${screenAfter.z | 0}`,
+              visible: obj.isVisibleOnTable,
+              placements: (obj.tablePlacements || '').slice(0, 120),
+            });
+          }
+        }
       }
     }
+    poseDebug('syncAllPosesFromObjects', {
+      viewId: viewId || '(none)',
+      movableCount: n,
+      driftBefore,
+      driftAfter,
+      samples,
+      layerKeys: Array.from(MovableDirective.layerMap.keys()),
+    });
   }
 
-  private static ensurePoseFlushHook() {
-    if (MovableDirective.poseFlushHooked) return;
+  /** Register map-switch / archive-load pose hooks (safe to call early). */
+  static ensurePoseFlushHook() {
+    if (MovableDirective.poseFlushHooked) {
+      poseDebug('ensurePoseFlushHook already registered');
+      return;
+    }
     MovableDirective.poseFlushHooked = true;
+    poseDebug('ensurePoseFlushHook REGISTERED');
     EventSystem.register(MovableDirective)
       .on('BEFORE_VIEW_TABLE_CHANGE', event => {
         const tableId: string = event.data?.tableId || '';
+        poseDebug('event BEFORE_VIEW_TABLE_CHANGE', { tableId });
         MovableDirective.flushAllPosesToTable(tableId || undefined);
       })
-      .on('AFTER_VIEW_TABLE_CHANGE', () => {
+      .on('AFTER_VIEW_TABLE_CHANGE', event => {
+        poseDebug('event AFTER_VIEW_TABLE_CHANGE', { tableId: event.data?.tableId || '' });
         MovableDirective.syncAllPosesFromObjects();
+      })
+      .on('ARCHIVE_LOAD_COMPLETE', () => {
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        let movableCount = 0;
+        for (const set of MovableDirective.layerMap.values()) movableCount += set.size;
+        poseDebug('event ARCHIVE_LOAD_COMPLETE (Movable)', {
+          viewId: viewId || '(none)',
+          movableCount,
+        });
+        if (viewId) TabletopObject.hydrateAllForView(viewId, true);
+        MovableDirective.syncAllPosesFromObjects();
+        setTimeout(() => {
+          const id = TabletopObject.resolveViewTableIdentifier();
+          let n = 0;
+          for (const set of MovableDirective.layerMap.values()) n += set.size;
+          poseDebug('ARCHIVE_LOAD_COMPLETE +0ms retry', { viewId: id || '(none)', movableCount: n });
+          if (id) TabletopObject.hydrateAllForView(id, true);
+          MovableDirective.syncAllPosesFromObjects();
+        }, 0);
+        setTimeout(() => {
+          let n = 0;
+          for (const set of MovableDirective.layerMap.values()) n += set.size;
+          poseDebug('ARCHIVE_LOAD_COMPLETE +100ms retry', { movableCount: n });
+          MovableDirective.syncAllPosesFromObjects();
+        }, 100);
       });
   }
 
