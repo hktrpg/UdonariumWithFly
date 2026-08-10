@@ -173,13 +173,16 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   }
 
   createRoom() {
-    if (this.connectionBusy.busy || this.createRoomKey) return;
+    const suppressBusy = !!this.modalService.option?.suppressConnectionBusy;
+    if (this.createRoomKey) return;
+    // Allow create while parent (folder backup) already holds the busy overlay.
+    if (this.connectionBusy.busy && !suppressBusy) return;
     const userId = Network.peer.userId;
     const roomId = this.resolveCreateRoomId();
     const roles = this.buildRoleAuthInputs();
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
-    this.connectionBusy.show('peer.creatingRoom');
+    if (!suppressBusy) this.connectionBusy.show('peer.creatingRoom');
     const afterCreate = this.modalService.option?.afterCreate;
     this.createRoomKey = { createRoom: true };
     this.createRoomTimer = setTimeout(() => this.abortCreateRoom(), 30000);
@@ -194,7 +197,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
           user: this.allowUser ? this.userPassword : '',
           guest: this.allowGuest ? this.guestPassword : '',
         });
-        this.connectionBusy.hide();
+        if (!suppressBusy) this.connectionBusy.hide();
         this.modalService.resolve(true);
         if (typeof afterCreate === 'function') afterCreate();
       })

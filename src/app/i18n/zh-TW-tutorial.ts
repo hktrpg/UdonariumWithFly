@@ -7,7 +7,7 @@ export const zhTW_tutorial: I18nDictionary = {
 Discord：https://support.hktrpg.com
 Patreon：https://www.patreon.com/HKTRPG
 地圖是 2.5D；資料在玩家之間互傳，伺服器不長期保管棋子與圖片。
-★ 保管資料可以用「綁定備份資料夾」(自動)或「下載 ZIP」(手動)；下次「讀取 ZIP」。不存就會消失。
+★ 保管資料可以用「綁定備份資料夾」(自動)或「下載 ZIP」(手動)；下次「讀取 ZIP」。不備份就會消失。
 建議桌面版 Chrome。輸入第一則聊天後，此教學會自動隱藏。
 完整說明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
   'tutorial.view': `＜視角＞右鍵拖曳＝平移地圖

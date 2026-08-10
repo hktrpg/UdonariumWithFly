@@ -19,7 +19,6 @@ export class VideoSharingSystem {
   private constructor() { }
 
   initialize() {
-    console.log('VideoSharingSystem ready...');
     EventSystem.unregister(this);
     EventSystem.register(this)
       .on('CONNECT_PEER', -1, event => {

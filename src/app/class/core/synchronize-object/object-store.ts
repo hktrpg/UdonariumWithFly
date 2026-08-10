@@ -25,7 +25,7 @@ export class ObjectStore {
   private garbageCollectionInterval: NodeJS.Timeout = null;
   private updateCallback = () => { this.updateQueue(); }
 
-  private constructor() { console.log('ObjectStore ready...'); };
+  private constructor() { };
 
   add(object: GameObject, shouldBroadcast: boolean = true): GameObject {
     if (this.get(object.identifier) != null || this.isDeleted(object.identifier)) return null;

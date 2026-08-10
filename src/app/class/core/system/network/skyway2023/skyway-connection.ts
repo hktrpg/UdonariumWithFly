@@ -60,7 +60,6 @@ export class SkyWayConnection implements Connection {
   open(userId?: string)
   open(userId: string, roomId: string, roomName: string, password: string)
   open(...args: any[]) {
-    console.log('open', args);
     let peer: PeerContext;
     if (args.length === 0) {
       peer = PeerContext.create(PeerContext.generateId());
@@ -73,9 +72,12 @@ export class SkyWayConnection implements Connection {
     this.openSkyWay(peer);
   }
 
-  close() {
+  close(): Promise<void> {
     this.disconnectAll();
-    this.skyWay.close();
+    this.listAllPeersInFlight = null;
+    this.listAllPeersCache = [];
+    this.listAllPeersCacheUntil = 0;
+    return this.skyWay.close();
   }
 
   connect(peer: IPeerContext): boolean {
@@ -211,18 +213,14 @@ export class SkyWayConnection implements Connection {
 
   private async openSkyWay(peer: IPeerContext) {
     if (this.skyWay.context) {
-      console.warn('It is already opened.');
       await this.skyWay.close();
     }
 
     this.skyWay.onOpen = peer => {
-      console.log('skyWay onOpen', peer);
-      console.log('My peer Context', this.peer);
       if (this.callback.onOpen) this.callback.onOpen(this.peer);
     };
 
     this.skyWay.onClose = peer => {
-      console.log('skyWay onClose', peer);
       if (this.peer.isOpen) this.close();
       if (this.callback.onClose) this.callback.onClose(this.peer);
     };
@@ -237,7 +235,6 @@ export class SkyWayConnection implements Connection {
     };
 
     this.skyWay.onSubscribed = (peer, subscription) => {
-      console.log(`skyWay onSubscribed ${peer.peerId}`);
       let stream = SkyWayDataStream.createPublication(this.skyWay, peer);
 
       if (!this.peer.verifyPeer(stream.peer.peerId)) {
@@ -249,7 +246,6 @@ export class SkyWayConnection implements Connection {
     }
 
     this.skyWay.onRoomRestore = (peer) => {
-      console.log(`skyWay onRoomRestore ${peer.peerId}`);
       for (let peerId of this.trustedPeerIds) {
         let peer = PeerContext.parse(peerId);
         this.disconnect(peer);

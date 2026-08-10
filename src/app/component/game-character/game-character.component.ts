@@ -37,6 +37,7 @@ import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-s
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { I18nService } from 'service/i18n.service';
+import { folderBackupDebug } from 'service/folder-backup-debug';
 
 @Component({
     selector: 'game-character',
@@ -100,8 +101,25 @@ import { I18nService } from 'service/i18n.service';
     standalone: false
 })
 export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestroy {
+  /**
+   * Room ZIP remounts tokens while FoW/camera may still hide hosts. bounceInOut starts at
+   * scale(0); if aborted mid-flight (esp. former display:none), tokens stay invisible even
+   * after data is fine — and dual-map placements never remount on scene switch. Suppress
+   * enter bounce during archive settle so tokens appear at scale(1).
+   */
+  static suppressEnterBounce = false;
+  /** Rate-limit mount debug during archive remount storms. */
+  private static mountLogBudget = 0;
+
+  /** Call when starting a remount wave so first N mounts are logged. */
+  static resetMountLogBudget(n = 16) {
+    GameCharacterComponent.mountLogBudget = n;
+  }
+
   @Input() gameCharacter: GameCharacter = null;
   @Input() is3D: boolean = false;
+
+  get skipEnterBounce(): boolean { return GameCharacterComponent.suppressEnterBounce; }
 
   get name(): string { return this.gameCharacter.name; }
   get size(): number { return MathUtil.clampMin(this.gameCharacter.size); }
@@ -630,6 +648,24 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.changeDetector.markForCheck();
         }
       })
+      .on('AFTER_VIEW_TABLE_CHANGE', () => {
+        // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
+        // EventSystem can fire outside Angular; markForCheck alone is not enough for OnPush.
+        this.ngZone.run(() => {
+          this.enforce2DRollZero();
+          const maps = this.gameCharacter?.placementTableIds || [];
+          if (maps.length > 1) {
+            folderBackupDebug('char AFTER_VIEW_TABLE_CHANGE dual', {
+              name: this.gameCharacter?.name || '',
+              id: (this.gameCharacter?.identifier || '').slice(0, 10),
+              is2D: this.is2DMode,
+              upright: (this.uprightTransform || '').slice(0, 48),
+              maps: maps.map(m => m.slice(0, 14)),
+            });
+          }
+          this.changeDetector.detectChanges();
+        });
+      })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameCharacter?.identifier}`, event => {
         if (this.gameCharacter.imageFiles.length <= 0) {
           this.naturalImageHeight = 0;
@@ -703,18 +739,71 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   ngAfterViewInit() {
+    this.logMount('ngAfterViewInit');
     this.markCharacterLoaded();
   }
 
   private markCharacterLoaded() {
+    // Defer: parent binds [style.visibility] to isLoaded; sync flip in the same CD
+    // pass causes NG0100. visibility:hidden still allows bounceInOut to finish.
     queueMicrotask(() => {
-      if (!this.gameCharacter) return;
+      if (!this.gameCharacter || this.gameCharacter.isLoaded) return;
       this.gameCharacter.isLoaded = true;
+      this.logMount('markLoaded');
       this.changeDetector.markForCheck();
     });
   }
 
+  private logMount(phase: string) {
+    if (GameCharacterComponent.mountLogBudget <= 0) return;
+    GameCharacterComponent.mountLogBudget--;
+    const c = this.gameCharacter;
+    if (!c) return;
+    const maps = c.placementTableIds || [];
+    const viewId = TableSelecter.instance?.viewedTableIdentifier
+      || TableSelecter.instance?.viewTableIdentifier
+      || '';
+    const pose = viewId ? c.getPoseForTable(viewId) : null;
+    folderBackupDebug(`char ${phase}`, {
+      name: c.name || '',
+      id: c.identifier.slice(0, 10),
+      dual: maps.length > 1,
+      maps: maps.map(m => m.slice(0, 14)),
+      skipBounce: this.skipEnterBounce,
+      is2D: this.is2DMode,
+      isLoaded: !!c.isLoaded,
+      isVisibleOnTable: !!c.isVisibleOnTable,
+      live: `${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}`,
+      pose: pose ? `${pose.x | 0},${pose.y | 0},${pose.posZ | 0}` : '-',
+      upright: (this.uprightTransform || '').slice(0, 48),
+      img: !!(c.imageFile?.url?.length),
+      budgetLeft: GameCharacterComponent.mountLogBudget,
+    });
+  }
+
+  /** Destroy logs must not eat mount budget (Angular destroys before creates on remount). */
+  private logUnmount() {
+    const c = this.gameCharacter;
+    if (!c) return;
+    const maps = c.placementTableIds || [];
+    // Always log dual-map; rate-limit the rest.
+    if (maps.length <= 1) {
+      if (GameCharacterComponent.mountLogBudget <= 0) return;
+      GameCharacterComponent.mountLogBudget--;
+    }
+    folderBackupDebug('char ngOnDestroy', {
+      name: c.name || '',
+      id: c.identifier.slice(0, 10),
+      dual: maps.length > 1,
+      maps: maps.map(m => m.slice(0, 14)),
+      isLoaded: !!c.isLoaded,
+      live: `${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}`,
+      budgetLeft: GameCharacterComponent.mountLogBudget,
+    });
+  }
+
   ngOnDestroy() {
+    this.logUnmount();
     this.clearChatDialogLocal();
     EventSystem.unregister(this);
   }

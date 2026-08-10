@@ -25,7 +25,6 @@ export class ObjectSerializer {
   }
 
   private constructor() {
-    console.log('ObjectSerializer ready...');
   };
 
   /** Stable object id for cross-refs (tableIdentifier, scene snaps). Not a SyncVar. */

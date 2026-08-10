@@ -44,6 +44,16 @@ export class ObjectNode extends GameObject implements XmlAttributes, InnerXml {
     this._children = [];
   }
 
+  /** Cascade-remove children locally without broadcasting DELETE. */
+  destroyLocal() {
+    for (let child of this._children.concat()) {
+      child.destroyLocal();
+    }
+    this._children = [];
+    if (orphanNodes[this.identifier]) delete orphanNodes[this.identifier];
+    ObjectStore.instance.delete(this, false);
+  }
+
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
@@ -90,6 +100,7 @@ export class ObjectNode extends GameObject implements XmlAttributes, InnerXml {
     if (orphanNodes[this.identifier] == null) return;
     let objects = orphanNodes[this.identifier];
     for (let object of objects) {
+      if (ObjectStore.instance.get(object.identifier) == null) continue;
       if (object.parent === this) this.updateChildren(object);
     }
     if (orphanNodes[this.identifier]) {

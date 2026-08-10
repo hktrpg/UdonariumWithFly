@@ -20,7 +20,6 @@ export class EventSystem implements Subject {
   private keyMap: Map<any, Listener[]> = new Map();
 
   private constructor() {
-    console.log('EventSystem ready...');
   }
 
   register(key: any): Listener {

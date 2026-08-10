@@ -1,25 +1,39 @@
 .help {
   font-size: smaller;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   margin-bottom: 8px;
 }
 
 .rules {
   font-size: smaller;
   margin-bottom: 10px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   background: rgba(100, 116, 139, 0.08);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .rules-title {
   font-weight: bold;
-  margin-bottom: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rules-title::-webkit-details-marker {
+  display: none;
+}
+
+.rules-title::before {
+  content: '▸ ';
+  opacity: 0.7;
+}
+
+.rules[open] .rules-title::before {
+  content: '▾ ';
 }
 
 .rules-list {
-  margin: 0;
+  margin: 6px 0 0;
   padding-left: 1.2em;
 }
 
@@ -27,43 +41,123 @@
   margin: 2px 0;
 }
 
+.help-auth {
+  margin-top: 8px;
+  margin-bottom: 0;
+  color: #64748b;
+}
+
 .empty {
   margin: 12px 0;
   opacity: 0.8;
 }
 
-.backup-list {
+.room-list {
   list-style: none;
   margin: 0 0 12px;
   padding: 0;
-  max-height: 260px;
+  max-height: 360px;
   overflow: auto;
 }
 
-.backup-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  margin: 0 0 6px;
+.room-card {
+  margin: 0 0 8px;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
 }
 
-.backup-item {
+.room-card.is-current {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.room-head {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.room-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
   min-width: 0;
   margin: 0;
+  padding: 8px 10px;
   text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 
-.backup-item .name {
+.room-thumb,
+.slot-thumb {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 54px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #2a241c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-thumb {
+  width: 56px;
+  height: 42px;
+}
+
+.room-thumb img,
+.slot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.room-thumb .material-icons,
+.slot-thumb .material-icons {
+  font-size: 22px;
+  opacity: 0.55;
+}
+
+.room-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1;
+}
+
+.room-text .name {
   font-weight: bold;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
-.backup-item .meta {
+.current-badge {
+  font-size: 11px;
+  font-weight: normal;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.room-text .meta,
+.slot-meta {
   font-size: smaller;
   opacity: 0.85;
+}
+
+.expand-icon {
+  opacity: 0.6;
+  font-size: 22px;
 }
 
 .auth-badge {
@@ -90,22 +184,75 @@
   background: rgba(154, 52, 18, 0.12);
 }
 
-.help-auth {
-  margin-top: -4px;
-  margin-bottom: 10px;
-  color: #64748b;
-}
-
 .delete-btn {
   flex: 0 0 auto;
   align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 12px;
-  margin: 0;
+  margin: 0 8px 0 0;
+  padding: 4px 6px;
 }
 
 .delete-btn .material-icons {
-  font-size: 1em;
+  font-size: 1.1em;
+}
+
+.slot-panel {
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+  padding: 6px 8px 8px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.slot-group-label {
+  font-size: 11px;
+  font-weight: bold;
+  opacity: 0.7;
+  margin: 6px 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  text-align: left;
+  border-radius: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.slot-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.slot-name {
+  font-weight: 600;
+}
+
+.thumb-preview {
+  position: fixed;
+  z-index: 10000;
+  width: 360px;
+  height: 270px;
+  padding: 4px;
+  border-radius: 6px;
+  background: #1c1917;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.thumb-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }

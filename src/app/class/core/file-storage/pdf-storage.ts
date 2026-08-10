@@ -19,7 +19,6 @@ export class PdfStorage {
   }
 
   private constructor() {
-    console.log('PdfStorage ready...');
   }
 
   async addAsync(file: File, displayName?: string): Promise<PdfFile>
@@ -49,7 +48,6 @@ export class PdfStorage {
     if (PdfState.COMPLETE <= pdf.state) this.lazySynchronize(100);
     if (this.update(pdf)) return this.hash[pdf.identifier];
     this.hash[pdf.identifier] = pdf;
-    console.log('add PDF: ' + pdf.identifier);
     return pdf;
   }
 

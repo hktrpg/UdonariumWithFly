@@ -16,6 +16,8 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   text: string = '';
   help: string = '';
   helpHtml: string = '';
+  /** Structured help blocks (title / chips / body) for richer confirmations. */
+  helpSections: { title?: string; body?: string; chips?: { label: string; tone?: string }[] }[] = [];
   materialIcon: string = '';
   okLabel: string = '';
   cancelLabel: string = '';
@@ -38,6 +40,8 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   choiceValue: string = '';
   rememberLabel: string = '';
   rememberValue: boolean = false;
+  /** When true, OK stays disabled until a radio choice is selected. */
+  requireChoice: boolean = false;
 
   constructor(
     private panelService: PanelService,
@@ -49,6 +53,7 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.text = modalService.option.text ? modalService.option.text : '';
     this.help = modalService.option.help ? modalService.option.help : '';
     this.helpHtml = modalService.option.helpHtml ? modalService.option.helpHtml : '';
+    this.helpSections = Array.isArray(modalService.option.helpSections) ? modalService.option.helpSections : [];
     this.materialIcon = modalService.option.materialIcon ? modalService.option.materialIcon : '';
     this.okLabel = modalService.option.okLabel ? modalService.option.okLabel : '';
     this.cancelLabel = modalService.option.cancelLabel ? modalService.option.cancelLabel : '';
@@ -63,9 +68,14 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.inputValue = modalService.option.inputValue != null ? String(modalService.option.inputValue) : '';
     this.inputPlaceholder = modalService.option.inputPlaceholder ? modalService.option.inputPlaceholder : '';
     this.choices = Array.isArray(modalService.option.choices) ? modalService.option.choices : [];
-    this.choiceValue = modalService.option.choiceValue != null
-      ? String(modalService.option.choiceValue)
-      : (this.choices[0]?.id || '');
+    this.requireChoice = !!modalService.option.requireChoice;
+    if (modalService.option.choiceValue != null) {
+      this.choiceValue = String(modalService.option.choiceValue);
+    } else if (this.requireChoice) {
+      this.choiceValue = '';
+    } else {
+      this.choiceValue = this.choices[0]?.id || '';
+    }
     this.rememberLabel = modalService.option.rememberLabel ? modalService.option.rememberLabel : '';
     this.rememberValue = !!modalService.option.rememberValue;
   }
@@ -99,6 +109,7 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   }
 
   ok() {
+    if (this.choices.length && this.requireChoice && !this.choiceValue) return;
     if (this.choices.length) {
       this.modalService.resolve({
         choice: this.choiceValue,

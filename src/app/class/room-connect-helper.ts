@@ -1,9 +1,9 @@
-import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { Room } from '@udonarium/room';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 
@@ -67,7 +67,9 @@ export class RoomConnectHelper {
         .on('OPEN_NETWORK', event => {
           console.log('RoomConnectHelper OPEN_PEER', event.data.peerId);
           EventSystem.unregister(triedPeer);
-          ObjectStore.instance.clearDeleteHistory();
+          // Discard lobby sample tables/tokens before catalog merge; otherwise shared
+          // syncIds (gameTable, testCharacter_*) overwrite the host house via LWW.
+          Room.clearLocalTabletopForJoin();
           if (targetPeers.length < 1) {
             finish(true);
             return;

@@ -43,6 +43,11 @@ export class GameObject {
     ObjectStore.instance.delete(this);
   }
 
+  /** Remove from the local store without broadcasting DELETE (join-time clear). */
+  destroyLocal() {
+    ObjectStore.instance.delete(this, false);
+  }
+
   // GameObject Lifecycle
   onStoreAdded() { }
 
@@ -69,6 +74,28 @@ export class GameObject {
   private versionUp() {
     this.context.majorVersion += 1;
     this.context.minorVersion = Math.random();
+  }
+
+  /**
+   * Raise sync version above typical session bumps so peers treat this
+   * instance as authoritative (e.g. after room ZIP / folder backup load).
+   */
+  claimSyncAuthority(broadcast = true) {
+    if (this._syncSuppressed) return;
+    const floor = Math.floor(Date.now() / 1000);
+    if (this.context.majorVersion < floor) {
+      this.context.majorVersion = floor;
+    } else {
+      this.context.majorVersion += 1;
+    }
+    this.context.minorVersion = Math.random();
+    if (broadcast) ObjectStore.instance.update(this.identifier);
+  }
+
+  /** Drop local version so a peer's catalog/UPDATE can win LWW (join room). */
+  yieldSyncAuthority() {
+    this.context.majorVersion = 0;
+    this.context.minorVersion = 0;
   }
 
   apply(context: ObjectContext) {

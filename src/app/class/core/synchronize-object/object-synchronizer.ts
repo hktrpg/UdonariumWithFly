@@ -23,7 +23,6 @@ export class ObjectSynchronizer {
 
   initialize() {
     this.destroy();
-    console.log('ObjectSynchronizer ready...');
     EventSystem.register(this)
       .on('CONNECT_PEER', 2, event => {
         if (!event.isSendFromSelf) return;

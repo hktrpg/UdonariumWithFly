@@ -19,7 +19,6 @@ export class PdfSharingSystem {
   private constructor() { }
 
   initialize() {
-    console.log('PdfSharingSystem ready...');
     EventSystem.unregister(this);
     EventSystem.register(this)
       .on('CONNECT_PEER', -1, event => {

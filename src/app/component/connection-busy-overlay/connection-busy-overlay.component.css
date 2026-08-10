@@ -61,6 +61,7 @@
   line-height: 1.4;
   text-align: center;
   color: #ccc;
+  white-space: pre-line;
   font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 

@@ -7,6 +7,8 @@ import { GameTable } from './game-table';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
 import { poseDebug } from './table-fx/pose-debug';
+import { folderBackupDebug, summarizeCharPlacements } from '../service/folder-backup-debug';
+import { GameCharacter } from './game-character';
 
 /**
  * Foundry-style scene selection:
@@ -70,6 +72,7 @@ export class TableSelecter extends GameObject implements InnerXml {
       const tables = ObjectStore.instance.getObjects<GameTable>(GameTable);
       if (tables.length < 1) {
         poseDebug('restoreAfterRoomLoad abort: no tables');
+        folderBackupDebug('restoreAfterRoomLoad abort: no tables');
         return;
       }
 
@@ -85,6 +88,18 @@ export class TableSelecter extends GameObject implements InnerXml {
 
       const pieces = TabletopObject.getAll().filter(o => o.location.name === 'table');
       const onTarget = pieces.filter(o => o.hasPlacement(targetId));
+      folderBackupDebug('restoreAfterRoomLoad', {
+        targetId,
+        source: activeObj ? 'selecter' : (selected ? 'GameTable.selected' : 'tables[0]'),
+        tableCount: tables.length,
+        tableIds: tables.map(t => t.identifier),
+        piecesOnTable: pieces.length,
+        piecesOnTarget: onTarget.length,
+        pieceSample: onTarget.slice(0, 8).map(o => {
+          const p = o.getPoseForTable(targetId);
+          return `${o.aliasName}|${o.identifier.slice(0, 8)}|${p ? `${p.x|0},${p.y|0}` : 'nopose'}`;
+        }),
+      });
       poseDebug('restoreAfterRoomLoad', {
         targetId,
         source: activeObj ? 'selecter' : (selected ? 'GameTable.selected' : 'tables[0]'),
@@ -113,13 +128,15 @@ export class TableSelecter extends GameObject implements InnerXml {
       this.viewedTableIdentifier = targetId;
       TabletopObject.hydrateAllForView(targetId, true);
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: targetId });
-      EventSystem.trigger('SELECT_GAME_TABLE', { identifier: targetId, _fromSelecter: true });
-      // Pieces were destroy+recreate with reused syncIds; force table *ngFor remount.
+      // Clear cameras / remount *before* SELECT so shared table ids (e.g. gameTable)
+      // do not briefly restore the previous room's saved camera.
       EventSystem.trigger('ROOM_PIECES_REPLACED', { tableId: targetId });
+      EventSystem.trigger('SELECT_GAME_TABLE', { identifier: targetId, _fromSelecter: true });
       this.syncMyViewedPresence();
       this.schedulePoseVisualSyncAfterLoad(targetId);
     } catch (e) {
       console.warn('TableSelecter.restoreAfterRoomLoad failed; falling back', e);
+      folderBackupDebug('restoreAfterRoomLoad failed', { error: String((e as Error)?.message || e) });
       this.ensureActiveOrFirst();
     }
   }
@@ -138,9 +155,15 @@ export class TableSelecter extends GameObject implements InnerXml {
           viewed: this.viewedTableIdentifier,
           active: this.viewTableIdentifier,
         });
+        folderBackupDebug(`schedulePose skip (${label})`, {
+          tableId,
+          viewed: this.viewedTableIdentifier,
+          active: this.viewTableIdentifier,
+        });
         return;
       }
       poseDebug(`schedulePose sync (${label})`, { tableId });
+      folderBackupDebug(`schedulePose sync (${label})`, { tableId });
       TabletopObject.hydrateAllForView(tableId, true);
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId });
     };
@@ -148,6 +171,8 @@ export class TableSelecter extends GameObject implements InnerXml {
     setTimeout(() => sync('0ms'), 0);
     setTimeout(() => sync('50ms'), 50);
     setTimeout(() => sync('200ms'), 200);
+    setTimeout(() => sync('500ms'), 500);
+    setTimeout(() => sync('1000ms'), 1000);
   }
 
   // GameObject Lifecycle
@@ -273,9 +298,17 @@ export class TableSelecter extends GameObject implements InnerXml {
 
   private applyViewLocal(identifier: string) {
     const prev = this.viewedTableIdentifier;
+    const chars = ObjectStore.instance.getObjects(GameCharacter);
+    const beforeSnap = summarizeCharPlacements(chars, prev || '', identifier);
     poseDebug('applyViewLocal (map switch)', {
       from: prev || '(none)',
       to: identifier,
+    });
+    folderBackupDebug('applyViewLocal', {
+      from: prev || '(none)',
+      to: identifier,
+      same: prev === identifier,
+      ...beforeSnap,
     });
     if (prev && prev !== identifier) {
       // Flush movable batches + live poses into placements[prev] before hydrate.
@@ -290,6 +323,14 @@ export class TableSelecter extends GameObject implements InnerXml {
     if (PeerCursor.myCursor) {
       PeerCursor.myCursor.viewedSceneIdentifier = identifier;
     }
+    const afterSnap = summarizeCharPlacements(chars, prev || '', identifier);
+    folderBackupDebug('applyViewLocal after hydrate', {
+      from: prev || '(none)',
+      to: identifier,
+      dual: afterSnap.dual,
+      survivors: afterSnap.survivors,
+      samples: afterSnap.samples,
+    });
   }
 
   /**
