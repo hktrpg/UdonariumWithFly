@@ -386,7 +386,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ngZone.run(() => this.lazyNgZoneUpdate(false));
       })
       .on<AppConfig>('LOAD_CONFIG', event => {
-        console.log('LOAD_CONFIG !!!', event.data);
         if (event.data.dice && event.data.dice.url) {
           const API_VERSION = event.data.dice.api;
           // zh-TW → zh-CN → en → ja (untagged 'A') → ko → Other; unknown codes sort last.
@@ -467,7 +466,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
               }
             });
         }
-        console.log('LOAD_CONFIG !!!');
         Network.configure(event.data);
         Network.open();
       })
@@ -475,7 +473,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         this.lazyNgZoneUpdate(false);
       })
       .on('OPEN_NETWORK', event => {
-        console.log('OPEN_NETWORK', event.data.peerId);
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
@@ -679,28 +676,38 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.isRefreshPromptOpen || this.GuestMode()) return;
     this.isRefreshPromptOpen = true;
     const folderReady = this.folderBackup.isReady;
-    this.modalService.open(ConfirmationComponent, {
+    const option: Record<string, unknown> = {
       title: this.i18n.t('menu.confirm.refresh.title'),
       text: this.i18n.t('menu.confirm.refresh.text'),
       help: this.i18n.t(folderReady ? 'menu.confirm.refresh.helpFolder' : 'menu.confirm.refresh.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sd_storage',
       okLabel: this.i18n.t('menu.downloadZip'),
-      cancelLabel: this.i18n.t('menu.confirm.refresh.reload'),
+      cancelLabel: this.i18n.t(
+        folderReady ? 'menu.confirm.refresh.flushReload' : 'menu.confirm.refresh.reload'
+      ),
       action: () => {
         void this.saveThenReload();
       },
       cancelAction: () => {
-        void this.flushFolderThenReload();
+        if (folderReady) void this.flushFolderThenReload();
+        else this.reloadWithoutPrompt();
       },
-    }).finally(() => {
+    };
+    if (folderReady) {
+      // True skip: no ZIP, no folder flush.
+      option.extraLabel = this.i18n.t('menu.confirm.refresh.reloadOnly');
+      option.extraAction = () => { this.reloadWithoutPrompt(); };
+      option.extraCloses = true;
+    }
+    this.modalService.open(ConfirmationComponent, option).finally(() => {
       this.isRefreshPromptOpen = false;
     });
   }
 
   private async saveThenReload() {
     await this.save();
-    const ok = await this.folderBackup.flush({ timeoutMs: 60000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 60000, requestAuth: true });
     if (!ok && this.folderBackup.hasFolder) {
       const proceed = await this.confirmFlushFailedReload();
       if (!proceed) return;
@@ -709,7 +716,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async flushFolderThenReload() {
-    const ok = await this.folderBackup.flush({ timeoutMs: 60000 });
+    const ok = await this.folderBackup.flush({ timeoutMs: 60000, requestAuth: true });
     if (!ok && this.folderBackup.hasFolder && this.isRoom && !this.GuestMode()) {
       const proceed = await this.confirmFlushFailedReload();
       if (!proceed) return;

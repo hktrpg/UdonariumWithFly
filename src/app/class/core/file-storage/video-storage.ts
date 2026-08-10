@@ -19,7 +19,6 @@ export class VideoStorage {
   }
 
   private constructor() {
-    console.log('VideoStorage ready...');
   }
 
   async addAsync(file: File, displayName?: string): Promise<VideoFile>
@@ -49,7 +48,6 @@ export class VideoStorage {
     if (VideoState.COMPLETE <= video.state) this.lazySynchronize(100);
     if (this.update(video)) return this.hash[video.identifier];
     this.hash[video.identifier] = video;
-    console.log('add Video: ' + video.identifier);
     return video;
   }
 

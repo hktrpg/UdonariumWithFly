@@ -24,7 +24,7 @@ export interface Connection {
   configure(config: any)
   open(userId?: string)
   open(userId: string, roomId: string, roomName: string, password: string)
-  close()
+  close(): void | Promise<void>
   connect(peer: IPeerContext): boolean
   disconnect(peer: IPeerContext): boolean
   disconnectAll()

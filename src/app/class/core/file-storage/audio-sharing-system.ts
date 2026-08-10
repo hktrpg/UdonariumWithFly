@@ -19,7 +19,6 @@ export class AudioSharingSystem {
   private constructor() { }
 
   initialize() {
-    console.log('AudioSharingSystem ready...');
     this.destroy();
     EventSystem.register(this)
       .on('CONNECT_PEER', -1, event => {

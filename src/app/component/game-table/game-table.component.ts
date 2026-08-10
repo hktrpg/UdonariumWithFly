@@ -26,6 +26,7 @@ import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
+import { GameCharacterComponent } from 'component/game-character/game-character.component';
 import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
@@ -42,6 +43,7 @@ import { TabletopService } from 'service/tabletop.service';
 import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { folderBackupDebug, folderBackupWarn, approxCssScale, summarizeCharPlacements, TokenDomProbe, TokenHideReason } from 'service/folder-backup-debug';
 import { MovableDirective } from 'directive/movable.directive';
 
 import { GridLineRender } from './grid-line-render';
@@ -274,6 +276,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
    * so *ngFor remounts like a map switch.
    */
   pieceRenderEpoch = 0;
+  /**
+   * Dual-map tokens stay in the character cache across VIEW switches, so Angular reuses the
+   * same game-character host (no ngAfterViewInit). Stuck bounce / stale 2D↔3D upright then
+   * never clears. Bump on SELECT so survivors remount like single-map tokens.
+   */
+  characterViewEpoch = 0;
 
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
@@ -477,20 +485,95 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     EventSystem.register(this)
       .on('SELECT_GAME_TABLE', -10, event => {
         // After TabletopService refreshes object caches for the new viewed table.
-        this.ngZone.run(() => queueMicrotask(() => this.applyViewedTable()));
+        const id = event.data?.identifier || '';
+        const viewed = this.tableSelecter.viewedTableIdentifier || '';
+        const cache = this.characters || [];
+        const dualInCache = cache.filter(c => (c.placementTableIds || []).length > 1);
+        folderBackupDebug('game-table SELECT_GAME_TABLE', {
+          id,
+          viewed,
+          fromSelecter: !!event.data?._fromSelecter,
+          fromCatalog: !!event.data?._fromCatalog,
+          charEpochBefore: this.characterViewEpoch,
+          pieceEpoch: this.pieceRenderEpoch,
+          cacheCount: cache.length,
+          dualInCache: dualInCache.length,
+          dualNames: dualInCache.map(c => c.name || c.identifier.slice(0, 8)),
+          cacheNames: cache.map(c => c.name || '?'),
+        });
+        this.ngZone.run(() => queueMicrotask(() => {
+          // Remount dual-map survivors (same cache membership → same trackBy otherwise).
+          const epochBefore = this.characterViewEpoch;
+          this.characterViewEpoch++;
+          GameCharacterComponent.resetMountLogBudget(16);
+          const viewed = this.tableSelecter.viewedTableIdentifier || id;
+          const placeSnap = summarizeCharPlacements(
+            ObjectStore.instance.getObjects(GameCharacter),
+            '',
+            viewed,
+          );
+          folderBackupDebug('game-table map remount chars', {
+            id,
+            charEpoch: `${epochBefore}→${this.characterViewEpoch}`,
+            dualInCache: dualInCache.map(c =>
+              `${c.name}|${c.identifier.slice(0, 8)}|maps=${(c.placementTableIds || []).map(m => m.slice(0, 12)).join('+')}|` +
+              `live=${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}|load=${!!c.isLoaded}`
+            ),
+            placeSnap,
+            mountBudget: 16,
+          });
+          this.applyViewedTable();
+          // Immediate DOM count (before bounce finishes).
+          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +0ms', {
+            tableId: id,
+            charEpoch: this.characterViewEpoch,
+          }), 0);
+          // Map-switch is the control that often "fixes" invisible tokens — capture DOM after it.
+          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +150ms', {
+            tableId: id,
+            charEpoch: this.characterViewEpoch,
+          }), 150);
+          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +600ms', {
+            tableId: id,
+            charEpoch: this.characterViewEpoch,
+          }), 600);
+        }));
       })
       .on('ARCHIVE_LOAD_COMPLETE', () => {
         // ZIP load replaces tables but keeps this component's in-memory cameras.
         // Stale pan/tilt (or a singular CSS matrix during hydrate) makes tokens look
         // "wrong" until the user switches maps — which re-runs applyViewedTable.
+        folderBackupDebug('game-table ARCHIVE_LOAD_COMPLETE → refreshAfterRoomArchiveLoad');
         this.ngZone.run(() => this.refreshAfterRoomArchiveLoad());
       })
       .on('ROOM_PIECES_REPLACED', () => {
         // fly_data.xml finished before images; remount so recycled syncId views are not kept.
         this.ngZone.run(() => {
+          folderBackupDebug('game-table ROOM_PIECES_REPLACED', {
+            epochBefore: this.pieceRenderEpoch,
+            cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
+            viewId: this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier || '',
+          });
+          GameCharacterComponent.suppressEnterBounce = true;
+          GameCharacterComponent.resetMountLogBudget(20);
           this.pieceRenderEpoch++;
+          // Room A→B reuses table syncIds; drop A's camera before applyViewedTable.
+          this.tableViewById.clear();
+          this.cameraTableId = '';
+          this._last2DMode = null;
+          this.visionRevealedIds = new Set();
           this.changeDetector.detectChanges();
           MovableDirective.syncAllPosesFromObjects();
+          // Defer FoW/camera refresh until after *ngFor remounts piece components.
+          queueMicrotask(() => {
+            this.applyViewedTable();
+            this.logTokenVisibilityDiag('game-table ROOM_PIECES microtask');
+          });
+          setTimeout(() => {
+            this.applyViewedTable();
+            MovableDirective.syncAllPosesFromObjects();
+            this.logTokenVisibilityDiag('game-table ROOM_PIECES +200ms');
+          }, 200);
         });
       })
       .on('UPDATE_GAME_OBJECT', event => {
@@ -656,7 +739,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this._last2DMode = !!table.is2DMode;
     if (!this.gameTable?.nativeElement) return;
 
-    const saved = this.tableViewById.get(table.identifier);
+    // During folder-backup settle, ignore any leftover per-table camera from the prior room
+    // (table ids like "gameTable" are often reused across rooms).
+    const saved = GameCharacterComponent.suppressEnterBounce
+      ? undefined
+      : this.tableViewById.get(table.identifier);
     if (saved) {
       if (table.is2DMode) {
         // Keep pan/zoom/yaw; force flat pitch/roll for 2D maps.
@@ -1392,9 +1479,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
-  trackByGameObject(index: number, gameObject: GameObject) {
+  /**
+   * Arrow property so NgFor keeps component `this` (method refs lose it → epoch is
+   * always undefined and dual-map survivors never remount on map switch).
+   */
+  trackByGameObject = (_index: number, gameObject: GameObject) => {
     return `${this.pieceRenderEpoch}:${gameObject.identifier}`;
-  }
+  };
+
+  /** Includes characterViewEpoch so dual-map tokens remount on map switch. */
+  trackByCharacter = (_index: number, gameObject: GameObject) => {
+    return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${gameObject.identifier}`;
+  };
 
   isCursorHidIn(cursor: PeerCursor): boolean {
     if (cursor.isGMMode) return true;
@@ -1551,7 +1647,27 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isBackgroundImageLoaded2 = false;
 
     const table = this.tableSelecter.viewTable;
-    if (!table) return;
+    if (!table) {
+      folderBackupDebug('applyViewedTable abort: no viewTable', {
+        viewed: this.tableSelecter.viewedTableIdentifier || '',
+        active: this.tableSelecter.viewTableIdentifier || '',
+      });
+      return;
+    }
+    folderBackupDebug('applyViewedTable', {
+      tableId: table.identifier,
+      size: `${table.width}x${table.height}`,
+      vision: !!table.visionEnabled,
+      is2D: !!table.is2DMode,
+      cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
+      charCache: (this.characters || []).length,
+      epoch: this.pieceRenderEpoch,
+      charEpoch: this.characterViewEpoch,
+      suppressBounce: GameCharacterComponent.suppressEnterBounce,
+      dualCache: (this.characters || [])
+        .filter(c => (c.placementTableIds || []).length > 1)
+        .map(c => c.name || c.identifier.slice(0, 8)),
+    });
     this.setGameTableGrid(
       table.width,
       table.height,
@@ -1569,27 +1685,283 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /**
    * After room ZIP finishes: remount piece views, reset cameras, re-apply grid,
    * then sync Movable once layout has settled.
+   *
+   * Enter bounce is suppressed until settle — display/FoW races previously aborted
+   * bounceInOut at scale(0); dual-map tokens never remounted on scene switch.
    */
   private refreshAfterRoomArchiveLoad() {
+    folderBackupDebug('game-table refreshAfterRoomArchiveLoad');
+    GameCharacterComponent.suppressEnterBounce = true;
+    GameCharacterComponent.resetMountLogBudget(24);
     this.pieceRenderEpoch++;
     this.tableViewById.clear();
     this.cameraTableId = '';
     this._last2DMode = null;
+    // Force FoW reveal set to rebuild on next refreshFx.
+    this.visionRevealedIds = new Set();
 
-    const refresh = () => {
+    const countMovables = () => {
+      let n = 0;
+      for (const set of MovableDirective.layerMap.values()) n += set.size;
+      return n;
+    };
+
+    const refresh = (label: string, remount = false) => {
+      if (remount) this.pieceRenderEpoch++;
       this.applyViewedTable();
       MovableDirective.syncAllPosesFromObjects();
+      for (const c of this.characters || []) {
+        if (c && !c.isLoaded) c.isLoaded = true;
+      }
+      this.changeDetector.detectChanges();
+      this.logTokenVisibilityDiag(`game-table refresh (${label})`, {
+        remount,
+        epoch: this.pieceRenderEpoch,
+        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+      });
     };
 
     // Force *ngFor to see the new trackBy epoch immediately.
     this.changeDetector.detectChanges();
 
-    queueMicrotask(refresh);
+    queueMicrotask(() => refresh('microtask'));
     requestAnimationFrame(() => {
-      requestAnimationFrame(refresh);
+      requestAnimationFrame(() => refresh('raf2'));
     });
-    // Late pass: remounted tokens + images may still be settling.
-    setTimeout(refresh, 100);
+    setTimeout(() => refresh('100ms'), 100);
+    setTimeout(() => {
+      // Remount after Movable usually exists — same effect as a real map switch.
+      refresh('350ms+epoch', true);
+      const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier;
+      if (viewId) {
+        EventSystem.trigger('VIEW_GAME_TABLE', { identifier: viewId });
+        MovableDirective.syncAllPosesFromObjects();
+        this.changeDetector.detectChanges();
+        folderBackupDebug('game-table VIEW_GAME_TABLE bounce', { viewId, movableCount: countMovables() });
+      }
+    }, 350);
+    setTimeout(() => refresh('700ms', true), 700);
+    setTimeout(() => {
+      refresh('1200ms', true);
+      // Remount while bounce is still suppressed — same as map switch, without
+      // replaying enter animation on brand-new hosts (which can leave tokens invisible).
+      this.pieceRenderEpoch++;
+      MovableDirective.syncAllPosesFromObjects();
+      this.changeDetector.detectChanges();
+      queueMicrotask(() => {
+        MovableDirective.syncAllPosesFromObjects();
+        this.changeDetector.detectChanges();
+        GameCharacterComponent.suppressEnterBounce = false;
+        this.logTokenVisibilityDiag('game-table archive settle done', {
+          movableCount: countMovables(),
+          suppressBounce: false,
+          epoch: this.pieceRenderEpoch,
+        });
+      });
+    }, 1200);
+    // Extra late probe — images / FoW may still settle after busy overlay hides.
+    setTimeout(() => this.logTokenVisibilityDiag('game-table +2s probe'), 2000);
+    setTimeout(() => this.logTokenVisibilityDiag('game-table +3.5s probe'), 3500);
+  }
+
+  /** Full per-token visibility diagnosis (data + DOM). Filter console: FolderBackup */
+  private logTokenVisibilityDiag(tag: string, extra: Record<string, unknown> = {}) {
+    try {
+      const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier || '';
+      const table = this.currentTable;
+      const cacheChars = this.characters || [];
+      const allChars = ObjectStore.instance.getObjects(GameCharacter);
+      const probes = this.probeAllTokenDom(allChars, viewId);
+      // Only treat tokens that should render on the current view as "HIDDEN".
+      // Other-map pieces (no-placement) are expected and must not drown the signal.
+      const bad = probes.filter(p =>
+        p.isVisibleOnTable && !(p.reasons.length === 1 && p.reasons[0] === 'ok')
+      );
+      const reasonCounts: Record<string, number> = {};
+      for (const p of probes) {
+        if (!p.isVisibleOnTable) continue;
+        for (const r of p.reasons) {
+          reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+        }
+      }
+      let movableCount = 0;
+      const movableSamples: string[] = [];
+      for (const set of MovableDirective.layerMap.values()) {
+        for (const m of set) {
+          movableCount++;
+          if (movableSamples.length < 12) {
+            const obj = m.tabletopObject;
+            movableSamples.push(
+              `${obj?.aliasName || '?'}|${obj?.identifier?.slice(0, 8) || ''}|screen=${m.posX|0},${m.posY|0},${m.posZ|0}|vis=${!!obj?.isVisibleOnTable}`
+            );
+          }
+        }
+      }
+      const payload: Record<string, unknown> = {
+        ...extra,
+        viewId: viewId || '(none)',
+        tableId: table?.identifier || '',
+        tableSize: table ? `${table.width}x${table.height}` : '',
+        visionOn: !!table?.visionEnabled,
+        visionSize: this.visionRevealedIds.size,
+        isGM: this.isGMMode,
+        epoch: this.pieceRenderEpoch,
+        charEpoch: this.characterViewEpoch,
+        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+        cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
+        camRot: `${this.viewRotateX|0},${this.viewRotateY|0},${this.viewRotateZ|0}`,
+        cacheCount: cacheChars.length,
+        storeCount: allChars.length,
+        domHosts: this.gameObjects?.nativeElement
+          ? this.gameObjects.nativeElement.querySelectorAll('game-character').length
+          : -1,
+        movableCount,
+        reasonCounts,
+        badCount: bad.length,
+        bad: bad.map(p => `${p.name}|${p.id.slice(0, 8)}|${p.reasons.join('+')}|scale=${p.innerScale.toFixed(2)}|rect=${p.rect}|fow=${p.fowOk}|load=${p.isLoaded}|img=${p.imgOk}`),
+        all: probes.map(p =>
+          `${p.name}|${p.reasons.join('+')}|live=${p.dataLive}|pose=${p.dataPose}|` +
+          `dual=${!!p.dualMap}|vis=${p.visibility || '?'}|op=${p.opacity || '?'}|` +
+          `scale=${p.innerScale.toFixed(2)}|rect=${p.rect || '-'}|img=${p.imgOk}`
+        ),
+        dualFocus: probes
+          .filter(p => p.dualMap || (p.isVisibleOnTable && p.reasons[0] !== 'ok'))
+          .map(p =>
+            `${p.name}|${p.reasons.join('+')}|dual=${!!p.dualMap}|flat2d=${!!p.flat2d}|` +
+            `upright=${(p.uprightTf || '').slice(0, 40)}|scale=${p.innerScale.toFixed(2)}|` +
+            `vis=${p.visibility}|op=${p.opacity}|rect=${p.rect}|load=${p.isLoaded}|fow=${p.fowOk}|` +
+            `place=${(p.placements || '').slice(0, 80)}`
+          ),
+        tableIs2D: !!table?.is2DMode,
+        trackBySample: cacheChars.slice(0, 3).map(c =>
+          `${c.name}|${this.pieceRenderEpoch}:${this.characterViewEpoch}:${c.identifier.slice(0, 8)}`
+        ),
+        movableSamples,
+      };
+      folderBackupDebug(tag, payload);
+      if (bad.length > 0) {
+        folderBackupWarn(`${tag} HIDDEN`, {
+          badCount: bad.length,
+          detail: bad.slice(0, 20),
+        });
+      }
+    } catch (e) {
+      folderBackupWarn(`${tag} diag failed`, { error: String(e) });
+    }
+  }
+
+  private probeAllTokenDom(chars: GameCharacter[], viewId: string): TokenDomProbe[] {
+    const root = this.gameObjects?.nativeElement as HTMLElement | undefined;
+    const hostById = new Map<string, HTMLElement>();
+    if (root) {
+      for (const el of Array.from(root.querySelectorAll('game-character')) as HTMLElement[]) {
+        const id = el.getAttribute('data-fb-id') || '';
+        if (id) hostById.set(id, el);
+      }
+    }
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const out: TokenDomProbe[] = [];
+    for (const c of chars) {
+      if (!c) continue;
+      const el = hostById.get(c.identifier);
+      const pose = viewId ? c.getPoseForTable(viewId) : null;
+      const fowOk = this.isTokenRevealedByVision(c);
+      const reasons: TokenHideReason[] = [];
+      if (!c.isVisible && !this.isGMMode) reasons.push('owner-hidden');
+      if (c.location?.name === 'table' && viewId && !c.hasPlacement(viewId)) reasons.push('no-placement');
+      if (!c.isLoaded) reasons.push('not-loaded');
+      if (!fowOk) reasons.push('fow-hidden');
+      if (!(c.imageFile?.url?.length > 0)) reasons.push('no-image');
+
+      let display = '';
+      let visibility = '';
+      let opacity = '';
+      let hostTf = '';
+      let innerTf = '';
+      let innerScale = 1;
+      let rect = '';
+      let imgW = 0;
+      let imgOk = false;
+      let inViewport = false;
+      let movableTf = '';
+
+      if (!el) {
+        // Only flag missing DOM if it should be rendered.
+        if (c.isVisibleOnTable && (c.isVisible || this.isGMMode)) reasons.push('not-in-dom');
+      } else {
+        // Host is often 0×0 (display:block wrapper). Movable lives on `.component`.
+        const movableEl = (el.querySelector('.component') as HTMLElement | null) || el;
+        const hostCs = getComputedStyle(el);
+        const movCs = getComputedStyle(movableEl);
+        display = movCs.display || hostCs.display;
+        // Host may carry FoW visibility:hidden; prefer host for that check.
+        visibility = hostCs.visibility;
+        opacity = movCs.opacity || hostCs.opacity;
+        hostTf = el.style.transform || hostCs.transform || '';
+        movableTf = movableEl.style.transform || movCs.transform || '';
+        const inner = el.querySelector('.component-content') as HTMLElement | null;
+        const innerCs = inner ? getComputedStyle(inner) : null;
+        // Prefer computed — bounceInOut may only live in animation matrix, not style=.
+        innerTf = (innerCs?.transform && innerCs.transform !== 'none'
+          ? innerCs.transform
+          : (inner?.style?.transform || ''));
+        innerScale = approxCssScale(innerTf);
+        const r = movableEl.getBoundingClientRect();
+        rect = `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(r.left)},${Math.round(r.top)}`;
+        inViewport = r.width > 0 && r.height > 0
+          && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh;
+        const img = el.querySelector('img.image:not(.drop-shadow)') as HTMLImageElement | null;
+        imgW = img?.naturalWidth || 0;
+        imgOk = !!(img && img.naturalWidth > 0);
+        if (hostCs.display === 'none' || movCs.display === 'none') reasons.push('display-none');
+        if (hostCs.visibility === 'hidden' || movCs.visibility === 'hidden') reasons.push('visibility-hidden');
+        if (innerScale < 0.05) reasons.push('scale0');
+        const op = parseFloat(opacity);
+        if (!Number.isNaN(op) && op < 0.05) reasons.push('opacity0');
+        if (r.width < 1 || r.height < 1) reasons.push('zero-size');
+        if (!inViewport && c.isVisibleOnTable) reasons.push('offscreen');
+        if (c.isVisibleOnTable && !imgOk) reasons.push('no-image');
+      }
+
+      const placementIds = c.placementTableIds || [];
+      const uprightEl = el?.querySelector('.upright-transform') as HTMLElement | null;
+      const flat2d = !!uprightEl?.classList.contains('is-flat-2d');
+      const uprightTf = uprightEl
+        ? (uprightEl.style.transform || getComputedStyle(uprightEl).transform || '').slice(0, 64)
+        : '';
+      // Dual survivor stuck in 2D upright while the viewed table is 3D (or vice versa).
+      const tableIs2D = !!this.currentTable?.is2DMode;
+      if (el && c.isVisibleOnTable && flat2d !== tableIs2D) reasons.push('flat2d-mismatch');
+      if (reasons.length === 0) reasons.push('ok');
+      out.push({
+        id: c.identifier,
+        name: c.name || '',
+        reasons,
+        display,
+        visibility,
+        opacity,
+        hostTf: hostTf.slice(0, 80),
+        innerTf: innerTf.slice(0, 80),
+        innerScale,
+        rect,
+        imgW,
+        imgOk,
+        inViewport,
+        movableTf: movableTf.slice(0, 80),
+        dataLive: `${c.location?.x|0},${c.location?.y|0},${c.posZ|0}`,
+        dataPose: pose ? `${pose.x|0},${pose.y|0},${pose.posZ|0}` : '(none)',
+        isLoaded: !!c.isLoaded,
+        isVisible: !!c.isVisible,
+        isVisibleOnTable: !!c.isVisibleOnTable,
+        fowOk,
+        placements: (c.tablePlacements || c.tableIdentifier || '').slice(0, 160),
+        dualMap: placementIds.length > 1,
+        flat2d,
+        uprightTf,
+      });
+    }
+    return out;
   }
 
   /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */

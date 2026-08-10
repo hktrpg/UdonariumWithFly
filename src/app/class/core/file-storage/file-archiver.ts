@@ -15,6 +15,7 @@ import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
+import { folderBackupDebug } from 'service/folder-backup-debug';
 
 type MetaData = { percent: number, currentFile: string };
 type UpdateCallback = (metadata: MetaData) => void;
@@ -28,6 +29,9 @@ export class FileArchiver {
     return FileArchiver._instance;
   }
 
+  /** Chrome often rejects move(); remember and skip after first NotAllowedError. */
+  private static moveUnsupported = false;
+
   /** Source accept cap; stored size is enforced by normalizeImageBlob (≤2MB). */
   private maxImageSize = IMAGE_SOURCE_MAX_BYTES;
   private maxAudioeSize = 20 * MEGA_BYTE;
@@ -40,7 +44,6 @@ export class FileArchiver {
   private callbackOnDrop;
 
   private constructor() {
-    console.log('FileArchiver ready...');
   }
 
   initialize() {
@@ -81,8 +84,6 @@ export class FileArchiver {
 
   private onDrop(event: DragEvent) {
     event.preventDefault();
-
-    console.log('onDrop', event.dataTransfer);
     let files = event.dataTransfer.files
     this.load(files);
   };
@@ -115,6 +116,10 @@ export class FileArchiver {
         poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
           fileCount: loadFiles.length,
           names: loadFiles.map(f => f.name).slice(0, 20),
+        });
+        folderBackupDebug('FileArchiver ARCHIVE_LOAD_COMPLETE', {
+          fileCount: loadFiles.length,
+          names: loadFiles.map(f => f.name).slice(0, 30),
         });
         EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
       }
@@ -154,7 +159,6 @@ export class FileArchiver {
       console.warn(`File size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    console.log(file.name + ' type:' + file.type);
     try {
       await ImageStorage.instance.addAsync(file);
     } catch (e) {
@@ -168,7 +172,6 @@ export class FileArchiver {
       console.warn(`File size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    console.log(file.name + ' type:' + file.type);
     const nameService = AudioImportNameService.instance;
     const displayName = nameService
       ? await nameService.resolveDisplayName(file)
@@ -179,7 +182,6 @@ export class FileArchiver {
     if (!audio) return;
     if (existed) {
       // Same bytes — list again in the target folder (settings can differ per folder).
-      console.log(`list existing audio in folder: ${file.name} → ${audio.identifier}`);
       AudioLibrary.instance.ensureListed(audio.identifier);
       return;
     }
@@ -194,7 +196,6 @@ export class FileArchiver {
       console.warn(`PDF size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    console.log(file.name + ' type:' + (file.type || 'application/pdf'));
     await PdfStorage.instance.addAsync(file);
   }
 
@@ -206,7 +207,6 @@ export class FileArchiver {
       console.warn(`Video size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    console.log(file.name + ' type:' + (file.type || 'video/mp4'));
     await VideoStorage.instance.addAsync(file);
   }
 
@@ -218,7 +218,6 @@ export class FileArchiver {
       || type === 'application/json'
       || /\.(xml|html?|txt|json|csv|md)$/i.test(name);
     if (!isTextish) return;
-    console.log(file.name + ' type:' + (file.type || '(by extension)'));
     try {
       let xmlElement: Element = XmlUtil.xml2element(await FileReaderUtil.readAsTextAsync(file));
       if (xmlElement) EventSystem.trigger('XML_LOADED', { xmlElement: xmlElement });
@@ -236,7 +235,6 @@ export class FileArchiver {
     for (let entry of entries) {
       try {
         let blob = await entry.getData(new BlobWriter());
-        console.log(entry.filename + ' 解凍...');
         await this.load([new File([blob], entry.filename, { type: MimeType.type(entry.filename) })]);
       } catch (reason) {
         console.warn(reason);
@@ -277,31 +275,131 @@ export class FileArchiver {
     saveAs(await this.createZipBlobAsync(files, updateCallback), zipName + '.zip');
   }
 
+  /**
+   * Write a blob into a directory.
+   * Prefer atomic tmp+move when the browser allows it; otherwise write the final
+   * name directly (Chrome commonly rejects move — avoid double-write + warn spam).
+   */
   async writeBlobToDirectory(dirHandle: FileSystemDirectoryHandle, fileName: string, blob: Blob): Promise<void> {
+    const canTryMove =
+      !FileArchiver.moveUnsupported &&
+      typeof (FileSystemFileHandle.prototype as { move?: unknown }).move === 'function';
+
+    if (!canTryMove) {
+      await this.writeBlobDirect(dirHandle, fileName, blob);
+      return;
+    }
+
     const tmpName = fileName + '.tmp';
-    const tmpHandle = await dirHandle.getFileHandle(tmpName, { create: true });
-    const writable = await tmpHandle.createWritable();
+    try {
+      const tmpHandle = await dirHandle.getFileHandle(tmpName, { create: true });
+      const writable = await tmpHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      await tmpHandle.move(fileName);
+      return;
+    } catch {
+      FileArchiver.moveUnsupported = true;
+      try { await dirHandle.removeEntry(tmpName); } catch { /* ignore */ }
+      // One fallback write after first move failure; later calls go direct.
+      await this.writeBlobDirect(dirHandle, fileName, blob);
+    }
+  }
+
+  private async writeBlobDirect(
+    dirHandle: FileSystemDirectoryHandle,
+    fileName: string,
+    blob: Blob
+  ): Promise<void> {
+    const handle = await dirHandle.getFileHandle(fileName, { create: true });
+    const writable = await handle.createWritable();
     await writable.write(blob);
     await writable.close();
+  }
 
-    if (typeof tmpHandle.move === 'function') {
-      try {
-        await tmpHandle.move(fileName);
-        return;
-      } catch (e) {
-        console.warn('FileSystemFileHandle.move failed, falling back', e);
+  async ensureDirectory(
+    parent: FileSystemDirectoryHandle,
+    name: string
+  ): Promise<FileSystemDirectoryHandle> {
+    return parent.getDirectoryHandle(name, { create: true });
+  }
+
+  async ensureDirectoryPath(
+    root: FileSystemDirectoryHandle,
+    segments: string[]
+  ): Promise<FileSystemDirectoryHandle> {
+    let cur = root;
+    for (const seg of segments) {
+      if (!seg) continue;
+      cur = await this.ensureDirectory(cur, seg);
+    }
+    return cur;
+  }
+
+  async fileExists(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+    try {
+      await dir.getFileHandle(name);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async readFilesFromDirectory(dir: FileSystemDirectoryHandle): Promise<File[]> {
+    const files: File[] = [];
+    for await (const [name, handle] of dir.entries()) {
+      if (handle.kind !== 'file') continue;
+      const file = await (handle as FileSystemFileHandle).getFile();
+      files.push(new File([file], name, { type: file.type || MimeType.type(name) }));
+    }
+    return files;
+  }
+
+  async copyDirectoryContents(
+    src: FileSystemDirectoryHandle,
+    dest: FileSystemDirectoryHandle,
+    options?: { exclude?: Set<string> }
+  ): Promise<void> {
+    const exclude = options?.exclude;
+    for await (const [name, handle] of src.entries()) {
+      if (exclude?.has(name)) continue;
+      if (handle.kind === 'file') {
+        const file = await (handle as FileSystemFileHandle).getFile();
+        await this.writeBlobToDirectory(dest, name, file);
+      } else if (handle.kind === 'directory') {
+        const childDest = await this.ensureDirectory(dest, name);
+        await this.copyDirectoryContents(handle as FileSystemDirectoryHandle, childDest, options);
       }
     }
+  }
 
-    const finalHandle = await dirHandle.getFileHandle(fileName, { create: true });
-    const finalWritable = await finalHandle.createWritable();
-    await finalWritable.write(blob);
-    await finalWritable.close();
+  async removeDirectoryRecursive(parent: FileSystemDirectoryHandle, name: string): Promise<void> {
     try {
-      await dirHandle.removeEntry(tmpName);
+      await parent.removeEntry(name, { recursive: true });
     } catch (e) {
-      console.warn('Failed to remove temp backup file', e);
+      // Idempotent: replace/prune often remove paths that were never created.
+      if (e && (e as DOMException).name === 'NotFoundError') return;
+      console.warn('removeDirectoryRecursive failed', name, e);
     }
+  }
+
+  /**
+   * Write into name.next/ then replace name/ (best-effort atomic directory swap).
+   */
+  async replaceDirectoryFrom(
+    parent: FileSystemDirectoryHandle,
+    destName: string,
+    source: FileSystemDirectoryHandle
+  ): Promise<void> {
+    const nextName = `${destName}.next`;
+    await this.removeDirectoryRecursive(parent, nextName);
+    const nextDir = await this.ensureDirectory(parent, nextName);
+    await this.copyDirectoryContents(source, nextDir);
+    await this.removeDirectoryRecursive(parent, destName);
+    // File System Access has no rename-dir; copy next → dest then drop next.
+    const destDir = await this.ensureDirectory(parent, destName);
+    await this.copyDirectoryContents(nextDir, destDir);
+    await this.removeDirectoryRecursive(parent, nextName);
   }
 }
 

@@ -24,6 +24,7 @@ import { UndoService } from 'service/undo.service';
 import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
+import { folderBackupDebug } from 'service/folder-backup-debug';
 
 type LayerName = string;
 
@@ -541,6 +542,16 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       samples,
       layerKeys: Array.from(MovableDirective.layerMap.keys()),
     });
+    // Also emit under FolderBackup filter during room-load diagnosis.
+    if (driftBefore > 0 || driftAfter > 0 || n === 0) {
+      folderBackupDebug('movable syncAllPoses', {
+        viewId: viewId || '(none)',
+        movableCount: n,
+        driftBefore,
+        driftAfter,
+        samples: samples.map(s => `${s.id.slice(0, 8)}|${s.screenBefore}→${s.screenAfter}|data=${s.data}|vis=${s.visible}`),
+      });
+    }
   }
 
   /** Register map-switch / archive-load pose hooks (safe to call early). */
@@ -569,6 +580,10 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
           viewId: viewId || '(none)',
           movableCount,
         });
+        folderBackupDebug('movable ARCHIVE_LOAD_COMPLETE', {
+          viewId: viewId || '(none)',
+          movableCount,
+        });
         if (viewId) TabletopObject.hydrateAllForView(viewId, true);
         MovableDirective.syncAllPosesFromObjects();
         setTimeout(() => {
@@ -576,6 +591,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
           let n = 0;
           for (const set of MovableDirective.layerMap.values()) n += set.size;
           poseDebug('ARCHIVE_LOAD_COMPLETE +0ms retry', { viewId: id || '(none)', movableCount: n });
+          folderBackupDebug('movable ARCHIVE +0ms', { viewId: id || '(none)', movableCount: n });
           if (id) TabletopObject.hydrateAllForView(id, true);
           MovableDirective.syncAllPosesFromObjects();
         }, 0);
@@ -583,6 +599,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
           let n = 0;
           for (const set of MovableDirective.layerMap.values()) n += set.size;
           poseDebug('ARCHIVE_LOAD_COMPLETE +100ms retry', { movableCount: n });
+          folderBackupDebug('movable ARCHIVE +100ms', { movableCount: n });
           MovableDirective.syncAllPosesFromObjects();
         }, 100);
       });

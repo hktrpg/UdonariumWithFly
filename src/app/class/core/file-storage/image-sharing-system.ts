@@ -19,7 +19,6 @@ export class ImageSharingSystem {
   private maxReceiveTask: number = 4;
 
   private constructor() {
-    console.log('FileSharingSystem ready...');
   }
 
   initialize() {

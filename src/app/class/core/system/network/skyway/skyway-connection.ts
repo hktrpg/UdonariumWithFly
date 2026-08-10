@@ -204,7 +204,6 @@ export class SkyWayConnection implements Connection {
 
   private openSkyWay() {
     if (this.skyWay) {
-      console.warn('It is already opened.');
       this.close();
     }
     let skyWay = new Peer(this.peer.peerId, { key: this.key });// SkyWay

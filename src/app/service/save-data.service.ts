@@ -50,6 +50,20 @@ import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import saveAs from 'file-saver';
 import * as localForage from 'localforage';
+import {
+  FOLDER_BACKUP_FORMAT_VERSION,
+  LATEST_DIR,
+  MANIFEST_FILE,
+  MEDIA_DIR,
+  ROOM_META_FILE,
+  ROOMS_DIR,
+  STATE_FILE_NAMES,
+  PREVIEW_FILE,
+  STATE_ZIP_FILE,
+  isMediaFileName,
+  mediaHashFromName,
+  sha256Hex,
+} from './folder-backup-layout';
 
 type UpdateCallback = (percent: number) => void;
 
@@ -69,8 +83,9 @@ export class SaveDataService {
   private static queue: PromiseQueue = new PromiseQueue('SaveDataServiceQueue');
   static readonly INCLUDE_AUDIO_STORAGE_KEY = 'udonarium.save.includeAudio';
 
-  /** Cached preference (default true until loaded). */
-  private includeAudioCache: boolean | undefined;
+  /** null = user has not chosen yet; undefined = not loaded from storage. */
+  private includeAudioCache: boolean | null | undefined;
+  private includeAudioLoaded = false;
 
   /** Cache materialized ./assets URL images so folder auto-backup does not re-fetch/normalize every flush. */
   private packedAssetCache = new Map<string, { sourceUrl: string; hashId: string; file: File }>();
@@ -86,28 +101,39 @@ export class SaveDataService {
     MovableDirective.ensurePoseFlushHook();
   }
 
-  /** Sync view of preference for settings toggles (defaults to true before load). */
+  /** Sync view of preference for settings toggles (defaults to true before load / when unset). */
   get includeAudio(): boolean {
     return this.includeAudioCache !== false;
   }
 
   async initializeIncludeAudioPreference(): Promise<void> {
-    await this.getIncludeAudio();
+    await this.ensureIncludeAudioLoaded();
   }
 
   async getIncludeAudio(): Promise<boolean> {
-    if (this.includeAudioCache !== undefined) return this.includeAudioCache;
+    await this.ensureIncludeAudioLoaded();
+    // Unset → include for legacy callers; folder bind forces an explicit choice first.
+    return this.includeAudioCache !== false;
+  }
+
+  private async ensureIncludeAudioLoaded(): Promise<void> {
+    if (this.includeAudioLoaded) return;
     try {
       const v = await localForage.getItem<boolean | string>(SaveDataService.INCLUDE_AUDIO_STORAGE_KEY);
-      this.includeAudioCache = !(v === false || v === 'false');
+      if (v === null || v === undefined) {
+        this.includeAudioCache = null;
+      } else {
+        this.includeAudioCache = !(v === false || v === 'false');
+      }
     } catch {
-      this.includeAudioCache = true;
+      this.includeAudioCache = null;
     }
-    return this.includeAudioCache;
+    this.includeAudioLoaded = true;
   }
 
   async setIncludeAudio(include: boolean): Promise<void> {
     this.includeAudioCache = !!include;
+    this.includeAudioLoaded = true;
     try {
       await localForage.setItem(SaveDataService.INCLUDE_AUDIO_STORAGE_KEY, this.includeAudioCache);
     } catch { /* ignore */ }
@@ -115,18 +141,42 @@ export class SaveDataService {
 
   /**
    * Ask whether to pack music files into a room save.
-   * Returns include flag, or null if cancelled.
-   * Folder bind always writes the choice as the local default; ZIP uses remember checkbox.
+   * Returns include flag, or null if cancelled / no choice.
+   * Folder bind asks this before the directory picker and writes the choice as the local default;
+   * ZIP uses remember checkbox.
    */
   async askIncludeAudio(context: SaveIncludeAudioAskContext): Promise<boolean | null> {
     if (!ModalService.defaultParentViewContainerRef) {
       return this.getIncludeAudio();
     }
-    const current = await this.getIncludeAudio();
+    await this.ensureIncludeAudioLoaded();
+    const preset = this.includeAudioCache;
+    const folderHelpSections = context === 'folder' ? [
+      {
+        title: this.i18n.t('save.includeAudio.helpFolder.include.title'),
+        body: this.i18n.t('save.includeAudio.helpFolder.include.body'),
+      },
+      {
+        title: this.i18n.t('save.includeAudio.helpFolder.points.title'),
+        chips: [
+          { label: this.i18n.t('save.includeAudio.chip.latest'), tone: 'latest' },
+          { label: this.i18n.t('save.includeAudio.chip.recent'), tone: 'recent' },
+          { label: this.i18n.t('save.includeAudio.chip.day'), tone: 'day' },
+          { label: this.i18n.t('save.includeAudio.chip.week'), tone: 'week' },
+          { label: this.i18n.t('save.includeAudio.chip.month'), tone: 'month' },
+        ],
+        body: this.i18n.t('save.includeAudio.helpFolder.points.body'),
+      },
+      {
+        title: this.i18n.t('save.includeAudio.helpFolder.list.title'),
+        body: this.i18n.t('save.includeAudio.helpFolder.list.body'),
+      },
+    ] : [];
     const result = await this.modalService.open<{ choice: string; remember: boolean } | false>(ConfirmationComponent, {
       title: this.i18n.t('save.includeAudio.title'),
       text: this.i18n.t(context === 'folder' ? 'save.includeAudio.textFolder' : 'save.includeAudio.textZip'),
-      help: this.i18n.t('save.includeAudio.help'),
+      help: context === 'folder' ? '' : this.i18n.t('save.includeAudio.helpZip'),
+      helpSections: folderHelpSections,
       materialIcon: 'library_music',
       type: ConfirmationType.OK_CANCEL,
       okLabel: this.i18n.t('confirm.ok'),
@@ -135,11 +185,16 @@ export class SaveDataService {
         { id: 'include', label: this.i18n.t('save.includeAudio.include') },
         { id: 'exclude', label: this.i18n.t('save.includeAudio.exclude') },
       ],
-      choiceValue: current ? 'include' : 'exclude',
+      // Folder bind: no pre-selection until user picks. ZIP may reuse last preference.
+      choiceValue: context === 'folder'
+        ? (preset === null || preset === undefined ? '' : (preset ? 'include' : 'exclude'))
+        : (preset === false ? 'exclude' : 'include'),
+      requireChoice: true,
       rememberLabel: context === 'zip' ? this.i18n.t('save.includeAudio.remember') : '',
       rememberValue: context === 'zip',
     });
     if (!result) return null;
+    if (result.choice !== 'include' && result.choice !== 'exclude') return null;
     const include = result.choice === 'include';
     if (context === 'folder' || result.remember) {
       await this.setIncludeAudio(include);
@@ -401,34 +456,156 @@ export class SaveDataService {
   ): Promise<void> {
     const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
     const files = await this.buildRoomFiles(packAudio);
-    let progresPercent = -1;
-    const zipBlob = await FileArchiver.instance.createZipBlobAsync(files, meta => {
+    await this.writeRoomFolderLayout(dirHandle, roomId, displayName, files, auth, packAudio, updateCallback);
+  }
+
+  /**
+   * Modern folder backup: shared media/ + rooms/<id>/latest/state.zip
+   * (Chrome prompts on creating loose .xml via File System Access — keep XML inside zip).
+   */
+  private async writeRoomFolderLayout(
+    root: FileSystemDirectoryHandle,
+    roomId: string,
+    displayName: string,
+    files: File[],
+    auth: {
+      allowUser: boolean;
+      allowGuest: boolean;
+      secrets?: { v: 1; salt: string; iv: string; data: string };
+    } | undefined,
+    includeAudio: boolean,
+    updateCallback?: UpdateCallback
+  ): Promise<void> {
+    const archiver = FileArchiver.instance;
+    const mediaDir = await archiver.ensureDirectory(root, MEDIA_DIR);
+    const roomsDir = await archiver.ensureDirectory(root, ROOMS_DIR);
+    const roomDir = await archiver.ensureDirectory(roomsDir, roomId);
+    const latestDir = await archiver.ensureDirectory(roomDir, LATEST_DIR);
+
+    let prevStateFp = '';
+    try {
+      const prevManifestFile = await (await latestDir.getFileHandle(MANIFEST_FILE)).getFile();
+      const prev = JSON.parse(await prevManifestFile.text()) as {
+        stateFingerprint?: string;
+      };
+      prevStateFp = prev?.stateFingerprint || '';
+    } catch { /* first save */ }
+
+    const stateFiles: File[] = [];
+    const mediaFiles: File[] = [];
+    for (const file of files) {
+      if (STATE_FILE_NAMES.has(file.name)) stateFiles.push(file);
+      else if (isMediaFileName(file.name)) mediaFiles.push(file);
+      else if (/\.(xml|json)$/i.test(file.name)) stateFiles.push(file);
+      else mediaFiles.push(file);
+    }
+
+    const total = mediaFiles.length + 3;
+    let done = 0;
+    const report = () => {
       if (!updateCallback) return;
-      let percent = meta.percent | 0;
-      if (percent <= progresPercent) return;
-      progresPercent = percent;
-      this.ngZone.run(() => updateCallback(progresPercent));
-    });
-    const zipFile = `${roomId}.zip`;
-    await FileArchiver.instance.writeBlobToDirectory(dirHandle, zipFile, zipBlob);
-    const meta: Record<string, unknown> = {
+      const percent = Math.min(99, Math.round((done / Math.max(1, total)) * 100));
+      this.ngZone.run(() => updateCallback(percent));
+    };
+
+    const mediaEntries: { hash: string; name: string }[] = [];
+    for (const file of mediaFiles) {
+      const hash = mediaHashFromName(file.name);
+      mediaEntries.push({ hash, name: file.name });
+      const exists = await archiver.fileExists(mediaDir, file.name);
+      if (!exists) {
+        await archiver.writeBlobToDirectory(mediaDir, file.name, file);
+      }
+      done++;
+      report();
+    }
+
+    const fileFingerprints: Record<string, string> = {};
+    const fpParts: string[] = [];
+    for (const file of stateFiles) {
+      const buf = await file.arrayBuffer();
+      const fp = await sha256Hex(buf);
+      fileFingerprints[file.name] = fp;
+      fpParts.push(`${file.name}:${fp}`);
+    }
+    fpParts.sort();
+    const stateFingerprint = await sha256Hex(fpParts.join('|'));
+
+    if (stateFingerprint !== prevStateFp) {
+      const stateZip = await archiver.createZipBlobAsync(stateFiles);
+      await archiver.writeBlobToDirectory(latestDir, STATE_ZIP_FILE, stateZip);
+      // Remove any prior loose .xml writes (Chrome prompts on those extensions).
+      for await (const [name, handle] of latestDir.entries()) {
+        if (handle.kind !== 'file') continue;
+        if (name === STATE_ZIP_FILE || name === MANIFEST_FILE || name === PREVIEW_FILE) continue;
+        if (/\.(xml|json\.tmp|xml\.tmp)$/i.test(name) || name.endsWith('.tmp')) {
+          try {
+            await latestDir.removeEntry(name);
+          } catch { /* ignore */ }
+        }
+      }
+    }
+    done++;
+    report();
+
+    const savedAt = new Date().toISOString();
+    const manifest = {
+      formatVersion: FOLDER_BACKUP_FORMAT_VERSION,
+      savedAt,
+      files: fileFingerprints,
+      stateFingerprint,
+      stateZip: STATE_ZIP_FILE,
+      media: mediaEntries,
+    };
+    await archiver.writeBlobToDirectory(
+      latestDir,
+      MANIFEST_FILE,
+      new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
+    );
+    done++;
+    report();
+
+    let slots: {
+      latest?: string;
+      recent?: string[];
+      snap_1d?: string;
+      snap_7d?: string;
+      snap_30d?: string;
+      recentIndex?: number;
+    } = { latest: savedAt };
+    const roomMeta: Record<string, unknown> = {
+      formatVersion: FOLDER_BACKUP_FORMAT_VERSION,
       roomId,
       displayName,
-      savedAt: new Date().toISOString(),
-      zipFile,
-      includeAudio: packAudio,
+      savedAt,
+      includeAudio,
+      slots,
     };
-    if (auth) {
-      meta.allowUser = !!auth.allowUser;
-      meta.allowGuest = !!auth.allowGuest;
-      if (auth.secrets) meta.secrets = auth.secrets;
-      // Never write plaintext passwords into the backup folder.
+    try {
+      const existingMetaFile = await (await roomDir.getFileHandle(ROOM_META_FILE)).getFile();
+      const existing = JSON.parse(await existingMetaFile.text()) as {
+        slots?: typeof slots;
+        firstSavedAt?: string;
+      };
+      if (existing?.slots) {
+        slots = { ...existing.slots, latest: savedAt };
+        roomMeta.slots = slots;
+      }
+      roomMeta.firstSavedAt = existing?.firstSavedAt || savedAt;
+    } catch {
+      roomMeta.firstSavedAt = savedAt;
     }
-    await FileArchiver.instance.writeBlobToDirectory(
-      dirHandle,
-      `${roomId}.meta.json`,
-      new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' })
+    if (auth) {
+      roomMeta.allowUser = !!auth.allowUser;
+      roomMeta.allowGuest = !!auth.allowGuest;
+      if (auth.secrets) roomMeta.secrets = auth.secrets;
+    }
+    await archiver.writeBlobToDirectory(
+      roomDir,
+      ROOM_META_FILE,
+      new Blob([JSON.stringify(roomMeta, null, 2)], { type: 'application/json' })
     );
+    if (updateCallback) this.ngZone.run(() => updateCallback(100));
   }
 
   saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
