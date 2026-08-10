@@ -315,19 +315,19 @@ export class TabletopActionService {
     table2d.weatherIntensity = 0.5;
     table2d.initialize();
 
-    // Initial view: 2D clue board (tech demo)
-    table3d.selected = false;
-    table2d.selected = true;
-    TableSelecter.instance.viewTableIdentifier = table2d.identifier;
-    TableSelecter.instance.viewedTableIdentifier = table2d.identifier;
-    EventSystem.trigger('SELECT_GAME_TABLE', { identifier: table2d.identifier });
+    // Initial view: 3D battle map
+    table3d.selected = true;
+    table2d.selected = false;
+    TableSelecter.instance.viewTableIdentifier = table3d.identifier;
+    TableSelecter.instance.viewedTableIdentifier = table3d.identifier;
+    EventSystem.trigger('SELECT_GAME_TABLE', { identifier: table3d.identifier });
   }
 
   makeDefaultTabletopObjects() {
-    // Classic battle tokens on 3D only; clue-board demo on 2D only.
+    // Classic battle tokens on 3D; clue-board demo on 2D (Monster C dual-placed).
     this.seedClassicBattleObjects(DEFAULT_TABLE_3D_ID);
     this.seedClueBoardObjects(DEFAULT_TABLE_2D_ID);
-    TabletopObject.migrateUnboundTablePieces(DEFAULT_TABLE_2D_ID);
+    TabletopObject.migrateUnboundTablePieces(DEFAULT_TABLE_3D_ID);
   }
 
   private seedClassicBattleObjects(tableId: string) {
@@ -398,13 +398,23 @@ export class TabletopActionService {
     testCharacter.moveToTableOnly(tableId);
   }
 
+  /** Standing-mask fill: darker sticky yellow (ZIP clueMask bgcolor). */
+  static readonly CLUE_STICKY_YELLOW = '#9e811a';
+
   /**
-   * Default 2D clue-board layout (from room save 普通房間…_0828.zip).
-   * Positions / pin styles / notes / mask / yarn links are fixed for a stable demo.
+   * Default 2D clue-board layout (from HKTRPG_2026-08-10_1009.zip 2D map).
+   * Monster C also sits under the yellow standing mask; rumour stays in common.
    */
   private seedClueBoardObjects(tableId: string) {
-    // Classic battle tokens stay on the 3D map only — putting them on the clue
-    // board (under the demo mask) makes ZIP reload look like a broken layout.
+    // Dual-map: keep 3D battle pose, add under yellow mask for standing-silhouette demo.
+    const monsterC = ObjectStore.instance.get<GameCharacter>('testCharacter_3');
+    if (monsterC) {
+      monsterC.pushPin = true;
+      monsterC.pushPinAngle = 13;
+      monsterC.pushPinStyle = 2;
+      monsterC.addToTable(tableId, { x: 175, y: 400, posZ: 0 }, false);
+    }
+
     const clueA = this.seedClueCharacter('clueCharacter_1', './assets/images/mon_150.gif',
       this.i18n.t('sample.clue.suspectA'), 829, 304, tableId, 'polaroid', -8, 6, -8);
     const clueB = this.seedClueCharacter('clueCharacter_2', './assets/images/mon_211.gif',
@@ -418,8 +428,8 @@ export class TabletopActionService {
       this.i18n.t('sample.clue.caseTitle'),
       this.i18n.t('sample.clue.caseBody'),
       12, 6, 6, 'clueNote_a4');
-    noteA4.location.x = 1217;
-    noteA4.location.y = 501;
+    noteA4.location.x = 1225;
+    noteA4.location.y = 625;
     noteA4.rotate = -4;
     noteA4.isUpright = false;
     noteA4.applyPaperStyle('a4');
@@ -431,7 +441,7 @@ export class TabletopActionService {
     const sticky = TextNote.create(
       this.i18n.t('sample.clue.stickyTitle'),
       this.i18n.t('sample.clue.stickyBody'),
-      14, 4, 2.5, 'clueNote_sticky');
+      14, 2.5, 2.5, 'clueNote_sticky');
     sticky.location.x = 981;
     sticky.location.y = 711;
     sticky.rotate = 7;
@@ -442,6 +452,7 @@ export class TabletopActionService {
     sticky.pushPinStyle = 6;
     sticky.moveToTableOnly(tableId);
 
+    // Inventory handout: revealed via mask click (matches ZIP location.name=common).
     const rumours = TextNote.create(
       this.i18n.t('sample.clue.rumourTitle'),
       this.i18n.t('sample.clue.rumourBody'),
@@ -450,7 +461,11 @@ export class TabletopActionService {
     rumours.location.y = 698;
     rumours.rotate = 0;
     rumours.isUpright = false;
-    rumours.moveToTableOnly(tableId);
+    rumours.isLocked = true;
+    rumours.textAlign = 'center';
+    rumours.tableIdentifier = tableId;
+    rumours.location.name = 'common';
+    rumours.update();
 
     const mask = GameTableMask.create(
       this.i18n.t('sample.clue.maskName'), 5, 7, 100, 'clueMask_org');
@@ -460,7 +475,9 @@ export class TabletopActionService {
     mask.borderType = 0;
     mask.text = this.i18n.t('sample.clue.maskText');
     mask.fontsize = 18;
-    mask.textPosition = 'middle-center';
+    mask.textPosition = 'top-center';
+    mask.color = '#555555';
+    mask.bgcolor = TabletopActionService.CLUE_STICKY_YELLOW;
     mask.tokenFxPassive = true;
     mask.tokenFxPassiveConfig = {
       isInverse: false,
@@ -475,7 +492,7 @@ export class TabletopActionService {
       altitudeMode: 'none',
       altitude: 0,
     };
-    mask.setEnabledClickActions(['note']);
+    mask.setEnabledClickActions(['note', 'tokenFx']);
     mask.clickNoteId = rumours.identifier;
     mask.moveToTableOnly(tableId);
     const clueTable = ObjectStore.instance.get<GameTable>(tableId);
