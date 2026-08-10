@@ -9,7 +9,7 @@ All samples below are from [BigSoundBank](https://bigsoundbank.com/) / La Sonoth
 | File | Source | Page |
 |------|--------|------|
 | `rain.ogg` | Rain on concrete (#1289) | https://bigsoundbank.com/rain-on-concrete-s1289.html |
-| `thunderstorm.ogg` | Rain and Thunder #3 (#2717) | https://bigsoundbank.com/storm-and-rain-3-s2717.html |
+| `thunderstorm.ogg` | Jurij(soundreality-thunder-sound-375727) | https://pixabay.com/users/soundreality-31074404/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=375727 |
 | `wind.ogg` | Wind (#0595) | https://bigsoundbank.com/wind-s0595.html |
 | `burning.ogg` | Fire, Foley (#3322) | https://bigsoundbank.com/fire-foley-s3322.html |
 | `snow.ogg` | Wind in Tall Grass (#0908) | https://bigsoundbank.com/wind-in-tall-grass-s0908.html |
