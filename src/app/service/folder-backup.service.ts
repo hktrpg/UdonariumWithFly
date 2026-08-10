@@ -136,6 +136,8 @@ export class FolderBackupService implements OnDestroy {
   /** Hot state writes (cheap XML). */
   private static readonly DEBOUNCE_MS = 2000;
   private static readonly MIN_INTERVAL_MS = 10000;
+  /** Retention slots must be at least this much older than latest to list / keep. */
+  private static readonly RETENTION_DISTINCT_MS = 5000;
   /** Includes time to materialize ./assets URL images into the room save. */
   private static readonly DEFAULT_FLUSH_TIMEOUT_MS = 60000;
 
@@ -1068,6 +1070,9 @@ export class FolderBackupService implements OnDestroy {
         if (snapshot.auth) {
           metaAuth = await this.resolveMetaAuthForWrite(snapshot.roomId, snapshot.auth);
         }
+        // Freeze previous latest into recent/calendar slots BEFORE overwriting latest.
+        // (Post-write promote stamped slots with the new latestAt and prune/list hid them.)
+        await this.archiveDueRetentionSlots(snapshot.roomId);
         await this.saveDataService.saveRoomToDirectoryAsync(
           this.dirHandle,
           snapshot.roomId,
@@ -1233,11 +1238,6 @@ export class FolderBackupService implements OnDestroy {
     } catch (e) {
       console.warn('FolderBackup preview failed', e);
     }
-    try {
-      await this.promoteRetentionSlots(roomId);
-    } catch (e) {
-      console.warn('FolderBackup retention promote failed', e);
-    }
   }
 
   private async writeLatestPreview(roomId: string): Promise<void> {
@@ -1249,13 +1249,23 @@ export class FolderBackupService implements OnDestroy {
     await FileArchiver.instance.writeBlobToDirectory(roomDir, PREVIEW_FILE, blob);
   }
 
-  private async promoteRetentionSlots(roomId: string): Promise<void> {
+  /**
+   * Copy current `latest/` into recent/calendar slots when their intervals are due.
+   * Must run before the next latest overwrite so checkpoints keep older content and timestamps.
+   */
+  private async archiveDueRetentionSlots(roomId: string): Promise<void> {
     if (!this.dirHandle) return;
     const archiver = FileArchiver.instance;
     const roomDir = await archiver.ensureDirectoryPath(this.dirHandle, [ROOMS_DIR, roomId]);
-    const latestDir = await roomDir.getDirectoryHandle(LATEST_DIR);
-    const now = Date.now();
 
+    let latestDir: FileSystemDirectoryHandle;
+    try {
+      latestDir = await roomDir.getDirectoryHandle(LATEST_DIR);
+    } catch {
+      return; // First save — nothing to archive yet.
+    }
+
+    const now = Date.now();
     let meta: FolderBackupRoomMetaV2;
     try {
       const raw = await (await roomDir.getFileHandle(ROOM_META_FILE)).getFile();
@@ -1263,17 +1273,22 @@ export class FolderBackupService implements OnDestroy {
     } catch {
       return;
     }
+
     const slots = { ...(meta.slots || {}) };
-    const latestAt = Date.parse(slots.latest || meta.savedAt || '') || now;
+    const previousLatestIso = slots.latest || meta.savedAt || '';
+    const previousLatestAt = Date.parse(previousLatestIso) || 0;
+    if (!previousLatestAt) return;
+
     if (!meta.firstSavedAt) {
-      meta.firstSavedAt = slots.latest || meta.savedAt || new Date(now).toISOString();
+      meta.firstSavedAt = previousLatestIso;
     }
-    const firstSavedMs = Date.parse(meta.firstSavedAt) || latestAt;
+    const firstSavedMs = Date.parse(meta.firstSavedAt) || previousLatestAt;
 
-    // Prune slots wrongly created on first save (same moment as latest).
-    await this.prunePrematureRetentionSlots(roomDir, slots, latestAt);
+    // Clean copies left by the old post-write promote (same timestamp as latest).
+    await this.prunePrematureRetentionSlots(roomDir, slots, previousLatestAt);
 
-    // Recent ring — only after the interval since first save / last recent promote.
+    let changed = false;
+
     const recentTimes = Array.isArray(slots.recent) ? [...slots.recent] : [];
     let recentIndex = typeof slots.recentIndex === 'number' ? slots.recentIndex : 0;
     const lastRecentMs = recentTimes.reduce((max, t) => Math.max(max, Date.parse(t) || 0), 0);
@@ -1284,10 +1299,11 @@ export class FolderBackupService implements OnDestroy {
       const recentRoot = await archiver.ensureDirectory(roomDir, RECENT_DIR);
       const idx = recentIndex % RECENT_SLOT_COUNT;
       await archiver.replaceDirectoryFrom(recentRoot, String(idx), latestDir);
-      recentTimes[idx] = new Date(latestAt).toISOString();
+      recentTimes[idx] = previousLatestIso;
       recentIndex = (idx + 1) % RECENT_SLOT_COUNT;
       slots.recent = recentTimes;
       slots.recentIndex = recentIndex;
+      changed = true;
     }
 
     const calendar: { dir: typeof SNAP_DIRS[number]; key: 'snap_1d' | 'snap_7d' | 'snap_30d'; ms: number }[] = [
@@ -1300,11 +1316,14 @@ export class FolderBackupService implements OnDestroy {
       const due = prev ? now - prev >= c.ms : now - firstSavedMs >= c.ms;
       if (!due) continue;
       await archiver.replaceDirectoryFrom(roomDir, c.dir, latestDir);
-      slots[c.key] = new Date(latestAt).toISOString();
+      slots[c.key] = previousLatestIso;
+      changed = true;
     }
 
+    // prunePrematureRetentionSlots mutates `slots`; persist whenever anything changed.
+    if (!changed && JSON.stringify(slots) === JSON.stringify(meta.slots || {})) return;
+
     meta.slots = slots;
-    meta.savedAt = slots.latest || meta.savedAt;
     meta.formatVersion = FOLDER_BACKUP_FORMAT_VERSION;
     await archiver.writeBlobToDirectory(
       roomDir,
@@ -1313,14 +1332,16 @@ export class FolderBackupService implements OnDestroy {
     );
   }
 
-  /** Drop retention copies that are not meaningfully older than latest (first-save bug). */
+  /** Drop retention copies that are not older than latest (duplicate / first-save bug). */
   private async prunePrematureRetentionSlots(
     roomDir: FileSystemDirectoryHandle,
     slots: NonNullable<FolderBackupRoomMetaV2['slots']>,
     latestAt: number
   ): Promise<void> {
     const archiver = FileArchiver.instance;
-    const minRecentGap = Math.floor(RECENT_INTERVAL_MS * 0.8);
+    // Only drop near-duplicates of latest; valid checkpoints may be only seconds older
+    // right after archive-then-write.
+    const minGapMs = FolderBackupService.RETENTION_DISTINCT_MS;
 
     if (Array.isArray(slots.recent)) {
       const next: string[] = [];
@@ -1328,7 +1349,7 @@ export class FolderBackupService implements OnDestroy {
       for (let i = 0; i < Math.max(slots.recent.length, RECENT_SLOT_COUNT); i++) {
         const iso = slots.recent[i];
         const t = Date.parse(iso || '') || 0;
-        if (iso && t && latestAt - t >= minRecentGap) {
+        if (iso && t && latestAt - t >= minGapMs) {
           next[i] = iso;
           any = true;
         } else if (iso) {
@@ -1342,15 +1363,15 @@ export class FolderBackupService implements OnDestroy {
       if (!any) slots.recentIndex = 0;
     }
 
-    const calendar: { key: 'snap_1d' | 'snap_7d' | 'snap_30d'; dir: string; ms: number }[] = [
-      { key: 'snap_1d', dir: 'snap_1d', ms: SNAP_1D_MS },
-      { key: 'snap_7d', dir: 'snap_7d', ms: SNAP_7D_MS },
-      { key: 'snap_30d', dir: 'snap_30d', ms: SNAP_30D_MS },
+    const calendar: { key: 'snap_1d' | 'snap_7d' | 'snap_30d'; dir: string }[] = [
+      { key: 'snap_1d', dir: 'snap_1d' },
+      { key: 'snap_7d', dir: 'snap_7d' },
+      { key: 'snap_30d', dir: 'snap_30d' },
     ];
     for (const c of calendar) {
       const t = Date.parse(slots[c.key] || '') || 0;
       if (!slots[c.key]) continue;
-      if (t && latestAt - t >= Math.floor(c.ms * 0.8)) continue;
+      if (t && latestAt - t >= minGapMs) continue;
       delete slots[c.key];
       try {
         await archiver.removeDirectoryRecursive(roomDir, c.dir);
@@ -1391,11 +1412,11 @@ export class FolderBackupService implements OnDestroy {
       await pushSlot('latest', 'latest', latestAt, latestDir);
     } catch { /* missing latest */ }
 
-    const isMeaningfulOlder = (savedAt: string, minGapMs: number): boolean => {
+    const isDistinctFromLatest = (savedAt: string): boolean => {
       const t = Date.parse(savedAt) || 0;
       if (!t) return false;
-      if (latestMs && latestMs - t >= minGapMs) return true;
-      return Date.now() - t >= minGapMs;
+      if (latestMs) return latestMs - t >= FolderBackupService.RETENTION_DISTINCT_MS;
+      return Date.now() - t >= FolderBackupService.RETENTION_DISTINCT_MS;
     };
 
     try {
@@ -1412,22 +1433,17 @@ export class FolderBackupService implements OnDestroy {
               savedAt = m.savedAt || '';
             } catch { /* empty */ }
           }
-          if (!savedAt || !isMeaningfulOlder(savedAt, Math.floor(RECENT_INTERVAL_MS * 0.8))) continue;
+          if (!savedAt || !isDistinctFromLatest(savedAt)) continue;
           await pushSlot(`recent/${i}`, 'recent', savedAt, d);
         } catch { /* missing slot */ }
       }
     } catch { /* no recent */ }
 
-    const calendarGaps: Record<string, number> = {
-      snap_1d: SNAP_1D_MS,
-      snap_7d: SNAP_7D_MS,
-      snap_30d: SNAP_30D_MS,
-    };
     for (const snap of SNAP_DIRS) {
       try {
         const d = await roomDir.getDirectoryHandle(snap);
         const savedAt = meta.slots?.[snap] || '';
-        if (!savedAt || !isMeaningfulOlder(savedAt, Math.floor(calendarGaps[snap] * 0.8))) continue;
+        if (!savedAt || !isDistinctFromLatest(savedAt)) continue;
         await pushSlot(snap, snap, savedAt, d);
       } catch { /* missing */ }
     }
