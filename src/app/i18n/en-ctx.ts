@@ -11,7 +11,7 @@ export const en_ctx: I18nDictionary = {
 
   'fx.aura': 'Aura', 'fx.none': 'None', 'fx.clearAura': 'Clear aura', 'fx.ring': 'Ring effect', 'fx.ring.none': 'None', 'fx.ring.fire': 'Fire ring', 'fx.ring.magic': 'Magic circle', 'fx.ring.tech': 'Tech ring', 'fx.ring.eldritch': 'Eldritch ring', 'fx.ring.holy': 'Holy ring', 'fx.status': 'Status',
   'fx.tokenFrame': 'Token frame', 'fx.tokenFrame.none': 'None', 'fx.tokenFrame.polaroid': 'Polaroid', 'fx.tokenFrame.photo': 'Photo', 'fx.tokenFrame.card': 'Card',
-  'fx.pushPin': 'Push pin', 'fx.pushPin.on': '☑ Show push pin', 'fx.pushPin.off': '☐ Show push pin', 'fx.pushPin.reangle': 'Randomize pin angle', 'fx.pushPin.red': 'Red', 'fx.pushPin.white': 'White', 'fx.pushPin.yellow': 'Yellow', 'fx.pushPin.green': 'Green',
+  'fx.pushPin': 'Push pin', 'fx.pushPin.on': '☑ Show push pin', 'fx.pushPin.off': '☐ Show push pin', 'fx.pushPin.reangle': 'Randomize pin angle / style',
   'fx.clueLink': 'Red string', 'fx.clueLink.to': 'Link to {{name}}', 'fx.clueLink.clear': 'Remove strings from this',
   'fx.paperStyle': 'Paper style', 'fx.paperStyle.none': 'None', 'fx.paperStyle.a4': 'A4 sheet', 'fx.paperStyle.sticky': 'Sticky note',
   'fx.status.blinded': 'Blinded', 'fx.status.charmed': 'Charmed', 'fx.status.deafened': 'Deafened', 'fx.status.frightened': 'Frightened', 'fx.status.grappled': 'Grappled', 'fx.status.incapacitated': 'Incapacitated', 'fx.status.invisible': 'Invisible', 'fx.status.paralyzed': 'Paralyzed', 'fx.status.petrified': 'Petrified', 'fx.status.poisoned': 'Poisoned', 'fx.status.prone': 'Prone', 'fx.status.restrained': 'Restrained', 'fx.status.stunned': 'Stunned', 'fx.status.unconscious': 'Unconscious', 'fx.status.exhaustion': 'Exhaustion', 'fx.status.dead': 'Dead',

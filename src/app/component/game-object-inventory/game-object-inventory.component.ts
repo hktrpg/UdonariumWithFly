@@ -685,11 +685,14 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = {
       title: title, left: coordinate.x - 270, top: coordinate.y - 240, width: 540, height: 480,
+      tourPanelId: tourId,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
     let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);

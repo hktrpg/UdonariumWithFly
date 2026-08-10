@@ -29,7 +29,7 @@ import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
-import { PAPER_STYLES } from '@udonarium/table-fx/push-pin.util';
+import { PAPER_STYLES, pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
@@ -67,6 +67,14 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   get fontSize(): number { this.calcFitHeightIfNeeded(); return this.textNote.fontSize; }
+  get textAlign(): string {
+    const a = this.textNote?.textAlign || 'left';
+    return (a === 'center' || a === 'right' || a === 'justify') ? a : 'left';
+  }
+  set textAlign(v: string) {
+    if (!this.textNote) return;
+    this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+  }
   get imageFile(): ImageFile { return this.textNote.imageFile; }
   get rotate(): number { return this.textNote.rotate; }
   set rotate(rotate: number) { this.textNote.rotate = rotate; }
@@ -114,10 +122,22 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isImageContent(): boolean { return this.contentKind === 'image'; }
   get isTextContent(): boolean { return this.contentKind === 'text'; }
   get videoSrc(): string { return this.textNote?.resolvedVideoUrl || ''; }
-  get paperStyle(): string { return this.textNote?.paperStyle || 'none'; }
-  get pushPin(): boolean { return !!this.textNote?.pushPin; }
+  /** Paper chrome is clue-board only. */
+  get paperStyle(): string {
+    if (!this.is2DMode) return 'none';
+    return this.textNote?.paperStyle || 'none';
+  }
+  get pushPin(): boolean { return !!this.textNote?.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.textNote?.pushPinAngle || 0; }
   get pushPinColor(): string { return this.textNote?.pushPinColor || 'red'; }
+  get pushPinSrc(): string {
+    return pushPinAssetUrl(
+      this.pushPinColor,
+      this.pushPinAngle,
+      this.textNote?.pushPinStyle,
+      this.textNote?.identifier,
+    );
+  }
 
   get isEditorSelected(): boolean {
     return !!this.textAreaElementRef?.nativeElement && document.activeElement === this.textAreaElementRef.nativeElement;
@@ -453,20 +473,22 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         on: this.i18n.t('note.flipped'),
         off: this.i18n.t('note.frontFace'),
       }),
-      {
-        name: this.i18n.t('fx.paperStyle'),
-        action: null,
-        subActions: PAPER_STYLES.map(id => ({
-          name: `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
-          action: () => {
-            this.textNote.applyPaperStyle(id);
-            this.changeDetector.markForCheck();
-          },
-          nameUpdate: () => `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
-          checkBox: 'radio' as const,
-        })),
-      },
-      this.characterFxMenu.makePushPinMenu(this.textNote),
+      ...(this.is2DMode ? [
+        {
+          name: this.i18n.t('fx.paperStyle'),
+          action: null,
+          subActions: PAPER_STYLES.map(id => ({
+            name: `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
+            action: () => {
+              this.textNote.applyPaperStyle(id);
+              this.changeDetector.markForCheck();
+            },
+            nameUpdate: () => `${this.paperStyle === id ? '◉' : '○'} ${this.i18n.t(`fx.paperStyle.${id}`)}`,
+            checkBox: 'radio' as const,
+          })),
+        },
+        this.characterFxMenu.makePushPinMenu(this.textNote),
+      ] : []),
       this.characterFxMenu.makeClueLinkMenu(this.textNote),
       ContextMenuSeparator,
       {
@@ -489,6 +511,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         action: () => { this.isWhiteOut = !this.isWhiteOut; this.changeDetector.markForCheck(); },
         checkBox: 'check'
       },
+      ...(this.isTextContent ? [{
+        name: this.i18n.t('note.fieldAlign'),
+        action: null,
+        subActions: (['left', 'center', 'right', 'justify'] as const).map(id => ({
+          name: `${this.textAlign === id ? '◉' : '○'} ${this.i18n.t(`note.align.${id}`)}`,
+          action: () => { this.textAlign = id; this.changeDetector.markForCheck(); },
+          nameUpdate: () => `${this.textAlign === id ? '◉' : '○'} ${this.i18n.t(`note.align.${id}`)}`,
+          checkBox: 'radio' as const,
+        })),
+      }] : []),
       ContextMenuSeparator,
       {
         name: this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
@@ -670,10 +702,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private showDetail(gameObject: TextNote) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    const coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('note.detailTitle');
     if (gameObject.title.length) title += ' - ' + gameObject.title;
-    const option: PanelOption = { title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    const coordinate = this.pointerDeviceService.pointers[0];
+    const option: PanelOption = {
+      title: title, left: coordinate.x - 280, top: coordinate.y - 180, width: 420, height: 440,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     const component = this.panelService.open<NoteSettingsComponent>(NoteSettingsComponent, option);
     component.note = gameObject;
     component.embedded = false;

@@ -14,6 +14,7 @@ import { MimeType } from './mime-type';
 import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
+import { poseDebug } from '@udonarium/table-fx/pose-debug';
 
 type MetaData = { percent: number, currentFile: string };
 type UpdateCallback = (metadata: MetaData) => void;
@@ -32,6 +33,7 @@ export class FileArchiver {
   private maxAudioeSize = 20 * MEGA_BYTE;
   private maxPdfSize = 20 * MEGA_BYTE;
   private maxVideoSize = 50 * MEGA_BYTE;
+  private loadDepth = 0;
 
   private callbackOnDragEnter;
   private callbackOnDragOver;
@@ -91,6 +93,7 @@ export class FileArchiver {
     if (!files) return;
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
+    this.loadDepth++;
     const nameService = AudioImportNameService.instance;
     nameService?.beginBatch();
     try {
@@ -106,6 +109,15 @@ export class FileArchiver {
       }
     } finally {
       nameService?.endBatch();
+      this.loadDepth--;
+      // Fire once after the outermost load (whole ZIP or single file batch) finishes.
+      if (this.loadDepth === 0) {
+        poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
+          fileCount: loadFiles.length,
+          names: loadFiles.map(f => f.name).slice(0, 20),
+        });
+        EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
+      }
     }
   }
 

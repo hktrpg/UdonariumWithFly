@@ -1,10 +1,8 @@
 /** Shared push-pin helpers for clue-board tokens / notes. */
 
-export type PushPinColor = 'red' | 'white' | 'yellow' | 'green';
 export type TokenFrameStyle = 'none' | 'polaroid' | 'photo' | 'card';
 export type PaperStyle = 'none' | 'a4' | 'sticky';
 
-export const PUSH_PIN_COLORS: PushPinColor[] = ['red', 'white', 'yellow', 'green'];
 export const TOKEN_FRAME_STYLES: TokenFrameStyle[] = ['none', 'polaroid', 'photo', 'card'];
 export const PAPER_STYLES: PaperStyle[] = ['none', 'a4', 'sticky'];
 
@@ -20,14 +18,55 @@ export function randomPinAngle(): number {
   return Math.round((Math.random() * 50 - 25) * 10) / 10;
 }
 
-export function pinColorCss(color: string): string {
-  switch (color) {
-    case 'white': return '#f5f5f0';
-    case 'yellow': return '#e8c84a';
-    case 'green': return '#6bbf6b';
-    case 'red':
-    default: return '#d32f2f';
-  }
+/** Oblique pin styles used in-game (random pick). */
+export const PUSH_PIN_ACTIVE_STYLES = [2, 3, 6, 7] as const;
+export type PushPinActiveStyleId = typeof PUSH_PIN_ACTIVE_STYLES[number];
+
+const PIN_ANGLED_DIR = './assets/images/clue-board/pins/angled/';
+
+export function pushPinStyleUrl(styleId: number): string {
+  const id = isActivePushPinStyle(styleId) ? styleId : 3;
+  return `${PIN_ANGLED_DIR}style-${id}.png`;
+}
+
+export function isActivePushPinStyle(style: number | null | undefined): style is PushPinActiveStyleId {
+  return !!style && (PUSH_PIN_ACTIVE_STYLES as readonly number[]).includes(style);
+}
+
+/** Random style from the active pool {2, 3, 6, 7}. */
+export function randomPushPinStyle(): PushPinActiveStyleId {
+  const pool = PUSH_PIN_ACTIVE_STYLES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/** Deterministic pool pick (for legacy style=0 without re-rolling every frame). */
+export function pushPinStyleFromId(id: string): PushPinActiveStyleId {
+  let h = 0;
+  const s = id || 'pin';
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  const pool = PUSH_PIN_ACTIVE_STYLES;
+  return pool[Math.abs(h) % pool.length];
+}
+
+export function normalizePushPinStyle(
+  style: number | null | undefined,
+  hostId?: string,
+): PushPinActiveStyleId {
+  if (isActivePushPinStyle(style)) return style;
+  return pushPinStyleFromId(hostId || '');
+}
+
+/**
+ * Oblique pin asset. Fine tilt still applied via CSS rotate(pushPinAngle).
+ * `color` is ignored (kept for call-site compat); art is chosen by styleId.
+ */
+export function pushPinAssetUrl(
+  _color: string,
+  _angleDeg?: number,
+  styleId?: number,
+  hostId?: string,
+): string {
+  return pushPinStyleUrl(normalizePushPinStyle(styleId, hostId));
 }
 
 /** A4 portrait aspect (width / height in grid units → height = width * √2). */
@@ -38,7 +77,7 @@ export function a4HeightForWidth(width: number): number {
 export interface PinHost {
   pushPin: boolean;
   pushPinAngle: number;
-  pushPinColor: string;
+  pushPinStyle?: number;
   location: { x: number; y: number };
   rotate?: number;
 }

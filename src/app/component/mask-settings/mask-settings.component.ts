@@ -32,6 +32,9 @@ type TokenFxFlag = keyof Pick<
   'isInverse' | 'isHollow' | 'isBlackPaint' | 'isGrayscale' | 'isSepia' | 'isWhitePaint' | 'isMatrix' | 'isFlipVertical' | 'isContrast'
 >;
 
+/** UI tab id: click-action kinds plus standing Token FX (tokenFxPassive). */
+type MaskActionTabId = TabletopClickAction | 'tokenFxStand';
+
 @Component({
   selector: 'mask-settings',
   templateUrl: './mask-settings.component.html',
@@ -50,7 +53,7 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   readonly trackIndexes = Array.from({ length: JUKEBOX_TRACK_COUNT }, (_, i) => i);
 
-  readonly actions: { id: TabletopClickAction; icon: string; labelKey: string }[] = [
+  readonly actions: { id: MaskActionTabId; icon: string; labelKey: string }[] = [
     { id: 'none', icon: 'block', labelKey: 'note.actionNone' },
     { id: 'chat', icon: 'chat', labelKey: 'note.actionChat' },
     { id: 'music', icon: 'music_note', labelKey: 'mask.actionMusic' },
@@ -59,7 +62,8 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     { id: 'table', icon: 'map', labelKey: 'note.actionTable' },
     { id: 'preset', icon: 'bookmark', labelKey: 'note.actionPreset' },
     { id: 'toggleAppearance', icon: 'flip', labelKey: 'mask.actionToggleAppearance' },
-    { id: 'tokenFx', icon: 'auto_fix', labelKey: 'mask.actionTokenFx' },
+    { id: 'tokenFxStand', icon: 'accessibility_new', labelKey: 'mask.actionTokenFxStand' },
+    { id: 'tokenFx', icon: 'touch_app', labelKey: 'mask.actionTokenFxClick' },
   ];
 
   readonly fxFlags: { key: TokenFxFlag; labelKey: string }[] = [
@@ -104,8 +108,14 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     return this.mask ? this.mask.appearanceAlt : emptyMaskAppearanceSnap();
   }
 
+  /** Click FX config. */
   get tokenFx(): MaskTokenFxConfig {
     return this.mask ? this.mask.tokenFxConfig : emptyMaskTokenFxConfig();
+  }
+
+  /** Standing FX config. */
+  get tokenFxStand(): MaskTokenFxConfig {
+    return this.mask ? this.mask.tokenFxPassiveConfig : emptyMaskTokenFxConfig();
   }
 
   get altImageUrl(): string {
@@ -161,11 +171,32 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     return !!this.mask && this.mask.hasClickActionKind(action);
   }
 
-  isPanelExpanded(action: TabletopClickAction): boolean {
+  /** Standing FX is independent of Alt+click (tokenFxPassive SyncVar). */
+  get isTokenFxStandOn(): boolean {
+    return !!this.mask?.tokenFxPassive;
+  }
+
+  get isTokenFxClickOn(): boolean {
+    return this.isActionOn('tokenFx');
+  }
+
+  /** Panels area visible when any click action or standing FX is on. */
+  get showActionPanels(): boolean {
+    return !!this.mask && (this.mask.hasAnyClickAction || this.isTokenFxStandOn);
+  }
+
+  isTabActive(id: MaskActionTabId): boolean {
+    if (!this.mask) return false;
+    if (id === 'none') return !this.mask.hasAnyClickAction && !this.isTokenFxStandOn;
+    if (id === 'tokenFxStand') return this.isTokenFxStandOn;
+    return this.isActionOn(id);
+  }
+
+  isPanelExpanded(action: string): boolean {
     return !this.panelCollapsed[action];
   }
 
-  togglePanel(action: TabletopClickAction, e?: Event) {
+  togglePanel(action: string, e?: Event) {
     e?.preventDefault();
     e?.stopPropagation();
     this.panelCollapsed[action] = !this.panelCollapsed[action];
@@ -173,19 +204,22 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
-  /** Multi-select toggle. "none" clears all. */
-  setClickAction(action: TabletopClickAction) {
+  /** Multi-select toggle. "none" clears all click actions + standing FX. */
+  setClickAction(action: MaskActionTabId) {
     if (!this.mask || this.GuestMode()) return;
     if (action === 'none') {
       this.mask.setEnabledClickActions([]);
-      // Passive checkbox lives under Token FX; clear so it cannot keep running hidden.
       this.mask.tokenFxPassive = false;
+    } else if (action === 'tokenFxStand') {
+      const wasOn = this.isTokenFxStandOn;
+      this.mask.tokenFxPassive = !wasOn;
+      if (!wasOn) {
+        this.panelCollapsed['tokenFxStand'] = false;
+        this.savePanelCollapsed();
+      }
     } else {
       const wasOn = this.isActionOn(action);
       this.mask.toggleClickAction(action);
-      if (wasOn && action === 'tokenFx') {
-        this.mask.tokenFxPassive = false;
-      }
       if (!wasOn) {
         this.panelCollapsed[action] = false;
         this.savePanelCollapsed();
@@ -261,14 +295,18 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  patchTokenFxStand(partial: Partial<MaskTokenFxConfig>) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.tokenFxPassiveConfig = { ...this.tokenFxStand, ...partial };
+    this.changeDetector.markForCheck();
+  }
+
   setTokenFxFlag(key: TokenFxFlag, checked: boolean) {
     this.patchTokenFx({ [key]: !!checked } as Partial<MaskTokenFxConfig>);
   }
 
-  setTokenFxPassive(checked: boolean) {
-    if (!this.mask || this.GuestMode()) return;
-    this.mask.tokenFxPassive = !!checked;
-    this.changeDetector.markForCheck();
+  setTokenFxStandFlag(key: TokenFxFlag, checked: boolean) {
+    this.patchTokenFxStand({ [key]: !!checked } as Partial<MaskTokenFxConfig>);
   }
 
   copyCurrentToAlt() {

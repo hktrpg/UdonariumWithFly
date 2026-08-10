@@ -73,6 +73,10 @@ export class ObjectSynchronizer {
         }
       })
       .on('DELETE_GAME_OBJECT', 1000, event => {
+        // Local destroy already removed the object; the network layer echoes our own
+        // DELETE back on a later tick. Applying that echo after Room ZIP reload would
+        // delete the freshly recreated objects that reuse the same syncId.
+        if (event.isSendFromSelf) return;
         let identifier: ObjectIdentifier = event.data.identifier;
         ObjectStore.instance.delete(identifier, false);
       });
@@ -98,6 +102,8 @@ export class ObjectSynchronizer {
       console.warn(context.aliasName + ' is Unknown...?', context);
       return null;
     }
+    // Room ZIP reload / peer resync reuses syncIds that were just DELETE-marked.
+    ObjectStore.instance.clearDeleted(context.identifier);
     // Suppress SyncVar update() during add→apply so onStoreAdded cannot broadcast
     // default 0,0 poses before real syncData is applied (multi-tab top-left drift).
     // Add before apply so ObjectStore.get works when onChildAdded fires MESSAGE_ADDED.

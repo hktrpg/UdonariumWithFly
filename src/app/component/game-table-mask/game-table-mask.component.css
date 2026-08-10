@@ -117,6 +117,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  padding: 4px;
 
   font-weight: bolder;
   text-align: center;
@@ -139,6 +141,16 @@
   #fff 0px 0px 2px,
   #fff 0px 0px 2px;
 }
+
+.text.text-pos-top-left { align-items: flex-start; justify-content: flex-start; text-align: left; }
+.text.text-pos-top-center { align-items: flex-start; justify-content: center; text-align: center; }
+.text.text-pos-top-right { align-items: flex-start; justify-content: flex-end; text-align: right; }
+.text.text-pos-middle-left { align-items: center; justify-content: flex-start; text-align: left; }
+.text.text-pos-middle-center { align-items: center; justify-content: center; text-align: center; }
+.text.text-pos-middle-right { align-items: center; justify-content: flex-end; text-align: right; }
+.text.text-pos-bottom-left { align-items: flex-end; justify-content: flex-start; text-align: left; }
+.text.text-pos-bottom-center { align-items: flex-end; justify-content: center; text-align: center; }
+.text.text-pos-bottom-right { align-items: flex-end; justify-content: flex-end; text-align: right; }
 
 .is-inverse {
   transform: rotateZ(180deg);

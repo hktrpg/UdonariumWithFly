@@ -1,40 +1,22 @@
 /* Shared clue-board chrome (token frames + push pins). */
 
+/* Oblique pin (head + collar + short tip). Fine tilt via CSS rotate. */
 .push-pin {
   position: absolute;
-  top: -4px;
-  left: 4px;
-  width: 16px;
-  height: 20px;
+  top: -20px;
+  left: -4px;
+  width: 30px;
+  height: 38px;
   z-index: 20;
   pointer-events: none;
-  transform-origin: 50% 85%;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
-}
-
-.push-pin::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 12px;
-  height: 12px;
-  margin-left: -6px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff8, transparent 55%), var(--pin-color, #d32f2f);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
-}
-
-.push-pin::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  width: 2px;
-  height: 8px;
-  margin-left: -1px;
-  background: linear-gradient(#c0c0c0, #888);
-  border-radius: 1px;
+  object-fit: contain;
+  object-position: center bottom;
+  /* Above clue yarn (table Z ≈ 2.4); keep pin head visible over the string. */
+  transform: translateZ(2.5px);
+  transform-origin: 50% 88%;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* Frame wraps OUTSIDE the token footprint (content-box) so the full sprite stays visible. */

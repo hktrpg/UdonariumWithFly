@@ -10,7 +10,7 @@ import {
   restoreMaskTokenFxSnapshot,
   snapshotCharacterTokenFx,
 } from '@udonarium/table-fx/mask-token-fx-apply';
-import { tokenFxConfigHasWork } from '@udonarium/table-fx/mask-appearance';
+import { MaskTokenFxConfig, tokenFxConfigHasWork } from '@udonarium/table-fx/mask-appearance';
 import { pickTopPassiveMask } from '@udonarium/table-fx/mask-token-overlap';
 
 import { TabletopService } from './tabletop.service';
@@ -18,13 +18,46 @@ import { TabletopService } from './tabletop.service';
 interface ActiveZone {
   maskId: string;
   snap: MaskTokenFxSnapshot;
-  /** Mask tokenFxJson at time of apply; used to detect config edits. */
+  /** Mask tokenFxPassiveJson at time of apply; used to detect config edits. */
   configKey: string;
+}
+
+const PASSIVE_FX_KEYS: (keyof MaskTokenFxConfig)[] = [
+  'isInverse',
+  'isHollow',
+  'isBlackPaint',
+  'isGrayscale',
+  'isSepia',
+  'isWhitePaint',
+  'isMatrix',
+  'isFlipVertical',
+  'isContrast',
+];
+
+function characterMatchesPassiveConfig(ch: GameCharacter, cfg: MaskTokenFxConfig): boolean {
+  for (const key of PASSIVE_FX_KEYS) {
+    if (!!(ch as any)[key] !== !!cfg[key]) return false;
+  }
+  return true;
+}
+
+/** Baseline used when FX were already baked into a loaded save while standing. */
+function clearedFxSnapshot(ch: GameCharacter, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
+  const snap = snapshotCharacterTokenFx(ch);
+  for (const key of PASSIVE_FX_KEYS) {
+    (snap as any)[key] = false;
+  }
+  const mode = cfg.altitudeMode || 'none';
+  if (mode === 'set' || mode === 'delta') {
+    // Best-effort: undo set/delta is unknown after bake; leave altitude as-is on restore.
+    snap.altitudeTouched = false;
+  }
+  return snap;
 }
 
 /**
  * Passive mask zones: when a token stands on a mask with tokenFxPassive,
- * apply image FX + altitude and restore on leave. Highest posZ mask wins.
+ * apply standing FX (tokenFxPassiveJson) and restore on leave. Highest posZ wins.
  */
 @Injectable()
 export class MaskTokenFxService implements OnDestroy {
@@ -41,10 +74,33 @@ export class MaskTokenFxService implements OnDestroy {
       .on('UPDATE_GAME_OBJECT', () => this.scheduleRefresh())
       .on('DELETE_GAME_OBJECT', () => this.scheduleRefresh())
       .on('UPDATE_OBJECT_CHILDREN', () => this.scheduleRefresh())
+      .on('BEFORE_ROOM_SAVE', () => this.restoreAllActiveForSave())
+      .on('AFTER_ROOM_SAVE', () => this.forceRefresh())
+      .on('ARCHIVE_LOAD_COMPLETE', () => this.forceRefresh())
       .on<{ characterIds?: string[] }>('MASK_TOKEN_FX_ADOPT', event => {
         this.adoptCurrentAsRestorePoint(event.data?.characterIds || []);
       });
     this.scheduleRefresh();
+  }
+
+  /**
+   * Before room ZIP serialize: restore pre-standing FX so temporary zone effects
+   * are not baked into character SyncVars permanently.
+   */
+  restoreAllActiveForSave() {
+    for (const [chId, zone] of Array.from(this.active.entries())) {
+      const ch = ObjectStore.instance.get<GameCharacter>(chId);
+      if (ch) restoreMaskTokenFxSnapshot(ch, zone.snap);
+      this.active.delete(chId);
+    }
+  }
+
+  private forceRefresh() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.refresh();
   }
 
   ngOnDestroy() {
@@ -109,9 +165,9 @@ export class MaskTokenFxService implements OnDestroy {
         continue;
       }
 
-      const cfg = top.tokenFxConfig;
+      const cfg = top.tokenFxPassiveConfig;
       const hasWork = tokenFxConfigHasWork(cfg);
-      const configKey = top.tokenFxJson || '';
+      const configKey = top.tokenFxPassiveJson || '';
 
       if (prev && prev.maskId === top.identifier) {
         if (prev.configKey === configKey) continue;
@@ -129,6 +185,15 @@ export class MaskTokenFxService implements OnDestroy {
         this.active.delete(chId);
       }
       if (!hasWork) continue;
+
+      // ZIP saved while standing may already have FX baked into the character.
+      // Treat that as "already applied" and use a cleared baseline so leave restores cleanly.
+      if (characterMatchesPassiveConfig(ch, cfg)) {
+        const snap = clearedFxSnapshot(ch, cfg);
+        this.active.set(chId, { maskId: top.identifier, snap, configKey });
+        continue;
+      }
+
       const snap = applyMaskTokenFxToCharacter(ch, cfg);
       this.active.set(chId, { maskId: top.identifier, snap, configKey });
     }

@@ -8,6 +8,7 @@ import { MathUtil } from './core/system/util/math-util';
 import { setZeroTimeout } from './core/system/util/zero-timeout';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
+import { poseDebug } from './table-fx/pose-debug';
 
 export interface TabletopLocation {
   name: string;
@@ -97,7 +98,8 @@ export class TabletopObject extends ObjectNode {
 
   setPoseForTable(tableId: string, pose: TablePlacementPose, syncLive = true) {
     if (!tableId) return;
-    this.ensurePlacementsMigrated();
+    // Do not call ensurePlacementsMigrated() — that can seed the current view map
+    // and invent dual placements when exclusive-placing onto another table.
     const map = this.parsePlacements();
     map[tableId] = {
       x: pose.x,
@@ -129,7 +131,10 @@ export class TabletopObject extends ObjectNode {
       this.update();
       return;
     }
-    if (exclusive) this.clearPlacements(false);
+    if (exclusive) {
+      this.clearPlacements(false);
+      this.tableIdentifier = '';
+    }
     const existing = this.getPoseForTable(id);
     const next: TablePlacementPose = {
       x: pose?.x ?? existing?.x ?? this.location.x,
@@ -181,7 +186,9 @@ export class TabletopObject extends ObjectNode {
     };
     if (silent) {
       this.withSyncSuppressed(apply);
+      // Fan out identifier events so MovableDirective.setPosition runs (plain UPDATE_GAME_OBJECT does not).
       EventSystem.trigger('UPDATE_GAME_OBJECT', this.toContext());
+      EventSystem.trigger(`UPDATE_GAME_OBJECT/identifier/${this.identifier}`, this.toContext());
     } else {
       apply();
     }
@@ -189,12 +196,21 @@ export class TabletopObject extends ObjectNode {
 
   static hydrateAllForView(viewTableId?: string, silent = false) {
     const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
-    if (!viewId) return;
+    if (!viewId) {
+      poseDebug('hydrateAllForView skip: no viewId');
+      return;
+    }
+    let hydrated = 0;
+    let skipped = 0;
     for (const obj of TabletopObject.getAll()) {
       if (obj.location.name === 'table' && obj.hasPlacement(viewId)) {
         obj.hydratePoseForView(viewId, silent);
+        hydrated++;
+      } else if (obj.location.name === 'table') {
+        skipped++;
       }
     }
+    poseDebug('hydrateAllForView', { viewId, silent, hydrated, skippedNoPlacement: skipped });
   }
 
   /**
@@ -244,16 +260,17 @@ export class TabletopObject extends ObjectNode {
     if (update) this.update();
   }
 
-  /** Seed placements from legacy tableIdentifier + location once. */
+  /**
+   * Seed placements from legacy tableIdentifier + location once.
+   * Never falls back to the current view id (that seeds dual placements).
+   */
   ensurePlacementsMigrated() {
     if (this.tablePlacements) return;
     if (this.location.name !== 'table') return;
-    const id = this.tableIdentifier || TabletopObject.resolveViewTableIdentifier();
-    if (!id) return;
+    if (!this.tableIdentifier) return;
     this.tablePlacements = JSON.stringify({
-      [id]: { x: this.location.x, y: this.location.y, posZ: this.posZ },
+      [this.tableIdentifier]: { x: this.location.x, y: this.location.y, posZ: this.posZ },
     });
-    if (!this.tableIdentifier) this.tableIdentifier = id;
   }
 
   /** All tabletop subclasses (character/card/dice/…). getObjects(TabletopObject) only matches the base alias. */
@@ -579,12 +596,14 @@ export class TabletopObject extends ObjectNode {
   setLocation(location: string, tableIdentifier?: string) {
     if (location === 'table') {
       // Prefer current live coords (create/drop set x/y before setLocation).
-      // Exclusive: tokens belong to one map unless inventory explicitly "also places".
+      // Exclusive only when coming from inventory (no map placements yet).
+      // Tokens already on another map must keep those placements (use moveToTableOnly for「僅此地圖」).
+      const exclusive = this.location.name !== 'table' && this.placementTableIds.length < 1;
       this.addToTable(tableIdentifier, {
         x: this.location.x,
         y: this.location.y,
         posZ: this.posZ,
-      }, true);
+      }, exclusive);
       return;
     }
     this.clearPlacements(false);
@@ -624,5 +643,18 @@ export class TabletopObject extends ObjectNode {
   /** Move exclusively to one map (clear other placements). */
   moveToTableOnly(tableIdentifier?: string, pose?: Partial<TablePlacementPose>) {
     this.addToTable(tableIdentifier, pose, true);
+  }
+
+  /** Drop every placement except {@param tableId} (keeps pose on that map). */
+  keepOnlyTablePlacement(tableId: string) {
+    if (!tableId) return;
+    const pose = this.getPoseForTable(tableId) || {
+      x: this.location.x,
+      y: this.location.y,
+      posZ: this.posZ,
+    };
+    this.clearPlacements(false);
+    this.tableIdentifier = '';
+    this.setPoseForTable(tableId, pose, true);
   }
 }

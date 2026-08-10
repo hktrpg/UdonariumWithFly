@@ -26,12 +26,17 @@ export class TextNote extends TabletopObject {
   @SyncVar() isShowTitle: boolean = true;
   /** Title bar background (#rrggbb). Empty = legacy dark bar. */
   @SyncVar() titleBgColor: string = '#1e1e1e';
+  /** Body text alignment: left | center | right | justify. */
+  @SyncVar() textAlign: string = 'left';
 
   /** Clue-board paper look: none | a4 | sticky */
   @SyncVar() paperStyle: string = 'none';
   @SyncVar() pushPin: boolean = false;
   @SyncVar() pushPinAngle: number = 0;
+  /** Legacy SyncVar (unused for art; kept for room XML compat). */
   @SyncVar() pushPinColor: string = 'red';
+  /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
+  @SyncVar() pushPinStyle: number = 0;
 
   /** When true, width/height edits are blocked in the inventory editor. */
   @SyncVar() isSizeLocked: boolean = false;

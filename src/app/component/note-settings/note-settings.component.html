@@ -38,6 +38,15 @@
         <span>{{ 'note.fieldColor' | i18n }}</span>
         <input type="color" [(ngModel)]="note.color" [disabled]="GuestMode()" />
       </label>
+      <label class="field" *ngIf="editMode === 'text'">
+        <span>{{ 'note.fieldAlign' | i18n }}</span>
+        <select [ngModel]="note.textAlign || 'left'" (ngModelChange)="note.textAlign = $event" [disabled]="GuestMode()">
+          <option value="left">{{ 'note.align.left' | i18n }}</option>
+          <option value="center">{{ 'note.align.center' | i18n }}</option>
+          <option value="right">{{ 'note.align.right' | i18n }}</option>
+          <option value="justify">{{ 'note.align.justify' | i18n }}</option>
+        </select>
+      </label>
     </div>
 
     <div class="mode-tabs" role="tablist" [attr.title]="'note.mediaHint' | i18n">
@@ -55,7 +64,8 @@
   <section class="card card-dense" *ngIf="editMode === 'text'">
     <label class="field">
       <span>{{ 'note.fieldText' | i18n }}</span>
-      <textarea class="text-body" rows="3" [(ngModel)]="note.text" [disabled]="GuestMode()"></textarea>
+      <textarea class="text-body" rows="3" [(ngModel)]="note.text" [disabled]="GuestMode()"
+        [style.text-align]="note.textAlign || 'left'"></textarea>
     </label>
     <div class="inline-tools">
       <div class="check-row tight">

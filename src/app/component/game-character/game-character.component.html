@@ -97,10 +97,10 @@
                     [style.filter]="imageEffectFilter"
                     [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
                   <span class="token-frame-caption" *ngIf="showPolaroidCaption">{{ tokenFrameCaption }}</span>
-                  <span class="push-pin" *ngIf="pushPin"
+                  <img *ngIf="pushPin" class="push-pin is-3d" alt="" draggable="false"
+                    [src]="pushPinSrc"
                     [attr.data-clue-pin]="gameCharacter.identifier"
-                    [style.--pin-color]="pushPinColor === 'white' ? '#f5f5f0' : pushPinColor === 'yellow' ? '#e8c84a' : pushPinColor === 'green' ? '#6bbf6b' : '#d32f2f'"
-                    [style.transform]="'rotate(' + pushPinAngle + 'deg)'"></span>
+                    [style.transform]="'translateZ(2.5px) rotate(' + pushPinAngle + 'deg)'" />
                   <div *ngIf="gameCharacter.isMatrix" class="matrix-rain is-3d" aria-hidden="true">
                     <span *ngFor="let col of matrixRainColumns; trackBy: trackByMatrixCol"
                       class="matrix-rain-col"

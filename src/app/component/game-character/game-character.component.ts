@@ -35,6 +35,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
+import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { I18nService } from 'service/i18n.service';
 
 @Component({
@@ -216,6 +217,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
   get pushPinColor(): string { return this.gameCharacter.pushPinColor || 'red'; }
+  get pushPinSrc(): string {
+    return pushPinAssetUrl(
+      this.pushPinColor,
+      this.pushPinAngle,
+      this.gameCharacter.pushPinStyle,
+      this.gameCharacter.identifier,
+    );
+  }
   get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
   /** Cap name-tag / status icon strip to roughly the token footprint. */
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
@@ -689,11 +698,19 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       tabletopObject: this.gameCharacter,
       targetPropertyName: 'roll',
     };
+    // Room ZIP reuses syncIds; recycled views skip ngAfterViewInit — mark loaded here too.
+    this.markCharacterLoaded();
   }
 
   ngAfterViewInit() {
+    this.markCharacterLoaded();
+  }
+
+  private markCharacterLoaded() {
     queueMicrotask(() => {
+      if (!this.gameCharacter) return;
       this.gameCharacter.isLoaded = true;
+      this.changeDetector.markForCheck();
     });
   }
 
@@ -965,8 +982,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       [
         this.characterFxMenu.makeAuraMenu(this.gameCharacter),
         this.characterFxMenu.makeRingMenu(this.gameCharacter),
-        this.characterFxMenu.makeTokenFrameMenu(this.gameCharacter),
-        this.characterFxMenu.makePushPinMenu(this.gameCharacter),
+        ...(this.is2DMode ? [
+          this.characterFxMenu.makeTokenFrameMenu(this.gameCharacter),
+          this.characterFxMenu.makePushPinMenu(this.gameCharacter),
+        ] : []),
         this.characterFxMenu.makeClueLinkMenu(this.gameCharacter),
         this.characterFxMenu.makeVisionMenu(this.gameCharacter),
         this.characterFxMenu.makeStatusMenu(this.gameCharacter),
@@ -1176,11 +1195,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private showDetail(gameObject: GameCharacter) {
     if (this.GuestMode()) return;
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('char.sheetTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
     let option: PanelOption = {
       title: title, left: coordinate.x - 270, top: coordinate.y - 240, width: 540, height: 480,
+      tourPanelId: tourId,
       geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
     };
     let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);

@@ -112,7 +112,10 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() tokenFrameCaption: string = '';
   @SyncVar() pushPin: boolean = false;
   @SyncVar() pushPinAngle: number = 0;
+  /** Legacy SyncVar (unused for art; kept for room XML compat). */
   @SyncVar() pushPinColor: string = 'red';
+  /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
+  @SyncVar() pushPinStyle: number = 0;
   
   text = '';
   dialog = null;

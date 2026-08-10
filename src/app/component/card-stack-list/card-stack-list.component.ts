@@ -124,13 +124,19 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
 
   showDetail(gameObject: Card) {
     if (this.GuestMode()) return;
+    let title = this.i18n.t('cardList.panelTitle');
+    if (gameObject.name.length) title += ' - ' + gameObject.name;
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
     let coordinate = {
       x: this.panelService.left,
       y: this.panelService.top
     };
-    let title = this.i18n.t('cardList.panelTitle');
-    if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 420, height: 360 };
+    let option: PanelOption = {
+      title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 420, height: 360,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<CardSettingsComponent>(CardSettingsComponent, option);
     component.card = gameObject;
   }

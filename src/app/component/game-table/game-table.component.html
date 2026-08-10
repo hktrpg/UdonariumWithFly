@@ -137,7 +137,7 @@
       </div>
       <svg class="clue-strings-layer is-fill is-pointer-events-none is-3d"
         [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
-        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.8) + 'px)'}">
+        [ngStyle]="{'transform': 'translateZ(' + clueStringsZ + 'px)'}">
         <path *ngFor="let link of clueLinks; trackBy: trackByGameObject"
           class="clue-string"
           [attr.d]="cluePathD(link)"

@@ -12,11 +12,23 @@ import { VideoState } from '@udonarium/core/file-storage/video-file';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PromiseQueue } from '@udonarium/core/system/util/promise-queue';
+import { EventSystem } from '@udonarium/core/system';
 import { XmlUtil } from '@udonarium/core/system/util/xml-util';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
+import { Jukebox } from '@udonarium/Jukebox';
 import { Room } from '@udonarium/room';
+import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
+import { GameTable } from '@udonarium/game-table';
+import { GameTableMask } from '@udonarium/game-table-mask';
+import { Terrain } from '@udonarium/terrain';
+import { TableDrawing } from '@udonarium/table-fx/table-drawing';
+import { TableLight } from '@udonarium/table-fx/table-light';
+import { TableWall } from '@udonarium/table-fx/table-wall';
 
 import Beautify from 'vkbeautify';
 
@@ -30,6 +42,8 @@ import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AudioLibrary } from '@udonarium/audio-library';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { MovableDirective } from 'directive/movable.directive';
+import { BatchService } from './batch.service';
 import { ChatMessageService } from './chat-message.service';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { I18nService } from './i18n.service';
@@ -41,6 +55,13 @@ type UpdateCallback = (percent: number) => void;
 
 export type SaveIncludeAudioAskContext = 'zip' | 'folder';
 
+const IMAGE_ID_ATTRS = [
+  'imageIdentifier',
+  'toImageIdentifier',
+  'backgroundImageIdentifier',
+  'backgroundImageIdentifier2',
+] as const;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -51,12 +72,19 @@ export class SaveDataService {
   /** Cached preference (default true until loaded). */
   private includeAudioCache: boolean | undefined;
 
+  /** Cache materialized ./assets URL images so folder auto-backup does not re-fetch/normalize every flush. */
+  private packedAssetCache = new Map<string, { sourceUrl: string; hashId: string; file: File }>();
+
   constructor(
     private ngZone: NgZone,
     private chatMessageService: ChatMessageService,
     private i18n: I18nService,
-    private modalService: ModalService
-  ) { }
+    private modalService: ModalService,
+    private batchService: BatchService,
+  ) {
+    // Register early so ARCHIVE_LOAD_COMPLETE can sync poses after ZIP load.
+    MovableDirective.ensurePoseFlushHook();
+  }
 
   /** Sync view of preference for settings toggles (defaults to true before load). */
   get includeAudio(): boolean {
@@ -147,7 +175,17 @@ export class SaveDataService {
     );
   }
 
-  buildRoomFiles(includeAudio = true): File[] {
+  async buildRoomFiles(includeAudio = true): Promise<File[]> {
+    this.prepareRoomSnapshotForSave();
+    try {
+      return await this.buildRoomFilesCore(includeAudio);
+    } finally {
+      // Re-apply standing mask FX that were stripped so the live room looks unchanged.
+      EventSystem.trigger('AFTER_ROOM_SAVE', null);
+    }
+  }
+
+  private async buildRoomFilesCore(includeAudio = true): Promise<File[]> {
     let files: File[] = [];
     let roomXml = this.convertToXml(new Room());
     let chatXml = this.convertToXml(ChatTabList.instance);
@@ -159,6 +197,26 @@ export class SaveDataService {
     let scenePermXml = this.convertToXml(SceneToolPermission.instance);
     let scenePresetXml = this.convertToXml(ScenePresetList.instance);
     let scenarioTextXml = this.convertToXml(ScenarioTextList.instance);
+    let audioLibraryXml = this.convertToXml(AudioLibrary.instance);
+    const jukebox = Jukebox.instance;
+    let jukeboxXml = jukebox ? this.convertToXml(jukebox) : '';
+
+    let images: ImageFile[] = [];
+    images = images.concat(this.searchImageFiles(roomXml));
+    images = images.concat(this.searchImageFiles(chatXml));
+    images = images.concat(this.searchImageFiles(cutInXml));
+    images = images.concat(this.searchImageFiles(scenePresetXml));
+    images = images.concat(this.collectStorageImages());
+
+    const { imageFiles, idRemap } = await this.packImagesForZip(images);
+    if (idRemap.size) {
+      roomXml = this.remapImageIdentifiers(roomXml, idRemap);
+      chatXml = this.remapImageIdentifiers(chatXml, idRemap);
+      cutInXml = this.remapImageIdentifiers(cutInXml, idRemap);
+      scenePresetXml = this.remapImageIdentifiers(scenePresetXml, idRemap);
+      combatXml = this.remapImageIdentifiers(combatXml, idRemap);
+    }
+
     files.push(new File([roomXml], 'fly_data.xml', { type: 'text/plain' }));
     files.push(new File([chatXml], 'fly_chat.xml', { type: 'text/plain' }));
     files.push(new File([diceRollTableXml], 'fly_rollTable.xml', { type: 'text/plain' }));
@@ -169,18 +227,14 @@ export class SaveDataService {
     files.push(new File([scenePermXml], 'fly_scenePerm.xml', { type: 'text/plain' }));
     files.push(new File([scenePresetXml], 'fly_scenePreset.xml', { type: 'text/plain' }));
     files.push(new File([scenarioTextXml], 'fly_scenarioText.xml', { type: 'text/plain' }));
-    files.push(new File([this.convertToXml(AudioLibrary.instance)], 'fly_audioLibrary.xml', { type: 'text/plain' }));
-
-    let images: ImageFile[] = [];
-    images = images.concat(this.searchImageFiles(roomXml));
-    images = images.concat(this.searchImageFiles(chatXml));
-    images = images.concat(this.searchImageFiles(cutInXml));
-    for (const image of images) {
-      if (image.state === ImageState.COMPLETE) {
-        files.push(new File([image.blob], image.identifier + '.' + MimeType.extension(image.blob.type), { type: image.blob.type }));
-      }
+    files.push(new File([audioLibraryXml], 'fly_audioLibrary.xml', { type: 'text/plain' }));
+    if (jukeboxXml) {
+      files.push(new File([jukeboxXml], 'fly_jukebox.xml', { type: 'text/plain' }));
     }
+    files.push(...imageFiles);
+
     let imageTagXml = this.convertToXml(ImageTagList.create(images));
+    if (idRemap.size) imageTagXml = this.remapImageIdentifiers(imageTagXml, idRemap);
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
 
     // User-uploaded BGM / SE (preset asset sounds are isHidden and omitted).
@@ -235,10 +289,97 @@ export class SaveDataService {
     return files;
   }
 
+  /** Flush live poses and reparent orphan table FX before Room XML. */
+  private prepareRoomSnapshotForSave() {
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    try {
+      this.batchService.flushNow();
+    } catch (e) {
+      console.warn('prepareRoomSnapshotForSave: BatchService.flushNow failed', e);
+    }
+    try {
+      MovableDirective.flushAllPosesToTable(viewId || undefined);
+    } catch (e) {
+      console.warn('prepareRoomSnapshotForSave: MovableDirective.flushAllPosesToTable failed', e);
+    }
+    try {
+      TabletopObject.flushLivePosesToView(viewId || undefined);
+    } catch (e) {
+      console.warn('prepareRoomSnapshotForSave: flushLivePosesToView failed', e);
+    }
+    try {
+      this.reparentOrphanTableFx();
+    } catch (e) {
+      console.warn('prepareRoomSnapshotForSave: reparentOrphanTableFx failed', e);
+    }
+    // Strip temporary standing-mask FX so they are not baked into the ZIP permanently.
+    EventSystem.trigger('BEFORE_ROOM_SAVE', null);
+  }
+
+  /** Attach parent-less table FX nodes under a valid GameTable so Room.innerXml includes them. */
+  private reparentOrphanTableFx() {
+    const tables = ObjectStore.instance.getObjects(GameTable);
+    if (tables.length < 1) return;
+    const fallback =
+      TableSelecter.instance.viewTable
+      || ObjectStore.instance.get<GameTable>(TableSelecter.instance.viewTableIdentifier)
+      || tables[0];
+
+    const resolveTable = (preferredId?: string): GameTable => {
+      if (preferredId) {
+        const t = ObjectStore.instance.get<GameTable>(preferredId);
+        if (t) return t;
+      }
+      return fallback;
+    };
+
+    const reparent = (node: ObjectNode, preferredId?: string) => {
+      if (!node || node.parent) return;
+      const table = resolveTable(preferredId);
+      if (table) table.appendChild(node);
+    };
+
+    for (const mask of ObjectStore.instance.getObjects(GameTableMask)) {
+      if (mask.parent) continue;
+      const tid = mask.tableIdentifier || mask.placementTableIds[0] || '';
+      reparent(mask, tid);
+    }
+    for (const terrain of ObjectStore.instance.getObjects(Terrain)) {
+      if (terrain.parent) continue;
+      const tid = terrain.tableIdentifier || terrain.placementTableIds[0] || '';
+      reparent(terrain, tid);
+    }
+    for (const wall of ObjectStore.instance.getObjects(TableWall)) {
+      reparent(wall);
+    }
+    for (const light of ObjectStore.instance.getObjects(TableLight)) {
+      reparent(light);
+    }
+    for (const drawing of ObjectStore.instance.getObjects(TableDrawing)) {
+      reparent(drawing);
+    }
+  }
+
+  /** All COMPLETE / local-asset images in the library (not only XML-referenced). */
+  private collectStorageImages(): ImageFile[] {
+    const out: ImageFile[] = [];
+    for (const image of ImageStorage.instance.images) {
+      if (!image) continue;
+      if (image.state === ImageState.COMPLETE) {
+        out.push(image);
+        continue;
+      }
+      if (image.state === ImageState.URL && image.url && !/^https?:\/\//i.test(image.url)) {
+        out.push(image);
+      }
+    }
+    return out;
+  }
+
   private async _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback, includeAudio?: boolean): Promise<void> {
     fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
     const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
-    return this.saveAsync(this.buildRoomFiles(packAudio), this.appendTimestamp(fileName), updateCallback);
+    return this.saveAsync(await this.buildRoomFiles(packAudio), this.appendTimestamp(fileName), updateCallback);
   }
 
   private async _saveRoomToDirectoryAsync(
@@ -259,7 +400,7 @@ export class SaveDataService {
     includeAudio?: boolean
   ): Promise<void> {
     const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
-    const files = this.buildRoomFiles(packAudio);
+    const files = await this.buildRoomFiles(packAudio);
     let progresPercent = -1;
     const zipBlob = await FileArchiver.instance.createZipBlobAsync(files, meta => {
       if (!updateCallback) return;
@@ -298,24 +439,186 @@ export class SaveDataService {
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveGameObjectAsync(gameObject, fileName, updateCallback)));
   }
 
-  private _saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
+  private async _saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
     let files: File[] = [];
     let xml: string = this.convertToXml(gameObject);
+    const images = this.searchImageFiles(xml);
+    const { imageFiles, idRemap } = await this.packImagesForZip(images);
+    if (idRemap.size) xml = this.remapImageIdentifiers(xml, idRemap);
 
     files.push(new File([xml], 'fly_data.xml', { type: 'text/plain' }));
-    //files = files.concat(this.searchImageFiles(xml));
-    
-    let images: ImageFile[] = [];
-    images = images.concat(this.searchImageFiles(xml));
-    for (const image of images) {
-      if (image.state === ImageState.COMPLETE) {
-        files.push(new File([image.blob], image.identifier + '.' + MimeType.extension(image.blob.type), { type: image.blob.type }));
-      }
-    }
+    files.push(...imageFiles);
     let imageTagXml = this.convertToXml(ImageTagList.create(images));
-    
+    if (idRemap.size) imageTagXml = this.remapImageIdentifiers(imageTagXml, idRemap);
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
     return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
+  }
+
+  /**
+   * Pack COMPLETE blobs and local asset URL images into ZIP files.
+   * Asset URLs (./assets/...) have no blob until fetched; after packing, identifiers
+   * become content hashes so ZIP reload matches ImageStorage.addAsync.
+   */
+  private async packImagesForZip(images: ImageFile[]): Promise<{ imageFiles: File[]; idRemap: Map<string, string> }> {
+    const imageFiles: File[] = [];
+    const idRemap = new Map<string, string>();
+    const packedIds = new Set<string>();
+    const seen = new Set<string>();
+
+    for (const image of images) {
+      if (!image || seen.has(image.identifier)) continue;
+      seen.add(image.identifier);
+
+      if (image.state === ImageState.COMPLETE && image.blob) {
+        if (packedIds.has(image.identifier)) continue;
+        packedIds.add(image.identifier);
+        const ext = MimeType.extension(image.blob.type) || 'bin';
+        imageFiles.push(new File(
+          [image.blob],
+          image.identifier + '.' + ext,
+          { type: image.blob.type },
+        ));
+        continue;
+      }
+
+      if (image.state !== ImageState.URL || !image.url) continue;
+      // Remote absolute URLs stay as references (no blob in ZIP).
+      if (/^https?:\/\//i.test(image.url)) continue;
+
+      try {
+        const cached = this.packedAssetCache.get(image.identifier);
+        if (cached && cached.sourceUrl === image.url) {
+          if (image.identifier !== cached.hashId) idRemap.set(image.identifier, cached.hashId);
+          if (!packedIds.has(cached.hashId)) {
+            packedIds.add(cached.hashId);
+            imageFiles.push(cached.file);
+          }
+          continue;
+        }
+
+        const res = await fetch(image.url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const materialized = await ImageFile.createAsync(
+          new File([blob], image.identifier, { type: blob.type || 'image/png' }),
+        );
+        if (image.identifier !== materialized.identifier) {
+          idRemap.set(image.identifier, materialized.identifier);
+        }
+        const ext = MimeType.extension(materialized.blob.type) || 'bin';
+        const file = new File(
+          [materialized.blob],
+          materialized.identifier + '.' + ext,
+          { type: materialized.blob.type },
+        );
+        this.packedAssetCache.set(image.identifier, {
+          sourceUrl: image.url,
+          hashId: materialized.identifier,
+          file,
+        });
+        if (packedIds.has(materialized.identifier)) continue;
+        packedIds.add(materialized.identifier);
+        imageFiles.push(file);
+      } catch (e) {
+        console.warn(`Failed to pack asset image ${image.identifier} (${image.url})`, e);
+      }
+    }
+
+    return { imageFiles, idRemap };
+  }
+
+  /** Rewrite image ids in exported XML after materializing asset URLs to content hashes. */
+  private remapImageIdentifiers(xml: string, idRemap: Map<string, string>): string {
+    if (!xml || !idRemap.size) return xml;
+    const root = XmlUtil.xml2element(xml);
+    if (!root || !root.ownerDocument) {
+      // Fallback: never use global replace (can corrupt coordinates / unrelated text).
+      return xml;
+    }
+    const doc = root.ownerDocument;
+
+    const mapId = (id: string | null): string | null => {
+      if (!id) return id;
+      return idRemap.has(id) ? idRemap.get(id) : id;
+    };
+
+    for (const node of Array.from(doc.querySelectorAll('*[type="image"]'))) {
+      const text = (node.textContent || '').trim();
+      if (text && idRemap.has(text)) node.textContent = idRemap.get(text);
+      const cv = node.getAttribute('currentValue');
+      const mappedCv = mapId(cv);
+      if (cv && mappedCv && cv !== mappedCv) node.setAttribute('currentValue', mappedCv);
+    }
+
+    for (const attr of IMAGE_ID_ATTRS) {
+      for (const node of Array.from(doc.querySelectorAll(`*[${attr}]`))) {
+        const v = node.getAttribute(attr);
+        const mapped = mapId(v);
+        if (v && mapped && v !== mapped) node.setAttribute(attr, mapped);
+      }
+    }
+
+    for (const node of Array.from(doc.querySelectorAll('*[attachedImageIdentifiers]'))) {
+      const v = node.getAttribute('attachedImageIdentifiers');
+      if (!v) continue;
+      const next = v.trim().split(/\s+/).map(id => mapId(id) || id).join(' ');
+      if (next !== v) node.setAttribute('attachedImageIdentifiers', next);
+    }
+
+    // image-tag identifiers are imagetag_<imageId>
+    for (const node of Array.from(doc.querySelectorAll('image-tag'))) {
+      const syncId = node.getAttribute('syncId');
+      if (syncId && syncId.startsWith('imagetag_')) {
+        const imgId = syncId.slice('imagetag_'.length);
+        if (idRemap.has(imgId)) {
+          node.setAttribute('syncId', 'imagetag_' + idRemap.get(imgId));
+        }
+      }
+      const imgAttr = node.getAttribute('imageIdentifier');
+      const mappedImg = mapId(imgAttr);
+      if (imgAttr && mappedImg && imgAttr !== mappedImg) {
+        node.setAttribute('imageIdentifier', mappedImg);
+      }
+    }
+
+    // JSON SyncVars that may embed image ids (token FX, combat entries, scene snaps).
+    for (const node of Array.from(doc.querySelectorAll('*'))) {
+      if (!node.attributes) continue;
+      for (const attr of Array.from(node.attributes)) {
+        const raw = attr.value;
+        if (!raw || (raw[0] !== '{' && raw[0] !== '[')) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          const next = this.remapIdsInJson(parsed, idRemap);
+          const serialized = JSON.stringify(next);
+          if (serialized !== raw) node.setAttribute(attr.name, serialized);
+        } catch {
+          /* not JSON */
+        }
+      }
+    }
+
+    const declaration = xml.trimStart().startsWith('<?xml')
+      ? xml.slice(0, xml.indexOf('?>') + 2) + '\n'
+      : '';
+    return declaration + new XMLSerializer().serializeToString(root);
+  }
+
+  private remapIdsInJson(value: any, idRemap: Map<string, string>): any {
+    if (typeof value === 'string') {
+      return idRemap.has(value) ? idRemap.get(value) : value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(v => this.remapIdsInJson(v, idRemap));
+    }
+    if (value && typeof value === 'object') {
+      const out: any = {};
+      for (const key of Object.keys(value)) {
+        out[key] = this.remapIdsInJson(value[key], idRemap);
+      }
+      return out;
+    }
+    return value;
   }
 
   private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void> {

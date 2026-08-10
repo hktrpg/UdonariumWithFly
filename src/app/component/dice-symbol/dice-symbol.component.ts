@@ -616,10 +616,16 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   showDetail(gameObject: DiceSymbol) {
     if (this.GuestMode()) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
-    let coordinate = this.pointerDeviceService.pointers[0];
     let title = this.i18n.t('dice.panelTitle');
     if (gameObject.name.length) title += ' - ' + gameObject.name;
-    let option: PanelOption = { title: title, left: coordinate.x - 210, top: coordinate.y - 180, width: 420, height: 400 };
+    const tourId = PanelService.tourIdObjectDetail(gameObject.identifier);
+    if (PanelService.bringTourPanelToFront(tourId, { title })) return;
+    let coordinate = this.pointerDeviceService.pointers[0];
+    let option: PanelOption = {
+      title: title, left: coordinate.x - 210, top: coordinate.y - 180, width: 420, height: 400,
+      tourPanelId: tourId,
+      geometryKey: PanelService.sheetGeometryKey(gameObject.aliasName),
+    };
     let component = this.panelService.open<DiceSettingsComponent>(DiceSettingsComponent, option);
     component.dice = gameObject;
   }

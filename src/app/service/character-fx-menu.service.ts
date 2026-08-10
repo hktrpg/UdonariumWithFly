@@ -20,9 +20,10 @@ import {
   clearImageEffects,
 } from '@udonarium/table-fx/image-effect';
 import {
+  isActivePushPinStyle,
   pinAngleFromId,
-  PUSH_PIN_COLORS,
   randomPinAngle,
+  randomPushPinStyle,
   TOKEN_FRAME_STYLES,
 } from '@udonarium/table-fx/push-pin.util';
 import { TextNote } from '@udonarium/text-note';
@@ -127,7 +128,7 @@ export class CharacterFxMenuService {
           get: () => !!host.pushPin,
           set: v => {
             host.pushPin = v;
-            if (host.pushPin && !host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
+            if (host.pushPin) this.ensureHostPushPin(host);
           },
           on: this.i18n.t('fx.pushPin.on'),
           off: this.i18n.t('fx.pushPin.off'),
@@ -135,17 +136,21 @@ export class CharacterFxMenuService {
         }),
         {
           name: this.i18n.t('fx.pushPin.reangle'),
-          action: () => { host.pushPinAngle = randomPinAngle(); host.pushPin = true; after(); },
+          action: () => {
+            host.pushPinAngle = randomPinAngle();
+            host.pushPinStyle = randomPushPinStyle();
+            host.pushPin = true;
+            after();
+          },
         },
-        ContextMenuSeparator,
-        ...PUSH_PIN_COLORS.map(color => ({
-          name: `${host.pushPinColor === color ? '◉' : '○'} ${this.i18n.t(`fx.pushPin.${color}`)}`,
-          action: () => { host.pushPinColor = color; host.pushPin = true; after(); },
-          nameUpdate: () => `${host.pushPinColor === color ? '◉' : '○'} ${this.i18n.t(`fx.pushPin.${color}`)}`,
-          checkBox: 'radio' as const,
-        })),
       ]
     };
+  }
+
+  /** Assign angle + active style {2,3,6,7} when enabling a pin. */
+  private ensureHostPushPin(host: GameCharacter | TextNote) {
+    if (!host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
+    if (!isActivePushPinStyle(host.pushPinStyle)) host.pushPinStyle = randomPushPinStyle();
   }
 
   makeClueLinkMenu(from: GameCharacter | TextNote): ContextMenuAction {
@@ -171,11 +176,11 @@ export class CharacterFxMenuService {
               if (on) {
                 if (!from.pushPin) {
                   from.pushPin = true;
-                  from.pushPinAngle = pinAngleFromId(from.identifier);
+                  this.ensureHostPushPin(from);
                 }
                 if (!t.pushPin) {
                   t.pushPin = true;
-                  t.pushPinAngle = pinAngleFromId(t.identifier);
+                  this.ensureHostPushPin(t);
                 }
                 if (!isLinked(t)) {
                   ClueLink.create(from.identifier, t.identifier, { tableIdentifier: viewId });

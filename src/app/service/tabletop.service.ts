@@ -26,6 +26,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { poseDebug } from '@udonarium/table-fx/pose-debug';
 
 import { CoordinateService } from './coordinate.service';
 import { BatchService } from './batch.service';
@@ -111,6 +112,30 @@ export class TabletopService {
         // Do not migrateUnbound here — rebinding to the new view corrupted per-map poses.
         this.refreshCacheAll();
       })
+      .on('ARCHIVE_LOAD_COMPLETE', () => {
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        this.refreshCacheAll();
+        const chars = this.characters || [];
+        const visible = chars.filter(c => c.isVisibleOnTable);
+        poseDebug('event ARCHIVE_LOAD_COMPLETE (TabletopService)', {
+          viewId: viewId || '(none)',
+          viewed: this.tableSelecter.viewedTableIdentifier,
+          active: this.tableSelecter.viewTableIdentifier,
+          characterCache: chars.length,
+          visibleOnTable: visible.length,
+          sample: visible.slice(0, 5).map(c => {
+            const p = c.getPoseForView();
+            return {
+              id: c.identifier,
+              live: `${c.location.x | 0},${c.location.y | 0},${c.posZ | 0}`,
+              poseForView: `${p.x | 0},${p.y | 0},${p.posZ | 0}`,
+              placements: (c.tablePlacements || '').slice(0, 100),
+            };
+          }),
+        });
+        if (viewId) TabletopObject.hydrateAllForView(viewId, true);
+        EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: viewId || '' });
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier === this.currentTable.identifier || event.data.identifier === this.tableSelecter.identifier) {
           this.refreshCache(GameTableMask.aliasName);
@@ -128,7 +153,11 @@ export class TabletopService {
       })
       .on('DELETE_GAME_OBJECT', event => {
         const deletedId = event.data.identifier as string;
-        if (deletedId && (event.data.aliasName === GameCharacter.aliasName || event.data.aliasName === TextNote.aliasName)) {
+        // Skip self-echo: after ZIP reload, syncIds are reused and cleanup would
+        // destroy newly parsed clue links that still reference those endpoints.
+        if (!event.isSendFromSelf
+          && deletedId
+          && (event.data.aliasName === GameCharacter.aliasName || event.data.aliasName === TextNote.aliasName)) {
           ClueLink.cleanupFor(deletedId);
         }
         let aliasName = event.data.aliasName;

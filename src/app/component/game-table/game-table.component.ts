@@ -126,6 +126,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
+  /**
+   * Yarn must sit above flat 2D tokens (movable ≈1px + upright ≈1px → ≈2px)
+   * but below push-pin heads (local translateZ on .push-pin).
+   */
+  get clueStringsZ(): number {
+    return this.gridHeight + 2.4;
+  }
+
   /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
   weatherLayerZ(layer: number): number {
     const gh = this.gridHeight;
@@ -260,6 +268,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   showDebugPose = sessionStorage.getItem('udon.debugPose') === '1';
   private debugPoseTimer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Room ZIP reuses syncIds; Angular trackBy(identifier) would recycle piece components
+   * bound to destroyed objects (isLoaded stays false → display:none). Bump on archive load
+   * so *ngFor remounts like a map switch.
+   */
+  pieceRenderEpoch = 0;
+
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
 
@@ -283,15 +298,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     ) as HTMLElement | null;
     if (pinEl) {
       const rect = pinEl.getBoundingClientRect();
-      // Pointer stack uses page coords; pin head is near the top of .push-pin.
-      const page = {
-        x: rect.left + rect.width * 0.5 + window.pageXOffset,
-        y: rect.top + rect.height * 0.3 + window.pageYOffset,
-        z: 0,
-      };
-      const local = this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
-      if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
-        return { x: local.x, y: local.y };
+      // display:none / not laid out → singular transform matrix (invert det=0).
+      if (rect.width > 0.5 && rect.height > 0.5) {
+        // Pointer stack uses page coords; pin head is near the top of .push-pin.
+        const page = {
+          x: rect.left + rect.width * 0.5 + window.pageXOffset,
+          y: rect.top + rect.height * 0.3 + window.pageYOffset,
+          z: 0,
+        };
+        const local = this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
+        if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
+          return { x: local.x, y: local.y };
+        }
       }
     }
     const obj = ObjectStore.instance.get(id);
@@ -460,6 +478,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('SELECT_GAME_TABLE', -10, event => {
         // After TabletopService refreshes object caches for the new viewed table.
         this.ngZone.run(() => queueMicrotask(() => this.applyViewedTable()));
+      })
+      .on('ARCHIVE_LOAD_COMPLETE', () => {
+        // ZIP load replaces tables but keeps this component's in-memory cameras.
+        // Stale pan/tilt (or a singular CSS matrix during hydrate) makes tokens look
+        // "wrong" until the user switches maps — which re-runs applyViewedTable.
+        this.ngZone.run(() => this.refreshAfterRoomArchiveLoad());
+      })
+      .on('ROOM_PIECES_REPLACED', () => {
+        // fly_data.xml finished before images; remount so recycled syncId views are not kept.
+        this.ngZone.run(() => {
+          this.pieceRenderEpoch++;
+          this.changeDetector.detectChanges();
+          MovableDirective.syncAllPosesFromObjects();
+        });
       })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
@@ -686,6 +718,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor);
     // First paint / deferred applyCameraForTable (ViewChild was not ready in ngOnInit).
+    this.tabletopActionService.ensureClueBoardBackground();
     this.applyCameraForTable(this.currentTable);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
@@ -1360,7 +1393,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   trackByGameObject(index: number, gameObject: GameObject) {
-    return gameObject.identifier;
+    return `${this.pieceRenderEpoch}:${gameObject.identifier}`;
   }
 
   isCursorHidIn(cursor: PeerCursor): boolean {
@@ -1531,6 +1564,32 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.refreshFx();
     this.ensureFxTimer();
     this.changeDetector.detectChanges();
+  }
+
+  /**
+   * After room ZIP finishes: remount piece views, reset cameras, re-apply grid,
+   * then sync Movable once layout has settled.
+   */
+  private refreshAfterRoomArchiveLoad() {
+    this.pieceRenderEpoch++;
+    this.tableViewById.clear();
+    this.cameraTableId = '';
+    this._last2DMode = null;
+
+    const refresh = () => {
+      this.applyViewedTable();
+      MovableDirective.syncAllPosesFromObjects();
+    };
+
+    // Force *ngFor to see the new trackBy epoch immediately.
+    this.changeDetector.detectChanges();
+
+    queueMicrotask(refresh);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(refresh);
+    });
+    // Late pass: remounted tokens + images may still be settling.
+    setTimeout(refresh, 100);
   }
 
   /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */
@@ -1851,7 +1910,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         // Selected tokens ignore self UPDATE in MovableDirective — clear first, then force pose sync.
         this.selectionService.remove(ch);
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, true);
+        // Keep other-map placements when dragging a token that is already on a table.
+        // Exclusive only for true inventory → table (no existing placements).
+        const exclusive = ch.location.name !== 'table' && ch.placementTableIds.length < 1;
+        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, exclusive);
         MovableDirective.syncPoseFromUndo(ch, x, y, ch.posZ);
         placedChars.push(ch);
       }

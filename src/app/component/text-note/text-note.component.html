@@ -18,10 +18,10 @@
             }"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
-            <span class="push-pin" *ngIf="pushPin"
+            <img *ngIf="pushPin" class="push-pin is-3d" alt="" draggable="false"
+              [src]="pushPinSrc"
               [attr.data-clue-pin]="textNote.identifier"
-              [style.--pin-color]="pushPinColor === 'white' ? '#f5f5f0' : pushPinColor === 'yellow' ? '#e8c84a' : pushPinColor === 'green' ? '#6bbf6b' : '#d32f2f'"
-              [style.transform]="'rotate(' + pushPinAngle + 'deg)'"></span>
+              [style.transform]="'translateZ(2.5px) rotate(' + pushPinAngle + 'deg)'" />
             <div *ngIf="isShowTitle && title.length" class="title is-3d is-pointer-events-none"
               [style.background-color]="titleBgColor"
               [style.color]="titleFgColor">{{title}}</div>
@@ -52,10 +52,12 @@
               <ng-container *ngSwitchDefault>
                 <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
                   [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
-                  [style.font-size.px]="fontSize + 9" [(ngModel)]="text" spellcheck="false"></textarea>
+                  [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
+                  [(ngModel)]="text" spellcheck="false"></textarea>
                 <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
                   [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
                   [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
+                  [style.text-align]="textAlign"
                   [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
               </ng-container>
             </ng-container>
