@@ -44,36 +44,45 @@ export function snapshotCharacterTokenFx(ch: GameCharacter): MaskTokenFxSnapshot
   };
 }
 
+function setAltitudeValue(ch: GameCharacter, altitude: number) {
+  const el = ch.commonDataElement?.getFirstElementByName('altitude');
+  if (el) el.value = altitude;
+}
+
 /** Apply mask FX config to character; returns snapshot taken before apply. */
 export function applyMaskTokenFxToCharacter(ch: GameCharacter, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
   const snap = snapshotCharacterTokenFx(ch);
   if (!ch || !cfg) return snap;
-  for (const key of FX_KEYS) {
-    (ch as any)[key] = !!cfg[key];
-  }
   const mode = cfg.altitudeMode || 'none';
-  if (mode === 'set') {
-    ch.altitude = Number(cfg.altitude) || 0;
-    snap.altitudeTouched = true;
-  } else if (mode === 'delta') {
-    ch.altitude = (Number(ch.altitude) || 0) + (Number(cfg.altitude) || 0);
-    snap.altitudeTouched = true;
-  }
+  ch.mutateAppearance(() => {
+    for (const key of FX_KEYS) {
+      (ch as any)[key] = !!cfg[key];
+    }
+    if (mode === 'set') {
+      setAltitudeValue(ch, Number(cfg.altitude) || 0);
+      snap.altitudeTouched = true;
+    } else if (mode === 'delta') {
+      setAltitudeValue(ch, (Number(ch.altitude) || 0) + (Number(cfg.altitude) || 0));
+      snap.altitudeTouched = true;
+    }
+  });
   return snap;
 }
 
 export function restoreMaskTokenFxSnapshot(ch: GameCharacter, snap: MaskTokenFxSnapshot): void {
   if (!ch || !snap) return;
-  ch.isInverse = snap.isInverse;
-  ch.isHollow = snap.isHollow;
-  ch.isBlackPaint = snap.isBlackPaint;
-  ch.isGrayscale = snap.isGrayscale;
-  ch.isSepia = snap.isSepia;
-  ch.isWhitePaint = snap.isWhitePaint;
-  ch.isMatrix = snap.isMatrix;
-  ch.isFlipVertical = snap.isFlipVertical;
-  ch.isContrast = snap.isContrast;
-  if (snap.altitudeTouched) {
-    ch.altitude = snap.altitude;
-  }
+  ch.mutateAppearance(() => {
+    ch.isInverse = snap.isInverse;
+    ch.isHollow = snap.isHollow;
+    ch.isBlackPaint = snap.isBlackPaint;
+    ch.isGrayscale = snap.isGrayscale;
+    ch.isSepia = snap.isSepia;
+    ch.isWhitePaint = snap.isWhitePaint;
+    ch.isMatrix = snap.isMatrix;
+    ch.isFlipVertical = snap.isFlipVertical;
+    ch.isContrast = snap.isContrast;
+    if (snap.altitudeTouched) {
+      setAltitudeValue(ch, snap.altitude);
+    }
+  });
 }

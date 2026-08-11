@@ -104,7 +104,7 @@
       </div>
     </div>
     <div class="check-row tight">
-      <label><input type="checkbox" [(ngModel)]="note.isFlipped" [disabled]="GuestMode()" /> {{ 'note.flipped' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="note.isFlipped" (ngModelChange)="setFlipped($event)" [disabled]="GuestMode()" /> {{ 'note.flipped' | i18n }}</label>
       <label><input type="checkbox" [(ngModel)]="note.isShowTitle" [disabled]="GuestMode()" /> {{ 'note.showTitle' | i18n }}</label>
     </div>
   </section>
@@ -168,7 +168,7 @@
           <input type="checkbox" [ngModel]="selfOnly" (ngModelChange)="setSelfOnly($event)" [disabled]="GuestMode()" />
           {{ 'note.selfOnly' | i18n }}
         </label>
-        <label *ngIf="editMode !== 'image'"><input type="checkbox" [(ngModel)]="note.isFlipped" [disabled]="GuestMode()" /> {{ 'note.flipped' | i18n }}</label>
+        <label *ngIf="editMode !== 'image'"><input type="checkbox" [ngModel]="note.isFlipped" (ngModelChange)="setFlipped($event)" [disabled]="GuestMode()" /> {{ 'note.flipped' | i18n }}</label>
       </div>
     </div>
 

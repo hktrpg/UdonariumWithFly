@@ -135,7 +135,12 @@
         <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
           [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
       </div>
-      <svg class="clue-strings-layer is-fill is-pointer-events-none is-3d"
+      <div *ngIf="!isTable2DMode" class="clue-strings-3d is-pointer-events-none is-3d">
+        <div *ngFor="let link of clueLinks; trackBy: trackByGameObject"
+          class="clue-string-beam is-3d"
+          [ngStyle]="clueStringBeamStyle(link)"></div>
+      </div>
+      <svg *ngIf="isTable2DMode" class="clue-strings-layer is-fill is-pointer-events-none is-3d"
         [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
         [ngStyle]="{'transform': 'translateZ(' + clueStringsZ + 'px)'}">
         <path *ngFor="let link of clueLinks; trackBy: trackByGameObject"

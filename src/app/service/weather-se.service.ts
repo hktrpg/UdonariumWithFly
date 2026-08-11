@@ -8,8 +8,10 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 
+import { WeatherLoopPlayer } from './weather-loop-player';
+
 /** Built-in weather loops under assets/audio/weather/ (files optional). */
-const WEATHER_SE_URL: Partial<Record<WeatherType, string>> = {
+const WEATHER_SE_PATH: Partial<Record<WeatherType, string>> = {
   rain: 'assets/audio/weather/rain.ogg',
   thunderstorm: 'assets/audio/weather/thunderstorm.ogg',
   wind: 'assets/audio/weather/wind.ogg',
@@ -21,9 +23,17 @@ const WEATHER_SE_URL: Partial<Record<WeatherType, string>> = {
   maple: 'assets/audio/weather/wind.ogg',
 };
 
+function resolveAssetUrl(relativePath: string): string {
+  try {
+    return new URL(relativePath, document.baseURI).href;
+  } catch {
+    return relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  }
+}
+
 /**
  * Local weather ambience on Jukebox track 5 (index 4).
- * Local-only playback via playBuiltInLocal — does not sync room BGM assignment.
+ * Local-only playback with crossfade loop — does not sync room BGM assignment.
  */
 @Injectable({ providedIn: 'root' })
 export class WeatherSeService implements OnDestroy {
@@ -34,6 +44,7 @@ export class WeatherSeService implements OnDestroy {
   private lastUrl = '';
   private ready = false;
   private needsUnlockRetry = false;
+  private readonly loopPlayer = new WeatherLoopPlayer();
 
   constructor() {
     localForage.getItem<boolean>(WeatherSeService.STORAGE_KEY).then(v => {
@@ -93,20 +104,20 @@ export class WeatherSeService implements OnDestroy {
       this.needsUnlockRetry = false;
       return;
     }
-    const url = WEATHER_SE_URL[type];
-    if (!url) {
+    const path = WEATHER_SE_PATH[type];
+    if (!path) {
       if (this.lastUrl) this.stop();
       this.lastType = type;
       this.lastUrl = '';
       this.needsUnlockRetry = false;
       return;
     }
-    const box = this.jukebox();
+    const url = resolveAssetUrl(path);
     const already =
       this.lastType === type
       && this.lastUrl === url
       && !this.needsUnlockRetry
-      && !!box?.isLocalPlaying(JUKEBOX_WEATHER_TRACK);
+      && this.loopPlayer.isPlaying();
     if (already) return;
 
     this.lastType = type;
@@ -115,19 +126,22 @@ export class WeatherSeService implements OnDestroy {
   }
 
   private startPlayback(url: string) {
-    const box = this.jukebox();
-    if (!box) {
+    AudioPlayer.ensureContextRunning();
+    try {
+      this.jukebox()?.stopBuiltInLocal(JUKEBOX_WEATHER_TRACK);
+    } catch { /* ignore */ }
+
+    if (AudioPlayer.isAmbientMute || AudioPlayer.ambientVolume <= 0) {
       this.needsUnlockRetry = true;
       return;
     }
-    AudioPlayer.ensureContextRunning();
-    const ok = box.playBuiltInLocal(JUKEBOX_WEATHER_TRACK, url, true);
+
+    const ok = this.loopPlayer.play(url, 1);
     this.needsUnlockRetry = !ok;
     window.setTimeout(() => {
       if (!this.enabled || this.lastUrl !== url) return;
-      const playing = !!this.jukebox()?.isLocalPlaying(JUKEBOX_WEATHER_TRACK);
-      this.needsUnlockRetry = !playing;
-    }, 150);
+      this.needsUnlockRetry = !this.loopPlayer.isPlaying();
+    }, 250);
   }
 
   private retryAfterUnlock() {
@@ -135,11 +149,12 @@ export class WeatherSeService implements OnDestroy {
       this.needsUnlockRetry = false;
       return;
     }
-    if (!this.needsUnlockRetry && this.jukebox()?.isLocalPlaying(JUKEBOX_WEATHER_TRACK)) return;
+    if (!this.needsUnlockRetry && this.loopPlayer.isPlaying()) return;
     this.startPlayback(this.lastUrl);
   }
 
   private stop() {
+    this.loopPlayer.stop();
     try {
       this.jukebox()?.stopBuiltInLocal(JUKEBOX_WEATHER_TRACK);
     } catch { /* ignore */ }

@@ -157,6 +157,21 @@
   transform: rotateX(-90deg);
 }
 
+.note-face-body {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+}
+
+/*
+ * No back art: mirror only the face body (not push-pin / resize).
+ * Do NOT use rotateY(180) — backface-visibility:hidden would hide the face.
+ */
+.note-face-body.is-content-flipped {
+  transform: scaleX(-1);
+  transform-origin: center center;
+}
+
 .is-back {
   transform-origin: 50% 100%;
   transform: rotateX(-90deg) rotateY(180deg);

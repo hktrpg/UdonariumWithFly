@@ -85,7 +85,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   get name(): string { return this.cardStack.name; }
   get rotate(): number { return this.cardStack.rotate; }
-  set rotate(rotate: number) { this.cardStack.rotate = rotate; }
+  set rotate(rotate: number) { this.cardStack.mutateAppearance(() => { this.cardStack.rotate = rotate; }); }
   get zindex(): number { return this.cardStack.zindex; }
   get isShowTotal(): boolean { return this.cardStack.isShowTotal; }
   get cards(): Card[] { return this.cardStack.cards; }
@@ -115,7 +115,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.topCard.text)) }
 
   get isLocked(): boolean { return this.cardStack ? this.cardStack.isLocked : false; }
-  set isLocked(isLocked: boolean) { if (this.cardStack) this.cardStack.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) { if (this.cardStack) { this.cardStack.mutateAppearance(() => { this.cardStack.isLocked = isLocked; }); } }
 
   gridSize: number = 50;
 

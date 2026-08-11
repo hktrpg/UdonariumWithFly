@@ -42,6 +42,7 @@ import {
 import { RoomInviteService } from './room-invite.service';
 import { SaveDataService } from './save-data.service';
 import { ConnectionBusyService } from './connection-busy.service';
+import { PanelService } from './panel.service';
 
 export type FolderBackupStatus = 'unsupported' | 'unbound' | 'needAuth' | 'ready' | 'writing' | 'error';
 
@@ -151,6 +152,8 @@ export class FolderBackupService implements OnDestroy {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private minIntervalTimer: ReturnType<typeof setTimeout> | null = null;
   private lastWriteAt = 0;
+  /** Room id of the last successful folder write (may differ from activeRoomId after switch). */
+  private lastWriteRoomId = '';
   private activeRoomId = '';
   private lastRoomSnapshot: RoomSnapshot | null = null;
   /** Load backup after OPEN_NETWORK flush finishes (must not race ahead of old-room write). */
@@ -206,6 +209,20 @@ export class FolderBackupService implements OnDestroy {
       && (this.status === 'ready' || this.status === 'writing' || this.status === 'error')
       && !!Network.peer?.isRoom
       && !Network.GuestMode();
+  }
+
+  /** Unwritten or in-flight folder backup work remains. */
+  get hasPendingWrite(): boolean {
+    return this.dirty || this.writing || !!this.writePromise || this.writeAgain;
+  }
+
+  /** Bound folder already holds the current room state (safe to reload without flush). */
+  get isBackupCurrent(): boolean {
+    return this.isReady
+      && this.lastWriteAt > 0
+      && !this.hasPendingWrite
+      && !!this.activeRoomId
+      && this.lastWriteRoomId === this.activeRoomId;
   }
 
   async initialize(): Promise<void> {
@@ -373,9 +390,12 @@ export class FolderBackupService implements OnDestroy {
     this.clearTimers();
     this.dirty = true;
     const timeoutMs = options?.timeoutMs ?? FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS;
+    const writeAtBefore = this.lastWriteAt;
     try {
       await this.withTimeout(this.flushWrites(options), timeoutMs);
-      return !this.dirty && !this.lastError;
+      if (this.lastError) return false;
+      // A concurrent markDirty during flush must not look like failure after a successful write.
+      return this.lastWriteAt > writeAtBefore || (!this.dirty && !this.lastError);
     } catch (e) {
       console.warn('FolderBackup flush failed', e);
       this.lastError = String((e as Error)?.message || e);
@@ -715,6 +735,7 @@ export class FolderBackupService implements OnDestroy {
         roomId: Network.peer?.roomId || '',
         roomName: RoomAuth.displayRoomName(Network.peer?.roomName || ''),
       });
+      this.closeLobbyWindows();
     } catch (e) {
       console.warn('FolderBackup resume/load failed', e);
       folderBackupDebug('resumeOrLoad error', { error: String((e as Error)?.message || e) });
@@ -759,6 +780,7 @@ export class FolderBackupService implements OnDestroy {
       this.logTokenVisibility('after-load-2000ms');
       await new Promise<void>(resolve => setTimeout(resolve, 1500));
       this.logTokenVisibility('after-load-3500ms');
+      this.closeLobbyWindows();
     } catch (e) {
       console.warn('FolderBackup load failed', e);
       folderBackupDebug('load error', { error: String((e as Error)?.message || e) });
@@ -972,6 +994,7 @@ export class FolderBackupService implements OnDestroy {
       });
     }
     this.activeRoomId = '';
+    this.lastWriteRoomId = '';
     this.listening = false;
     this.clearTimers();
     this.dirty = false;
@@ -1025,19 +1048,31 @@ export class FolderBackupService implements OnDestroy {
   }
 
   private async flushWrites(options?: FolderFlushOptions): Promise<void> {
-    if (this.writePromise) {
-      try {
-        await this.writePromise;
-      } catch {
-        // Retry below.
+    // Suspend auto dirty while flushing — prepareRoomSnapshot / AFTER_ROOM_SAVE
+    // otherwise markDirty mid-write and force a second full buildRoomFiles (slow).
+    const prevSuspend = this.suspendAutoWrite;
+    this.suspendAutoWrite = true;
+    this.clearTimers();
+    try {
+      if (this.writePromise) {
+        try {
+          await this.writePromise;
+        } catch {
+          // Retry below.
+        }
       }
-    }
-    this.dirty = true;
-    await this.performWrite(options || {});
-    if (this.dirty || this.writeAgain) {
-      this.writeAgain = false;
       this.dirty = true;
+      this.writeAgain = false;
       await this.performWrite(options || {});
+      // Second pass only if another explicit writer joined mid-flight (writeAgain),
+      // not for UI/sync noise while we were suspended.
+      if (this.writeAgain) {
+        this.writeAgain = false;
+        this.dirty = true;
+        await this.performWrite(options || {});
+      }
+    } finally {
+      this.suspendAutoWrite = prevSuspend;
     }
   }
 
@@ -1061,6 +1096,10 @@ export class FolderBackupService implements OnDestroy {
     this.setStatus('writing');
 
     const run = async () => {
+      // Pose flush / AFTER_ROOM_SAVE emit UPDATE_GAME_OBJECT; ignore them mid-write
+      // so we do not immediately schedule a second full pack+zip.
+      const prevSuspend = this.suspendAutoWrite;
+      this.suspendAutoWrite = true;
       try {
         let metaAuth: {
           allowUser: boolean;
@@ -1072,7 +1111,13 @@ export class FolderBackupService implements OnDestroy {
         }
         // Freeze previous latest into recent/calendar slots BEFORE overwriting latest.
         // (Post-write promote stamped slots with the new latestAt and prune/list hid them.)
-        await this.archiveDueRetentionSlots(snapshot.roomId);
+        try {
+          await this.archiveDueRetentionSlots(snapshot.roomId);
+        } catch (e) {
+          console.warn('FolderBackup retention archive failed (continuing latest write)', e);
+        }
+        // Capture while the map is still painted; write after state save.
+        const previewBlob = await this.capturePreviewBlob();
         await this.saveDataService.saveRoomToDirectoryAsync(
           this.dirHandle,
           snapshot.roomId,
@@ -1080,8 +1125,9 @@ export class FolderBackupService implements OnDestroy {
           undefined,
           metaAuth
         );
-        await this.afterSuccessfulWrite(snapshot.roomId);
+        await this.writeLatestPreview(snapshot.roomId, previewBlob);
         this.lastWriteAt = Date.now();
+        this.lastWriteRoomId = snapshot.roomId;
         this.lastSavedAt = new Date().toISOString();
         this.lastError = '';
         this.activeRoomId = snapshot.roomId;
@@ -1094,6 +1140,7 @@ export class FolderBackupService implements OnDestroy {
         this.setStatus(perm === 'granted' ? 'error' : 'needAuth');
         throw e;
       } finally {
+        this.suspendAutoWrite = prevSuspend;
         this.writing = false;
         if (this.writeAgain) {
           this.writeAgain = false;
@@ -1231,22 +1278,36 @@ export class FolderBackupService implements OnDestroy {
     }
   }
 
-  private async afterSuccessfulWrite(roomId: string): Promise<void> {
-    if (!this.dirHandle || !this.isSafeRoomFileName(roomId)) return;
+  /** Close lobby panel(s) left open after loading / resuming a room. */
+  private closeLobbyWindows() {
     try {
-      await this.writeLatestPreview(roomId);
+      this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+    } catch { /* ignore */ }
+  }
+
+  private async capturePreviewBlob(): Promise<Blob | null> {
+    try {
+      const dataUrl = await captureMapPreviewDataUrl();
+      return dataUrlToJpegBlob(dataUrl);
     } catch (e) {
-      console.warn('FolderBackup preview failed', e);
+      console.warn('FolderBackup preview capture failed', e);
+      return null;
     }
   }
 
-  private async writeLatestPreview(roomId: string): Promise<void> {
-    if (!this.dirHandle) return;
-    const dataUrl = await captureMapPreviewDataUrl();
-    const blob = dataUrlToJpegBlob(dataUrl);
-    if (!blob) return;
-    const roomDir = await FileArchiver.instance.ensureDirectoryPath(this.dirHandle, [ROOMS_DIR, roomId, LATEST_DIR]);
-    await FileArchiver.instance.writeBlobToDirectory(roomDir, PREVIEW_FILE, blob);
+  private async writeLatestPreview(roomId: string, blob?: Blob | null): Promise<void> {
+    if (!this.dirHandle || !this.isSafeRoomFileName(roomId)) return;
+    try {
+      const preview = blob ?? await this.capturePreviewBlob();
+      if (!preview) return;
+      const roomDir = await FileArchiver.instance.ensureDirectoryPath(
+        this.dirHandle,
+        [ROOMS_DIR, roomId, LATEST_DIR]
+      );
+      await FileArchiver.instance.writeBlobToDirectory(roomDir, PREVIEW_FILE, preview);
+    } catch (e) {
+      console.warn('FolderBackup preview failed', e);
+    }
   }
 
   /**

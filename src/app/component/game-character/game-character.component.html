@@ -89,6 +89,7 @@
                   [class.card]="tokenFrame === 'card'"
                   [class.has-caption]="hasTokenFrame && tokenFrame === 'polaroid' && isShowName"
                   [class.is-framed-2d]="hasTokenFrame"
+                  [class.has-push-pin]="pushPin"
                   [style.width.px]="tokenBoxWidthPx"
                   [style.height.px]="tokenFrameHeightPx"
                   [style.transform]="is2DMode ? null : ('translateX(' + ((size * gridSize - characterImageWidth) / 2) + 'px)')">
@@ -97,10 +98,13 @@
                     [style.filter]="imageEffectFilter"
                     [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
                   <span class="token-frame-caption" *ngIf="showPolaroidCaption">{{ tokenFrameCaption }}</span>
-                  <img *ngIf="pushPin" class="push-pin is-3d" alt="" draggable="false"
-                    [src]="pushPinSrc"
-                    [attr.data-clue-pin]="gameCharacter.identifier"
-                    [style.transform]="'translateZ(2.5px) rotate(' + pushPinAngle + 'deg)'" />
+                  <span *ngIf="pushPin" class="push-pin is-3d"
+                    [style.left.px]="pushPinLeft"
+                    [style.top.px]="pushPinTop"
+                    [style.transform]="'translateZ(4px) rotate(' + pushPinAngle + 'deg)'">
+                    <img class="push-pin-img" alt="" draggable="false" [src]="pushPinSrc" />
+                    <i class="push-pin-tip" [attr.data-clue-pin]="gameCharacter.identifier" aria-hidden="true"></i>
+                  </span>
                   <div *ngIf="gameCharacter.isMatrix" class="matrix-rain is-3d" aria-hidden="true">
                     <span *ngFor="let col of matrixRainColumns; trackBy: trackByMatrixCol"
                       class="matrix-rain-col"

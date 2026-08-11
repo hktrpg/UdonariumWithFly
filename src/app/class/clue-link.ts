@@ -3,7 +3,14 @@ import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { GameCharacter } from './game-character';
 import { TextNote } from './text-note';
-import { notePinAnchorPx, pinAnchorPx, stringPathD } from './table-fx/push-pin.util';
+import { TableSelecter } from './table-selecter';
+import {
+  notePinAnchorPx,
+  pinAnchorPx,
+  stringPathD,
+  tokenCenterAnchorPx,
+  tokenVisualHeightPx,
+} from './table-fx/push-pin.util';
 
 export type ClueLinkEndpoint = GameCharacter | TextNote;
 
@@ -60,13 +67,25 @@ export class ClueLink extends GameObject {
     }
   }
 
+  /**
+   * After ZIP reload, self-echo DELETE must not wipe newly parsed links
+   * that still reference reused syncIds.
+   */
+  static shouldCleanupOnEndpointDelete(opts: {
+    isSendFromSelf?: boolean;
+    aliasName?: string;
+  }): boolean {
+    if (opts.isSendFromSelf) return false;
+    const alias = opts.aliasName || '';
+    return alias === GameCharacter.aliasName || alias === TextNote.aliasName;
+  }
+
   isValidOnTable(viewTableId: string): boolean {
     if (this.tableIdentifier && viewTableId && this.tableIdentifier !== viewTableId) return false;
     const a = this.fromObject;
     const b = this.toObject;
     if (!a || !b) return false;
     if (!a.isVisibleOnTable || !b.isVisibleOnTable) return false;
-    if (!(a.pushPin && b.pushPin)) return false;
     return true;
   }
 
@@ -83,6 +102,11 @@ export class ClueLink extends GameObject {
 function endpointPinAnchor(obj: ClueLinkEndpoint, gridSize: number): { x: number; y: number } {
   if (obj instanceof GameCharacter) {
     const s = (obj.size || 1) * gridSize;
+    // 3D: token XYZ center; 2D corkboard: push-pin tip.
+    if (!TableSelecter.instance?.viewTable?.is2DMode) {
+      const c = tokenCenterAnchorPx(obj, s, tokenVisualHeightPx(obj, gridSize), gridSize);
+      return { x: c.x, y: c.y };
+    }
     return pinAnchorPx(obj, s, s);
   }
   const w = (obj.width || 1) * gridSize;

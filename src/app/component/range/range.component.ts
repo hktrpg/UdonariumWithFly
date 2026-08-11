@@ -306,7 +306,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   get opacity(): number { return this.range.opacity; }
   get imageFile(): ImageFile { return this.range.imageFile; }
   get isLocked(): boolean { return this.range.isLocked; }
-  set isLocked(isLock: boolean) { this.range.isLocked = isLock; }
+  set isLocked(isLock: boolean) { this.range.mutateAppearance(() => { this.range.isLocked = isLock; }); }
 
   get selectionState(): SelectionState { return this.selectionService.state(this.range); }
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }

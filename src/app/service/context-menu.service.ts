@@ -49,12 +49,25 @@ export interface ContextMenuAction {
   nameUpdate?: () => string,
 }
 
-/** Checkbox that toggles live state (safe to click repeatedly while menu stays open). */
+/**
+ * Checkbox that toggles live state (safe to click repeatedly while menu stays open).
+ *
+ * Modern label style (preferred):
+ *   { label: '僅自己可見' } → "☑ 僅自己可見" / "☐ 僅自己可見"
+ *   Checkbox shows current state; label names the feature (not the action / opposite).
+ *
+ * Legacy:
+ *   { on: '☑ …', off: '☐ …' } still supported.
+ */
 export function contextMenuToggleCheck(options: {
   get: () => boolean;
   set: (value: boolean) => void;
-  on: string;
-  off: string;
+  /** Feature name; ☑/☐ prefix is applied from get(). */
+  label?: string;
+  /** Legacy on-state text (may already include ☑). */
+  on?: string;
+  /** Legacy off-state text (may already include ☐). */
+  off?: string;
   after?: () => void;
   disabled?: boolean;
   error?: string;
@@ -63,7 +76,13 @@ export function contextMenuToggleCheck(options: {
   selfOnly?: boolean;
   hotkey?: string;
 }): ContextMenuAction {
-  const nameUpdate = () => (options.get() ? options.on : options.off);
+  const nameUpdate = () => {
+    if (options.label != null && options.label !== '') {
+      const body = String(options.label).replace(/^[☑☐]\s*/, '');
+      return `${options.get() ? '☑' : '☐'} ${body}`;
+    }
+    return options.get() ? (options.on ?? '') : (options.off ?? '');
+  };
   return {
     name: nameUpdate(),
     nameUpdate,

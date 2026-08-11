@@ -273,13 +273,31 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   setBlendType(value: number) {
     if (!this.mask || this.GuestMode()) return;
-    this.mask.blendType = value;
+    this.mask.mutateAppearance(() => { this.mask.blendType = value; });
     this.changeDetector.markForCheck();
   }
 
   setBorderType(value: number) {
     if (!this.mask || this.GuestMode()) return;
-    this.mask.borderType = value;
+    this.mask.mutateAppearance(() => { this.mask.borderType = value; });
+    this.changeDetector.markForCheck();
+  }
+
+  setAppearanceFlag(key: 'isLock' | 'affectsLight' | 'isAltitudeIndicate', value: boolean) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.mutateAppearance(() => { (this.mask as any)[key] = value; });
+    this.changeDetector.markForCheck();
+  }
+
+  setTextAlignH(value: string) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.mutateAppearance(() => { this.mask.textAlignH = value; });
+    this.changeDetector.markForCheck();
+  }
+
+  setTextAlignV(value: string) {
+    if (!this.mask || this.GuestMode()) return;
+    this.mask.mutateAppearance(() => { this.mask.textAlignV = value; });
     this.changeDetector.markForCheck();
   }
 

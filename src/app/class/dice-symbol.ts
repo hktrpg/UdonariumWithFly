@@ -66,7 +66,8 @@ export class DiceSymbol extends TabletopObject {
 
   diceRoll(): string {
     let faces = this.faces;
-    this.face = 0 < faces.length ? faces[Math.floor(Math.random() * faces.length)] : '';
+    const next = 0 < faces.length ? faces[Math.floor(Math.random() * faces.length)] : '';
+    this.mutateAppearance(() => { this.face = next; });
     return this.face;
   }
 

@@ -105,6 +105,12 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  setFlipped(flipped: boolean) {
+    if (!this.note || this.GuestMode()) return;
+    this.note.mutateAppearance(() => { this.note.isFlipped = !!flipped; });
+    this.changeDetector.markForCheck();
+  }
+
   onDragOver(e: DragEvent) {
     if (this.GuestMode()) return;
     e.preventDefault();

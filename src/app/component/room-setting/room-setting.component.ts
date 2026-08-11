@@ -172,6 +172,15 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     this.validateLength = peer.peerId.length <= 64;
   }
 
+  onPrimaryAction() {
+    if (!this.canSubmit) return;
+    if (this.editMode) {
+      void this.saveRoomPasswords();
+      return;
+    }
+    if (!this.connectionBusy.busy) this.createRoom();
+  }
+
   createRoom() {
     const suppressBusy = !!this.modalService.option?.suppressConnectionBusy;
     if (this.createRoomKey) return;

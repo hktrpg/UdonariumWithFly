@@ -118,15 +118,18 @@
     <div class="field-row metrics vision-row">
       <label class="field">
         <span>{{ 'char.settings.vision' | i18n }}</span>
-        <input type="number" min="0" step="1" [(ngModel)]="character.visionRange" [disabled]="GuestMode()" />
+        <input type="number" min="0" step="1" [ngModel]="character.visionRange"
+          (ngModelChange)="setVisionRange($event)" [disabled]="GuestMode()" />
       </label>
       <label class="field">
         <span>{{ 'char.settings.bright' | i18n }}</span>
-        <input type="number" min="0" step="1" [(ngModel)]="character.brightLight" [disabled]="GuestMode()" />
+        <input type="number" min="0" step="1" [ngModel]="character.brightLight"
+          (ngModelChange)="setBrightLight($event)" [disabled]="GuestMode()" />
       </label>
       <label class="field">
         <span>{{ 'char.settings.dim' | i18n }}</span>
-        <input type="number" min="0" step="1" [(ngModel)]="character.dimLight" [disabled]="GuestMode()" />
+        <input type="number" min="0" step="1" [ngModel]="character.dimLight"
+          (ngModelChange)="setDimLight($event)" [disabled]="GuestMode()" />
       </label>
       <div class="tool-actions">
         <button type="button" class="btn btn-sm" (click)="showChatPalette()" [disabled]="!isAllowsChat">

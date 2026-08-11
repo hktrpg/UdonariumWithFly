@@ -175,7 +175,14 @@
   inset: auto;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate3d(-50%, -50%, 0);
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  overflow: visible;
+}
+
+/* Unframed + pin: pin sits at top:-20px — must not clip under .image-box overflow:hidden. */
+.upright-transform.is-flat-2d .image-box.has-push-pin {
   overflow: visible;
 }
 

@@ -37,6 +37,9 @@ export class TextNote extends TabletopObject {
   @SyncVar() pushPinColor: string = 'red';
   /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
   @SyncVar() pushPinStyle: number = 0;
+  /** CSS left/top of `.push-pin` on the paper face (randomized). */
+  @SyncVar() pushPinLeft: number = -4;
+  @SyncVar() pushPinTop: number = -20;
 
   /** When true, width/height edits are blocked in the inventory editor. */
   @SyncVar() isSizeLocked: boolean = false;
@@ -79,17 +82,23 @@ export class TextNote extends TabletopObject {
 
   /** Visual paper look only — size stays free (width/height independent). */
   applyPaperStyle(style: PaperStyle | string) {
-    this.paperStyle = style || 'none';
-    if (this.paperStyle === 'a4') {
-      // Seed A4 proportion once when switching style; later resize stays free.
-      const w = this.width > 0 ? this.width : 4;
-      this.setCommonValue('width', w);
-      this.setCommonValue('height', a4HeightForWidth(w));
-    } else if (this.paperStyle === 'sticky') {
-      const s = Math.min(this.width || 2, this.height || 2, 2.5) || 2;
-      this.setCommonValue('width', s);
-      this.setCommonValue('height', s);
-    }
+    this.mutateAppearance(() => {
+      this.paperStyle = style || 'none';
+      if (this.paperStyle === 'a4') {
+        // Seed A4 proportion once when switching style; later resize stays free.
+        const w = this.width > 0 ? this.width : 4;
+        const widthEl = this.getElement('width', this.commonDataElement);
+        const heightEl = this.getElement('height', this.commonDataElement);
+        if (widthEl) widthEl.value = w;
+        if (heightEl) heightEl.value = a4HeightForWidth(w);
+      } else if (this.paperStyle === 'sticky') {
+        const s = Math.min(this.width || 2, this.height || 2, 2.5) || 2;
+        const widthEl = this.getElement('width', this.commonDataElement);
+        const heightEl = this.getElement('height', this.commonDataElement);
+        if (widthEl) widthEl.value = s;
+        if (heightEl) heightEl.value = s;
+      }
+    });
   }
   get fontSize(): number { return this.getCommonValue('fontsize', 1); }
   set fontSize(fontSize: number) { this.setCommonValue('fontsize', fontSize); }
@@ -138,11 +147,14 @@ export class TextNote extends TabletopObject {
     return this.getImageFile('back') || ImageFile.Empty;
   }
 
+  /** True when a dedicated back-face image is set. */
+  get hasBackImage(): boolean {
+    return !!(this.backImage && this.backImage.url);
+  }
+
   override get imageFile(): ImageFile {
-    if (this.isFlipped) {
-      const back = this.backImage;
-      if (back && back.url) return back;
-    }
+    // Flipped + back art → show back. Flipped without back → keep front (CSS 180°).
+    if (this.isFlipped && this.hasBackImage) return this.backImage;
     const front = this.frontImage;
     if (front && front.url) return front;
     return super.imageFile;

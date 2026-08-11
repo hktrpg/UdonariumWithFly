@@ -22,7 +22,7 @@ import {
 import {
   isActivePushPinStyle,
   pinAngleFromId,
-  randomPinAngle,
+  randomPinOffset,
   randomPushPinStyle,
   TOKEN_FRAME_STYLES,
 } from '@udonarium/table-fx/push-pin.util';
@@ -57,13 +57,17 @@ export class CharacterFxMenuService {
   makeAuraMenu(character: GameCharacter): ContextMenuAction {
     const names = this.auraNames;
     const auraLabel = (i: number) => `${character.aura == i ? '◉' : '○'} ${i < 0 ? this.i18n.t('fx.none') : this.auraDisplayName(i, names[i])}`;
+    const setAura = (i: number) => {
+      character.mutateAppearance(() => { character.aura = i; });
+      EventSystem.trigger('UPDATE_INVENTORY', null);
+    };
     return {
       name: this.i18n.t('fx.aura'),
       action: null,
       subActions: [
         {
           name: auraLabel(-1),
-          action: () => { character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null); },
+          action: () => setAura(-1),
           nameUpdate: () => auraLabel(-1),
           checkBox: 'radio'
         },
@@ -72,14 +76,14 @@ export class CharacterFxMenuService {
           name: auraLabel(i),
           colorSample: true,
           sampleColor: AURA_SAMPLE_COLORS[i],
-          action: () => { character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null); },
+          action: () => setAura(i),
           nameUpdate: () => auraLabel(i),
           checkBox: 'radio' as const
         })),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.clearAura'),
-          action: () => { character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null); },
+          action: () => setAura(-1),
           disabled: character.aura === -1
         }
       ]
@@ -92,7 +96,10 @@ export class CharacterFxMenuService {
       action: null,
       subActions: RING_OPTIONS.map(id => ({
         name: `${character.floorRing === id ? '◉' : '○'} ${this.i18n.t(`fx.ring.${id}`)}`,
-        action: () => { character.floorRing = id; EventSystem.trigger('UPDATE_INVENTORY', null); },
+        action: () => {
+          character.mutateAppearance(() => { character.floorRing = id; });
+          EventSystem.trigger('UPDATE_INVENTORY', null);
+        },
         nameUpdate: () => `${character.floorRing === id ? '◉' : '○'} ${this.i18n.t(`fx.ring.${id}`)}`,
         checkBox: 'radio' as const
       }))
@@ -106,10 +113,12 @@ export class CharacterFxMenuService {
       subActions: TOKEN_FRAME_STYLES.map(id => ({
         name: `${character.tokenFrame === id ? '◉' : '○'} ${this.i18n.t(`fx.tokenFrame.${id}`)}`,
         action: () => {
-          character.tokenFrame = id;
-          if (id === 'polaroid' && !character.tokenFrameCaption) {
-            character.tokenFrameCaption = character.name || '';
-          }
+          character.mutateAppearance(() => {
+            character.tokenFrame = id;
+            if (id === 'polaroid' && !character.tokenFrameCaption) {
+              character.tokenFrameCaption = character.name || '';
+            }
+          });
           EventSystem.trigger('UPDATE_INVENTORY', null);
         },
         nameUpdate: () => `${character.tokenFrame === id ? '◉' : '○'} ${this.i18n.t(`fx.tokenFrame.${id}`)}`,
@@ -127,30 +136,39 @@ export class CharacterFxMenuService {
         contextMenuToggleCheck({
           get: () => !!host.pushPin,
           set: v => {
-            host.pushPin = v;
-            if (host.pushPin) this.ensureHostPushPin(host);
+            host.mutateAppearance(() => {
+              host.pushPin = v;
+              if (host.pushPin) this.ensureHostPushPin(host);
+            });
           },
           on: this.i18n.t('fx.pushPin.on'),
           off: this.i18n.t('fx.pushPin.off'),
           after,
         }),
-        {
-          name: this.i18n.t('fx.pushPin.reangle'),
-          action: () => {
-            host.pushPinAngle = randomPinAngle();
-            host.pushPinStyle = randomPushPinStyle();
-            host.pushPin = true;
-            after();
-          },
-        },
       ]
     };
   }
 
-  /** Assign angle + active style {2,3,6,7} when enabling a pin. */
+  /** Assign angle + style + position when enabling a pin. */
   private ensureHostPushPin(host: GameCharacter | TextNote) {
     if (!host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
     if (!isActivePushPinStyle(host.pushPinStyle)) host.pushPinStyle = randomPushPinStyle();
+    this.applyRandomPinOffset(host);
+  }
+
+  private applyRandomPinOffset(host: GameCharacter | TextNote) {
+    const GRID = 50;
+    let widthPx = GRID;
+    if (host instanceof TextNote) {
+      widthPx = Math.max(1, host.width) * GRID;
+    } else {
+      widthPx = Math.max(1, host.size) * GRID;
+      // Framed tokens grow outward with padding (~7–8px each side).
+      if (host.tokenFrame && host.tokenFrame !== 'none') widthPx += 16;
+    }
+    const off = randomPinOffset(widthPx);
+    host.pushPinLeft = off.left;
+    host.pushPinTop = off.top;
   }
 
   makeClueLinkMenu(from: GameCharacter | TextNote): ContextMenuAction {
@@ -174,14 +192,7 @@ export class CharacterFxMenuService {
             get: () => isLinked(t),
             set: (on) => {
               if (on) {
-                if (!from.pushPin) {
-                  from.pushPin = true;
-                  this.ensureHostPushPin(from);
-                }
-                if (!t.pushPin) {
-                  t.pushPin = true;
-                  this.ensureHostPushPin(t);
-                }
+                // Yarn does not require a visible push pin.
                 if (!isLinked(t)) {
                   ClueLink.create(from.identifier, t.identifier, { tableIdentifier: viewId });
                 }
@@ -367,22 +378,26 @@ export class CharacterFxMenuService {
         ContextMenuSeparator,
         rangeSub(this.i18n.t('fx.visionRange'), VISION_RANGE_PRESETS,
           () => character.visionRangeGrid,
-          n => { character.visionRange = n; }),
+          n => { character.mutateAppearance(() => { character.visionRange = n; }); }),
         rangeSub(this.i18n.t('fx.brightLight'), BRIGHT_LIGHT_PRESETS,
           () => character.brightLightGrid,
           n => {
-            character.brightLight = n;
-            if (character.dimLightGrid < n) character.dimLight = n;
+            character.mutateAppearance(() => {
+              character.brightLight = n;
+              if (character.dimLightGrid < n) character.dimLight = n;
+            });
           }),
         rangeSub(this.i18n.t('fx.dimLight'), DIM_LIGHT_PRESETS,
           () => character.dimLightGrid,
-          n => { character.dimLight = n; }),
+          n => { character.mutateAppearance(() => { character.dimLight = n; }); }),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.clearLight'),
           action: () => {
-            character.brightLight = 0;
-            character.dimLight = 0;
+            character.mutateAppearance(() => {
+              character.brightLight = 0;
+              character.dimLight = 0;
+            });
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           disabled: character.brightLightGrid <= 0 && character.dimLightGrid <= 0,
@@ -393,20 +408,21 @@ export class CharacterFxMenuService {
 
   makeImageEffectMenu(character: GameCharacter): ContextMenuAction {
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
+    const setFx = (fn: () => void) => character.mutateAppearance(fn);
     return {
       name: this.i18n.t('fx.imageEffects'),
       action: null,
       subActions: [
         contextMenuToggleCheck({
           get: () => character.isInverse,
-          set: (v) => { character.isInverse = v; },
+          set: (v) => { setFx(() => { character.isInverse = v; }); },
           on: this.i18n.t('fx.inverseOn'),
           off: this.i18n.t('fx.inverseOff'),
           after,
         }),
         contextMenuToggleCheck({
           get: () => character.isFlipVertical,
-          set: (v) => { character.isFlipVertical = v; },
+          set: (v) => { setFx(() => { character.isFlipVertical = v; }); },
           on: this.i18n.t('fx.flipVerticalOn'),
           off: this.i18n.t('fx.flipVerticalOff'),
           after,
@@ -414,35 +430,35 @@ export class CharacterFxMenuService {
         ContextMenuSeparator,
         contextMenuToggleCheck({
           get: () => character.isHollow,
-          set: (v) => { character.isHollow = v; },
+          set: (v) => { setFx(() => { character.isHollow = v; }); },
           on: this.i18n.t('fx.blurOn'),
           off: this.i18n.t('fx.blurOff'),
           after,
         }),
         contextMenuToggleCheck({
           get: () => character.isGrayscale,
-          set: (v) => { character.isGrayscale = v; },
+          set: (v) => { setFx(() => { character.isGrayscale = v; }); },
           on: this.i18n.t('fx.grayscaleOn'),
           off: this.i18n.t('fx.grayscaleOff'),
           after,
         }),
         contextMenuToggleCheck({
           get: () => character.isSepia,
-          set: (v) => { character.isSepia = v; },
+          set: (v) => { setFx(() => { character.isSepia = v; }); },
           on: this.i18n.t('fx.sepiaOn'),
           off: this.i18n.t('fx.sepiaOff'),
           after,
         }),
         contextMenuToggleCheck({
           get: () => character.isMatrix,
-          set: (v) => { character.isMatrix = v; },
+          set: (v) => { setFx(() => { character.isMatrix = v; }); },
           on: this.i18n.t('fx.matrixOn'),
           off: this.i18n.t('fx.matrixOff'),
           after,
         }),
         contextMenuToggleCheck({
           get: () => character.isContrast,
-          set: (v) => { character.isContrast = v; },
+          set: (v) => { setFx(() => { character.isContrast = v; }); },
           on: this.i18n.t('fx.contrastOn'),
           off: this.i18n.t('fx.contrastOff'),
           after,
@@ -451,8 +467,10 @@ export class CharacterFxMenuService {
         contextMenuToggleCheck({
           get: () => character.isBlackPaint,
           set: (v) => {
-            character.isBlackPaint = v;
-            if (v) character.isWhitePaint = false;
+            setFx(() => {
+              character.isBlackPaint = v;
+              if (v) character.isWhitePaint = false;
+            });
           },
           on: this.i18n.t('fx.silhouetteOn'),
           off: this.i18n.t('fx.silhouetteOff'),
@@ -461,8 +479,10 @@ export class CharacterFxMenuService {
         contextMenuToggleCheck({
           get: () => character.isWhitePaint,
           set: (v) => {
-            character.isWhitePaint = v;
-            if (v) character.isBlackPaint = false;
+            setFx(() => {
+              character.isWhitePaint = v;
+              if (v) character.isBlackPaint = false;
+            });
           },
           on: this.i18n.t('fx.whiteSilhouetteOn'),
           off: this.i18n.t('fx.whiteSilhouetteOff'),
@@ -472,7 +492,7 @@ export class CharacterFxMenuService {
         {
           name: this.i18n.t('fx.resetImageEffects'),
           action: () => {
-            clearImageEffects(character);
+            setFx(() => clearImageEffects(character));
             after();
           },
           disabled: !anyImageEffect(character),

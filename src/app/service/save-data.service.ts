@@ -12,7 +12,6 @@ import { VideoState } from '@udonarium/core/file-storage/video-file';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
-import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PromiseQueue } from '@udonarium/core/system/util/promise-queue';
 import { EventSystem } from '@udonarium/core/system';
@@ -23,12 +22,6 @@ import { Jukebox } from '@udonarium/Jukebox';
 import { Room } from '@udonarium/room';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
-import { GameTable } from '@udonarium/game-table';
-import { GameTableMask } from '@udonarium/game-table-mask';
-import { Terrain } from '@udonarium/terrain';
-import { TableDrawing } from '@udonarium/table-fx/table-drawing';
-import { TableLight } from '@udonarium/table-fx/table-light';
-import { TableWall } from '@udonarium/table-fx/table-wall';
 
 import Beautify from 'vkbeautify';
 
@@ -62,19 +55,15 @@ import {
   STATE_ZIP_FILE,
   isMediaFileName,
   mediaHashFromName,
+  computeStateFingerprint,
   sha256Hex,
 } from './folder-backup-layout';
+import { remapImageIdentifiers as remapXmlImageIds, remapIdsInJson as remapJsonImageIds } from './save-xml-remap.util';
+import { reparentOrphanTableFx } from './tabletop-orphan-fx.util';
 
 type UpdateCallback = (percent: number) => void;
 
 export type SaveIncludeAudioAskContext = 'zip' | 'folder';
-
-const IMAGE_ID_ATTRS = [
-  'imageIdentifier',
-  'toImageIdentifier',
-  'backgroundImageIdentifier',
-  'backgroundImageIdentifier2',
-] as const;
 
 @Injectable({
   providedIn: 'root'
@@ -363,56 +352,12 @@ export class SaveDataService {
       console.warn('prepareRoomSnapshotForSave: flushLivePosesToView failed', e);
     }
     try {
-      this.reparentOrphanTableFx();
+      reparentOrphanTableFx();
     } catch (e) {
       console.warn('prepareRoomSnapshotForSave: reparentOrphanTableFx failed', e);
     }
     // Strip temporary standing-mask FX so they are not baked into the ZIP permanently.
     EventSystem.trigger('BEFORE_ROOM_SAVE', null);
-  }
-
-  /** Attach parent-less table FX nodes under a valid GameTable so Room.innerXml includes them. */
-  private reparentOrphanTableFx() {
-    const tables = ObjectStore.instance.getObjects(GameTable);
-    if (tables.length < 1) return;
-    const fallback =
-      TableSelecter.instance.viewTable
-      || ObjectStore.instance.get<GameTable>(TableSelecter.instance.viewTableIdentifier)
-      || tables[0];
-
-    const resolveTable = (preferredId?: string): GameTable => {
-      if (preferredId) {
-        const t = ObjectStore.instance.get<GameTable>(preferredId);
-        if (t) return t;
-      }
-      return fallback;
-    };
-
-    const reparent = (node: ObjectNode, preferredId?: string) => {
-      if (!node || node.parent) return;
-      const table = resolveTable(preferredId);
-      if (table) table.appendChild(node);
-    };
-
-    for (const mask of ObjectStore.instance.getObjects(GameTableMask)) {
-      if (mask.parent) continue;
-      const tid = mask.tableIdentifier || mask.placementTableIds[0] || '';
-      reparent(mask, tid);
-    }
-    for (const terrain of ObjectStore.instance.getObjects(Terrain)) {
-      if (terrain.parent) continue;
-      const tid = terrain.tableIdentifier || terrain.placementTableIds[0] || '';
-      reparent(terrain, tid);
-    }
-    for (const wall of ObjectStore.instance.getObjects(TableWall)) {
-      reparent(wall);
-    }
-    for (const light of ObjectStore.instance.getObjects(TableLight)) {
-      reparent(light);
-    }
-    for (const drawing of ObjectStore.instance.getObjects(TableDrawing)) {
-      reparent(drawing);
-    }
   }
 
   /** All COMPLETE / local-asset images in the library (not only XML-referenced). */
@@ -521,15 +466,11 @@ export class SaveDataService {
     }
 
     const fileFingerprints: Record<string, string> = {};
-    const fpParts: string[] = [];
     for (const file of stateFiles) {
       const buf = await file.arrayBuffer();
-      const fp = await sha256Hex(buf);
-      fileFingerprints[file.name] = fp;
-      fpParts.push(`${file.name}:${fp}`);
+      fileFingerprints[file.name] = await sha256Hex(buf);
     }
-    fpParts.sort();
-    const stateFingerprint = await sha256Hex(fpParts.join('|'));
+    const stateFingerprint = await computeStateFingerprint(fileFingerprints);
 
     if (stateFingerprint !== prevStateFp) {
       const stateZip = await archiver.createZipBlobAsync(stateFiles);
@@ -706,96 +647,11 @@ export class SaveDataService {
 
   /** Rewrite image ids in exported XML after materializing asset URLs to content hashes. */
   private remapImageIdentifiers(xml: string, idRemap: Map<string, string>): string {
-    if (!xml || !idRemap.size) return xml;
-    const root = XmlUtil.xml2element(xml);
-    if (!root || !root.ownerDocument) {
-      // Fallback: never use global replace (can corrupt coordinates / unrelated text).
-      return xml;
-    }
-    const doc = root.ownerDocument;
-
-    const mapId = (id: string | null): string | null => {
-      if (!id) return id;
-      return idRemap.has(id) ? idRemap.get(id) : id;
-    };
-
-    for (const node of Array.from(doc.querySelectorAll('*[type="image"]'))) {
-      const text = (node.textContent || '').trim();
-      if (text && idRemap.has(text)) node.textContent = idRemap.get(text);
-      const cv = node.getAttribute('currentValue');
-      const mappedCv = mapId(cv);
-      if (cv && mappedCv && cv !== mappedCv) node.setAttribute('currentValue', mappedCv);
-    }
-
-    for (const attr of IMAGE_ID_ATTRS) {
-      for (const node of Array.from(doc.querySelectorAll(`*[${attr}]`))) {
-        const v = node.getAttribute(attr);
-        const mapped = mapId(v);
-        if (v && mapped && v !== mapped) node.setAttribute(attr, mapped);
-      }
-    }
-
-    for (const node of Array.from(doc.querySelectorAll('*[attachedImageIdentifiers]'))) {
-      const v = node.getAttribute('attachedImageIdentifiers');
-      if (!v) continue;
-      const next = v.trim().split(/\s+/).map(id => mapId(id) || id).join(' ');
-      if (next !== v) node.setAttribute('attachedImageIdentifiers', next);
-    }
-
-    // image-tag identifiers are imagetag_<imageId>
-    for (const node of Array.from(doc.querySelectorAll('image-tag'))) {
-      const syncId = node.getAttribute('syncId');
-      if (syncId && syncId.startsWith('imagetag_')) {
-        const imgId = syncId.slice('imagetag_'.length);
-        if (idRemap.has(imgId)) {
-          node.setAttribute('syncId', 'imagetag_' + idRemap.get(imgId));
-        }
-      }
-      const imgAttr = node.getAttribute('imageIdentifier');
-      const mappedImg = mapId(imgAttr);
-      if (imgAttr && mappedImg && imgAttr !== mappedImg) {
-        node.setAttribute('imageIdentifier', mappedImg);
-      }
-    }
-
-    // JSON SyncVars that may embed image ids (token FX, combat entries, scene snaps).
-    for (const node of Array.from(doc.querySelectorAll('*'))) {
-      if (!node.attributes) continue;
-      for (const attr of Array.from(node.attributes)) {
-        const raw = attr.value;
-        if (!raw || (raw[0] !== '{' && raw[0] !== '[')) continue;
-        try {
-          const parsed = JSON.parse(raw);
-          const next = this.remapIdsInJson(parsed, idRemap);
-          const serialized = JSON.stringify(next);
-          if (serialized !== raw) node.setAttribute(attr.name, serialized);
-        } catch {
-          /* not JSON */
-        }
-      }
-    }
-
-    const declaration = xml.trimStart().startsWith('<?xml')
-      ? xml.slice(0, xml.indexOf('?>') + 2) + '\n'
-      : '';
-    return declaration + new XMLSerializer().serializeToString(root);
+    return remapXmlImageIds(xml, idRemap);
   }
 
   private remapIdsInJson(value: any, idRemap: Map<string, string>): any {
-    if (typeof value === 'string') {
-      return idRemap.has(value) ? idRemap.get(value) : value;
-    }
-    if (Array.isArray(value)) {
-      return value.map(v => this.remapIdsInJson(v, idRemap));
-    }
-    if (value && typeof value === 'object') {
-      const out: any = {};
-      for (const key of Object.keys(value)) {
-        out[key] = this.remapIdsInJson(value[key], idRemap);
-      }
-      return out;
-    }
-    return value;
+    return remapJsonImageIds(value, idRemap);
   }
 
   private saveAsync(files: File[], zipName: string, updateCallback?: UpdateCallback): Promise<void> {

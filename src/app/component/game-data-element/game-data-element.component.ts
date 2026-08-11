@@ -224,10 +224,22 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   private setUpdateTimer() {
     clearTimeout(this.updateTimer);
     this.updateTimer = setTimeout(() => {
+      const needsAppearance = !!(this.tabletopObject && this.isAppearancePlacementField(this.gameDataElement.name));
+      // Seed other maps from pre-edit live before mutating footprint DataElements.
+      if (needsAppearance) this.tabletopObject.ensureAppearanceBackfilled();
       if (this.gameDataElement.name !== this.name) this.gameDataElement.name = this.name;
       if (this.gameDataElement.currentValue !== this.currentValue) this.gameDataElement.currentValue = this.currentValue;
       if (this.gameDataElement.value !== this.value) this.gameDataElement.value = this.value;
+      // Per-map appearance (size/height/altitude) must not stay only on shared DataElements.
+      if (needsAppearance) {
+        this.tabletopObject.syncAppearanceToCurrentViewPlacement();
+      }
       this.updateTimer = null;
     }, 66);
+  }
+
+  private isAppearancePlacementField(name: string): boolean {
+    return name === 'size' || name === 'height' || name === 'altitude'
+      || name === 'width' || name === 'depth' || name === 'length';
   }
 }

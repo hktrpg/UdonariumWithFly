@@ -78,11 +78,15 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   get opacity(): number { return this.gameTableMask.opacity; }
   get imageFile(): ImageFile { return this.gameTableMask.imageFile; }
   get isLock(): boolean { return this.gameTableMask.isLock; }
-  set isLock(isLock: boolean) { this.gameTableMask.isLock = isLock; }
+  set isLock(isLock: boolean) { this.gameTableMask.mutateAppearance(() => { this.gameTableMask.isLock = isLock; }); }
   get blendType(): number { return this.gameTableMask.blendType; }
-  set blendType(blendType: number) { this.gameTableMask.blendType = blendType; }
+  set blendType(blendType: number) {
+    this.gameTableMask.mutateAppearance(() => { this.gameTableMask.blendType = blendType; });
+  }
   get borderType(): number { return this.gameTableMask.borderType; }
-  set borderType(borderType: number) { this.gameTableMask.borderType = borderType; }
+  set borderType(borderType: number) {
+    this.gameTableMask.mutateAppearance(() => { this.gameTableMask.borderType = borderType; });
+  }
 
   get fontSize(): number { return this.gameTableMask.fontsize; }
   set fontSize(fontSize: number) { this.gameTableMask.fontsize = fontSize; }
@@ -101,8 +105,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
   set textPosition(v: string) {
     if (!this.gameTableMask) return;
-    this.gameTableMask.textPosition =
-      (GameTableMaskComponent.TEXT_POSITIONS as readonly string[]).includes(v) ? v : 'middle-center';
+    const next = (GameTableMaskComponent.TEXT_POSITIONS as readonly string[]).includes(v) ? v : 'middle-center';
+    this.gameTableMask.mutateAppearance(() => { this.gameTableMask.textPosition = next; });
   }
 
   get textPositionClass(): string {
@@ -534,7 +538,9 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
           name: this.i18n.t('mask.menu.2'), action: null, subActions: [
             {
               name: this.i18n.t('mask.menu.3'), action: () => {
-                selectedGameTableMasks().forEach(gameTableMask => gameTableMask.isLock = true);
+                selectedGameTableMasks().forEach(gameTableMask => {
+                  gameTableMask.mutateAppearance(() => { gameTableMask.isLock = true; });
+                });
                 SoundEffect.play(PresetSound.lock);
               }
             },
@@ -585,7 +591,9 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       (this.isGMMode ? ContextMenuSeparator : null),
       contextMenuToggleCheck({
         get: () => !!this.gameTableMask.affectsLight,
-        set: (v) => { this.gameTableMask.affectsLight = v; },
+        set: (v) => {
+          this.gameTableMask.mutateAppearance(() => { this.gameTableMask.affectsLight = v; });
+        },
         on: this.i18n.t('mask.menu.9'),
         off: this.i18n.t('mask.menu.10'),
       }),

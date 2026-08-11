@@ -169,7 +169,7 @@ export class FolderBackupListComponent implements OnInit, OnDestroy {
   }
 
   private refreshTitle() {
-    this.modalService.title = this.panelService.title = this.i18n.t('folderBackup.loadTitle');
+    this.modalService.title = this.panelService.title = this.i18n.t('menu.folderBackup.loadRoom');
   }
 
   private revokeRoomUrls(room: RoomBackupInfo) {

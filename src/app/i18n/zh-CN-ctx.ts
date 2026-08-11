@@ -11,7 +11,7 @@ export const zhCN_ctx: I18nDictionary = {
 
   'fx.aura': '光环', 'fx.none': '无', 'fx.clearAura': '清除光环', 'fx.ring': '光环特效', 'fx.ring.none': '无', 'fx.ring.fire': '火环', 'fx.ring.magic': '魔法阵', 'fx.ring.tech': '科技环', 'fx.ring.eldritch': '异界环', 'fx.ring.holy': '圣光环', 'fx.status': '状态',
   'fx.tokenFrame': '外框', 'fx.tokenFrame.none': '无', 'fx.tokenFrame.polaroid': '拍立得', 'fx.tokenFrame.photo': '照片', 'fx.tokenFrame.card': '卡牌',
-  'fx.pushPin': '图钉', 'fx.pushPin.on': '☑ 显示图钉', 'fx.pushPin.off': '☐ 显示图钉', 'fx.pushPin.reangle': '随机图钉角度／样式',
+  'fx.pushPin': '图钉', 'fx.pushPin.on': '☑ 显示图钉', 'fx.pushPin.off': '☐ 显示图钉',
   'fx.clueLink': '红绳', 'fx.clueLink.to': '连到 {{name}}', 'fx.clueLink.clear': '移除此物件的红绳',
   'fx.paperStyle': '纸张外形', 'fx.paperStyle.none': '无', 'fx.paperStyle.a4': 'A4 纸', 'fx.paperStyle.sticky': '便利贴',
   'fx.status.blinded': '目盲', 'fx.status.charmed': '魅惑', 'fx.status.deafened': '耳聋', 'fx.status.frightened': '恐慌', 'fx.status.grappled': '被擒', 'fx.status.incapacitated': '失能', 'fx.status.invisible': '隐形', 'fx.status.paralyzed': '麻痹', 'fx.status.petrified': '石化', 'fx.status.poisoned': '中毒', 'fx.status.prone': '倒地', 'fx.status.restrained': '束缚', 'fx.status.stunned': '震慑', 'fx.status.unconscious': '昏迷', 'fx.status.exhaustion': '力竭', 'fx.status.dead': '死亡',

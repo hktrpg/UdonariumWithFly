@@ -73,11 +73,19 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
   set textAlign(v: string) {
     if (!this.textNote) return;
-    this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+    this.textNote.mutateAppearance(() => {
+      this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+    });
   }
   get imageFile(): ImageFile { return this.textNote.imageFile; }
+  get isFlipped(): boolean { return !!this.textNote?.isFlipped; }
+  get hasBackImage(): boolean { return !!this.textNote?.hasBackImage; }
+  /** Flipped with no back art: keep front content and spin the face 180°. */
+  get isContentFlipped(): boolean { return this.isFlipped && !this.hasBackImage; }
+  /** Flipped with back art: replace face media with the back image. */
+  get showBackFace(): boolean { return this.isFlipped && this.hasBackImage; }
   get rotate(): number { return this.textNote.rotate; }
-  set rotate(rotate: number) { this.textNote.rotate = rotate; }
+  set rotate(rotate: number) { this.textNote.mutateAppearance(() => { this.textNote.rotate = rotate; }); }
   get height(): number { return MathUtil.clampMin(this.textNote.height); }
   get width(): number { return MathUtil.clampMin(this.textNote.width); }
   get altitude(): number { return this.textNote.altitude; }
@@ -97,14 +105,20 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
   set isUpright(isUpright: boolean) {
     if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps
-    this.textNote.isUpright = isUpright;
+    this.textNote.mutateAppearance(() => { this.textNote.isUpright = isUpright; });
   }
   get isAltitudeIndicate(): boolean { return this.textNote.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.textNote.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isAltitudeIndicate = isAltitudeIndicate; });
+  }
   get isLocked(): boolean { return this.textNote.isLocked; }
-  set isLocked(isLocked: boolean) { this.textNote.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isLocked = isLocked; });
+  }
   get isShowTitle(): boolean { return this.textNote.isShowTitle; }
-  set isShowTitle(isShowTitle: boolean) { this.textNote.isShowTitle = isShowTitle; }
+  set isShowTitle(isShowTitle: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isShowTitle = isShowTitle; });
+  }
   get titleBgColor(): string {
     const c = this.textNote.titleBgColor || '#1e1e1e';
     return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#1e1e1e';
@@ -114,7 +128,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     return StringUtil.textShadowColor(this.titleBgColor, '#f2f2f2', '#222222');
   }
   get isWhiteOut(): boolean { return this.textNote.isWhiteOut; }
-  set isWhiteOut(isWhiteOut: boolean) { this.textNote.isWhiteOut = isWhiteOut; }
+  set isWhiteOut(isWhiteOut: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isWhiteOut = isWhiteOut; });
+  }
   get isGhosted(): boolean { return !!this.textNote?.isGhosted; }
   get contentKind() { return this.textNote?.contentKind || 'text'; }
   get isPdfContent(): boolean { return this.contentKind === 'pdf'; }
@@ -129,6 +145,12 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
   get pushPin(): boolean { return !!this.textNote?.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.textNote?.pushPinAngle || 0; }
+  get pushPinLeft(): number {
+    return typeof this.textNote?.pushPinLeft === 'number' ? this.textNote.pushPinLeft : -4;
+  }
+  get pushPinTop(): number {
+    return typeof this.textNote?.pushPinTop === 'number' ? this.textNote.pushPinTop : -20;
+  }
   get pushPinColor(): string { return this.textNote?.pushPinColor || 'red'; }
   get pushPinSrc(): string {
     return pushPinAssetUrl(
@@ -443,35 +465,32 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       z: this.textNote.posZ
     };
 
+    const after = () => this.changeDetector.markForCheck();
     const actions: ContextMenuAction[] = [
-      {
-        name: this.isLocked ? this.i18n.t('textNote.menu.2') : this.i18n.t('textNote.menu.3'),
-        nameUpdate: () => this.isLocked ? this.i18n.t('textNote.menu.2') : this.i18n.t('textNote.menu.3'),
-        action: () => {
-          this.isLocked = !this.isLocked;
-          SoundEffect.play(this.isLocked ? PresetSound.lock : PresetSound.unlock);
-          this.changeDetector.markForCheck();
+      // Toggles: ☑/☐ + feature name (current state), never the opposite action.
+      contextMenuToggleCheck({
+        get: () => this.isLocked,
+        set: (v) => {
+          this.isLocked = v;
+          SoundEffect.play(v ? PresetSound.lock : PresetSound.unlock);
         },
-        checkBox: 'check',
+        on: this.i18n.t('textNote.menu.2'),
+        off: this.i18n.t('textNote.menu.3'),
+        after,
         hotkey: 'L',
-      },
-      {
-        name: this.textNote.isSelfOnly
-          ? this.i18n.t('note.showEveryone')
-          : this.i18n.t('note.selfOnly'),
-        nameUpdate: () => this.textNote.isSelfOnly
-          ? this.i18n.t('note.showEveryone')
-          : this.i18n.t('note.selfOnly'),
-        action: () => {
-          this.textNote.setSelfOnly(!this.textNote.isSelfOnly);
-          this.changeDetector.markForCheck();
-        },
-      },
+      }),
+      contextMenuToggleCheck({
+        get: () => this.textNote.isSelfOnly,
+        set: (v) => { this.textNote.setSelfOnly(v); },
+        label: this.i18n.t('note.selfOnly'),
+        after,
+      }),
       contextMenuToggleCheck({
         get: () => this.textNote.isFlipped,
-        set: v => { this.textNote.isFlipped = v; },
-        on: this.i18n.t('note.flipped'),
-        off: this.i18n.t('note.frontFace'),
+        set: (v) => { this.textNote.mutateAppearance(() => { this.textNote.isFlipped = v; }); },
+        label: this.i18n.t('note.flipped'),
+        tip: this.i18n.t('note.flipTip'),
+        after,
       }),
       ...(this.is2DMode ? [
         {
@@ -491,26 +510,29 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       ] : []),
       this.characterFxMenu.makeClueLinkMenu(this.textNote),
       ContextMenuSeparator,
-      {
-        name: this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
-        nameUpdate: () => this.isUpright ? this.i18n.t('textNote.menu.4') : this.i18n.t('textNote.menu.5'),
-        action: () => { this.isUpright = !this.isUpright; this.changeDetector.markForCheck(); },
-        checkBox: 'check',
+      contextMenuToggleCheck({
+        get: () => this.isUpright,
+        set: (v) => { this.isUpright = v; },
+        on: this.i18n.t('textNote.menu.4'),
+        off: this.i18n.t('textNote.menu.5'),
+        after,
         disabled: this.is2DMode,
         tip: this.is2DMode ? this.i18n.t('note.upright2dLocked') : undefined,
-      },
-      {
-        name: this.isShowTitle ? this.i18n.t('textNote.menu.6') : this.i18n.t('textNote.menu.7'),
-        nameUpdate: () => this.isShowTitle ? this.i18n.t('textNote.menu.6') : this.i18n.t('textNote.menu.7'),
-        action: () => { this.isShowTitle = !this.isShowTitle; this.changeDetector.markForCheck(); },
-        checkBox: 'check'
-      },
-      {
-        name: this.isWhiteOut ? this.i18n.t('textNote.menu.8') : this.i18n.t('textNote.menu.9'),
-        nameUpdate: () => this.isWhiteOut ? this.i18n.t('textNote.menu.8') : this.i18n.t('textNote.menu.9'),
-        action: () => { this.isWhiteOut = !this.isWhiteOut; this.changeDetector.markForCheck(); },
-        checkBox: 'check'
-      },
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isShowTitle,
+        set: (v) => { this.isShowTitle = v; },
+        on: this.i18n.t('textNote.menu.6'),
+        off: this.i18n.t('textNote.menu.7'),
+        after,
+      }),
+      contextMenuToggleCheck({
+        get: () => this.isWhiteOut,
+        set: (v) => { this.isWhiteOut = v; },
+        on: this.i18n.t('textNote.menu.8'),
+        off: this.i18n.t('textNote.menu.9'),
+        after,
+      }),
       ...(this.isTextContent ? [{
         name: this.i18n.t('note.fieldAlign'),
         action: null,
@@ -522,12 +544,13 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         })),
       }] : []),
       ContextMenuSeparator,
-      {
-        name: this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
-        nameUpdate: () => this.isAltitudeIndicate ? this.i18n.t('textNote.menu.10') : this.i18n.t('textNote.menu.11'),
-        action: () => { this.isAltitudeIndicate = !this.isAltitudeIndicate; this.changeDetector.markForCheck(); },
-        checkBox: 'check'
-      },
+      contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('textNote.menu.10'),
+        off: this.i18n.t('textNote.menu.11'),
+        after,
+      }),
       {
         name: this.i18n.t('textNote.menu.12'),
         action: () => {

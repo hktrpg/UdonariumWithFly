@@ -100,6 +100,17 @@ export class TabletopService {
     this.refreshCacheAll();
     TabletopObject.migrateUnboundTablePieces();
     EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', 900, event => {
+        // After ObjectSynchronizer (prio 1000) applies remote SyncVars, restore this
+        // client's view pose so dual-map appearance/coords stay per-map.
+        if (event.isSendFromSelf) return;
+        const id = event.data?.identifier as string;
+        if (!id) return;
+        const obj = ObjectStore.instance.get(id);
+        if (obj instanceof TabletopObject) {
+          TabletopObject.reprojectForLocalView(obj);
+        }
+      })
       .on('BEFORE_VIEW_TABLE_CHANGE', () => {
         // Run deferred drag writes first; MovableDirective then pins _pos → placements.
         this.batchService.flushNow();
@@ -155,9 +166,10 @@ export class TabletopService {
         const deletedId = event.data.identifier as string;
         // Skip self-echo: after ZIP reload, syncIds are reused and cleanup would
         // destroy newly parsed clue links that still reference those endpoints.
-        if (!event.isSendFromSelf
-          && deletedId
-          && (event.data.aliasName === GameCharacter.aliasName || event.data.aliasName === TextNote.aliasName)) {
+        if (ClueLink.shouldCleanupOnEndpointDelete({
+          isSendFromSelf: event.isSendFromSelf,
+          aliasName: event.data.aliasName,
+        }) && deletedId) {
           ClueLink.cleanupFor(deletedId);
         }
         let aliasName = event.data.aliasName;

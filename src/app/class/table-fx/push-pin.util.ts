@@ -18,6 +18,24 @@ export function randomPinAngle(): number {
   return Math.round((Math.random() * 50 - 25) * 10) / 10;
 }
 
+/** Default CSS box for `.push-pin` (must stay in sync with clue-board.css). */
+export const PIN_BOX = { left: -4, top: -20, width: 30, height: 38, tipX: 0.5, tipY: 0.5 };
+
+/**
+ * Random pin offset along the host top edge (corkboard look).
+ * `hostWidthPx` = image-box / paper width in CSS pixels.
+ */
+export function randomPinOffset(hostWidthPx: number): { left: number; top: number } {
+  const w = Math.max(PIN_BOX.width, hostWidthPx || 50);
+  const minLeft = PIN_BOX.left;
+  // Keep most of the pin head over the host (tip near the top edge).
+  const maxLeft = Math.max(minLeft, Math.round(w - PIN_BOX.width * 0.55));
+  const left = Math.round(minLeft + Math.random() * (maxLeft - minLeft));
+  // Slight vertical jitter on the outer frame / top edge (2px higher than before).
+  const top = Math.round(-28 + Math.random() * 8); // -28 .. -16
+  return { left, top };
+}
+
 /** Oblique pin styles used in-game (random pick). */
 export const PUSH_PIN_ACTIVE_STYLES = [2, 3, 6, 7] as const;
 export type PushPinActiveStyleId = typeof PUSH_PIN_ACTIVE_STYLES[number];
@@ -78,45 +96,108 @@ export interface PinHost {
   pushPin: boolean;
   pushPinAngle: number;
   pushPinStyle?: number;
+  pushPinLeft?: number;
+  pushPinTop?: number;
   location: { x: number; y: number };
   rotate?: number;
 }
 
+/** Tip of the CSS pin relative to the host image-box / paper top-left. */
+function pinTipLocal(host?: PinHost): { x: number; y: number } {
+  const left = (host && typeof host.pushPinLeft === 'number') ? host.pushPinLeft : PIN_BOX.left;
+  const top = (host && typeof host.pushPinTop === 'number') ? host.pushPinTop : PIN_BOX.top;
+  return {
+    x: left + PIN_BOX.width * PIN_BOX.tipX,
+    y: top + PIN_BOX.height * PIN_BOX.tipY,
+  };
+}
+
 /**
  * Token-style host: location is the top-left of the footprint.
- * Pin sits near that corner (with inset), then rotated around footprint center.
+ * Fallback when DOM tip is missing — matches unframed .push-pin tip.
+ * (2D corkboard yarn only; 3D uses {@link tokenCenterAnchorPx}.)
  */
 export function pinAnchorPx(
   host: PinHost,
   widthPx: number,
   heightPx: number,
-  inset = 10,
 ): { x: number; y: number } {
-  const lx = inset;
-  const ly = inset;
+  const tip = pinTipLocal(host);
   return rotateAround(
     host.location.x + widthPx / 2,
     host.location.y + heightPx / 2,
-    host.location.x + lx,
-    host.location.y + ly,
+    host.location.x + tip.x,
+    host.location.y + tip.y,
     host.rotate || 0,
   );
+}
+
+export interface TokenCenterHost {
+  location: { x: number; y: number };
+  posZ?: number;
+  altitude?: number;
+  height?: number;
+  size?: number;
+  /** Degrees; used to shift the yarn anchor slightly behind the footprint. */
+  rotate?: number;
+}
+
+/**
+ * Standing token art height in px.
+ * When `height` > 0 matches game-character `characterImageHeight`; otherwise footprint size.
+ */
+export function tokenVisualHeightPx(
+  host: { height?: number; size?: number },
+  gridSize = 50,
+): number {
+  const h = Number(host.height);
+  if (Number.isFinite(h) && h > 0) return h * gridSize;
+  const size = Number(host.size);
+  const s = Number.isFinite(size) && size > 0 ? size : 1;
+  return s * gridSize;
+}
+
+/**
+ * 3D yarn anchor: slightly behind footprint center, Z near token-height bottom
+ * with a small lift so the rope clears the floor.
+ */
+export function tokenCenterAnchorPx(
+  host: TokenCenterHost,
+  footprintPx: number,
+  visualHeightPx: number,
+  gridSize = 50,
+): { x: number; y: number; z: number } {
+  const alt = (typeof host.altitude === 'number' ? host.altitude : 0) * gridSize;
+  const tall = visualHeightPx > 0 ? visualHeightPx : footprintPx;
+  const lift = Math.max(gridSize * 0.16, tall * 0.08);
+  const cx = host.location.x + footprintPx / 2;
+  const cy = host.location.y + footprintPx / 2;
+  // Local +Y = behind the token; negative = slightly in front. Rotate with facing.
+  const back = footprintPx * -0.02;
+  const rad = ((host.rotate || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    x: cx - back * sin,
+    y: cy + back * cos,
+    z: (host.posZ || 0) + alt + lift,
+  };
 }
 
 /**
  * TextNote geometry: movable origin is the bottom-center of the paper
  * (content uses translateX(-50%), face hinged at bottom:0).
  * Table Y grows downward, so the title/top edge is at location.y - height.
- * Pin sits at the visual top-left (title-bar corner).
+ * Fallback tip matches `.push-pin` on the paper face.
  */
 export function notePinAnchorPx(
   host: PinHost,
   widthPx: number,
   heightPx: number,
-  inset = 12,
 ): { x: number; y: number } {
-  const lx = -widthPx / 2 + inset;
-  const ly = -heightPx + inset;
+  const tip = pinTipLocal(host);
+  const lx = -widthPx / 2 + tip.x;
+  const ly = -heightPx + tip.y;
   return rotateAround(
     host.location.x,
     host.location.y,
@@ -157,4 +238,37 @@ export function stringPathD(
   const dist = Math.hypot(x2 - x1, y2 - y1) || 1;
   const drop = dist * Math.max(0.05, Math.min(0.55, sag));
   return `M ${x1} ${y1} Q ${mx} ${my + drop} ${x2} ${y2}`;
+}
+
+/**
+ * CSS 3D beam from (x1,y1,z1) → (x2,y2,z2) so each yarn end keeps its own height.
+ * Element is a thin bar with transform-origin at the left (start) center.
+ */
+export function stringBeamStyle3d(
+  x1: number,
+  y1: number,
+  z1: number,
+  x2: number,
+  y2: number,
+  z2: number,
+  color = '#c62828',
+): Record<string, string> {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dz = z2 - z1;
+  const lenXY = Math.hypot(dx, dy) || 0.001;
+  const len = Math.hypot(dx, dy, dz) || 0.001;
+  const rotZ = (Math.atan2(dy, dx) * 180) / Math.PI;
+  // After rotateZ, local +X lies on the table along the rope; pitch into +Z.
+  const rotY = (-Math.atan2(dz, lenXY) * 180) / Math.PI;
+  return {
+    position: 'absolute',
+    left: '0',
+    top: '0',
+    width: `${len}px`,
+    height: '2.2px',
+    background: color,
+    'transform-origin': '0 50%',
+    transform: `translate3d(${x1}px, ${y1}px, ${z1}px) rotateZ(${rotZ}deg) rotateY(${rotY}deg)`,
+  };
 }

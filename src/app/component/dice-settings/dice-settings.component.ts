@@ -106,7 +106,7 @@ export class DiceSettingsComponent implements OnInit, OnChanges, OnDestroy {
   openFaceImage(face: string) {
     if (!this.dice || this.GuestMode() || !this.isVisible) return;
     this.hideFacePreview();
-    this.dice.face = face;
+    this.dice.mutateAppearance(() => { this.dice.face = face; });
     const current = this.dice.imageDataElement?.getFirstElementByName(face)?.value + '' || '';
     this.modalService.open<string>(FileSelecterComponent, {
       isAllowedEmpty: true,
@@ -115,7 +115,7 @@ export class DiceSettingsComponent implements OnInit, OnChanges, OnDestroy {
       if (!this.dice || value == null) return;
       const el = this.dice.imageDataElement?.getFirstElementByName(face);
       if (el) el.value = value;
-      this.dice.face = face;
+      this.dice.mutateAppearance(() => { this.dice.face = face; });
       this.changeDetector.markForCheck();
     });
   }

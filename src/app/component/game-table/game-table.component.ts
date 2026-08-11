@@ -19,7 +19,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
 import { TableLight } from '@udonarium/table-fx/table-light';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
-import { notePinAnchorPx, pinAnchorPx, stringPathD } from '@udonarium/table-fx/push-pin.util';
+import { notePinAnchorPx, pinAnchorPx, stringBeamStyle3d, stringPathD, tokenCenterAnchorPx, tokenVisualHeightPx } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
@@ -48,7 +48,7 @@ import { MovableDirective } from 'directive/movable.directive';
 
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
-import { TableMouseGesture } from './table-mouse-gesture';
+import { TableMouseGesture, TableMouseGestureEvent } from './table-mouse-gesture';
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
 import { collectFootprintWalls } from './footprint-walls';
@@ -129,11 +129,37 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
   /**
-   * Yarn must sit above flat 2D tokens (movable ≈1px + upright ≈1px → ≈2px)
-   * but below push-pin heads (local translateZ on .push-pin).
+   * 2D: yarn just above the corkboard, under pin heads.
    */
   get clueStringsZ(): number {
-    return this.gridHeight + 2.4;
+    return this.gridHeight + 2.2;
+  }
+
+  get isTable2DMode(): boolean {
+    return !!this.currentTable?.is2DMode;
+  }
+
+  /**
+   * 3D yarn: one CSS beam per link with independent endpoint Z
+   * (tall token only lifts its own end — not a shared flat plane).
+   */
+  clueStringBeamStyle(link: ClueLink): Record<string, string> {
+    if (!link) return { display: 'none' };
+    const grid = this.currentTable?.gridSize || 50;
+    const a = this.resolveYarnEndpoint(link.fromIdentifier, grid);
+    const b = this.resolveYarnEndpoint(link.toIdentifier, grid);
+    if (!a || !b) return { display: 'none' };
+    return stringBeamStyle3d(a.x, a.y, a.z, b.x, b.y, b.z, link.color || '#c62828');
+  }
+
+  /** Prefer live pin DOM position (handles note 3D tip-over); fall back to model math. */
+  cluePathD(link: ClueLink): string {
+    if (!link) return '';
+    const grid = this.currentTable?.gridSize || 50;
+    const p1 = this.resolvePinTablePoint(link.fromIdentifier, grid);
+    const p2 = this.resolvePinTablePoint(link.toIdentifier, grid);
+    if (!p1 || !p2) return '';
+    return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
   }
 
   /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
@@ -286,49 +312,65 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
 
-  /** Prefer live pin DOM position (handles note 3D tip-over); fall back to model math. */
-  cluePathD(link: ClueLink): string {
-    if (!link) return '';
-    const grid = this.currentTable?.gridSize || 50;
-    const p1 = this.resolvePinTablePoint(link.fromIdentifier, grid);
-    const p2 = this.resolvePinTablePoint(link.toIdentifier, grid);
-    if (!p1 || !p2) return '';
-    return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
+  private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
+    const p = this.resolveYarnEndpoint(id, gridSize);
+    return p ? { x: p.x, y: p.y } : null;
   }
 
-  private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
+  /** Full 3D yarn endpoint (footprint XY + token-height bottom Z). */
+  private resolveYarnEndpoint(id: string, gridSize: number): { x: number; y: number; z: number } | null {
     if (!id) return null;
+    const obj = ObjectStore.instance.get(id);
+    const is2D = !!this.currentTable?.is2DMode;
+
+    if (obj instanceof GameCharacter && !is2D) {
+      const foot = (obj.size || 1) * gridSize;
+      return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
+    }
+
     const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
       ? CSS.escape(id)
       : id.replace(/["\\]/g, '\\$&');
+    // Prefer the tip marker (0×0 after rotate). Fall back to legacy .push-pin img.
     const pinEl = this.gameObjects?.nativeElement?.querySelector(
       `[data-clue-pin="${esc}"]`
     ) as HTMLElement | null;
     if (pinEl) {
       const rect = pinEl.getBoundingClientRect();
-      // display:none / not laid out → singular transform matrix (invert det=0).
-      if (rect.width > 0.5 && rect.height > 0.5) {
-        // Pointer stack uses page coords; pin head is near the top of .push-pin.
+      // Tip markers are 0×0; img fallback needs a real box.
+      const isTip = pinEl.classList.contains('push-pin-tip') || (rect.width < 1 && rect.height < 1);
+      if (isTip || (rect.width > 0.5 && rect.height > 0.5)) {
+        // Pointer stack uses page coords. Sample tip (or AABB tip fraction on legacy img).
         const page = {
-          x: rect.left + rect.width * 0.5 + window.pageXOffset,
-          y: rect.top + rect.height * 0.3 + window.pageYOffset,
+          x: (isTip ? rect.left : rect.left + rect.width * 0.5) + window.pageXOffset,
+          y: (isTip ? rect.top : rect.top + rect.height * 0.5) + window.pageYOffset,
           z: 0,
         };
-        const local = this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
+        // Project onto the table plane (not the tilted pin plane) so yarn matches the tip pixel.
+        const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
+        const local = origin
+          ? this.coordinateService.convertToLocal(page, origin)
+          : this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
         if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
-          return { x: local.x, y: local.y };
+          return { x: local.x, y: local.y, z: this.clueStringsZ };
         }
       }
     }
-    const obj = ObjectStore.instance.get(id);
     if (obj instanceof GameCharacter) {
       const s = (obj.size || 1) * gridSize;
-      return pinAnchorPx(obj, s, s);
+      const p = pinAnchorPx(obj, s, s);
+      return { x: p.x, y: p.y, z: this.clueStringsZ };
     }
     if (obj instanceof TextNote) {
       const w = (obj.width || 1) * gridSize;
       const h = (obj.height || 1) * gridSize;
-      return notePinAnchorPx(obj, w, h);
+      if (!is2D) {
+        const p = notePinAnchorPx(obj, w, h);
+        const alt = (typeof obj.altitude === 'number' ? obj.altitude : 0) * gridSize;
+        return { x: p.x, y: p.y, z: (obj.posZ || 0) + alt + h / 2 };
+      }
+      const p = notePinAnchorPx(obj, w, h);
+      return { x: p.x, y: p.y, z: this.clueStringsZ };
     }
     return null;
   }
@@ -787,11 +829,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  /** 2D mode: any non-zero tip/tilt (roll) is written to 0 (synced). */
+  /** 2D mode: tip/tilt is display-only (getter forces 0); never wipe SyncVar / other maps. */
   private zeroAllCharacterRolls() {
-    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
-      if (ch && ch.roll !== 0) ch.roll = 0;
-    }
+    // no-op — GameCharacterComponent.roll returns 0 while is2DMode
   }
 
   ngAfterViewInit() {
@@ -988,8 +1028,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.selectionService.size > 0 || this.sceneTools.selectionCount > 0) return;
       this.removeFocus();
       this.isTableTransformMode = true;
-    } else if (!this.isTableTransformMode || document.body !== document.activeElement) {
+    } else if (!this.isTableTransformMode) {
       return;
+    } else if (document.body !== document.activeElement) {
+      // Wheel / drag after map switch while menu control still holds focus.
+      const pointerGesture =
+        event === TableMouseGestureEvent.ZOOM
+        || event === TableMouseGestureEvent.DRAG
+        || event === TableMouseGestureEvent.ROTATE;
+      if (!pointerGesture) return;
+      this.removeFocus();
     }
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu && this.contextMenuService.isShow) {
@@ -1679,6 +1727,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.applyCameraForTable(table);
     this.refreshFx();
     this.ensureFxTimer();
+    this.removeFocus();
+    this.isTableTransformMode = true;
     this.changeDetector.detectChanges();
   }
 

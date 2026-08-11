@@ -141,33 +141,44 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   
   get imageFile(): ImageFile { return this.gameCharacter.imageFile; }
   get rotate(): number { return this.gameCharacter.rotate; }
-  set rotate(rotate: number) { this.gameCharacter.rotate = rotate; }
+  set rotate(rotate: number) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.rotate = rotate; });
+  }
   /** 2D mode: roll SyncVar is forced to 0 (no tip/tilt). */
   get roll(): number { return this.is2DMode ? 0 : this.gameCharacter.roll; }
   set roll(roll: number) {
     if (this.is2DMode) {
-      if (this.gameCharacter.roll !== 0) this.gameCharacter.roll = 0;
+      // Display-only: never wipe the shared SyncVar (other maps keep their tip).
       return;
     }
-    this.gameCharacter.roll = roll;
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.roll = roll; });
   }
   get isRollLocked(): boolean { return this.is2DMode || this.isMoveLocked; }
 
-  /** Write stored roll → 0 while room is in 2D (covers tokens that already had a non-zero tip). */
+  /** 2D display ignores tip; do not mutate SyncVar (would destroy 3D map roll). */
   private enforce2DRollZero() {
-    if (!this.is2DMode || !this.gameCharacter) return;
-    if (this.gameCharacter.roll !== 0) this.gameCharacter.roll = 0;
+    // no-op — getter already returns 0 in 2D
   }
   get isDropShadow(): boolean { return this.gameCharacter.isDropShadow; }
-  set isDropShadow(isDropShadow: boolean) { this.gameCharacter.isDropShadow = isDropShadow; }
+  set isDropShadow(isDropShadow: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isDropShadow = isDropShadow; });
+  }
   get isAltitudeIndicate(): boolean { return this.gameCharacter.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.gameCharacter.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isAltitudeIndicate = isAltitudeIndicate; });
+  }
   get isInverse(): boolean { return this.gameCharacter.isInverse; }
-  set isInverse(isInverse: boolean) { this.gameCharacter.isInverse = isInverse; }
+  set isInverse(isInverse: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isInverse = isInverse; });
+  }
   get isHollow(): boolean { return this.gameCharacter.isHollow; }
-  set isHollow(isHollow: boolean) { this.gameCharacter.isHollow = isHollow; }
+  set isHollow(isHollow: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isHollow = isHollow; });
+  }
   get isBlackPaint(): boolean { return this.gameCharacter.isBlackPaint; }
-  set isBlackPaint(isBlackPaint: boolean) { this.gameCharacter.isBlackPaint = isBlackPaint; }
+  set isBlackPaint(isBlackPaint: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isBlackPaint = isBlackPaint; });
+  }
 
   private imageEffectSource() {
     return {
@@ -203,7 +214,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
 
   get aura(): number { return this.gameCharacter.aura; }
-  set aura(aura: number) { this.gameCharacter.aura = aura; }
+  set aura(aura: number) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.aura = aura; });
+  }
+
+  private syncViewPlacement() {
+    this.gameCharacter?.syncAppearanceToCurrentViewPlacement();
+  }
   get floorRing(): string { return this.gameCharacter.floorRing || 'none'; }
   get floorRingUrl(): string { return this.characterFxMenu.ringAsset(this.floorRing); }
   get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
@@ -234,6 +251,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
   get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
+  get pushPinLeft(): number {
+    return typeof this.gameCharacter.pushPinLeft === 'number' ? this.gameCharacter.pushPinLeft : -4;
+  }
+  get pushPinTop(): number {
+    return typeof this.gameCharacter.pushPinTop === 'number' ? this.gameCharacter.pushPinTop : -20;
+  }
   get pushPinColor(): string { return this.gameCharacter.pushPinColor || 'red'; }
   get pushPinSrc(): string {
     return pushPinAssetUrl(
@@ -1322,6 +1345,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     if (this.GuestMode()) return;
     if (this.gameCharacter.currntImageIndex != index) {
       this.gameCharacter.currntImageIndex = index;
+      this.syncViewPlacement();
       if (!this.isHideIn && this.gameCharacter.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
       EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
       EventSystem.trigger('UPDATE_INVENTORY', null);

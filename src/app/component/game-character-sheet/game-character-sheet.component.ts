@@ -400,14 +400,14 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   // TODO: 索引也應抽象化以通用化
   selectImage(index: number, name='imageIdentifier') {
     if (this.tabletopObject.currntImageIndex == index) return;
-    this.tabletopObject.currntImageIndex = index;
+    this.tabletopObject.mutateAppearance(() => { this.tabletopObject.currntImageIndex = index; });
     SoundEffect.play(PresetSound.surprise);
     EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 
   selectIcon(index: number) {
     if (this.tabletopObject.currntIconIndex == index) return;
-    this.tabletopObject.currntIconIndex = index;
+    this.tabletopObject.mutateAppearance(() => { this.tabletopObject.currntIconIndex = index; });
   }
 
   deleteImage(index: number=0, name='imageIdentifier') {
