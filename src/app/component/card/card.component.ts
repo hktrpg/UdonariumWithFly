@@ -138,7 +138,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text)) }
 
   get isLocked(): boolean { return this.card ? this.card.isLocked : false; }
-  set isLocked(isLocked: boolean) { if (this.card) this.card.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) { if (this.card) { this.card.isLocked = isLocked; this.card.syncAppearanceToCurrentViewPlacement(); } }
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;

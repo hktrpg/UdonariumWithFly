@@ -40,25 +40,30 @@ describe('push-pin.util', () => {
     expect(p.y).toBeCloseTo(-30 + PIN_BOX.height * PIN_BOX.tipY, 5);
   });
 
-  it('tokenCenterAnchorPx uses visual height for Z (not footprint size)', () => {
+  it('tokenCenterAnchorPx lifts Z and offsets XY by footprint * -0.02', () => {
     const host = {
       location: { x: 100, y: 200 },
       posZ: 10,
       altitude: 2,
       height: 3,
       size: 1,
+      rotate: 0,
     };
     const grid = 50;
     const foot = 50;
     const tall = tokenVisualHeightPx(host, grid);
     expect(tall).toBe(150);
     const c = tokenCenterAnchorPx(host, foot, tall, grid);
+    const back = foot * -0.02;
     expect(c.x).toBeCloseTo(125, 5);
-    expect(c.y).toBeCloseTo(225, 5);
-    // z = posZ + altitude*grid + visualHeight/2
-    expect(c.z).toBeCloseTo(10 + 100 + 75, 5);
-    const short = tokenCenterAnchorPx(host, foot, foot, grid);
-    expect(c.z).toBeGreaterThan(short.z);
+    expect(c.y).toBeCloseTo(225 + back, 5);
+    const lift = Math.max(grid * 0.16, tall * 0.08);
+    expect(c.z).toBeCloseTo(10 + 100 + lift, 5);
+    expect(c.z).toBeLessThan(10 + 100 + tall / 2);
+
+    const turned = tokenCenterAnchorPx({ ...host, rotate: 90 }, foot, tall, grid);
+    expect(turned.x).toBeCloseTo(125 - back, 5);
+    expect(turned.y).toBeCloseTo(225, 5);
   });
 
   it('tokenVisualHeightPx falls back to size when height unset', () => {

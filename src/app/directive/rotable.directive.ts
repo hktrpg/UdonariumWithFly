@@ -246,6 +246,7 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
       this.isUpdateBatching = true;
       this.batchService.add(() => {
         this.targetProperty = this.rotate;
+        this.tabletopObject?.syncAppearanceToCurrentViewPlacement();
         this.isUpdateBatching = false;
       });
     }

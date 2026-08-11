@@ -102,7 +102,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isAltitudeIndicate(): boolean { return this.textNote.isAltitudeIndicate; }
   set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.textNote.isAltitudeIndicate = isAltitudeIndicate; }
   get isLocked(): boolean { return this.textNote.isLocked; }
-  set isLocked(isLocked: boolean) { this.textNote.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) { this.textNote.isLocked = isLocked; this.textNote.syncAppearanceToCurrentViewPlacement(); }
   get isShowTitle(): boolean { return this.textNote.isShowTitle; }
   set isShowTitle(isShowTitle: boolean) { this.textNote.isShowTitle = isShowTitle; }
   get titleBgColor(): string {

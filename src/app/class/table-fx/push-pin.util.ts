@@ -138,6 +138,8 @@ export interface TokenCenterHost {
   altitude?: number;
   height?: number;
   size?: number;
+  /** Degrees; used to shift the yarn anchor slightly behind the footprint. */
+  rotate?: number;
 }
 
 /**
@@ -156,8 +158,8 @@ export function tokenVisualHeightPx(
 }
 
 /**
- * 3D yarn anchor: footprint XY center, Z at mid token height
- * (posZ + altitude·grid + visualHeight/2).
+ * 3D yarn anchor: slightly behind footprint center, Z near token-height bottom
+ * with a small lift so the rope clears the floor.
  */
 export function tokenCenterAnchorPx(
   host: TokenCenterHost,
@@ -167,10 +169,18 @@ export function tokenCenterAnchorPx(
 ): { x: number; y: number; z: number } {
   const alt = (typeof host.altitude === 'number' ? host.altitude : 0) * gridSize;
   const tall = visualHeightPx > 0 ? visualHeightPx : footprintPx;
+  const lift = Math.max(gridSize * 0.16, tall * 0.08);
+  const cx = host.location.x + footprintPx / 2;
+  const cy = host.location.y + footprintPx / 2;
+  // Local +Y = behind the token; negative = slightly in front. Rotate with facing.
+  const back = footprintPx * -0.02;
+  const rad = ((host.rotate || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
   return {
-    x: host.location.x + footprintPx / 2,
-    y: host.location.y + footprintPx / 2,
-    z: (host.posZ || 0) + alt + tall / 2,
+    x: cx - back * sin,
+    y: cy + back * cos,
+    z: (host.posZ || 0) + alt + lift,
   };
 }
 

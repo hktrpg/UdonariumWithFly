@@ -46,6 +46,11 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   GuestMode() { return Network.GuestMode(); }
 
+  /** Persist vision / light radii into the current map placement. */
+  syncLightPlacement() {
+    this.character?.syncAppearanceToCurrentViewPlacement();
+  }
+
   get size(): number { return this.character?.size ?? 1; }
   set size(value: number) {
     const el = this.character?.commonDataElement?.getFirstElementByName('size');

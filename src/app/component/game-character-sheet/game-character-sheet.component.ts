@@ -401,6 +401,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   selectImage(index: number, name='imageIdentifier') {
     if (this.tabletopObject.currntImageIndex == index) return;
     this.tabletopObject.currntImageIndex = index;
+    this.tabletopObject.syncAppearanceToCurrentViewPlacement();
     SoundEffect.play(PresetSound.surprise);
     EventSystem.trigger('UPDATE_INVENTORY', null);
   }
@@ -408,6 +409,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
   selectIcon(index: number) {
     if (this.tabletopObject.currntIconIndex == index) return;
     this.tabletopObject.currntIconIndex = index;
+    this.tabletopObject.syncAppearanceToCurrentViewPlacement();
   }
 
   deleteImage(index: number=0, name='imageIdentifier') {

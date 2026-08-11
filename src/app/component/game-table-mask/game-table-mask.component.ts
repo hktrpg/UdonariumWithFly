@@ -78,7 +78,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   get opacity(): number { return this.gameTableMask.opacity; }
   get imageFile(): ImageFile { return this.gameTableMask.imageFile; }
   get isLock(): boolean { return this.gameTableMask.isLock; }
-  set isLock(isLock: boolean) { this.gameTableMask.isLock = isLock; }
+  set isLock(isLock: boolean) { this.gameTableMask.isLock = isLock; this.gameTableMask.syncAppearanceToCurrentViewPlacement(); }
   get blendType(): number { return this.gameTableMask.blendType; }
   set blendType(blendType: number) { this.gameTableMask.blendType = blendType; }
   get borderType(): number { return this.gameTableMask.borderType; }

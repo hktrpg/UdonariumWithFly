@@ -151,7 +151,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   set isDropShadow(isDropShadow: boolean) { this.diceSymbol.isDropShadow = isDropShadow; }
 
   get isLock(): boolean { return this.diceSymbol.isLock; }
-  set isLock(isLock: boolean) { this.diceSymbol.isLock = isLock; }
+  set isLock(isLock: boolean) { this.diceSymbol.isLock = isLock; this.diceSymbol.syncAppearanceToCurrentViewPlacement(); }
 
   get isCoin(): boolean { return this.diceSymbol.isCoin; }
   get selectionState(): SelectionState { return this.selectionService.state(this.diceSymbol); }

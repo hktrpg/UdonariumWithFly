@@ -59,6 +59,7 @@ export function applyMaskTokenFxToCharacter(ch: GameCharacter, cfg: MaskTokenFxC
     ch.altitude = (Number(ch.altitude) || 0) + (Number(cfg.altitude) || 0);
     snap.altitudeTouched = true;
   }
+  ch.syncAppearanceToCurrentViewPlacement();
   return snap;
 }
 
@@ -76,4 +77,5 @@ export function restoreMaskTokenFxSnapshot(ch: GameCharacter, snap: MaskTokenFxS
   if (snap.altitudeTouched) {
     ch.altitude = snap.altitude;
   }
+  ch.syncAppearanceToCurrentViewPlacement();
 }

@@ -93,6 +93,7 @@ export class TextNote extends TabletopObject {
       this.setCommonValue('width', s);
       this.setCommonValue('height', s);
     }
+    this.syncAppearanceToCurrentViewPlacement();
   }
   get fontSize(): number { return this.getCommonValue('fontsize', 1); }
   set fontSize(fontSize: number) { this.setCommonValue('fontsize', fontSize); }

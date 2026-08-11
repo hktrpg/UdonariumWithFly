@@ -177,13 +177,86 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(ch.getPoseForTable('tableB')!.height).toBe(2);
   });
 
+  it('keeps rotate/roll and image FX independent per map', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_pose');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+    ch.ensureAppearanceBackfilled();
+
+    ch.rotate = 90;
+    ch.roll = 30;
+    ch.isInverse = true;
+    ch.currntImageIndex = 0;
+    ch.syncAppearanceToCurrentViewPlacement();
+
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(90);
+    expect(ch.getPoseForTable('tableA')!.roll).toBe(30);
+    expect(ch.getPoseForTable('tableA')!.isInverse).toBeTrue();
+    expect(ch.getPoseForTable('tableB')!.rotate).toBe(0);
+    expect(ch.getPoseForTable('tableB')!.roll).toBe(0);
+    expect(ch.getPoseForTable('tableB')!.isInverse).toBeFalse();
+
+    TabletopObject.flushLivePosesToView('tableA');
+    viewTables('tableB');
+    ch.hydratePoseForView('tableB');
+
+    expect(ch.rotate).toBe(0);
+    expect(ch.roll).toBe(0);
+    expect(ch.isInverse).toBeFalse();
+
+    ch.rotate = 45;
+    ch.syncAppearanceToCurrentViewPlacement();
+    TabletopObject.flushLivePosesToView('tableB');
+    viewTables('tableA');
+    ch.hydratePoseForView('tableA');
+
+    expect(ch.rotate).toBe(90);
+    expect(ch.roll).toBe(30);
+    expect(ch.isInverse).toBeTrue();
+    expect(ch.getPoseForTable('tableB')!.rotate).toBe(45);
+  });
+
+  it('hydrate resets SyncVar cosmetics when destination pose omits them', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_leak');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    // Simulate legacy B pose with coords only (no rotate / FX / light).
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableB = { x: 50, y: 50, posZ: 0 };
+    ch.tablePlacements = JSON.stringify(map);
+
+    ch.rotate = 90;
+    ch.isInverse = true;
+    ch.visionRange = 12;
+    ch.syncAppearanceToCurrentViewPlacement();
+
+    TabletopObject.flushLivePosesToView('tableA');
+    viewTables('tableB');
+    ch.hydratePoseForView('tableB');
+
+    expect(ch.rotate).toBe(0);
+    expect(ch.isInverse).toBeFalse();
+    expect(ch.visionRange).toBe(6);
+  });
+
   it('setPoseForTable merge preserves appearance when only coords change', () => {
     makeTable('tableA');
     viewTables('tableA');
 
     const ch = makeCharacter('char_merge');
     ch.location = { name: 'table', x: 0, y: 0 };
-    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0, height: 7, size: 2 }, true);
+    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0, height: 7, size: 2, rotate: 15 }, true);
 
     ch.setPoseForTable('tableA', { x: 9, y: 8, posZ: 1 }, false);
 
@@ -193,5 +266,6 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(pose.posZ).toBe(1);
     expect(pose.height).toBe(7);
     expect(pose.size).toBe(2);
+    expect(pose.rotate).toBe(15);
   });
 });

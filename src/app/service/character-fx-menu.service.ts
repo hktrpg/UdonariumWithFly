@@ -367,22 +367,24 @@ export class CharacterFxMenuService {
         ContextMenuSeparator,
         rangeSub(this.i18n.t('fx.visionRange'), VISION_RANGE_PRESETS,
           () => character.visionRangeGrid,
-          n => { character.visionRange = n; }),
+          n => { character.visionRange = n; character.syncAppearanceToCurrentViewPlacement(); }),
         rangeSub(this.i18n.t('fx.brightLight'), BRIGHT_LIGHT_PRESETS,
           () => character.brightLightGrid,
           n => {
             character.brightLight = n;
             if (character.dimLightGrid < n) character.dimLight = n;
+            character.syncAppearanceToCurrentViewPlacement();
           }),
         rangeSub(this.i18n.t('fx.dimLight'), DIM_LIGHT_PRESETS,
           () => character.dimLightGrid,
-          n => { character.dimLight = n; }),
+          n => { character.dimLight = n; character.syncAppearanceToCurrentViewPlacement(); }),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.clearLight'),
           action: () => {
             character.brightLight = 0;
             character.dimLight = 0;
+            character.syncAppearanceToCurrentViewPlacement();
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           disabled: character.brightLightGrid <= 0 && character.dimLightGrid <= 0,

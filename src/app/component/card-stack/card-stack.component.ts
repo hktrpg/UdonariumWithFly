@@ -115,7 +115,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.topCard.text)) }
 
   get isLocked(): boolean { return this.cardStack ? this.cardStack.isLocked : false; }
-  set isLocked(isLocked: boolean) { if (this.cardStack) this.cardStack.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) { if (this.cardStack) { this.cardStack.isLocked = isLocked; this.cardStack.syncAppearanceToCurrentViewPlacement(); } }
 
   gridSize: number = 50;
 

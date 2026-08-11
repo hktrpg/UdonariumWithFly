@@ -47,7 +47,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   set mode(mode: TerrainViewState) { this.terrain.mode = mode; }
 
   get isLocked(): boolean { return this.terrain.isLocked; }
-  set isLocked(isLocked: boolean) { this.terrain.isLocked = isLocked; }
+  set isLocked(isLocked: boolean) { this.terrain.isLocked = isLocked; this.terrain.syncAppearanceToCurrentViewPlacement(); }
   get hasWall(): boolean { return this.terrain.hasWall; }
   get hasFloor(): boolean { return this.terrain.hasFloor; }
 

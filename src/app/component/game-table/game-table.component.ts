@@ -317,7 +317,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return p ? { x: p.x, y: p.y } : null;
   }
 
-  /** Full 3D yarn endpoint (footprint XY + mid visual height Z for tokens). */
+  /** Full 3D yarn endpoint (footprint XY + token-height bottom Z). */
   private resolveYarnEndpoint(id: string, gridSize: number): { x: number; y: number; z: number } | null {
     if (!id) return null;
     const obj = ObjectStore.instance.get(id);
@@ -829,11 +829,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  /** 2D mode: any non-zero tip/tilt (roll) is written to 0 (synced). */
+  /** 2D mode: tip/tilt is display-only (getter forces 0); never wipe SyncVar / other maps. */
   private zeroAllCharacterRolls() {
-    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
-      if (ch && ch.roll !== 0) ch.roll = 0;
-    }
+    // no-op — GameCharacterComponent.roll returns 0 while is2DMode
   }
 
   ngAfterViewInit() {
