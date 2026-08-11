@@ -103,16 +103,16 @@
   <!-- Options -->
   <section class="card card-dense opts-card">
     <div class="check-row tight">
-      <label><input type="checkbox" [(ngModel)]="character.isShowName" [disabled]="GuestMode()" /> {{ 'char.settings.showName' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="character.isShowName" (ngModelChange)="setPlacementFlag('isShowName', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.showName' | i18n }}</label>
       <label><input type="checkbox" [(ngModel)]="character.isAllowsChat" [disabled]="GuestMode()" /> {{ 'char.settings.allowsChat' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="character.isShowChatBubble" [disabled]="GuestMode()" /> {{ 'char.settings.chatBubble' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="character.isShowChatBubble" (ngModelChange)="setPlacementFlag('isShowChatBubble', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.chatBubble' | i18n }}</label>
       <label><input type="checkbox" [(ngModel)]="character.isInventoryIndicate" [disabled]="GuestMode()" /> {{ 'char.settings.inventory' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="character.isAltitudeIndicate" [disabled]="GuestMode()" /> {{ 'char.settings.altitudeIndicate' | i18n }}</label>
-      <label><input type="checkbox" [(ngModel)]="character.isDropShadow" [disabled]="GuestMode()" /> {{ 'char.settings.dropShadow' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="character.isAltitudeIndicate" (ngModelChange)="setPlacementFlag('isAltitudeIndicate', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.altitudeIndicate' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="character.isDropShadow" (ngModelChange)="setPlacementFlag('isDropShadow', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.dropShadow' | i18n }}</label>
     </div>
     <label class="field" *ngIf="character.tokenFrame === 'polaroid'">
       <span>{{ 'char.settings.polaroidCaption' | i18n }}</span>
-      <input type="text" [(ngModel)]="character.tokenFrameCaption" [disabled]="GuestMode() || !character.isShowName"
+      <input type="text" [ngModel]="character.tokenFrameCaption" (ngModelChange)="setPlacementFlag('tokenFrameCaption', $event)" [disabled]="GuestMode() || !character.isShowName"
         [attr.placeholder]="character.name || ''" />
     </label>
     <div class="field-row metrics vision-row">

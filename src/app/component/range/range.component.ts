@@ -339,7 +339,9 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   get isAltitudeIndicate(): boolean { return this.range.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.range.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.range.mutateAppearance(() => { this.range.isAltitudeIndicate = isAltitudeIndicate; });
+  }
 
   get textShadowCss(): string {
     let shadow = StringUtil.textShadowColor(this.range.rangeColor, '#f5f5f5');

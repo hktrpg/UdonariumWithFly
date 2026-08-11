@@ -249,14 +249,31 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
   const defaults = defaultPlacementViewState(obj);
   const effective: PlacementViewState = { ...defaults, ...pickPlacementViewState(pose) };
 
+  const same = (a: any, b: any) => a == b || String(a ?? '') === String(b ?? '');
+
   const setEl = (name: string, value: any, currentValue?: any) => {
     const el = commonEl(obj, name);
     if (!el) return;
-    el.value = value;
-    if (currentValue !== undefined) el.currentValue = currentValue;
+    const sameValue = same(el.value, value);
+    const sameCurrent = currentValue === undefined || same(el.currentValue, currentValue);
+    if (sameValue && sameCurrent) return;
+    // Local view projection only — never fan out (dual-map reproject storm).
+    el.withSyncSuppressed(() => {
+      el.value = value;
+      if (currentValue !== undefined) el.currentValue = currentValue;
+    });
+  };
+
+  const setSync = (key: string, value: any) => {
+    if (value === undefined || !hasProp(obj, key)) return;
+    if (same(obj[key], value)) return;
+    obj[key] = value;
   };
 
   // DataElements: only when explicitly stored on the pose (avoid inventing sizes).
+  // Always sync-suppress: apply is a local view projection. Broadcasting here
+  // ping-pongs dual-map peers (reproject → el.update → remote reproject → …)
+  // and keeps the network indicator stuck on「同步中」.
   if (pose.size !== undefined) setEl('size', pose.size);
   if (pose.height !== undefined) setEl('height', pose.height, pose.heightCurrentValue);
   if (pose.altitude !== undefined) setEl('altitude', pose.altitude);
@@ -264,53 +281,47 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
   if (pose.depth !== undefined) setEl('depth', pose.depth);
   if (pose.length !== undefined) setEl('length', pose.length);
 
-  if (effective.rotate !== undefined && hasProp(obj, 'rotate')) obj.rotate = effective.rotate;
-  if (effective.roll !== undefined && hasProp(obj, 'roll')) obj.roll = effective.roll;
-  if (effective.zindex !== undefined && hasProp(obj, 'zindex')) obj.zindex = effective.zindex;
-
-  if (effective.currntImageIndex !== undefined && hasProp(obj, 'currntImageIndex')) {
-    obj.currntImageIndex = effective.currntImageIndex;
-  }
-  if (effective.currntIconIndex !== undefined && hasProp(obj, 'currntIconIndex')) {
-    obj.currntIconIndex = effective.currntIconIndex;
-  }
-  if (effective.isUseIconToOverviewImage !== undefined && hasProp(obj, 'isUseIconToOverviewImage')) {
-    obj.isUseIconToOverviewImage = effective.isUseIconToOverviewImage;
-  }
+  setSync('rotate', effective.rotate);
+  setSync('roll', effective.roll);
+  setSync('zindex', effective.zindex);
+  setSync('currntImageIndex', effective.currntImageIndex);
+  setSync('currntIconIndex', effective.currntIconIndex);
+  setSync('isUseIconToOverviewImage', effective.isUseIconToOverviewImage);
   for (const k of [
     'isInverse', 'isHollow', 'isBlackPaint', 'isGrayscale', 'isSepia',
     'isWhitePaint', 'isMatrix', 'isFlipVertical', 'isContrast', 'isAltitudeIndicate',
     'isDropShadow', 'isShowName', 'isShowChatBubble', 'pushPin',
     'isUpright', 'isFlipped', 'isWhiteOut', 'isShowTitle', 'isLocked', 'isLock',
   ] as const) {
-    if (effective[k] !== undefined && hasProp(obj, k)) obj[k] = effective[k];
+    setSync(k, effective[k]);
   }
-  if (effective.aura !== undefined && hasProp(obj, 'aura')) obj.aura = effective.aura;
+  setSync('aura', effective.aura);
 
   for (const k of ['tokenFrame', 'tokenFrameCaption', 'floorRing', 'floorRingColor', 'pushPinColor', 'titleBgColor', 'textAlign', 'paperStyle'] as const) {
-    if (effective[k] !== undefined && hasProp(obj, k)) obj[k] = effective[k];
+    setSync(k, effective[k]);
   }
   for (const k of ['floorRingSpeed', 'pushPinAngle', 'pushPinStyle', 'pushPinLeft', 'pushPinTop', 'visionRange', 'brightLight', 'dimLight'] as const) {
-    if (effective[k] !== undefined && hasProp(obj, k)) obj[k] = effective[k];
+    setSync(k, effective[k]);
   }
 
-  if (effective.cardState !== undefined && hasProp(obj, 'state')) obj.state = effective.cardState;
-  if (effective.diceFace !== undefined && hasProp(obj, 'face')) obj.face = effective.diceFace;
+  if (effective.cardState !== undefined && hasProp(obj, 'state') && !same(obj.state, effective.cardState)) {
+    obj.state = effective.cardState;
+  }
+  if (effective.diceFace !== undefined && hasProp(obj, 'face') && !same(obj.face, effective.diceFace)) {
+    obj.face = effective.diceFace;
+  }
 
-  if (effective.terrainMode !== undefined && hasProp(obj, 'mode') && typeof obj.mode === 'number') {
+  if (effective.terrainMode !== undefined && hasProp(obj, 'mode') && typeof obj.mode === 'number'
+    && !same(obj.mode, effective.terrainMode)) {
     obj.mode = effective.terrainMode;
   }
   for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope'] as const) {
-    if (effective[k] !== undefined && hasProp(obj, k)) obj[k] = effective[k];
+    setSync(k, effective[k]);
   }
-  if (effective.slopeDirection !== undefined && hasProp(obj, 'slopeDirection')) {
-    obj.slopeDirection = effective.slopeDirection;
-  }
-  if (effective.blendType !== undefined && hasProp(obj, 'blendType')) obj.blendType = effective.blendType;
-  if (effective.borderType !== undefined && hasProp(obj, 'borderType')) obj.borderType = effective.borderType;
-  if (effective.textPosition !== undefined && hasProp(obj, 'textPosition')) {
-    obj.textPosition = effective.textPosition;
-  }
+  setSync('slopeDirection', effective.slopeDirection);
+  setSync('blendType', effective.blendType);
+  setSync('borderType', effective.borderType);
+  setSync('textPosition', effective.textPosition);
 }
 
 export function placementHasViewState(pose: any): boolean {

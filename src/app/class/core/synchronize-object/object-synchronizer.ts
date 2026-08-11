@@ -1,4 +1,5 @@
 import { EventSystem, Network } from '../system';
+import { netDebug } from '../system/network/net-debug';
 import { GameObject, ObjectContext } from './game-object';
 import { markForChanged } from './object-event-extension';
 import { ObjectFactory } from './object-factory';
@@ -26,7 +27,7 @@ export class ObjectSynchronizer {
     EventSystem.register(this)
       .on('CONNECT_PEER', 2, event => {
         if (!event.isSendFromSelf) return;
-        console.log('CONNECT_PEER GameRoomService !!!', event.data.peerId);
+        netDebug('CONNECT_PEER GameRoomService !!!', event.data.peerId);
         this.sendCatalog(event.data.peerId);
       })
       .on('DISCONNECT_PEER', event => {
@@ -34,7 +35,7 @@ export class ObjectSynchronizer {
       })
       .on<CatalogItem[]>('SYNCHRONIZE_GAME_OBJECT', event => {
         if (event.isSendFromSelf) return;
-        console.log('SYNCHRONIZE_GAME_OBJECT ' + event.sendFrom);
+        netDebug('SYNCHRONIZE_GAME_OBJECT ' + event.sendFrom);
         let catalog: CatalogItem[] = event.data;
         for (let item of catalog) {
           if (ObjectStore.instance.isDeleted(item.identifier)) {
@@ -103,7 +104,7 @@ export class ObjectSynchronizer {
     }
     // Room ZIP reload / peer resync reuses syncIds that were just DELETE-marked.
     ObjectStore.instance.clearDeleted(context.identifier);
-    // Suppress SyncVar update() during add→apply so onStoreAdded cannot broadcast
+    // Suppress SyncVar update() during add?apply so onStoreAdded cannot broadcast
     // default 0,0 poses before real syncData is applied (multi-tab top-left drift).
     // Add before apply so ObjectStore.get works when onChildAdded fires MESSAGE_ADDED.
     newObject.syncSuppressed = true;
@@ -174,7 +175,7 @@ export class ObjectSynchronizer {
     }
 
     task.ontimeout = (task, remainedRequests) => {
-      console.log('GameObject synchronize timeout');
+      netDebug('GameObject synchronize timeout');
       remainedRequests.forEach(request => this.requestMap.set(request.identifier, request));
     }
 

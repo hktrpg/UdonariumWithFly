@@ -1,6 +1,7 @@
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
+import { netDebug } from '@udonarium/core/system/network/net-debug';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
@@ -107,9 +108,9 @@ export class RoomConnectHelper {
 
       const onConnect = (peerId: string) => {
         if (settled) return;
-        console.log('連線成功！', peerId);
+        netDebug('連線成功！', peerId);
         tried.add(peerId);
-        console.log(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
+        netDebug(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
         if (RoomConnectHelper.shouldEarlySucceed(Network.peers.length)) {
           finish(true);
         }
@@ -120,7 +121,7 @@ export class RoomConnectHelper {
         if (settled) return;
         console.warn('放棄連線（對方離線或訂閱逾時）', peerId);
         tried.add(peerId);
-        console.warn(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
+        netDebug(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
         if (RoomConnectHelper.shouldFailJoin(tried.size, targetPeers.length, Network.peers.length)) {
           RoomConnectHelper.resetIfAlone();
           finish(false);
@@ -129,7 +130,7 @@ export class RoomConnectHelper {
 
       EventSystem.register(listenerKey)
         .on('OPEN_NETWORK', event => {
-          console.log('RoomConnectHelper OPEN_PEER', event.data.peerId);
+          netDebug('RoomConnectHelper OPEN_PEER', event.data.peerId);
           EventSystem.unregister(listenerKey);
           // Discard lobby sample tables/tokens before catalog merge; otherwise shared
           // syncIds (gameTable, testCharacter_*) overwrite the host house via LWW.

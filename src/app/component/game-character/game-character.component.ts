@@ -108,6 +108,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
    * enter bounce during archive settle so tokens appear at scale(1).
    */
   static suppressEnterBounce = false;
+  /** Coalesce out-of-zone AFTER_VIEW_TABLE_CHANGE into one NgZone kick (avoid N×tick). */
+  private static viewTableKickScheduled = false;
   /** Rate-limit mount debug during archive remount storms. */
   private static mountLogBudget = 0;
 
@@ -290,7 +292,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
   set isNotRide(isNotRide: boolean) { this.gameCharacter.isNotRide = isNotRide; }
   get isUseIconToOverviewImage(): boolean { return this.gameCharacter.isUseIconToOverviewImage; }
-  set isUseIconToOverviewImage(isUseIconToOverviewImage: boolean) { this.gameCharacter.isUseIconToOverviewImage = isUseIconToOverviewImage; }
+  set isUseIconToOverviewImage(isUseIconToOverviewImage: boolean) {
+    this.gameCharacter.mutateAppearance(() => {
+      this.gameCharacter.isUseIconToOverviewImage = isUseIconToOverviewImage;
+    });
+  }
 
   hasOverviewFaceIcon(): boolean {
     return !!(this.faceIcon && 0 < this.faceIcon.url.length);
@@ -673,21 +679,25 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       })
       .on('AFTER_VIEW_TABLE_CHANGE', () => {
         // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
-        // EventSystem can fire outside Angular; markForCheck alone is not enough for OnPush.
-        this.ngZone.run(() => {
-          this.enforce2DRollZero();
-          const maps = this.gameCharacter?.placementTableIds || [];
-          if (maps.length > 1) {
-            folderBackupDebug('char AFTER_VIEW_TABLE_CHANGE dual', {
-              name: this.gameCharacter?.name || '',
-              id: (this.gameCharacter?.identifier || '').slice(0, 10),
-              is2D: this.is2DMode,
-              upright: (this.uprightTransform || '').slice(0, 48),
-              maps: maps.map(m => m.slice(0, 14)),
-            });
-          }
-          this.changeDetector.detectChanges();
-        });
+        this.enforce2DRollZero();
+        const maps = this.gameCharacter?.placementTableIds || [];
+        if (maps.length > 1) {
+          folderBackupDebug('char AFTER_VIEW_TABLE_CHANGE dual', {
+            name: this.gameCharacter?.name || '',
+            id: (this.gameCharacter?.identifier || '').slice(0, 10),
+            is2D: this.is2DMode,
+            upright: (this.uprightTransform || '').slice(0, 48),
+            maps: maps.map(m => m.slice(0, 14)),
+          });
+        }
+        this.changeDetector.markForCheck();
+        // Already in a click/CD turn: upcoming tick picks up markForCheck.
+        // Outside Angular (rare EventSystem path): one shared zone kick for all chars.
+        if (!NgZone.isInAngularZone()) {
+          if (GameCharacterComponent.viewTableKickScheduled) return;
+          GameCharacterComponent.viewTableKickScheduled = true;
+          this.ngZone.run(() => { GameCharacterComponent.viewTableKickScheduled = false; });
+        }
       })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameCharacter?.identifier}`, event => {
         if (this.gameCharacter.imageFiles.length <= 0) {
@@ -1133,7 +1143,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       [
         contextMenuToggleCheck({
           get: () => this.gameCharacter.isShowChatBubble,
-          set: (v) => { this.gameCharacter.isShowChatBubble = v; },
+          set: (v) => { this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isShowChatBubble = v; }); },
           on: this.i18n.t('char.chatBubbleOn'),
           off: this.i18n.t('char.chatBubbleOff'),
           tip: this.i18n.t('char.chatBubbleTip'),

@@ -5,6 +5,7 @@ import { setZeroTimeout } from '../../util/zero-timeout';
 import { Connection, ConnectionCallback } from '../connection';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { IRoomInfo, RoomInfo } from '../room-info';
+import { netDebug } from '../net-debug';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
@@ -91,34 +92,34 @@ export class SkyWayConnection implements Connection {
 
     if (!this.shouldConnect(peer.peerId)) return false;
 
-    console.log(`connect() ${peer.peerId}`);
+    netDebug(`connect() ${peer.peerId}`);
     this.connectStream(SkyWayDataStream.createSubscription(this.skyWay, peer));
     return true;
   }
 
   private shouldConnect(peerId: string): boolean {
     if (!this.skyWay.isOpen) {
-      console.log('connect() is Fail. Wait until ID is assigned');
+      netDebug('connect() is Fail. Wait until ID is assigned');
       return false;
     }
 
     if (this.peerId === peerId) {
-      console.log('connect() is Fail. ' + peerId + ' is me.');
+      netDebug('connect() is Fail. ' + peerId + ' is me.');
       return false;
     }
 
     if (this.peerIds.includes(peerId)) {
-      console.log('connect() is Fail. <' + peerId + '> is already connecting.');
+      netDebug('connect() is Fail. <' + peerId + '> is already connecting.');
       return false;
     }
 
     if (!this.peer.verifyPeer(peerId)) {
-      console.log('connect() is Fail. <' + peerId + '> is invalid.');
+      netDebug('connect() is Fail. <' + peerId + '> is invalid.');
       return false;
     }
 
     if (!this.skyWay?.room?.members.find(member => member.name === peerId)) {
-      console.log('connect() is Fail.  <' + peerId + '> is not found.');
+      netDebug('connect() is Fail.  <' + peerId + '> is not found.');
       return false;
     }
 
@@ -259,7 +260,7 @@ export class SkyWayConnection implements Connection {
 
   private connectStream(stream: SkyWayDataStream) {
     if (this.streams.add(stream) == null) return;
-    console.log(`openStream ${stream.peer.peerId}`);
+    netDebug(`openStream ${stream.peer.peerId}`);
 
     this.trustedPeerIds.delete(stream.peer.peerId);
     this.maybeUnavailablePeerIds.add(stream.peer.peerId);
@@ -329,7 +330,7 @@ export class SkyWayConnection implements Connection {
     for (let peerId of relayingPeerIds) {
       let conn = this.streams.find(peerId);
       if (conn && conn.open) {
-        console.log('<' + peerId + '> need to forward...');
+        netDebug('<' + peerId + '> need to forward...');
         conn.send(container);
       }
     }
@@ -355,7 +356,7 @@ export class SkyWayConnection implements Connection {
       for (let userId of unknownUserIds) {
         let peer = this.makeFriendPeer(userId);
         if (!this.maybeUnavailablePeerIds.has(peer.peerId) && this.connect(peer)) {
-          console.log('auto connect to unknown Peer <' + peer.peerId + '>');
+          netDebug('auto connect to unknown Peer <' + peer.peerId + '>');
         }
       }
     }

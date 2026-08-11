@@ -103,12 +103,14 @@ export class TabletopService {
       .on('UPDATE_GAME_OBJECT', 900, event => {
         // After ObjectSynchronizer (prio 1000) applies remote SyncVars, restore this
         // client's view pose so dual-map appearance/coords stay per-map.
+        // Altitude/height/size live on DataElement children — only reproject those
+        // (and TabletopObject itself). Reprojecting every sheet field (HP…) storms CD/net.
         if (event.isSendFromSelf) return;
         const id = event.data?.identifier as string;
         if (!id) return;
-        const obj = ObjectStore.instance.get(id);
-        if (obj instanceof TabletopObject) {
-          TabletopObject.reprojectForLocalView(obj);
+        const tabletop = TabletopObject.resolveReprojectTarget(ObjectStore.instance.get(id));
+        if (tabletop) {
+          TabletopObject.reprojectForLocalView(tabletop);
         }
       })
       .on('BEFORE_VIEW_TABLE_CHANGE', () => {

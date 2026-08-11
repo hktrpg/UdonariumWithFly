@@ -54,14 +54,18 @@ export class RangeSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   get length(): number { return this.range?.length ?? 1; }
   set length(value: number) {
-    const el = this.range?.commonDataElement?.getFirstElementByName('length');
-    if (el) el.value = value;
+    this.range?.mutateAppearance(() => {
+      const el = this.range?.commonDataElement?.getFirstElementByName('length');
+      if (el) el.value = value;
+    });
   }
 
   get width(): number { return this.range?.width ?? 1; }
   set width(value: number) {
-    const el = this.range?.commonDataElement?.getFirstElementByName('width');
-    if (el) el.value = value;
+    this.range?.mutateAppearance(() => {
+      const el = this.range?.commonDataElement?.getFirstElementByName('width');
+      if (el) el.value = value;
+    });
   }
 
   get opacityPercent(): number {

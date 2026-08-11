@@ -239,7 +239,6 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   }
 
   private isAppearancePlacementField(name: string): boolean {
-    return name === 'size' || name === 'height' || name === 'altitude'
-      || name === 'width' || name === 'depth' || name === 'length';
+    return TabletopObject.isPlacementFootprintName(name);
   }
 }

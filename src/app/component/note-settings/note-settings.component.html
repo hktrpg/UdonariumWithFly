@@ -16,7 +16,7 @@
       </label>
       <label class="field title-bg-field">
         <span>{{ 'note.fieldTitleBg' | i18n }}</span>
-        <input type="color" [(ngModel)]="note.titleBgColor" [disabled]="GuestMode() || !note.isShowTitle" />
+        <input type="color" [ngModel]="note.titleBgColor" (ngModelChange)="setTitleBgColor($event)" [disabled]="GuestMode() || !note.isShowTitle" />
       </label>
       <span class="kind-pill">{{ ('note.kind.' + note.contentKind) | i18n }}</span>
     </div>
@@ -40,7 +40,7 @@
       </label>
       <label class="field" *ngIf="editMode === 'text'">
         <span>{{ 'note.fieldAlign' | i18n }}</span>
-        <select [ngModel]="note.textAlign || 'left'" (ngModelChange)="note.textAlign = $event" [disabled]="GuestMode()">
+        <select [ngModel]="note.textAlign || 'left'" (ngModelChange)="setTextAlign($event)" [disabled]="GuestMode()">
           <option value="left">{{ 'note.align.left' | i18n }}</option>
           <option value="center">{{ 'note.align.center' | i18n }}</option>
           <option value="right">{{ 'note.align.right' | i18n }}</option>

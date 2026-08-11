@@ -5,6 +5,7 @@ import {
 } from './table-placement-view-state';
 import { CardState } from './card';
 import { TerrainViewState } from './terrain';
+import { ObjectStore } from './core/synchronize-object/object-store';
 import {
   makeCard,
   makeCharacter,
@@ -52,6 +53,52 @@ describe('table-placement-view-state', () => {
     expect(ch.isInverse).toBeTrue();
     expect(ch.tokenFrame).toBe('polaroid');
     expect(viewStatesEqual(snap, capturePlacementViewState(ch))).toBeTrue();
+  });
+
+  it('applyPlacementViewState never broadcasts DataElement updates', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+    const ch = makeCharacter('vs_no_broadcast');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 1, y: 1, posZ: 0, altitude: 0, size: 1 }, true);
+
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    const sizeEl = ch.commonDataElement.getFirstElementByName('size')!;
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+
+    applyPlacementViewState(ch, { altitude: 5, size: 3, rotate: 45 });
+
+    expect(ch.altitude).toBe(5);
+    expect(ch.size).toBe(3);
+    expect(ch.rotate).toBe(45);
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).not.toContain(altitudeEl.identifier);
+    expect(updatedIds).not.toContain(sizeEl.identifier);
+  });
+
+  it('applyPlacementViewState skips unchanged SyncVars (no redundant update)', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+    const ch = makeCharacter('vs_skip_same');
+    ch.rotate = 10;
+    ch.isInverse = true;
+    const snap = capturePlacementViewState(ch);
+    const before = ch.version;
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+
+    applyPlacementViewState(ch, snap);
+
+    expect(ch.rotate).toBe(10);
+    expect(ch.isInverse).toBeTrue();
+    expect(ch.version).toBe(before);
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).not.toContain(ch.identifier);
   });
 
   it('captures card / dice / terrain / mask / note desktop SyncVars', () => {

@@ -2,6 +2,8 @@ import { CardState } from './card';
 import { TerrainViewState } from './terrain';
 import { TabletopObject } from './tabletop-object';
 import { PLACEMENT_VIEW_STATE_KEYS } from './table-placement-view-state';
+import { ObjectStore } from './core/synchronize-object/object-store';
+import { DataElement } from './data-element';
 import {
   makeCard,
   makeCharacter,
@@ -309,6 +311,210 @@ describe('TabletopObject placements / migrate / repair', () => {
 
     expect(ch.getPoseForTable('tableB')!.rotate).toBe(90);
     expect(ch.getPoseForTable('tableA')!.rotate).toBe(0);
+  });
+
+  it('writeDataElementValue routes footprint fields through mutateAppearance', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_write_de');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    TabletopObject.writeDataElementValue(altitudeEl, 4);
+
+    expect(ch.altitude).toBe(4);
+    expect(ch.getPoseForTable('tableA')!.altitude).toBe(4);
+    expect(ch.getPoseForTable('tableB')!.altitude).toBe(0);
+
+    ch.mutateAppearance(() => { ch.isAltitudeIndicate = false; });
+    expect(ch.isAltitudeIndicate).toBeFalse();
+    expect(ch.getPoseForTable('tableA')!.isAltitudeIndicate).toBeFalse();
+  });
+
+  it('resolveOwningTabletop finds token from altitude/height DataElement', () => {
+    makeTable('tableA');
+    const ch = makeCharacter('char_owner');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0 }, true);
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude');
+    const heightEl = ch.commonDataElement.getFirstElementByName('height');
+    expect(altitudeEl).toBeTruthy();
+    expect(heightEl).toBeTruthy();
+    expect(TabletopObject.resolveOwningTabletop(altitudeEl!)).toBe(ch);
+    expect(TabletopObject.resolveOwningTabletop(heightEl!)).toBe(ch);
+    expect(TabletopObject.resolveOwningTabletop(ch.commonDataElement)).toBe(ch);
+  });
+
+  it('reproject after remote DataElement altitude/height overwrite keeps local map', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_remote_alt');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0, altitude: 3, height: 5 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0, altitude: 0, height: 0 }, false);
+    ch.hydratePoseForView('tableB');
+    expect(ch.altitude).toBe(0);
+    expect(ch.height).toBe(0);
+
+    // Peer on map A wrote shared DataElements (arrives as DataElement UPDATE, not Character).
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    const heightEl = ch.commonDataElement.getFirstElementByName('height')!;
+    altitudeEl.value = 3;
+    heightEl.value = 5;
+    expect(ch.altitude).toBe(3);
+    expect(ch.height).toBe(5);
+
+    const owner = TabletopObject.resolveOwningTabletop(altitudeEl);
+    expect(owner).toBe(ch);
+    TabletopObject.reprojectForLocalView(owner!);
+
+    expect(ch.altitude).toBe(0);
+    expect(ch.height).toBe(0);
+    expect(ch.getPoseForTable('tableA')!.altitude).toBe(3);
+    expect(ch.getPoseForTable('tableA')!.height).toBe(5);
+    expect(ch.getPoseForTable('tableB')!.altitude).toBe(0);
+    expect(ch.getPoseForTable('tableB')!.height).toBe(0);
+  });
+
+  it('reprojectForLocalView does not broadcast DataElement updates (no sync storm)', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_no_storm');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0, altitude: 3, size: 2 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0, altitude: 0, size: 1 }, false);
+    ch.hydratePoseForView('tableB');
+
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    const sizeEl = ch.commonDataElement.getFirstElementByName('size')!;
+    altitudeEl.value = 3;
+    sizeEl.value = 2;
+
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+    TabletopObject.reprojectForLocalView(ch);
+
+    expect(ch.altitude).toBe(0);
+    expect(ch.size).toBe(1);
+    // apply must restore footprint locally without ObjectStore.update fan-out
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).not.toContain(altitudeEl.identifier);
+    expect(updatedIds).not.toContain(sizeEl.identifier);
+  });
+
+  it('silent hydrateAllForView does not broadcast footprint DataElements', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_hydrate_silent');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0, altitude: 1, size: 1 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0, altitude: 4, size: 2 }, false);
+    ch.hydratePoseForView('tableA');
+
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    const sizeEl = ch.commonDataElement.getFirstElementByName('size')!;
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+
+    viewTables('tableB');
+    TabletopObject.hydrateAllForView('tableB', true);
+
+    expect(ch.altitude).toBe(4);
+    expect(ch.size).toBe(2);
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).not.toContain(altitudeEl.identifier);
+    expect(updatedIds).not.toContain(sizeEl.identifier);
+  });
+
+  it('resolveReprojectTarget ignores non-footprint DataElements (HP etc.)', () => {
+    makeTable('tableA');
+    const ch = makeCharacter('char_hp_filter');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0 }, true);
+
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+    const sizeEl = ch.commonDataElement.getFirstElementByName('size')!;
+    expect(TabletopObject.resolveReprojectTarget(ch)).toBe(ch);
+    expect(TabletopObject.resolveReprojectTarget(altitudeEl)).toBe(ch);
+    expect(TabletopObject.resolveReprojectTarget(sizeEl)).toBe(ch);
+
+    const hp = DataElement.create('HP', 10, { type: 'numberResource' }, 'fake_hp_reproject');
+    ch.commonDataElement.appendChild(hp);
+    expect(TabletopObject.resolveOwningTabletop(hp)).toBe(ch);
+    expect(TabletopObject.resolveReprojectTarget(hp)).toBeNull();
+  });
+
+  it('writeDataElementValue still broadcasts intentional footprint edits', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+    const ch = makeCharacter('char_write_broadcast');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 1, y: 1, posZ: 0, altitude: 0 }, true);
+    const altitudeEl = ch.commonDataElement.getFirstElementByName('altitude')!;
+
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+    TabletopObject.writeDataElementValue(altitudeEl, 7);
+
+    expect(ch.altitude).toBe(7);
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).toContain(altitudeEl.identifier);
+  });
+
+  it('reproject restores note/terrain footprint without DataElement broadcast', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const note = makeTextNote('note_storm');
+    note.location = { name: 'table', x: 0, y: 0 };
+    note.addToTable('tableA', { x: 10, y: 10, posZ: 0, width: 3, height: 2 }, false);
+    note.addToTable('tableB', { x: 40, y: 40, posZ: 0, width: 1, height: 1 }, false);
+    note.hydratePoseForView('tableB');
+
+    const widthEl = note.commonDataElement.getFirstElementByName('width')!;
+    const heightEl = note.commonDataElement.getFirstElementByName('height')!;
+    widthEl.value = 3;
+    heightEl.value = 2;
+
+    const terrain = makeTerrain('terrain_storm');
+    terrain.location = { name: 'table', x: 0, y: 0 };
+    terrain.addToTable('tableA', { x: 5, y: 5, posZ: 0, width: 4, height: 3, depth: 2 }, false);
+    terrain.addToTable('tableB', { x: 20, y: 20, posZ: 0, width: 1, height: 1, depth: 1 }, false);
+    terrain.hydratePoseForView('tableB');
+    const tWidth = terrain.commonDataElement.getFirstElementByName('width')!;
+    tWidth.value = 4;
+
+    const updateSpy = spyOn(ObjectStore.instance, 'update').and.callThrough();
+    TabletopObject.reprojectForLocalView(note);
+    TabletopObject.reprojectForLocalView(terrain);
+
+    expect(note.width).toBe(1);
+    expect(note.height).toBe(1);
+    expect(terrain.width).toBe(1);
+    const updatedIds = updateSpy.calls.allArgs().map(args => {
+      const arg = args[0];
+      return typeof arg === 'string' ? arg : arg?.identifier;
+    });
+    expect(updatedIds).not.toContain(widthEl.identifier);
+    expect(updatedIds).not.toContain(heightEl.identifier);
+    expect(updatedIds).not.toContain(tWidth.identifier);
   });
 
   it('reprojectForLocalView restores local map rotate after remote SyncVar overwrite', () => {

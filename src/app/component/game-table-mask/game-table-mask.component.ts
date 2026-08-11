@@ -214,7 +214,11 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   set altitude(altitude: number) { this.gameTableMask.altitude = altitude; }
 
   get isAltitudeIndicate(): boolean { return this.gameTableMask.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.gameTableMask.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.gameTableMask.mutateAppearance(() => {
+      this.gameTableMask.isAltitudeIndicate = isAltitudeIndicate;
+    });
+  }
 
   get gameTableMaskAltitude(): number {
     return +this.altitude.toFixed(1); 

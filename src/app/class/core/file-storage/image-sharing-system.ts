@@ -1,5 +1,6 @@
 import { EventSystem, Network } from '../system';
 import { UUID } from '../system/util/uuid';
+import { netDebug } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
@@ -25,7 +26,7 @@ export class ImageSharingSystem {
     EventSystem.register(this)
       .on('CONNECT_PEER', 1, event => {
         if (!event.isSendFromSelf) return;
-        console.log('CONNECT_PEER ImageStorageService !!!', event.data.peerId);
+        netDebug('CONNECT_PEER ImageStorageService !!!', event.data.peerId);
         ImageStorage.instance.synchronize();
       })
       .on('XML_LOADED', event => {
@@ -33,7 +34,7 @@ export class ImageSharingSystem {
       })
       .on('SYNCHRONIZE_FILE_LIST', event => {
         if (event.isSendFromSelf) return;
-        console.log('SYNCHRONIZE_FILE_LIST ImageStorageService ' + event.sendFrom);
+        netDebug('SYNCHRONIZE_FILE_LIST ImageStorageService ' + event.sendFrom);
 
         let otherCatalog: CatalogItem[] = event.data;
         let request: CatalogItem[] = [];
@@ -74,7 +75,7 @@ export class ImageSharingSystem {
         if (this.isLimitSendTask() === false && 0 < randomRequest.length && !this.existsSendTask(event.data.receiver)) {
           // 送信
           let updateImages: ImageContext[] = this.makeSendUpdateImages(randomRequest);
-          console.log('REQUEST_FILE_RESOURE ImageStorageService Send!!! ' + event.data.receiver + ' -> ' + updateImages.length);
+          netDebug('REQUEST_FILE_RESOURE ImageStorageService Send!!! ' + event.data.receiver + ' -> ' + updateImages.length);
           this.startSendTask(updateImages, event.data.receiver);
         } else {
           // 中継
@@ -83,16 +84,16 @@ export class ImageSharingSystem {
           if (-1 < index) candidatePeers.splice(index, 1);
 
           for (let peerId of candidatePeers) {
-            console.log('REQUEST_FILE_RESOURE ImageStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers);
+            netDebug('REQUEST_FILE_RESOURE ImageStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers);
             EventSystem.call(event, peerId);
             return;
           }
-          console.log('REQUEST_FILE_RESOURE ImageStorageService overflow...' + event.data.receiver, randomRequest.length);
+          netDebug('REQUEST_FILE_RESOURE ImageStorageService overflow...' + event.data.receiver, randomRequest.length);
         }
       })
       .on('UPDATE_FILE_RESOURE', 1000, event => {
         let updateImages: ImageContext[] = event.data.updateImages;
-        console.log('UPDATE_FILE_RESOURE ImageStorageService ' + event.sendFrom + ' -> ', updateImages);
+        netDebug('UPDATE_FILE_RESOURE ImageStorageService ' + event.sendFrom + ' -> ', updateImages);
         for (let context of updateImages) {
           if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
           if (context.thumbnail.blob) context.thumbnail.blob = new Blob([context.thumbnail.blob], { type: context.thumbnail.type });
@@ -100,7 +101,7 @@ export class ImageSharingSystem {
         }
       })
       .on('START_FILE_TRANSMISSION', event => {
-        console.log('START_FILE_TRANSMISSION ' + event.data.taskIdentifier);
+        netDebug('START_FILE_TRANSMISSION ' + event.data.taskIdentifier);
         let identifier = event.data.taskIdentifier;
         let image: ImageFile = ImageStorage.instance.get(identifier);
         if (this.receiveTaskMap.has(identifier) || (image && ImageState.COMPLETE <= image.state)) {
@@ -150,7 +151,7 @@ export class ImageSharingSystem {
     }
 
     task.start();
-    console.log('startReceiveTask => ', this.receiveTaskMap.size);
+    netDebug('startReceiveTask => ', this.receiveTaskMap.size);
   }
 
   private stopSendTask(identifier: string) {
@@ -158,7 +159,7 @@ export class ImageSharingSystem {
     if (task) { task.cancel(); }
     this.sendTaskMap.delete(identifier);
 
-    console.log('stopSendTask => ', this.sendTaskMap.size);
+    netDebug('stopSendTask => ', this.sendTaskMap.size);
   }
 
   private stopReceiveTask(identifier: string) {
@@ -166,11 +167,11 @@ export class ImageSharingSystem {
     if (task) { task.cancel(); }
     this.receiveTaskMap.delete(identifier);
 
-    console.log('stopReceiveTask => ', this.receiveTaskMap.size);
+    netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
   private request(request: CatalogItem[], peerId: string) {
-    console.log('requestFile() ' + peerId);
+    netDebug('requestFile() ' + peerId);
     let peerIds = Network.peerIds;
     EventSystem.call('REQUEST_FILE_RESOURE', { identifiers: request, receiver: Network.peerId, candidatePeers: peerIds }, peerId);
   }

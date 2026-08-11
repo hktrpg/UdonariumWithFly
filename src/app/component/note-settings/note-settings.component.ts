@@ -111,6 +111,18 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  setTitleBgColor(color: string) {
+    if (!this.note || this.GuestMode()) return;
+    this.note.mutateAppearance(() => { this.note.titleBgColor = color; });
+    this.changeDetector.markForCheck();
+  }
+
+  setTextAlign(align: string) {
+    if (!this.note || this.GuestMode()) return;
+    this.note.mutateAppearance(() => { this.note.textAlign = align; });
+    this.changeDetector.markForCheck();
+  }
+
   onDragOver(e: DragEvent) {
     if (this.GuestMode()) return;
     e.preventDefault();

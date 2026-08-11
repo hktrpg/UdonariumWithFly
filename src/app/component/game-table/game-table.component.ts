@@ -323,9 +323,15 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const obj = ObjectStore.instance.get(id);
     const is2D = !!this.currentTable?.is2DMode;
 
-    if (obj instanceof GameCharacter && !is2D) {
-      const foot = (obj.size || 1) * gridSize;
-      return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
+    // Prefer model math for characters — live pin DOM changes mid-CD and trips NG0100 on map switch.
+    if (obj instanceof GameCharacter) {
+      if (!is2D) {
+        const foot = (obj.size || 1) * gridSize;
+        return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
+      }
+      const s = (obj.size || 1) * gridSize;
+      const p = pinAnchorPx(obj, s, s);
+      return { x: p.x, y: p.y, z: this.clueStringsZ };
     }
 
     const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
@@ -355,11 +361,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           return { x: local.x, y: local.y, z: this.clueStringsZ };
         }
       }
-    }
-    if (obj instanceof GameCharacter) {
-      const s = (obj.size || 1) * gridSize;
-      const p = pinAnchorPx(obj, s, s);
-      return { x: p.x, y: p.y, z: this.clueStringsZ };
     }
     if (obj instanceof TextNote) {
       const w = (obj.width || 1) * gridSize;

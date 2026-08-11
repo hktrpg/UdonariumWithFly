@@ -37,7 +37,6 @@ export class ChatMessageService {
 
   calibrateTimeOffset() {
     if (this.intervalTimer != null) {
-      console.log('calibrateTimeOffset was canceled.');
       return;
     }
     let index = Math.floor(Math.random() * this.ntpApiUrls.length);
@@ -56,14 +55,10 @@ export class ChatMessageService {
         let fixedTime = st + latency;
         this.timeOffset = fixedTime;
         this.performanceOffset = endTime;
-        console.log('latency: ' + latency + 'ms');
-        console.log('st: ' + st + '');
-        console.log('timeOffset: ' + this.timeOffset);
-        console.log('performanceOffset: ' + this.performanceOffset);
         this.setIntervalTimer();
       })
-      .catch(error => {
-        console.warn('There has been a problem with your fetch operation: ', error.message);
+      .catch(() => {
+        // NTP is best-effort (often blocked); retry later without console noise.
         this.setIntervalTimer();
       });
     this.setIntervalTimer();

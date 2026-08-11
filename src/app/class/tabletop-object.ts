@@ -1,5 +1,6 @@
 import { ImageFile } from './core/file-storage/image-file';
 import { ImageStorage } from './core/file-storage/image-storage';
+import { GameObject } from './core/synchronize-object/game-object';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { ObjectStore } from './core/synchronize-object/object-store';
@@ -239,6 +240,36 @@ export class TabletopObject extends ObjectNode {
       }
     }
     poseDebug('hydrateAllForView', { viewId, silent, hydrated, skippedNoPlacement: skipped });
+  }
+
+  /**
+   * Walk ObjectNode parents to the owning TabletopObject.
+   * Remote altitude/height/size arrive as DataElement UPDATEs, not Character UPDATEs.
+   */
+  static resolveOwningTabletop(node: ObjectNode | null | undefined): TabletopObject | null {
+    let cur: ObjectNode | null | undefined = node;
+    const seen = new Set<string>();
+    while (cur) {
+      if (seen.has(cur.identifier)) break;
+      seen.add(cur.identifier);
+      if (cur instanceof TabletopObject) return cur;
+      cur = cur.parent;
+    }
+    return null;
+  }
+
+  /**
+   * Which tabletop (if any) should reproject after a remote UPDATE.
+   * Only the piece itself or footprint DataElements — never HP/status sheet fields.
+   */
+  static resolveReprojectTarget(obj: GameObject | null | undefined): TabletopObject | null {
+    if (!obj) return null;
+    if (obj instanceof TabletopObject) return obj;
+    const name = (obj as any).name;
+    if (typeof name === 'string' && TabletopObject.isPlacementFootprintName(name)) {
+      return TabletopObject.resolveOwningTabletop(obj as any);
+    }
+    return null;
   }
 
   /**
@@ -724,6 +755,26 @@ export class TabletopObject extends ObjectNode {
     if (!this.detailDataElement) this.rootDataElement.appendChild(DataElement.create('detail', '', {}, 'detail_' + this.identifier));
   }
 
+  /** Footprint DataElements stored per map in tablePlacements. */
+  static isPlacementFootprintName(name: string): boolean {
+    return name === 'size' || name === 'height' || name === 'altitude'
+      || name === 'width' || name === 'depth' || name === 'length';
+  }
+
+  /**
+   * Write a DataElement value. Footprint fields go through mutateAppearance so
+   * other maps keep their own size/height/altitude; other fields write directly.
+   */
+  static writeDataElementValue(el: DataElement | null | undefined, value: any) {
+    if (!el) return;
+    const owner = TabletopObject.resolveOwningTabletop(el);
+    if (owner && TabletopObject.isPlacementFootprintName(el.name)) {
+      owner.mutateAppearance(() => { el.value = value; });
+      return;
+    }
+    el.value = value;
+  }
+
   protected getElement(name: string, from: DataElement = this.rootDataElement): DataElement {
     if (!from) return null;
     let element: DataElement = this._dataElements[name] ? ObjectStore.instance.get(this._dataElements[name]) : null;
@@ -753,8 +804,7 @@ export class TabletopObject extends ObjectNode {
   protected setCommonValue(elementName: string, value: any) {
     let element = this.getElement(elementName, this.commonDataElement);
     if (!element) { return; }
-    const isAppearance = elementName === 'size' || elementName === 'height' || elementName === 'altitude'
-      || elementName === 'width' || elementName === 'depth' || elementName === 'length';
+    const isAppearance = TabletopObject.isPlacementFootprintName(elementName);
     if (isAppearance) {
       this.mutateAppearance(() => { element.value = value; });
       return;

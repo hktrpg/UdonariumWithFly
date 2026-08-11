@@ -473,4 +473,9 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   textAreaActivate() {
     if (this.textAreaElementRef && this.textAreaElementRef.nativeElement) this.textAreaElementRef.nativeElement.focus();
   }
+
+  /** Footprint DataElements (size/altitude/length/…) stay per-map. */
+  writeOverviewDataElm(el: DataElement, value: any) {
+    TabletopObject.writeDataElementValue(el, value);
+  }
 }

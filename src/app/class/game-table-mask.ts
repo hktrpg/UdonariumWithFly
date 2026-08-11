@@ -53,7 +53,7 @@ export class GameTableMask extends TabletopObject {
   }
   set textAlignV(v: string) {
     const vert = (GameTableMask.TEXT_ALIGN_V as readonly string[]).includes(v) ? v : 'middle';
-    this.textPosition = `${vert}-${this.textAlignH}`;
+    this.mutateAppearance(() => { this.textPosition = `${vert}-${this.textAlignH}`; });
   }
 
   get textAlignH(): 'left' | 'center' | 'right' {
@@ -65,7 +65,7 @@ export class GameTableMask extends TabletopObject {
   }
   set textAlignH(h: string) {
     const horiz = (GameTableMask.TEXT_ALIGN_H as readonly string[]).includes(h) ? h : 'center';
-    this.textPosition = `${this.textAlignV}-${horiz}`;
+    this.mutateAppearance(() => { this.textPosition = `${this.textAlignV}-${horiz}`; });
   }
   /** When true, footprint blocks light and vision (opt-in; floors stay open by default). */
   @SyncVar() affectsLight: boolean = false;

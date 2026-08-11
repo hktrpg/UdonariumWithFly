@@ -429,7 +429,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         get: () => hasFace && gameObject.isUseIconToOverviewImage,
         set: (v) => {
           if (!this.hasOverviewFaceIcon(gameObject)) return;
-          gameObject.isUseIconToOverviewImage = v;
+          gameObject.mutateAppearance(() => { gameObject.isUseIconToOverviewImage = v; });
         },
         on: this.i18n.t('char.overviewFaceOn'),
         off: this.i18n.t('char.overviewFaceOff'),
@@ -439,7 +439,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }),
       contextMenuToggleCheck({
         get: () => gameObject.isDropShadow,
-        set: (v) => { gameObject.isDropShadow = v; },
+        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isDropShadow = v; }); },
         on: this.i18n.t('char.shadowOn'),
         off: this.i18n.t('char.shadowOff'),
         after: afterInv,
@@ -463,7 +463,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       }),
       contextMenuToggleCheck({
         get: () => gameObject.isAltitudeIndicate,
-        set: (v) => { gameObject.isAltitudeIndicate = v; },
+        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
         on: this.i18n.t('char.altitudeOn'),
         off: this.i18n.t('char.altitudeOff'),
         after: afterInv,
@@ -483,7 +483,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const chatPanels: ContextMenuAction[] = [
       contextMenuToggleCheck({
         get: () => gameObject.isShowChatBubble,
-        set: (v) => { gameObject.isShowChatBubble = v; },
+        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isShowChatBubble = v; }); },
         on: this.i18n.t('char.chatBubbleOn'),
         off: this.i18n.t('char.chatBubbleOff'),
         tip: this.i18n.t('char.chatBubbleTip'),
@@ -804,10 +804,22 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   toggleOverviewFaceIcon(gameObject: TabletopObject) {
     if (!this.hasOverviewFaceIcon(gameObject)) {
-      gameObject.isUseIconToOverviewImage = false;
+      gameObject.mutateAppearance(() => { gameObject.isUseIconToOverviewImage = false; });
       return;
     }
-    gameObject.isUseIconToOverviewImage = !gameObject.isUseIconToOverviewImage;
+    gameObject.mutateAppearance(() => {
+      gameObject.isUseIconToOverviewImage = !gameObject.isUseIconToOverviewImage;
+    });
+  }
+
+  /** Toggle a per-map SyncVar from the template (Angular templates cannot parse arrow blocks). */
+  togglePlacementFlag(gameObject: TabletopObject, key: 'isShowChatBubble' | 'isDropShadow' | 'isAltitudeIndicate') {
+    gameObject.mutateAppearance(() => { (gameObject as any)[key] = !(gameObject as any)[key]; });
+  }
+
+  /** Footprint fields (size/altitude/…) stay per-map via mutateAppearance. */
+  writeInventoryDataElm(el: DataElement, value: any) {
+    TabletopObject.writeDataElementValue(el, value);
   }
 
   /** Characters can be dragged to table / common / personal / graveyard. */

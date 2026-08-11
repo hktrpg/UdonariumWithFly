@@ -1190,16 +1190,18 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           action: null,
           subActions: [
             ...fxWithoutReset,
-            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.aura = -1; EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
+            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.mutateAppearance(() => { this.character.aura = -1; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
               const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
-              return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.aura = i; EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
+              return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.mutateAppearance(() => { this.character.aura = i; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
             })) },
             ContextMenuSeparator,
             {
               name: this.i18n.t('chat.ctx.reset'),
               action: () => {
-                clearImageEffects(this.character);
-                this.character.aura = -1;
+                this.character.mutateAppearance(() => {
+                  clearImageEffects(this.character);
+                  this.character.aura = -1;
+                });
                 EventSystem.trigger('UPDATE_INVENTORY', null);
               },
               disabled: !anyImageEffect(this.character) && this.character.aura == -1

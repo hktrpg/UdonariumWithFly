@@ -61,6 +61,11 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     this.character?.mutateAppearance(() => { this.character.dimLight = n; });
   }
 
+  /** Desktop cosmetics stored per map. */
+  setPlacementFlag(key: string, value: any) {
+    this.character?.mutateAppearance(() => { (this.character as any)[key] = value; });
+  }
+
   get size(): number { return this.character?.size ?? 1; }
   set size(value: number) {
     this.character?.mutateAppearance(() => {
