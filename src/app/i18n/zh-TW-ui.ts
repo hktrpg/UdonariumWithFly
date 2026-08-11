@@ -532,7 +532,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.fieldTitleBg': '標題欄底色',
   'note.showTitle': '顯示標題', 'note.whiteOut': '白底遮罩', 'note.upright': '直立', 'note.upright2dLocked': '2D 地圖筆記固定平放',
   'note.pickImage': '選擇圖片', 'note.pdfPage': '頁碼', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加影片。',
-  'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.ctrlHoverHint': '提示：在桌面筆記上按住 Ctrl 並懸停可預覽。',
+  'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.ctrlHoverHint': '提示：滑鼠移到桌面筆記上後再按 Ctrl 可預覽。',
   'note.settingsEmpty': '請選擇要編輯的筆記。',
   'note.selfOnly': '僅自己可見', 'note.showEveryone': '顯示給所有人', 'note.importFile': '匯入檔案', 'note.dropHint': '拖曳文字／圖片／影片／PDF 到此處即可匯入。',
   'mask.clickAction': '點擊動作', 'mask.clickSettings': '點擊動作設定',

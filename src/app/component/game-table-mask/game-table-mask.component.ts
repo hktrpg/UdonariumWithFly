@@ -4,6 +4,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  HostBinding,
   HostListener,
   Input,
   NgZone,
@@ -70,6 +71,38 @@ import { SelectionState, TabletopSelectionService } from 'service/tabletop-selec
     standalone: false
 })
 export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewInit {
+  /** GM+Alt pass-through: one shared capture listener for Alt+double-click mask actions. */
+  private static readonly altPassThroughMasks = new Set<GameTableMaskComponent>();
+  private static altPassThroughDblClickBound = false;
+  private static readonly onAltPassThroughDocDblClick = (e: MouseEvent) => {
+    if (!e.altKey) return;
+    // Mask PE is off during Alt pass-through; do not steal dblclick from a piece under the mask.
+    const hit = document.elementFromPoint(e.clientX, e.clientY) as Element | null;
+    if (hit) {
+      const underPiece = hit.closest(
+        'game-character, text-note, card, card-stack, dice-symbol, range, terrain'
+      );
+      if (underPiece) return;
+      const stackHost = hit.closest('[data-stack-id]') as HTMLElement | null;
+      if (stackHost && stackHost.tagName.toLowerCase() !== 'game-table-mask') return;
+    }
+    let best: GameTableMaskComponent = null;
+    let bestZ = -Infinity;
+    for (const c of GameTableMaskComponent.altPassThroughMasks) {
+      if (!c.isAltHitPassThrough || !c.hasClickAction) continue;
+      if (!c.coversClientPoint(e.clientX, e.clientY)) continue;
+      const z = typeof c.gameTableMask?.zindex === 'number' ? c.gameTableMask.zindex : -1;
+      if (z >= bestZ) {
+        best = c;
+        bestZ = z;
+      }
+    }
+    if (!best) return;
+    e.preventDefault();
+    e.stopPropagation();
+    best.runAltClickAction();
+  };
+
   @Input() gameTableMask: GameTableMask = null;
   @Input() is3D: boolean = false;
   get name(): string { return this.gameTableMask.name; }
@@ -234,6 +267,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   get isGMMode(): boolean { return this.gameTableMask.isGMMode; }
+
+  /** GM + Alt highlight: mask must not block pick/drag of outlined pieces underneath. */
+  @HostBinding('class.is-alt-hit-pass-through')
+  get isAltHitPassThrough(): boolean {
+    return !!(this.isGMMode && this.selectionService.canvasHighlight && !this.isScratching);
+  }
   get isScratching(): boolean { return !!this.gameTableMask.owner; }
 
   get hasOwner(): boolean { return this.gameTableMask.hasOwner; }
@@ -299,12 +338,14 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     EventSystem.unregister(this);
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.gameTableMask?.identifier}`, event => {
+        this.syncAltHitPassThroughListener();
         this.changeDetector.markForCheck();
       })
       .on(`UPDATE_OBJECT_CHILDREN/identifier/${this.gameTableMask?.identifier}`, event => {
         this.changeDetector.markForCheck();
       })
       .on('CHANGE_GM_MODE', event => {
+        this.syncAltHitPassThroughListener();
         this.changeDetector.markForCheck();
       })
       .on('SYNCHRONIZE_FILE_LIST', event => {
@@ -320,6 +361,10 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         });
       })
       .on(`UPDATE_SELECTION/identifier/${this.gameTableMask?.identifier}`, event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('CANVAS_HIGHLIGHT', () => {
+        this.syncAltHitPassThroughListener();
         this.changeDetector.markForCheck();
       });
     this.movableOption = {
@@ -337,9 +382,12 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     });
     this.input.onStart = this.onInputStart.bind(this);
     this.input.onMove = this.onInputMove.bind(this);
+    this.syncAltHitPassThroughListener();
   }
 
   ngOnDestroy() {
+    GameTableMaskComponent.altPassThroughMasks.delete(this);
+    GameTableMaskComponent.refreshAltPassThroughDocListener();
     this.input.destroy();
     EventSystem.unregister(this);
     clearTimeout(this._scratchingTimerId);
@@ -893,6 +941,39 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       return;
     }
     this.showDetail(this.gameTableMask);
+  }
+
+  private syncAltHitPassThroughListener() {
+    if (this.isAltHitPassThrough) {
+      GameTableMaskComponent.altPassThroughMasks.add(this);
+    } else {
+      GameTableMaskComponent.altPassThroughMasks.delete(this);
+    }
+    GameTableMaskComponent.refreshAltPassThroughDocListener();
+  }
+
+  private static refreshAltPassThroughDocListener() {
+    const need = GameTableMaskComponent.altPassThroughMasks.size > 0;
+    if (need && !GameTableMaskComponent.altPassThroughDblClickBound) {
+      document.addEventListener('dblclick', GameTableMaskComponent.onAltPassThroughDocDblClick, true);
+      GameTableMaskComponent.altPassThroughDblClickBound = true;
+    } else if (!need && GameTableMaskComponent.altPassThroughDblClickBound) {
+      document.removeEventListener('dblclick', GameTableMaskComponent.onAltPassThroughDocDblClick, true);
+      GameTableMaskComponent.altPassThroughDblClickBound = false;
+    }
+  }
+
+  private coversClientPoint(x: number, y: number): boolean {
+    const hit = this.elementRef.nativeElement.querySelector('.mask-hit-surface') as HTMLElement
+      || this.elementRef.nativeElement.querySelector('.component') as HTMLElement;
+    if (!hit) return false;
+    const r = hit.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+      && r.width > 1 && r.height > 1;
+  }
+
+  private runAltClickAction() {
+    this.ngZone.run(() => executeTabletopClickAction(this.gameTableMask, this.chatMessageService));
   }
 
   private showDetail(gameObject: GameTableMask) {

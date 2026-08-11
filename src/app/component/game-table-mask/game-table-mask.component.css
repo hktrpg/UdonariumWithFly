@@ -311,3 +311,8 @@
 .selected-highlight.is-magnetic {
   background-color: hsla(60, 100%, 75%, 0.6);
 }
+
+/* GM + Alt outline: punch through mask so buried pieces can be clicked / box-selected. */
+:host.is-alt-hit-pass-through .mask-hit-surface {
+  pointer-events: none !important;
+}

@@ -189,7 +189,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private lastPdfKey = '';
   private selfPreviewOpen = false;
   private isHovering = false;
-  private ctrlHeld = false;
+  /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
+  private pointerButtons = 0;
   private resizeStartW = 1;
   /** True if this note was already selected when the current pointer-down began. */
   private selectedOnPointerDown = false;
@@ -350,45 +351,49 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   @HostListener('mouseenter', ['$event'])
   onMouseEnter(e: MouseEvent) {
     this.isHovering = true;
-    this.ctrlHeld = !!(e.ctrlKey || e.metaKey);
-    this.syncSelfPreview();
+    this.pointerButtons = e.buttons;
+    // Preview opens only when Ctrl is pressed while already hovering (not Ctrl+sweep).
   }
 
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
     this.isHovering = true;
-    this.ctrlHeld = !!(e.ctrlKey || e.metaKey);
-    this.syncSelfPreview();
+    this.pointerButtons = e.buttons;
   }
 
   @HostListener('mouseleave')
   onMouseLeave() {
     this.isHovering = false;
-    // Hack: keep Ctrl preview until Ctrl is released (mouse leave alone does not close).
+    // Keep Ctrl preview until Ctrl is released (mouse leave alone does not close).
+  }
+
+  @HostListener('window:mouseup', ['$event'])
+  onWindowMouseUp(e: MouseEvent) {
+    this.pointerButtons = e.buttons;
   }
 
   @HostListener('window:keydown', ['$event'])
   onWindowKeyDown(e: KeyboardEvent) {
     if (e.key !== 'Control' && e.key !== 'Meta') return;
-    this.ctrlHeld = true;
-    this.syncSelfPreview();
+    if (e.repeat) return;
+    this.tryOpenSelfPreviewFromCtrl();
   }
 
   @HostListener('window:keyup', ['$event'])
   onWindowKeyUp(e: KeyboardEvent) {
     if (e.key !== 'Control' && e.key !== 'Meta') return;
-    this.ctrlHeld = false;
     this.closeSelfPreview();
   }
 
   @HostListener('window:blur')
   onWindowBlur() {
-    this.ctrlHeld = false;
+    this.pointerButtons = 0;
     this.closeSelfPreview();
   }
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
+    this.pointerButtons = e?.buttons ?? this.pointerButtons;
     this.selectedOnPointerDown = this.isSelected;
     if (this.GuestMode()) return;
     if (e.ctrlKey || e.metaKey) return;
@@ -778,10 +783,12 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     if (peerId === PeerCursor.myCursor?.peerId) EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
   }
 
-  private syncSelfPreview() {
-    // Open only on hover+Ctrl; once open, stay until Ctrl release.
-    if (this.isHovering && this.ctrlHeld) this.openSelfPreview();
-    else if (!this.ctrlHeld) this.closeSelfPreview();
+  /** Hover the note first, then press Ctrl/Meta to open; stays until Ctrl release. */
+  private tryOpenSelfPreviewFromCtrl() {
+    if (!this.isHovering) return;
+    // Ctrl+right-drag rotates the view — ignore Ctrl while any button is held.
+    if (this.pointerButtons !== 0 || this.pointerDeviceService.isDragging) return;
+    this.openSelfPreview();
   }
 
   private openSelfPreview() {

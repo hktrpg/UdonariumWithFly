@@ -143,24 +143,96 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /**
    * 3D yarn: one CSS beam per link with independent endpoint Z
    * (tall token only lifts its own end — not a shared flat plane).
+   * Template must read a cache — live DOM in CD causes NG0100 on scene switch.
    */
   clueStringBeamStyle(link: ClueLink): Record<string, string> {
     if (!link) return { display: 'none' };
+    let style = this.clueBeamStyleById.get(link.identifier);
+    if (!style) {
+      style = this.buildClueBeamStyle(link, false);
+      this.clueBeamStyleById.set(link.identifier, style);
+      this.scheduleClueYarnRefresh();
+    }
+    return style;
+  }
+
+  /** Cached 2D path; live pin tip is sampled after layout (see scheduleClueYarnRefresh). */
+  cluePathD(link: ClueLink): string {
+    if (!link) return '';
+    let d = this.cluePathDById.get(link.identifier);
+    if (d === undefined) {
+      d = this.buildCluePathD(link, false);
+      this.cluePathDById.set(link.identifier, d);
+      this.scheduleClueYarnRefresh();
+    }
+    return d;
+  }
+
+  private cluePathDById = new Map<string, string>();
+  private clueBeamStyleById = new Map<string, Record<string, string>>();
+  private clueYarnRefreshRaf = 0;
+
+  private buildCluePathD(link: ClueLink, allowDom: boolean): string {
     const grid = this.currentTable?.gridSize || 50;
-    const a = this.resolveYarnEndpoint(link.fromIdentifier, grid);
-    const b = this.resolveYarnEndpoint(link.toIdentifier, grid);
+    const p1 = this.resolveYarnEndpoint(link.fromIdentifier, grid, allowDom);
+    const p2 = this.resolveYarnEndpoint(link.toIdentifier, grid, allowDom);
+    if (!p1 || !p2) return '';
+    return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
+  }
+
+  private buildClueBeamStyle(link: ClueLink, allowDom: boolean): Record<string, string> {
+    const grid = this.currentTable?.gridSize || 50;
+    const a = this.resolveYarnEndpoint(link.fromIdentifier, grid, allowDom);
+    const b = this.resolveYarnEndpoint(link.toIdentifier, grid, allowDom);
     if (!a || !b) return { display: 'none' };
     return stringBeamStyle3d(a.x, a.y, a.z, b.x, b.y, b.z, link.color || '#c62828');
   }
 
-  /** Prefer live pin DOM position (handles note 3D tip-over); fall back to model math. */
-  cluePathD(link: ClueLink): string {
-    if (!link) return '';
-    const grid = this.currentTable?.gridSize || 50;
-    const p1 = this.resolvePinTablePoint(link.fromIdentifier, grid);
-    const p2 = this.resolvePinTablePoint(link.toIdentifier, grid);
-    if (!p1 || !p2) return '';
-    return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
+  private scheduleClueYarnRefresh() {
+    if (this.clueYarnRefreshRaf) return;
+    this.ngZone.runOutsideAngular(() => {
+      // Double rAF: wait until pin DOM has settled after the current CD / scene remount.
+      this.clueYarnRefreshRaf = requestAnimationFrame(() => {
+        this.clueYarnRefreshRaf = requestAnimationFrame(() => {
+          this.clueYarnRefreshRaf = 0;
+          this.refreshClueYarnCache();
+        });
+      });
+    });
+  }
+
+  private stopClueYarnRefresh() {
+    if (this.clueYarnRefreshRaf) {
+      cancelAnimationFrame(this.clueYarnRefreshRaf);
+      this.clueYarnRefreshRaf = 0;
+    }
+  }
+
+  private refreshClueYarnCache() {
+    const links = this.clueLinks;
+    const nextPath = new Map<string, string>();
+    const nextBeam = new Map<string, Record<string, string>>();
+    let changed = false;
+    for (const link of links) {
+      if (!link) continue;
+      const d = this.buildCluePathD(link, true);
+      const style = this.buildClueBeamStyle(link, true);
+      nextPath.set(link.identifier, d);
+      nextBeam.set(link.identifier, style);
+      if (this.cluePathDById.get(link.identifier) !== d) changed = true;
+      const prev = this.clueBeamStyleById.get(link.identifier);
+      if (!prev || prev['transform'] !== style['transform'] || prev['width'] !== style['width']
+        || prev['display'] !== style['display'] || prev['background'] !== style['background']) {
+        changed = true;
+      }
+    }
+    if (nextPath.size !== this.cluePathDById.size || nextBeam.size !== this.clueBeamStyleById.size) {
+      changed = true;
+    }
+    if (!changed) return;
+    this.cluePathDById = nextPath;
+    this.clueBeamStyleById = nextBeam;
+    this.ngZone.run(() => this.changeDetector.markForCheck());
   }
 
   /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
@@ -338,6 +410,212 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return { 'z-index': zindex };
   }
 
+  private setCanvasHighlightActive(active: boolean) {
+    if (this.canvasHighlightActive === active) {
+      if (active) this.refreshCanvasHighlightBoxes();
+      return;
+    }
+    this.canvasHighlightActive = active;
+    if (!active) {
+      this.stopCanvasHighlightLoop();
+      this.canvasHighlightBoxes = [];
+      this.changeDetector.markForCheck();
+      return;
+    }
+    this.refreshCanvasHighlightBoxes();
+    this.startCanvasHighlightLoop();
+    this.changeDetector.markForCheck();
+  }
+
+  private startCanvasHighlightLoop() {
+    this.stopCanvasHighlightLoop();
+    this.ngZone.runOutsideAngular(() => {
+      const tick = () => {
+        if (!this.canvasHighlightActive) return;
+        this.refreshCanvasHighlightBoxes();
+        this.canvasHighlightRaf = requestAnimationFrame(tick);
+      };
+      this.canvasHighlightRaf = requestAnimationFrame(tick);
+    });
+  }
+
+  private stopCanvasHighlightLoop() {
+    if (this.canvasHighlightRaf) {
+      cancelAnimationFrame(this.canvasHighlightRaf);
+      this.canvasHighlightRaf = 0;
+    }
+  }
+
+  private refreshCanvasHighlightBoxes() {
+    const root = this.rootElementRef?.nativeElement;
+    const tableRoot = this.gameObjects?.nativeElement;
+    if (!root || !tableRoot) {
+      this.canvasHighlightBoxes = [];
+      return;
+    }
+    const rootRect = root.getBoundingClientRect();
+    const gridSize = this.currentTable?.gridSize || 50;
+    const isGm = this.isGMMode;
+    const masks = this.tableMasks.filter(m => m && m.isVisibleOnTable);
+    const occlude = !isGm && masks.length > 0;
+
+    const ids = new Set<string>();
+    for (const piece of this.desktopLayerPieces) {
+      if (!piece?.identifier) continue;
+      if (piece instanceof GameCharacter && !(piece.isVisible || isGm)) continue;
+      if (occlude && !(piece instanceof GameTableMask) && this.isFootprintCoveredByMask(piece, masks, gridSize)) {
+        continue;
+      }
+      ids.add(piece.identifier);
+    }
+    for (const range of this.ranges) {
+      if (!range?.identifier || !range.isVisibleOnTable) continue;
+      if (occlude && this.isFootprintCoveredByMask(range, masks, gridSize)) continue;
+      ids.add(range.identifier);
+    }
+    for (const dice of this.diceSymbols) {
+      if (!dice?.identifier || !dice.isVisibleOnTable) continue;
+      if (occlude && this.isFootprintCoveredByMask(dice, masks, gridSize)) continue;
+      ids.add(dice.identifier);
+    }
+
+    const next: { id: string; left: number; top: number; width: number; height: number }[] = [];
+    for (const id of ids) {
+      const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+        ? CSS.escape(id)
+        : id.replace(/["\\]/g, '\\$&');
+      const host = tableRoot.querySelector(`[data-stack-id="${esc}"]`) as HTMLElement | null;
+      if (!host) continue;
+      const box = this.resolveCanvasHighlightBox(host, rootRect, id, gridSize);
+      if (!box) continue;
+      next.push(box);
+    }
+
+    // Avoid CD spam when boxes are unchanged (rAF runs outside Angular).
+    const same =
+      this.canvasHighlightBoxes.length === next.length
+      && this.canvasHighlightBoxes.every((b, i) =>
+        b.id === next[i].id
+        && Math.abs(b.left - next[i].left) < 0.5
+        && Math.abs(b.top - next[i].top) < 0.5
+        && Math.abs(b.width - next[i].width) < 0.5
+        && Math.abs(b.height - next[i].height) < 0.5);
+    if (same) return;
+    this.canvasHighlightBoxes = next;
+    this.ngZone.run(() => this.changeDetector.markForCheck());
+  }
+
+  /**
+   * Screen AABB for Alt outlines. Notes keep .component at ~0×0 for movable
+   * centering — prefer flat hit plate / upright face, then model footprint.
+   */
+  private resolveCanvasHighlightBox(
+    host: HTMLElement,
+    rootRect: DOMRect,
+    id: string,
+    gridSize: number,
+  ): { id: string; left: number; top: number; width: number; height: number } | null {
+    const candidates: (HTMLElement | null)[] = [
+      host.querySelector('.note-flat-hit') as HTMLElement | null,
+      host.querySelector('.upright-transform.is-front') as HTMLElement | null,
+      host.querySelector('.note-visual') as HTMLElement | null,
+      host.querySelector('.component-content') as HTMLElement | null,
+      host.querySelector('.component') as HTMLElement | null,
+      host,
+    ];
+    for (const el of candidates) {
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      return {
+        id,
+        left: r.left - rootRect.left,
+        top: r.top - rootRect.top,
+        width: r.width,
+        height: r.height,
+      };
+    }
+
+    // Last resort: table-plane footprint → screen (notes with collapsed DOM).
+    const obj = ObjectStore.instance.get(id);
+    const foot = this.tableFootprint(obj, gridSize);
+    if (!foot) return null;
+    const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
+    if (!origin) return null;
+    const tl = this.coordinateService.convertToGlobal({ x: foot.x, y: foot.y, z: 0 }, origin);
+    const br = this.coordinateService.convertToGlobal(
+      { x: foot.x + foot.w, y: foot.y + foot.h, z: 0 },
+      origin,
+    );
+    const left = Math.min(tl.x, br.x) - rootRect.left;
+    const top = Math.min(tl.y, br.y) - rootRect.top;
+    const width = Math.abs(br.x - tl.x);
+    const height = Math.abs(br.y - tl.y);
+    if (width < 2 || height < 2) return null;
+    return { id, left, top, width, height };
+  }
+
+  /** Table-plane AABB overlap: non-GM Alt must not outline pieces under a higher mask. */
+  private isFootprintCoveredByMask(
+    piece: { identifier: string; zindex?: number; getPoseForView?: () => { x: number; y: number } },
+    masks: GameTableMask[],
+    gridSize: number,
+  ): boolean {
+    const a = this.tableFootprint(piece, gridSize);
+    if (!a) return false;
+    const pieceZ = typeof piece.zindex === 'number' ? piece.zindex : -1;
+    for (const mask of masks) {
+      const b = this.tableFootprint(mask, gridSize);
+      if (!b) continue;
+      if (!this.rectsOverlap(a, b)) continue;
+      if (mask.zindex > pieceZ) return true;
+    }
+    return false;
+  }
+
+  private tableFootprint(
+    obj: any,
+    gridSize: number,
+  ): { x: number; y: number; w: number; h: number } | null {
+    if (!obj) return null;
+    const pose = typeof obj.getPoseForView === 'function'
+      ? obj.getPoseForView()
+      : { x: obj.location?.x ?? 0, y: obj.location?.y ?? 0 };
+    let w = gridSize;
+    let h = gridSize;
+    if (obj instanceof GameCharacter) {
+      w = h = Math.max(0.25, obj.size || 1) * gridSize;
+    } else if (obj instanceof GameTableMask || obj instanceof TextNote) {
+      w = Math.max(0.25, obj.width || 1) * gridSize;
+      h = Math.max(0.25, obj.height || 1) * gridSize;
+    } else if (obj instanceof Card) {
+      w = Math.max(0.25, obj.size || 2) * gridSize;
+      h = w * 1.4;
+    } else if (obj instanceof CardStack) {
+      const s = obj.topCard?.size || 2;
+      w = Math.max(0.25, s) * gridSize;
+      h = w * 1.4;
+    } else if (obj instanceof DiceSymbol) {
+      w = h = Math.max(0.25, obj.size || 1) * gridSize;
+    } else if (obj instanceof RangeArea) {
+      w = Math.max(0.25, obj.width || 1) * gridSize;
+      h = Math.max(0.25, obj.length || 1) * gridSize;
+    } else if (typeof obj.zindex === 'number') {
+      // Stackable fallback
+      w = h = gridSize;
+    } else {
+      return null;
+    }
+    return { x: pose.x, y: pose.y, w, h };
+  }
+
+  private rectsOverlap(
+    a: { x: number; y: number; w: number; h: number },
+    b: { x: number; y: number; w: number; h: number },
+  ): boolean {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
   isLayerNote(piece: Stackable): piece is TextNote { return piece instanceof TextNote; }
   isLayerCard(piece: Stackable): piece is Card { return piece instanceof Card; }
   isLayerCardStack(piece: Stackable): piece is CardStack { return piece instanceof CardStack; }
@@ -350,15 +628,27 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     return piece.identifier;
   };
+
+  /** Foundry-style Alt hold outlines (screen AABB). */
+  canvasHighlightActive = false;
+  canvasHighlightBoxes: { id: string; left: number; top: number; width: number; height: number }[] = [];
+  private canvasHighlightRaf = 0;
+
+  trackByHighlightBox = (_i: number, box: { id: string }) => box.id;
+
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
 
   private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
-    const p = this.resolveYarnEndpoint(id, gridSize);
+    const p = this.resolveYarnEndpoint(id, gridSize, true);
     return p ? { x: p.x, y: p.y } : null;
   }
 
   /** Full yarn endpoint: 3D tokens → footprint center; 2D → live pin tip (DOM) then model. */
-  private resolveYarnEndpoint(id: string, gridSize: number): { x: number; y: number; z: number } | null {
+  private resolveYarnEndpoint(
+    id: string,
+    gridSize: number,
+    allowDom = true,
+  ): { x: number; y: number; z: number } | null {
     if (!id) return null;
     const obj = ObjectStore.instance.get(id);
     const is2D = !!this.currentTable?.is2DMode;
@@ -373,27 +663,30 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       ? CSS.escape(id)
       : id.replace(/["\\]/g, '\\$&');
     // 2D corkboard: snap to the live pin tip (same as pre–3D-yarn behaviour).
-    const pinEl = this.gameObjects?.nativeElement?.querySelector(
-      `[data-clue-pin="${esc}"]`
-    ) as HTMLElement | null;
-    if (pinEl) {
-      const rect = pinEl.getBoundingClientRect();
-      // Tip markers are 0×0; img fallback needs a real box.
-      const isTip = pinEl.classList.contains('push-pin-tip') || (rect.width < 1 && rect.height < 1);
-      if (isTip || (rect.width > 0.5 && rect.height > 0.5)) {
-        // Pointer stack uses page coords. Sample tip (or AABB tip fraction on legacy img).
-        const page = {
-          x: (isTip ? rect.left : rect.left + rect.width * 0.5) + window.pageXOffset,
-          y: (isTip ? rect.top : rect.top + rect.height * 0.5) + window.pageYOffset,
-          z: 0,
-        };
-        // Project onto the table plane (not the tilted pin plane) so yarn matches the tip pixel.
-        const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
-        const local = origin
-          ? this.coordinateService.convertToLocal(page, origin)
-          : this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
-        if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
-          return { x: local.x, y: local.y, z: this.clueStringsZ };
+    // Never sample DOM during the template CD pass (allowDom=false) — that caused NG0100.
+    if (allowDom) {
+      const pinEl = this.gameObjects?.nativeElement?.querySelector(
+        `[data-clue-pin="${esc}"]`
+      ) as HTMLElement | null;
+      if (pinEl) {
+        const rect = pinEl.getBoundingClientRect();
+        // Tip markers are 0×0; img fallback needs a real box.
+        const isTip = pinEl.classList.contains('push-pin-tip') || (rect.width < 1 && rect.height < 1);
+        if (isTip || (rect.width > 0.5 && rect.height > 0.5)) {
+          // Pointer stack uses page coords. Sample tip (or AABB tip fraction on legacy img).
+          const page = {
+            x: (isTip ? rect.left : rect.left + rect.width * 0.5) + window.pageXOffset,
+            y: (isTip ? rect.top : rect.top + rect.height * 0.5) + window.pageYOffset,
+            z: 0,
+          };
+          // Project onto the table plane (not the tilted pin plane) so yarn matches the tip pixel.
+          const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
+          const local = origin
+            ? this.coordinateService.convertToLocal(page, origin)
+            : this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
+          if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
+            return { x: local.x, y: local.y, z: this.clueStringsZ };
+          }
         }
       }
     }
@@ -660,6 +953,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         });
       })
       .on('UPDATE_GAME_OBJECT', event => {
+        // Yarn endpoints move with tokens/notes; refresh after layout (not mid-CD).
+        if (this.clueLinks.length) this.scheduleClueYarnRefresh();
         if (event.data.identifier !== this.currentTable.identifier && event.data.identifier !== this.tableSelecter.identifier) return;
 
         this.setGameTableGrid(this.currentTable.width, this.currentTable.height, this.currentTable.gridSize, this.currentTable.gridType, this.currentTable.gridColor, this.currentTable.isShowNumber);
@@ -681,6 +976,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         this.ngZone.run(() => {
           this.changeDetector.markForCheck();
           this.changeDetector.detectChanges();
+        });
+      })
+      .on('CANVAS_HIGHLIGHT', event => {
+        this.ngZone.run(() => {
+          const active = !!event.data?.active;
+          this.setCanvasHighlightActive(active);
         });
       })
       .on('DRAG_LOCKED_OBJECT', event => {
@@ -908,10 +1209,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.startDebugPoseRefresh();
       queueMicrotask(() => this.refreshDebugPoseDom());
     }
+    this.scheduleClueYarnRefresh();
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+    this.stopCanvasHighlightLoop();
+    this.stopClueYarnRefresh();
     this.mouseGesture.destroy();
     this.touchGesture.destroy();
     this.pickGesture.destroy();
@@ -1778,6 +2082,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.removeFocus();
     this.isTableTransformMode = true;
     this.changeDetector.detectChanges();
+    this.scheduleClueYarnRefresh();
   }
 
   /**

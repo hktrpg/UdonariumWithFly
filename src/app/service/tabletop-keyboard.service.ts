@@ -69,6 +69,7 @@ export class TabletopKeyboardService {
     this.pressed.clear();
     this.wheelAcc = 0;
     this.altHeld = false;
+    this.selectionService.setCanvasHighlight(false);
   };
 
   constructor(
@@ -116,6 +117,8 @@ export class TabletopKeyboardService {
     document.removeEventListener('wheel', this.onWheel, true);
     window.removeEventListener('blur', this.onBlur);
     this.pressed.clear();
+    this.altHeld = false;
+    this.selectionService.setCanvasHighlight(false);
     this.listening = false;
   }
 
@@ -124,6 +127,7 @@ export class TabletopKeyboardService {
     if (code === 'AltLeft' || code === 'AltRight') {
       if (this.shouldIgnore(e)) return;
       this.altHeld = true;
+      this.runInAngular(() => this.selectionService.setCanvasHighlight(true));
       // Stop Windows/Chrome from focusing the menu bar (breaks WASD after Alt+wheel).
       if (e.cancelable) e.preventDefault();
       return;
@@ -352,10 +356,14 @@ export class TabletopKeyboardService {
   private handleKeyUp(e: KeyboardEvent) {
     if (e.code === 'AltLeft' || e.code === 'AltRight') {
       this.altHeld = false;
+      this.runInAngular(() => this.selectionService.setCanvasHighlight(false));
       return;
     }
     // Heal lost Alt keyup (common after Alt+wheel on Windows).
-    if (!e.altKey) this.altHeld = false;
+    if (!e.altKey) {
+      this.altHeld = false;
+      this.runInAngular(() => this.selectionService.setCanvasHighlight(false));
+    }
     this.pressed.delete(e.code);
   }
 

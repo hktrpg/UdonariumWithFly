@@ -521,7 +521,7 @@ export const ja_ui: I18nDictionary = {
   'note.fieldTitleBg': 'タイトル欄の背景色',
   'note.showTitle': 'タイトル表示', 'note.whiteOut': '白塗り', 'note.upright': '直立', 'note.upright2dLocked': '2Dマップでは平置き固定',
   'note.pickImage': '画像を選択', 'note.pdfPage': 'ページ', 'note.pdfEmpty': 'PDFは未添付です。', 'note.videoEmpty': '動画は未添付です。',
-  'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.ctrlHoverHint': 'ヒント：卓上メモに Ctrl を押しながらホバーでプレビュー。',
+  'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.ctrlHoverHint': 'ヒント：卓上メモにホバーしてから Ctrl を押すとプレビュー。',
   'note.settingsEmpty': '編集するメモを選択してください。',
   'note.selfOnly': '自分のみ表示', 'note.showEveryone': '全員に表示', 'note.importFile': 'ファイル読込', 'note.dropHint': 'テキスト／画像／動画／PDF をここにドロップして取り込み。',
   'mask.clickAction': 'クリック動作', 'mask.clickSettings': 'クリック動作設定',

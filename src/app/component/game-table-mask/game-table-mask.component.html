@@ -8,7 +8,7 @@
       <div class="is-3d" [ngClass]="{'is-inverse': isInverse}" [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss" [style.text-align]="textAlignCss" style="z-index: 5; pointer-events: none; max-width: 100%" [innerHtml]="rubiedText"></div>
     </div>
     <div class="is-fit-full is-3d">
-      <div class="is-fit-full is-3d chrome-smooth-image-trick" style="pointer-events: auto; position: absolute; backface-visibility: hidden"
+      <div class="is-fit-full is-3d chrome-smooth-image-trick mask-hit-surface" style="pointer-events: auto; position: absolute; backface-visibility: hidden"
         (dblclick)="onDoubleClick($event)"
         [ngStyle]="{'opacity': operateOpacity, 'background-color': imageFileUrl.length < 1 || blendType > 0 ? bgcolor : null, '-webkit-mask': masksCss, mask: masksCss}"
         [ngClass]="{image: imageFileUrl.length >= 1}">

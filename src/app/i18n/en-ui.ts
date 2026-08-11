@@ -521,7 +521,7 @@ export const en_ui: I18nDictionary = {
   'note.fieldTitleBg': 'Title bar color',
   'note.showTitle': 'Show title', 'note.whiteOut': 'White out', 'note.upright': 'Upright', 'note.upright2dLocked': 'Notes stay flat on 2D maps',
   'note.pickImage': 'Choose image', 'note.pdfPage': 'Page', 'note.pdfEmpty': 'No PDF attached yet.', 'note.videoEmpty': 'No video attached yet.',
-  'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.ctrlHoverHint': 'Tip: hold Ctrl and hover a note on the table to preview.',
+  'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.ctrlHoverHint': 'Tip: hover a table note, then press Ctrl to preview.',
   'note.settingsEmpty': 'Select a note to edit.',
   'note.selfOnly': 'Self only', 'note.showEveryone': 'Show to everyone', 'note.importFile': 'Import file', 'note.dropHint': 'Drop text / image / video / PDF here to import.',
   'mask.clickAction': 'On click', 'mask.clickSettings': 'Click action settings',

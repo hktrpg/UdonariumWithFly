@@ -49,6 +49,24 @@
   transform-style: flat;
 }
 
+/* Alt hold: Foundry-style canvas object outlines (screen AABB above peers). */
+.canvas-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 100000;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.canvas-highlight-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid hsla(200, 100%, 70%, 0.95);
+  box-shadow: 0 0 0 1px hsla(0, 0%, 0%, 0.4);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
 .component {
   -moz-user-select: none;
   -webkit-user-select: none;

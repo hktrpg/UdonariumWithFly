@@ -100,7 +100,7 @@
         <game-character *ngIf="isLayerCharacter(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-fb-id]="piece.identifier" [attr.data-fb-name]="piece.name" [attr.data-stack-id]="piece.identifier" [style.visibility]="piece.isLoaded && isTokenRevealedByVision(piece) ? 'visible' : 'hidden'" [ngStyle]="layerHostStyle(piece.zindex)" [gameCharacter]="piece" [appTooltip]="piece"></game-character>
       </ng-container>
       <range class="is-3d" *ngFor="let range of ranges; trackBy: trackByGameObject" [range]="range" [attr.data-stack-id]="range.identifier" [appTooltip]="range"></range>
-      <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
+      <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [attr.data-stack-id]="diceSymbol.identifier" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
       <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
@@ -164,6 +164,13 @@
           [style.left.px]="p.x" [style.top.px]="p.y">{{ i + 1 }}</div>
       </div>
     </div>
+  </div>
+  <!-- Foundry-style Alt: screen AABB outlines (above peers). pointer-events none. -->
+  <div class="canvas-highlight-layer is-pointer-events-none" *ngIf="canvasHighlightActive"
+    aria-hidden="true">
+    <div class="canvas-highlight-box" *ngFor="let box of canvasHighlightBoxes; trackBy: trackByHighlightBox"
+      [style.left.px]="box.left" [style.top.px]="box.top"
+      [style.width.px]="box.width" [style.height.px]="box.height"></div>
   </div>
 </div>
 <div class="pick-area" #pickArea></div>

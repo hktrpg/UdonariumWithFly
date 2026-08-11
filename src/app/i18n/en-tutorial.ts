@@ -78,7 +78,7 @@ Drag images or music into the browser to import.`,
 　　　　Every enabled role has a password = V3 mesh-lock
 　　　　When a new build is ready = Connection shows a PWA update hint — confirm to reload
 <Guest> Rooms can “allow guests”; guests are limited. Passwords still apply
-<Notes> Menu → Note inventory: text／image／video／PDF; drag-import; self-only (like tokens); GM show-to-players; Ctrl+hover preview
+<Notes> Menu → Note inventory: text／image／video／PDF; drag-import; self-only (like tokens); GM show-to-players; hover then Ctrl to preview
 <Whispers> Not saved in ZIP; after a new connection ID, old whispers are gone
 <Settings*> Optional “Auto-open chat when someone speaks (if closed)” (default off)
 　　　　Cold start not in a room = lobby as a normal window
@@ -137,7 +137,7 @@ Upgraded to 1.13.2`,
 ・Keyboard (with selection): WASD move, Shift+WASD face, Q/E rotate, R reset all angles, PageUp/Down altitude, F flip, L lock, H hide (GM), T gather to mouse, Delete, Ctrl+C　Ctrl+X　Ctrl+V, Ctrl+Z/Y
 ・Chat: 1–9 switch viewable tab (opens chat; no selection required)
 ・C = close all panels; context menu shows shortcut hints (T) (L) etc.
-・[ / ] layer order; Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
+・[ / ] layer order; hold Alt = outline table objects (under map masks: GM only); Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
 ・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
 ・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels
@@ -182,7 +182,7 @@ Upgraded to 1.13.2`,
 ・Note inventory opens a dedicated settings panel (front/back, scope: this map / all maps, lock, flip, etc.)
 ・“Self only” matches token stealth (owner-bound); hidden from others’ table/inventory; ghosted for owner, visible to GM
 ・GM “Show to players” full-screen handout (optional targets); self-only notes are never room-broadcast
-・Ctrl+hover a table note to preview; PDF pages wrap first↔last
+・Hover a table note, then press Ctrl to preview; PDF pages wrap first↔last
 ・Map-mask actions: Alt+double-click (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX & altitude
 ・Token FX can auto-apply while standing on the mask (restore on leave); manual apply is not undone by leaving
 ・Characters/cards/dice/terrain/masks/notes use dedicated settings panels; denser settings UI

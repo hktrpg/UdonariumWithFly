@@ -521,7 +521,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.fieldTitleBg': '标题栏底色',
   'note.showTitle': '显示标题', 'note.whiteOut': '白底遮罩', 'note.upright': '直立', 'note.upright2dLocked': '2D 地图笔记固定平放',
   'note.pickImage': '选择图片', 'note.pdfPage': '页码', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加视频。',
-  'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.ctrlHoverHint': '提示：在桌面笔记上按住 Ctrl 并悬停可预览。',
+  'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.ctrlHoverHint': '提示：鼠标移到桌面笔记上后再按 Ctrl 可预览。',
   'note.settingsEmpty': '请选择要编辑的笔记。',
   'note.selfOnly': '仅自己可见', 'note.showEveryone': '显示给所有人', 'note.importFile': '导入文件', 'note.dropHint': '拖入文字／图片／视频／PDF 即可导入。',
   'mask.clickAction': '点击动作', 'mask.clickSettings': '点击动作设置',
