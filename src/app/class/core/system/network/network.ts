@@ -3,6 +3,7 @@ import { setZeroTimeout } from '../util/zero-timeout';
 import { Connection, ConnectionCallback } from './connection';
 import { IPeerContext, PeerContext } from './peer-context';
 import { IRoomInfo } from './room-info';
+import { LastRoomSession } from '@udonarium/room-reconnect.util';
 
 type QueueItem = { data: any, sendTo: string };
 type ConnectionClass = new (...args: any[]) => Connection;
@@ -37,6 +38,8 @@ export class Network {
   private closing: Promise<void> = Promise.resolve();
   /** Bumped on close so dispose-time callbacks from the old connection are ignored. */
   private connectionGen = 0;
+  /** Survives fatal close() which wipes peer to ??? — used for room reopen. */
+  private lastRoomSession: LastRoomSession | null = null;
 
   private queue: Set<QueueItem> = new Set();
   private sendInterval: number = null;
@@ -44,6 +47,25 @@ export class Network {
   private callbackUnload: any = (e) => { this.close(); };
 
   private constructor() {
+  }
+
+  /** Remember a successful room open so NETWORK_ERROR can reopen the same house. */
+  rememberRoomSession(session: LastRoomSession) {
+    if (!session?.roomId || !session?.roomName) return;
+    this.lastRoomSession = {
+      userId: session.userId || '',
+      roomId: session.roomId,
+      roomName: session.roomName,
+      meshPassword: session.meshPassword || '',
+    };
+  }
+
+  getLastRoomSession(): LastRoomSession | null {
+    return this.lastRoomSession ? { ...this.lastRoomSession } : null;
+  }
+
+  clearLastRoomSession() {
+    this.lastRoomSession = null;
   }
 
   configure(config: any) {

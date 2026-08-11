@@ -26,7 +26,7 @@ describe('GameCharacter temporary copy', () => {
     expect(copy.isTemporaryCopy).toBeTrue();
     expect(copy.isInventoryIndicate).toBeFalse();
     expect(copy.hasPlacement('mapA')).toBeTrue();
-    expect(copy.getPoseForTable('mapA')).toEqual({ x: 50, y: 60, posZ: 1 });
+    expect(copy.getPoseForTable('mapA')).toEqual(jasmine.objectContaining({ x: 50, y: 60, posZ: 1 }));
     expect(src.isTemporaryCopy).toBeFalse();
     expect(src.hasPlacement('mapA')).toBeTrue();
   });

@@ -3,7 +3,10 @@ import {
   notePinAnchorPx,
   pinAnchorPx,
   randomPinOffset,
+  stringBeamStyle3d,
   stringPathD,
+  tokenCenterAnchorPx,
+  tokenVisualHeightPx,
 } from './push-pin.util';
 
 describe('push-pin.util', () => {
@@ -35,6 +38,40 @@ describe('push-pin.util', () => {
     const p = pinAnchorPx(host, 50, 50);
     expect(p.x).toBeCloseTo(10 + PIN_BOX.width * PIN_BOX.tipX, 5);
     expect(p.y).toBeCloseTo(-30 + PIN_BOX.height * PIN_BOX.tipY, 5);
+  });
+
+  it('tokenCenterAnchorPx uses visual height for Z (not footprint size)', () => {
+    const host = {
+      location: { x: 100, y: 200 },
+      posZ: 10,
+      altitude: 2,
+      height: 3,
+      size: 1,
+    };
+    const grid = 50;
+    const foot = 50;
+    const tall = tokenVisualHeightPx(host, grid);
+    expect(tall).toBe(150);
+    const c = tokenCenterAnchorPx(host, foot, tall, grid);
+    expect(c.x).toBeCloseTo(125, 5);
+    expect(c.y).toBeCloseTo(225, 5);
+    // z = posZ + altitude*grid + visualHeight/2
+    expect(c.z).toBeCloseTo(10 + 100 + 75, 5);
+    const short = tokenCenterAnchorPx(host, foot, foot, grid);
+    expect(c.z).toBeGreaterThan(short.z);
+  });
+
+  it('tokenVisualHeightPx falls back to size when height unset', () => {
+    expect(tokenVisualHeightPx({ size: 2 }, 50)).toBe(100);
+    expect(tokenVisualHeightPx({ height: 0, size: 2 }, 50)).toBe(100);
+  });
+
+  it('stringBeamStyle3d pitches when endpoint Z differs', () => {
+    const flat = stringBeamStyle3d(0, 0, 10, 100, 0, 10);
+    expect(flat.transform).toContain('rotateY(0deg)');
+    const tilted = stringBeamStyle3d(0, 0, 10, 100, 0, 60);
+    expect(tilted.transform).toMatch(/rotateY\(-/);
+    expect(parseFloat(tilted.width)).toBeGreaterThan(100);
   });
 
   it('notePinAnchorPx uses bottom-center paper origin', () => {

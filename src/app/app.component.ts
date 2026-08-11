@@ -82,6 +82,7 @@ import { RoomSettingComponent } from 'component/room-setting/room-setting.compon
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
+import { RoomAuth } from '@udonarium/room-auth';
 import { RoomInviteService } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { AppUpdateService } from 'service/app-update.service';
@@ -477,16 +478,26 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
         if (Network.peer?.isRoom) {
+          // Survive fatal close() which wipes peer to ??? — needed for room reopen.
+          Network.rememberRoomSession({
+            userId: Network.peer.userId,
+            roomId: Network.peer.roomId,
+            roomName: Network.peer.roomName,
+            meshPassword: Network.peer.channelPassword || RoomAuth.getSessionMeshPassword() || '',
+          });
           // Create / join / resume room: dismiss lobby windows left from cold start.
           this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
-        } else if (!this.inviteHandled) {
-          this.inviteHandled = true;
-          this.ngZone.run(async () => {
-            await this.tryConsumeInvite();
-            if (!Network.peer?.isRoom) this.openLobbyIfNeeded();
-          });
         } else {
-          this.ngZone.run(() => this.openLobbyIfNeeded());
+          Network.clearLastRoomSession();
+          if (!this.inviteHandled) {
+            this.inviteHandled = true;
+            this.ngZone.run(async () => {
+              await this.tryConsumeInvite();
+              if (!Network.peer?.isRoom) this.openLobbyIfNeeded();
+            });
+          } else {
+            this.ngZone.run(() => this.openLobbyIfNeeded());
+          }
         }
       })
       .on('ROOM_REKEY', event => {
@@ -514,28 +525,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         let errorMessage: string = event.data.errorMessage;
 
         this.ngZone.run(async () => {
-          // SkyWay error handling
           let quietErrorTypes = ['peer-unavailable'];
-          // Only auto-retry transient network drops. Backend/auth failures need config fixes.
-          let reconnectErrorTypes = ['disconnected', 'socket-error', 'unavailable-id'];
           let configErrorTypes = ['server-error', 'authentication', 'token-expired'];
 
           if (quietErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
+          this.isLoggedin = false;
 
           if (configErrorTypes.includes(errorType)) {
+            await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
             await this.modalService.open(TextViewComponent, {
               title: this.i18n.t('net.errorTitle'),
               text: this.i18n.t('net.backendHelp')
             });
-            this.isLoggedin = false;
             return;
           }
 
-          if (!reconnectErrorTypes.includes(errorType)) return;
-          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: this.i18n.t('net.reconnectHint') });
-          Network.open();
-          this.isLoggedin = false;
+          // Transient drops (cable / SkyWay internal): auto-reopen without blocking modals.
+          if (RoomConnectHelper.isRecoverableNetworkError(errorType)) {
+            RoomConnectHelper.reopenLastRoomOrLobby();
+            return;
+          }
+
+          await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
         });
       })
       .on('CONNECT_PEER', event => {
@@ -686,31 +697,34 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.isRefreshPromptOpen || this.GuestMode() || !this.isRoom) return;
     this.isRefreshPromptOpen = true;
     const folderReady = this.folderBackup.isReady;
-    const option: Record<string, unknown> = {
+    if (folderReady) {
+      // Folder is the safety net; ZIP stays in the menu (not on this dialog).
+      this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('menu.confirm.refresh.title'),
+        text: this.i18n.t('menu.confirm.refresh.textFolder'),
+        help: this.i18n.t('menu.confirm.refresh.helpFolder'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'folder',
+        okLabel: this.i18n.t('menu.confirm.refresh.flushReload'),
+        cancelLabel: this.i18n.t('menu.confirm.refresh.reloadOnly'),
+        action: () => { void this.flushFolderThenReload(); },
+        cancelAction: () => { this.reloadWithoutPrompt(); },
+      }).finally(() => {
+        this.isRefreshPromptOpen = false;
+      });
+      return;
+    }
+    this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('menu.confirm.refresh.title'),
       text: this.i18n.t('menu.confirm.refresh.text'),
-      help: this.i18n.t(folderReady ? 'menu.confirm.refresh.helpFolder' : 'menu.confirm.refresh.help'),
+      help: this.i18n.t('menu.confirm.refresh.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'sd_storage',
       okLabel: this.i18n.t('menu.downloadZip'),
-      cancelLabel: this.i18n.t(
-        folderReady ? 'menu.confirm.refresh.flushReload' : 'menu.confirm.refresh.reload'
-      ),
-      action: () => {
-        void this.saveThenReload();
-      },
-      cancelAction: () => {
-        if (folderReady) void this.flushFolderThenReload();
-        else this.reloadWithoutPrompt();
-      },
-    };
-    if (folderReady) {
-      // True skip: no ZIP, no folder flush.
-      option.extraLabel = this.i18n.t('menu.confirm.refresh.reloadOnly');
-      option.extraAction = () => { this.reloadWithoutPrompt(); };
-      option.extraCloses = true;
-    }
-    this.modalService.open(ConfirmationComponent, option).finally(() => {
+      cancelLabel: this.i18n.t('menu.confirm.refresh.reload'),
+      action: () => { void this.saveThenReload(); },
+      cancelAction: () => { this.reloadWithoutPrompt(); },
+    }).finally(() => {
       this.isRefreshPromptOpen = false;
     });
   }

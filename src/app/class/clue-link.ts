@@ -3,7 +3,14 @@ import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { GameCharacter } from './game-character';
 import { TextNote } from './text-note';
-import { notePinAnchorPx, pinAnchorPx, stringPathD } from './table-fx/push-pin.util';
+import { TableSelecter } from './table-selecter';
+import {
+  notePinAnchorPx,
+  pinAnchorPx,
+  stringPathD,
+  tokenCenterAnchorPx,
+  tokenVisualHeightPx,
+} from './table-fx/push-pin.util';
 
 export type ClueLinkEndpoint = GameCharacter | TextNote;
 
@@ -95,6 +102,11 @@ export class ClueLink extends GameObject {
 function endpointPinAnchor(obj: ClueLinkEndpoint, gridSize: number): { x: number; y: number } {
   if (obj instanceof GameCharacter) {
     const s = (obj.size || 1) * gridSize;
+    // 3D: token XYZ center; 2D corkboard: push-pin tip.
+    if (!TableSelecter.instance?.viewTable?.is2DMode) {
+      const c = tokenCenterAnchorPx(obj, s, tokenVisualHeightPx(obj, gridSize), gridSize);
+      return { x: c.x, y: c.y };
+    }
     return pinAnchorPx(obj, s, s);
   }
   const w = (obj.width || 1) * gridSize;

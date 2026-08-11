@@ -5,6 +5,7 @@ import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
+import { isRecoverableNetworkError } from '@udonarium/room-reconnect.util';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 
 /**
@@ -17,6 +18,57 @@ export class RoomConnectHelper {
    * (and the local peer was reset out of the room).
    */
   private static readonly CONNECT_TIMEOUT_MS = 45000;
+  /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
+  private static reopenInFlight = false;
+
+  static isRecoverableNetworkError(errorType: string): boolean {
+    return isRecoverableNetworkError(errorType);
+  }
+
+  /**
+   * After SkyWay fatal close: reopen the last room (so lobby lists us again),
+   * or fall back to a plain lobby peer when no room session was stored.
+   * Shows busy overlay until OPEN_NETWORK / NETWORK_ERROR / timeout.
+   * @returns false if a reopen is already in progress.
+   */
+  static reopenLastRoomOrLobby(): boolean {
+    if (RoomConnectHelper.reopenInFlight) return false;
+    RoomConnectHelper.reopenInFlight = true;
+
+    const session = Network.getLastRoomSession();
+    const willReopenRoom = !!(session?.roomId && session.roomName);
+    const busyKey = willReopenRoom ? 'net.reconnectingRoom' : 'net.reconnecting';
+    ConnectionBusyService.instance?.show(busyKey);
+
+    const key = { autoReconnect: true };
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      EventSystem.unregister(key);
+      ConnectionBusyService.instance?.hide();
+      // Allow a later genuine drop to reconnect again.
+      setTimeout(() => { RoomConnectHelper.reopenInFlight = false; }, 2000);
+    };
+    const timer = setTimeout(() => {
+      console.warn('RoomConnectHelper reopenLastRoomOrLobby timeout');
+      finish();
+    }, 30000);
+
+    EventSystem.register(key)
+      .on('OPEN_NETWORK', () => finish())
+      .on('NETWORK_ERROR', () => finish());
+
+    if (willReopenRoom) {
+      const userId = session!.userId || Network.peer.userId;
+      Network.open(userId, session!.roomId, session!.roomName, session!.meshPassword || '');
+    } else {
+      Network.open();
+    }
+    if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+    return true;
+  }
 
   static openAndConnect(room: IRoomInfo, password: string, targetPeers: IPeerContext[]): Promise<boolean> {
     ConnectionBusyService.instance?.show('peer.connectingRoom');
@@ -52,14 +104,15 @@ export class RoomConnectHelper {
       const onConnect = (peerId: string) => {
         console.log('連線成功！', peerId);
         triedPeer.push(peerId);
-        console.log('連線成功 ' + triedPeer.length + '/' + targetPeers.length);
+        console.log(`連線進度 ${triedPeer.length}/${targetPeers.length}（成功 ${Network.peers.length}）`);
         return onTried();
       };
 
       const onDisconnect = (peerId: string) => {
-        console.warn('連線失敗', peerId);
+        // Stale lobby/room peers often leave before subscribe finishes — not a join failure by itself.
+        console.warn('放棄連線（對方離線或訂閱逾時）', peerId);
         triedPeer.push(peerId);
-        console.warn('連線失敗 ' + triedPeer.length + '/' + targetPeers.length);
+        console.warn(`連線進度 ${triedPeer.length}/${targetPeers.length}（成功 ${Network.peers.length}）`);
         return onTried();
       };
 

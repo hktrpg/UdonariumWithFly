@@ -60,8 +60,8 @@ describe('Room XML round-trip', () => {
     expect(c2).toBeTruthy();
     expect(c2.hasPlacement('gameTable')).toBeTrue();
     expect(c2.hasPlacement('gameTable_clue2d')).toBeTrue();
-    expect(c2.getPoseForTable('gameTable')).toEqual({ x: 175, y: 225, posZ: 0 });
-    expect(c2.getPoseForTable('gameTable_clue2d')).toEqual({ x: 175, y: 400, posZ: 0 });
+    expect(c2.getPoseForTable('gameTable')).toEqual(jasmine.objectContaining({ x: 175, y: 225, posZ: 0 }));
+    expect(c2.getPoseForTable('gameTable_clue2d')).toEqual(jasmine.objectContaining({ x: 175, y: 400, posZ: 0 }));
 
     const link = ObjectStore.instance.get<ClueLink>('battleClueLink_1');
     expect(link).toBeTruthy();

@@ -21,6 +21,14 @@ export interface TablePlacementPose {
   x: number;
   y: number;
   posZ: number;
+  /** Per-map footprint size (characters, dice, cards, …). */
+  size?: number;
+  /** Per-map standing / paper height (raw DataElement value). */
+  height?: number;
+  /** Character height-scale flag (DataElement.currentValue for `height`). */
+  heightCurrentValue?: string | number;
+  /** Per-map altitude above the table. */
+  altitude?: number;
 }
 
 @SyncObject('TabletopObject')
@@ -101,7 +109,11 @@ export class TabletopObject extends ObjectNode {
     // Do not call ensurePlacementsMigrated() — that can seed the current view map
     // and invent dual placements when exclusive-placing onto another table.
     const map = this.parsePlacements();
+    const prev = map[tableId];
+    // Merge so movable x/y/posZ updates do not wipe per-map appearance fields.
     map[tableId] = {
+      ...prev,
+      ...pose,
       x: pose.x,
       y: pose.y,
       posZ: pose.posZ,
@@ -136,10 +148,18 @@ export class TabletopObject extends ObjectNode {
       this.tableIdentifier = '';
     }
     const existing = this.getPoseForTable(id);
+    const appearance = existing && TabletopObject.placementHasAppearance(existing)
+      ? TabletopObject.pickAppearance(existing)
+      : this.captureLiveAppearance();
     const next: TablePlacementPose = {
+      ...appearance,
       x: pose?.x ?? existing?.x ?? this.location.x,
       y: pose?.y ?? existing?.y ?? this.location.y,
       posZ: pose?.posZ ?? existing?.posZ ?? this.posZ,
+      ...(pose?.size !== undefined ? { size: pose.size } : {}),
+      ...(pose?.height !== undefined ? { height: pose.height } : {}),
+      ...(pose?.heightCurrentValue !== undefined ? { heightCurrentValue: pose.heightCurrentValue } : {}),
+      ...(pose?.altitude !== undefined ? { altitude: pose.altitude } : {}),
     };
     this.setPoseForTable(id, next, true);
   }
@@ -170,6 +190,7 @@ export class TabletopObject extends ObjectNode {
     this.location.x = pose.x;
     this.location.y = pose.y;
     this.posZ = pose.posZ;
+    this.applyAppearanceFromPose(pose);
     this.update();
   }
 
@@ -177,12 +198,14 @@ export class TabletopObject extends ObjectNode {
   hydratePoseForView(viewTableId?: string, silent = false) {
     const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!viewId || this.location.name !== 'table') return;
+    this.ensureAppearanceBackfilled();
     const pose = this.getPoseForTable(viewId);
     if (!pose) return;
     const apply = () => {
       this.location = { name: 'table', x: pose.x, y: pose.y };
       this.posZ = pose.posZ;
       this.tableIdentifier = viewId;
+      this.applyAppearanceFromPose(pose);
     };
     if (silent) {
       this.withSyncSuppressed(apply);
@@ -214,7 +237,7 @@ export class TabletopObject extends ObjectNode {
   }
 
   /**
-   * Persist live location/posZ into placements[viewId] before leaving that map.
+   * Persist live location/posZ/appearance into placements[viewId] before leaving that map.
    * Does not change which maps the object belongs to.
    */
   static flushLivePosesToView(viewTableId?: string) {
@@ -223,15 +246,41 @@ export class TabletopObject extends ObjectNode {
     for (const obj of TabletopObject.getAll()) {
       if (obj.location.name !== 'table') continue;
       if (!obj.hasPlacement(viewId)) continue;
+      obj.ensureAppearanceBackfilled();
       const live: TablePlacementPose = {
         x: obj.location.x,
         y: obj.location.y,
         posZ: obj.posZ,
+        ...obj.captureLiveAppearance(),
       };
       const saved = obj.getPoseForTable(viewId);
-      if (saved && saved.x === live.x && saved.y === live.y && saved.posZ === live.posZ) continue;
+      if (saved && TabletopObject.posesEqual(saved, live)) continue;
       obj.setPoseForTable(viewId, live, false);
     }
+  }
+
+  /**
+   * Write live size/height/altitude into the current view's placement.
+   * Call after sheet edits so other maps keep their own records.
+   */
+  syncAppearanceToCurrentViewPlacement() {
+    if (this.location.name !== 'table') return;
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    if (!viewId || !this.hasPlacement(viewId)) return;
+    this.ensureAppearanceBackfilled();
+    const saved = this.getPoseForTable(viewId);
+    if (!saved) return;
+    const liveAppearance = this.captureLiveAppearance();
+    if (!Object.keys(liveAppearance).length) return;
+    const next: TablePlacementPose = {
+      ...saved,
+      ...liveAppearance,
+      x: saved.x,
+      y: saved.y,
+      posZ: saved.posZ,
+    };
+    if (TabletopObject.posesEqual(saved, next)) return;
+    this.setPoseForTable(viewId, next, false);
   }
 
   /** Destroy temporary copies; otherwise optional graveyard callback. */
@@ -265,12 +314,104 @@ export class TabletopObject extends ObjectNode {
    * Never falls back to the current view id (that seeds dual placements).
    */
   ensurePlacementsMigrated() {
-    if (this.tablePlacements) return;
+    if (this.tablePlacements) {
+      this.ensureAppearanceBackfilled();
+      return;
+    }
     if (this.location.name !== 'table') return;
     if (!this.tableIdentifier) return;
     this.tablePlacements = JSON.stringify({
-      [this.tableIdentifier]: { x: this.location.x, y: this.location.y, posZ: this.posZ },
+      [this.tableIdentifier]: {
+        x: this.location.x,
+        y: this.location.y,
+        posZ: this.posZ,
+        ...this.captureLiveAppearance(),
+      },
     });
+  }
+
+  /** Snapshot live size/height/altitude for the current map record. */
+  captureLiveAppearance(): Partial<TablePlacementPose> {
+    const out: Partial<TablePlacementPose> = {};
+    if (this.getElement('size', this.commonDataElement)) {
+      out.size = this.getCommonValue('size', 1);
+    }
+    const heightEl = this.getElement('height', this.commonDataElement);
+    if (heightEl) {
+      const num = +heightEl.value;
+      out.height = Number.isNaN(num) ? 0 : num;
+      out.heightCurrentValue = heightEl.currentValue == null ? '' : heightEl.currentValue;
+    }
+    if (this.isHaveAltitude) {
+      out.altitude = this.altitude;
+    }
+    return out;
+  }
+
+  /** Apply per-map appearance onto shared DataElements (current view live values). */
+  applyAppearanceFromPose(pose: TablePlacementPose) {
+    if (!pose) return;
+    if (pose.size !== undefined) {
+      const sizeEl = this.getElement('size', this.commonDataElement);
+      if (sizeEl) sizeEl.value = pose.size;
+    }
+    if (pose.height !== undefined) {
+      const heightEl = this.getElement('height', this.commonDataElement);
+      if (heightEl) {
+        heightEl.value = pose.height;
+        if (pose.heightCurrentValue !== undefined) {
+          heightEl.currentValue = pose.heightCurrentValue;
+        }
+      }
+    }
+    if (pose.altitude !== undefined) {
+      const el = this.getElement('altitude', this.commonDataElement);
+      if (el) el.value = pose.altitude;
+    }
+  }
+
+  /**
+   * One-time: copy shared DataElement appearance into every placement that has none yet.
+   * Runs only when no placement has appearance fields (legacy dual-map saves).
+   */
+  ensureAppearanceBackfilled() {
+    if (!this.tablePlacements) return;
+    const map = this.parsePlacements();
+    const keys = Object.keys(map);
+    if (!keys.length) return;
+    if (keys.some(k => TabletopObject.placementHasAppearance(map[k]))) return;
+    const live = this.captureLiveAppearance();
+    if (!Object.keys(live).length) return;
+    for (const k of keys) {
+      map[k] = { ...map[k], ...live };
+    }
+    this.tablePlacements = JSON.stringify(map);
+  }
+
+  static placementHasAppearance(pose: TablePlacementPose | null | undefined): boolean {
+    if (!pose) return false;
+    return pose.size !== undefined
+      || pose.height !== undefined
+      || pose.altitude !== undefined;
+  }
+
+  static pickAppearance(pose: TablePlacementPose): Partial<TablePlacementPose> {
+    const out: Partial<TablePlacementPose> = {};
+    if (pose.size !== undefined) out.size = pose.size;
+    if (pose.height !== undefined) out.height = pose.height;
+    if (pose.heightCurrentValue !== undefined) out.heightCurrentValue = pose.heightCurrentValue;
+    if (pose.altitude !== undefined) out.altitude = pose.altitude;
+    return out;
+  }
+
+  static posesEqual(a: TablePlacementPose, b: TablePlacementPose): boolean {
+    return a.x === b.x
+      && a.y === b.y
+      && a.posZ === b.posZ
+      && a.size === b.size
+      && a.height === b.height
+      && String(a.heightCurrentValue ?? '') === String(b.heightCurrentValue ?? '')
+      && a.altitude === b.altitude;
   }
 
   /** All tabletop subclasses (character/card/dice/…). getObjects(TabletopObject) only matches the base alias. */
@@ -504,7 +645,10 @@ export class TabletopObject extends ObjectNode {
   }
   set altitude(altitude: number) {
     let element = this.getElement('altitude', this.commonDataElement);
-    if (element) element.value = altitude;
+    if (element) {
+      element.value = altitude;
+      this.syncAppearanceToCurrentViewPlacement();
+    }
   }
 
   get isHaveAltitude(): boolean {
@@ -579,6 +723,9 @@ export class TabletopObject extends ObjectNode {
     let element = this.getElement(elementName, this.commonDataElement);
     if (!element) { return; }
     element.value = value;
+    if (elementName === 'size' || elementName === 'height' || elementName === 'altitude') {
+      this.syncAppearanceToCurrentViewPlacement();
+    }
   }
 
   protected getImageFile(elementName: string) {
@@ -652,6 +799,7 @@ export class TabletopObject extends ObjectNode {
       x: this.location.x,
       y: this.location.y,
       posZ: this.posZ,
+      ...this.captureLiveAppearance(),
     };
     this.clearPlacements(false);
     this.tableIdentifier = '';

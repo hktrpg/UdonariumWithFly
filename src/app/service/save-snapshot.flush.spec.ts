@@ -29,6 +29,6 @@ describe('Save snapshot pose flush', () => {
 
     TabletopObject.flushLivePosesToView('gameTable');
 
-    expect(ch.getPoseForTable('gameTable')).toEqual({ x: 333, y: 444, posZ: 0 });
+    expect(ch.getPoseForTable('gameTable')).toEqual(jasmine.objectContaining({ x: 333, y: 444, posZ: 0 }));
   });
 });

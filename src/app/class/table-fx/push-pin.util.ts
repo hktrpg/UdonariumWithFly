@@ -115,6 +115,7 @@ function pinTipLocal(host?: PinHost): { x: number; y: number } {
 /**
  * Token-style host: location is the top-left of the footprint.
  * Fallback when DOM tip is missing — matches unframed .push-pin tip.
+ * (2D corkboard yarn only; 3D uses {@link tokenCenterAnchorPx}.)
  */
 export function pinAnchorPx(
   host: PinHost,
@@ -129,6 +130,48 @@ export function pinAnchorPx(
     host.location.y + tip.y,
     host.rotate || 0,
   );
+}
+
+export interface TokenCenterHost {
+  location: { x: number; y: number };
+  posZ?: number;
+  altitude?: number;
+  height?: number;
+  size?: number;
+}
+
+/**
+ * Standing token art height in px.
+ * When `height` > 0 matches game-character `characterImageHeight`; otherwise footprint size.
+ */
+export function tokenVisualHeightPx(
+  host: { height?: number; size?: number },
+  gridSize = 50,
+): number {
+  const h = Number(host.height);
+  if (Number.isFinite(h) && h > 0) return h * gridSize;
+  const size = Number(host.size);
+  const s = Number.isFinite(size) && size > 0 ? size : 1;
+  return s * gridSize;
+}
+
+/**
+ * 3D yarn anchor: footprint XY center, Z at mid token height
+ * (posZ + altitude·grid + visualHeight/2).
+ */
+export function tokenCenterAnchorPx(
+  host: TokenCenterHost,
+  footprintPx: number,
+  visualHeightPx: number,
+  gridSize = 50,
+): { x: number; y: number; z: number } {
+  const alt = (typeof host.altitude === 'number' ? host.altitude : 0) * gridSize;
+  const tall = visualHeightPx > 0 ? visualHeightPx : footprintPx;
+  return {
+    x: host.location.x + footprintPx / 2,
+    y: host.location.y + footprintPx / 2,
+    z: (host.posZ || 0) + alt + tall / 2,
+  };
 }
 
 /**
@@ -185,4 +228,37 @@ export function stringPathD(
   const dist = Math.hypot(x2 - x1, y2 - y1) || 1;
   const drop = dist * Math.max(0.05, Math.min(0.55, sag));
   return `M ${x1} ${y1} Q ${mx} ${my + drop} ${x2} ${y2}`;
+}
+
+/**
+ * CSS 3D beam from (x1,y1,z1) → (x2,y2,z2) so each yarn end keeps its own height.
+ * Element is a thin bar with transform-origin at the left (start) center.
+ */
+export function stringBeamStyle3d(
+  x1: number,
+  y1: number,
+  z1: number,
+  x2: number,
+  y2: number,
+  z2: number,
+  color = '#c62828',
+): Record<string, string> {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dz = z2 - z1;
+  const lenXY = Math.hypot(dx, dy) || 0.001;
+  const len = Math.hypot(dx, dy, dz) || 0.001;
+  const rotZ = (Math.atan2(dy, dx) * 180) / Math.PI;
+  // After rotateZ, local +X lies on the table along the rope; pitch into +Z.
+  const rotY = (-Math.atan2(dz, lenXY) * 180) / Math.PI;
+  return {
+    position: 'absolute',
+    left: '0',
+    top: '0',
+    width: `${len}px`,
+    height: '2.2px',
+    background: color,
+    'transform-origin': '0 50%',
+    transform: `translate3d(${x1}px, ${y1}px, ${z1}px) rotateZ(${rotZ}deg) rotateY(${rotY}deg)`,
+  };
 }

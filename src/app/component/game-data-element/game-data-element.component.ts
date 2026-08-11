@@ -227,7 +227,15 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
       if (this.gameDataElement.name !== this.name) this.gameDataElement.name = this.name;
       if (this.gameDataElement.currentValue !== this.currentValue) this.gameDataElement.currentValue = this.currentValue;
       if (this.gameDataElement.value !== this.value) this.gameDataElement.value = this.value;
+      // Per-map appearance (size/height/altitude) must not stay only on shared DataElements.
+      if (this.tabletopObject && this.isAppearancePlacementField(this.gameDataElement.name)) {
+        this.tabletopObject.syncAppearanceToCurrentViewPlacement();
+      }
       this.updateTimer = null;
     }, 66);
+  }
+
+  private isAppearancePlacementField(name: string): boolean {
+    return name === 'size' || name === 'height' || name === 'altitude';
   }
 }

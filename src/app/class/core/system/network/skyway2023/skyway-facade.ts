@@ -167,8 +167,17 @@ export class SkyWayFacade {
       name: this.peer.peerId,
     });
 
-    lobbyPerson.onFatalError.add(err => {
+    lobbyPerson.onFatalError.add(async err => {
       console.error('lobbyPerson onFatalError', err);
+      // Lobby membership is what listAllPeers uses — try rejoin without tearing down the room.
+      if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+        try {
+          await this.joinLobby();
+          return;
+        } catch (rejoinErr) {
+          console.error('lobbyPerson rejoin failed', rejoinErr);
+        }
+      }
       const fatal = this.formatFatalError(err);
       if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });

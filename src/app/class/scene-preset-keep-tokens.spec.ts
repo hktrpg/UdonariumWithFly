@@ -48,7 +48,7 @@ describe('ScenePreset keep-tokens helpers', () => {
 
     expect(ch.hasPlacement('mapA')).toBeTrue();
     expect(ch.hasPlacement('mapB')).toBeTrue();
-    expect(ch.getPoseForTable('mapB')).toEqual({ x: 90, y: 91, posZ: 2 });
+    expect(ch.getPoseForTable('mapB')).toEqual(jasmine.objectContaining({ x: 90, y: 91, posZ: 2 }));
   });
 
   it('removeExtraPiecesFromTable keeps captured tokens when skipTokens', () => {

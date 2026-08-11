@@ -27,7 +27,7 @@ describe('TabletopObject placements / migrate / repair', () => {
 
     expect(ch.hasPlacement('tableA')).toBeTrue();
     expect(ch.hasPlacement('tableB')).toBeFalse();
-    expect(ch.getPoseForTable('tableA')).toEqual({ x: 10, y: 20, posZ: 0 });
+    expect(ch.getPoseForTable('tableA')).toEqual(jasmine.objectContaining({ x: 10, y: 20, posZ: 0 }));
   });
 
   it('migrateUnboundTablePieces binds truly unbound pieces to the given view', () => {
@@ -77,7 +77,7 @@ describe('TabletopObject placements / migrate / repair', () => {
     ch.addToTable('tableA', { x: 111, y: 111, posZ: 0 }, true);
     expect(ch.hasPlacement('tableA')).toBeTrue();
     expect(ch.hasPlacement('tableB')).toBeFalse();
-    expect(ch.getPoseForTable('tableA')).toEqual({ x: 111, y: 111, posZ: 0 });
+    expect(ch.getPoseForTable('tableA')).toEqual(jasmine.objectContaining({ x: 111, y: 111, posZ: 0 }));
   });
 
   it('repairOrphanedPieceBindings remaps 1:1 when orphan count equals table count', () => {
@@ -131,7 +131,67 @@ describe('TabletopObject placements / migrate / repair', () => {
 
     TabletopObject.flushLivePosesToView('tableA');
 
-    expect(ch.getPoseForTable('tableA')).toEqual({ x: 77, y: 88, posZ: 0 });
-    expect(ch.getPoseForTable('tableB')).toEqual({ x: 50, y: 50, posZ: 0 });
+    expect(ch.getPoseForTable('tableA')!.x).toBe(77);
+    expect(ch.getPoseForTable('tableA')!.y).toBe(88);
+    expect(ch.getPoseForTable('tableA')!.posZ).toBe(0);
+    expect(ch.getPoseForTable('tableB')!.x).toBe(50);
+    expect(ch.getPoseForTable('tableB')!.y).toBe(50);
+  });
+
+  it('keeps height/size/altitude independent per map placement', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_height');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+    ch.ensureAppearanceBackfilled();
+
+    // Edit height on map A only.
+    const heightEl = ch.commonDataElement.getFirstElementByName('height');
+    expect(heightEl).toBeTruthy();
+    heightEl!.value = 5;
+    ch.syncAppearanceToCurrentViewPlacement();
+
+    expect(ch.getPoseForTable('tableA')!.height).toBe(5);
+    expect(ch.getPoseForTable('tableB')!.height).toBe(0);
+
+    TabletopObject.flushLivePosesToView('tableA');
+    viewTables('tableB');
+    ch.hydratePoseForView('tableB');
+
+    expect(ch.height).toBe(0);
+    expect(heightEl!.value).toBe(0);
+
+    // Edit height on map B; A stays 5.
+    heightEl!.value = 2;
+    ch.syncAppearanceToCurrentViewPlacement();
+    TabletopObject.flushLivePosesToView('tableB');
+    viewTables('tableA');
+    ch.hydratePoseForView('tableA');
+
+    expect(ch.height).toBe(5);
+    expect(ch.getPoseForTable('tableA')!.height).toBe(5);
+    expect(ch.getPoseForTable('tableB')!.height).toBe(2);
+  });
+
+  it('setPoseForTable merge preserves appearance when only coords change', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_merge');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0, height: 7, size: 2 }, true);
+
+    ch.setPoseForTable('tableA', { x: 9, y: 8, posZ: 1 }, false);
+
+    const pose = ch.getPoseForTable('tableA')!;
+    expect(pose.x).toBe(9);
+    expect(pose.y).toBe(8);
+    expect(pose.posZ).toBe(1);
+    expect(pose.height).toBe(7);
+    expect(pose.size).toBe(2);
   });
 });

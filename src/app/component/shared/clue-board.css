@@ -262,6 +262,29 @@
   pointer-events: none;
 }
 
+.clue-strings-3d {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.clue-string-beam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: 1px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
 .clue-string {
   fill: none;
   stroke-linecap: round;

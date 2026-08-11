@@ -1031,19 +1031,31 @@ export class FolderBackupService implements OnDestroy {
   }
 
   private async flushWrites(options?: FolderFlushOptions): Promise<void> {
-    if (this.writePromise) {
-      try {
-        await this.writePromise;
-      } catch {
-        // Retry below.
+    // Suspend auto dirty while flushing — prepareRoomSnapshot / AFTER_ROOM_SAVE
+    // otherwise markDirty mid-write and force a second full buildRoomFiles (slow).
+    const prevSuspend = this.suspendAutoWrite;
+    this.suspendAutoWrite = true;
+    this.clearTimers();
+    try {
+      if (this.writePromise) {
+        try {
+          await this.writePromise;
+        } catch {
+          // Retry below.
+        }
       }
-    }
-    this.dirty = true;
-    await this.performWrite(options || {});
-    if (this.dirty || this.writeAgain) {
-      this.writeAgain = false;
       this.dirty = true;
+      this.writeAgain = false;
       await this.performWrite(options || {});
+      // Second pass only if another explicit writer joined mid-flight (writeAgain),
+      // not for UI/sync noise while we were suspended.
+      if (this.writeAgain) {
+        this.writeAgain = false;
+        this.dirty = true;
+        await this.performWrite(options || {});
+      }
+    } finally {
+      this.suspendAutoWrite = prevSuspend;
     }
   }
 
@@ -1067,6 +1079,10 @@ export class FolderBackupService implements OnDestroy {
     this.setStatus('writing');
 
     const run = async () => {
+      // Pose flush / AFTER_ROOM_SAVE emit UPDATE_GAME_OBJECT; ignore them mid-write
+      // so we do not immediately schedule a second full pack+zip.
+      const prevSuspend = this.suspendAutoWrite;
+      this.suspendAutoWrite = true;
       try {
         let metaAuth: {
           allowUser: boolean;
@@ -1106,6 +1122,7 @@ export class FolderBackupService implements OnDestroy {
         this.setStatus(perm === 'granted' ? 'error' : 'needAuth');
         throw e;
       } finally {
+        this.suspendAutoWrite = prevSuspend;
         this.writing = false;
         if (this.writeAgain) {
           this.writeAgain = false;
