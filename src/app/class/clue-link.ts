@@ -66,7 +66,6 @@ export class ClueLink extends GameObject {
     const b = this.toObject;
     if (!a || !b) return false;
     if (!a.isVisibleOnTable || !b.isVisibleOnTable) return false;
-    if (!(a.pushPin && b.pushPin)) return false;
     return true;
   }
 

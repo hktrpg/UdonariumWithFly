@@ -11,7 +11,7 @@ export const ja_ctx: I18nDictionary = {
 
   'fx.aura': 'オーラ', 'fx.none': 'なし', 'fx.clearAura': 'オーラを消去', 'fx.ring': 'リングエフェクト', 'fx.ring.none': 'なし', 'fx.ring.fire': '炎のリング', 'fx.ring.magic': '魔法陣', 'fx.ring.tech': 'テックリング', 'fx.ring.eldritch': '異界のリング', 'fx.ring.holy': '聖なるリング', 'fx.status': '状態',
   'fx.tokenFrame': 'トークン枠', 'fx.tokenFrame.none': 'なし', 'fx.tokenFrame.polaroid': 'ポラロイド', 'fx.tokenFrame.photo': '写真', 'fx.tokenFrame.card': 'カード',
-  'fx.pushPin': '画鋲', 'fx.pushPin.on': '☑ 画鋲を表示', 'fx.pushPin.off': '☐ 画鋲を表示', 'fx.pushPin.reangle': '画鋲の角度／スタイルをランダム化',
+  'fx.pushPin': '画鋲', 'fx.pushPin.on': '☑ 画鋲を表示', 'fx.pushPin.off': '☐ 画鋲を表示',
   'fx.clueLink': '赤い糸', 'fx.clueLink.to': '{{name}} へ繋ぐ', 'fx.clueLink.clear': 'このオブジェクトの糸を削除',
   'fx.paperStyle': '用紙スタイル', 'fx.paperStyle.none': 'なし', 'fx.paperStyle.a4': 'A4', 'fx.paperStyle.sticky': '付箋',
   'fx.status.blinded': '盲目', 'fx.status.charmed': '魅了', 'fx.status.deafened': '聴覚喪失', 'fx.status.frightened': '恐怖', 'fx.status.grappled': 'つかまれた', 'fx.status.incapacitated': '無力状態', 'fx.status.invisible': '透明', 'fx.status.paralyzed': '麻痺', 'fx.status.petrified': '石化', 'fx.status.poisoned': '毒', 'fx.status.prone': '伏せ', 'fx.status.restrained': '拘束', 'fx.status.stunned': '朦朧', 'fx.status.unconscious': '気絶', 'fx.status.exhaustion': '疲労', 'fx.status.dead': '死亡',

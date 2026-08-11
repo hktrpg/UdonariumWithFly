@@ -283,7 +283,7 @@ export const ja_ui: I18nDictionary = {
   'menu.confirm.refresh.reload': 'ダウンロードせず再読込',
   'menu.confirm.refresh.flushReload': 'フォルダ書き出し後に再読込',
   'menu.confirm.refresh.reloadOnly': 'バックアップせず再読込',
-  'folderBackup.loadTitle': 'フォルダバックアップ',
+  'folderBackup.loadTitle': '部屋を読込',
   'folderBackup.loadHelp': '部屋と時点を選んで復元。同じ部屋は卓を上書き、別部屋は既定でその roomId／部屋名へ切り替えます。',
   'folderBackup.loadHelpAuth': 'パスワード表示：端末内鍵で暗号化。別ブラウザでは再入力が必要です。',
   'folderBackup.storeRulesTitle': '自動保存ルール',

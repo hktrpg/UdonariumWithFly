@@ -283,7 +283,7 @@ export const zhCN_ui: I18nDictionary = {
   'menu.confirm.refresh.reload': '无需下载，重新加载',
   'menu.confirm.refresh.flushReload': '写入文件夹后重新加载',
   'menu.confirm.refresh.reloadOnly': '直接重新加载（不备份）',
-  'folderBackup.loadTitle': '文件夹备份',
+  'folderBackup.loadTitle': '读取房间',
   'folderBackup.loadHelp': '选择房间与时间点还原。同房间会覆盖当前桌面；不同房间默认切换为该房间 ID／房名。',
   'folderBackup.loadHelpAuth': '密码状态标签：以本机密钥加密；换浏览器需重填一次。',
   'folderBackup.storeRulesTitle': '自动保存规则',

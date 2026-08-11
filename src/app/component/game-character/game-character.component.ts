@@ -234,6 +234,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
   get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
+  get pushPinLeft(): number {
+    return typeof this.gameCharacter.pushPinLeft === 'number' ? this.gameCharacter.pushPinLeft : -4;
+  }
+  get pushPinTop(): number {
+    return typeof this.gameCharacter.pushPinTop === 'number' ? this.gameCharacter.pushPinTop : -20;
+  }
   get pushPinColor(): string { return this.gameCharacter.pushPinColor || 'red'; }
   get pushPinSrc(): string {
     return pushPinAssetUrl(

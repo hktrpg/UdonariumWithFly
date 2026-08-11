@@ -283,7 +283,7 @@ export const en_ui: I18nDictionary = {
   'menu.confirm.refresh.reload': 'Reload without download',
   'menu.confirm.refresh.flushReload': 'Flush folder then reload',
   'menu.confirm.refresh.reloadOnly': 'Reload without backup',
-  'folderBackup.loadTitle': 'Folder backups',
+  'folderBackup.loadTitle': 'Load room',
   'folderBackup.loadHelp': 'Pick a room and restore point. Same room overwrites the tabletop; a different room switches to that roomId/name by default.',
   'folderBackup.loadHelpAuth': 'Password badges: encrypted with a local key; other browsers need a one-time re-entry.',
   'folderBackup.storeRulesTitle': 'Auto-store rules',

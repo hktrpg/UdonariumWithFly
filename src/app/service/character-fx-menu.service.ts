@@ -22,7 +22,7 @@ import {
 import {
   isActivePushPinStyle,
   pinAngleFromId,
-  randomPinAngle,
+  randomPinOffset,
   randomPushPinStyle,
   TOKEN_FRAME_STYLES,
 } from '@udonarium/table-fx/push-pin.util';
@@ -134,23 +134,30 @@ export class CharacterFxMenuService {
           off: this.i18n.t('fx.pushPin.off'),
           after,
         }),
-        {
-          name: this.i18n.t('fx.pushPin.reangle'),
-          action: () => {
-            host.pushPinAngle = randomPinAngle();
-            host.pushPinStyle = randomPushPinStyle();
-            host.pushPin = true;
-            after();
-          },
-        },
       ]
     };
   }
 
-  /** Assign angle + active style {2,3,6,7} when enabling a pin. */
+  /** Assign angle + style + position when enabling a pin. */
   private ensureHostPushPin(host: GameCharacter | TextNote) {
     if (!host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
     if (!isActivePushPinStyle(host.pushPinStyle)) host.pushPinStyle = randomPushPinStyle();
+    this.applyRandomPinOffset(host);
+  }
+
+  private applyRandomPinOffset(host: GameCharacter | TextNote) {
+    const GRID = 50;
+    let widthPx = GRID;
+    if (host instanceof TextNote) {
+      widthPx = Math.max(1, host.width) * GRID;
+    } else {
+      widthPx = Math.max(1, host.size) * GRID;
+      // Framed tokens grow outward with padding (~7–8px each side).
+      if (host.tokenFrame && host.tokenFrame !== 'none') widthPx += 16;
+    }
+    const off = randomPinOffset(widthPx);
+    host.pushPinLeft = off.left;
+    host.pushPinTop = off.top;
   }
 
   makeClueLinkMenu(from: GameCharacter | TextNote): ContextMenuAction {
@@ -174,14 +181,7 @@ export class CharacterFxMenuService {
             get: () => isLinked(t),
             set: (on) => {
               if (on) {
-                if (!from.pushPin) {
-                  from.pushPin = true;
-                  this.ensureHostPushPin(from);
-                }
-                if (!t.pushPin) {
-                  t.pushPin = true;
-                  this.ensureHostPushPin(t);
-                }
+                // Yarn does not require a visible push pin.
                 if (!isLinked(t)) {
                   ClueLink.create(from.identifier, t.identifier, { tableIdentifier: viewId });
                 }

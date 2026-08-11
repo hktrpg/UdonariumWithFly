@@ -129,6 +129,12 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
   get pushPin(): boolean { return !!this.textNote?.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.textNote?.pushPinAngle || 0; }
+  get pushPinLeft(): number {
+    return typeof this.textNote?.pushPinLeft === 'number' ? this.textNote.pushPinLeft : -4;
+  }
+  get pushPinTop(): number {
+    return typeof this.textNote?.pushPinTop === 'number' ? this.textNote.pushPinTop : -20;
+  }
   get pushPinColor(): string { return this.textNote?.pushPinColor || 'red'; }
   get pushPinSrc(): string {
     return pushPinAssetUrl(

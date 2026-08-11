@@ -1,22 +1,55 @@
 /* Shared clue-board chrome (token frames + push pins). */
 
-/* Oblique pin (head + collar + short tip). Fine tilt via CSS rotate. */
+/*
+  Oblique pin host. Rotate around the tip (50% / 88%) so yarn can snap to
+  `.push-pin-tip` after CSS rotate (AABB midpoints are wrong once tilted).
+*/
 .push-pin {
   position: absolute;
+  /* Defaults; overridden by sync'd pushPinLeft / pushPinTop. */
   top: -20px;
   left: -4px;
   width: 30px;
   height: 38px;
   z-index: 20;
   pointer-events: none;
-  object-fit: contain;
-  object-position: center bottom;
-  /* Above clue yarn (table Z ≈ 2.4); keep pin head visible over the string. */
-  transform: translateZ(2.5px);
+  /*
+    Above clue yarn (gridHeight + 2.4). Do NOT put filter on this host —
+    filter flattens translateZ so yarn paints over the pin (photo frames).
+  */
+  transform: translateZ(4px);
   transform-origin: 50% 88%;
-  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   user-select: none;
   -webkit-user-drag: none;
+}
+
+.push-pin-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+}
+
+/* Yarn joins under the pin-head center (covered by the red head). */
+.push-pin-tip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 0;
+  line-height: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
 /* Frame wraps OUTSIDE the token footprint (content-box) so the full sprite stays visible. */
@@ -25,7 +58,14 @@
   display: block;
   box-sizing: content-box;
   overflow: visible;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
+
+/*
+  Framed prints: pin sits on the outer matte/frame edge (not down on the print).
+  Default top:-20 / left:-4 already aligns with the frame corner.
+*/
 
 .token-frame > .image {
   width: 100% !important;
@@ -37,6 +77,11 @@
   position: relative;
   z-index: 1;
   background: #1c1c1c;
+}
+
+/* Pin must paint above the print (and photo gloss overlays). */
+.token-frame > .push-pin {
+  z-index: 30;
 }
 
 /* ---- Polaroid: Instant film (thick bottom caption when name shown) ---- */
@@ -146,7 +191,7 @@
     inset 0 2px 5px rgba(0, 0, 0, 0.28);
 }
 
-/* Soft gloss streak across the print */
+/* Soft gloss streak across the print (no mix-blend — it flattens 3D pin Z). */
 .token-frame.photo::after {
   content: '';
   position: absolute;
@@ -158,18 +203,19 @@
   pointer-events: none;
   background: linear-gradient(
     185deg,
-    rgba(255, 255, 255, 0.28) 0%,
-    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.05) 45%,
     transparent 70%
   );
-  mix-blend-mode: soft-light;
 }
 
 .token-frame.photo > .image {
   border: none;
   background: #151515;
-  filter: contrast(1.08) saturate(0.85) sepia(0.12);
+  /* Keep print look without filter on a sibling plane that fights pin Z. */
   box-shadow: none;
+  opacity: 0.96;
+  filter: contrast(1.06) saturate(0.88) sepia(0.1);
 }
 
 /* ---- Card: bevelled cardstock edge + inner rail ---- */

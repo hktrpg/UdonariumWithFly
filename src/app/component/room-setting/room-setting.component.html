@@ -1,6 +1,7 @@
 <div class="settings-ui dense" *ngIf="editMode || !isConnected; else other_content">
   <section class="card">
     <header class="card-head"><h3>{{ (editMode ? 'room.editTitle' : (isResume ? 'room.resumeTitle' : 'room.title')) | i18n }}</h3></header>
+    <form (ngSubmit)="onPrimaryAction()">
     <p class="hint" *ngIf="isResume">{{ 'room.resumeHint' | i18n:{ id: preferredRoomId } }}</p>
     <p class="hint hint-auth" *ngIf="isResume && resumeAuthHintKey" [ngClass]="{
       'hint-ok': preferredAuthStatus === 'ready',
@@ -112,20 +113,18 @@
     <footer class="actions">
       <ng-container *ngIf="!editMode">
         <button
-          type="button"
+          type="submit"
           class="btn btn-primary"
           [disabled]="!canSubmit || connectionBusy.busy"
-          (click)="createRoom()"
         >
           {{ (isResume ? 'room.resume' : 'room.create') | i18n }}
         </button>
       </ng-container>
       <ng-container *ngIf="editMode">
         <button
-          type="button"
+          type="submit"
           class="btn btn-primary"
           [disabled]="isSaving || !canSubmit"
-          (click)="saveRoomPasswords()"
         >
           {{ 'room.savePasswords' | i18n }}
         </button>
@@ -134,6 +133,7 @@
         </button>
       </ng-container>
     </footer>
+    </form>
   </section>
   <p class="empty-hint" *ngIf="!editMode">{{ 'room.emptyRoomHint' | i18n }}</p>
 </div>

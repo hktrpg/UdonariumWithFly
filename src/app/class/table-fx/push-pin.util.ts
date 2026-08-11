@@ -18,6 +18,24 @@ export function randomPinAngle(): number {
   return Math.round((Math.random() * 50 - 25) * 10) / 10;
 }
 
+/** Default CSS box for `.push-pin` (must stay in sync with clue-board.css). */
+export const PIN_BOX = { left: -4, top: -20, width: 30, height: 38, tipX: 0.5, tipY: 0.5 };
+
+/**
+ * Random pin offset along the host top edge (corkboard look).
+ * `hostWidthPx` = image-box / paper width in CSS pixels.
+ */
+export function randomPinOffset(hostWidthPx: number): { left: number; top: number } {
+  const w = Math.max(PIN_BOX.width, hostWidthPx || 50);
+  const minLeft = PIN_BOX.left;
+  // Keep most of the pin head over the host (tip near the top edge).
+  const maxLeft = Math.max(minLeft, Math.round(w - PIN_BOX.width * 0.55));
+  const left = Math.round(minLeft + Math.random() * (maxLeft - minLeft));
+  // Slight vertical jitter on the outer frame / top edge (2px higher than before).
+  const top = Math.round(-28 + Math.random() * 8); // -28 .. -16
+  return { left, top };
+}
+
 /** Oblique pin styles used in-game (random pick). */
 export const PUSH_PIN_ACTIVE_STYLES = [2, 3, 6, 7] as const;
 export type PushPinActiveStyleId = typeof PUSH_PIN_ACTIVE_STYLES[number];
@@ -78,27 +96,37 @@ export interface PinHost {
   pushPin: boolean;
   pushPinAngle: number;
   pushPinStyle?: number;
+  pushPinLeft?: number;
+  pushPinTop?: number;
   location: { x: number; y: number };
   rotate?: number;
 }
 
+/** Tip of the CSS pin relative to the host image-box / paper top-left. */
+function pinTipLocal(host?: PinHost): { x: number; y: number } {
+  const left = (host && typeof host.pushPinLeft === 'number') ? host.pushPinLeft : PIN_BOX.left;
+  const top = (host && typeof host.pushPinTop === 'number') ? host.pushPinTop : PIN_BOX.top;
+  return {
+    x: left + PIN_BOX.width * PIN_BOX.tipX,
+    y: top + PIN_BOX.height * PIN_BOX.tipY,
+  };
+}
+
 /**
  * Token-style host: location is the top-left of the footprint.
- * Pin sits near that corner (with inset), then rotated around footprint center.
+ * Fallback when DOM tip is missing — matches unframed .push-pin tip.
  */
 export function pinAnchorPx(
   host: PinHost,
   widthPx: number,
   heightPx: number,
-  inset = 10,
 ): { x: number; y: number } {
-  const lx = inset;
-  const ly = inset;
+  const tip = pinTipLocal(host);
   return rotateAround(
     host.location.x + widthPx / 2,
     host.location.y + heightPx / 2,
-    host.location.x + lx,
-    host.location.y + ly,
+    host.location.x + tip.x,
+    host.location.y + tip.y,
     host.rotate || 0,
   );
 }
@@ -107,16 +135,16 @@ export function pinAnchorPx(
  * TextNote geometry: movable origin is the bottom-center of the paper
  * (content uses translateX(-50%), face hinged at bottom:0).
  * Table Y grows downward, so the title/top edge is at location.y - height.
- * Pin sits at the visual top-left (title-bar corner).
+ * Fallback tip matches `.push-pin` on the paper face.
  */
 export function notePinAnchorPx(
   host: PinHost,
   widthPx: number,
   heightPx: number,
-  inset = 12,
 ): { x: number; y: number } {
-  const lx = -widthPx / 2 + inset;
-  const ly = -heightPx + inset;
+  const tip = pinTipLocal(host);
+  const lx = -widthPx / 2 + tip.x;
+  const ly = -heightPx + tip.y;
   return rotateAround(
     host.location.x,
     host.location.y,

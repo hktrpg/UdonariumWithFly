@@ -71,7 +71,6 @@ export const zhTW_ctx: I18nDictionary = {
   'fx.pushPin': '圖釘',
   'fx.pushPin.on': '☑ 顯示圖釘',
   'fx.pushPin.off': '☐ 顯示圖釘',
-  'fx.pushPin.reangle': '隨機圖釘角度／樣式',
   'fx.clueLink': '紅繩',
   'fx.clueLink.to': '連到 {{name}}',
   'fx.clueLink.clear': '移除此物件的紅繩',

@@ -18,10 +18,13 @@
             }"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
-            <img *ngIf="pushPin" class="push-pin is-3d" alt="" draggable="false"
-              [src]="pushPinSrc"
-              [attr.data-clue-pin]="textNote.identifier"
-              [style.transform]="'translateZ(2.5px) rotate(' + pushPinAngle + 'deg)'" />
+            <span *ngIf="pushPin" class="push-pin is-3d"
+              [style.left.px]="pushPinLeft"
+              [style.top.px]="pushPinTop"
+              [style.transform]="'translateZ(4px) rotate(' + pushPinAngle + 'deg)'">
+              <img class="push-pin-img" alt="" draggable="false" [src]="pushPinSrc" />
+              <i class="push-pin-tip" [attr.data-clue-pin]="textNote.identifier" aria-hidden="true"></i>
+            </span>
             <div *ngIf="isShowTitle && title.length" class="title is-3d is-pointer-events-none"
               [style.background-color]="titleBgColor"
               [style.color]="titleFgColor">{{title}}</div>

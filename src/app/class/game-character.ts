@@ -116,6 +116,9 @@ export class GameCharacter extends TabletopObject {
   @SyncVar() pushPinColor: string = 'red';
   /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
   @SyncVar() pushPinStyle: number = 0;
+  /** CSS left/top of `.push-pin` on the token image-box (randomized). */
+  @SyncVar() pushPinLeft: number = -4;
+  @SyncVar() pushPinTop: number = -20;
   
   text = '';
   dialog = null;

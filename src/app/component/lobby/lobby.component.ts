@@ -261,6 +261,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (!(await this.folderBackup.ensureBound())) return;
     if (!this.canLoadRoom) return;
     await this.folderBackup.openLoadUi();
+    if (Network.peer?.isRoom) this.dismissLobby();
   }
 
   /** Close whether lobby was opened as a panel or (legacy) modal. */

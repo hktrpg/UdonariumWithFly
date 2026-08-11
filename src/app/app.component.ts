@@ -476,13 +476,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
-        if (!this.inviteHandled && !Network.peer.isRoom) {
+        if (Network.peer?.isRoom) {
+          // Create / join / resume room: dismiss lobby windows left from cold start.
+          this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+        } else if (!this.inviteHandled) {
           this.inviteHandled = true;
           this.ngZone.run(async () => {
             await this.tryConsumeInvite();
             if (!Network.peer?.isRoom) this.openLobbyIfNeeded();
           });
-        } else if (!Network.peer.isRoom) {
+        } else {
           this.ngZone.run(() => this.openLobbyIfNeeded());
         }
       })
@@ -663,6 +666,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       ((event.ctrlKey || event.metaKey) && (event.key === 'r' || event.key === 'R'));
     if (!isReload) return;
     if (this.GuestMode()) return;
+    // Lobby / no room: nothing to ZIP — reload without the save prompt.
+    if (!this.isRoom) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.ngZone.run(() => this.reloadWithoutPrompt());
+      return;
+    }
     if (this.isRefreshPromptOpen || this.isSaveing) {
       event.preventDefault();
       return;
@@ -673,7 +683,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   private promptRefreshDownload() {
-    if (this.isRefreshPromptOpen || this.GuestMode()) return;
+    if (this.isRefreshPromptOpen || this.GuestMode() || !this.isRoom) return;
     this.isRefreshPromptOpen = true;
     const folderReady = this.folderBackup.isReady;
     const option: Record<string, unknown> = {

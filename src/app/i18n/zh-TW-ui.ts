@@ -284,7 +284,7 @@ export const zhTW_ui: I18nDictionary = {
   'menu.confirm.refresh.reload': '不需下載，重新整理',
   'menu.confirm.refresh.flushReload': '寫入資料夾後重新整理',
   'menu.confirm.refresh.reloadOnly': '直接重新整理（不備份）',
-  'folderBackup.loadTitle': '資料夾備份',
+  'folderBackup.loadTitle': '讀取房間',
   'folderBackup.loadHelp': '選擇房間與時間點還原。同房間會覆寫目前桌面；不同房間預設切換為該房間 ID／房名。',
   'folderBackup.loadHelpAuth': '密碼狀態標籤：以本機金鑰加密；換瀏覽器需重填一次。',
   'folderBackup.storeRulesTitle': '自動儲存規則',

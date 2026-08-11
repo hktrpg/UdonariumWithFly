@@ -48,7 +48,7 @@ import { MovableDirective } from 'directive/movable.directive';
 
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
-import { TableMouseGesture } from './table-mouse-gesture';
+import { TableMouseGesture, TableMouseGestureEvent } from './table-mouse-gesture';
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
 import { collectFootprintWalls } from './footprint-walls';
@@ -129,11 +129,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
   /**
-   * Yarn must sit above flat 2D tokens (movable ≈1px + upright ≈1px → ≈2px)
-   * but below push-pin heads (local translateZ on .push-pin).
+   * Yarn above flat 2D tokens (≈1–2px) but below pin heads (pin local Z ≈ 4px → ~5px).
    */
   get clueStringsZ(): number {
-    return this.gridHeight + 2.4;
+    return this.gridHeight + 2.2;
   }
 
   /** CSS translateZ for volumetric weather sheets (0=near floor … 2=high). */
@@ -301,20 +300,26 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
       ? CSS.escape(id)
       : id.replace(/["\\]/g, '\\$&');
+    // Prefer the tip marker (0×0 after rotate). Fall back to legacy .push-pin img.
     const pinEl = this.gameObjects?.nativeElement?.querySelector(
       `[data-clue-pin="${esc}"]`
     ) as HTMLElement | null;
     if (pinEl) {
       const rect = pinEl.getBoundingClientRect();
-      // display:none / not laid out → singular transform matrix (invert det=0).
-      if (rect.width > 0.5 && rect.height > 0.5) {
-        // Pointer stack uses page coords; pin head is near the top of .push-pin.
+      // Tip markers are 0×0; img fallback needs a real box.
+      const isTip = pinEl.classList.contains('push-pin-tip') || (rect.width < 1 && rect.height < 1);
+      if (isTip || (rect.width > 0.5 && rect.height > 0.5)) {
+        // Pointer stack uses page coords. Sample tip (or AABB tip fraction on legacy img).
         const page = {
-          x: rect.left + rect.width * 0.5 + window.pageXOffset,
-          y: rect.top + rect.height * 0.3 + window.pageYOffset,
+          x: (isTip ? rect.left : rect.left + rect.width * 0.5) + window.pageXOffset,
+          y: (isTip ? rect.top : rect.top + rect.height * 0.5) + window.pageYOffset,
           z: 0,
         };
-        const local = this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
+        // Project onto the table plane (not the tilted pin plane) so yarn matches the tip pixel.
+        const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
+        const local = origin
+          ? this.coordinateService.convertToLocal(page, origin)
+          : this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
         if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
           return { x: local.x, y: local.y };
         }
@@ -988,8 +993,16 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.selectionService.size > 0 || this.sceneTools.selectionCount > 0) return;
       this.removeFocus();
       this.isTableTransformMode = true;
-    } else if (!this.isTableTransformMode || document.body !== document.activeElement) {
+    } else if (!this.isTableTransformMode) {
       return;
+    } else if (document.body !== document.activeElement) {
+      // Wheel / drag after map switch while menu control still holds focus.
+      const pointerGesture =
+        event === TableMouseGestureEvent.ZOOM
+        || event === TableMouseGestureEvent.DRAG
+        || event === TableMouseGestureEvent.ROTATE;
+      if (!pointerGesture) return;
+      this.removeFocus();
     }
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu && this.contextMenuService.isShow) {
@@ -1679,6 +1692,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.applyCameraForTable(table);
     this.refreshFx();
     this.ensureFxTimer();
+    this.removeFocus();
+    this.isTableTransformMode = true;
     this.changeDetector.detectChanges();
   }
 

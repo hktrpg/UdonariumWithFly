@@ -37,6 +37,9 @@ export class TextNote extends TabletopObject {
   @SyncVar() pushPinColor: string = 'red';
   /** Active oblique styles: 2 | 3 | 6 | 7. 0 = derive from identifier. */
   @SyncVar() pushPinStyle: number = 0;
+  /** CSS left/top of `.push-pin` on the paper face (randomized). */
+  @SyncVar() pushPinLeft: number = -4;
+  @SyncVar() pushPinTop: number = -20;
 
   /** When true, width/height edits are blocked in the inventory editor. */
   @SyncVar() isSizeLocked: boolean = false;
