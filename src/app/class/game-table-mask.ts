@@ -22,10 +22,14 @@ import {
   TabletopClickTabMode,
 } from './tabletop-click-action';
 import { TabletopObject } from './tabletop-object';
+import { moveToBackmost, moveToTopmost, moveToTopmostInTier } from './tabletop-object-util';
+import { TableSelecter } from './table-selecter';
 
 @SyncObject('table-mask')
 export class GameTableMask extends TabletopObject {
   @SyncVar() isLock: boolean = false;
+  /** Dense paint order among layer peers (reconcile puts masks above desk). */
+  @SyncVar() zindex: number = 0;
   @SyncVar() blendType: number = 0;
   @SyncVar() isTransparentOnGMMode: boolean = false;
 
@@ -34,6 +38,15 @@ export class GameTableMask extends TabletopObject {
   @SyncVar() scratchedGrids: string = '';
   @SyncVar() isScratchPreviewOnGMMode = false;
   @SyncVar() isPreview = false;
+
+  /**
+   * Masks are GameTable children (not location/placement tokens).
+   * Parent === current view table ⇒ on the desktop for [ ] / caches.
+   */
+  get isVisibleOnTable(): boolean {
+    const view = TableSelecter.instance?.viewTable;
+    return !!view && this.parent === view;
+  }
 
   @SyncVar() borderType = 1; // 0:不顯示 1:僅未鎖定時顯示 2:一律顯示
   /**
@@ -330,6 +343,18 @@ export class GameTableMask extends TabletopObject {
       else if (this.clickAction === 'preset' && !this.clickPresetId) this.clickPresetId = payload;
     }
     this.clickActionsJson = stringifyClickActions([this.clickAction]);
+  }
+
+  toTopmost() {
+    moveToTopmost(this);
+  }
+
+  raiseInTier() {
+    moveToTopmostInTier(this);
+  }
+
+  toBackmost() {
+    moveToBackmost(this);
   }
 
   static create(name: string, width: number, height: number, opacity: number, identifier?: string): GameTableMask {

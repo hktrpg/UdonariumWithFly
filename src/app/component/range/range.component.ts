@@ -23,6 +23,7 @@ import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { RangeArea } from '@udonarium/range';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { RangeSettingsComponent } from 'component/range-settings/range-settings.component';
 
@@ -474,7 +475,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       });
     this.movableOption = {
       tabletopObject: this.range,
-      transformCssOffset: 'translateZ(0.25px)',
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain', 'text-note']
     };
     this.rotableOption = {

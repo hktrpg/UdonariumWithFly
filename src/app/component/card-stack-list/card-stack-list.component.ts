@@ -81,7 +81,7 @@ export class CardStackListComponent implements OnChanges, OnDestroy {
     card.tableIdentifier = this.cardStack.location.name === 'table' ? this.cardStack.tableIdentifier : '';
     card.rotate += this.cardStack.rotate;
     if (360 < card.rotate) card.rotate -= 360;
-    card.toTopmost();
+    card.raiseInTier();
     SoundEffect.play(PresetSound.cardDraw);
     const stackName = this.cardStack.name == '' ? this.i18n.t('stack.unnamed') : this.cardStack.name;
     if (card.isFront) {

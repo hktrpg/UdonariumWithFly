@@ -329,7 +329,7 @@ input {
   height: 0;
 }
 
-/* Mobile / tablet chrome — desktop unchanged unless .udon-mobile-layout */
+/* Mobile / tablet chrome â desktop unchanged unless .udon-mobile-layout */
 :root {
   /* Filled from env() so JS can read --udon-safe-bottom via getComputedStyle */
   --udon-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -363,4 +363,10 @@ body.udon-mobile-layout .resource-hud {
   max-width: calc(100vw - 16px);
   max-height: calc(40vh);
   bottom: calc(var(--udon-bottom-chrome, 56px) + 8px) !important;
+}
+
+/* Drag: parent PE none is not enough — children with PE auto still receive hits and leak 3D Z into posZ. */
+.is-movable-pe-none,
+.is-movable-pe-none * {
+  pointer-events: none !important;
 }

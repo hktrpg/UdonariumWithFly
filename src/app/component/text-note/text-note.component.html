@@ -1,12 +1,23 @@
 <div class="component is-3d is-pointer-events-none"
   [ngClass]="{'is-grab': !isLocked && !GuestMode()}"
-  appMovable [movable.option]="movableOption" [movable.disable]="isEditorSelected || isLocked || GuestMode()"
+  appMovable [movable.option]="movableOption" [movable.disable]="isLocked || GuestMode()"
   (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="is-3d" appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked || GuestMode()"
     (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
     <div class="component-content is-3d is-pointer-events-auto" (dblclick)="onDoubleClick($event)"
       [style.width.px]="width * gridSize">
-      <div class="is-3d" [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
+      <!--
+        2D only: table-plane hit footprint (3D flat notes must not add this — an extra
+        untransformed WxH plane next to cards breaks preserve-3d compositing / looks misaligned).
+        Do NOT size .component — movable uses clientWidth/Height as center offset.
+      -->
+      <div *ngIf="useFlatHitPlate"
+        class="note-flat-hit"
+        (click)="activate()"
+        [style.width.px]="width * gridSize"
+        [style.height.px]="height * gridSize"></div>
+      <div class="note-visual is-3d" [class.note-visual-pe-pass]="useFlatHitPlate"
+        [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
         [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
           <div class="upright-transform is-3d is-bg-color is-front chrome-smooth-image-trick"
@@ -63,6 +74,7 @@
 
                 <ng-container *ngSwitchDefault>
                   <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
+                    (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()"
                     [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
                     [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
                     [(ngModel)]="text" spellcheck="false"></textarea>

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { ChatTabList } from '@udonarium/chat-tab-list';
@@ -19,7 +19,7 @@ import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
-import { moveToBackmost, moveToTopmost, Stackable } from '@udonarium/tabletop-object-util';
+import { moveToBackmost, moveToTopmost, reconcileLayerStack, Stackable } from '@udonarium/tabletop-object-util';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { MovableDirective } from 'directive/movable.directive';
@@ -78,7 +78,17 @@ export class TabletopKeyboardService {
     private undoService: UndoService,
     private tokenPath: TokenPathMoveService,
     private contextMenu: ContextMenuService,
+    private ngZone: NgZone,
   ) { }
+
+  /**
+   * Keyboard listeners are registered outside NgZone (game-table init) so WASD
+   * does not thrash CD. Template-bound state (z-index, mask order, flip…) must
+   * re-enter the zone or the view never updates.
+   */
+  private runInAngular<T>(fn: () => T): T {
+    return NgZone.isInAngularZone() ? fn() : this.ngZone.run(fn);
+  }
 
   initialize() {
     if (this.listening) return;
@@ -126,7 +136,14 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (this.shouldIgnore(e)) return;
+    if (this.shouldIgnore(e)) {
+      // Note inline editor: keep [ ] as layer shortcuts (blur so we don't type brackets into the note).
+      if ((code === 'BracketLeft' || code === 'BracketRight') && this.isTextNoteEditorFocus()) {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+      } else {
+        return;
+      }
+    }
 
     if (MOVE_CODES.has(code)) this.pressed.add(code);
 
@@ -197,7 +214,9 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (Network.GuestMode()) return;
+    if (Network.GuestMode()) {
+      return;
+    }
 
     // Path draft: Space commits movement along existing waypoints.
     // Else GM toggles room PAUSE watermark (non-blocking).
@@ -223,7 +242,9 @@ export class TabletopKeyboardService {
     }
 
     if ((code === 'BracketLeft' || code === 'BracketRight') && !mod && !this.altHeld && !e.shiftKey) {
-      if (this.changeLayerOrder(code === 'BracketRight')) this.consume(e);
+      if (Network.GuestMode()) return;
+      const changed = this.runInAngular(() => this.changeLayerOrder(code === 'BracketRight'));
+      if (changed) this.consume(e);
       return;
     }
 
@@ -255,7 +276,7 @@ export class TabletopKeyboardService {
       if (this.selectionService.size < 1) return;
       const step = e.shiftKey ? 0.5 : 1;
       const delta = code === 'PageUp' ? step : -step;
-      if (this.nudgeAltitude(delta)) this.consume(e);
+      if (this.runInAngular(() => this.nudgeAltitude(delta))) this.consume(e);
       return;
     }
 
@@ -263,7 +284,7 @@ export class TabletopKeyboardService {
     if (code === 'KeyF' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
-      if (this.flipSelection()) this.consume(e);
+      if (this.runInAngular(() => this.flipSelection())) this.consume(e);
       return;
     }
 
@@ -271,7 +292,7 @@ export class TabletopKeyboardService {
     if (code === 'KeyH' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
-      if (this.toggleHideSelection()) this.consume(e);
+      if (this.runInAngular(() => this.toggleHideSelection())) this.consume(e);
       return;
     }
 
@@ -279,7 +300,7 @@ export class TabletopKeyboardService {
     if (code === 'KeyL' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
-      if (this.toggleLockSelection()) this.consume(e);
+      if (this.runInAngular(() => this.toggleLockSelection())) this.consume(e);
       return;
     }
 
@@ -456,6 +477,12 @@ export class TabletopKeyboardService {
     return !!target.closest('[contenteditable="true"], [contenteditable=""]');
   }
 
+  /** True when focus is in a tabletop note's inline textarea (not chat / panel fields). */
+  private isTextNoteEditorFocus(): boolean {
+    const ae = document.activeElement;
+    return ae instanceof HTMLTextAreaElement && !!ae.closest('text-note');
+  }
+
   /**
    * Esc priority: context menu → modal → path/scene draft → clear selection → close frontmost panel.
    * Selection clears before panels so box-selected tokens are not left selected while a window closes.
@@ -529,28 +556,48 @@ export class TabletopKeyboardService {
     const before = this.snapshotZindexes(this.selectionService.objects);
     const beforeOrder = this.snapshotChildOrders(this.selectionService.objects);
     let changed = false;
-    for (const object of this.selectionService.objects) {
-      if (this.isLocked(object)) continue;
-      if (toFront ? this.bringToFront(object) : this.sendToBack(object)) changed = true;
+    // Process back→front when bringing forward (and reverse when sending back) so
+    // multi-select keeps relative order while moving as a group.
+    const objects = this.selectionService.objects.slice().sort((a, b) => {
+      const za = 'zindex' in a ? (a as Stackable).zindex : 0;
+      const zb = 'zindex' in b ? (b as Stackable).zindex : 0;
+      return toFront ? za - zb : zb - za;
+    });
+    for (const object of objects) {
+      // Lock blocks drag/delete, not [ ] paint order — default clue masks ship locked.
+      const did = toFront ? this.bringToFront(object) : this.sendToBack(object);
+      if (did) changed = true;
     }
     if (changed) {
       const after = this.snapshotZindexes(this.selectionService.objects);
       const afterOrder = this.snapshotChildOrders(this.selectionService.objects);
       this.undoService.recordLayerChange(before, after, beforeOrder, afterOrder, 'layer');
+      // Stackable toTopmost/toBackmost already emit TABLETOP_LAYER_CHANGED via util.
+      // Re-firing here doubles detectChanges and makes every token flash on [ ].
+      const needsExtraLayerEvent = objects.some(o => {
+        if (o instanceof Terrain) return true;
+        if (typeof (o as any).toTopmost === 'function' || typeof (o as any).toBackmost === 'function') {
+          return false;
+        }
+        return !('zindex' in o);
+      });
+      if (needsExtraLayerEvent) {
+        EventSystem.trigger('TABLETOP_LAYER_CHANGED', {
+          toFront,
+          ids: objects.map(o => o.identifier),
+        });
+      }
     }
     return changed;
   }
 
   private snapshotZindexes(objects: TabletopObject[]): Map<string, number> {
     const map = new Map<string, number>();
-    const aliases = new Set<string>();
-    for (const object of objects) {
-      if (!('zindex' in object)) continue;
-      aliases.add(object.aliasName);
-    }
-    for (const alias of aliases) {
+    // Snapshot the whole shared layer space (not only selected aliases).
+    for (const alias of ['text-note', 'card', 'card-stack', 'range', 'table-mask', 'character']) {
       for (const peer of ObjectStore.instance.getObjects(alias) as Stackable[]) {
         if (!peer.isVisibleOnTable) continue;
+        if (typeof peer.zindex !== 'number') continue;
         map.set(peer.identifier, peer.zindex);
       }
     }
@@ -570,32 +617,38 @@ export class TabletopKeyboardService {
 
   private bringToFront(object: TabletopObject): boolean {
     if (typeof (object as any).toTopmost === 'function') {
+      const z0 = 'zindex' in object ? (object as Stackable).zindex : null;
       (object as any).toTopmost();
+      const z1 = 'zindex' in object ? (object as Stackable).zindex : null;
+      // Card/Note/Mask toTopmost() → moveToTopmost; detect no-op via zindex when present.
+      if (z0 != null && z1 != null) return z0 !== z1;
       return true;
     }
-    if ((object instanceof Terrain || object instanceof GameTableMask) && object.parent) {
+    // Terrains stay on parent child-order (no shared zindex with desktop pieces).
+    if (object instanceof Terrain && object.parent) {
       object.parent.appendChild(object);
       return true;
     }
     if ('zindex' in object) {
-      moveToTopmost(object as Stackable);
-      return true;
+      return moveToTopmost(object as Stackable);
     }
     return false;
   }
 
   private sendToBack(object: TabletopObject): boolean {
     if (typeof (object as any).toBackmost === 'function') {
+      const z0 = 'zindex' in object ? (object as Stackable).zindex : null;
       (object as any).toBackmost();
+      const z1 = 'zindex' in object ? (object as Stackable).zindex : null;
+      if (z0 != null && z1 != null) return z0 !== z1;
       return true;
     }
-    if ((object instanceof Terrain || object instanceof GameTableMask) && object.parent) {
+    if (object instanceof Terrain && object.parent) {
       object.parent.prependChild(object);
       return true;
     }
     if ('zindex' in object) {
-      moveToBackmost(object as Stackable);
-      return true;
+      return moveToBackmost(object as Stackable);
     }
     return false;
   }
@@ -699,14 +752,14 @@ export class TabletopKeyboardService {
         if (table) table.appendChild(object);
       } else if (object instanceof Card) {
         object.isLocked = false;
-        object.toTopmost();
+        object.raiseInTier();
       } else if (object instanceof CardStack) {
         object.isLocked = false;
         object.owner = '';
-        object.toTopmost();
+        object.raiseInTier();
       } else if (object instanceof TextNote) {
         object.isLocked = false;
-        object.toTopmost();
+        object.raiseInTier();
       } else if (object instanceof DiceSymbol) {
         object.update();
       } else if (object instanceof RangeArea) {
@@ -721,6 +774,7 @@ export class TabletopKeyboardService {
     for (const object of pasted) {
       this.selectionService.add(object);
     }
+    reconcileLayerStack();
     this.undoService.recordCreated(pasted as ObjectNode[], 'paste');
     SoundEffect.play(PresetSound.piecePut);
     return true;

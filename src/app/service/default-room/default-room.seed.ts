@@ -18,6 +18,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { reconcileLayerStack } from '@udonarium/tabletop-object-util';
 
 import {
   CLUE_BOARD_BG_URL,
@@ -89,6 +90,7 @@ export function seedDefaultRoomObjects(t: DefaultRoomTranslate): void {
   seedClassicBattleObjects(DEFAULT_TABLE_3D_ID, t);
   seedClueBoardObjects(DEFAULT_TABLE_2D_ID, t);
   TabletopObject.migrateUnboundTablePieces(DEFAULT_TABLE_3D_ID);
+  reconcileLayerStack();
 }
 
 /**

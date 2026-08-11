@@ -6,7 +6,7 @@ import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
 import { EventSystem, Network } from './core/system';
-import { moveToBackmost, moveToTopmost } from './tabletop-object-util';
+import { moveToBackmost, moveToTopmost, moveToTopmostInTier } from './tabletop-object-util';
 
 @SyncObject('card-stack')
 export class CardStack extends TabletopObject {
@@ -68,7 +68,7 @@ export class CardStack extends TabletopObject {
       card.rotate += this.rotate;
       if (360 < card.rotate) card.rotate -= 360;
       this.setSamePositionFor(card);
-      card.toTopmost();
+      card.raiseInTier();
     }
     return card;
   }
@@ -162,11 +162,15 @@ export class CardStack extends TabletopObject {
   }
 
   toTopmost() {
-    moveToTopmost(this, ['card']);
+    moveToTopmost(this);
+  }
+
+  raiseInTier() {
+    moveToTopmostInTier(this);
   }
 
   toBackmost() {
-    moveToBackmost(this, ['card']);
+    moveToBackmost(this);
   }
 
   // override

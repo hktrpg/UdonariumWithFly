@@ -1,5 +1,7 @@
 :host {
   display: block;
+  /* Needed so [style.z-index] / ngStyle z-index on the host actually stacks in 2D. */
+  position: relative;
 }
 
 .is-ghosted {
@@ -134,8 +136,12 @@
   -moz-user-drag: none;
   -webkit-user-drag: none;
 
+  /* Keep a 0-footprint anchor: movable uses clientWidth/Height as center offset.
+   * Sizing the host to the paper jumps flat notes across the table.
+   * contain:layout stops the 2D hit plate from expanding ancestor overflow. */
   width: 1px;
-  height:0;
+  height: 0;
+  contain: layout;
 }
 
 .component-content {
@@ -144,12 +150,41 @@
   transform : translateX(-50%);
 }
 
+/*
+ * 2D flat-note hit plate only (see useFlatHitPlate).
+ * Bottom-anchored WxH in table XY; contain so it does not grow #app-game-table scrollport.
+ */
+.note-flat-hit {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  pointer-events: auto;
+  z-index: 0;
+  contain: strict;
+}
+
+/* 2D: whole visual tree ignores hits so the plate underneath receives them.
+ * Interactive bits re-enable pointer-events (resize / pdf / video / pin). */
+.note-visual-pe-pass {
+  pointer-events: none;
+}
+
+.note-visual-pe-pass .resize-grab,
+.note-visual-pe-pass .pdf-nav,
+.note-visual-pe-pass .pdf-btn,
+.note-visual-pe-pass .note-video,
+.note-visual-pe-pass .note-text,
+.note-visual-pe-pass .push-pin {
+  pointer-events: auto;
+}
+
 .upright-transform {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   backface-visibility: hidden;
+  pointer-events: auto;
 }
 
 .is-front {

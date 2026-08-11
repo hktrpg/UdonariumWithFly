@@ -34,6 +34,21 @@
   pointer-events: none;
 }
 
+/* Layer peers: host must not steal hits; only content with pointer-events:auto does. */
+.layer-peer-host {
+  pointer-events: none;
+}
+
+/*
+ * 2D corkboard: flatten layer hosts so CSS z-index from [ ] actually paints.
+ * preserve-3d on the table otherwise ignores z-index and only DOM order counts
+ * (notes often looked stuck when model z changed).
+ */
+.layer-peer-host.layer-flat-2d {
+  -webkit-transform-style: flat;
+  transform-style: flat;
+}
+
 .component {
   -moz-user-select: none;
   -webkit-user-select: none;

@@ -182,14 +182,14 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
       case 'card':
       case 'card-stack':
         (cloneObject as any).owner = '';
-        (cloneObject as any).toTopmost();
+        (cloneObject as any).raiseInTier();
       case 'table-mask':
         (cloneObject as any).isLock = false;
         (cloneObject as any).isPreview = false;
         SoundEffect.play(PresetSound.cardPut);
         break;
       case 'text-note':
-        (cloneObject as any).toTopmost();
+        (cloneObject as any).raiseInTier();
         SoundEffect.play(PresetSound.cardPut);
         break;
       case 'dice-symbol':

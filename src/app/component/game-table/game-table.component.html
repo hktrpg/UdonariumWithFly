@@ -79,23 +79,28 @@
           <ng-container *ngIf="!terrain.detailDataElement || terrain.detailDataElement.children.length <= 0"><terrain class="is-3d" [style.z-index]="z + (terrain.height > 0 ? 0 : 10000)" [terrain]="terrain"></terrain></ng-container>
         </ng-container>
       </div>
-      <div class="is-fill is-3d is-pointer-events-none">
-        <ng-container *ngFor="let mask of tableMasks; trackBy: trackByGameObject; index as z">
-          <ng-container *ngIf="mask.detailDataElement && 0 < mask.detailDataElement.children.length"><game-table-mask class="is-3d" [gameTableMask]="mask" [appTooltip]="mask" [ngStyle]="{'z-index': z, 'transform': 'translateZ(' + (z * 0.0001) +'px)'}"></game-table-mask></ng-container>
-          <ng-container *ngIf="!mask.detailDataElement || mask.detailDataElement.children.length <= 0"><game-table-mask class="is-3d" [gameTableMask]="mask" [ngStyle]="{'z-index': z, 'transform': 'translateZ(' + (z * 0.0001) +'px)'}"></game-table-mask></ng-container>
+      <!--
+        Shared [ ] among card / note / mask / character: dense zindex.
+        Stable DOM (id order) — never reorder on [ ] (that flashed every token).
+        2D paint: CSS z-index (layer-flat-2d). 3D paint: micro translateZ on movable.
+        Hosts stay transform-free (0×0 hosts with translateZ break tall-note hit tests).
+        Hosts are pointer-events:none so only real content steals hits.
+      -->
+      <ng-container *ngFor="let piece of desktopLayerPieces; trackBy: trackByLayerPiece">
+        <ng-container *ngIf="isLayerMask(piece)">
+          <game-table-mask *ngIf="piece.detailDataElement && 0 < piece.detailDataElement.children.length" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [gameTableMask]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></game-table-mask>
+          <game-table-mask *ngIf="!piece.detailDataElement || piece.detailDataElement.children.length <= 0" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [gameTableMask]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></game-table-mask>
         </ng-container>
-      </div>
-      <ng-container *ngFor="let textNote of textNotes; trackBy: trackByGameObject">
-        <ng-container *ngIf="textNote && (textNote.canSeeSelfOnly || isGMMode)">
-          <text-note *ngIf="textNote.text != null && textNote.text.trim() != ''" class="is-3d" [textNote]="textNote" [appTooltip]="textNote" [style.z-index]="textNote.zindex"></text-note>
-          <text-note *ngIf="textNote.text == null || textNote.text.trim() === ''" class="is-3d" [textNote]="textNote" [style.z-index]="textNote.zindex"></text-note>
+        <ng-container *ngIf="isLayerNote(piece)">
+          <text-note *ngIf="piece.text != null && piece.text.trim() != ''" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [textNote]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></text-note>
+          <text-note *ngIf="piece.text == null || piece.text.trim() === ''" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [textNote]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></text-note>
         </ng-container>
+        <card-stack *ngIf="isLayerCardStack(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [cardStack]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card-stack>
+        <card *ngIf="isLayerCard(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [card]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card>
+        <game-character *ngIf="isLayerCharacter(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-fb-id]="piece.identifier" [attr.data-fb-name]="piece.name" [attr.data-stack-id]="piece.identifier" [style.visibility]="piece.isLoaded && isTokenRevealedByVision(piece) ? 'visible' : 'hidden'" [ngStyle]="layerHostStyle(piece.zindex)" [gameCharacter]="piece" [appTooltip]="piece"></game-character>
       </ng-container>
-      <card-stack class="is-3d" *ngFor="let cardStack of cardStacks; trackBy: trackByGameObject" [cardStack]="cardStack" [appTooltip]="cardStack" [ngStyle]="{'z-index' : cardStack.zindex, 'transform': 'translateZ(' + (cardStack.zindex * 0.001) +'px)'}"></card-stack>
-      <card class="is-3d" *ngFor="let card of cards; trackBy: trackByGameObject" [card]="card" [appTooltip]="card" [ngStyle]="{'z-index' : card.zindex, 'transform': 'translateZ(' + (card.zindex * 0.001) +'px)'}"></card>
-      <range class="is-3d" *ngFor="let range of ranges; trackBy: trackByGameObject" [range]="range" [style.z-index]="range.zindex" [appTooltip]="range"></range>
+      <range class="is-3d" *ngFor="let range of ranges; trackBy: trackByGameObject" [range]="range" [attr.data-stack-id]="range.identifier" [appTooltip]="range"></range>
       <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
-      <ng-container *ngFor="let character of characters; trackBy: trackByCharacter"><ng-container *ngIf="character && (character.isVisible || isGMMode)"><game-character class="is-3d" [attr.data-fb-id]="character.identifier" [attr.data-fb-name]="character.name" [style.visibility]="character.isLoaded && isTokenRevealedByVision(character) ? 'visible' : 'hidden'" [gameCharacter]="character" [appTooltip]="character"></game-character></ng-container></ng-container>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
       <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>

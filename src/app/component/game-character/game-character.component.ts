@@ -14,6 +14,7 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameCharacter } from '@udonarium/game-character';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
@@ -132,9 +133,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   get uprightTransform(): string {
     if (this.is2DMode) {
-      // Face parallel to the table, slight Z lift above pedestal/grid.
-      // Do not use note tip-over (hinge at bottom) — that parks tall art above the base.
-      return `translateZ(${this.altitude * this.gridSize + 1}px)`;
+      // Same peer height as notes/cards/masks; [ ] uses DOM order, not altitude.
+      return `translateZ(${this.altitude * this.gridSize + LAYER_PEER_MOVABLE_Z_PX}px)`;
     }
     const alt = (-this.altitude) * this.gridSize;
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
@@ -244,12 +244,6 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
   get tokenBoxHeightPx(): number {
     return this.is2DMode ? this.size * this.gridSize : this.characterImageHeight;
-  }
-  /** Polaroid caption strip sits below the photo — grow the box so text never covers art. */
-  private static readonly POLAROID_CAPTION_STRIP_PX = 22;
-  get tokenFrameHeightPx(): number {
-    const h = this.tokenBoxHeightPx;
-    return this.showPolaroidCaption ? h + GameCharacterComponent.POLAROID_CAPTION_STRIP_PX : h;
   }
   get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
   get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
@@ -757,7 +751,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.enforce2DRollZero();
     this.movableOption = {
       tabletopObject: this.gameCharacter,
-      transformCssOffset: 'translateZ(1.0px)',
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain', 'text-note', 'character']
     };
     this.rotableOption = {
@@ -868,6 +862,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       menuActions = menuActions.concat(this.makeContextMenu());
     }
     this.contextMenuService.open(position, menuActions, title);
+  }
+
+  onInteractStart() {
+    // Same as card/note: pointer down brings token to shared [ ] front.
+    if (!this.GuestMode() && !this.isMoveLocked) {
+      this.gameCharacter.raiseInTier();
+    }
   }
 
   onMove() {

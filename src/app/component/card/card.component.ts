@@ -21,6 +21,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { CardSettingsComponent } from 'component/card-settings/card-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
@@ -222,7 +223,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       });
     this.movableOption = {
       tabletopObject: this.card,
-      transformCssOffset: 'translateZ(0.15px)',
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain', 'text-note']
     };
     this.rotableOption = {
@@ -281,7 +282,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   onInputStart(e: MouseEvent | TouchEvent) {    
     // TODO: 想更好的做法
     this.ngZone.run(() => {
-      this.card.toTopmost();
+      this.card.raiseInTier();
     });
     this.startIconHiddenTimer();
 
@@ -578,7 +579,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         let cloneObject = this.card.clone();
         cloneObject.location.x += this.gridSize;
         cloneObject.location.y += this.gridSize;
-        cloneObject.toTopmost();
+        cloneObject.raiseInTier();
         cloneObject.isLocked = false;
         SoundEffect.play(PresetSound.cardPut);
       }

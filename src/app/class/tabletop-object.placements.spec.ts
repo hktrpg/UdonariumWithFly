@@ -794,4 +794,40 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(ch.getPoseForTable('tableB')!.rotate).toBeUndefined();
     expect(ch.getPoseForTable('tableA')!.rotate).toBe(0);
   });
+
+  it('appendChild reorders an already-attached mask (bring-to-front)', () => {
+    const table = makeTable('tableA');
+    viewTables('tableA');
+    const a = makeMask('mask_front_a');
+    const b = makeMask('mask_front_b');
+    table.appendChild(a);
+    table.appendChild(b);
+    expect(table.masks.map(m => m.identifier)).toEqual(['mask_front_a', 'mask_front_b']);
+
+    table.appendChild(a);
+    expect(table.masks.map(m => m.identifier)).toEqual(['mask_front_b', 'mask_front_a']);
+  });
+
+  it('moveToTopmost persists zindex into current-view placement only', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const c1 = makeCard('card_layer_1');
+    const c2 = makeCard('card_layer_2');
+    c1.location = { name: 'table', x: 0, y: 0 };
+    c2.location = { name: 'table', x: 10, y: 10 };
+    c1.addToTable('tableA', { x: 0, y: 0, posZ: 0, zindex: 0 }, false);
+    c1.addToTable('tableB', { x: 0, y: 0, posZ: 0, zindex: 5 }, false);
+    c2.addToTable('tableA', { x: 10, y: 10, posZ: 0, zindex: 0 }, false);
+    c2.addToTable('tableB', { x: 10, y: 10, posZ: 0, zindex: 0 }, false);
+    c1.hydratePoseForView('tableA');
+    c2.hydratePoseForView('tableA');
+
+    c1.toTopmost();
+
+    expect(c1.zindex).toBeGreaterThan(c2.zindex);
+    expect(c1.getPoseForTable('tableA')!.zindex).toBe(c1.zindex);
+    expect(c1.getPoseForTable('tableB')!.zindex).toBe(5);
+  });
 });

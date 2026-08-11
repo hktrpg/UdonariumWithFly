@@ -3,7 +3,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from './data-element';
 import { TabletopObject } from './tabletop-object';
-import { moveToTopmost } from './tabletop-object-util';
+import { moveToBackmost, moveToTopmost } from './tabletop-object-util';
 import { UUID } from './core/system/util/uuid';
 
 @SyncObject('range')
@@ -110,6 +110,10 @@ export class RangeArea extends TabletopObject {
 
   toTopmost() {
     moveToTopmost(this);
+  }
+
+  toBackmost() {
+    moveToBackmost(this);
   }
 
   static create(name: string, width: number, length: number, opacity: number, identifier?: string): RangeArea {

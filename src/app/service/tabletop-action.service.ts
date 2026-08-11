@@ -12,6 +12,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { reconcileLayerStack } from '@udonarium/tabletop-object-util';
 
 import { ContextMenuAction } from './context-menu.service';
 import {
@@ -50,6 +51,7 @@ export class TabletopActionService {
     character.location.y = position.y - 25;
     character.posZ = position.z;
     character.setLocation('table');
+    reconcileLayerStack();
     return character;
   }
 
@@ -64,6 +66,7 @@ export class TabletopActionService {
     tableMask.posZ = position.z;
 
     viewTable.appendChild(tableMask);
+    reconcileLayerStack();
     return tableMask;
   }
 
@@ -98,6 +101,7 @@ export class TabletopActionService {
     // 2D boards: notes are always face-up on the table (never billboard upright).
     if (TableSelecter.instance.viewTable?.is2DMode) textNote.isUpright = false;
     textNote.setLocation('table');
+    reconcileLayerStack();
     return textNote;
   }
 
@@ -158,6 +162,7 @@ export class TabletopActionService {
     card.location.y = position.y - 25;
     card.posZ = position.z;
     card.setLocation('table');
+    reconcileLayerStack();
     return card;
   }
 
@@ -229,6 +234,7 @@ export class TabletopActionService {
       //let card = Card.create('卡牌', url, back);
       cardStack.putOnBottom(card);
     }
+    reconcileLayerStack();
     return cardStack;
   }
 

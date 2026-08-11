@@ -24,6 +24,7 @@ import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { Stackable } from '@udonarium/tabletop-object-util';
 
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
 import { GameCharacterComponent } from 'component/game-character/game-character.component';
@@ -310,6 +311,45 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   characterViewEpoch = 0;
 
   get characters(): GameCharacter[] { return this.tabletopService.characters; }
+
+  /**
+   * Card / note / mask / character (+ stacks) in one peer list.
+   * Always keep stable DOM order (id). Re-sorting by zindex on [ ] moves every
+   * host in *ngFor and all tokens flash (2D and 3D).
+   * Paint/hit: 2D → CSS z-index (layer-flat-2d); 3D → micro translateZ from zindex
+   * on the movable (see stackTranslateZPx), not DOM sibling order.
+   */
+  get desktopLayerPieces(): Stackable[] {
+    const notes = this.textNotes.filter(n => n && (n.canSeeSelfOnly || this.isGMMode));
+    const chars = this.characters.filter(c => c && (c.isVisible || this.isGMMode));
+    const pieces: Stackable[] = [
+      ...this.tableMasks,
+      ...notes,
+      ...this.cards,
+      ...this.cardStacks,
+      ...chars,
+    ];
+    return pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
+  }
+
+  /** Host style for [ ] peers: z-index only. Layer depth uses movable translateZ (not host —
+   *  a transformed 0×0 Angular host breaks hit-testing on tall notes). */
+  layerHostStyle(zindex: number): { [key: string]: number } {
+    return { 'z-index': zindex };
+  }
+
+  isLayerNote(piece: Stackable): piece is TextNote { return piece instanceof TextNote; }
+  isLayerCard(piece: Stackable): piece is Card { return piece instanceof Card; }
+  isLayerCardStack(piece: Stackable): piece is CardStack { return piece instanceof CardStack; }
+  isLayerCharacter(piece: Stackable): piece is GameCharacter { return piece instanceof GameCharacter; }
+  isLayerMask(piece: Stackable): piece is GameTableMask { return piece instanceof GameTableMask; }
+
+  trackByLayerPiece = (_index: number, piece: Stackable) => {
+    if (piece instanceof GameCharacter) {
+      return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
+    }
+    return piece.identifier;
+  };
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
 
   private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
@@ -317,27 +357,22 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return p ? { x: p.x, y: p.y } : null;
   }
 
-  /** Full 3D yarn endpoint (footprint XY + token-height bottom Z). */
+  /** Full yarn endpoint: 3D tokens → footprint center; 2D → live pin tip (DOM) then model. */
   private resolveYarnEndpoint(id: string, gridSize: number): { x: number; y: number; z: number } | null {
     if (!id) return null;
     const obj = ObjectStore.instance.get(id);
     const is2D = !!this.currentTable?.is2DMode;
 
-    // Prefer model math for characters — live pin DOM changes mid-CD and trips NG0100 on map switch.
-    if (obj instanceof GameCharacter) {
-      if (!is2D) {
-        const foot = (obj.size || 1) * gridSize;
-        return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
-      }
-      const s = (obj.size || 1) * gridSize;
-      const p = pinAnchorPx(obj, s, s);
-      return { x: p.x, y: p.y, z: this.clueStringsZ };
+    // 3D standing tokens: model center only (pin DOM is 2D-only and mid-CD reads caused NG0100).
+    if (obj instanceof GameCharacter && !is2D) {
+      const foot = (obj.size || 1) * gridSize;
+      return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
     }
 
     const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
       ? CSS.escape(id)
       : id.replace(/["\\]/g, '\\$&');
-    // Prefer the tip marker (0×0 after rotate). Fall back to legacy .push-pin img.
+    // 2D corkboard: snap to the live pin tip (same as pre–3D-yarn behaviour).
     const pinEl = this.gameObjects?.nativeElement?.querySelector(
       `[data-clue-pin="${esc}"]`
     ) as HTMLElement | null;
@@ -361,6 +396,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           return { x: local.x, y: local.y, z: this.clueStringsZ };
         }
       }
+    }
+    if (obj instanceof GameCharacter) {
+      const s = (obj.size || 1) * gridSize;
+      const p = pinAnchorPx(obj, s, s);
+      return { x: p.x, y: p.y, z: this.clueStringsZ };
     }
     if (obj instanceof TextNote) {
       const w = (obj.width || 1) * gridSize;
@@ -635,6 +675,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('SCENE_TOOLS_PANEL', () => {
         this.ngZone.run(() => this.changeDetector.markForCheck());
+      })
+      .on('TABLETOP_LAYER_CHANGED', () => {
+        // [ ] updates SyncVar zindex; 2D needs CSS z-index CD, 3D needs micro translateZ refresh.
+        this.ngZone.run(() => {
+          this.changeDetector.markForCheck();
+          this.changeDetector.detectChanges();
+        });
       })
       .on('DRAG_LOCKED_OBJECT', event => {
         this.isTableTransformMode = true;

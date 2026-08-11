@@ -23,6 +23,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote } from '@udonarium/text-note';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -86,6 +87,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get showBackFace(): boolean { return this.isFlipped && this.hasBackImage; }
   get rotate(): number { return this.textNote.rotate; }
   set rotate(rotate: number) { this.textNote.mutateAppearance(() => { this.textNote.rotate = rotate; }); }
+  get zindex(): number { return this.textNote.zindex; }
   get height(): number { return MathUtil.clampMin(this.textNote.height); }
   get width(): number { return MathUtil.clampMin(this.textNote.width); }
   get altitude(): number { return this.textNote.altitude; }
@@ -102,6 +104,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
 
   /** Room 2D mode: notes lie flat on the board (no billboard upright). */
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
+  /** 2D corkboard only — see template note on note-flat-hit (breaks 3D card compositing). */
+  get useFlatHitPlate(): boolean { return this.is2DMode; }
   get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
   set isUpright(isUpright: boolean) {
     if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps
@@ -187,6 +191,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private isHovering = false;
   private ctrlHeld = false;
   private resizeStartW = 1;
+  /** True if this note was already selected when the current pointer-down began. */
+  private selectedOnPointerDown = false;
   private resizeStartH = 1;
   private resizeStartTable = { x: 0, y: 0 };
 
@@ -235,7 +241,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck());
     this.movableOption = {
       tabletopObject: this.textNote,
-      transformCssOffset: 'translateZ(0.17px)',
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain']
     };
     this.rotableOption = {
@@ -383,11 +389,12 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
+    this.selectedOnPointerDown = this.isSelected;
     if (this.GuestMode()) return;
     if (e.ctrlKey || e.metaKey) return;
     if (this.isActive || this.isLocked) return;
     e.preventDefault();
-    this.textNote.toTopmost();
+    this.textNote.raiseInTier();
     if (e.button === 2) {
       EventSystem.trigger('DRAG_LOCKED_OBJECT', { srcEvent: e });
       return;
@@ -396,10 +403,11 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   onMouseUp(e: any) {
-    if (this.pointerDeviceService.isAllowedToOpenContextMenu && this.isTextContent && this.textAreaElementRef?.nativeElement) {
+    // Do not autofocus the textarea on select — that steals [ ] / WASD / etc.
+    // Enter edit via activate() (click the note text) or explicit focus.
+    if (this.isEditorSelected && this.pointerDeviceService.isAllowedToOpenContextMenu && this.isTextContent) {
       const selection = window.getSelection();
-      if (!selection.isCollapsed) selection.removeAllRanges();
-      this.textAreaElementRef.nativeElement.focus();
+      if (selection && !selection.isCollapsed) selection.removeAllRanges();
     }
     this.removeMouseEventListeners();
     e.preventDefault();
@@ -663,7 +671,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
           cloneObject.isLocked = false;
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
-          cloneObject.toTopmost();
+          cloneObject.raiseInTier();
           SoundEffect.play(PresetSound.cardPut);
         }
       },
@@ -741,6 +749,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   activate() {
+    // First click only selects (so [ ] / WASD work). Second click on an
+    // already-selected note enters text edit.
+    if (!this.selectedOnPointerDown) return;
     if (!this.isLocked && this.isTextContent) this.textAreaElementRef?.nativeElement?.focus();
   }
 

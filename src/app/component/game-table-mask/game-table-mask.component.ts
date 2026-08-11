@@ -15,6 +15,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { MaskSettingsComponent } from 'component/mask-settings/mask-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -323,7 +324,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       });
     this.movableOption = {
       tabletopObject: this.gameTableMask,
-      transformCssOffset: 'translateZ(0.10px)',
+      // Same height as note/card peers; [ ] order is DOM/z-index, not altitude.
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain']
     };
     this.panelId = UUID.generateUuid();
@@ -351,6 +353,10 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onInputStart(e: any) {
+    // Same as card/note: interact brings mask to shared [ ] front (unless locked/scratching).
+    if (!this.isLock && !this.isScratching) {
+      this.ngZone.run(() => this.gameTableMask.raiseInTier());
+    }
     if (!this.isScratching || !this.gameTableMask.isMine) { 
       this.input.cancel();
     } else if (!window.PointerEvent && e.button < 2 && e.buttons < 2) {

@@ -20,6 +20,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { CardStackListComponent } from 'component/card-stack-list/card-stack-list.component';
 import { CardStackSettingsComponent } from 'component/card-stack-settings/card-stack-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -210,7 +211,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       });
     this.movableOption = {
       tabletopObject: this.cardStack,
-      transformCssOffset: 'translateZ(0.15px)',
+      transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain', 'text-note']
     };
     this.rotableOption = {
@@ -288,14 +289,14 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (this.GuestMode()) return;
     // TODO: 想更好的做法
     if (this.isLocked) {
-      this.cardStack.toTopmost();
+      this.cardStack.raiseInTier();
       EventSystem.trigger('DRAG_LOCKED_OBJECT', {});
       return;
     }
 
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: this.cardStack.identifier, className: 'GameCharacter' });
     this.ngZone.run(() => {
-      this.cardStack.toTopmost();
+      this.cardStack.raiseInTier();
       this.startIconHiddenTimer();
     });
   }
@@ -361,7 +362,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     for (let card of cards) {
       card.location.x += 25 - (Math.random() * 50);
       card.location.y += 25 - (Math.random() * 50);
-      card.toTopmost();
+      card.raiseInTier();
       card.setLocation(this.cardStack.location.name, this.cardStack.tableIdentifier);
     }
     this.cardStack.setLocation('graveyard');
@@ -380,7 +381,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       cardStack.location.name = this.cardStack.location.name;
       cardStack.tableIdentifier = this.cardStack.tableIdentifier;
       cardStack.rotate = this.rotate;
-      cardStack.toTopmost();
+      cardStack.raiseInTier();
       cardStacks.push(cardStack);
     }
 
@@ -709,7 +710,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
           cloneObject.location.y += this.gridSize;
           cloneObject.owner = '';
           cloneObject.isLocked = false;
-          cloneObject.toTopmost();
+          cloneObject.raiseInTier();
           SoundEffect.play(PresetSound.cardPut);
         }
       },

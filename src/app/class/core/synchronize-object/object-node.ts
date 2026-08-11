@@ -165,6 +165,10 @@ export class ObjectNode extends GameObject implements XmlAttributes, InnerXml {
     if (isAdded) {
       children.push(child);
       this._onChildAdded(child);
+    } else {
+      // Existing child: majorIndex changed but _children order is stale until sorted.
+      // Without this, toTopmost()/bringToFront (appendChild on self) has no effect.
+      this.needsSort = true;
     }
 
     return child;

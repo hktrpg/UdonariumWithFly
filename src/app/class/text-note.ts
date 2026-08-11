@@ -7,7 +7,7 @@ import { Network } from './core/system';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
-import { moveToTopmost } from './tabletop-object-util';
+import { moveToBackmost, moveToTopmost, moveToTopmostInTier } from './tabletop-object-util';
 import { a4HeightForWidth, PaperStyle } from './table-fx/push-pin.util';
 
 export type TextNoteScope = 'room' | 'scene';
@@ -293,6 +293,14 @@ export class TextNote extends TabletopObject {
 
   toTopmost() {
     moveToTopmost(this);
+  }
+
+  raiseInTier() {
+    moveToTopmostInTier(this);
+  }
+
+  toBackmost() {
+    moveToBackmost(this);
   }
 
   complement(): void {

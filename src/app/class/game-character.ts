@@ -2,6 +2,7 @@ import { ChatPalette } from './chat-palette';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { DataElement } from './data-element';
 import { TabletopObject } from './tabletop-object';
+import { moveToBackmost, moveToTopmost, moveToTopmostInTier } from './tabletop-object-util';
 import { UUID } from '@udonarium/core/system/util/uuid';
 
 import { StandList } from './stand-list';
@@ -19,6 +20,11 @@ export class GameCharacter extends TabletopObject {
 
   @SyncVar() rotate: number = 0;
   @SyncVar() roll: number = 0;
+  /**
+   * Dense paint order among layer peers (0..n-1 after reconcile / [ ] / click).
+   * Default hierarchy is applied by reconcileLayerStack (desk < mask < character).
+   */
+  @SyncVar() zindex: number = 0;
   @SyncVar() isDropShadow: boolean = true;
   @SyncVar() isShowChatBubble: boolean = true;
   /** Show name on token (name-tag, or Polaroid caption when framed). */
@@ -263,6 +269,24 @@ export class GameCharacter extends TabletopObject {
     standList.initialize();
     this.appendChild(standList);
     return standList;
+  }
+
+  toTopmost() {
+    moveToTopmost(this);
+  }
+
+  /** Click / drag: stay in character tier (above masks/desk unless [ ] was used). */
+  raiseInTier() {
+    moveToTopmostInTier(this);
+  }
+
+  toBackmost() {
+    moveToBackmost(this);
+  }
+
+  // GameObject Lifecycle
+  onStoreAdded() {
+    super.onStoreAdded();
   }
 
   static create(name: string, size: number, imageIdentifier: string): GameCharacter {

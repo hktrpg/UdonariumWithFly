@@ -1,5 +1,7 @@
 :host {
   display: block;
+  /* Stack among notes/cards via z-index + shared DOM order (not host preserve-3d). */
+  position: relative;
 }
 
 .is-grab {
@@ -170,12 +172,12 @@
   justify-content: center;
 }
 
-/* Framed tokens: keep sprite at full cell size; frame padding grows outward. */
+/* Framed tokens: content box = cell footprint; padding/margin grow chrome outward (no recenter). */
 .upright-transform.is-flat-2d .image-box.is-framed-2d {
   inset: auto;
-  top: 50%;
-  left: 50%;
-  transform: translate3d(-50%, -50%, 0);
+  top: 0;
+  left: 0;
+  transform: none;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
   overflow: visible;
@@ -186,13 +188,9 @@
   overflow: visible;
 }
 
-/* Polaroid + name: column layout so caption sits under the photo (not over it). */
+/* Caption is absolutely in the bottom matte — do not grow the footprint box. */
 .upright-transform.is-flat-2d .image-box.token-frame.polaroid.has-caption {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  box-sizing: content-box;
+  display: block;
 }
 
 .upright-transform.is-flat-2d .image {

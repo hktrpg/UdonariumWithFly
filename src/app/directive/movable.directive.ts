@@ -14,6 +14,11 @@ import { GridType } from '@udonarium/game-table';
 import { isHexGrid, snapToHexCell } from '@udonarium/hex-grid';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
+import {
+  LAYER_PEER_ALIASES,
+  LAYER_PEER_MOVABLE_Z_PX,
+  stackTranslateZPx,
+} from '@udonarium/tabletop-object-util';
 import { BatchService } from 'service/batch.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { TabletopService } from 'service/tabletop.service';
@@ -182,6 +187,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.input.onContextMenu = this.onContextMenu.bind(this);
 
     this.findCollidableElements();
+    // Repair PE after a prior drag may have stripped inline auto (masks/cards).
+    this.setPointerEvents(true);
   }
 
   cancel() {
@@ -272,14 +279,17 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     pointer2d.x = Math.min(window.innerWidth - 0.1, Math.max(pointer2d.x, 0.1));
     pointer2d.y = Math.min(window.innerHeight - 0.1, Math.max(pointer2d.y, 0.1));
 
-    let element = document.elementFromPoint(pointer2d.x, pointer2d.y) as HTMLElement;
+    // elementsFromPoint still lists PE-none peers (mask / character), unlike elementFromPoint.
+    const hitStack = document.elementsFromPoint(pointer2d.x, pointer2d.y) as Element[];
+    let element = (hitStack[0] as HTMLElement) || null;
     if (element == null) return;
 
     let pointer3d = this.coordinateService.calcTabletopLocalCoordinate(pointer2d, element);
     pointer3d.x -= this.width / 2;
     pointer3d.y -= this.height / 2;
 
-    if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === pointer3d.z) return;
+    const nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === nextZ) return;
 
     if (!this.input.isDragging) this.ondragstart.emit(e as PointerEvent);
     this.ondrag.emit(e as PointerEvent);
@@ -301,15 +311,17 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     const viewTable = TableSelecter.instance.viewTable;
     viewTable.gridClipRect = null;
     viewTable.gridHeight = this.posZ + 0.5;
+    const nextX = pointer3d.x;
+    const nextY = pointer3d.y;
     let delta = {
-      x: pointer3d.x - this.posX,
-      y: pointer3d.y - this.posY,
-      z: pointer3d.z - this.posZ,
+      x: nextX - this.posX,
+      y: nextY - this.posY,
+      z: nextZ - this.posZ,
     };
 
-    this.posX = pointer3d.x;
-    this.posY = pointer3d.y;
-    this.posZ = pointer3d.z;
+    this.posX = nextX;
+    this.posY = nextY;
+    this.posZ = nextZ;
 
     this.synchronizer.updateMove(delta);
   }
@@ -602,7 +614,23 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
           folderBackupDebug('movable ARCHIVE +100ms', { movableCount: n });
           MovableDirective.syncAllPosesFromObjects();
         }, 100);
+      })
+      .on('TABLETOP_LAYER_CHANGED', () => {
+        // zindex SyncVar updates alone skip movable setPosition (shouldTransition).
+        // Refresh micro translateZ lift without CSS transition (avoids a slide/flash).
+        for (const set of MovableDirective.layerMap.values()) {
+          for (const movable of set) movable.refreshLayerLiftCss();
+        }
       });
+  }
+
+  /** Apply [ ] peer translateZ from current zindex without animating. */
+  refreshLayerLiftCss() {
+    if (!LAYER_PEER_ALIASES.has(this.layerName)) return;
+    const prevTransition = this.nativeElement.style.transition;
+    this.nativeElement.style.transition = '';
+    this.updateTransformCss();
+    this.nativeElement.style.transition = prevTransition;
   }
 
   private findCollidableElements() {
@@ -634,8 +662,83 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   setPointerEvents(isEnable: boolean) {
-    let css = isEnable ? 'auto' : 'none';
-    this.collidableElements.forEach(element => element.style.pointerEvents = css);
+    // Children with `pointer-events: auto` still receive hits when only the parent is none.
+    // Force the whole subtree off while dragging so 3D faces cannot leak Z into posZ.
+    this.nativeElement.classList.toggle('is-movable-pe-none', !isEnable);
+    // Always set 'auto' when enabling — removeProperty() strips inline PE from masks/cards
+    // (e.g. style="pointer-events: auto") and they stay unhittable under PE-none ancestors.
+    const css = isEnable ? 'auto' : 'none';
+    this.collidableElements.forEach(element => {
+      element.style.pointerEvents = css;
+    });
+  }
+
+  /**
+   * Adopt picked Z only on true ride surfaces (terrain / notes / …).
+   * Never climb when a non-ride peer (mask / character / other cards) occupies the
+   * same screen point — even if PE-none let the pick punch through to terrain/table.
+   * Climbing there floats the piece between a flat mask and a tall character while
+   * zindex correctly stays below both.
+   */
+  private resolveDragPosZ(hit: HTMLElement, pickedZ: number, hitStack?: Element[]): number {
+    const z = 0 < pickedZ ? pickedZ : 0;
+    // Keep desk altitude under peers (honor existing zindex paint order).
+    if (this.hitStackHasNonRidePeer(hitStack) || this.isHitOnNonRidePeer(hit)) {
+      return z <= this.posZ + 0.01 ? z : this.posZ;
+    }
+    if (this.isHitOnColideLayer(hit)) return z;
+    if (z <= this.posZ + 0.01) return z;
+    return this.posZ;
+  }
+
+  /**
+   * True only when the pick landed on a collidable movable (root or descendant).
+   * Do NOT use hit.contains(root): #app-game-table contains every note/terrain and
+   * would always match, letting any elevated convertLocalToLocal Z through.
+   */
+  private isHitOnColideLayer(hit: HTMLElement): boolean {
+    if (!hit || !this.colideLayers?.length) return false;
+    for (const layerName of this.colideLayers) {
+      const layer = MovableDirective.layerMap.get(layerName);
+      if (!layer) continue;
+      for (const movable of layer) {
+        if (movable === this) continue;
+        if (layerName === 'character' && this.tabletopObject?.isNotRide) continue;
+        const root = movable.nativeElement;
+        if (!root) continue;
+        if (root === hit || root.contains(hit)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** True when elementFromPoint landed on another movable we must not climb. */
+  private isHitOnNonRidePeer(hit: HTMLElement): boolean {
+    if (!hit) return false;
+    for (const [layerName, layer] of MovableDirective.layerMap) {
+      if (this.colideLayers?.includes(layerName)) continue;
+      for (const movable of layer) {
+        if (movable === this) continue;
+        const root = movable.nativeElement;
+        if (!root) continue;
+        if (root === hit || root.contains(hit)) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * elementsFromPoint includes PE-none nodes. If a mask/character/card is under the
+   * cursor, dragging must not adopt elevated Z from terrain behind them.
+   */
+  private hitStackHasNonRidePeer(hitStack?: Element[]): boolean {
+    if (!hitStack?.length) return false;
+    for (const el of hitStack) {
+      if (!(el instanceof HTMLElement)) continue;
+      if (this.nativeElement === el || this.nativeElement.contains(el)) continue;
+      if (this.isHitOnNonRidePeer(el)) return true;
+    }
+    return false;
   }
 
   setAnimatedTransition(isEnable: boolean, durationMs: number = 132) {
@@ -651,7 +754,16 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private updateTransformCss() {
-    let css = `${this.transformCssOffset} translate3d(${this.posX.toFixed(4)}px, ${this.posY.toFixed(4)}px, ${this.posZ.toFixed(4)}px)`;
+    let offset = this.transformCssOffset || '';
+    // Shared [ ] peers: base lift + micro zindex step (3D paint without DOM reorder).
+    if (LAYER_PEER_ALIASES.has(this.layerName)) {
+      const raw = this.tabletopObject as TabletopObject & { zindex?: number };
+      const zindex = typeof raw?.zindex === 'number' ? raw.zindex : 0;
+      const lift = LAYER_PEER_MOVABLE_Z_PX + stackTranslateZPx(zindex);
+      offset = offset.replace(/translateZ\([^)]*\)\s*/g, '');
+      offset = `translateZ(${lift.toFixed(4)}px)`;
+    }
+    const css = `${offset} translate3d(${this.posX.toFixed(4)}px, ${this.posY.toFixed(4)}px, ${this.posZ.toFixed(4)}px)`;
     this.nativeElement.style.transform = css;
   }
 

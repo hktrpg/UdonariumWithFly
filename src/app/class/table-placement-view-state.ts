@@ -122,6 +122,7 @@ export function defaultPlacementViewState(obj: any): PlacementViewState {
   if (!obj) return out;
   if (hasProp(obj, 'rotate')) out.rotate = 0;
   if (hasProp(obj, 'roll')) out.roll = 0;
+  // Dense layer order is owned by reconcileLayerStack / [ ]; placement default stays 0.
   if (hasProp(obj, 'zindex')) out.zindex = 0;
   if (hasProp(obj, 'currntImageIndex')) out.currntImageIndex = 0;
   if (hasProp(obj, 'currntIconIndex')) out.currntIconIndex = 0;

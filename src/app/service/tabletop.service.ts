@@ -50,20 +50,38 @@ export class TabletopService {
   private indexMap: Map<ObjectIdentifier, ObjecNodeIndex> = new Map();
   private tableIdMap: Map<ObjectIdentifier, string> = new Map();
   private placementsMap: Map<ObjectIdentifier, string> = new Map();
-  private characterCache = new TabletopCache<GameCharacter>(() => ObjectStore.instance.getObjects(GameCharacter).filter(obj => obj.isVisibleOnTable));
-  private cardCache = new TabletopCache<Card>(() => ObjectStore.instance.getObjects(Card).filter(obj => obj.isVisibleOnTable));
-  private cardStackCache = new TabletopCache<CardStack>(() => ObjectStore.instance.getObjects(CardStack).filter(obj => obj.isVisibleOnTable));
+  private characterCache = new TabletopCache<GameCharacter>(() =>
+    ObjectStore.instance.getObjects(GameCharacter)
+      .filter(obj => obj.isVisibleOnTable)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier))
+  );
+  private cardCache = new TabletopCache<Card>(() =>
+    ObjectStore.instance.getObjects(Card)
+      .filter(obj => obj.isVisibleOnTable)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier))
+  );
+  private cardStackCache = new TabletopCache<CardStack>(() =>
+    ObjectStore.instance.getObjects(CardStack)
+      .filter(obj => obj.isVisibleOnTable)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier))
+  );
   private tableMaskCache = new TabletopCache<GameTableMask>(() => {
     let viewTable = this.tableSelecter.viewTable;
-    return viewTable ? viewTable.masks : [];
+    const masks = viewTable ? viewTable.masks.slice() : [];
+    return masks.sort((a, b) => a.identifier.localeCompare(b.identifier));
   });
   private rangeCache = new TabletopCache<RangeArea>(() => ObjectStore.instance.getObjects(RangeArea).filter(obj => obj.isVisibleOnTable));
   private terrainCache = new TabletopCache<Terrain>(() => {
     let viewTable = this.tableSelecter.viewTable;
     return viewTable ? viewTable.terrains : [];
   });
-  // Same as characters: location cache only; self-only filtered in game-table template.
-  private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote).filter(obj => obj.isVisibleOnTable));
+  // Location cache only; self-only filtered in game-table template.
+  // Stable id order — paint uses CSS z-index / micro translateZ, not array order.
+  private textNoteCache = new TabletopCache<TextNote>(() =>
+    ObjectStore.instance.getObjects(TextNote)
+      .filter(obj => obj.isVisibleOnTable)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier))
+  );
   private diceSymbolCache = new TabletopCache<DiceSymbol>(() => ObjectStore.instance.getObjects(DiceSymbol).filter(obj => obj.isVisibleOnTable));
   private _clueLinks: ClueLink[] = [];
   private _clueLinksDirty = true;
@@ -159,7 +177,16 @@ export class TabletopService {
         let object = ObjectStore.instance.get(event.data.identifier);
         if (!object || !(object instanceof TabletopObject)) {
           this.refreshCache(event.data.aliasName);
-        } else if (object instanceof TextNote || this.shouldRefreshCache(object)) {
+        } else if (
+          // Keep caches fresh on peer updates (zindex / pose); paint order is not array order.
+          object instanceof TextNote
+          || object instanceof Card
+          || object instanceof CardStack
+          || object instanceof RangeArea
+          || object instanceof GameTableMask
+          || object instanceof GameCharacter
+          || this.shouldRefreshCache(object)
+        ) {
           this.refreshCache(event.data.aliasName);
           this.updateMap(object);
         }

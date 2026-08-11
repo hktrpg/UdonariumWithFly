@@ -19,6 +19,7 @@ export function randomPinAngle(): number {
 }
 
 /** Default CSS box for `.push-pin` (must stay in sync with clue-board.css). */
+/** tipX/tipY match `.push-pin-tip` (50% / 50% = pin-head center where 2D yarn joins). */
 export const PIN_BOX = { left: -4, top: -20, width: 30, height: 38, tipX: 0.5, tipY: 0.5 };
 
 /**

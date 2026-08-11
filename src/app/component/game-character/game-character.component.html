@@ -1,6 +1,6 @@
 <div class="component is-3d is-grab is-pointer-events-none" [style.width.px]="size * gridSize"
   [style.height.px]="size * gridSize" appMovable [movable.option]="movableOption" [movable.disable]="isMoveLocked"
-  (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
+  (movable.onstart)="onInteractStart()" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
   <div class="component-content is-3d" [@bounceInOut]="'in'" [@.disabled]="skipEnterBounce">
     <div class="component-content is-3d is-pointer-events-auto" appRotable [rotable.option]="rotableOption"
       [rotable.disable]="isMoveLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()"
@@ -91,7 +91,7 @@
                   [class.is-framed-2d]="hasTokenFrame"
                   [class.has-push-pin]="pushPin"
                   [style.width.px]="tokenBoxWidthPx"
-                  [style.height.px]="tokenFrameHeightPx"
+                  [style.height.px]="tokenBoxHeightPx"
                   [style.transform]="is2DMode ? null : ('translateX(' + ((size * gridSize - characterImageWidth) / 2) + 'px)')">
                   <img #characterImage *ngIf="0 < imageFile.url.length" class="image is-3d chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" [ngClass]="{'is-hide-in': isHideIn}"
                     [style.height.px]="(is2DMode || hasTokenFrame) ? null : characterImageHeight"

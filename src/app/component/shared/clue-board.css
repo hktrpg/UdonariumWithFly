@@ -86,7 +86,9 @@
 
 /* ---- Polaroid: Instant film (thick bottom caption when name shown) ---- */
 .token-frame.polaroid {
+  /* Content = cell; pad+border grow outward via negative margin (keeps token on footprint). */
   padding: 7px;
+  margin: -8px; /* 7px pad + 1px border */
   background:
     radial-gradient(120% 80% at 30% 20%, #ffffff 0%, transparent 55%),
     linear-gradient(165deg, #fffcf8 0%, #f4efe6 42%, #ebe3d6 100%);
@@ -100,13 +102,11 @@
     4px 7px 14px rgba(0, 0, 0, 0.5);
 }
 
-/* Caption is in-flow under the photo (parent height already includes the strip). */
+/* Caption lives in the bottom matte outside the cell (absolute), footprint height stays cell-sized. */
 .token-frame.polaroid.has-caption {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 7px;
+  display: block;
+  padding: 7px 7px 29px 7px; /* 7 + 22px caption strip */
+  margin: -8px -8px -30px -8px; /* bottom: 29 pad + 1 border */
   box-sizing: content-box;
 }
 
@@ -134,25 +134,23 @@
 }
 
 .token-frame.polaroid.has-caption > .image {
-  flex: 1 1 auto;
   width: 100% !important;
-  height: auto !important;
-  min-height: 0;
-  align-self: stretch;
+  height: 100% !important;
+  flex: none;
+  align-self: auto;
 }
 
 .token-frame.polaroid .token-frame-caption {
-  position: relative;
-  left: auto;
-  right: auto;
-  bottom: auto;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
   z-index: 3;
-  flex: 0 0 22px;
-  margin-top: 0;
+  height: 22px;
+  margin: 0;
   font-size: 11px;
   letter-spacing: 0.02em;
   line-height: 22px;
-  height: 22px;
   color: #2f2a24;
   text-align: center;
   white-space: nowrap;
@@ -166,6 +164,7 @@
 /* ---- Photo: developed print (equal white border, glossy well) ---- */
 .token-frame.photo {
   padding: 8px;
+  margin: -9px; /* 8px pad + 1px border */
   background:
     linear-gradient(180deg, #fffefb 0%, #f7f2ea 55%, #efe8dc 100%);
   border: 1px solid #d2c8b8;
@@ -221,6 +220,7 @@
 /* ---- Card: bevelled cardstock edge + inner rail ---- */
 .token-frame.card {
   padding: 7px;
+  margin: -9px; /* 7px pad + 2px border */
   background: linear-gradient(145deg, #faf3e4 0%, #ead9b4 55%, #dcc89a 100%);
   border: 2px solid #b89255;
   border-radius: 5px;

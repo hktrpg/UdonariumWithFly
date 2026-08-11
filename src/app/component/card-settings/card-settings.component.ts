@@ -99,7 +99,7 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
     if (this.card.parent) this.card.parent.appendChild(cloneObject);
     cloneObject.owner = '';
     cloneObject.isLocked = false;
-    cloneObject.toTopmost();
+    cloneObject.raiseInTier();
     cloneObject.update();
     SoundEffect.play(PresetSound.cardPut);
   }
