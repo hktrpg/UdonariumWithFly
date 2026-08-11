@@ -506,6 +506,7 @@ export const ja_ui: I18nDictionary = {
   'note.changeFront': '表面画像', 'note.changeBack': '裏面画像', 'note.attachPdf': 'PDFを添付', 'note.clearPdf': 'PDFを解除', 'note.pdfAttached': 'PDF添付済み',
   'note.scope': '範囲', 'note.scopeScene': 'このマップ', 'note.scopeRoom': '全マップ',
   'note.lock': '位置ロック', 'note.sizeLock': 'サイズロック', 'note.resizeHint': 'ドラッグでサイズ変更', 'note.visible': '表示', 'note.hidden': '非表示', 'note.flipped': '裏返し', 'note.frontFace': '表面',
+  'note.flipTip': 'オン＝裏面画像（あれば）／なければ表面を左右反転。',
   'note.clickAction': 'クリック動作', 'note.actionNone': 'なし', 'note.actionChat': 'チャット／ダイス送信', 'note.actionTable': 'マップ切替', 'note.actionPreset': 'シーン適用',
   'note.clickChatText': 'チャット／ダイス文', 'note.clickGameType': 'ゲームタイプ', 'note.clickTable': '対象マップ', 'note.clickPreset': 'シーン',
   'note.pickTable': 'マップを選択…', 'note.pickPreset': 'シーンを選択…',

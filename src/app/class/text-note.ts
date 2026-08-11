@@ -147,11 +147,14 @@ export class TextNote extends TabletopObject {
     return this.getImageFile('back') || ImageFile.Empty;
   }
 
+  /** True when a dedicated back-face image is set. */
+  get hasBackImage(): boolean {
+    return !!(this.backImage && this.backImage.url);
+  }
+
   override get imageFile(): ImageFile {
-    if (this.isFlipped) {
-      const back = this.backImage;
-      if (back && back.url) return back;
-    }
+    // Flipped + back art → show back. Flipped without back → keep front (CSS 180°).
+    if (this.isFlipped && this.hasBackImage) return this.backImage;
     const front = this.frontImage;
     if (front && front.url) return front;
     return super.imageFile;

@@ -9,14 +9,12 @@
       <div class="is-3d" [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
         [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
         <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
-          <div class="upright-transform is-3d is-bg-color is-front is-bg-texture chrome-smooth-image-trick"
+          <div class="upright-transform is-3d is-bg-color is-front chrome-smooth-image-trick"
             [ngClass]="{
-              'is-bg-filter': isWhiteOut && isTextContent,
               'is-ghosted': isGhosted,
               'paper-a4': paperStyle === 'a4',
               'paper-sticky': paperStyle === 'sticky'
             }"
-            [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
             <span *ngIf="pushPin" class="push-pin is-3d"
               [style.left.px]="pushPinLeft"
@@ -25,45 +23,57 @@
               <img class="push-pin-img" alt="" draggable="false" [src]="pushPinSrc" />
               <i class="push-pin-tip" [attr.data-clue-pin]="textNote.identifier" aria-hidden="true"></i>
             </span>
-            <div *ngIf="isShowTitle && title.length" class="title is-3d is-pointer-events-none"
-              [style.background-color]="titleBgColor"
-              [style.color]="titleFgColor">{{title}}</div>
+            <!-- Flip only the face body so push-pin / resize stay upright. -->
+            <div class="note-face-body is-3d is-bg-texture"
+              [ngClass]="{
+                'is-bg-filter': isWhiteOut && isTextContent && !showBackFace,
+                'is-content-flipped': isContentFlipped
+              }"
+              [style.background-image]="(!showBackFace && isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null">
+              <div *ngIf="isShowTitle && title.length && !showBackFace" class="title is-3d is-pointer-events-none"
+                [style.background-color]="titleBgColor"
+                [style.color]="titleFgColor">{{title}}</div>
 
-            <ng-container [ngSwitch]="contentKind">
-              <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
-                <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
-                <div class="pdf-nav is-3d" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
-                  <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
-                  <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
-                  <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
-                    [disabled]="textNote.pdfPageCount <= 1">›</button>
-                </div>
-              </div>
-
-              <div *ngSwitchCase="'video'" class="video-wrap is-3d"
-                (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
-                <video *ngIf="videoSrc" class="note-video is-3d" [src]="videoSrc | safe: 'resourceUrl'"
-                  controls playsinline preload="metadata"
-                  (click)="$event.stopPropagation()"></video>
-                <div *ngIf="!videoSrc" class="media-loading is-3d">…</div>
-              </div>
-
-              <div *ngSwitchCase="'image'" class="image-wrap is-3d">
+              <!-- Has back art: swap to back image. No back art: keep front + CSS mirror. -->
+              <div *ngIf="showBackFace" class="image-wrap is-3d">
                 <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
               </div>
+              <ng-container *ngIf="!showBackFace" [ngSwitch]="contentKind">
+                <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
+                  <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
+                  <div class="pdf-nav is-3d" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                    <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
+                    <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
+                    <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
+                      [disabled]="textNote.pdfPageCount <= 1">›</button>
+                  </div>
+                </div>
 
-              <ng-container *ngSwitchDefault>
-                <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
-                  [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
-                  [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
-                  [(ngModel)]="text" spellcheck="false"></textarea>
-                <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
-                  [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
-                  [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
-                  [style.text-align]="textAlign"
-                  [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
+                <div *ngSwitchCase="'video'" class="video-wrap is-3d"
+                  (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                  <video *ngIf="videoSrc" class="note-video is-3d" [src]="videoSrc | safe: 'resourceUrl'"
+                    controls playsinline preload="metadata"
+                    (click)="$event.stopPropagation()"></video>
+                  <div *ngIf="!videoSrc" class="media-loading is-3d">…</div>
+                </div>
+
+                <div *ngSwitchCase="'image'" class="image-wrap is-3d">
+                  <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+                </div>
+
+                <ng-container *ngSwitchDefault>
+                  <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
+                    [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
+                    [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
+                    [(ngModel)]="text" spellcheck="false"></textarea>
+                  <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
+                    [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
+                    [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
+                    [style.text-align]="textAlign"
+                    [innerHTML]="lastNewLineAdjust(rubiedText) | safe: 'html'"></div>
+                </ng-container>
               </ng-container>
-            </ng-container>
+            </div>
 
             <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
             <div *ngIf="!isLocked && !GuestMode() && !textNote.isSizeLocked"

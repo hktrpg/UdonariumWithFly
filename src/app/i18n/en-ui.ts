@@ -506,6 +506,7 @@ export const en_ui: I18nDictionary = {
   'note.changeFront': 'Front image', 'note.changeBack': 'Back image', 'note.attachPdf': 'Attach PDF', 'note.clearPdf': 'Clear PDF', 'note.pdfAttached': 'PDF attached',
   'note.scope': 'Scope', 'note.scopeScene': 'This map', 'note.scopeRoom': 'All maps',
   'note.lock': 'Lock position', 'note.sizeLock': 'Lock size', 'note.resizeHint': 'Drag to resize', 'note.visible': 'Visible', 'note.hidden': 'Hidden', 'note.flipped': 'Flipped', 'note.frontFace': 'Front face',
+  'note.flipTip': 'Checked = show back image (if set) or mirror the front face.',
   'note.clickAction': 'On click', 'note.actionNone': 'None', 'note.actionChat': 'Send chat / dice', 'note.actionTable': 'Switch map', 'note.actionPreset': 'Apply scene',
   'note.clickChatText': 'Chat / dice text', 'note.clickGameType': 'Game type', 'note.clickTable': 'Target map', 'note.clickPreset': 'Scene',
   'note.pickTable': 'Select map…', 'note.pickPreset': 'Select scene…',

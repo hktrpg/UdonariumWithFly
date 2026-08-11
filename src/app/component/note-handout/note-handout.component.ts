@@ -32,6 +32,14 @@ export type NoteHandoutPayload = {
 
 export function buildNoteHandoutPayload(note: TextNote, nameFallback: string): NoteHandoutPayload {
   if (!note) return {};
+  // Match tabletop: flipped + back art replaces PDF/video/text with the back image.
+  if (note.isFlipped && note.hasBackImage) {
+    return {
+      name: note.title || nameFallback,
+      imageUrl: note.backImage?.url || '',
+      noteIdentifier: note.identifier,
+    };
+  }
   const kind = note.contentKind;
   return {
     name: note.title || nameFallback,

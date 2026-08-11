@@ -506,6 +506,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.changeFront': '正面图', 'note.changeBack': '背面图', 'note.attachPdf': '附加 PDF', 'note.clearPdf': '清除 PDF', 'note.pdfAttached': '已附加 PDF',
   'note.scope': '范围', 'note.scopeScene': '当前地图', 'note.scopeRoom': '全房间地图',
   'note.lock': '锁定位置', 'note.sizeLock': '锁定大小', 'note.resizeHint': '拖曳以调整大小', 'note.visible': '显示', 'note.hidden': '隐藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
+  'note.flipTip': '勾选＝显示背面（有背面图）或正面镜像翻转（无背面图）。',
   'note.clickAction': '点击动作', 'note.actionNone': '无', 'note.actionChat': '发送聊天／骰子', 'note.actionTable': '切换地图', 'note.actionPreset': '应用场面',
   'note.clickChatText': '聊天／骰子文字', 'note.clickGameType': '系统类型', 'note.clickTable': '目标地图', 'note.clickPreset': '场面',
   'note.pickTable': '选择地图…', 'note.pickPreset': '选择场面…',

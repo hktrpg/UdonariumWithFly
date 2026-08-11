@@ -517,6 +517,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.changeFront': '正面圖', 'note.changeBack': '背面圖', 'note.attachPdf': '附加 PDF', 'note.clearPdf': '清除 PDF', 'note.pdfAttached': '已附加 PDF',
   'note.scope': '範圍', 'note.scopeScene': '目前地圖', 'note.scopeRoom': '全房間地圖',
   'note.lock': '鎖定位置', 'note.sizeLock': '鎖定大小', 'note.resizeHint': '拖曳以調整大小', 'note.visible': '顯示', 'note.hidden': '隱藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
+  'note.flipTip': '勾選＝顯示背面（有背面圖）或正面鏡像翻轉（無背面圖）。',
   'note.clickAction': '點擊動作', 'note.actionNone': '無', 'note.actionChat': '送出聊天／骰子', 'note.actionTable': '切換地圖', 'note.actionPreset': '套用場面',
   'note.clickChatText': '聊天／骰子文字', 'note.clickGameType': '系統類型', 'note.clickTable': '目標地圖', 'note.clickPreset': '場面',
   'note.pickTable': '選擇地圖…', 'note.pickPreset': '選擇場面…',
