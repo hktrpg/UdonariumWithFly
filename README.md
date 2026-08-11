@@ -61,7 +61,8 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Load room data perms | Load ZIP / folder restore **GM-only by default** (can enable for players) |
 | Combat tracker | Initiative, rounds/turns, announce, end turn, defeated skip |
 | Player token claim | “My character”: default chat speaker, vision, others can’t move it |
-| Weather | Rain / snow / sakura / maple / aurora / etc. on table settings |
+| Weather | Rain / snow / sakura / maple / aurora / etc. on table settings; optional weather SE (dedicated jukebox track) |
+| 2D mode | Top-down camera + flat character/dice; notes stay flat on 2D maps |
 | Image FX | Grayscale, sepia, contrast, flip, silhouette, Matrix, … on tokens / stands / chat icons / sheets |
 | Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
 | Reload save prompt | F5 / Ctrl+R offers ZIP download; with a bound folder, flushes backup before reload (skipped for guests) |
@@ -76,7 +77,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Chat unread badge | Unread count on the menu chat icon while no chat panel is open |
 | View reset / close panels | Available to everyone (Settings / More / right-click); not gated by toolbox menu permission |
 | Lobby on start | Cold start opens Lobby when not in a room (skipped for invite join) |
-| Multi-map placements | Same object can sit on several tables; pose kept when switching maps; notes supported |
+| Multi-map placements | Same object can sit on several tables; pose kept when switching maps; rotation/appearance independent per map (peers don’t overwrite); notes supported |
 | Temporary token copy | Ctrl+drag a character for a temp copy (not sent to graveyard) |
 | Inventory multi-place | Shift multi-select / Select All, then drag onto the table |
 | Preset scene preview / keep tokens | Thumbnail preview; “Apply (keep tokens)” keeps current poses; inventory bound to viewed map |
@@ -84,8 +85,9 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | GM kick | GM can kick a peer from the Connection panel |
 | V3 mesh-lock | When every enabled role has a password, SkyWay channel uses sealed mesh lock |
 | PWA update hint | Connection panel shows when a new version is ready to reload |
-| Mobile UX | Chat toolbar & map HUD/toolbox exclusivity; hover teaching tips desktop-only |
+| Mobile UX | Icon-grid nav/action sheets with snap sizing; chat toolbar & map HUD/toolbox exclusivity; hover teaching tips desktop-only |
 | Character JSON | JSON for easy import/export; CCFOLIA-compatible (Ctrl+V on table; export from character sheet) |
+| Note flip | Back art when set; otherwise mirror the face (pins stay upright); handouts follow |
 
 Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, dice-bot tables, SkyWay 2023 (`@skyway-sdk`), etc. This fork uses a self-hosted backend (do not point at public WithFly Workers).
 

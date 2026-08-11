@@ -38,9 +38,13 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | V3 mesh-lock | When every enabled role is password-gated, SkyWay channel uses sealed mesh password | `room-auth.ts`, `peer-context.ts` | All roles password → join still works; channel key not in peerId |
 | PWA update hint | Service worker update ready → Connection panel icon / confirm reload | `app-update.service.ts`, `peer-menu` | Deploy new build → icon appears → reload applies |
 | Optional music in backup | Bind folder / ZIP prompts; Settings* toggle; auto folder backup uses preference | `save-data.service.ts`, `folder-backup.service.ts`, settings menu | Exclude music → ZIP/meta without audio blobs; library XML still saved |
+| Weather SE | Local weather loop on dedicated jukebox track; toggles with table weather | `weather-se.service.ts`, `weather-loop-player.ts`, `Jukebox.ts` | Enable rain → hear SE; switch weather changes loop; mute weather SE stops audio |
+| 2D table mode | Top-down camera + flat character/dice; notes stay flat | `game-table.component.*`, table settings `mode2d` | Enable 2D → tokens flat; disable → 2.5D restored |
+| Per-map appearance | Dual-map peers: rotation/FX SyncVars reprojected to local viewed map | `table-placement-view-state.ts`, `tabletop-object.ts`, `tabletop.service.ts` | A on map1 rotates token → B on map2 pose unchanged |
+| Note flip | Back art when set; else CSS mirror of face; pins upright; handout follows | `text-note.ts`, `text-note.component.*`, `note-handout` | Flip with/without back art; handout shows back when flipped |
 | Save-room folder flyout | Hover Load room → Change folder / Disconnect folder | `peer-menu.component.*` | Hover load shows flyout; change rebinds; disconnect unbinds |
 | Esc close frontmost | Esc: context menu → modal → clear drafts/selection (priority over panels) → frontmost closable panel | `tabletop-keyboard.service.ts`, `panel.service.ts` `closeFrontmostPanel`, `ModalService.dismissTop` | Box-select tokens with a panel open → Esc clears selection first; Esc again closes the panel |
-| Mobile HUD / tips | Map HUD and toolbox exclusivity; hover teaching tips desktop-only | `app.component`, teaching-tip / overview | Mobile: open toolbox collapses HUD; no sticky hover tips |
+| Mobile HUD / tips | Icon-grid nav/sheets + snap sizing; map HUD／toolbox exclusivity; hover tips desktop-only | `app.component`, context-menu, teaching-tip / overview | Mobile: toolbox collapses HUD; no sticky hover tips; sheets snap |
 
 ## Port decisions
 

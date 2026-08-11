@@ -187,6 +187,18 @@ Upgraded to 1.13.2`,
 ・Token FX can auto-apply while standing on the mask (restore on leave); manual apply is not undone by leaving
 ・Characters/cards/dice/terrain/masks/notes use dedicated settings panels; denser settings UI
 ・Old rooms: hide flag without owner is not private; owner id may not match after reload (GM sees it — same as tokens); re-check “Self only”`,
+  'changelog.2026ux': `2026/08/09–10 Mobile・weather SE・2D・backup
+・Mobile nav／action sheets → icon grids with snap sizing; tighter chat, inventory, combat; HUD／context-menu cleanup
+・Weather SE on a dedicated jukebox track (rain／thunder／snow／sandstorm…); toggles with weather
+・Table **2D mode** (top-down camera + flat character／dice); dusk lighting; auto-fit table size to map art
+・Default chat-tab labels localize locally (not SyncVar-written)
+・Folder-backup／room join fixes; landing page copy refresh`,
+  'changelog.2026sync': `2026/08/11 Multi-map pose・note flip・join
+・Per-map placement view-state: rotation／appearance stay independent per map; peers on other maps no longer overwrite your local pose
+・3D yarn anchor tweaks; default-map／connection fixes
+・Room-join busy ends on first live peer (less stuck “connecting”)
+・Note flip: back art when set; otherwise mirror the face (pins／handles stay upright); handouts follow the back
+・Context-menu toggles use “☑／☐ + feature name” (current state)`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com
