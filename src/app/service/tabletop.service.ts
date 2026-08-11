@@ -155,9 +155,10 @@ export class TabletopService {
         const deletedId = event.data.identifier as string;
         // Skip self-echo: after ZIP reload, syncIds are reused and cleanup would
         // destroy newly parsed clue links that still reference those endpoints.
-        if (!event.isSendFromSelf
-          && deletedId
-          && (event.data.aliasName === GameCharacter.aliasName || event.data.aliasName === TextNote.aliasName)) {
+        if (ClueLink.shouldCleanupOnEndpointDelete({
+          isSendFromSelf: event.isSendFromSelf,
+          aliasName: event.data.aliasName,
+        }) && deletedId) {
           ClueLink.cleanupFor(deletedId);
         }
         let aliasName = event.data.aliasName;

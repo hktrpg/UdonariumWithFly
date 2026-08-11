@@ -97,6 +97,27 @@ export async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Aggregate fingerprint used to skip rewriting state.zip when room XML is unchanged.
+ * Input: per-file name → content hash (same map written into manifest.files).
+ */
+export async function computeStateFingerprint(
+  fileFingerprints: Record<string, string>
+): Promise<string> {
+  const parts = Object.keys(fileFingerprints)
+    .sort()
+    .map(name => `${name}:${fileFingerprints[name]}`);
+  return sha256Hex(parts.join('|'));
+}
+
+/** True when previous manifest fingerprint matches current state (skip state.zip write). */
+export function shouldSkipStateZipWrite(
+  stateFingerprint: string,
+  previousStateFingerprint: string | undefined | null
+): boolean {
+  return !!stateFingerprint && stateFingerprint === (previousStateFingerprint || '');
+}
+
 export function dataUrlToJpegBlob(dataUrl: string): Blob | null {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
   const comma = dataUrl.indexOf(',');

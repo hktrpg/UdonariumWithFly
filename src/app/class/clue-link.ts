@@ -60,6 +60,19 @@ export class ClueLink extends GameObject {
     }
   }
 
+  /**
+   * After ZIP reload, self-echo DELETE must not wipe newly parsed links
+   * that still reference reused syncIds.
+   */
+  static shouldCleanupOnEndpointDelete(opts: {
+    isSendFromSelf?: boolean;
+    aliasName?: string;
+  }): boolean {
+    if (opts.isSendFromSelf) return false;
+    const alias = opts.aliasName || '';
+    return alias === GameCharacter.aliasName || alias === TextNote.aliasName;
+  }
+
   isValidOnTable(viewTableId: string): boolean {
     if (this.tableIdentifier && viewTableId && this.tableIdentifier !== viewTableId) return false;
     const a = this.fromObject;
