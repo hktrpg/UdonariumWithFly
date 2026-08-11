@@ -202,7 +202,8 @@ export class TabletopObject extends ObjectNode {
   hydratePoseForView(viewTableId?: string, silent = false) {
     const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!viewId || this.location.name !== 'table') return;
-    this.ensureAppearanceBackfilled();
+    // Do not ensureAppearanceBackfilled() here: live SyncVars may still hold the
+    // previous map's values and would pollute sibling placements (!anyHas seed).
     const pose = this.getPoseForTable(viewId);
     if (!pose) return;
     const apply = () => {
@@ -241,6 +242,18 @@ export class TabletopObject extends ObjectNode {
   }
 
   /**
+   * After a remote SyncVar apply, live rotate/coords follow the editor's map.
+   * Re-apply this client's current view pose so dual-map peers stay independent.
+   */
+  static reprojectForLocalView(obj: TabletopObject) {
+    if (!obj || obj.location.name !== 'table') return;
+    if (obj.placementTableIds.length < 2) return;
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    if (!viewId || !obj.hasPlacement(viewId)) return;
+    obj.hydratePoseForView(viewId, true);
+  }
+
+  /**
    * Persist live location/posZ/appearance into placements[viewId] before leaving that map.
    * Does not change which maps the object belongs to.
    */
@@ -250,7 +263,8 @@ export class TabletopObject extends ObjectNode {
     for (const obj of TabletopObject.getAll()) {
       if (obj.location.name !== 'table') continue;
       if (!obj.hasPlacement(viewId)) continue;
-      obj.ensureAppearanceBackfilled();
+      // Do not ensureAppearanceBackfilled() here: live values may already be a
+      // per-map edit and must not be copied onto sibling placements.
       const live: TablePlacementPose = {
         x: obj.location.x,
         y: obj.location.y,
@@ -264,21 +278,26 @@ export class TabletopObject extends ObjectNode {
   }
 
   /**
-   * Write live view-state into the current view's placement.
+   * Write live view-state into a map's placement (default: current view).
    * Call after sheet / rotate / FX edits so other maps keep their own records.
+   *
+   * Important: do NOT call ensureAppearanceBackfilled() here after SyncVars were
+   * already mutated — that would seed maps from post-edit live values.
+   * Prefer {@link mutateAppearance}, or call ensureAppearanceBackfilled() before mutating.
+   * Pass {@code viewTableId} when writing from a deferred batch (map may have switched).
    */
-  syncAppearanceToCurrentViewPlacement() {
+  syncAppearanceToCurrentViewPlacement(viewTableId?: string) {
     if (this.location.name !== 'table') return;
-    const viewId = TabletopObject.resolveViewTableIdentifier();
+    const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!viewId || !this.hasPlacement(viewId)) return;
-    this.ensureAppearanceBackfilled();
     const map = this.parsePlacements();
     const saved = map[viewId];
     if (!saved) return;
     const liveAppearance = this.captureLiveAppearance();
     if (!Object.keys(liveAppearance).length) return;
 
-    // Seed sibling placements that still lack individual fields (pre-edit values).
+    // Seed sibling placements that still lack fields. Use the target map's
+    // pre-write record (shared baseline) or defaults — never post-edit live.
     const defaults = defaultPlacementViewState(this);
     for (const id of Object.keys(map)) {
       if (id === viewId) continue;
@@ -286,7 +305,6 @@ export class TabletopObject extends ObjectNode {
         if (map[id][key] !== undefined) continue;
         if (saved[key] !== undefined) (map[id] as any)[key] = saved[key];
         else if (defaults[key] !== undefined) (map[id] as any)[key] = defaults[key];
-        else if (liveAppearance[key] !== undefined) (map[id] as any)[key] = liveAppearance[key];
       }
     }
 
@@ -301,6 +319,13 @@ export class TabletopObject extends ObjectNode {
     if (TabletopObject.posesEqual(saved, next) && JSON.stringify(map) === this.tablePlacements) return;
     this.tablePlacements = JSON.stringify(map);
     this.update();
+  }
+
+  /** Backfill missing placement keys from pre-edit live, mutate, then write current view. */
+  mutateAppearance(mutator: () => void) {
+    if (this.location.name === 'table') this.ensureAppearanceBackfilled();
+    mutator();
+    this.syncAppearanceToCurrentViewPlacement();
   }
 
   /** Destroy temporary copies; otherwise optional graveyard callback. */
@@ -362,15 +387,16 @@ export class TabletopObject extends ObjectNode {
 
   /**
    * Per-field backfill for legacy dual-map saves.
-   * - If no placement has a key yet: seed all from live (shared → independent).
-   * - If some have it: fill missing siblings with defaults (not live), so the
-   *   first edit on map A does not copy into map B.
+   * - If no placement has a key yet: current view gets live (shared look); siblings
+   *   get defaults — never copy post-edit live onto every map.
+   * - If some have it: fill missing siblings with defaults only.
    */
   ensureAppearanceBackfilled() {
     if (!this.tablePlacements) return;
     const map = this.parsePlacements();
     const keys = Object.keys(map);
     if (!keys.length) return;
+    const viewId = TabletopObject.resolveViewTableIdentifier();
     const live = this.captureLiveAppearance();
     const defaults = defaultPlacementViewState(this);
     let changed = false;
@@ -380,15 +406,24 @@ export class TabletopObject extends ObjectNode {
       if (liveVal === undefined && defaultVal === undefined) continue;
       const anyHas = keys.some(k => map[k][field] !== undefined);
       if (!anyHas) {
-        const seed = liveVal !== undefined ? liveVal : defaultVal;
         for (const k of keys) {
+          let seed: any;
+          if (viewId && k === viewId) {
+            seed = liveVal !== undefined ? liveVal : defaultVal;
+          } else {
+            // Other maps: defaults only (never post-edit / current-view live).
+            seed = defaultVal;
+          }
+          if (seed === undefined) continue;
           (map[k] as any)[field] = seed;
           changed = true;
         }
       } else {
         for (const k of keys) {
           if (map[k][field] !== undefined) continue;
-          (map[k] as any)[field] = defaultVal !== undefined ? defaultVal : liveVal;
+          // Missing siblings get defaults only — never post-edit live.
+          if (defaultVal === undefined) continue;
+          (map[k] as any)[field] = defaultVal;
           changed = true;
         }
       }
@@ -643,8 +678,7 @@ export class TabletopObject extends ObjectNode {
   set altitude(altitude: number) {
     let element = this.getElement('altitude', this.commonDataElement);
     if (element) {
-      element.value = altitude;
-      this.syncAppearanceToCurrentViewPlacement();
+      this.mutateAppearance(() => { element.value = altitude; });
     }
   }
 
@@ -719,11 +753,13 @@ export class TabletopObject extends ObjectNode {
   protected setCommonValue(elementName: string, value: any) {
     let element = this.getElement(elementName, this.commonDataElement);
     if (!element) { return; }
-    element.value = value;
-    if (elementName === 'size' || elementName === 'height' || elementName === 'altitude'
-      || elementName === 'width' || elementName === 'depth' || elementName === 'length') {
-      this.syncAppearanceToCurrentViewPlacement();
+    const isAppearance = elementName === 'size' || elementName === 'height' || elementName === 'altitude'
+      || elementName === 'width' || elementName === 'depth' || elementName === 'length';
+    if (isAppearance) {
+      this.mutateAppearance(() => { element.value = value; });
+      return;
     }
+    element.value = value;
   }
 
   protected getImageFile(elementName: string) {

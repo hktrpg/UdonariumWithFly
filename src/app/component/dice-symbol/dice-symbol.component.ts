@@ -119,11 +119,11 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   @Input() is3D: boolean = false;
 
   get face(): string { return this.diceSymbol.face; }
-  set face(face: string) { this.diceSymbol.face = face; }
+  set face(face: string) { this.diceSymbol.mutateAppearance(() => { this.diceSymbol.face = face; }); }
   get owner(): string { return this.diceSymbol.owner; }
   set owner(owner: string) { this.diceSymbol.owner = owner; }
   get rotate(): number { return this.diceSymbol.rotate; }
-  set rotate(rotate: number) { this.diceSymbol.rotate = rotate; }
+  set rotate(rotate: number) { this.diceSymbol.mutateAppearance(() => { this.diceSymbol.rotate = rotate; }); }
 
   get name(): string { return this.diceSymbol.name; }
   set name(name: string) { this.diceSymbol.name = name; }
@@ -148,10 +148,12 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   get isVisible(): boolean { return this.diceSymbol.isVisible; }
 
   get isDropShadow(): boolean { return this.diceSymbol.isDropShadow; }
-  set isDropShadow(isDropShadow: boolean) { this.diceSymbol.isDropShadow = isDropShadow; }
+  set isDropShadow(isDropShadow: boolean) {
+    this.diceSymbol.mutateAppearance(() => { this.diceSymbol.isDropShadow = isDropShadow; });
+  }
 
   get isLock(): boolean { return this.diceSymbol.isLock; }
-  set isLock(isLock: boolean) { this.diceSymbol.isLock = isLock; this.diceSymbol.syncAppearanceToCurrentViewPlacement(); }
+  set isLock(isLock: boolean) { this.diceSymbol.mutateAppearance(() => { this.diceSymbol.isLock = isLock; }); }
 
   get isCoin(): boolean { return this.diceSymbol.isCoin; }
   get selectionState(): SelectionState { return this.selectionService.state(this.diceSymbol); }

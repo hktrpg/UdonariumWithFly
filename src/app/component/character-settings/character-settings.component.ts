@@ -51,10 +51,22 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     this.character?.syncAppearanceToCurrentViewPlacement();
   }
 
+  setVisionRange(n: number) {
+    this.character?.mutateAppearance(() => { this.character.visionRange = n; });
+  }
+  setBrightLight(n: number) {
+    this.character?.mutateAppearance(() => { this.character.brightLight = n; });
+  }
+  setDimLight(n: number) {
+    this.character?.mutateAppearance(() => { this.character.dimLight = n; });
+  }
+
   get size(): number { return this.character?.size ?? 1; }
   set size(value: number) {
-    const el = this.character?.commonDataElement?.getFirstElementByName('size');
-    if (el) el.value = value;
+    this.character?.mutateAppearance(() => {
+      const el = this.character?.commonDataElement?.getFirstElementByName('size');
+      if (el) el.value = value;
+    });
   }
 
   /** Raw height field (image-relative when heightScale). */
@@ -64,8 +76,10 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     return Number.isNaN(n) ? 0 : n;
   }
   set heightRaw(value: number) {
-    const el = this.character?.commonDataElement?.getFirstElementByName('height');
-    if (el) el.value = value;
+    this.character?.mutateAppearance(() => {
+      const el = this.character?.commonDataElement?.getFirstElementByName('height');
+      if (el) el.value = value;
+    });
   }
 
   get heightScale(): boolean {
@@ -73,9 +87,11 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     return !!(el && el.currentValue);
   }
   set heightScale(on: boolean) {
-    const el = this.character?.commonDataElement?.getFirstElementByName('height');
-    if (!el) return;
-    el.currentValue = on ? 'height' : '';
+    this.character?.mutateAppearance(() => {
+      const el = this.character?.commonDataElement?.getFirstElementByName('height');
+      if (!el) return;
+      el.currentValue = on ? 'height' : '';
+    });
   }
 
   get detailSections(): DataElement[] {
@@ -230,7 +246,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   selectImage(index: number) {
     if (!this.character || this.character.currntImageIndex === index) return;
-    this.character.currntImageIndex = index;
+    this.character.mutateAppearance(() => { this.character.currntImageIndex = index; });
     SoundEffect.play(PresetSound.surprise);
     EventSystem.trigger('UPDATE_INVENTORY', null);
     this.changeDetector.markForCheck();
@@ -238,7 +254,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   selectIcon(index: number) {
     if (!this.character || this.character.currntIconIndex === index) return;
-    this.character.currntIconIndex = index;
+    this.character.mutateAppearance(() => { this.character.currntIconIndex = index; });
     this.changeDetector.markForCheck();
   }
 

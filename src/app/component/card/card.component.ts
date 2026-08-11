@@ -87,9 +87,9 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   get name(): string { return this.card.name; }
   get state(): CardState { return this.card.state; }
-  set state(state: CardState) { this.card.state = state; }
+  set state(state: CardState) { this.card.mutateAppearance(() => { this.card.state = state; }); }
   get rotate(): number { return this.card.rotate; }
-  set rotate(rotate: number) { this.card.rotate = rotate; }
+  set rotate(rotate: number) { this.card.mutateAppearance(() => { this.card.rotate = rotate; }); }
   get owner(): string { return this.card.owner; }
   set owner(owner: string) { this.card.owner = owner; }
   get zindex(): number { return this.card.zindex; }
@@ -138,7 +138,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text)) }
 
   get isLocked(): boolean { return this.card ? this.card.isLocked : false; }
-  set isLocked(isLocked: boolean) { if (this.card) { this.card.isLocked = isLocked; this.card.syncAppearanceToCurrentViewPlacement(); } }
+  set isLocked(isLocked: boolean) { if (this.card) { this.card.mutateAppearance(() => { this.card.isLocked = isLocked; }); } }
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;
@@ -604,24 +604,24 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   vertical() {
-    if (!this.card.isVisible || this.card.rotate == 0) return; 
-    this.card.rotate = 0; 
+    if (!this.card.isVisible || this.card.rotate == 0) return;
+    this.rotate = 0;
     SoundEffect.play(PresetSound.cardPut);
   }
 
   horizontal() {
-    if (!this.card.isVisible || this.card.rotate == 90) return; 
-    this.card.rotate = 90; 
+    if (!this.card.isVisible || this.card.rotate == 90) return;
+    this.rotate = 90;
     SoundEffect.play(PresetSound.cardPut);
   }
 
   turnRight() {
-    this.card.rotate += 45; 
+    this.rotate = this.card.rotate + 45;
     SoundEffect.play(PresetSound.cardPut);
   }
 
   turnLeft() {
-    this.card.rotate -= 45; 
+    this.rotate = this.card.rotate - 45;
     SoundEffect.play(PresetSound.cardPut);
   }
 

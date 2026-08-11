@@ -698,6 +698,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isRefreshPromptOpen = true;
     const folderReady = this.folderBackup.isReady;
     if (folderReady) {
+      // Already flushed — no need to confirm flush or reload.
+      if (this.folderBackup.isBackupCurrent) {
+        this.isRefreshPromptOpen = false;
+        this.reloadWithoutPrompt();
+        return;
+      }
       // Folder is the safety net; ZIP stays in the menu (not on this dialog).
       this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.confirm.refresh.title'),

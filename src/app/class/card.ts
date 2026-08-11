@@ -86,12 +86,12 @@ export class Card extends TabletopObject {
   }
 
   faceUp() {
-    this.state = CardState.FRONT;
+    this.mutateAppearance(() => { this.state = CardState.FRONT; });
     this.owner = '';
   }
 
   faceDown() {
-    this.state = CardState.BACK;
+    this.mutateAppearance(() => { this.state = CardState.BACK; });
     this.owner = '';
   }
 

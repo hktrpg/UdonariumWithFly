@@ -66,6 +66,17 @@ export const PLACEMENT_VIEW_STATE_KEYS = [
   'diceFace',
   'isLocked',
   'isLock',
+  // Terrain desktop look / collision
+  'terrainMode',
+  'isSurfaceShading',
+  'isInteract',
+  'affectsLight',
+  'isSlope',
+  'slopeDirection',
+  // Mask desktop look
+  'blendType',
+  'borderType',
+  'textPosition',
 ] as const;
 
 export type PlacementViewStateKey = (typeof PLACEMENT_VIEW_STATE_KEYS)[number];
@@ -149,6 +160,15 @@ export function defaultPlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'dimLight')) out.dimLight = 0;
   if (hasProp(obj, 'state')) out.cardState = 0;
   if (hasProp(obj, 'face') && typeof obj.face === 'string') out.diceFace = String(obj.face ?? '0');
+  if (hasProp(obj, 'mode') && typeof obj.mode === 'number') out.terrainMode = 3; // TerrainViewState.ALL
+  if (hasProp(obj, 'isSurfaceShading')) out.isSurfaceShading = true;
+  if (hasProp(obj, 'isInteract')) out.isInteract = true;
+  if (hasProp(obj, 'affectsLight')) out.affectsLight = false;
+  if (hasProp(obj, 'isSlope')) out.isSlope = false;
+  if (hasProp(obj, 'slopeDirection')) out.slopeDirection = 0;
+  if (hasProp(obj, 'blendType')) out.blendType = 0;
+  if (hasProp(obj, 'borderType')) out.borderType = 1;
+  if (hasProp(obj, 'textPosition')) out.textPosition = 'middle-center';
   return out;
 }
 
@@ -207,6 +227,15 @@ export function capturePlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'face') && typeof obj.face === 'string') out.diceFace = String(obj.face ?? '');
   if (hasProp(obj, 'isLocked')) out.isLocked = !!obj.isLocked;
   if (hasProp(obj, 'isLock')) out.isLock = !!obj.isLock;
+
+  if (hasProp(obj, 'mode') && typeof obj.mode === 'number') out.terrainMode = readNum(obj, 'mode');
+  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope'] as const) {
+    if (hasProp(obj, k)) out[k] = !!obj[k];
+  }
+  if (hasProp(obj, 'slopeDirection')) out.slopeDirection = readNum(obj, 'slopeDirection');
+  if (hasProp(obj, 'blendType')) out.blendType = readNum(obj, 'blendType');
+  if (hasProp(obj, 'borderType')) out.borderType = readNum(obj, 'borderType');
+  if (hasProp(obj, 'textPosition')) out.textPosition = obj.textPosition == null ? '' : String(obj.textPosition);
 
   return out;
 }
@@ -267,6 +296,21 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
 
   if (effective.cardState !== undefined && hasProp(obj, 'state')) obj.state = effective.cardState;
   if (effective.diceFace !== undefined && hasProp(obj, 'face')) obj.face = effective.diceFace;
+
+  if (effective.terrainMode !== undefined && hasProp(obj, 'mode') && typeof obj.mode === 'number') {
+    obj.mode = effective.terrainMode;
+  }
+  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope'] as const) {
+    if (effective[k] !== undefined && hasProp(obj, k)) obj[k] = effective[k];
+  }
+  if (effective.slopeDirection !== undefined && hasProp(obj, 'slopeDirection')) {
+    obj.slopeDirection = effective.slopeDirection;
+  }
+  if (effective.blendType !== undefined && hasProp(obj, 'blendType')) obj.blendType = effective.blendType;
+  if (effective.borderType !== undefined && hasProp(obj, 'borderType')) obj.borderType = effective.borderType;
+  if (effective.textPosition !== undefined && hasProp(obj, 'textPosition')) {
+    obj.textPosition = effective.textPosition;
+  }
 }
 
 export function placementHasViewState(pose: any): boolean {

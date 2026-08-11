@@ -142,8 +142,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get imageFile(): ImageFile { return this.gameCharacter.imageFile; }
   get rotate(): number { return this.gameCharacter.rotate; }
   set rotate(rotate: number) {
-    this.gameCharacter.rotate = rotate;
-    this.gameCharacter.syncAppearanceToCurrentViewPlacement();
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.rotate = rotate; });
   }
   /** 2D mode: roll SyncVar is forced to 0 (no tip/tilt). */
   get roll(): number { return this.is2DMode ? 0 : this.gameCharacter.roll; }
@@ -152,8 +151,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       // Display-only: never wipe the shared SyncVar (other maps keep their tip).
       return;
     }
-    this.gameCharacter.roll = roll;
-    this.gameCharacter.syncAppearanceToCurrentViewPlacement();
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.roll = roll; });
   }
   get isRollLocked(): boolean { return this.is2DMode || this.isMoveLocked; }
 
@@ -162,15 +160,25 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     // no-op — getter already returns 0 in 2D
   }
   get isDropShadow(): boolean { return this.gameCharacter.isDropShadow; }
-  set isDropShadow(isDropShadow: boolean) { this.gameCharacter.isDropShadow = isDropShadow; this.syncViewPlacement(); }
+  set isDropShadow(isDropShadow: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isDropShadow = isDropShadow; });
+  }
   get isAltitudeIndicate(): boolean { return this.gameCharacter.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.gameCharacter.isAltitudeIndicate = isAltitudeIndicate; this.syncViewPlacement(); }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isAltitudeIndicate = isAltitudeIndicate; });
+  }
   get isInverse(): boolean { return this.gameCharacter.isInverse; }
-  set isInverse(isInverse: boolean) { this.gameCharacter.isInverse = isInverse; this.syncViewPlacement(); }
+  set isInverse(isInverse: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isInverse = isInverse; });
+  }
   get isHollow(): boolean { return this.gameCharacter.isHollow; }
-  set isHollow(isHollow: boolean) { this.gameCharacter.isHollow = isHollow; this.syncViewPlacement(); }
+  set isHollow(isHollow: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isHollow = isHollow; });
+  }
   get isBlackPaint(): boolean { return this.gameCharacter.isBlackPaint; }
-  set isBlackPaint(isBlackPaint: boolean) { this.gameCharacter.isBlackPaint = isBlackPaint; this.syncViewPlacement(); }
+  set isBlackPaint(isBlackPaint: boolean) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isBlackPaint = isBlackPaint; });
+  }
 
   private imageEffectSource() {
     return {
@@ -206,7 +214,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
 
   get aura(): number { return this.gameCharacter.aura; }
-  set aura(aura: number) { this.gameCharacter.aura = aura; this.syncViewPlacement(); }
+  set aura(aura: number) {
+    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.aura = aura; });
+  }
 
   private syncViewPlacement() {
     this.gameCharacter?.syncAppearanceToCurrentViewPlacement();

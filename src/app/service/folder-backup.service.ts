@@ -152,6 +152,8 @@ export class FolderBackupService implements OnDestroy {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private minIntervalTimer: ReturnType<typeof setTimeout> | null = null;
   private lastWriteAt = 0;
+  /** Room id of the last successful folder write (may differ from activeRoomId after switch). */
+  private lastWriteRoomId = '';
   private activeRoomId = '';
   private lastRoomSnapshot: RoomSnapshot | null = null;
   /** Load backup after OPEN_NETWORK flush finishes (must not race ahead of old-room write). */
@@ -207,6 +209,20 @@ export class FolderBackupService implements OnDestroy {
       && (this.status === 'ready' || this.status === 'writing' || this.status === 'error')
       && !!Network.peer?.isRoom
       && !Network.GuestMode();
+  }
+
+  /** Unwritten or in-flight folder backup work remains. */
+  get hasPendingWrite(): boolean {
+    return this.dirty || this.writing || !!this.writePromise || this.writeAgain;
+  }
+
+  /** Bound folder already holds the current room state (safe to reload without flush). */
+  get isBackupCurrent(): boolean {
+    return this.isReady
+      && this.lastWriteAt > 0
+      && !this.hasPendingWrite
+      && !!this.activeRoomId
+      && this.lastWriteRoomId === this.activeRoomId;
   }
 
   async initialize(): Promise<void> {
@@ -978,6 +994,7 @@ export class FolderBackupService implements OnDestroy {
       });
     }
     this.activeRoomId = '';
+    this.lastWriteRoomId = '';
     this.listening = false;
     this.clearTimers();
     this.dirty = false;
@@ -1110,6 +1127,7 @@ export class FolderBackupService implements OnDestroy {
         );
         await this.writeLatestPreview(snapshot.roomId, previewBlob);
         this.lastWriteAt = Date.now();
+        this.lastWriteRoomId = snapshot.roomId;
         this.lastSavedAt = new Date().toISOString();
         this.lastError = '';
         this.activeRoomId = snapshot.roomId;

@@ -24,6 +24,9 @@ export interface RotableOption {
     standalone: false
 })
 export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
+  private static readonly allRotables = new Set<RotableDirective>();
+  private static viewHooked = false;
+
   private _tabletopObject: TabletopObject;
   private _targetPropertyName: string = '';
   private _transformCssOffset: string = '';
@@ -91,9 +94,32 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     private tabletopService: TabletopService,
     private selectionService: TabletopSelectionService,
     _undoService: UndoService,
-  ) { }
+  ) {
+    RotableDirective.ensureViewHook();
+  }
+
+  private static ensureViewHook() {
+    if (RotableDirective.viewHooked) return;
+    RotableDirective.viewHooked = true;
+    EventSystem.register(RotableDirective)
+      .on('AFTER_VIEW_TABLE_CHANGE', () => {
+        RotableDirective.syncAllFromObjects();
+      });
+  }
+
+  /** After hydrate: snap every rotable visual to SyncVar (per-map appearance). */
+  static syncAllFromObjects() {
+    for (const rotable of RotableDirective.allRotables) {
+      if (!rotable.tabletopObject) continue;
+      if (rotable.input.isGrabbing) continue;
+      rotable.setAnimatedTransition(false);
+      rotable.stopTransition(rotable.targetProperty);
+      rotable.setRotate(rotable.tabletopObject);
+    }
+  }
 
   ngAfterViewInit() {
+    RotableDirective.allRotables.add(this);
     this.batchService.add(() => this.initialize(), this.onstart);
   }
 
@@ -119,6 +145,7 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
+    RotableDirective.allRotables.delete(this);
     if (this.input.isGrabbing) this.cancelWithoutCommit();
     else this.cancel();
     this.dispose();
@@ -244,11 +271,15 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
   private setUpdateBatching() {
     if (!this.isUpdateBatching) {
       this.isUpdateBatching = true;
+      // Pin map id at queue time — resolveViewTableIdentifier() at flush can be another map.
+      const batchViewId = TabletopObject.resolveViewTableIdentifier();
       this.batchService.add(() => {
+        // Seed missing placement keys from pre-edit live BEFORE mutating SyncVars.
+        this.tabletopObject?.ensureAppearanceBackfilled();
         this.targetProperty = this.rotate;
-        this.tabletopObject?.syncAppearanceToCurrentViewPlacement();
+        this.tabletopObject?.syncAppearanceToCurrentViewPlacement(batchViewId);
         this.isUpdateBatching = false;
-      });
+      }, this);
     }
     this.updateTransformCss();
   }

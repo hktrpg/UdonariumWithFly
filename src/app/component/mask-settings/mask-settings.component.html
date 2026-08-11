@@ -89,7 +89,7 @@
     <div class="field-row nowrap" *ngIf="mask.text">
       <label class="field grow">
         <span>{{ 'mask.fieldTextAlignH' | i18n }}</span>
-        <select [ngModel]="mask.textAlignH" (ngModelChange)="mask.textAlignH = $event" [disabled]="GuestMode()">
+        <select [ngModel]="mask.textAlignH" (ngModelChange)="setTextAlignH($event)" [disabled]="GuestMode()">
           <option value="left">{{ 'mask.textAlign.left' | i18n }}</option>
           <option value="center">{{ 'mask.textAlign.center' | i18n }}</option>
           <option value="right">{{ 'mask.textAlign.right' | i18n }}</option>
@@ -97,7 +97,7 @@
       </label>
       <label class="field grow">
         <span>{{ 'mask.fieldTextAlignV' | i18n }}</span>
-        <select [ngModel]="mask.textAlignV" (ngModelChange)="mask.textAlignV = $event" [disabled]="GuestMode()">
+        <select [ngModel]="mask.textAlignV" (ngModelChange)="setTextAlignV($event)" [disabled]="GuestMode()">
           <option value="top">{{ 'mask.textAlign.top' | i18n }}</option>
           <option value="middle">{{ 'mask.textAlign.middle' | i18n }}</option>
           <option value="bottom">{{ 'mask.textAlign.bottom' | i18n }}</option>
@@ -424,7 +424,7 @@
   <section class="card card-dense opts-card">
     <div class="check-row tight">
       <label>
-        <input type="checkbox" [(ngModel)]="mask.isLock" [disabled]="GuestMode()" />
+        <input type="checkbox" [ngModel]="mask.isLock" (ngModelChange)="setAppearanceFlag('isLock', $event)" [disabled]="GuestMode()" />
         {{ 'note.lock' | i18n }}
       </label>
       <label>
@@ -432,11 +432,11 @@
         {{ 'mask.optGmSeeThrough' | i18n }}
       </label>
       <label>
-        <input type="checkbox" [(ngModel)]="mask.affectsLight" [disabled]="GuestMode()" />
+        <input type="checkbox" [ngModel]="mask.affectsLight" (ngModelChange)="setAppearanceFlag('affectsLight', $event)" [disabled]="GuestMode()" />
         {{ 'mask.optAffectsLight' | i18n }}
       </label>
       <label>
-        <input type="checkbox" [(ngModel)]="mask.isAltitudeIndicate" [disabled]="GuestMode()" />
+        <input type="checkbox" [ngModel]="mask.isAltitudeIndicate" (ngModelChange)="setAppearanceFlag('isAltitudeIndicate', $event)" [disabled]="GuestMode()" />
         {{ 'mask.optShowAltitude' | i18n }}
       </label>
       <label>

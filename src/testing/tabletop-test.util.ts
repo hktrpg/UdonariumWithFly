@@ -1,7 +1,10 @@
+import { Card, CardState } from '@udonarium/card';
 import { ClueLink } from '@udonarium/clue-link';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
+import { GameTableMask } from '@udonarium/game-table-mask';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote } from '@udonarium/text-note';
 import { Terrain } from '@udonarium/terrain';
@@ -17,6 +20,9 @@ export function resetTabletopStore(): void {
   destroyAll(ObjectStore.instance.getObjects(GameCharacter));
   destroyAll(ObjectStore.instance.getObjects(TextNote));
   destroyAll(ObjectStore.instance.getObjects(Terrain));
+  destroyAll(ObjectStore.instance.getObjects(Card));
+  destroyAll(ObjectStore.instance.getObjects(DiceSymbol));
+  destroyAll(ObjectStore.instance.getObjects(GameTableMask));
   destroyAll(ObjectStore.instance.getObjects(GameTable));
   ObjectStore.instance.clearDeleteHistory();
   TableSelecter.instance.prepareForRoomReload();
@@ -35,6 +41,28 @@ export function makeCharacter(id: string, name = id, size = 1): GameCharacter {
   ch.initialize();
   ch.createTestGameDataElement(name, size, '');
   return ch;
+}
+
+export function makeTextNote(id: string, title = id): TextNote {
+  return TextNote.create(title, 'body', 14, 2, 2, id);
+}
+
+export function makeTerrain(id: string, name = id): Terrain {
+  return Terrain.create(name, 2, 2, 1, '', '', id);
+}
+
+export function makeCard(id: string, name = id): Card {
+  const card = Card.create(name, '', '', 2, id);
+  card.state = CardState.FRONT;
+  return card;
+}
+
+export function makeDice(id: string, name = id): DiceSymbol {
+  return DiceSymbol.create(name, DiceType.D6, 1, id);
+}
+
+export function makeMask(id: string, name = id): GameTableMask {
+  return GameTableMask.create(name, 2, 2, 0.5, id);
 }
 
 export function viewTables(activeId: string, viewedId = activeId): void {

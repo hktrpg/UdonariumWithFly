@@ -44,10 +44,10 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   get name(): string { return this.terrain.name; }
   get mode(): TerrainViewState { return this.terrain.mode; }
-  set mode(mode: TerrainViewState) { this.terrain.mode = mode; }
+  set mode(mode: TerrainViewState) { this.terrain.mutateAppearance(() => { this.terrain.mode = mode; }); }
 
   get isLocked(): boolean { return this.terrain.isLocked; }
-  set isLocked(isLocked: boolean) { this.terrain.isLocked = isLocked; this.terrain.syncAppearanceToCurrentViewPlacement(); }
+  set isLocked(isLocked: boolean) { this.terrain.mutateAppearance(() => { this.terrain.isLocked = isLocked; }); }
   get hasWall(): boolean { return this.terrain.hasWall; }
   get hasFloor(): boolean { return this.terrain.hasFloor; }
 
@@ -61,17 +61,25 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   set altitude(altitude: number) { this.terrain.altitude = altitude; }
 
   get isDropShadow(): boolean { return this.terrain.isDropShadow; }
-  set isDropShadow(isDropShadow: boolean) { this.terrain.isDropShadow = isDropShadow; }
+  set isDropShadow(isDropShadow: boolean) {
+    this.terrain.mutateAppearance(() => { this.terrain.isDropShadow = isDropShadow; });
+  }
   get isSurfaceShading(): boolean { return this.terrain.isSurfaceShading; }
-  set isSurfaceShading(isSurfaceShading: boolean) { this.terrain.isSurfaceShading = isSurfaceShading; }
+  set isSurfaceShading(isSurfaceShading: boolean) {
+    this.terrain.mutateAppearance(() => { this.terrain.isSurfaceShading = isSurfaceShading; });
+  }
 
   get isInteract(): boolean { return this.terrain.isInteract; }
-  set isInteract(isInteract: boolean) { this.terrain.isInteract = isInteract; }
+  set isInteract(isInteract: boolean) {
+    this.terrain.mutateAppearance(() => { this.terrain.isInteract = isInteract; });
+  }
 
   get isSlope(): boolean { return this.terrain.isSlope; }
   set isSlope(isSlope: boolean) {
-    this.terrain.isSlope = isSlope;
-    if (!isSlope) this.terrain.slopeDirection = SlopeDirection.NONE;
+    this.terrain.mutateAppearance(() => {
+      this.terrain.isSlope = isSlope;
+      if (!isSlope) this.terrain.slopeDirection = SlopeDirection.NONE;
+    });
   }
 
   get slopeDirection(): number {
@@ -80,12 +88,16 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     return this.terrain.slopeDirection;
   }
   set slopeDirection(slopeDirection: number) {
-    this.terrain.isSlope = (slopeDirection != SlopeDirection.NONE);
-    this.terrain.slopeDirection = slopeDirection;
+    this.terrain.mutateAppearance(() => {
+      this.terrain.isSlope = (slopeDirection != SlopeDirection.NONE);
+      this.terrain.slopeDirection = slopeDirection;
+    });
   }
   
   get isAltitudeIndicate(): boolean { return this.terrain.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.terrain.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.terrain.mutateAppearance(() => { this.terrain.isAltitudeIndicate = isAltitudeIndicate; });
+  }
 
 
   get isVisibleFloor(): boolean { return 0 < this.width * this.depth; }
@@ -326,7 +338,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
           name: this.i18n.t('terrain.menu.2'), action: null, subActions: [
             {
               name: this.i18n.t('terrain.menu.3'), action: () => {
-                selectedGameTableMasks().forEach(terrain => terrain.isLocked = true);
+                selectedGameTableMasks().forEach(terrain => {
+                  terrain.mutateAppearance(() => { terrain.isLocked = true; });
+                });
                 SoundEffect.play(PresetSound.lock);
               }
             },
@@ -469,7 +483,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       */
       contextMenuToggleCheck({
         get: () => !!this.terrain.affectsLight,
-        set: (v) => { this.terrain.affectsLight = v; },
+        set: (v) => {
+          this.terrain.mutateAppearance(() => { this.terrain.affectsLight = v; });
+        },
         on: this.i18n.t('terrain.menu.13'),
         off: this.i18n.t('terrain.menu.14'),
       }),

@@ -100,6 +100,17 @@ export class TabletopService {
     this.refreshCacheAll();
     TabletopObject.migrateUnboundTablePieces();
     EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', 900, event => {
+        // After ObjectSynchronizer (prio 1000) applies remote SyncVars, restore this
+        // client's view pose so dual-map appearance/coords stay per-map.
+        if (event.isSendFromSelf) return;
+        const id = event.data?.identifier as string;
+        if (!id) return;
+        const obj = ObjectStore.instance.get(id);
+        if (obj instanceof TabletopObject) {
+          TabletopObject.reprojectForLocalView(obj);
+        }
+      })
       .on('BEFORE_VIEW_TABLE_CHANGE', () => {
         // Run deferred drag writes first; MovableDirective then pins _pos → placements.
         this.batchService.flushNow();

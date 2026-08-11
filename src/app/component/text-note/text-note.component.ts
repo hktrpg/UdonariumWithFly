@@ -73,11 +73,13 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
   set textAlign(v: string) {
     if (!this.textNote) return;
-    this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+    this.textNote.mutateAppearance(() => {
+      this.textNote.textAlign = (v === 'center' || v === 'right' || v === 'justify') ? v : 'left';
+    });
   }
   get imageFile(): ImageFile { return this.textNote.imageFile; }
   get rotate(): number { return this.textNote.rotate; }
-  set rotate(rotate: number) { this.textNote.rotate = rotate; }
+  set rotate(rotate: number) { this.textNote.mutateAppearance(() => { this.textNote.rotate = rotate; }); }
   get height(): number { return MathUtil.clampMin(this.textNote.height); }
   get width(): number { return MathUtil.clampMin(this.textNote.width); }
   get altitude(): number { return this.textNote.altitude; }
@@ -97,14 +99,20 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
   set isUpright(isUpright: boolean) {
     if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps
-    this.textNote.isUpright = isUpright;
+    this.textNote.mutateAppearance(() => { this.textNote.isUpright = isUpright; });
   }
   get isAltitudeIndicate(): boolean { return this.textNote.isAltitudeIndicate; }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) { this.textNote.isAltitudeIndicate = isAltitudeIndicate; }
+  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isAltitudeIndicate = isAltitudeIndicate; });
+  }
   get isLocked(): boolean { return this.textNote.isLocked; }
-  set isLocked(isLocked: boolean) { this.textNote.isLocked = isLocked; this.textNote.syncAppearanceToCurrentViewPlacement(); }
+  set isLocked(isLocked: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isLocked = isLocked; });
+  }
   get isShowTitle(): boolean { return this.textNote.isShowTitle; }
-  set isShowTitle(isShowTitle: boolean) { this.textNote.isShowTitle = isShowTitle; }
+  set isShowTitle(isShowTitle: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isShowTitle = isShowTitle; });
+  }
   get titleBgColor(): string {
     const c = this.textNote.titleBgColor || '#1e1e1e';
     return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#1e1e1e';
@@ -114,7 +122,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     return StringUtil.textShadowColor(this.titleBgColor, '#f2f2f2', '#222222');
   }
   get isWhiteOut(): boolean { return this.textNote.isWhiteOut; }
-  set isWhiteOut(isWhiteOut: boolean) { this.textNote.isWhiteOut = isWhiteOut; }
+  set isWhiteOut(isWhiteOut: boolean) {
+    this.textNote.mutateAppearance(() => { this.textNote.isWhiteOut = isWhiteOut; });
+  }
   get isGhosted(): boolean { return !!this.textNote?.isGhosted; }
   get contentKind() { return this.textNote?.contentKind || 'text'; }
   get isPdfContent(): boolean { return this.contentKind === 'pdf'; }
@@ -475,7 +485,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       },
       contextMenuToggleCheck({
         get: () => this.textNote.isFlipped,
-        set: v => { this.textNote.isFlipped = v; },
+        set: v => { this.textNote.mutateAppearance(() => { this.textNote.isFlipped = v; }); },
         on: this.i18n.t('note.flipped'),
         off: this.i18n.t('note.frontFace'),
       }),

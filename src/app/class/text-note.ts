@@ -82,18 +82,23 @@ export class TextNote extends TabletopObject {
 
   /** Visual paper look only — size stays free (width/height independent). */
   applyPaperStyle(style: PaperStyle | string) {
-    this.paperStyle = style || 'none';
-    if (this.paperStyle === 'a4') {
-      // Seed A4 proportion once when switching style; later resize stays free.
-      const w = this.width > 0 ? this.width : 4;
-      this.setCommonValue('width', w);
-      this.setCommonValue('height', a4HeightForWidth(w));
-    } else if (this.paperStyle === 'sticky') {
-      const s = Math.min(this.width || 2, this.height || 2, 2.5) || 2;
-      this.setCommonValue('width', s);
-      this.setCommonValue('height', s);
-    }
-    this.syncAppearanceToCurrentViewPlacement();
+    this.mutateAppearance(() => {
+      this.paperStyle = style || 'none';
+      if (this.paperStyle === 'a4') {
+        // Seed A4 proportion once when switching style; later resize stays free.
+        const w = this.width > 0 ? this.width : 4;
+        const widthEl = this.getElement('width', this.commonDataElement);
+        const heightEl = this.getElement('height', this.commonDataElement);
+        if (widthEl) widthEl.value = w;
+        if (heightEl) heightEl.value = a4HeightForWidth(w);
+      } else if (this.paperStyle === 'sticky') {
+        const s = Math.min(this.width || 2, this.height || 2, 2.5) || 2;
+        const widthEl = this.getElement('width', this.commonDataElement);
+        const heightEl = this.getElement('height', this.commonDataElement);
+        if (widthEl) widthEl.value = s;
+        if (heightEl) heightEl.value = s;
+      }
+    });
   }
   get fontSize(): number { return this.getCommonValue('fontsize', 1); }
   set fontSize(fontSize: number) { this.setCommonValue('fontsize', fontSize); }

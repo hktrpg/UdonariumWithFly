@@ -1,7 +1,15 @@
+import { CardState } from './card';
+import { TerrainViewState } from './terrain';
 import { TabletopObject } from './tabletop-object';
+import { PLACEMENT_VIEW_STATE_KEYS } from './table-placement-view-state';
 import {
+  makeCard,
   makeCharacter,
+  makeDice,
+  makeMask,
   makeTable,
+  makeTerrain,
+  makeTextNote,
   resetTabletopStore,
   viewTables,
 } from '../../testing/tabletop-test.util';
@@ -147,13 +155,12 @@ describe('TabletopObject placements / migrate / repair', () => {
     ch.location = { name: 'table', x: 0, y: 0 };
     ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
     ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
-    ch.ensureAppearanceBackfilled();
 
-    // Edit height on map A only.
     const heightEl = ch.commonDataElement.getFirstElementByName('height');
     expect(heightEl).toBeTruthy();
-    heightEl!.value = 5;
-    ch.syncAppearanceToCurrentViewPlacement();
+
+    // Product path: mutateAppearance backfills from pre-edit live, then writes current view.
+    ch.mutateAppearance(() => { heightEl!.value = 5; });
 
     expect(ch.getPoseForTable('tableA')!.height).toBe(5);
     expect(ch.getPoseForTable('tableB')!.height).toBe(0);
@@ -165,9 +172,7 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(ch.height).toBe(0);
     expect(heightEl!.value).toBe(0);
 
-    // Edit height on map B; A stays 5.
-    heightEl!.value = 2;
-    ch.syncAppearanceToCurrentViewPlacement();
+    ch.mutateAppearance(() => { heightEl!.value = 2; });
     TabletopObject.flushLivePosesToView('tableB');
     viewTables('tableA');
     ch.hydratePoseForView('tableA');
@@ -186,13 +191,13 @@ describe('TabletopObject placements / migrate / repair', () => {
     ch.location = { name: 'table', x: 0, y: 0 };
     ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
     ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
-    ch.ensureAppearanceBackfilled();
 
-    ch.rotate = 90;
-    ch.roll = 30;
-    ch.isInverse = true;
-    ch.currntImageIndex = 0;
-    ch.syncAppearanceToCurrentViewPlacement();
+    ch.mutateAppearance(() => {
+      ch.rotate = 90;
+      ch.roll = 30;
+      ch.isInverse = true;
+      ch.currntImageIndex = 0;
+    });
 
     expect(ch.getPoseForTable('tableA')!.rotate).toBe(90);
     expect(ch.getPoseForTable('tableA')!.roll).toBe(30);
@@ -209,8 +214,7 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(ch.roll).toBe(0);
     expect(ch.isInverse).toBeFalse();
 
-    ch.rotate = 45;
-    ch.syncAppearanceToCurrentViewPlacement();
+    ch.mutateAppearance(() => { ch.rotate = 45; });
     TabletopObject.flushLivePosesToView('tableB');
     viewTables('tableA');
     ch.hydratePoseForView('tableA');
@@ -236,10 +240,11 @@ describe('TabletopObject placements / migrate / repair', () => {
     map.tableB = { x: 50, y: 50, posZ: 0 };
     ch.tablePlacements = JSON.stringify(map);
 
-    ch.rotate = 90;
-    ch.isInverse = true;
-    ch.visionRange = 12;
-    ch.syncAppearanceToCurrentViewPlacement();
+    ch.mutateAppearance(() => {
+      ch.rotate = 90;
+      ch.isInverse = true;
+      ch.visionRange = 12;
+    });
 
     TabletopObject.flushLivePosesToView('tableA');
     viewTables('tableB');
@@ -248,6 +253,262 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(ch.rotate).toBe(0);
     expect(ch.isInverse).toBeFalse();
     expect(ch.visionRange).toBe(6);
+  });
+
+  it('keeps appearance independent on mutate-then-sync without prior backfill (drag path)', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_rotate_leak');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    // Legacy dual-map: coords only — mirrors RotableDirective (mutate SyncVar, then sync).
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableA = { x: 10, y: 10, posZ: 0 };
+    map.tableB = { x: 50, y: 50, posZ: 0 };
+    ch.tablePlacements = JSON.stringify(map);
+
+    ch.rotate = 90;
+    ch.isInverse = true;
+    ch.syncAppearanceToCurrentViewPlacement();
+
+    expect(ch.getPoseForTable('tableB')!.rotate).toBe(90);
+    expect(ch.getPoseForTable('tableB')!.isInverse).toBeTrue();
+    // Other map must not inherit post-edit live SyncVars (defaults seed).
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(0);
+    expect(ch.getPoseForTable('tableA')!.isInverse).toBeFalse();
+
+    TabletopObject.flushLivePosesToView('tableB');
+    viewTables('tableA');
+    ch.hydratePoseForView('tableA');
+    expect(ch.rotate).toBe(0);
+    expect(ch.isInverse).toBeFalse();
+  });
+
+  it('ensureAppearanceBackfilled does not copy post-edit live rotate onto sibling maps', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_ensure_leak');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableA = { x: 10, y: 10, posZ: 0 };
+    map.tableB = { x: 50, y: 50, posZ: 0 };
+    ch.tablePlacements = JSON.stringify(map);
+
+    // Simulate mistaken ensure AFTER SyncVar was already rotated.
+    ch.rotate = 90;
+    ch.ensureAppearanceBackfilled();
+
+    expect(ch.getPoseForTable('tableB')!.rotate).toBe(90);
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(0);
+  });
+
+  it('reprojectForLocalView restores local map rotate after remote SyncVar overwrite', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_remote_rot');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0, rotate: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0, rotate: 0 }, false);
+    ch.hydratePoseForView('tableB');
+
+    // Peer on map A rotated the token: SyncVar + placements[A] update arrive together.
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableA.rotate = 90;
+    ch.tablePlacements = JSON.stringify(map);
+    ch.rotate = 90; // live SyncVar follows the remote editor
+
+    TabletopObject.reprojectForLocalView(ch);
+
+    expect(ch.rotate).toBe(0);
+    expect(ch.location.x).toBe(50);
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(90);
+    expect(ch.getPoseForTable('tableB')!.rotate).toBe(0);
+  });
+
+  it('reprojectForLocalView restores placement SyncVars but keeps intentional globals', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const ch = makeCharacter('char_remote_suite');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', {
+      x: 10, y: 10, posZ: 0,
+      rotate: 90, roll: 15, isInverse: true, aura: 2,
+      visionRange: 12, brightLight: 3, dimLight: 5,
+      tokenFrame: 'polaroid', pushPin: true,
+      size: 2, height: 4, altitude: 1,
+    }, false);
+    ch.addToTable('tableB', {
+      x: 50, y: 50, posZ: 2,
+      rotate: 0, roll: 0, isInverse: false, aura: -1,
+      visionRange: 6, brightLight: 0, dimLight: 0,
+      tokenFrame: 'none', pushPin: false,
+      size: 1, height: 0, altitude: 0,
+    }, false);
+    ch.hydratePoseForView('tableB');
+    ch.statusesJson = '[{"id":"ok"}]';
+    ch.owner = 'localOwner';
+
+    // Remote peer on A pushed live SyncVars + their placement edit + global status.
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableA.rotate = 180;
+    ch.tablePlacements = JSON.stringify(map);
+    ch.location = { name: 'table', x: 10, y: 10 };
+    ch.posZ = 0;
+    ch.rotate = 180;
+    ch.roll = 15;
+    ch.isInverse = true;
+    ch.aura = 2;
+    ch.visionRange = 12;
+    ch.brightLight = 3;
+    ch.dimLight = 5;
+    ch.tokenFrame = 'polaroid';
+    ch.pushPin = true;
+    // Raw SyncVar/DataElement writes (remote apply) — do not use altitude/size setters
+    // (those call mutateAppearance and would contaminate the local view placement).
+    ch.commonDataElement.getFirstElementByName('size')!.value = 2;
+    ch.commonDataElement.getFirstElementByName('height')!.value = 4;
+    ch.commonDataElement.getFirstElementByName('altitude')!.value = 1;
+    ch.statusesJson = '[{"id":"fromA"}]';
+    ch.owner = 'peerA';
+
+    TabletopObject.reprojectForLocalView(ch);
+
+    expect(ch.location.x).toBe(50);
+    expect(ch.location.y).toBe(50);
+    expect(ch.posZ).toBe(2);
+    expect(ch.rotate).toBe(0);
+    expect(ch.roll).toBe(0);
+    expect(ch.isInverse).toBeFalse();
+    expect(ch.aura).toBe(-1);
+    expect(ch.visionRange).toBe(6);
+    expect(ch.brightLight).toBe(0);
+    expect(ch.dimLight).toBe(0);
+    expect(ch.tokenFrame).toBe('none');
+    expect(ch.pushPin).toBeFalse();
+    expect(ch.size).toBe(1);
+    expect(ch.height).toBe(0);
+    expect(ch.altitude).toBe(0);
+    // Intentional globals must follow the remote apply.
+    expect(ch.statusesJson).toBe('[{"id":"fromA"}]');
+    expect(ch.owner).toBe('peerA');
+  });
+
+  it('reprojectForLocalView is a no-op for single-map pieces', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+    const ch = makeCharacter('char_single');
+    ch.location = { name: 'table', x: 1, y: 2 };
+    ch.addToTable('tableA', { x: 1, y: 2, posZ: 0, rotate: 0 }, true);
+    ch.hydratePoseForView('tableA');
+    ch.rotate = 45;
+    TabletopObject.reprojectForLocalView(ch);
+    expect(ch.rotate).toBe(45);
+  });
+
+  it('reprojectForLocalView restores note / card / dice / terrain / mask desktop SyncVars', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableB');
+
+    const note = makeTextNote('note_remote');
+    note.location = { name: 'table', x: 0, y: 0 };
+    note.addToTable('tableA', { x: 1, y: 1, posZ: 0, rotate: 90, isWhiteOut: true, paperStyle: 'a4' }, false);
+    note.addToTable('tableB', { x: 9, y: 9, posZ: 0, rotate: 0, isWhiteOut: false, paperStyle: 'none' }, false);
+    note.hydratePoseForView('tableB');
+    note.rotate = 90;
+    note.isWhiteOut = true;
+    note.paperStyle = 'a4';
+    TabletopObject.reprojectForLocalView(note);
+    expect(note.rotate).toBe(0);
+    expect(note.isWhiteOut).toBeFalse();
+    expect(note.paperStyle).toBe('none');
+    expect(note.location.x).toBe(9);
+
+    const card = makeCard('card_remote');
+    card.location = { name: 'table', x: 0, y: 0 };
+    card.addToTable('tableA', { x: 2, y: 2, posZ: 0, rotate: 90, cardState: CardState.BACK }, false);
+    card.addToTable('tableB', { x: 8, y: 8, posZ: 0, rotate: 0, cardState: CardState.FRONT }, false);
+    card.hydratePoseForView('tableB');
+    card.rotate = 90;
+    card.state = CardState.BACK;
+    TabletopObject.reprojectForLocalView(card);
+    expect(card.rotate).toBe(0);
+    expect(card.state as CardState).toBe(CardState.FRONT);
+
+    const dice = makeDice('dice_remote');
+    dice.location = { name: 'table', x: 0, y: 0 };
+    dice.addToTable('tableA', { x: 3, y: 3, posZ: 0, rotate: 45, diceFace: '6', isLock: true }, false);
+    dice.addToTable('tableB', { x: 7, y: 7, posZ: 0, rotate: 0, diceFace: '1', isLock: false }, false);
+    dice.hydratePoseForView('tableB');
+    dice.rotate = 45;
+    dice.face = '6';
+    dice.isLock = true;
+    TabletopObject.reprojectForLocalView(dice);
+    expect(dice.rotate).toBe(0);
+    expect(dice.face).toBe('1');
+    expect(dice.isLock).toBeFalse();
+
+    const terrain = makeTerrain('terrain_remote');
+    terrain.location = { name: 'table', x: 0, y: 0 };
+    terrain.addToTable('tableA', {
+      x: 4, y: 4, posZ: 0, rotate: 30, terrainMode: TerrainViewState.FLOOR, isSlope: true, slopeDirection: 2,
+    }, false);
+    terrain.addToTable('tableB', {
+      x: 6, y: 6, posZ: 0, rotate: 0, terrainMode: TerrainViewState.ALL, isSlope: false, slopeDirection: 0,
+    }, false);
+    terrain.hydratePoseForView('tableB');
+    terrain.rotate = 30;
+    terrain.mode = TerrainViewState.FLOOR;
+    terrain.isSlope = true;
+    terrain.slopeDirection = 2;
+    TabletopObject.reprojectForLocalView(terrain);
+    expect(terrain.rotate).toBe(0);
+    expect(terrain.mode as TerrainViewState).toBe(TerrainViewState.ALL);
+    expect(terrain.isSlope).toBeFalse();
+    expect(terrain.slopeDirection).toBe(0);
+
+    const mask = makeMask('mask_remote');
+    mask.location = { name: 'table', x: 0, y: 0 };
+    mask.addToTable('tableA', { x: 5, y: 5, posZ: 0, blendType: 2, borderType: 0, textPosition: 'top-left', isLock: true }, false);
+    mask.addToTable('tableB', { x: 1, y: 1, posZ: 0, blendType: 0, borderType: 1, textPosition: 'middle-center', isLock: false }, false);
+    mask.hydratePoseForView('tableB');
+    mask.blendType = 2;
+    mask.borderType = 0;
+    mask.textPosition = 'top-left';
+    mask.isLock = true;
+    TabletopObject.reprojectForLocalView(mask);
+    expect(mask.blendType).toBe(0);
+    expect(mask.borderType).toBe(1);
+    expect(mask.textPosition).toBe('middle-center');
+    expect(mask.isLock).toBeFalse();
+  });
+
+  it('placement view-state keys exclude intentional globals', () => {
+    const keys = new Set<string>(PLACEMENT_VIEW_STATE_KEYS as readonly string[]);
+    for (const globalKey of [
+      'owner', 'playerOwner', 'visionOwner', 'statusesJson', 'name',
+      'password', 'scope', 'contentMode', 'pdfIdentifier', 'videoIdentifier',
+      'chatDialogText', 'isAllowsChat', 'isInventoryIndicate', 'isNotRide',
+      'clickAction', 'appearanceDefaultJson', 'tokenFxJson', 'scratchingGrids',
+    ]) {
+      expect(keys.has(globalKey)).withContext(globalKey).toBeFalse();
+    }
+    for (const perMap of ['rotate', 'roll', 'cardState', 'diceFace', 'terrainMode', 'blendType', 'visionRange']) {
+      expect(keys.has(perMap)).withContext(perMap).toBeTrue();
+    }
   });
 
   it('setPoseForTable merge preserves appearance when only coords change', () => {
@@ -267,5 +528,64 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(pose.height).toBe(7);
     expect(pose.size).toBe(2);
     expect(pose.rotate).toBe(15);
+  });
+
+  it('FX mutateAppearance keeps other map independent after switch', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_fx');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    ch.mutateAppearance(() => {
+      ch.isInverse = true;
+      ch.aura = 2;
+      ch.tokenFrame = 'polaroid';
+    });
+
+    expect(ch.getPoseForTable('tableA')!.isInverse).toBeTrue();
+    expect(ch.getPoseForTable('tableA')!.aura).toBe(2);
+    expect(ch.getPoseForTable('tableA')!.tokenFrame).toBe('polaroid');
+    expect(ch.getPoseForTable('tableB')!.isInverse).toBeFalse();
+    expect(ch.getPoseForTable('tableB')!.aura).toBe(-1);
+    expect(ch.getPoseForTable('tableB')!.tokenFrame).toBe('none');
+
+    TabletopObject.flushLivePosesToView('tableA');
+    viewTables('tableB');
+    ch.hydratePoseForView('tableB');
+    expect(ch.isInverse).toBeFalse();
+    expect(ch.aura).toBe(-1);
+    expect(ch.tokenFrame).toBe('none');
+  });
+
+  it('hydrate does not seed previous-map live into destination placements', () => {
+    makeTable('tableA');
+    makeTable('tableB');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_hydrate_live');
+    ch.location = { name: 'table', x: 0, y: 0 };
+    ch.addToTable('tableA', { x: 10, y: 10, posZ: 0 }, false);
+    ch.addToTable('tableB', { x: 50, y: 50, posZ: 0 }, false);
+
+    // Coords-only placements; live still shows map A cosmetics after a local edit.
+    const map = JSON.parse(ch.tablePlacements);
+    map.tableA = { x: 10, y: 10, posZ: 0, rotate: 0, isInverse: false };
+    map.tableB = { x: 50, y: 50, posZ: 0 };
+    ch.tablePlacements = JSON.stringify(map);
+
+    ch.rotate = 120;
+    ch.isInverse = true;
+    // Switch without flushing the bad live into B via ensureAppearanceBackfilled.
+    viewTables('tableB');
+    ch.hydratePoseForView('tableB');
+
+    expect(ch.rotate).toBe(0);
+    expect(ch.isInverse).toBeFalse();
+    expect(ch.getPoseForTable('tableB')!.rotate).toBeUndefined();
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(0);
   });
 });

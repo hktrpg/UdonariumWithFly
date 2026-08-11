@@ -3,9 +3,16 @@ import {
   capturePlacementViewState,
   viewStatesEqual,
 } from './table-placement-view-state';
+import { CardState } from './card';
+import { TerrainViewState } from './terrain';
 import {
+  makeCard,
   makeCharacter,
+  makeDice,
+  makeMask,
   makeTable,
+  makeTerrain,
+  makeTextNote,
   resetTabletopStore,
   viewTables,
 } from '../../testing/tabletop-test.util';
@@ -45,5 +52,50 @@ describe('table-placement-view-state', () => {
     expect(ch.isInverse).toBeTrue();
     expect(ch.tokenFrame).toBe('polaroid');
     expect(viewStatesEqual(snap, capturePlacementViewState(ch))).toBeTrue();
+  });
+
+  it('captures card / dice / terrain / mask / note desktop SyncVars', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+
+    const card = makeCard('vs_card');
+    card.state = CardState.BACK;
+    card.rotate = 90;
+    const cardSnap = capturePlacementViewState(card);
+    expect(cardSnap.cardState).toBe(CardState.BACK);
+    expect(cardSnap.rotate).toBe(90);
+    card.state = CardState.FRONT;
+    applyPlacementViewState(card, cardSnap);
+    expect(card.state as CardState).toBe(CardState.BACK);
+
+    const dice = makeDice('vs_dice');
+    dice.face = '3';
+    dice.isLock = true;
+    const diceSnap = capturePlacementViewState(dice);
+    expect(diceSnap.diceFace).toBe('3');
+    expect(diceSnap.isLock).toBeTrue();
+
+    const terrain = makeTerrain('vs_terrain');
+    terrain.mode = TerrainViewState.FLOOR;
+    terrain.isSlope = true;
+    terrain.slopeDirection = 1;
+    const terrainSnap = capturePlacementViewState(terrain);
+    expect(terrainSnap.terrainMode).toBe(TerrainViewState.FLOOR);
+    expect(terrainSnap.isSlope).toBeTrue();
+    expect(terrainSnap.slopeDirection).toBe(1);
+
+    const mask = makeMask('vs_mask');
+    mask.blendType = 2;
+    mask.textPosition = 'bottom-right';
+    const maskSnap = capturePlacementViewState(mask);
+    expect(maskSnap.blendType).toBe(2);
+    expect(maskSnap.textPosition).toBe('bottom-right');
+
+    const note = makeTextNote('vs_note');
+    note.paperStyle = 'sticky';
+    note.isFlipped = true;
+    const noteSnap = capturePlacementViewState(note);
+    expect(noteSnap.paperStyle).toBe('sticky');
+    expect(noteSnap.isFlipped).toBeTrue();
   });
 });

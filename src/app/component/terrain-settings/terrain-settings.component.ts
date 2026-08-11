@@ -117,13 +117,27 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   setMode(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    this.terrain.mode = value;
+    this.terrain.mutateAppearance(() => { this.terrain.mode = value; });
     this.changeDetector.markForCheck();
   }
 
   setSlopeDirection(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    this.terrain.slopeDirection = value;
+    this.terrain.mutateAppearance(() => {
+      this.terrain.slopeDirection = value;
+      this.terrain.isSlope = value !== SlopeDirection.NONE;
+    });
+    this.changeDetector.markForCheck();
+  }
+
+  setAppearanceFlag(key:
+    'isSlope' | 'isSurfaceShading' | 'isDropShadow' | 'isInteract' |
+    'affectsLight' | 'isLocked' | 'isAltitudeIndicate', value: boolean) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.mutateAppearance(() => {
+      (this.terrain as any)[key] = value;
+      if (key === 'isSlope' && !value) this.terrain.slopeDirection = SlopeDirection.NONE;
+    });
     this.changeDetector.markForCheck();
   }
 
