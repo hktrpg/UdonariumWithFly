@@ -16,17 +16,28 @@
         (click)="activate()"
         [style.width.px]="width * gridSize"
         [style.height.px]="height * gridSize"></div>
-      <div class="note-visual is-3d" [class.note-visual-pe-pass]="useFlatHitPlate"
-        [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
-        [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
-        <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
-          <div class="upright-transform is-3d is-bg-color is-front chrome-smooth-image-trick"
+      <!--
+        2D: keep paper coplanar (translateZ only). Tip-over rotateY(90)→…→rotateX(-90)
+        goes edge-on; under layer-flat-2d Safari flattens early and culls the face
+        (real iPhone). Chromium / Edge device emulation often still composites it.
+      -->
+      <div class="note-visual" [class.is-3d]="!is2DMode" [class.note-visual-pe-pass]="useFlatHitPlate"
+        [ngClass]="is2DMode ? null : {'fall': altitude == 0, 'softy': !isUpright}"
+        [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px)' + (is2DMode ? '' : ' rotateY(90deg)')}">
+        <div [class.is-3d]="!is2DMode" [class.is-transition]="!is2DMode"
+          [ngStyle]="is2DMode ? null : {'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
+          <div class="upright-transform is-bg-color"
+            [class.is-3d]="!is2DMode"
+            [class.is-front]="!is2DMode"
+            [class.note-flat-face-2d]="is2DMode"
             [ngClass]="{
               'is-ghosted': isGhosted,
               'paper-a4': paperStyle === 'a4',
               'paper-sticky': paperStyle === 'sticky'
             }"
-            [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
+            [style.width.px]="width * gridSize"
+            [style.min-height.px]="height * gridSize"
+            [style.height.px]="is2DMode ? height * gridSize : null">
             <span *ngIf="pushPin" class="push-pin is-3d"
               [style.left.px]="pushPinLeft"
               [style.top.px]="pushPinTop"
@@ -35,24 +46,24 @@
               <i class="push-pin-tip" [attr.data-clue-pin]="textNote.identifier" aria-hidden="true"></i>
             </span>
             <!-- Flip only the face body so push-pin / resize stay upright. -->
-            <div class="note-face-body is-3d is-bg-texture"
+            <div class="note-face-body is-bg-texture" [class.is-3d]="!is2DMode"
               [ngClass]="{
                 'is-bg-filter': isWhiteOut && isTextContent && !showBackFace,
                 'is-content-flipped': isContentFlipped
               }"
               [style.background-image]="(!showBackFace && isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null">
-              <div *ngIf="isShowTitle && title.length && !showBackFace" class="title is-3d is-pointer-events-none"
+              <div *ngIf="isShowTitle && title.length && !showBackFace" class="title is-pointer-events-none" [class.is-3d]="!is2DMode"
                 [style.background-color]="titleBgColor"
                 [style.color]="titleFgColor">{{title}}</div>
 
               <!-- Has back art: swap to back image. No back art: keep front + CSS mirror. -->
-              <div *ngIf="showBackFace" class="image-wrap is-3d">
-                <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+              <div *ngIf="showBackFace" class="image-wrap" [class.is-3d]="!is2DMode">
+                <img *ngIf="imageFile?.url" class="note-image" [class.is-3d]="!is2DMode" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
               </div>
               <ng-container *ngIf="!showBackFace" [ngSwitch]="contentKind">
-                <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
-                  <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
-                  <div class="pdf-nav is-3d" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                <div *ngSwitchCase="'pdf'" class="pdf-wrap" [class.is-3d]="!is2DMode">
+                  <canvas #pdfCanvas class="pdf-canvas" [class.is-3d]="!is2DMode"></canvas>
+                  <div class="pdf-nav" [class.is-3d]="!is2DMode" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
                     <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
                     <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
                     <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
@@ -60,25 +71,25 @@
                   </div>
                 </div>
 
-                <div *ngSwitchCase="'video'" class="video-wrap is-3d"
+                <div *ngSwitchCase="'video'" class="video-wrap" [class.is-3d]="!is2DMode"
                   (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
-                  <video *ngIf="videoSrc" class="note-video is-3d" [src]="videoSrc | safe: 'resourceUrl'"
+                  <video *ngIf="videoSrc" class="note-video" [class.is-3d]="!is2DMode" [src]="videoSrc | safe: 'resourceUrl'"
                     controls playsinline preload="metadata"
                     (click)="$event.stopPropagation()"></video>
-                  <div *ngIf="!videoSrc" class="media-loading is-3d">…</div>
+                  <div *ngIf="!videoSrc" class="media-loading" [class.is-3d]="!is2DMode">…</div>
                 </div>
 
-                <div *ngSwitchCase="'image'" class="image-wrap is-3d">
-                  <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+                <div *ngSwitchCase="'image'" class="image-wrap" [class.is-3d]="!is2DMode">
+                  <img *ngIf="imageFile?.url" class="note-image" [class.is-3d]="!is2DMode" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
                 </div>
 
                 <ng-container *ngSwitchDefault>
-                  <textarea #textArea (input)="calcFitHeight();" class="textarea is-3d"
+                  <textarea #textArea (input)="calcFitHeight();" class="textarea" [class.is-3d]="!is2DMode"
                     (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()"
                     [ngClass]="{'is-pointer-events-none': !isEditorSelected, 'is-pointer-events-auto': isEditorSelected, 'hide-area': !isEditorSelected}"
                     [style.font-size.px]="fontSize + 9" [style.text-align]="textAlign"
                     [(ngModel)]="text" spellcheck="false"></textarea>
-                  <div class="is-3d is-outline-text note-text" style="margin-top:-18px"
+                  <div class="is-outline-text note-text" [class.is-3d]="!is2DMode" style="margin-top:-18px"
                     [ngClass]="{'hide-area': isEditorSelected}" (click)="activate()"
                     [style.font-size.px]="fontSize + 9" [style.color]="color" [style.text-shadow]="textShadowCss"
                     [style.text-align]="textAlign"
@@ -95,7 +106,7 @@
               <i class="material-icons">open_in_full</i>
             </div>
           </div>
-          <div class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
+          <div *ngIf="!is2DMode" class="upright-transform is-3d is-back is-bg-color is-bg-texture"
             [ngClass]="{'is-ghosted': isGhosted}"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">

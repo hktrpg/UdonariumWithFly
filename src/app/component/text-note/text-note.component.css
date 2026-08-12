@@ -192,6 +192,16 @@
   transform: rotateX(-90deg);
 }
 
+/*
+ * 2D corkboard face: already in table XY (same footprint as .note-flat-hit).
+ * Do not use rotateX(-90deg) tip-over — under .layer-flat-2d, Mobile Safari
+ * flattens intermediate rotateY(90deg) edge-on and culls the paper.
+ */
+.note-flat-face-2d {
+  transform: none;
+  backface-visibility: visible;
+}
+
 .note-face-body {
   position: absolute;
   inset: 0;
