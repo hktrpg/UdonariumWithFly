@@ -300,6 +300,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
+  get is2DMode(): boolean { return !!this.currentTable?.is2DMode || !!this.tableSelecter?.viewTable?.is2DMode; }
 
   get name(): string { return this.range.name; }
   get width(): number { return this.adjustMinBounds(this.range.width); }
@@ -593,15 +594,17 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
         on: this.i18n.t('range.menu.8'),
         off: this.i18n.t('range.menu.9'),
       }));
-      menuArray.push(contextMenuToggleCheck({
-        get: () => this.range.isFollowAltitude,
-        set: (v) => {
-          this.range.isFollowAltitude = v;
-          if (v && this.followingCharactor) this.range.following();
-        },
-        on: this.i18n.t('range.menu.10'),
-        off: this.i18n.t('range.menu.11'),
-      }));
+      if (!this.is2DMode) {
+        menuArray.push(contextMenuToggleCheck({
+          get: () => this.range.isFollowAltitude,
+          set: (v) => {
+            this.range.isFollowAltitude = v;
+            if (v && this.followingCharactor) this.range.following();
+          },
+          on: this.i18n.t('range.menu.10'),
+          off: this.i18n.t('range.menu.11'),
+        }));
+      }
     } else {
       menuArray.push(contextMenuToggleCheck({
         get: () => this.range.subDivisionSnapPolygonal,
@@ -631,21 +634,23 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
         disabled: this.range.fillType == 0
       }
     );
-    menuArray.push(contextMenuToggleCheck({
-      get: () => this.isAltitudeIndicate,
-      set: (v) => { this.isAltitudeIndicate = v; },
-      on: this.i18n.t('range.menu.17'),
-      off: this.i18n.t('range.menu.18'),
-    }));
-    menuArray.push({
-      name: this.i18n.t('range.menu.19'), action: () => {
-        if (this.altitude != 0) {
-          this.altitude = 0;
-          SoundEffect.play(PresetSound.sweep);
-        }
-      },
-      altitudeHande: this.range
-    });
+    if (!this.is2DMode) {
+      menuArray.push(contextMenuToggleCheck({
+        get: () => this.isAltitudeIndicate,
+        set: (v) => { this.isAltitudeIndicate = v; },
+        on: this.i18n.t('range.menu.17'),
+        off: this.i18n.t('range.menu.18'),
+      }));
+      menuArray.push({
+        name: this.i18n.t('range.menu.19'), action: () => {
+          if (this.altitude != 0) {
+            this.altitude = 0;
+            SoundEffect.play(PresetSound.sweep);
+          }
+        },
+        altitudeHande: this.range
+      });
+    }
     menuArray.push(ContextMenuSeparator);
     menuArray.push(
       { name: this.i18n.t('range.menu.20'), action: () => { this.showDetail(this.range); } }

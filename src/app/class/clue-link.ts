@@ -100,16 +100,31 @@ export class ClueLink extends GameObject {
 }
 
 function endpointPinAnchor(obj: ClueLinkEndpoint, gridSize: number): { x: number; y: number } {
+  const pose = obj.getPoseForView();
+  const host = {
+    pushPin: !!obj.pushPin,
+    pushPinAngle: obj.pushPinAngle || 0,
+    pushPinStyle: obj.pushPinStyle,
+    pushPinLeft: obj.pushPinLeft,
+    pushPinTop: obj.pushPinTop,
+    location: { x: pose.x, y: pose.y },
+    rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0,
+  };
   if (obj instanceof GameCharacter) {
     const s = (obj.size || 1) * gridSize;
     // 3D: token XYZ center; 2D corkboard: push-pin tip.
     if (!TableSelecter.instance?.viewTable?.is2DMode) {
-      const c = tokenCenterAnchorPx(obj, s, tokenVisualHeightPx(obj, gridSize), gridSize);
+      const c = tokenCenterAnchorPx(
+        { ...obj, location: host.location, posZ: pose.posZ, rotate: host.rotate },
+        s,
+        tokenVisualHeightPx(obj, gridSize),
+        gridSize,
+      );
       return { x: c.x, y: c.y };
     }
-    return pinAnchorPx(obj, s, s);
+    return pinAnchorPx(host, s, s);
   }
   const w = (obj.width || 1) * gridSize;
   const h = (obj.height || 1) * gridSize;
-  return notePinAnchorPx(obj, w, h);
+  return notePinAnchorPx(host, w, h);
 }

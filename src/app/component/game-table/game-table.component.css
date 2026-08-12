@@ -40,13 +40,14 @@
 }
 
 /*
- * 2D corkboard: flatten layer hosts so CSS z-index from [ ] actually paints.
- * preserve-3d on the table otherwise ignores z-index and only DOM order counts
- * (notes often looked stuck when model z changed).
+ * 2D corkboard peers: keep preserve-3d (do NOT flatten).
+ * Flattening made CSS z-index win, but also collapsed .push-pin translateZ(4px),
+ * so yarn could not sit between the photo and the pin head.
+ * Shared [ ] paint/hit order uses movable micro translateZ (stackTranslateZPx).
  */
 .layer-peer-host.layer-flat-2d {
-  -webkit-transform-style: flat;
-  transform-style: flat;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
 }
 
 /* Alt hold: Foundry-style canvas object outlines (screen AABB above peers). */

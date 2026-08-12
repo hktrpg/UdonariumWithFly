@@ -987,13 +987,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           EventSystem.trigger('UPDATE_INVENTORY', null);
         }
       },
-      {
+      ...(this.is2DMode ? [] : [{
         name: this.i18n.t('char.resetAltitudeAll'),
         action: () => {
           selectedCharacter().forEach(ch => { ch.altitude = 0; });
           SoundEffect.play(PresetSound.sweep);
         }
-      },
+      }]),
       ContextMenuSeparator,
       {
         name: this.i18n.t('char.cloneAll'),
@@ -1122,23 +1122,25 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           off: this.i18n.t('char.stackOff'),
           after,
         }),
-        contextMenuToggleCheck({
-          get: () => this.isAltitudeIndicate,
-          set: (v) => { this.isAltitudeIndicate = v; },
-          on: this.i18n.t('char.altitudeOn'),
-          off: this.i18n.t('char.altitudeOff'),
-          after,
-        }),
-        {
-          name: this.i18n.t('char.resetAltitude'),
-          action: () => {
-            if (this.altitude != 0) {
-              this.altitude = 0;
-              if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
-            }
+        ...(this.is2DMode ? [] : [
+          contextMenuToggleCheck({
+            get: () => this.isAltitudeIndicate,
+            set: (v) => { this.isAltitudeIndicate = v; },
+            on: this.i18n.t('char.altitudeOn'),
+            off: this.i18n.t('char.altitudeOff'),
+            after,
+          }),
+          {
+            name: this.i18n.t('char.resetAltitude'),
+            action: () => {
+              if (this.altitude != 0) {
+                this.altitude = 0;
+                if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
+              }
+            },
+            altitudeHande: this.gameCharacter
           },
-          altitudeHande: this.gameCharacter
-        },
+        ]),
       ],
       // Chat / panels
       [

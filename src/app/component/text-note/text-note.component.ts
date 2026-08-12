@@ -557,25 +557,27 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         })),
       }] : []),
       ContextMenuSeparator,
-      contextMenuToggleCheck({
-        get: () => this.isAltitudeIndicate,
-        set: (v) => { this.isAltitudeIndicate = v; },
-        on: this.i18n.t('textNote.menu.10'),
-        off: this.i18n.t('textNote.menu.11'),
-        after,
-      }),
-      {
-        name: this.i18n.t('textNote.menu.12'),
-        action: () => {
-          if (this.altitude != 0) {
-            this.altitude = 0;
-            SoundEffect.play(PresetSound.sweep);
-            this.changeDetector.markForCheck();
-          }
+      ...(this.is2DMode ? [] : [
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('textNote.menu.10'),
+          off: this.i18n.t('textNote.menu.11'),
+          after,
+        }),
+        {
+          name: this.i18n.t('textNote.menu.12'),
+          action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              SoundEffect.play(PresetSound.sweep);
+              this.changeDetector.markForCheck();
+            }
+          },
+          altitudeHande: this.textNote
         },
-        altitudeHande: this.textNote
-      },
-      ContextMenuSeparator,
+        ContextMenuSeparator,
+      ]),
       {
         name: this.i18n.t('note.moveTo'),
         action: null,

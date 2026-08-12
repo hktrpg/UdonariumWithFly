@@ -11,6 +11,7 @@ import { SortOrder } from '@udonarium/data-summary-setting';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
@@ -453,6 +454,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       this.characterFxMenu.makeStatusMenu(gameObject),
     ];
 
+    const is2D = !!TableSelecter.instance?.viewTable?.is2DMode;
     const pose: ContextMenuAction[] = [
       contextMenuToggleCheck({
         get: () => !gameObject.isNotRide,
@@ -461,23 +463,25 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         off: this.i18n.t('char.stackOff'),
         after: afterInv,
       }),
-      contextMenuToggleCheck({
-        get: () => gameObject.isAltitudeIndicate,
-        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
-        on: this.i18n.t('char.altitudeOn'),
-        off: this.i18n.t('char.altitudeOff'),
-        after: afterInv,
-      }),
-      {
-        name: this.i18n.t('char.resetAltitude'),
-        action: () => {
-          if (gameObject.altitude != 0) {
-            gameObject.altitude = 0;
-            if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
-          }
+      ...(is2D ? [] : [
+        contextMenuToggleCheck({
+          get: () => gameObject.isAltitudeIndicate,
+          set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
+          on: this.i18n.t('char.altitudeOn'),
+          off: this.i18n.t('char.altitudeOff'),
+          after: afterInv,
+        }),
+        {
+          name: this.i18n.t('char.resetAltitude'),
+          action: () => {
+            if (gameObject.altitude != 0) {
+              gameObject.altitude = 0;
+              if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
+            }
+          },
+          altitudeHande: gameObject
         },
-        altitudeHande: gameObject
-      },
+      ]),
     ];
 
     const chatPanels: ContextMenuAction[] = [

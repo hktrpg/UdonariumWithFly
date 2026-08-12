@@ -848,6 +848,7 @@ export class TabletopKeyboardService {
 
   private nudgeAltitude(delta: number): boolean {
     if (delta === 0) return false;
+    if (TableSelecter.instance?.viewTable?.is2DMode) return false;
     let changed = false;
     for (const object of this.selectionService.objects) {
       if (this.isLocked(object)) continue;

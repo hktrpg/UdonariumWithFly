@@ -1,5 +1,6 @@
 import {
   PIN_BOX,
+  framePinOriginOffset,
   notePinAnchorPx,
   pinAnchorPx,
   randomPinOffset,
@@ -24,6 +25,50 @@ describe('push-pin.util', () => {
     const tipY = PIN_BOX.top + PIN_BOX.height * PIN_BOX.tipY;
     expect(p.x).toBeCloseTo(100 + tipX, 5);
     expect(p.y).toBeCloseTo(200 + tipY, 5);
+  });
+
+  it('pinAnchorPx includes token frame padding-edge offset', () => {
+    const host = {
+      pushPin: true,
+      pushPinAngle: 0,
+      pushPinLeft: PIN_BOX.left,
+      pushPinTop: PIN_BOX.top,
+      tokenFrame: 'polaroid',
+      location: { x: 100, y: 200 },
+      rotate: 0,
+    };
+    const p = pinAnchorPx(host, 50, 50);
+    const frame = framePinOriginOffset('polaroid');
+    const tipX = PIN_BOX.left + PIN_BOX.width * PIN_BOX.tipX + frame.x;
+    const tipY = PIN_BOX.top + PIN_BOX.height * PIN_BOX.tipY + frame.y;
+    expect(frame.x).toBe(-7);
+    expect(frame.y).toBe(-7);
+    expect(p.x).toBeCloseTo(100 + tipX, 5);
+    expect(p.y).toBeCloseTo(200 + tipY, 5);
+  });
+
+  it('pinAnchorPx tilts tip around needle plant (50% / 88%)', () => {
+    const angle = 20;
+    const host = {
+      pushPin: true,
+      pushPinAngle: angle,
+      pushPinLeft: -4,
+      pushPinTop: -20,
+      location: { x: 0, y: 0 },
+      rotate: 0,
+    };
+    const p = pinAnchorPx(host, 50, 50);
+    const left = -4;
+    const top = -20;
+    const tipX = left + PIN_BOX.width * 0.5;
+    const tipY = top + PIN_BOX.height * 0.5;
+    const ox = left + PIN_BOX.width * 0.5;
+    const oy = top + PIN_BOX.height * 0.88;
+    const rad = (angle * Math.PI) / 180;
+    const dx = tipX - ox;
+    const dy = tipY - oy;
+    expect(p.x).toBeCloseTo(ox + dx * Math.cos(rad) - dy * Math.sin(rad), 5);
+    expect(p.y).toBeCloseTo(oy + dx * Math.sin(rad) + dy * Math.cos(rad), 5);
   });
 
   it('pinAnchorPx respects custom pushPinLeft/Top', () => {
@@ -91,8 +136,8 @@ describe('push-pin.util', () => {
     const w = 200;
     const h = 150;
     const p = notePinAnchorPx(host, w, h);
-    const tipX = -4 + PIN_BOX.width * 0.5;
-    const tipY = -20 + PIN_BOX.height * 0.5;
+    const tipX = -4 + PIN_BOX.width * PIN_BOX.tipX;
+    const tipY = -20 + PIN_BOX.height * PIN_BOX.tipY;
     expect(p.x).toBeCloseTo(500 + (-w / 2 + tipX), 5);
     expect(p.y).toBeCloseTo(400 + (-h + tipY), 5);
   });

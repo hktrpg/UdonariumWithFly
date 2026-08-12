@@ -16,6 +16,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { TerrainSettingsComponent } from 'component/terrain-settings/terrain-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
@@ -59,6 +60,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   get depth(): number { return MathUtil.clampMin(this.terrain.depth); }
   get altitude(): number { return this.terrain.altitude; }
   set altitude(altitude: number) { this.terrain.altitude = altitude; }
+
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
 
   get isDropShadow(): boolean { return this.terrain.isDropShadow; }
   set isDropShadow(isDropShadow: boolean) {
@@ -495,21 +498,23 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         on: this.i18n.t('terrain.menu.15'),
         off: this.i18n.t('terrain.menu.16'),
       }),
-      contextMenuToggleCheck({
-        get: () => this.isAltitudeIndicate,
-        set: (v) => { this.isAltitudeIndicate = v; },
-        on: this.i18n.t('terrain.menu.17'),
-        off: this.i18n.t('terrain.menu.18'),
-      }),
-      {
-        name: this.i18n.t('terrain.menu.19'), action: () => {
-          if (this.altitude != 0) {
-            this.altitude = 0;
-            SoundEffect.play(PresetSound.sweep);
-          }
+      ...(this.is2DMode ? [] : [
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('terrain.menu.17'),
+          off: this.i18n.t('terrain.menu.18'),
+        }),
+        {
+          name: this.i18n.t('terrain.menu.19'), action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              SoundEffect.play(PresetSound.sweep);
+            }
+          },
+          altitudeHande: this.terrain
         },
-        altitudeHande: this.terrain
-      },
+      ]),
       ContextMenuSeparator,
       { name: this.i18n.t('terrain.menu.20'), action: () => { this.showDetail(this.terrain); } },
       (this.terrain.getUrls().length <= 0 ? null : {

@@ -130,7 +130,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
   /**
-   * 2D: yarn just above the corkboard, under pin heads.
+   * 2D yarn: above flat token/photo (~movable lift) and below pin heads
+   * (.push-pin translateZ(4px)). Do not flatten layer hosts — that collapses pin Z
+   * so the rope cannot sit between photo and pin. Peer [ ] order uses movable micro Z.
    */
   get clueStringsZ(): number {
     return this.gridHeight + 2.2;
@@ -149,19 +151,19 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!link) return { display: 'none' };
     let style = this.clueBeamStyleById.get(link.identifier);
     if (!style) {
-      style = this.buildClueBeamStyle(link, false);
+      style = this.buildClueBeamStyle(link);
       this.clueBeamStyleById.set(link.identifier, style);
       this.scheduleClueYarnRefresh();
     }
     return style;
   }
 
-  /** Cached 2D path; live pin tip is sampled after layout (see scheduleClueYarnRefresh). */
+  /** Cached 2D path from model pin tips (see resolveYarnEndpoint). */
   cluePathD(link: ClueLink): string {
     if (!link) return '';
     let d = this.cluePathDById.get(link.identifier);
     if (d === undefined) {
-      d = this.buildCluePathD(link, false);
+      d = this.buildCluePathD(link);
       this.cluePathDById.set(link.identifier, d);
       this.scheduleClueYarnRefresh();
     }
@@ -172,18 +174,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private clueBeamStyleById = new Map<string, Record<string, string>>();
   private clueYarnRefreshRaf = 0;
 
-  private buildCluePathD(link: ClueLink, allowDom: boolean): string {
+  private buildCluePathD(link: ClueLink): string {
     const grid = this.currentTable?.gridSize || 50;
-    const p1 = this.resolveYarnEndpoint(link.fromIdentifier, grid, allowDom);
-    const p2 = this.resolveYarnEndpoint(link.toIdentifier, grid, allowDom);
+    const p1 = this.resolveYarnEndpoint(link.fromIdentifier, grid);
+    const p2 = this.resolveYarnEndpoint(link.toIdentifier, grid);
     if (!p1 || !p2) return '';
     return stringPathD(p1.x, p1.y, p2.x, p2.y, link.sag);
   }
 
-  private buildClueBeamStyle(link: ClueLink, allowDom: boolean): Record<string, string> {
+  private buildClueBeamStyle(link: ClueLink): Record<string, string> {
     const grid = this.currentTable?.gridSize || 50;
-    const a = this.resolveYarnEndpoint(link.fromIdentifier, grid, allowDom);
-    const b = this.resolveYarnEndpoint(link.toIdentifier, grid, allowDom);
+    const a = this.resolveYarnEndpoint(link.fromIdentifier, grid);
+    const b = this.resolveYarnEndpoint(link.toIdentifier, grid);
     if (!a || !b) return { display: 'none' };
     return stringBeamStyle3d(a.x, a.y, a.z, b.x, b.y, b.z, link.color || '#c62828');
   }
@@ -191,7 +193,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private scheduleClueYarnRefresh() {
     if (this.clueYarnRefreshRaf) return;
     this.ngZone.runOutsideAngular(() => {
-      // Double rAF: wait until pin DOM has settled after the current CD / scene remount.
+      // Double rAF: wait until layout has settled after CD / scene remount.
       this.clueYarnRefreshRaf = requestAnimationFrame(() => {
         this.clueYarnRefreshRaf = requestAnimationFrame(() => {
           this.clueYarnRefreshRaf = 0;
@@ -215,8 +217,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     let changed = false;
     for (const link of links) {
       if (!link) continue;
-      const d = this.buildCluePathD(link, true);
-      const style = this.buildClueBeamStyle(link, true);
+      const d = this.buildCluePathD(link);
+      const style = this.buildClueBeamStyle(link);
       nextPath.set(link.identifier, d);
       nextBeam.set(link.identifier, style);
       if (this.cluePathDById.get(link.identifier) !== d) changed = true;
@@ -404,8 +406,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
   }
 
-  /** Host style for [ ] peers: z-index only. Layer depth uses movable translateZ (not host —
-   *  a transformed 0×0 Angular host breaks hit-testing on tall notes). */
+  /**
+   * Host style for [ ] peers: z-index hint only.
+   * Layer depth uses movable micro translateZ (not host transform — a transformed 0×0
+   * Angular host breaks tall-note hit tests). Keep hosts preserve-3d so .push-pin
+   * translateZ(4px) can sit above clueStringsZ (photo < yarn < pin).
+   */
   layerHostStyle(zindex: number): { [key: string]: number } {
     return { 'z-index': zindex };
   }
@@ -639,75 +645,72 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get clueLinks(): ClueLink[] { return this.tabletopService.clueLinks; }
 
   private resolvePinTablePoint(id: string, gridSize: number): { x: number; y: number } | null {
-    const p = this.resolveYarnEndpoint(id, gridSize, true);
+    const p = this.resolveYarnEndpoint(id, gridSize);
     return p ? { x: p.x, y: p.y } : null;
   }
 
-  /** Full yarn endpoint: 3D tokens → footprint center; 2D → live pin tip (DOM) then model. */
+  /**
+   * Yarn endpoint.
+   * 3D tokens → footprint center.
+   * 2D corkboard → model pin tip (frame chrome + pin tilt). DOM sampling under
+   * perspective is unreliable (often lands on footprint center before settle).
+   */
   private resolveYarnEndpoint(
     id: string,
     gridSize: number,
-    allowDom = true,
   ): { x: number; y: number; z: number } | null {
     if (!id) return null;
     const obj = ObjectStore.instance.get(id);
-    const is2D = !!this.currentTable?.is2DMode;
+    const is2D = !!this.currentTable?.is2DMode
+      || !!TableSelecter.instance?.viewTable?.is2DMode;
 
-    // 3D standing tokens: model center only (pin DOM is 2D-only and mid-CD reads caused NG0100).
     if (obj instanceof GameCharacter && !is2D) {
       const foot = (obj.size || 1) * gridSize;
-      return tokenCenterAnchorPx(obj, foot, tokenVisualHeightPx(obj, gridSize), gridSize);
+      const pose = obj.getPoseForView();
+      return tokenCenterAnchorPx(
+        { ...obj, location: { x: pose.x, y: pose.y }, posZ: pose.posZ, rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0 },
+        foot,
+        tokenVisualHeightPx(obj, gridSize),
+        gridSize,
+      );
     }
 
-    const esc = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
-      ? CSS.escape(id)
-      : id.replace(/["\\]/g, '\\$&');
-    // 2D corkboard: snap to the live pin tip (same as pre–3D-yarn behaviour).
-    // Never sample DOM during the template CD pass (allowDom=false) — that caused NG0100.
-    if (allowDom) {
-      const pinEl = this.gameObjects?.nativeElement?.querySelector(
-        `[data-clue-pin="${esc}"]`
-      ) as HTMLElement | null;
-      if (pinEl) {
-        const rect = pinEl.getBoundingClientRect();
-        // Tip markers are 0×0; img fallback needs a real box.
-        const isTip = pinEl.classList.contains('push-pin-tip') || (rect.width < 1 && rect.height < 1);
-        if (isTip || (rect.width > 0.5 && rect.height > 0.5)) {
-          // Pointer stack uses page coords. Sample tip (or AABB tip fraction on legacy img).
-          const page = {
-            x: (isTip ? rect.left : rect.left + rect.width * 0.5) + window.pageXOffset,
-            y: (isTip ? rect.top : rect.top + rect.height * 0.5) + window.pageYOffset,
-            z: 0,
-          };
-          // Project onto the table plane (not the tilted pin plane) so yarn matches the tip pixel.
-          const origin = this.coordinateService.tabletopOriginElement || this.gameObjects?.nativeElement;
-          const local = origin
-            ? this.coordinateService.convertToLocal(page, origin)
-            : this.coordinateService.calcTabletopLocalCoordinate(page, pinEl);
-          if (Number.isFinite(local.x) && Number.isFinite(local.y)) {
-            return { x: local.x, y: local.y, z: this.clueStringsZ };
-          }
-        }
-      }
-    }
     if (obj instanceof GameCharacter) {
       const s = (obj.size || 1) * gridSize;
-      const p = pinAnchorPx(obj, s, s);
-      return { x: p.x, y: p.y, z: this.clueStringsZ };
+      const model = pinAnchorPx(this.pinHostFromView(obj), s, s);
+      return { x: model.x, y: model.y, z: this.clueStringsZ };
     }
     if (obj instanceof TextNote) {
       const w = (obj.width || 1) * gridSize;
       const h = (obj.height || 1) * gridSize;
+      const host = this.pinHostFromView(obj);
+      const model = notePinAnchorPx(host, w, h);
       if (!is2D) {
-        const p = notePinAnchorPx(obj, w, h);
         const alt = (typeof obj.altitude === 'number' ? obj.altitude : 0) * gridSize;
-        return { x: p.x, y: p.y, z: (obj.posZ || 0) + alt + h / 2 };
+        return { x: model.x, y: model.y, z: (host.posZ || 0) + alt + h / 2 };
       }
-      const p = notePinAnchorPx(obj, w, h);
-      return { x: p.x, y: p.y, z: this.clueStringsZ };
+      return { x: model.x, y: model.y, z: this.clueStringsZ };
     }
     return null;
   }
+
+  /** Pin math must use the viewed-map pose, not possibly-stale location SyncVar. */
+  private pinHostFromView(obj: GameCharacter | TextNote) {
+    const pose = obj.getPoseForView();
+    const tokenFrame = (obj instanceof GameCharacter) ? (obj.tokenFrame || 'none') : 'none';
+    return {
+      pushPin: !!obj.pushPin,
+      pushPinAngle: obj.pushPinAngle || 0,
+      pushPinStyle: obj.pushPinStyle,
+      pushPinLeft: obj.pushPinLeft,
+      pushPinTop: obj.pushPinTop,
+      tokenFrame,
+      location: { x: pose.x, y: pose.y },
+      rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0,
+      posZ: pose.posZ,
+    };
+  }
+
   get tableMasks(): GameTableMask[] { return this.tabletopService.tableMasks; }
   get cards(): Card[] { return this.tabletopService.cards; }
   get cardStacks(): CardStack[] { return this.tabletopService.cardStacks; }

@@ -1,8 +1,8 @@
 /* Shared clue-board chrome (token frames + push pins). */
 
 /*
-  Oblique pin host. Rotate around the tip (50% / 88%) so yarn can snap to
-  `.push-pin-tip` after CSS rotate (AABB midpoints are wrong once tilted).
+  Oblique pin host. Rotate around the needle plant (50% / 88%) so the tip stays
+  fixed on the photo while the head tilts. Yarn joins at `.push-pin-tip` (50% / 50%).
 */
 .push-pin {
   position: absolute;
@@ -14,8 +14,9 @@
   z-index: 20;
   pointer-events: none;
   /*
-    Above clue yarn (gridHeight + 2.4). Do NOT put filter on this host —
-    filter flattens translateZ so yarn paints over the pin (photo frames).
+    Local translateZ(4px) keeps the head above clueStringsZ (photo < yarn < pin).
+    Layer peer hosts must stay preserve-3d — flattening collapses this lift.
+    Do NOT put filter on this host (filter also flattens translateZ).
   */
   transform: translateZ(4px);
   transform-origin: 50% 88%;
@@ -36,7 +37,10 @@
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
 }
 
-/* Yarn joins under the pin-head center (covered by the red head). */
+/*
+  Yarn joins under the pin head (covered by the red head). Pin tilts around the
+  needle plant (transform-origin 50% / 88%). Keep tip % in sync with PIN_BOX.tipX/Y.
+*/
 .push-pin-tip {
   position: absolute;
   left: 50%;

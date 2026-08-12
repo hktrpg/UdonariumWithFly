@@ -247,6 +247,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   get altitude(): number { return this.gameTableMask.altitude; }
   set altitude(altitude: number) { this.gameTableMask.altitude = altitude; }
 
+  get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
+
   get isAltitudeIndicate(): boolean { return this.gameTableMask.isAltitudeIndicate; }
   set isAltitudeIndicate(isAltitudeIndicate: boolean) {
     this.gameTableMask.mutateAppearance(() => {
@@ -855,24 +857,26 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         disabled: this.isScratching
       },
       ContextMenuSeparator,
-      contextMenuToggleCheck({
-        get: () => this.isAltitudeIndicate,
-        set: (v) => { this.isAltitudeIndicate = v; },
-        on: this.i18n.t('mask.menu.27'),
-        off: this.i18n.t('mask.menu.28'),
-      }),
-      {
-        name: this.i18n.t('mask.menu.29'), action: () => {
-          if (this.altitude != 0) {
-            this.altitude = 0;
-            SoundEffect.play(PresetSound.sweep);
-          }
+      ...(this.is2DMode ? [] : [
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('mask.menu.27'),
+          off: this.i18n.t('mask.menu.28'),
+        }),
+        {
+          name: this.i18n.t('mask.menu.29'), action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              SoundEffect.play(PresetSound.sweep);
+            }
+          },
+          disabled: this.isScratching,
+          altitudeHande: this.gameTableMask,
+          altitudeDisabled: this.isScratching
         },
-        disabled: this.isScratching,
-        altitudeHande: this.gameTableMask,
-        altitudeDisabled: this.isScratching
-      },
-      ContextMenuSeparator,
+        ContextMenuSeparator,
+      ]),
       {
         name: this.i18n.t('mask.clickSettings'),
         action: () => this.showClickSettings(this.gameTableMask),

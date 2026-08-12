@@ -194,8 +194,8 @@
 
 /*
  * 2D corkboard face: already in table XY (same footprint as .note-flat-hit).
- * Do not use rotateX(-90deg) tip-over — under .layer-flat-2d, Mobile Safari
- * flattens intermediate rotateY(90deg) edge-on and culls the paper.
+ * Do not use rotateX(-90deg) tip-over — nested rotateY(90) edge-on was culled on
+ * Mobile Safari. Keep preserve-3d (.is-3d) so pin translateZ stays above yarn.
  */
 .note-flat-face-2d {
   transform: none;

@@ -19,8 +19,14 @@ export function randomPinAngle(): number {
 }
 
 /** Default CSS box for `.push-pin` (must stay in sync with clue-board.css). */
-/** tipX/tipY match `.push-pin-tip` (50% / 50% = pin-head center where 2D yarn joins). */
+/**
+ * tipX/tipY = yarn join under pin head (`.push-pin-tip` at 50% / 50%).
+ * Pin CSS rotates around needle plant (50% / 88%) — see pinTipLocal.
+ * Default left/top match clue-board `.push-pin` (-4, -20).
+ */
 export const PIN_BOX = { left: -4, top: -20, width: 30, height: 38, tipX: 0.5, tipY: 0.5 };
+/** Must match `.push-pin { transform-origin }` in clue-board.css */
+const PIN_ROTATE_ORIGIN = { x: 0.5, y: 0.88 };
 
 /**
  * Random pin offset along the host top edge (corkboard look).
@@ -99,24 +105,54 @@ export interface PinHost {
   pushPinStyle?: number;
   pushPinLeft?: number;
   pushPinTop?: number;
+  /** 2D token frame id — chrome margin shifts the pin's CSS containing block. */
+  tokenFrame?: string;
   location: { x: number; y: number };
   rotate?: number;
 }
 
-/** Tip of the CSS pin relative to the host image-box / paper top-left. */
+/**
+ * Polaroid/photo/card use content-box + negative margin so the print stays on the
+ * footprint while padding grows outward. Absolute `.push-pin` is positioned against
+ * the padding edge (= footprint + this offset).
+ */
+export function framePinOriginOffset(tokenFrame?: string): { x: number; y: number } {
+  switch (tokenFrame) {
+    case 'polaroid': return { x: -7, y: -7 }; // pad 7 + border 1, margin -8
+    case 'photo': return { x: -8, y: -8 };    // pad 8 + border 1, margin -9
+    case 'card': return { x: -7, y: -7 };     // pad 7 + border 2, margin -9
+    default: return { x: 0, y: 0 };
+  }
+}
+
+/** Tip of the CSS pin relative to the host image-box / paper content top-left. */
 function pinTipLocal(host?: PinHost): { x: number; y: number } {
   const left = (host && typeof host.pushPinLeft === 'number') ? host.pushPinLeft : PIN_BOX.left;
   const top = (host && typeof host.pushPinTop === 'number') ? host.pushPinTop : PIN_BOX.top;
-  return {
-    x: left + PIN_BOX.width * PIN_BOX.tipX,
-    y: top + PIN_BOX.height * PIN_BOX.tipY,
-  };
+  let x = left + PIN_BOX.width * PIN_BOX.tipX;
+  let y = top + PIN_BOX.height * PIN_BOX.tipY;
+  const frame = framePinOriginOffset(host?.tokenFrame);
+  x += frame.x;
+  y += frame.y;
+  // Match CSS: transform-origin 50% 88%, then rotate(pushPinAngle).
+  const angle = host?.pushPinAngle || 0;
+  if (angle) {
+    const ox = frame.x + left + PIN_BOX.width * PIN_ROTATE_ORIGIN.x;
+    const oy = frame.y + top + PIN_BOX.height * PIN_ROTATE_ORIGIN.y;
+    const rad = (angle * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const dx = x - ox;
+    const dy = y - oy;
+    x = ox + dx * cos - dy * sin;
+    y = oy + dx * sin + dy * cos;
+  }
+  return { x, y };
 }
 
 /**
  * Token-style host: location is the top-left of the footprint.
- * Fallback when DOM tip is missing — matches unframed .push-pin tip.
- * (2D corkboard yarn only; 3D uses {@link tokenCenterAnchorPx}.)
+ * Includes frame chrome offset + pin tilt (matches on-screen thumbtack).
  */
 export function pinAnchorPx(
   host: PinHost,
