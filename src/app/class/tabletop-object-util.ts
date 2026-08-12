@@ -259,12 +259,15 @@ export function layerPeerMovableTransform(): string {
  * Extra translateZ per dense zindex so 3D paint/hit follow [ ] without reordering DOM
  * (DOM reorder made every token flash). Keep the step tiny — large steps shifted
  * 2D yarn pin tips when projecting getBoundingClientRect.
+ * Cap keeps corkboard peers under clueStringsZ (~gridHeight+2.2) and below pin (+4px).
  */
 export const STACK_TRANSLATE_Z_STEP_PX = 0.02;
+/** Max peer stack lift so photo < yarn (~2.2) < pin (+4). */
+export const STACK_TRANSLATE_Z_MAX_PX = 1.5;
 
 export function stackTranslateZPx(zindex: number | null | undefined): number {
   if (typeof zindex !== 'number' || !Number.isFinite(zindex) || zindex <= 0) return 0;
-  return zindex * STACK_TRANSLATE_Z_STEP_PX;
+  return Math.min(zindex * STACK_TRANSLATE_Z_STEP_PX, STACK_TRANSLATE_Z_MAX_PX);
 }
 
 /** Layers that participate in shared [ ] peer lift (not dice etc.). */

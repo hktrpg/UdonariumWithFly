@@ -43,7 +43,8 @@
  * 2D corkboard peers: keep preserve-3d (do NOT flatten).
  * Flattening made CSS z-index win, but also collapsed .push-pin translateZ(4px),
  * so yarn could not sit between the photo and the pin head.
- * Shared [ ] paint/hit order uses movable micro translateZ (stackTranslateZPx).
+ * Shared [ ] paint/hit order uses movable micro translateZ (capped under yarn Z).
+ * Corkboard visuals ignore SyncVar altitude so pieces stay under clueStringsZ.
  */
 .layer-peer-host.layer-flat-2d {
   -webkit-transform-style: preserve-3d;

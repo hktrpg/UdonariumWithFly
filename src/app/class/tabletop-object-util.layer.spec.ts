@@ -193,6 +193,7 @@ describe('shared LAYER_STACK [ ] peers', () => {
     expect(stackTranslateZPx(8)).toBe(8 * STACK_TRANSLATE_Z_STEP_PX);
     expect(stackTranslateZPx(8)).toBeLessThan(1);
     expect(STACK_TRANSLATE_Z_STEP_PX).toBe(0.02);
+    expect(stackTranslateZPx(10_000)).toBe(1.5);
     expect(LAYER_TIER_RANK.CHARACTER).toBeGreaterThan(LAYER_TIER_RANK.MASK);
   });
 

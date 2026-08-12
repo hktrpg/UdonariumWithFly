@@ -14,7 +14,7 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameCharacter } from '@udonarium/game-character';
-import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
+import { layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
@@ -133,8 +133,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   get uprightTransform(): string {
     if (this.is2DMode) {
-      // Same peer height as notes/cards/masks; [ ] uses DOM order, not altitude.
-      return `translateZ(${this.altitude * this.gridSize + LAYER_PEER_MOVABLE_Z_PX}px)`;
+      // Movable already applies peer lift; ignore SyncVar altitude on corkboard.
+      return '';
     }
     const alt = (-this.altitude) * this.gridSize;
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;

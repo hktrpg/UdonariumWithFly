@@ -130,9 +130,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
   /**
-   * 2D yarn: above flat token/photo (~movable lift) and below pin heads
-   * (.push-pin translateZ(4px)). Do not flatten layer hosts — that collapses pin Z
-   * so the rope cannot sit between photo and pin. Peer [ ] order uses movable micro Z.
+   * 2D yarn Z: above peer movable lift (≤ LAYER_PEER + STACK_MAX ≈ 1.65) and
+   * below pin heads (.push-pin translateZ(4px)). Corkboard ignores SyncVar altitude
+   * so pieces cannot climb over this plane. Keep layer hosts preserve-3d.
    */
   get clueStringsZ(): number {
     return this.gridHeight + 2.2;

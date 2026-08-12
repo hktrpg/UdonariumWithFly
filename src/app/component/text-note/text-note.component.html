@@ -23,7 +23,7 @@
       -->
       <div class="note-visual is-3d" [class.note-visual-pe-pass]="useFlatHitPlate"
         [ngClass]="is2DMode ? null : {'fall': altitude == 0, 'softy': !isUpright}"
-        [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px)' + (is2DMode ? '' : ' rotateY(90deg)')}">
+        [ngStyle]="{'transform': 'translateZ(' + (is2DMode ? 0 : altitude * gridSize) + 'px)' + (is2DMode ? '' : ' rotateY(90deg)')}">
         <div class="is-3d" [class.is-transition]="!is2DMode"
           [ngStyle]="is2DMode ? null : {'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
           <div class="upright-transform is-3d is-bg-color"
@@ -117,14 +117,14 @@
         [ngStyle]="{'transform': 'translateX(' + gridSize / 2 + 'px) translateY(' + (-gridSize / 4) + 'px)'}"
         [style.width.px]="(width - 1) * gridSize"
         [style.min-height.px]="gridSize / 2"></div>
-      <div *ngIf="!isLocked && !GuestMode()" [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px)'}">
+      <div *ngIf="!isLocked && !GuestMode()" [ngStyle]="{'transform': 'translateZ(' + (is2DMode ? 0 : altitude * gridSize) + 'px)'}">
         <div class="rotate-grab of-left-top">
           <i class="material-icons" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}">autorenew</i>
         </div>
       </div>
     </div>
   </div>
-  <div class="is-3d" *ngIf="isAltitudeIndicate && math.abs(textNoteAltitude) >= 0.5"
+  <div class="is-3d" *ngIf="!is2DMode && isAltitudeIndicate && math.abs(textNoteAltitude) >= 0.5"
     style="display: flex; align-items: center; border-left: 2px dashed blanchedalmond; transform-origin: top left"
     [style.height.px]="math.abs(textNoteAltitude * gridSize)"
     [ngStyle]="{transform: 'rotateX(-90deg) translateY(' + (altitude > 0 ? -altitude * gridSize : 0) + 'px) rotateY(' + (viewRotateZ) + 'deg)'}">
