@@ -703,7 +703,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       if (!layer) continue;
       for (const movable of layer) {
         if (movable === this) continue;
-        if (layerName === 'character' && this.tabletopObject?.isNotRide) continue;
+        if (layerName === 'character' && (this.tabletopObject?.isNotRide || !!TableSelecter.instance?.viewTable?.is2DMode)) continue;
         const root = movable.nativeElement;
         if (!root) continue;
         if (root === hit || root.contains(hit)) return true;
@@ -774,7 +774,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       if (this.colideLayers.includes(layerName)) {
         //isEnable = this.input.isGrabbing ? isCollidable : true;
         if (layerName == 'character') {
-          isEnable = this.input.isGrabbing ? isCollidable && !this.tabletopObject.isNotRide : true;
+          const canRide = !this.tabletopObject.isNotRide && !TableSelecter.instance?.viewTable?.is2DMode;
+          isEnable = this.input.isGrabbing ? isCollidable && canRide : true;
         } else {
           isEnable = this.input.isGrabbing ? isCollidable : true;
         }

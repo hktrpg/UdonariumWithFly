@@ -455,7 +455,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     ];
 
     const is2D = !!TableSelecter.instance?.viewTable?.is2DMode;
-    const pose: ContextMenuAction[] = [
+    const pose: ContextMenuAction[] = is2D ? [] : [
       contextMenuToggleCheck({
         get: () => !gameObject.isNotRide,
         set: (v) => { gameObject.isNotRide = !v; },
@@ -463,25 +463,23 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         off: this.i18n.t('char.stackOff'),
         after: afterInv,
       }),
-      ...(is2D ? [] : [
-        contextMenuToggleCheck({
-          get: () => gameObject.isAltitudeIndicate,
-          set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
-          on: this.i18n.t('char.altitudeOn'),
-          off: this.i18n.t('char.altitudeOff'),
-          after: afterInv,
-        }),
-        {
-          name: this.i18n.t('char.resetAltitude'),
-          action: () => {
-            if (gameObject.altitude != 0) {
-              gameObject.altitude = 0;
-              if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
-            }
-          },
-          altitudeHande: gameObject
+      contextMenuToggleCheck({
+        get: () => gameObject.isAltitudeIndicate,
+        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
+        on: this.i18n.t('char.altitudeOn'),
+        off: this.i18n.t('char.altitudeOff'),
+        after: afterInv,
+      }),
+      {
+        name: this.i18n.t('char.resetAltitude'),
+        action: () => {
+          if (gameObject.altitude != 0) {
+            gameObject.altitude = 0;
+            if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
+          }
         },
-      ]),
+        altitudeHande: gameObject
+      },
     ];
 
     const chatPanels: ContextMenuAction[] = [

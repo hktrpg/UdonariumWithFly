@@ -1114,8 +1114,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.characterFxMenu.makeVisionMenu(this.gameCharacter),
         this.characterFxMenu.makeStatusMenu(this.gameCharacter),
       ],
-      // Pose
-      [
+      // Pose (3D only — corkboard has no ride/altitude)
+      this.is2DMode ? [] : [
         contextMenuToggleCheck({
           get: () => !this.isNotRide,
           set: (v) => { this.isNotRide = !v; },
@@ -1123,25 +1123,23 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           off: this.i18n.t('char.stackOff'),
           after,
         }),
-        ...(this.is2DMode ? [] : [
-          contextMenuToggleCheck({
-            get: () => this.isAltitudeIndicate,
-            set: (v) => { this.isAltitudeIndicate = v; },
-            on: this.i18n.t('char.altitudeOn'),
-            off: this.i18n.t('char.altitudeOff'),
-            after,
-          }),
-          {
-            name: this.i18n.t('char.resetAltitude'),
-            action: () => {
-              if (this.altitude != 0) {
-                this.altitude = 0;
-                if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
-              }
-            },
-            altitudeHande: this.gameCharacter
+        contextMenuToggleCheck({
+          get: () => this.isAltitudeIndicate,
+          set: (v) => { this.isAltitudeIndicate = v; },
+          on: this.i18n.t('char.altitudeOn'),
+          off: this.i18n.t('char.altitudeOff'),
+          after,
+        }),
+        {
+          name: this.i18n.t('char.resetAltitude'),
+          action: () => {
+            if (this.altitude != 0) {
+              this.altitude = 0;
+              if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
+            }
           },
-        ]),
+          altitudeHande: this.gameCharacter
+        },
       ],
       // Chat / panels
       [
