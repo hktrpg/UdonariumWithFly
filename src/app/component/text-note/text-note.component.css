@@ -192,6 +192,23 @@
   transform: rotateX(-90deg);
 }
 
+/*
+ * 2D corkboard: paper in table XY (same footprint as .note-flat-hit).
+ * Skip rotateX tip — with layer-flat-2d / iOS chrome-smooth flatten,
+ * backface-visibility:hidden was culling glyphs on mobile.
+ */
+.upright-transform.is-flat-2d.is-front {
+  transform: none;
+  backface-visibility: visible;
+}
+
+.upright-transform.is-flat-2d .note-face-body,
+.upright-transform.is-flat-2d .note-text,
+.upright-transform.is-flat-2d .title,
+.upright-transform.is-flat-2d .textarea {
+  backface-visibility: visible;
+}
+
 .note-face-body {
   position: absolute;
   inset: 0;

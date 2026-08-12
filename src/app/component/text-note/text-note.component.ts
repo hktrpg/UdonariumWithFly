@@ -106,6 +106,22 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   /** 2D corkboard only — see template note on note-flat-hit (breaks 3D card compositing). */
   get useFlatHitPlate(): boolean { return this.is2DMode; }
+  /**
+   * Outer visual lift. In 2D skip rotateY tip — mobile WebKit + layer-flat-2d /
+   * chrome-smooth flatten otherwise culls .note-text (backface-visibility).
+   */
+  get noteVisualTransform(): string {
+    const z = this.altitude * this.gridSize;
+    if (this.is2DMode) {
+      return `translateZ(${z + LAYER_PEER_MOVABLE_Z_PX}px)`;
+    }
+    return `translateZ(${z}px) rotateY(90deg)`;
+  }
+  /** Inner tip hinge; identity in 2D (paper already in table XY). */
+  get noteTipTransform(): string | null {
+    if (this.is2DMode) return null;
+    return `rotateZ(${this.isUpright ? 0 : 90}deg) rotateY(-90deg)`;
+  }
   get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
   set isUpright(isUpright: boolean) {
     if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps

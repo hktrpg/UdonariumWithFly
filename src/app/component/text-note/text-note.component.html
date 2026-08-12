@@ -17,10 +17,12 @@
         [style.width.px]="width * gridSize"
         [style.height.px]="height * gridSize"></div>
       <div class="note-visual is-3d" [class.note-visual-pe-pass]="useFlatHitPlate"
-        [ngClass]="{'fall': altitude == 0, 'softy': !isUpright}"
-        [ngStyle]="{'transform': 'translateZ(' + (altitude * gridSize) + 'px) rotateY(90deg)'}">
-        <div class="is-3d is-transition" [ngStyle]="{'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
-          <div class="upright-transform is-3d is-bg-color is-front chrome-smooth-image-trick"
+        [ngClass]="{'fall': altitude == 0 && !is2DMode, 'softy': !isUpright}"
+        [ngStyle]="{'transform': noteVisualTransform}">
+        <div class="is-3d is-transition" [ngStyle]="noteTipTransform ? {'transform': noteTipTransform} : null">
+          <div class="upright-transform is-3d is-bg-color is-front"
+            [class.is-flat-2d]="is2DMode"
+            [class.chrome-smooth-image-trick]="!is2DMode"
             [ngClass]="{
               'is-ghosted': isGhosted,
               'paper-a4': paperStyle === 'a4',
@@ -95,7 +97,8 @@
               <i class="material-icons">open_in_full</i>
             </div>
           </div>
-          <div class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
+          <!-- Back face is tip-chain only; unused when paper already lies in table XY. -->
+          <div *ngIf="!is2DMode" class="upright-transform is-3d is-back is-bg-color is-bg-texture chrome-smooth-image-trick"
             [ngClass]="{'is-ghosted': isGhosted}"
             [style.background-image]="(isTextContent && imageFile?.url) ? ('url(' + imageFile.url + ')' | safe: 'style') : null"
             [style.width.px]="width * gridSize" [style.min-height.px]="height * gridSize">
