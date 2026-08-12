@@ -133,8 +133,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   get uprightTransform(): string {
     if (this.is2DMode) {
-      // Movable already applies peer lift; ignore SyncVar altitude on corkboard.
-      return '';
+      // Must set an inline transform so CSS rotateX(-90deg) on .upright-transform
+      // does not stand the token up. Ignore SyncVar altitude on corkboard.
+      return 'translateZ(0px)';
     }
     const alt = (-this.altitude) * this.gridSize;
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
