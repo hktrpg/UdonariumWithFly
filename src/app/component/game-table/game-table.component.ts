@@ -1583,12 +1583,19 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       });
       extraActions.push(ContextMenuSeparator);
     }
-    Array.prototype.push.apply(extraActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
-    const sceneCreates = this.makeSceneCreateMenuActions(objectPosition);
-    if (sceneCreates.length) {
-      extraActions.push(ContextMenuSeparator);
-      Array.prototype.push.apply(extraActions, sceneCreates);
+
+    const createSubs: ContextMenuAction[] = [
+      ...this.tabletopActionService.makeDefaultContextMenuActions(objectPosition),
+      ...this.makeSceneCreateMenuActions(objectPosition),
+    ];
+    if (createSubs.length) {
+      extraActions.push({
+        name: this.i18n.t('hud.add'),
+        action: null,
+        subActions: createSubs,
+      });
     }
+
     if (SceneToolPermission.instance.canOpenMenu('menu.table')) {
       extraActions.push(ContextMenuSeparator);
       extraActions.push({

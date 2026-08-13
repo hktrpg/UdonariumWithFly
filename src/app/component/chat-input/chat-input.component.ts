@@ -9,6 +9,7 @@ import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { ResettableTimeout } from '@udonarium/core/system/util/resettable-timeout';
 import { DiceBot } from '@udonarium/dice-bot';
 import { popupCharacterChatBalloon } from '@udonarium/chat-balloon';
+import { CharacterToken } from '@udonarium/character-token';
 import { GameCharacter } from '@udonarium/game-character';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -156,6 +157,11 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       return object;
     }
     return null;
+  }
+
+  /** Map Token cosmetics when the speaker is on the table; else sheet seed. */
+  get appearanceHost(): GameCharacter | CharacterToken | null {
+    return CharacterToken.appearanceHostFor(this.character);
   }
 
   get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
@@ -325,13 +331,16 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get charImageFilter(): string | null {
-    return this.character ? imageEffectFilter(this.character) : null;
+    const host = this.appearanceHost;
+    return host ? imageEffectFilter(host) : null;
   }
   get charImageOpacity(): number | null {
-    return this.character ? imageEffectOpacity(this.character) : null;
+    const host = this.appearanceHost;
+    return host ? imageEffectOpacity(host) : null;
   }
   get charImageTransform(): string | null {
-    return this.character ? imageEffectTransform(this.character) : null;
+    const host = this.appearanceHost;
+    return host ? imageEffectTransform(host) : null;
   }
 
   constructor(
@@ -1186,28 +1195,29 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           });
         }
         contextMenuActions.push(ContextMenuSeparator);
-        const fxSubs = this.characterFxMenu.makeImageEffectMenu(this.character).subActions || [];
+        const fxHost = this.appearanceHost || this.character;
+        const fxSubs = this.characterFxMenu.makeImageEffectMenu(fxHost).subActions || [];
         const fxWithoutReset = fxSubs.slice(0, -1);
         contextMenuActions.push({
           name: this.i18n.t('chat.ctx.imageEffect'),
           action: null,
           subActions: [
             ...fxWithoutReset,
-            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${this.character.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { this.character.mutateAppearance(() => { this.character.aura = -1; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
+            { name: this.i18n.t('chat.ctx.aura'), action: null, subActions: [{ name: `${fxHost.aura == -1 ? '◉' : '○'} ${this.i18n.t('chat.ctx.auraNone')}`, action: () => { fxHost.mutateAppearance(() => { fxHost.aura = -1; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, checkBox: 'radio' }, ContextMenuSeparator].concat(['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'].map((color, i) => {
               const sampleColors = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
-              return { name: `${this.character.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { this.character.mutateAppearance(() => { this.character.aura = i; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
+              return { name: `${fxHost.aura == i ? '◉' : '○'} ${this.i18n.t(`chat.aura.${color}`)}`, action: () => { fxHost.mutateAppearance(() => { fxHost.aura = i; }); EventSystem.trigger('UPDATE_INVENTORY', null) }, colorSample: true, sampleColor: sampleColors[i], checkBox: 'radio' };
             })) },
             ContextMenuSeparator,
             {
               name: this.i18n.t('chat.ctx.reset'),
               action: () => {
-                this.character.mutateAppearance(() => {
-                  clearImageEffects(this.character);
-                  this.character.aura = -1;
+                fxHost.mutateAppearance(() => {
+                  clearImageEffects(fxHost);
+                  fxHost.aura = -1;
                 });
                 EventSystem.trigger('UPDATE_INVENTORY', null);
               },
-              disabled: !anyImageEffect(this.character) && this.character.aura == -1
+              disabled: !anyImageEffect(fxHost) && fxHost.aura == -1
             }
           ]
         });

@@ -49,6 +49,9 @@ export class GameCharacter extends TabletopObject {
    */
   @SyncVar() visionOwner: string = '';
 
+  /** Session-only: Advanced copy applies auto-number to Token/Character clones. */
+  static menuCloneAutoNumber = false;
+
   /** Local preferred chat character (last「作為我的角色」claim). */
   private static preferredChatCharacterId = '';
 

@@ -141,4 +141,27 @@ describe('Plan alignment gaps', () => {
     // Inventory filter is location===graveyard only (no per-map check).
     expect(body.location.name === 'graveyard' && !body.isTemporaryCopy).toBeTrue();
   });
+
+  it('CharacterToken exposes altitude for context-menu / keyboard nudge', () => {
+    const body = makeCharacter('alt_body');
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, { tableId: 'mapA' });
+    expect(tok.isHaveAltitude).toBeTrue();
+    tok.altitude = 3;
+    expect(tok.altitude).toBe(3);
+    expect(tok.altitudeValue).toBe(3);
+  });
+
+  it('appearanceHostFor prefers the viewed Token over the sheet', () => {
+    const body = makeCharacter('host_body');
+    body.aura = -1;
+    expect(CharacterToken.appearanceHostFor(body)).toBe(body);
+
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, {
+      tableId: 'mapA',
+      copyAppearanceFrom: body,
+    });
+    tok.aura = 2;
+    expect(CharacterToken.appearanceHostFor(body)).toBe(tok);
+    expect(CharacterToken.appearanceHostFor(body, { preferredToken: tok })).toBe(tok);
+  });
 });

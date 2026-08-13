@@ -28,6 +28,7 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { I18nService } from 'service/i18n.service';
+import { TabletopActionService } from 'service/tabletop-action.service';
 import { hasStatus } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 
@@ -118,6 +119,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private selectionService: TabletopSelectionService,
     private characterFxMenu: CharacterFxMenuService,
+    private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
   ) { }
 
@@ -331,16 +333,97 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     }
 
     const afterInv = () => EventSystem.trigger('UPDATE_INVENTORY', null);
-    const hasMultiImage = gameObject.imageFiles.length > 1;
+    const imageCount = gameObject.imageFiles.length;
+    const hasMultiImage = imageCount > 1;
     const hasFace = this.hasOverviewFaceIcon(gameObject);
     const fxHost = this.appearanceHost(gameObject);
     if (!hasFace && fxHost.isUseIconToOverviewImage) {
       fxHost.mutateAppearance(() => { fxHost.isUseIconToOverviewImage = false; });
     }
     const inGraveyard = gameObject.location.name === 'graveyard';
+    const is2D = !!TableSelecter.instance?.viewTable?.is2DMode;
+    const canEdit = gameObject.isVisible || this.isGMMode;
 
-    const identity: (ContextMenuAction | null)[] = [
-      (this.hasTokenOnView(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+    this.tabletopActionService.ensureObjectSelected(gameObject);
+
+    const advancedCopy: ContextMenuAction = {
+      name: this.i18n.t('char.copyAdvanced'),
+      action: null,
+      disabled: !canEdit,
+      subActions: [
+        {
+          name: this.i18n.t('char.createTemporaryCopy'),
+          action: () => { this.createTemporaryCopy(gameObject); },
+          disabled: !canEdit,
+        },
+        {
+          name: this.i18n.t('char.cloneToken'),
+          action: () => {
+            const appearance = this.appearanceHost(gameObject);
+            const pose = appearance.getPoseForView
+              ? appearance.getPoseForView()
+              : { x: gameObject.location.x, y: gameObject.location.y, posZ: gameObject.posZ };
+            const names = ObjectStore.instance.getObjects(CharacterToken)
+              .filter(t => t.characterId === gameObject.identifier)
+              .map(t => t.displayNameOverride || gameObject.name);
+            names.push(gameObject.name);
+            const token = CharacterToken.create(gameObject.identifier, {
+              x: (pose.x || 0) + 50,
+              y: (pose.y || 0) + 50,
+              posZ: pose.posZ || 0,
+            }, { copyAppearanceFrom: appearance as any, major: false });
+            if (GameCharacter.menuCloneAutoNumber) {
+              token.displayNameOverride = GameCharacter.nextNumberedName(gameObject.name, names);
+              token.update();
+            }
+            SoundEffect.play(PresetSound.piecePut);
+            EventSystem.call('UPDATE_INVENTORY', true);
+          },
+          disabled: !canEdit,
+        },
+        {
+          name: this.i18n.t('char.cloneCharacter'),
+          action: () => {
+            this.cloneCharacterBody(gameObject, GameCharacter.menuCloneAutoNumber);
+            SoundEffect.play(PresetSound.piecePut);
+          },
+          disabled: !canEdit,
+        },
+        contextMenuToggleCheck({
+          get: () => GameCharacter.menuCloneAutoNumber,
+          set: (v) => { GameCharacter.menuCloneAutoNumber = v; },
+          on: this.i18n.t('char.cloneAutoNumberOn'),
+          off: this.i18n.t('char.cloneAutoNumberOff'),
+        }),
+      ],
+    };
+
+    const deleteAction: ContextMenuAction = inGraveyard ? {
+      name: this.i18n.t('char.deleteForever'),
+      action: () => {
+        this.selectionService.remove(gameObject);
+        this.deleteGameObject(gameObject);
+        SoundEffect.play(PresetSound.sweep);
+      }
+    } : {
+      name: gameObject.isTemporaryCopy
+        ? this.i18n.t('char.deleteTemporaryCopy')
+        : this.i18n.t('char.deleteToGraveyard'),
+      action: () => {
+        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
+        this.selectionService.remove(gameObject);
+        if (gameObject.isTemporaryCopy) {
+          this.deleteGameObject(gameObject);
+        } else {
+          this.moveCharacterToLocation(gameObject, 'graveyard', { silent: true });
+        }
+        SoundEffect.play(PresetSound.sweep);
+        EventSystem.call('UPDATE_INVENTORY', true);
+      }
+    };
+
+    const placement: (ContextMenuAction | null)[] = [
+      (this.hasTokenOnView(gameObject) && canEdit) ? {
         name: this.i18n.t('char.findOnTable'),
         action: () => {
           const tok = CharacterToken.focusTokenForCharacter(gameObject.identifier);
@@ -356,7 +439,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         disabled: !this.hasTokenOnView(gameObject),
         selfOnly: true
       } : null,
-      (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+      (this.isOnOtherTable(gameObject) && canEdit) ? {
         name: this.i18n.t('inv.placeOnCurrentMap'),
         action: () => {
           this.placeBodyTokenOnView(gameObject);
@@ -364,18 +447,17 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+      (this.isOnOtherTable(gameObject) && canEdit) ? {
         name: this.i18n.t('inv.moveToCurrentMapOnly'),
         action: () => {
           CharacterToken.removeTokensOnTable(gameObject.identifier);
-          // Also clear leftover body placements if any legacy ones remain.
           if (gameObject.location.name === 'table') gameObject.removeFromTable();
           this.placeBodyTokenOnView(gameObject);
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      (this.hasTokenOnView(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
+      (this.hasTokenOnView(gameObject) && canEdit) ? {
         name: this.i18n.t('inv.removeFromCurrentMap'),
         action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
@@ -384,7 +466,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      (!this.hasTokenOnView(gameObject) && gameObject.location.name != 'graveyard' && (this.isGMMode || gameObject.isVisible)) ? {
+      (!this.hasTokenOnView(gameObject) && gameObject.location.name != 'graveyard' && canEdit) ? {
         name: this.i18n.t('char.moveToTable'),
         action: () => {
           let isStealthMode = GameCharacter.isStealthMode;
@@ -404,8 +486,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
+    ];
+
+    const identity: (ContextMenuAction | null)[] = [
       (() => {
-        const stealthHost = CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+        const stealthHost = this.appearanceHost(gameObject);
         const isHidden = !!stealthHost.owner || !!(stealthHost as GameCharacter).isHideIn;
         if (isHidden) {
           return {
@@ -443,102 +528,139 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       this.characterFxMenu.makeCombatMenu(gameObject),
     ];
 
-    const appearance: (ContextMenuAction | null)[] = [
-      hasMultiImage ? {
-        name: this.i18n.t('char.imageSwitch'),
-        action: null,
-        subActions: gameObject.imageFiles.map((image, i) => ({
-          name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+    const tokenSettings: ContextMenuAction = {
+      name: this.i18n.t('char.tokenSettings'),
+      action: null,
+      subActions: [
+        ...(is2D ? [] : [
+          contextMenuToggleCheck({
+            get: () => !fxHost.isNotRide,
+            set: (v) => { fxHost.isNotRide = !v; },
+            on: this.i18n.t('char.stackOn'),
+            off: this.i18n.t('char.stackOff'),
+            after: afterInv,
+          }),
+          contextMenuToggleCheck({
+            get: () => fxHost.isAltitudeIndicate,
+            set: (v) => { fxHost.mutateAppearance(() => { fxHost.isAltitudeIndicate = v; }); },
+            on: this.i18n.t('char.altitudeOn'),
+            off: this.i18n.t('char.altitudeOff'),
+            after: afterInv,
+          }),
+        ]),
+        contextMenuToggleCheck({
+          get: () => fxHost.isDropShadow,
+          set: (v) => { fxHost.mutateAppearance(() => { fxHost.isDropShadow = v; }); },
+          on: this.i18n.t('char.shadowOn'),
+          off: this.i18n.t('char.shadowOff'),
+          after: afterInv,
+        }),
+        contextMenuToggleCheck({
+          get: () => hasFace && fxHost.isUseIconToOverviewImage,
+          set: (v) => {
+            if (!this.hasOverviewFaceIcon(gameObject)) return;
+            fxHost.mutateAppearance(() => { fxHost.isUseIconToOverviewImage = v; });
+          },
+          on: this.i18n.t('char.overviewFaceOn'),
+          off: this.i18n.t('char.overviewFaceOff'),
+          after: afterInv,
+          disabled: !hasFace,
+          error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
+        }),
+        contextMenuToggleCheck({
+          get: () => fxHost.isShowChatBubble,
+          set: (v) => { fxHost.mutateAppearance(() => { fxHost.isShowChatBubble = v; }); },
+          on: this.i18n.t('char.chatBubbleOn'),
+          off: this.i18n.t('char.chatBubbleOff'),
+          tip: this.i18n.t('char.chatBubbleTip'),
+          after: afterInv,
+        }),
+        contextMenuToggleCheck({
+          get: () => gameObject.isAllowsChat,
+          set: (v) => { gameObject.isAllowsChat = v; },
+          on: this.i18n.t('char.chatOn'),
+          off: this.i18n.t('char.chatOff'),
+          after: afterInv,
+          disabled: inGraveyard,
+        }),
+      ],
+    };
+
+    const appearanceFx: ContextMenuAction = {
+      name: this.i18n.t('char.appearanceFx'),
+      action: null,
+      ...(is2D ? {} : { altitudeHande: fxHost }),
+      subActions: [
+        this.characterFxMenu.makeImageEffectMenu(fxHost),
+        this.characterFxMenu.makeAuraMenu(fxHost),
+        this.characterFxMenu.makeRingMenu(fxHost),
+        ...(is2D ? [
+          this.characterFxMenu.makeTokenFrameMenu(fxHost),
+          this.characterFxMenu.makePushPinMenu(fxHost),
+        ] : []),
+        this.characterFxMenu.makeClueLinkMenu(fxHost),
+        this.characterFxMenu.makeStatusMenu(gameObject),
+      ],
+    };
+
+    const locations = [
+      { name: 'table', aliasKey: 'char.table' },
+      { name: 'common', aliasKey: 'char.commonInventory' },
+      { name: Network.peerId, aliasKey: 'char.personalInventory' },
+      { name: 'graveyard', aliasKey: 'char.graveyard' }
+    ];
+
+    let menu = this.joinContextMenuGroups([
+      [
+        advancedCopy,
+        {
+          name: this.i18n.t('char.moveFrom', { from: this.i18n.t((locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).aliasKey) }),
+          action: null,
+          subActions: locations
+            .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
+            .map((location) => ({
+              name: this.i18n.t(location.aliasKey),
+              action: () => {
+                this.moveCharacterToLocation(gameObject, location.name);
+              }
+            })),
+          disabled: !canEdit
+        },
+        deleteAction,
+      ],
+      placement,
+      identity,
+      [
+        hasMultiImage ? {
+          name: this.i18n.t('char.nextImage'),
           action: () => {
-            gameObject.currntImageIndex = i;
+            const next = (gameObject.currntImageIndex + 1) % gameObject.imageFiles.length;
+            gameObject.currntImageIndex = next;
             if (!gameObject.isHideIn && gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
-          default: gameObject.currntImageIndex == i,
-          icon: image,
-          checkBox: 'radio' as const
-        })),
-      } : null,
-      contextMenuToggleCheck({
-        get: () => hasFace && fxHost.isUseIconToOverviewImage,
-        set: (v) => {
-          if (!this.hasOverviewFaceIcon(gameObject)) return;
-          fxHost.mutateAppearance(() => { fxHost.isUseIconToOverviewImage = v; });
-        },
-        on: this.i18n.t('char.overviewFaceOn'),
-        off: this.i18n.t('char.overviewFaceOff'),
-        after: afterInv,
-        disabled: !hasFace,
-        error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
-      }),
-      contextMenuToggleCheck({
-        get: () => fxHost.isDropShadow,
-        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isDropShadow = v; }); },
-        on: this.i18n.t('char.shadowOn'),
-        off: this.i18n.t('char.shadowOff'),
-        after: afterInv,
-      }),
-      this.characterFxMenu.makeImageEffectMenu(fxHost),
-    ];
-
-    const fx: ContextMenuAction[] = [
-      this.characterFxMenu.makeAuraMenu(fxHost),
-      this.characterFxMenu.makeRingMenu(fxHost),
-      this.characterFxMenu.makeStatusMenu(gameObject),
-    ];
-
-    const is2D = !!TableSelecter.instance?.viewTable?.is2DMode;
-    const pose: ContextMenuAction[] = is2D ? [] : [
-      contextMenuToggleCheck({
-        get: () => !fxHost.isNotRide,
-        set: (v) => { fxHost.isNotRide = !v; },
-        on: this.i18n.t('char.stackOn'),
-        off: this.i18n.t('char.stackOff'),
-        after: afterInv,
-      }),
-      contextMenuToggleCheck({
-        get: () => fxHost.isAltitudeIndicate,
-        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isAltitudeIndicate = v; }); },
-        on: this.i18n.t('char.altitudeOn'),
-        off: this.i18n.t('char.altitudeOff'),
-        after: afterInv,
-      }),
-      {
-        name: this.i18n.t('char.resetAltitude'),
-        action: () => {
-          if (fxHost.altitude != 0) {
-            fxHost.altitude = 0;
-            if (fxHost.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
-          }
-        },
-        altitudeHande: fxHost
-      },
-    ];
-
-    const chatPanels: ContextMenuAction[] = [
-      contextMenuToggleCheck({
-        get: () => fxHost.isShowChatBubble,
-        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isShowChatBubble = v; }); },
-        on: this.i18n.t('char.chatBubbleOn'),
-        off: this.i18n.t('char.chatBubbleOff'),
-        tip: this.i18n.t('char.chatBubbleTip'),
-        after: afterInv,
-      }),
-      contextMenuToggleCheck({
-        get: () => gameObject.isAllowsChat,
-        set: (v) => { gameObject.isAllowsChat = v; },
-        on: this.i18n.t('char.chatOn'),
-        off: this.i18n.t('char.chatOff'),
-        after: afterInv,
-        disabled: inGraveyard,
-      }),
-      { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(gameObject); } },
-      { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
-      { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
-      {
-        name: this.i18n.t('char.openReferenceUrl'),
-        action: null,
-        subActions: gameObject.getUrls().map((urlElement) => {
+        } : null,
+        imageCount > 2 ? {
+          name: this.i18n.t('char.imageSwitch'),
+          action: null,
+          subActions: gameObject.imageFiles.map((image, i) => ({
+            name: `${gameObject.currntImageIndex == i ? '◉' : '○'}`,
+            action: () => {
+              gameObject.currntImageIndex = i;
+              if (!gameObject.isHideIn && gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.surprise);
+              EventSystem.trigger('UPDATE_INVENTORY', null);
+            },
+            default: gameObject.currntImageIndex == i,
+            icon: image,
+            checkBox: 'radio' as const
+          })),
+        } : null,
+      ],
+      [
+        { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(gameObject); } },
+        { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+        { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(gameObject); }, disabled: !gameObject.isAllowsChat || inGraveyard },
+        ...gameObject.getUrls().map((urlElement) => {
           const url = urlElement.value.toString();
           return {
             name: urlElement.name ? urlElement.name : url,
@@ -554,97 +676,22 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
             isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
           };
         }),
-        disabled: gameObject.getUrls().length <= 0
-      },
-    ];
+      ],
+      [appearanceFx, tokenSettings],
+      [
+        contextMenuToggleCheck({
+          get: () => gameObject.isInventoryIndicate,
+          set: (v) => { gameObject.isInventoryIndicate = v; },
+          on: this.i18n.t('char.inventoryOn'),
+          off: this.i18n.t('char.inventoryOff'),
+          after: afterInv,
+        }),
+        this.characterFxMenu.makeVisionMenu(fxHost),
+      ],
+    ]);
 
-    const locations = [
-      { name: 'table', aliasKey: 'char.table' },
-      { name: 'common', aliasKey: 'char.commonInventory' },
-      { name: Network.peerId, aliasKey: 'char.personalInventory' },
-      { name: 'graveyard', aliasKey: 'char.graveyard' }
-    ];
-    const locationGroup: ContextMenuAction[] = [
-      contextMenuToggleCheck({
-        get: () => gameObject.isInventoryIndicate,
-        set: (v) => { gameObject.isInventoryIndicate = v; },
-        on: this.i18n.t('char.inventoryOn'),
-        off: this.i18n.t('char.inventoryOff'),
-        after: afterInv,
-      }),
-      {
-        name: this.i18n.t('char.moveFrom', { from: this.i18n.t((locations.find((location) => { return location.name == gameObject.location.name }) || locations[1]).aliasKey) }),
-        action: null,
-        subActions: locations
-          .filter((location, i) => { return !(gameObject.location.name == location.name || (i == 1 && !locations.map(loc => loc.name).includes(gameObject.location.name))) })
-          .map((location) => ({
-            name: this.i18n.t(location.aliasKey),
-            action: () => {
-              this.moveCharacterToLocation(gameObject, location.name);
-            }
-          })),
-        disabled: !gameObject.isVisible && !this.isGMMode
-      },
-    ];
-
-    const cloneDelete: ContextMenuAction[] = [
-      {
-        name: this.i18n.t('char.createTemporaryCopy'),
-        action: () => {
-          this.createTemporaryCopy(gameObject);
-        },
-        disabled: !gameObject.isVisible && !this.isGMMode
-      },
-      {
-        name: this.i18n.t('char.cloneCharacter'),
-        action: () => {
-          this.cloneCharacterBody(gameObject);
-          SoundEffect.play(PresetSound.piecePut);
-        },
-        disabled: !gameObject.isVisible && !this.isGMMode
-      },
-      {
-        name: this.i18n.t('char.cloneCharacterNumbered'),
-        action: () => {
-          this.cloneCharacterBody(gameObject, true);
-          SoundEffect.play(PresetSound.piecePut);
-        },
-        disabled: !gameObject.isVisible && !this.isGMMode
-      },
-      inGraveyard ? {
-        name: this.i18n.t('char.deleteForever'),
-        action: () => {
-          this.selectionService.remove(gameObject);
-          this.deleteGameObject(gameObject);
-          SoundEffect.play(PresetSound.sweep);
-        }
-      } : {
-        name: gameObject.isTemporaryCopy
-          ? this.i18n.t('char.deleteTemporaryCopy')
-          : this.i18n.t('char.deleteToGraveyard'),
-        action: () => {
-          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
-          this.selectionService.remove(gameObject);
-          if (gameObject.isTemporaryCopy) {
-            this.deleteGameObject(gameObject);
-          } else {
-            this.moveCharacterToLocation(gameObject, 'graveyard', { silent: true });
-          }
-          SoundEffect.play(PresetSound.sweep);
-          EventSystem.call('UPDATE_INVENTORY', true);
-        }
-      },
-    ];
-
-    actions = actions.concat(this.joinContextMenuGroups([
-      identity,
-      appearance,
-      fx,
-      pose,
-      chatPanels,
-      locationGroup,
-      cloneDelete,
-    ]));
+    menu = this.tabletopActionService.withClipboardMenuPrefix(menu);
+    actions = actions.concat(menu);
     this.contextMenuService.open(position, actions, gameObject.name);
   }
 
@@ -691,7 +738,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   /** New sheet (+ Token on current view when a map is open). */
   private cloneCharacterBody(gameObject: GameCharacter, numbered = false) {
     if (this.GuestMode()) return;
-    const appearance = CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+    const appearance = this.appearanceHost(gameObject);
     const pose = appearance.getPoseForView
       ? appearance.getPoseForView()
       : { x: gameObject.location.x, y: gameObject.location.y, posZ: gameObject.posZ };
@@ -843,7 +890,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   /** Map Token cosmetics when present; otherwise the sheet (seed / off-map). */
   appearanceHost(gameObject: GameCharacter): GameCharacter | CharacterToken {
-    return CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+    return CharacterToken.appearanceHostFor(gameObject) || gameObject;
   }
 
   /** Stealth / hide-in for inventory row chrome. */

@@ -51,8 +51,8 @@
 <ng-template #actionMenu let-action="action">
   <li [ngClass]="{
         'has-color': action.color,
-        'hasHighlight': !(action.disabled || action.icon || (action.altitudeHande && action.altitudeHande.altitude == 0)),
-        'disabled': (action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)),
+        'hasHighlight': !(action.disabled || action.icon || (action.altitudeHande && !action.subActions && action.altitudeHande.altitude == 0)),
+        'disabled': (action.disabled || (action.altitudeHande && !action.subActions && action.altitudeHande.altitude == 0)),
         'has-material-icon': !!action.materialIcon,
         'is-grid-icon': showIconGrid && action.type !== 'separator'
       }"
@@ -60,8 +60,8 @@
       [style.color]="action.color ? action.color : ''" 
       [style.text-align]="action.center ? 'center': ''"
       [attr.title]="action.tip || action.name || null"
-      (click)="(action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)) ? false : doAction(action, $event)"
-      (mouseenter)="(action.disabled || (action.altitudeHande && action.altitudeHande.altitude == 0)) ? false : showSubMenu(action)">
+      (click)="(action.disabled || (action.altitudeHande && !action.subActions && action.altitudeHande.altitude == 0)) ? false : doAction(action, $event)"
+      (mouseenter)="(action.disabled || (action.altitudeHande && !action.subActions && action.altitudeHande.altitude == 0)) ? false : showSubMenu(action)">
     <div class="menu-title" [ngClass]="{'icon-menu': action.icon, default: action.default, 'grid-icon-title': showIconGrid}" style="width: 100%">
       <ng-container *ngIf="showIconGrid; else listMenuContent">
         <i *ngIf="action.materialIcon" class="material-icons grid-icon">{{action.materialIcon}}</i>

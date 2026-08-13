@@ -12,6 +12,10 @@ export type CharacterTokenPose = { x?: number; y?: number; posZ?: number };
 /**
  * Map projection of a {@link GameCharacter} sheet.
  * No DataElement sheet — HP / images / palette live on the body only.
+ *
+ * Map cosmetics (altitude, aura, stealth, vision, rings, …) live here.
+ * Always resolve the write target with {@link CharacterToken.appearanceHostFor}
+ * instead of mutating the sheet when a Token is on the viewed map.
  */
 @SyncObject('character-token')
 export class CharacterToken extends TabletopObject {
@@ -92,7 +96,14 @@ export class CharacterToken extends TabletopObject {
   }
 
   override set altitude(value: number) {
-    this.altitudeValue = Number(value) || 0;
+    const next = Number(value) || 0;
+    if ((Number(this.altitudeValue) || 0) === next) return;
+    this.mutateAppearance(() => { this.altitudeValue = next; });
+  }
+
+  /** Tokens store altitude on SyncVar, not a sheet DataElement. */
+  override get isHaveAltitude(): boolean {
+    return true;
   }
 
   get chatBubbleAltitude(): number {
@@ -218,6 +229,21 @@ export class CharacterToken extends TabletopObject {
     if (major) return major;
     const tokens = CharacterToken.tokensOnTable(characterId, tableId);
     return tokens[0] || null;
+  }
+
+  /**
+   * Compliant host for map cosmetics / altitude / stealth / FoW radii.
+   * Prefer a Token on the viewed map (or {@param preferredToken}); otherwise the sheet seed.
+   * Sheet-only fields (name, size, HP, palette, stands) must stay on {@link GameCharacter}.
+   */
+  static appearanceHostFor(
+    body: GameCharacter | null | undefined,
+    opts?: { preferredToken?: CharacterToken | null; tableId?: string }
+  ): GameCharacter | CharacterToken | null {
+    if (!body) return null;
+    const preferred = opts?.preferredToken;
+    if (preferred && preferred.characterId === body.identifier) return preferred;
+    return CharacterToken.focusTokenForCharacter(body.identifier, opts?.tableId) || body;
   }
 
   /**

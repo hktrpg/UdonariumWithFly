@@ -159,6 +159,7 @@ export function defaultPlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'visionRange')) out.visionRange = 6;
   if (hasProp(obj, 'brightLight')) out.brightLight = 0;
   if (hasProp(obj, 'dimLight')) out.dimLight = 0;
+  if (commonEl(obj, 'altitude') || hasProp(obj, 'altitudeValue')) out.altitude = 0;
   if (hasProp(obj, 'state')) out.cardState = 0;
   if (hasProp(obj, 'face') && typeof obj.face === 'string') out.diceFace = String(obj.face ?? '0');
   if (hasProp(obj, 'mode') && typeof obj.mode === 'number') out.terrainMode = 3; // TerrainViewState.ALL
@@ -189,6 +190,7 @@ export function capturePlacementViewState(obj: any): PlacementViewState {
 
   const altitudeEl = commonEl(obj, 'altitude');
   if (altitudeEl) out.altitude = elNum(altitudeEl, 0);
+  else if (hasProp(obj, 'altitudeValue')) out.altitude = readNum(obj, 'altitudeValue');
 
   const widthEl = commonEl(obj, 'width');
   if (widthEl) out.width = elNum(widthEl, 1);
@@ -277,7 +279,11 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
   // and keeps the network indicator stuck on「同步中」.
   if (pose.size !== undefined) setEl('size', pose.size);
   if (pose.height !== undefined) setEl('height', pose.height, pose.heightCurrentValue);
-  if (pose.altitude !== undefined) setEl('altitude', pose.altitude);
+  if (pose.altitude !== undefined) {
+    const altitudeEl = commonEl(obj, 'altitude');
+    if (altitudeEl) setEl('altitude', pose.altitude);
+    else if (hasProp(obj, 'altitudeValue')) setSync('altitudeValue', pose.altitude);
+  }
   if (pose.width !== undefined) setEl('width', pose.width);
   if (pose.depth !== undefined) setEl('depth', pose.depth);
   if (pose.length !== undefined) setEl('length', pose.length);

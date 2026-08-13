@@ -61,7 +61,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   /** Host for vision / light / token cosmetics: Token when on map, else body (seed). */
   private get appearanceTarget(): GameCharacter | CharacterToken | null {
-    return this.mapToken || this.character;
+    return CharacterToken.appearanceHostFor(this.character, { preferredToken: this.token });
   }
 
   get visionRange(): number {
@@ -140,6 +140,22 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
       const el = this.character?.commonDataElement?.getFirstElementByName('size');
       if (el) el.value = value;
     });
+  }
+
+  /** Map Token altitude when present; else sheet seed. */
+  get altitude(): number {
+    return this.appearanceTarget?.altitude ?? 0;
+  }
+  set altitude(value: number) {
+    if (this.GuestMode()) return;
+    const host = this.appearanceTarget;
+    if (!host) return;
+    host.altitude = value;
+    // Keep body as seed for future inventory→map creates.
+    if (this.character && host !== this.character) {
+      this.character.altitude = value;
+    }
+    this.changeDetector.markForCheck();
   }
 
   /** Raw height field (image-relative when heightScale). */
@@ -364,7 +380,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   clone() {
     if (!this.character || this.GuestMode()) return;
-    const appearance = CharacterToken.focusTokenForCharacter(this.character.identifier) || this.character;
+    const appearance = CharacterToken.appearanceHostFor(this.character, { preferredToken: this.token }) || this.character;
     const pose = appearance.getPoseForView
       ? appearance.getPoseForView()
       : { x: this.character.location.x, y: this.character.location.y, posZ: this.character.posZ };

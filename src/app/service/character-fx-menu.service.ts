@@ -41,7 +41,7 @@ const RING_OPTIONS = ['none', 'fire', 'magic', 'tech', 'eldritch', 'holy'];
 const AURA_COLOR_KEYS = ['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'] as const;
 const AURA_SAMPLE_COLORS = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
 
-/** Table cosmetics / stealth / FoW ranges — Token when on the map, else body. */
+/** Table cosmetics / stealth / FoW — resolve with CharacterToken.appearanceHostFor. */
 type CosmeticsHost = GameCharacter | CharacterToken;
 
 @Injectable({ providedIn: 'root' })

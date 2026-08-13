@@ -138,7 +138,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
    * Sheet fields (name size image status chat) stay on {@link gameCharacter}.
    */
   get appearanceHost(): GameCharacter | CharacterToken {
-    return this.characterToken || this.gameCharacter;
+    return CharacterToken.appearanceHostFor(this.gameCharacter, {
+      preferredToken: this.characterToken,
+    }) || this.gameCharacter;
   }
 
   get skipEnterBounce(): boolean { return GameCharacterComponent.suppressEnterBounce; }
@@ -1197,64 +1199,130 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private makeContextMenu(): ContextMenuAction[] {
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
-    const hasMultiImage = this.gameCharacter.imageFiles.length > 1;
+    const imageCount = this.gameCharacter.imageFiles.length;
+    const hasMultiImage = imageCount > 1;
     const hasFace = this.hasOverviewFaceIcon();
     if (!hasFace && this.isUseIconToOverviewImage) this.isUseIconToOverviewImage = false;
 
-    return this.joinContextMenuGroups([
-      // Identity / claim
-      [
+    const clonePose = () => {
+      const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+      return {
+        x: pose.x + this.gridSize,
+        y: pose.y + this.gridSize,
+        posZ: pose.posZ,
+      };
+    };
+
+    const advancedCopy: ContextMenuAction = {
+      name: this.i18n.t('char.copyAdvanced'),
+      action: null,
+      subActions: [
         {
-          name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
-          hotkey: 'H',
+          name: this.i18n.t('char.createTemporaryCopy'),
           action: () => {
-            const host = this.appearanceHost;
-            if (!host) return;
-            if (this.isHideIn) {
-              host.owner = '';
-              SoundEffect.play(PresetSound.piecePut);
-            } else {
-              if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
-                this.modalService.open(ConfirmationComponent, {
-                  title: this.i18n.t('char.stealthTitle'),
-                  text: this.i18n.t('char.stealthText'),
-                  help: this.i18n.t('char.stealthHelp'),
-                  type: ConfirmationType.OK,
-                  materialIcon: 'disabled_visible'
-                });
-              }
-              host.owner = Network.peer.userId;
-              // FoW claim stays on the body sheet.
-              if (this.gameCharacter && !this.gameCharacter.visionOwner) {
-                this.gameCharacter.visionOwner = Network.peer.userId;
-              }
-              SoundEffect.play(PresetSound.sweep);
-              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            }
-            EventSystem.call('UPDATE_INVENTORY', true);
-          },
+            const body = this.characterToken?.character || this.gameCharacter;
+            if (!body) return;
+            const pose = clonePose();
+            GameCharacter.createTemporaryCopy(body, pose, undefined, this.characterToken || body);
+            SoundEffect.play(PresetSound.piecePut);
+          }
         },
-        this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
-        this.characterFxMenu.makeCombatMenu(this.gameCharacter),
-      ],
-      // Image / appearance
-      [
-        hasMultiImage ? {
-          name: this.i18n.t('char.imageSwitch'),
-          action: null,
-          subActions: this.gameCharacter.imageFiles.map((image, i) => ({
-            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`,
-            action: () => { this.changeImage(i); },
-            default: this.gameCharacter.currntImageIndex == i,
-            icon: image,
-            checkBox: 'radio' as const
-          }))
-        } : null,
         {
-          name: this.i18n.t('char.nextImage'),
-          action: () => { this.nextImage(); },
-          disabled: !hasMultiImage
+          name: this.i18n.t('char.cloneToken'),
+          action: () => {
+            const body = this.characterToken?.character || this.gameCharacter;
+            if (!body) return;
+            const pose = clonePose();
+            const names = ObjectStore.instance.getObjects(CharacterToken)
+              .filter(t => t.characterId === body.identifier)
+              .map(t => t.displayNameOverride || body.name);
+            names.push(body.name);
+            const token = CharacterToken.create(body.identifier, pose, {
+              copyAppearanceFrom: this.characterToken || body,
+              major: false,
+            });
+            if (GameCharacter.menuCloneAutoNumber) {
+              token.displayNameOverride = GameCharacter.nextNumberedName(body.name, names);
+              token.update();
+            }
+            SoundEffect.play(PresetSound.piecePut);
+          }
         },
+        {
+          name: this.i18n.t('char.cloneCharacter'),
+          action: () => {
+            const body = this.characterToken?.character || this.gameCharacter;
+            if (!body) return;
+            const pose = clonePose();
+            GameCharacter.cloneCharacter(body, {
+              numbered: GameCharacter.menuCloneAutoNumber,
+              pose,
+              copyAppearanceFrom: this.characterToken || body,
+            });
+            SoundEffect.play(PresetSound.piecePut);
+            EventSystem.call('UPDATE_INVENTORY', true);
+          }
+        },
+        contextMenuToggleCheck({
+          get: () => GameCharacter.menuCloneAutoNumber,
+          set: (v) => { GameCharacter.menuCloneAutoNumber = v; },
+          on: this.i18n.t('char.cloneAutoNumberOn'),
+          off: this.i18n.t('char.cloneAutoNumberOff'),
+        }),
+      ],
+    };
+
+    const deleteAction: ContextMenuAction = {
+      name: this.characterToken?.isTemporaryCopy || this.gameCharacter.isTemporaryCopy
+        ? this.i18n.t('char.deleteTemporaryCopy')
+        : this.i18n.t('char.deleteToGraveyard'),
+      hotkey: 'Del',
+      action: () => {
+        if (this.characterToken) {
+          this.selectionService.remove(this.characterToken);
+          CharacterToken.destroyToken(this.characterToken);
+          SoundEffect.play(PresetSound.sweep);
+          return;
+        }
+        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
+        this.selectionService.remove(this.gameCharacter);
+        CharacterToken.destroyTokensForCharacter(this.gameCharacter.identifier);
+        if (this.gameCharacter.isTemporaryCopy) {
+          this.gameCharacter.destroy();
+        } else {
+          this.gameCharacter.leaveCurrentTable('graveyard');
+        }
+        SoundEffect.play(PresetSound.sweep);
+      }
+    };
+
+    const tokenSettings: ContextMenuAction = {
+      name: this.i18n.t('char.tokenSettings'),
+      action: null,
+      subActions: [
+        ...(this.is2DMode ? [] : [
+          contextMenuToggleCheck({
+            get: () => !this.isNotRide,
+            set: (v) => { this.isNotRide = !v; },
+            on: this.i18n.t('char.stackOn'),
+            off: this.i18n.t('char.stackOff'),
+            after,
+          }),
+          contextMenuToggleCheck({
+            get: () => this.isAltitudeIndicate,
+            set: (v) => { this.isAltitudeIndicate = v; },
+            on: this.i18n.t('char.altitudeOn'),
+            off: this.i18n.t('char.altitudeOff'),
+            after,
+          }),
+        ]),
+        contextMenuToggleCheck({
+          get: () => this.isDropShadow,
+          set: (v) => { this.isDropShadow = v; },
+          on: this.i18n.t('char.shadowOn'),
+          off: this.i18n.t('char.shadowOff'),
+          after,
+        }),
         contextMenuToggleCheck({
           get: () => hasFace && this.isUseIconToOverviewImage,
           set: (v) => {
@@ -1267,56 +1335,6 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           disabled: !hasFace,
           error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
         }),
-        contextMenuToggleCheck({
-          get: () => this.isDropShadow,
-          set: (v) => { this.isDropShadow = v; },
-          on: this.i18n.t('char.shadowOn'),
-          off: this.i18n.t('char.shadowOff'),
-          after,
-        }),
-        this.characterFxMenu.makeImageEffectMenu(this.appearanceHost),
-      ],
-      // FX / lighting / status
-      [
-        this.characterFxMenu.makeAuraMenu(this.appearanceHost),
-        this.characterFxMenu.makeRingMenu(this.appearanceHost),
-        ...(this.is2DMode ? [
-          this.characterFxMenu.makeTokenFrameMenu(this.appearanceHost),
-          this.characterFxMenu.makePushPinMenu(this.appearanceHost),
-        ] : []),
-        this.characterFxMenu.makeClueLinkMenu(this.appearanceHost),
-        this.characterFxMenu.makeVisionMenu(this.appearanceHost),
-        this.characterFxMenu.makeStatusMenu(this.gameCharacter),
-      ],
-      // Pose (3D only — corkboard has no ride/altitude)
-      this.is2DMode ? [] : [
-        contextMenuToggleCheck({
-          get: () => !this.isNotRide,
-          set: (v) => { this.isNotRide = !v; },
-          on: this.i18n.t('char.stackOn'),
-          off: this.i18n.t('char.stackOff'),
-          after,
-        }),
-        contextMenuToggleCheck({
-          get: () => this.isAltitudeIndicate,
-          set: (v) => { this.isAltitudeIndicate = v; },
-          on: this.i18n.t('char.altitudeOn'),
-          off: this.i18n.t('char.altitudeOff'),
-          after,
-        }),
-        {
-          name: this.i18n.t('char.resetAltitude'),
-          action: () => {
-            if (this.altitude != 0) {
-              this.altitude = 0;
-              if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
-            }
-          },
-          altitudeHande: this.appearanceHost
-        },
-      ],
-      // Chat / panels
-      [
         contextMenuToggleCheck({
           get: () => !!(this.appearanceHost as any)?.isShowChatBubble,
           set: (v) => {
@@ -1336,57 +1354,31 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           off: this.i18n.t('char.chatOff'),
           after,
         }),
-        { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
-        { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
-        { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
-        {
-          name: this.i18n.t('char.openReferenceUrl'),
-          action: null,
-          subActions: this.gameCharacter.getUrls().map((urlElement) => {
-            const url = urlElement.value.toString();
-            return {
-              name: urlElement.name ? urlElement.name : url,
-              action: () => {
-                if (StringUtil.sameOrigin(url)) {
-                  window.open(url.trim(), '_blank', 'noopener');
-                } else {
-                  this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
-                }
-              },
-              disabled: !StringUtil.validUrl(url),
-              error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
-              isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
-            };
-          }),
-          disabled: this.gameCharacter.getUrls().length <= 0
-        },
       ],
-      // Inventory / location
+    };
+
+    const appearanceFx: ContextMenuAction = {
+      name: this.i18n.t('char.appearanceFx'),
+      action: null,
+      // Root-menu altitude meter (3D). Must stay on a top-level action.
+      ...(this.is2DMode ? {} : { altitudeHande: this.appearanceHost }),
+      subActions: [
+        this.characterFxMenu.makeImageEffectMenu(this.appearanceHost),
+        this.characterFxMenu.makeAuraMenu(this.appearanceHost),
+        this.characterFxMenu.makeRingMenu(this.appearanceHost),
+        ...(this.is2DMode ? [
+          this.characterFxMenu.makeTokenFrameMenu(this.appearanceHost),
+          this.characterFxMenu.makePushPinMenu(this.appearanceHost),
+        ] : []),
+        this.characterFxMenu.makeClueLinkMenu(this.appearanceHost),
+        this.characterFxMenu.makeStatusMenu(this.gameCharacter),
+      ],
+    };
+
+    return this.joinContextMenuGroups([
+      // Frequent: clipboard prefix adds Copy/Cut above this
       [
-        contextMenuToggleCheck({
-          get: () => this.gameCharacter.isInventoryIndicate,
-          set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
-          on: this.i18n.t('char.inventoryOn'),
-          off: this.i18n.t('char.inventoryOff'),
-          after,
-        }),
-        ...(this.characterToken ? [contextMenuToggleCheck({
-          get: () => !!this.characterToken.isMajorMarker,
-          set: (v) => {
-            if (!this.characterToken) return;
-            const viewId = TabletopObject.resolveViewTableIdentifier();
-            if (v) {
-              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId, this.characterToken.identifier);
-            } else {
-              this.characterToken.isMajorMarker = false;
-              this.characterToken.update();
-              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId);
-            }
-          },
-          on: this.i18n.t('char.majorMarkerOn'),
-          off: this.i18n.t('char.majorMarkerOff'),
-          after,
-        })] : []),
+        advancedCopy,
         {
           name: this.i18n.t('char.moveTo'),
           action: null,
@@ -1441,123 +1433,111 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
             },
           ]
         },
+        deleteAction,
       ],
-      // Clone / delete — instant clones live under Advanced copy; Copy/Cut use clipboard
+      // Identity / combat
       [
         {
-          name: this.i18n.t('char.copyAdvanced'),
-          action: null,
-          subActions: [
-            {
-              name: this.i18n.t('char.createTemporaryCopy'),
-              action: () => {
-                const body = this.characterToken?.character || this.gameCharacter;
-                if (!body) return;
-                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
-                GameCharacter.createTemporaryCopy(body, {
-                  x: pose.x + this.gridSize,
-                  y: pose.y + this.gridSize,
-                  posZ: pose.posZ,
-                }, undefined, this.characterToken || body);
-                SoundEffect.play(PresetSound.piecePut);
-              }
-            },
-            {
-              name: this.i18n.t('char.cloneToken'),
-              action: () => {
-                const body = this.characterToken?.character || this.gameCharacter;
-                if (!body) return;
-                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
-                CharacterToken.create(body.identifier, {
-                  x: pose.x + this.gridSize,
-                  y: pose.y + this.gridSize,
-                  posZ: pose.posZ,
-                }, { copyAppearanceFrom: this.characterToken || body, major: false });
-                SoundEffect.play(PresetSound.piecePut);
-              }
-            },
-            {
-              name: this.i18n.t('char.cloneTokenNumbered'),
-              action: () => {
-                const body = this.characterToken?.character || this.gameCharacter;
-                if (!body) return;
-                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
-                const names = ObjectStore.instance.getObjects(CharacterToken)
-                  .filter(t => t.characterId === body.identifier)
-                  .map(t => t.displayNameOverride || body.name);
-                names.push(body.name);
-                const token = CharacterToken.create(body.identifier, {
-                  x: pose.x + this.gridSize,
-                  y: pose.y + this.gridSize,
-                  posZ: pose.posZ,
-                }, { copyAppearanceFrom: this.characterToken || body, major: false });
-                token.displayNameOverride = GameCharacter.nextNumberedName(body.name, names);
-                token.update();
-                SoundEffect.play(PresetSound.piecePut);
-              }
-            },
-            {
-              name: this.i18n.t('char.cloneCharacter'),
-              action: () => {
-                const body = this.characterToken?.character || this.gameCharacter;
-                if (!body) return;
-                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
-                GameCharacter.cloneCharacter(body, {
-                  pose: {
-                    x: pose.x + this.gridSize,
-                    y: pose.y + this.gridSize,
-                    posZ: pose.posZ,
-                  },
-                  copyAppearanceFrom: this.characterToken || body,
-                });
-                SoundEffect.play(PresetSound.piecePut);
-                EventSystem.call('UPDATE_INVENTORY', true);
-              }
-            },
-            {
-              name: this.i18n.t('char.cloneCharacterNumbered'),
-              action: () => {
-                const body = this.characterToken?.character || this.gameCharacter;
-                if (!body) return;
-                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
-                GameCharacter.cloneCharacter(body, {
-                  numbered: true,
-                  pose: {
-                    x: pose.x + this.gridSize,
-                    y: pose.y + this.gridSize,
-                    posZ: pose.posZ,
-                  },
-                  copyAppearanceFrom: this.characterToken || body,
-                });
-                SoundEffect.play(PresetSound.piecePut);
-                EventSystem.call('UPDATE_INVENTORY', true);
-              }
-            },
-          ],
-        },
-        {
-          name: this.characterToken?.isTemporaryCopy || this.gameCharacter.isTemporaryCopy
-            ? this.i18n.t('char.deleteTemporaryCopy')
-            : this.i18n.t('char.deleteToGraveyard'),
-          hotkey: 'Del',
+          name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
+          hotkey: 'H',
           action: () => {
-            if (this.characterToken) {
-              this.selectionService.remove(this.characterToken);
-              CharacterToken.destroyToken(this.characterToken);
-              SoundEffect.play(PresetSound.sweep);
-              return;
-            }
-            EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.selectionService.remove(this.gameCharacter);
-            CharacterToken.destroyTokensForCharacter(this.gameCharacter.identifier);
-            if (this.gameCharacter.isTemporaryCopy) {
-              this.gameCharacter.destroy();
+            const host = this.appearanceHost;
+            if (!host) return;
+            if (this.isHideIn) {
+              host.owner = '';
+              SoundEffect.play(PresetSound.piecePut);
             } else {
-              this.gameCharacter.leaveCurrentTable('graveyard');
+              if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
+                this.modalService.open(ConfirmationComponent, {
+                  title: this.i18n.t('char.stealthTitle'),
+                  text: this.i18n.t('char.stealthText'),
+                  help: this.i18n.t('char.stealthHelp'),
+                  type: ConfirmationType.OK,
+                  materialIcon: 'disabled_visible'
+                });
+              }
+              host.owner = Network.peer.userId;
+              if (this.gameCharacter && !this.gameCharacter.visionOwner) {
+                this.gameCharacter.visionOwner = Network.peer.userId;
+              }
+              SoundEffect.play(PresetSound.sweep);
+              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             }
-            SoundEffect.play(PresetSound.sweep);
-          }
+            EventSystem.call('UPDATE_INVENTORY', true);
+          },
         },
+        this.characterFxMenu.makeMyTokenMenu(this.gameCharacter),
+        this.characterFxMenu.makeCombatMenu(this.gameCharacter),
+      ],
+      // Image (next = frequent; switch list only when 3+)
+      [
+        hasMultiImage ? {
+          name: this.i18n.t('char.nextImage'),
+          action: () => { this.nextImage(); },
+        } : null,
+        imageCount > 2 ? {
+          name: this.i18n.t('char.imageSwitch'),
+          action: null,
+          subActions: this.gameCharacter.imageFiles.map((image, i) => ({
+            name: `${this.gameCharacter.currntImageIndex == i ? '◉' : '○'}`,
+            action: () => { this.changeImage(i); },
+            default: this.gameCharacter.currntImageIndex == i,
+            icon: image,
+            checkBox: 'radio' as const
+          }))
+        } : null,
+      ],
+      // Panels
+      [
+        { name: this.i18n.t('char.showDetail'), action: () => { this.showDetail(this.gameCharacter); } },
+        { name: this.i18n.t('char.showChatPalette'), action: () => { this.showChatPalette(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        { name: this.i18n.t('char.standSetting'), action: () => { this.showStandSetting(this.gameCharacter); }, disabled: !this.gameCharacter.isAllowsChat },
+        ...this.gameCharacter.getUrls().map((urlElement) => {
+          const url = urlElement.value.toString();
+          return {
+            name: urlElement.name ? urlElement.name : url,
+            action: () => {
+              if (StringUtil.sameOrigin(url)) {
+                window.open(url.trim(), '_blank', 'noopener');
+              } else {
+                this.modalService.open(OpenUrlComponent, { url: url, title: this.gameCharacter.name, subTitle: urlElement.name });
+              }
+            },
+            disabled: !StringUtil.validUrl(url),
+            error: !StringUtil.validUrl(url) ? this.i18n.t('char.invalidUrl') : null,
+            isOuterLink: StringUtil.validUrl(url) && !StringUtil.sameOrigin(url)
+          };
+        }),
+      ],
+      // Appearance / FX (+ root altitude meter) and Token settings at L1
+      [appearanceFx, tokenSettings],
+      // Table presence
+      [
+        contextMenuToggleCheck({
+          get: () => this.gameCharacter.isInventoryIndicate,
+          set: (v) => { this.gameCharacter.isInventoryIndicate = v; },
+          on: this.i18n.t('char.inventoryOn'),
+          off: this.i18n.t('char.inventoryOff'),
+          after,
+        }),
+        ...(this.characterToken ? [contextMenuToggleCheck({
+          get: () => !!this.characterToken.isMajorMarker,
+          set: (v) => {
+            if (!this.characterToken) return;
+            const viewId = TabletopObject.resolveViewTableIdentifier();
+            if (v) {
+              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId, this.characterToken.identifier);
+            } else {
+              this.characterToken.isMajorMarker = false;
+              this.characterToken.update();
+              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId);
+            }
+          },
+          on: this.i18n.t('char.majorMarkerOn'),
+          off: this.i18n.t('char.majorMarkerOff'),
+          after,
+        })] : []),
+        this.characterFxMenu.makeVisionMenu(this.appearanceHost),
       ],
     ]);
   }

@@ -56,7 +56,13 @@ function setAltitudeValue(ch: MaskTokenFxTarget, altitude: number) {
     if (el) el.value = altitude;
     return;
   }
-  ch.altitude = altitude;
+  // CharacterToken (and similar): write SyncVar inside the caller's mutateAppearance.
+  // Do not call the altitude setter — it would nest another mutateAppearance.
+  if ('altitudeValue' in (ch as object)) {
+    (ch as any).altitudeValue = Number(altitude) || 0;
+    return;
+  }
+  (ch as any).altitude = Number(altitude) || 0;
 }
 
 /** Apply mask FX config to character/token; returns snapshot taken before apply. */
