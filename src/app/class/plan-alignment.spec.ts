@@ -78,6 +78,19 @@ describe('Plan alignment gaps', () => {
     expect(GameCharacter.isStealthMode).toBeTrue();
   });
 
+  it('stealth ownerName is empty string when PeerCursor is missing (room-load safe)', () => {
+    const body = makeCharacter('stealth_owner_name');
+    body.owner = 'missing-peer';
+    expect(body.ownerName).toBe('');
+    expect(() => body.ownerName.length).not.toThrow();
+
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, { tableId: 'mapA' });
+    tok.owner = 'missing-peer';
+    expect(tok.isHideIn).toBeTrue();
+    expect(tok.ownerName).toBe('');
+    expect(() => tok.ownerName.length).not.toThrow();
+  });
+
   it('setLocation(graveyard) destroys all map Tokens', () => {
     const body = makeCharacter('grave_body');
     body.location.name = 'common';

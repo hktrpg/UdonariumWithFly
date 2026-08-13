@@ -41,7 +41,8 @@ export class ImageFile {
   get identifier(): string { return this.context.identifier };
   get name(): string { return this.context.name };
   get blob(): Blob { return this.context.blob ? this.context.blob : this.context.thumbnail.blob; };
-  get url(): string { return this.context.url ? this.context.url : this.context.thumbnail.url; };
+  /** Always a string — templates frequently read url.length during sync/remount. */
+  get url(): string { return this.context.url || this.context.thumbnail?.url || ''; };
   get thumbnail(): ThumbnailContext { return this.context.thumbnail };
 
   get state(): ImageState {

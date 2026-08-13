@@ -169,7 +169,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   
-  get imageFile(): ImageFile { return this.gameCharacter?.imageFile; }
+  get imageFile(): ImageFile { return this.gameCharacter?.imageFile ?? ImageFile.Empty; }
   get rotate(): number {
     return this.appearanceHost?.rotate ?? 0;
   }
@@ -378,11 +378,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   hasOverviewFaceIcon(): boolean {
-    return !!(this.faceIcon && 0 < this.faceIcon.url.length);
+    return !!(this.faceIcon && 0 < this.faceIcon.url?.length);
   }
 
   get ownerName(): string {
-    return (this.appearanceHost as any)?.ownerName ?? this.gameCharacter?.ownerName;
+    return (this.appearanceHost as any)?.ownerName || this.gameCharacter?.ownerName || '';
   }
   get ownerColor(): string {
     return (this.appearanceHost as any)?.ownerColor ?? this.gameCharacter?.ownerColor;
@@ -409,7 +409,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return ImageStorage.instance.get(<string>this.dialog.faceIconIdentifier);
   }
 
-  get shadowImageFile(): ImageFile { return this.gameCharacter?.shadowImageFile; }
+  get shadowImageFile(): ImageFile { return this.gameCharacter?.shadowImageFile ?? ImageFile.Empty; }
 
   get elevation(): number {
     return +((this.tablePiece.posZ + (this.altitude * this.gridSize)) / this.gridSize).toFixed(1);

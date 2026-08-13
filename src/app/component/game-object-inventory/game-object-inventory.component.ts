@@ -887,10 +887,27 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     return CharacterToken.appearanceHostFor(gameObject) || gameObject;
   }
 
-  /** Stealth / hide-in for inventory row chrome. */
+  /** Stealth / hide-in for inventory row chrome (Token host after legacy migrate). */
   invIsHideIn(gameObject: GameCharacter): boolean {
     const host = this.appearanceHost(gameObject);
     return !!host.owner || !!(host as GameCharacter).isHideIn;
+  }
+
+  /** Owner tag only when an owner id exists (not merely hide-in / empty PeerCursor name). */
+  invHasOwnerTag(gameObject: GameCharacter): boolean {
+    const host = this.appearanceHost(gameObject);
+    return !!(host?.owner && host.owner.length);
+  }
+
+  /** Owner label from appearance host; always a string for template .length safety. */
+  invOwnerName(gameObject: GameCharacter): string {
+    const host = this.appearanceHost(gameObject) as any;
+    return host?.ownerName || '';
+  }
+
+  invOwnerColor(gameObject: GameCharacter): string {
+    const host = this.appearanceHost(gameObject) as any;
+    return host?.ownerColor || '#444444';
   }
 
   toggleOverviewFaceIcon(gameObject: GameCharacter) {

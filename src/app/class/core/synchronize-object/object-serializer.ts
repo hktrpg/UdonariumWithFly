@@ -120,6 +120,7 @@ export class ObjectSerializer {
       return null;
     }
 
+    const tagName = xmlElement.tagName;
     let syncId = xmlElement.getAttribute(ObjectSerializer.SYNC_ID_ATTR);
     if (syncId) {
       syncId = XmlUtil.decodeEntityReference(syncId);
@@ -127,34 +128,50 @@ export class ObjectSerializer {
     }
 
     let gameObject: GameObject = null;
-    // Reuse id only when free (clone while original exists still gets a new UUID).
-    if (syncId && ObjectStore.instance.get(syncId) == null) {
-      ObjectStore.instance.clearDeleted(syncId);
-      gameObject = ObjectFactory.instance.create(xmlElement.tagName, syncId);
-    } else {
-      gameObject = ObjectFactory.instance.create(xmlElement.tagName);
-    }
-    if (!gameObject) return null;
-
-    if ('parseAttributes' in gameObject) {
-      (<XmlAttributes>gameObject).parseAttributes(xmlElement.attributes);
-    } else {
-      let context: ObjectContext = gameObject.toContext();
-      ObjectSerializer.parseAttributes(context.syncData, xmlElement.attributes);
-      gameObject.apply(context);
-    }
-
-    gameObject.initialize();
-    if ('parseInnerXml' in gameObject) {
-      (<InnerXml>gameObject).parseInnerXml(xmlElement);
-    }
     try {
-      gameObject.complement();
-    } catch(e) {
-      console.log(e);
+      // Reuse id only when free (clone while original exists still gets a new UUID).
+      if (syncId && ObjectStore.instance.get(syncId) == null) {
+        ObjectStore.instance.clearDeleted(syncId);
+        gameObject = ObjectFactory.instance.create(tagName, syncId);
+      } else {
+        gameObject = ObjectFactory.instance.create(tagName);
+      }
+      if (!gameObject) return null;
+
+      if ('parseAttributes' in gameObject) {
+        (<XmlAttributes>gameObject).parseAttributes(xmlElement.attributes);
+      } else {
+        let context: ObjectContext = gameObject.toContext();
+        ObjectSerializer.parseAttributes(context.syncData, xmlElement.attributes);
+        gameObject.apply(context);
+      }
+
+      gameObject.initialize();
+      if ('parseInnerXml' in gameObject) {
+        (<InnerXml>gameObject).parseInnerXml(xmlElement);
+      }
+      try {
+        gameObject.complement();
+      } catch (e) {
+        console.warn('[ObjectSerializer] complement failed; keeping object', tagName, syncId || gameObject.identifier, e);
+      }
+
+      return gameObject;
+    } catch (e) {
+      console.warn(
+        '[ObjectSerializer] skip corrupt object',
+        { tag: tagName, syncId: syncId || '', error: String((e as Error)?.message || e) },
+        e
+      );
+      if (gameObject) {
+        try {
+          gameObject.destroy();
+        } catch (destroyErr) {
+          console.warn('[ObjectSerializer] destroy after parse failure failed', destroyErr);
+        }
+      }
+      return null;
     }
-    
-    return gameObject;
   }
 
   static parseAttributes(syncData: Object, attributes: NamedNodeMap): Object {
@@ -182,7 +199,12 @@ export class ObjectSerializer {
 
       let type = typeof obj[key];
       if (type !== 'string' && obj[key] != null) {
-        value = JSON.parse(value);
+        try {
+          value = JSON.parse(value);
+        } catch (e) {
+          console.warn('[ObjectSerializer] skip corrupt attribute value', attributes[i].name, e);
+          continue;
+        }
       }
       obj[key] = value;
     }

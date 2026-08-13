@@ -34,7 +34,8 @@ export class ObjectFactory {
   create<T extends GameObject>(alias: string, identifer?: string): T | null {
     let classConstructor = this.constructorMap.get(alias);
     if (!classConstructor) {
-      console.error('GameObject class named ' + alias + ' is not defined');
+      // Unknown aliases are common in resilient room load; warn instead of error.
+      console.warn('GameObject class named ' + alias + ' is not defined');
       return null;
     }
     let gameObject: GameObject = new classConstructor(identifer);

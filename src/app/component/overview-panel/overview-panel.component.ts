@@ -144,7 +144,7 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   get hasImage(): boolean { return 0 < this.imageUrl.length; }
   get isUseIcon(): boolean {
     const body = this.overviewCharacterBody;
-    return !!(body && body.isUseIconToOverviewImage && body.faceIcon && 0 < body.faceIcon.url.length);
+    return !!(body && body.isUseIconToOverviewImage && body.faceIcon && 0 < body.faceIcon.url?.length);
   }
 
   get roll(): number {

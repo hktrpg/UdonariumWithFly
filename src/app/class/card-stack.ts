@@ -18,14 +18,12 @@ export class CardStack extends TabletopObject {
   
   get name(): string { return this.getCommonValue('name', ''); }
   get ownerName(): string {
-    let object = PeerCursor.findByUserId(this.owner);
-    return object ? object.name : '';
+    return PeerCursor.findByUserId(this.owner)?.name || '';
   }
   get ownerColor(): string {
-    let object = PeerCursor.findByUserId(this.owner);
-    return object ? object.color : '#444444';
+    return PeerCursor.findByUserId(this.owner)?.color || '#444444';
   }
-  get hasOwner(): boolean { return 0 < this.owner.length; }
+  get hasOwner(): boolean { return !!(this.owner && this.owner.length); }
   get ownerIsOnline(): boolean { return this.hasOwner && Network.peers.some(peer => peer.userId === this.owner && peer.isOpen); }
 
   private get cardRoot(): ObjectNode {

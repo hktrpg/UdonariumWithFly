@@ -111,13 +111,12 @@ export class CharacterToken extends TabletopObject {
   }
 
   get ownerName(): string {
-    const object = PeerCursor.findByUserId(this.owner);
-    return object ? object.name : null;
+    // Never return null: templates use ownerName.length during remount / room load.
+    return PeerCursor.findByUserId(this.owner)?.name || '';
   }
 
   get ownerColor(): string {
-    const object = PeerCursor.findByUserId(this.owner);
-    return object ? object.color : '#444444';
+    return PeerCursor.findByUserId(this.owner)?.color || '#444444';
   }
 
   /** Bodies that have at least one Token on the current view. */
@@ -439,42 +438,54 @@ export class CharacterToken extends TabletopObject {
     const characters = ObjectStore.instance.getObjects(GameCharacter);
 
     for (const ch of characters) {
-      if (ch.isTemporaryCopy) {
-        CharacterToken.migrateTemporaryCharacter(ch);
-        count++;
-        continue;
-      }
-      if (ch.location.name !== 'table') continue;
+      try {
+        if (ch.isTemporaryCopy) {
+          CharacterToken.migrateTemporaryCharacter(ch);
+          count++;
+          continue;
+        }
+        if (ch.location.name !== 'table') continue;
 
-      const tokenId = CharacterToken.legacyTokenId(ch.identifier);
-      const existing = ObjectStore.instance.get(tokenId);
-      if (existing instanceof CharacterToken) {
+        const tokenId = CharacterToken.legacyTokenId(ch.identifier);
+        const existing = ObjectStore.instance.get(tokenId);
+        if (existing instanceof CharacterToken) {
+          CharacterToken.ensureBodyOffTable(ch);
+          continue;
+        }
+
+        const tableId =
+          ch.placementTableIds[0] ||
+          ch.tableIdentifier ||
+          viewId ||
+          '';
+        const pose = tableId ? ch.getPoseForTable(tableId) : null;
+        CharacterToken.create(ch.identifier, {
+          x: pose?.x ?? ch.location.x,
+          y: pose?.y ?? ch.location.y,
+          posZ: pose?.posZ ?? ch.posZ,
+        }, {
+          tableId,
+          identifier: tokenId,
+          major: true,
+          copyAppearanceFrom: ch,
+        });
         CharacterToken.ensureBodyOffTable(ch);
-        continue;
+        count++;
+      } catch (e) {
+        console.warn('[CharacterToken] skip legacy migrate for body', ch?.identifier, e);
       }
-
-      const tableId =
-        ch.placementTableIds[0] ||
-        ch.tableIdentifier ||
-        viewId ||
-        '';
-      const pose = tableId ? ch.getPoseForTable(tableId) : null;
-      CharacterToken.create(ch.identifier, {
-        x: pose?.x ?? ch.location.x,
-        y: pose?.y ?? ch.location.y,
-        posZ: pose?.posZ ?? ch.posZ,
-      }, {
-        tableId,
-        identifier: tokenId,
-        major: true,
-        copyAppearanceFrom: ch,
-      });
-      CharacterToken.ensureBodyOffTable(ch);
-      count++;
     }
 
-    CharacterToken.dedupeLegacyTokens();
-    CharacterToken.retargetClueAndRangeEndpoints();
+    try {
+      CharacterToken.dedupeLegacyTokens();
+    } catch (e) {
+      console.warn('[CharacterToken] dedupeLegacyTokens failed', e);
+    }
+    try {
+      CharacterToken.retargetClueAndRangeEndpoints();
+    } catch (e) {
+      console.warn('[CharacterToken] retargetClueAndRangeEndpoints failed', e);
+    }
     return count;
   }
 
@@ -593,8 +604,12 @@ export class CharacterToken extends TabletopObject {
   /** Destroy tokens whose body is gone. */
   static pruneOrphanTokens() {
     for (const t of ObjectStore.instance.getObjects(CharacterToken)) {
-      if (!t.characterId || !t.character) {
-        t.destroy();
+      try {
+        if (!t.characterId || !t.character) {
+          t.destroy();
+        }
+      } catch (e) {
+        console.warn('[CharacterToken] pruneOrphanTokens skip', t?.identifier, e);
       }
     }
   }

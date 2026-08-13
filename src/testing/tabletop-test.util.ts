@@ -1,4 +1,5 @@
 import { Card, CardState } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
 import { CharacterToken } from '@udonarium/character-token';
 import { ClueLink } from '@udonarium/clue-link';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -6,7 +7,9 @@ import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
+import { RangeArea } from '@udonarium/range';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 import { Terrain } from '@udonarium/terrain';
 
@@ -20,14 +23,18 @@ export function resetTabletopStore(): void {
       try { o.destroy(); } catch { /* ignore */ }
     }
   };
+  // Cover every TabletopObject subclass — leftovers change repairOrphan 1:1 pairing.
   destroyAll(ObjectStore.instance.getObjects(ClueLink));
   destroyAll(ObjectStore.instance.getObjects(CharacterToken));
   destroyAll(ObjectStore.instance.getObjects(GameCharacter));
   destroyAll(ObjectStore.instance.getObjects(TextNote));
   destroyAll(ObjectStore.instance.getObjects(Terrain));
+  destroyAll(ObjectStore.instance.getObjects(CardStack));
   destroyAll(ObjectStore.instance.getObjects(Card));
   destroyAll(ObjectStore.instance.getObjects(DiceSymbol));
   destroyAll(ObjectStore.instance.getObjects(GameTableMask));
+  destroyAll(ObjectStore.instance.getObjects(RangeArea));
+  destroyAll(TabletopObject.getAll());
   destroyAll(ObjectStore.instance.getObjects(GameTable));
   ObjectStore.instance.clearDeleteHistory();
   TableSelecter.instance.prepareForRoomReload();

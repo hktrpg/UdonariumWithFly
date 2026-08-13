@@ -505,21 +505,25 @@ export class TabletopObject extends ObjectNode {
     const id = viewTableId || TabletopObject.resolveViewTableIdentifier();
     if (!id) return;
     for (const obj of TabletopObject.getAll()) {
-      if (obj.location.name !== 'table') continue;
-      if (obj.tablePlacements) {
-        // Placements already authoritative — only heal empty primary id.
-        if (!obj.tableIdentifier) {
-          const keys = Object.keys(obj.parsePlacements());
-          if (keys.length) obj.tableIdentifier = keys[0];
+      try {
+        if (obj.location.name !== 'table') continue;
+        if (obj.tablePlacements) {
+          // Placements already authoritative — only heal empty primary id.
+          if (!obj.tableIdentifier) {
+            const keys = Object.keys(obj.parsePlacements());
+            if (keys.length) obj.tableIdentifier = keys[0];
+          }
+          continue;
         }
-        continue;
+        if (obj.tableIdentifier) {
+          obj.ensurePlacementsMigrated();
+          continue;
+        }
+        // Truly unbound (no id, no placements): bind once to the given/current view.
+        obj.addToTable(id, undefined, true);
+      } catch (e) {
+        console.warn('[TabletopObject] migrateUnbound skip', obj?.identifier, e);
       }
-      if (obj.tableIdentifier) {
-        obj.ensurePlacementsMigrated();
-        continue;
-      }
-      // Truly unbound (no id, no placements): bind once to the given/current view.
-      obj.addToTable(id, undefined, true);
     }
   }
 
@@ -547,10 +551,14 @@ export class TabletopObject extends ObjectNode {
     };
 
     for (const obj of TabletopObject.getAll()) {
-      if (obj.location.name !== 'table') continue;
-      obj.ensurePlacementsMigrated();
-      consider(obj.tableIdentifier);
-      for (const tid of Object.keys(obj.parsePlacements())) consider(tid);
+      try {
+        if (obj.location.name !== 'table') continue;
+        obj.ensurePlacementsMigrated();
+        consider(obj.tableIdentifier);
+        for (const tid of Object.keys(obj.parsePlacements())) consider(tid);
+      } catch (e) {
+        console.warn('[TabletopObject] repairOrphan consider skip', obj?.identifier, e);
+      }
     }
     for (const tid of extraOrphanIds) consider(tid);
 
@@ -558,30 +566,39 @@ export class TabletopObject extends ObjectNode {
       if (tables.length === 1) {
         for (const id of orphanIds) remap.set(id, tables[0].identifier);
       } else if (orphanIds.length === tables.length) {
-        for (let i = 0; i < orphanIds.length; i++) remap.set(orphanIds[i], tables[i].identifier);
+        // Pair by sorted id — ObjectStore / getAll() order is not stable across browsers.
+        const sortedOrphans = [...orphanIds].sort();
+        const sortedTableIds = tables.map(t => t.identifier).sort();
+        for (let i = 0; i < sortedOrphans.length; i++) {
+          remap.set(sortedOrphans[i], sortedTableIds[i]);
+        }
       } else {
         const viewId = TabletopObject.resolveViewTableIdentifier() || tables[0].identifier;
         for (const id of orphanIds) remap.set(id, viewId);
       }
 
       for (const obj of TabletopObject.getAll()) {
-        if (obj.location.name !== 'table') continue;
-        const nextPrimary = remap.get(obj.tableIdentifier);
-        if (nextPrimary) obj.tableIdentifier = nextPrimary;
-        const map = obj.parsePlacements();
-        let changed = false;
-        const nextMap: { [tableId: string]: TablePlacementPose } = {};
-        for (const [tid, pose] of Object.entries(map)) {
-          const next = remap.get(tid) || tid;
-          if (validIds.has(next)) {
-            nextMap[next] = pose;
-            if (next !== tid) changed = true;
-          } else {
-            changed = true;
+        try {
+          if (obj.location.name !== 'table') continue;
+          const nextPrimary = remap.get(obj.tableIdentifier);
+          if (nextPrimary) obj.tableIdentifier = nextPrimary;
+          const map = obj.parsePlacements();
+          let changed = false;
+          const nextMap: { [tableId: string]: TablePlacementPose } = {};
+          for (const [tid, pose] of Object.entries(map)) {
+            const next = remap.get(tid) || tid;
+            if (validIds.has(next)) {
+              nextMap[next] = pose;
+              if (next !== tid) changed = true;
+            } else {
+              changed = true;
+            }
           }
-        }
-        if (changed || Object.keys(nextMap).length !== Object.keys(map).length) {
-          obj.tablePlacements = Object.keys(nextMap).length ? JSON.stringify(nextMap) : '';
+          if (changed || Object.keys(nextMap).length !== Object.keys(map).length) {
+            obj.tablePlacements = Object.keys(nextMap).length ? JSON.stringify(nextMap) : '';
+          }
+        } catch (e) {
+          console.warn('[TabletopObject] repairOrphan remap skip', obj?.identifier, e);
         }
       }
     }
