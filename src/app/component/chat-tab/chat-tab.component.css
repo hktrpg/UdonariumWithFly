@@ -20,6 +20,9 @@
 .virtual-scroll-container {
   flex-shrink: 0;
   width: 100%;
+  /* Keep the last line clear of the sticky composer edge / panel padding. */
+  padding-bottom: 6px;
+  box-sizing: border-box;
 }
 
 .tutorial-cards {

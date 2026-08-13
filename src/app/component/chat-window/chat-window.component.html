@@ -1,7 +1,7 @@
 <!--<h2>聊天系統</h2>-->
 <div class="component">
 <div class="log">
-  <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" [leftOnly]="isLeftOnly" (onAddMessage)="scrollToBottom()"></chat-tab>
+  <chat-tab #chatTabComponemt *ngIf="chatTab" [chatTab]="chatTab" [compact]="isCompact" [leftOnly]="isLeftOnly" (onAddMessage)="scheduleScrollToBottom()"></chat-tab>
 </div>
 <div class="sticky-bottom" [ngClass]="{'is-clarify': ClarifyModeActive()}">
   <form *ngIf="!ClarifyModeActive()">

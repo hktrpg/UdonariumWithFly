@@ -174,10 +174,10 @@
         <input type="text" [(ngModel)]="targetUserId" [placeholder]="'peer.targetIdPlaceholder' | i18n" name="targetUserId" />
         <button type="button" class="btn btn-sm btn-primary" (click)="connectPeer()" [disabled]="!networkService.isOpen || targetUserId == null || targetUserId == ''">{{ 'peer.privateConnect' | i18n }}</button>
       </ng-container>
-      <button type="button" class="btn btn-sm btn-primary" *ngIf="networkService.peers.length < 1" (click)="showLobby()" [disabled]="!networkService.isOpen">
+      <button type="button" class="btn btn-sm btn-primary" (click)="showLobby()" [disabled]="!networkService.isOpen">
         <i class="material-icons">meeting_room</i>{{ 'peer.lobby' | i18n }}
       </button>
-      <button type="button" class="btn btn-sm" *ngIf="networkService.peers.length < 1" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
+      <button type="button" class="btn btn-sm" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
       </button>
       <button type="button" class="btn btn-sm" *ngIf="isGMMode && networkService.peer.isRoom && isRoleAuthRoom" (click)="editRoomPasswords()">

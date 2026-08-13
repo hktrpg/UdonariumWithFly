@@ -99,9 +99,11 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   //private minMessageHeight: number = 26;
   private get minMessageHeight(): number {
-    if (this.compact) return 26; 
-    let chatMessage = this.chatTab.chatMessages[this.chatTab.chatMessages.length - 1]
-    return (chatMessage && chatMessage.isOperationLog) ? 26 : 61;
+    let chatMessage = this.chatTab?.chatMessages[this.chatTab.chatMessages.length - 1];
+    const isOpLog = !!(chatMessage && chatMessage.isOperationLog);
+    // Operation logs render compact but stacked (name + body).
+    if (this.compact) return isOpLog ? 40 : 26;
+    return isOpLog ? 40 : 61;
   }
 
   private preScrollTop = 0;
@@ -123,9 +125,11 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   }
 
   get minScrollHeight(): number {
-    return this.chatTab.chatMessages.reduce((height, chatMessage) => { height += chatMessage.isDisplayable ? (this.compact || chatMessage.isOperationLog ? 26 : 61) : 0; return height }, 0);
-    //let length = this.chatTab ? this.chatTab.chatMessages.length : this.sampleMessages.length;
-    //return (length < 10000 ? length : 10000) * this.minMessageHeight;
+    return this.chatTab.chatMessages.reduce((height, chatMessage) => {
+      if (!chatMessage.isDisplayable) return height;
+      if (chatMessage.isOperationLog) return height + 40;
+      return height + (this.compact ? 26 : 61);
+    }, 0);
   }
 
   get topSpace(): number { return this.minScrollHeight - this.bottomSpace; }

@@ -410,7 +410,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /** Open / tab change / new message — retry until virtual list paints. */
-  private scheduleScrollToBottom(force: boolean = true) {
+  scheduleScrollToBottom(force: boolean = true) {
     if (this.openScrollRetryTimers.length) {
       this.openScrollRetryTimers.forEach(t => clearTimeout(t));
       this.openScrollRetryTimers = [];

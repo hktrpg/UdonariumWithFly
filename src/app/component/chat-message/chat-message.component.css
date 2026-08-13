@@ -252,7 +252,9 @@ textarea {
 }
 
 .container.compact {
-  overflow: hidden;
+  /* Keep horizontal clip only — overflow-y:hidden cuts oblique glyphs and wrapped last lines. */
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .container.compact.editing {
@@ -260,13 +262,25 @@ textarea {
 }
 
 .container.compact .message {
-  padding: 2px !important;
+  padding: 2px 2px 4px !important;
 }
 
 .container.compact .body {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* Operation logs are compact but often long; stack so the value line is never clipped. */
+.container.compact .message.operation-log .body {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.container.compact .message.operation-log .text {
+  min-width: 0;
 }
 
 .container.compact .title {
