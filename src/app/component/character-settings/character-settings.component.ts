@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
 import { stringifyCcfoliaClipboard } from '@udonarium/ccfolia-clipboard';
+import { CharacterToken } from '@udonarium/character-token';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { UUID } from '@udonarium/core/system/util/uuid';
 import { DataElement } from '@udonarium/data-element';
@@ -27,6 +28,8 @@ import { SaveDataService } from 'service/save-data.service';
 })
 export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy {
   @Input() character: GameCharacter = null;
+  /** When opened from a map Token, prefer that Token for FoW / cosmetics (plan: vision on Token). */
+  @Input() token: CharacterToken = null;
 
   networkService = Network;
   MAX_IMAGE_ICON_COUNT = 8;
@@ -46,24 +49,89 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   GuestMode() { return Network.GuestMode(); }
 
-  /** Persist vision / light radii into the current map placement. */
+  /**
+   * Map Token used for per-token FoW / placement cosmetics.
+   * Prefer the Token that opened this panel; else view major / any on current map.
+   */
+  get mapToken(): CharacterToken | null {
+    if (!this.character) return null;
+    if (this.token && this.token.characterId === this.character.identifier) return this.token;
+    return CharacterToken.focusTokenForCharacter(this.character.identifier);
+  }
+
+  /** Host for vision / light / token cosmetics: Token when on map, else body (seed). */
+  private get appearanceTarget(): GameCharacter | CharacterToken | null {
+    return this.mapToken || this.character;
+  }
+
+  get visionRange(): number {
+    return this.appearanceTarget?.visionRange ?? 6;
+  }
+  get brightLight(): number {
+    return this.appearanceTarget?.brightLight ?? 0;
+  }
+  get dimLight(): number {
+    return this.appearanceTarget?.dimLight ?? 0;
+  }
+
+  /** Persist vision / light radii onto the Token (or body seed when none on view). */
   syncLightPlacement() {
+    const tok = this.mapToken;
+    if (tok) {
+      tok.syncAppearanceToCurrentViewPlacement();
+      return;
+    }
     this.character?.syncAppearanceToCurrentViewPlacement();
   }
 
   setVisionRange(n: number) {
-    this.character?.mutateAppearance(() => { this.character.visionRange = n; });
+    this.setTokenOrBodyNumber('visionRange', n);
   }
   setBrightLight(n: number) {
-    this.character?.mutateAppearance(() => { this.character.brightLight = n; });
+    this.setTokenOrBodyNumber('brightLight', n);
   }
   setDimLight(n: number) {
-    this.character?.mutateAppearance(() => { this.character.dimLight = n; });
+    this.setTokenOrBodyNumber('dimLight', n);
   }
 
-  /** Desktop cosmetics stored per map. */
+  private setTokenOrBodyNumber(key: 'visionRange' | 'brightLight' | 'dimLight', n: number) {
+    if (this.GuestMode()) return;
+    const value = Number(n) || 0;
+    const tok = this.mapToken;
+    if (tok) {
+      tok.mutateAppearance(() => { (tok as any)[key] = value; });
+      // Keep body as seed for future inventory→map creates.
+      if (this.character) {
+        (this.character as any)[key] = value;
+        this.character.update();
+      }
+      this.changeDetector.markForCheck();
+      return;
+    }
+    if (this.character) {
+      this.character.mutateAppearance(() => { (this.character as any)[key] = value; });
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  /** Desktop cosmetics stored on the map Token when present. */
   setPlacementFlag(key: string, value: any) {
+    if (this.GuestMode()) return;
+    const tok = this.mapToken;
+    if (tok) {
+      tok.mutateAppearance(() => { (tok as any)[key] = value; });
+      if (this.character && key in this.character) (this.character as any)[key] = value;
+      this.changeDetector.markForCheck();
+      return;
+    }
     this.character?.mutateAppearance(() => { (this.character as any)[key] = value; });
+    this.changeDetector.markForCheck();
+  }
+
+  placementFlag(key: string, fallback: any = false): any {
+    const host = this.appearanceTarget as any;
+    if (host && host[key] !== undefined) return host[key];
+    return fallback;
   }
 
   get size(): number { return this.character?.size ?? 1; }
@@ -126,8 +194,14 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
         if (this.character && event.data?.identifier === this.character.identifier) this.panelService.close();
       })
       .on('UPDATE_GAME_OBJECT', event => {
-        if (this.character && event.data?.identifier === this.character.identifier) {
+        const id = event.data?.identifier;
+        if (!id) return;
+        if (this.character && id === this.character.identifier) {
           this.refreshTitle();
+          this.changeDetector.markForCheck();
+          return;
+        }
+        if (this.mapToken && id === this.mapToken.identifier) {
           this.changeDetector.markForCheck();
         }
       })
@@ -290,11 +364,18 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   clone() {
     if (!this.character || this.GuestMode()) return;
-    const cloneObject = this.character.clone() as GameCharacter;
-    cloneObject.location.x += 50;
-    cloneObject.location.y += 50;
-    if (this.character.parent) this.character.parent.appendChild(cloneObject);
-    cloneObject.update();
+    const appearance = CharacterToken.focusTokenForCharacter(this.character.identifier) || this.character;
+    const pose = appearance.getPoseForView
+      ? appearance.getPoseForView()
+      : { x: this.character.location.x, y: this.character.location.y, posZ: this.character.posZ };
+    GameCharacter.cloneCharacter(this.character, {
+      pose: {
+        x: (pose.x || 0) + 50,
+        y: (pose.y || 0) + 50,
+        posZ: pose.posZ || 0,
+      },
+      copyAppearanceFrom: appearance,
+    });
     SoundEffect.play(PresetSound.piecePut);
   }
 

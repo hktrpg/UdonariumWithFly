@@ -53,6 +53,7 @@ import { StandImageService } from 'service/stand-image.service';
 import { I18nService } from 'service/i18n.service';
 import { AppLocale } from 'i18n';
 import '@udonarium/clue-link';
+import { CharacterToken } from '@udonarium/character-token';
 import { GameCharacter } from '@udonarium/game-character';
 import { DataElement } from '@udonarium/data-element';
 import { StandImageComponent } from 'component/stand-image/stand-image.component';
@@ -919,7 +920,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'CombatTrackerComponent':
         component = CombatTrackerComponent;
-        option = { width: 520, height: 420, left: 100, title: this.i18n.t('combat.title') };
+        option = { width: 520, height: 480, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
       case 'SceneToolsComponent':

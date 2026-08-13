@@ -1,13 +1,14 @@
 import { I18nDictionary } from './types';
 
 export const zhCN_ctx: I18nDictionary = {
+  'edit.copy': '复制', 'edit.cut': '剪切', 'edit.paste': '粘贴', 'edit.pasteTemporary': '粘贴为暂存 Token', 'char.copyAdvanced': '高级复制',
   'char.congregate': '集中到这里', 'char.selectedCharacters': '已选择的角色', 'char.moveAllToCommon': '全部移至公共仓库', 'char.moveAllToPersonal': '全部移至个人仓库', 'char.moveAllToGraveyard': '全部移至回收区',
   'char.revealPosition': '公开位置', 'char.selfOnlyStealth': '仅自己可见（隐身）', 'char.stealthTitle': '隐身模式', 'char.stealthText': '已开启隐身：其他人看不到你的光标位置。', 'char.stealthHelp': '只要桌面上有“仅自己可见”的角色，其他人就看不到你的光标位置。',
   'char.imageSwitch': '图片切换', 'char.overviewFaceOn': '☑ 总览显示头像', 'char.overviewFaceOff': '☐ 总览显示头像', 'char.overviewFaceRequired': '请先在角色卡设置头像',   'char.chatBubbleOn': '☑ 显示浮动式对话框', 'char.chatBubbleOff': '☐ 显示浮动式对话框', 'char.chatBubbleTip': '对话内容「」内的文字会立即显示在 Token 上方', 'char.shadowOn': '☑ 显示阴影', 'char.shadowOff': '☐ 显示阴影',
   'char.stackOn': '☑ 可叠在其他角色上', 'char.stackOff': '☐ 可叠在其他角色上', 'char.altitudeOn': '☑ 显示高度', 'char.altitudeOff': '☐ 显示高度', 'char.resetAltitude': '将高度设为0',
-  'char.resetAltitudeAll': '全部将高度设为0', 'char.selectedCount': '已选择 {{count}} 个角色', 'char.inventoryAllOn': '全部在桌面仓库显示', 'char.inventoryAllOff': '全部不在桌面仓库显示', 'char.cloneAll': '全部建立副本', 'char.deleteAllToGraveyard': '全部删除（移至回收区）', 'char.clearSelection': '取消选择',
+  'char.resetAltitudeAll': '全部将高度设为0', 'char.selectedCount': '已选择 {{count}} 个角色', 'char.inventoryAllOn': '全部在桌面仓库显示', 'char.inventoryAllOff': '全部不在桌面仓库显示', 'char.cloneAll': '全部复制 Token', 'char.deleteAllToGraveyard': '全部删除（移至回收区）', 'char.clearSelection': '取消选择',
   'char.showDetail': '显示详情...', 'char.nextImage': '切换下一张图像', 'char.chatOn': '☑ 可进行聊天', 'char.chatOff': '☐ 可进行聊天', 'char.showChatPalette': '显示聊天面板...', 'char.standSetting': '立绘设置...', 'char.openReferenceUrl': '打开参考网址', 'char.invalidUrl': '网址无效',
-  'char.inventoryOn': '☑ 在桌面仓库显示', 'char.inventoryOff': '☐ 在桌面仓库显示', 'char.moveTo': '移动位置', 'char.commonInventory': '公共仓库', 'char.personalInventory': '个人仓库', 'char.graveyard': '回收区', 'char.clone': '建立副本', 'char.createTemporaryCopy': '建立暂存副本', 'char.deleteTemporaryCopy': '删除暂存副本', 'char.cloneNumbered': '建立副本（自动编号）', 'char.deleteToGraveyard': '删除（移至回收区）', 'char.sheetTitle': '角色卡',
+  'char.inventoryOn': '☑ 在桌面仓库显示', 'char.inventoryOff': '☐ 在桌面仓库显示', 'char.majorMarkerOn': '☑ 主标记（此地图）', 'char.majorMarkerOff': '☐ 主标记（此地图）', 'char.moveTo': '移动位置', 'char.commonInventory': '公共仓库', 'char.personalInventory': '个人仓库', 'char.graveyard': '回收区', 'char.clone': '复制角色', 'char.cloneCharacter': '复制角色', 'char.cloneCharacterNumbered': '复制角色（自动编号）', 'char.cloneToken': '复制 Token', 'char.cloneTokenNumbered': '复制 Token（自动编号）', 'char.createTemporaryCopy': '建立暂存 Token', 'char.deleteTemporaryCopy': '删除暂存 Token', 'char.cloneNumbered': '复制角色（自动编号）', 'char.deleteToGraveyard': '删除（移至回收区）', 'char.sheetTitle': '角色卡',
 
   'fx.aura': '光环', 'fx.none': '无', 'fx.clearAura': '清除光环', 'fx.ring': '光环特效', 'fx.ring.none': '无', 'fx.ring.fire': '火环', 'fx.ring.magic': '魔法阵', 'fx.ring.tech': '科技环', 'fx.ring.eldritch': '异界环', 'fx.ring.holy': '圣光环', 'fx.status': '状态',
   'fx.tokenFrame': '外框', 'fx.tokenFrame.none': '无', 'fx.tokenFrame.polaroid': '拍立得', 'fx.tokenFrame.photo': '照片', 'fx.tokenFrame.card': '卡牌',

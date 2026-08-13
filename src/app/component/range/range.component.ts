@@ -22,7 +22,6 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
-import { RangeArea } from '@udonarium/range';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { RangeSettingsComponent } from 'component/range-settings/range-settings.component';
@@ -38,13 +37,14 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 
 import { TabletopService } from 'service/tabletop.service';
+import { GameCharacter } from '@udonarium/game-character';
+import { RangeArea, RangeFollowTarget } from '@udonarium/range';
 import { RangeRender, RangeRenderSetting, ClipAreaCorn, ClipAreaLine, ClipAreaSquare, ClipAreaDiamond} from './range-render'; // 注意：會存取其他元件資料夾來繪製格線
 import { TableSelecter } from '@udonarium/table-selecter';
 import { GameTable } from '@udonarium/game-table';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
-import { GameCharacter } from '@udonarium/game-character';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 
 @Component({
@@ -350,8 +350,8 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     return `${shadow} 0px 0px 3px`;
   }
 
-  get followingCharactor(): GameCharacter { return this.range.followingCharactor; }
-  set followingCharactor(followingCharactor: GameCharacter) { this.range.followingCharactor = followingCharactor; }
+  get followingCharactor(): RangeFollowTarget { return this.range.followingCharactor; }
+  set followingCharactor(followingCharactor: RangeFollowTarget) { this.range.followingCharactor = followingCharactor; }
 
   get isFollowed(): boolean {
     return this.followingCharactor 
@@ -360,10 +360,9 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       && (this.followingCharactor.altitude + this.followingCharactor.posZ - 0.5) <= (this.range.altitude + this.range.posZ) && (this.range.altitude + this.range.posZ) <= (this.followingCharactor.altitude + this.followingCharactor.posZ + 0.5)
   }
 
-  get dockableCharacters(): GameCharacter[] {
-    let ary: GameCharacter[] = this.tabletopService.characters.filter(character => {
+  get dockableCharacters(): RangeFollowTarget[] {
+    let ary: RangeFollowTarget[] = this.tabletopService.characterTokens.filter(character => {
       if (!character.isVisibleOnTable || character.isHideIn) return false;
-      //if (this.range.followingCharctor && this.range.followingCharctor === character) isContainFollowing = true;
       return [
         {x: 0, y: 0},
         {x: character.size * this.gridSize, y: 0},
@@ -448,7 +447,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
               this.setRange();
             });
             markForCheck = true;
-          } else if (object instanceof ObjectNode) {
+          } else if (object instanceof ObjectNode && this.followingCharactor instanceof GameCharacter) {
             if (this.followingCharactor.contains(object)) {
               this.ngZone.run(() => {
                 this.range.following();
@@ -522,10 +521,13 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     e.preventDefault();
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.range);
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
 
     let menuArray = [];
+    menuArray.push(...this.tabletopActionService.makeClipboardMenuActions());
+    if (menuArray.length) menuArray.push(ContextMenuSeparator);
 
     if (this.selectionService.objects.length) {
       menuArray.push({ name: this.i18n.t('range.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });

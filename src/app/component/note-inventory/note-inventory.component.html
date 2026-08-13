@@ -57,11 +57,15 @@
       (click)="toggleExpand(gameObject); $event.stopPropagation()">
       {{expandedId === gameObject.identifier ? ('note.collapse' | i18n) : ('note.expand' | i18n)}}
     </button>
+    <note-settings
+      *ngIf="selectedIdentifier === gameObject.identifier"
+      [note]="gameObject"
+      [embedded]="true"
+      (click)="$event.stopPropagation()"
+    ></note-settings>
   </section>
 
   <p class="empty-hint" *ngIf="filteredNotes().length < 1">{{ 'note.empty' | i18n }}</p>
-
-  <note-settings *ngIf="selected" [note]="selected" [embedded]="true"></note-settings>
 </div>
 <ng-template #guestBlock>
   <div class="settings-ui empty-hint">{{ 'note.guestUnavailable' | i18n }}</div>

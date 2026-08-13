@@ -1,6 +1,7 @@
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
+import { CharacterToken } from './character-token';
 import { GameCharacter } from './game-character';
 import { TextNote } from './text-note';
 import { TableSelecter } from './table-selecter';
@@ -12,7 +13,7 @@ import {
   tokenVisualHeightPx,
 } from './table-fx/push-pin.util';
 
-export type ClueLinkEndpoint = GameCharacter | TextNote;
+export type ClueLinkEndpoint = CharacterToken | GameCharacter | TextNote;
 
 @SyncObject('clue-link')
 export class ClueLink extends GameObject {
@@ -35,7 +36,13 @@ export class ClueLink extends GameObject {
   static resolveEndpoint(id: string): ClueLinkEndpoint | null {
     if (!id) return null;
     const obj = ObjectStore.instance.get(id);
-    if (obj instanceof GameCharacter || obj instanceof TextNote) return obj;
+    if (obj instanceof CharacterToken || obj instanceof TextNote) return obj;
+    if (obj instanceof GameCharacter) {
+      // Prefer the map Token when the body is off-table (strict body/TOKEN model).
+      const tok = CharacterToken.focusTokenForCharacter(obj.identifier);
+      if (tok) return tok;
+      return obj;
+    }
     return null;
   }
 
@@ -77,7 +84,10 @@ export class ClueLink extends GameObject {
   }): boolean {
     if (opts.isSendFromSelf) return false;
     const alias = opts.aliasName || '';
-    return alias === GameCharacter.aliasName || alias === TextNote.aliasName;
+    return alias === GameCharacter.aliasName
+      || alias === CharacterToken.aliasName
+      || alias === 'character-token'
+      || alias === TextNote.aliasName;
   }
 
   isValidOnTable(viewTableId: string): boolean {
@@ -110,7 +120,7 @@ function endpointPinAnchor(obj: ClueLinkEndpoint, gridSize: number): { x: number
     location: { x: pose.x, y: pose.y },
     rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0,
   };
-  if (obj instanceof GameCharacter) {
+  if (obj instanceof CharacterToken || obj instanceof GameCharacter) {
     const s = (obj.size || 1) * gridSize;
     // 3D: token XYZ center; 2D corkboard: push-pin tip.
     if (!TableSelecter.instance?.viewTable?.is2DMode) {

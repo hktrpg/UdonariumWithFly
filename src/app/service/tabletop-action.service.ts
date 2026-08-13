@@ -14,7 +14,7 @@ import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { reconcileLayerStack } from '@udonarium/tabletop-object-util';
 
-import { ContextMenuAction } from './context-menu.service';
+import { ContextMenuAction, ContextMenuSeparator } from './context-menu.service';
 import {
   ensureClueBoardBackground as ensureClueBoardBackgroundSeed,
   makeDefaultTables,
@@ -22,9 +22,12 @@ import {
 } from './default-room/default-room.seed';
 import { I18nService } from './i18n.service';
 import { PointerCoordinate } from './pointer-device.service';
+import { TabletopKeyboardService } from './tabletop-keyboard.service';
+import { TabletopSelectionService } from './tabletop-selection.service';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { RangeArea } from '@udonarium/range';
+import { TabletopObject } from '@udonarium/tabletop-object';
 
 export {
   DEFAULT_BG_2D_IMAGE_ID,
@@ -38,10 +41,78 @@ export {
 })
 export class TabletopActionService {
 
-  constructor(private i18n: I18nService) { }
+  constructor(
+    private i18n: I18nService,
+    private keyboard: TabletopKeyboardService,
+    private selectionService: TabletopSelectionService,
+  ) { }
 
   GuestMode() {
     return Network.GuestMode();
+  }
+
+  /** Right-click: select the target when it was not already in the selection. */
+  ensureObjectSelected(object: TabletopObject): void {
+    this.keyboard.ensureObjectSelected(object);
+  }
+
+  /** Windows-style Copy / Cut for object context menus (requires a selection). */
+  makeClipboardMenuActions(): ContextMenuAction[] {
+    if (this.GuestMode()) return [];
+    const hasSelection = () => this.selectionService.size > 0 || this.keyboard.hasSceneSelection;
+    return [
+      {
+        name: this.i18n.t('edit.copy'),
+        hotkey: 'C',
+        disabled: !hasSelection(),
+        action: () => { this.keyboard.copySelection(); },
+      },
+      {
+        name: this.i18n.t('edit.cut'),
+        hotkey: 'X',
+        disabled: !hasSelection(),
+        action: () => { this.keyboard.cutSelection(); },
+      },
+    ];
+  }
+
+  /** Windows-style Paste for empty-table (and similar) context menus. */
+  makePasteMenuAction(): ContextMenuAction | null {
+    if (this.GuestMode()) return null;
+    return {
+      name: this.i18n.t('edit.paste'),
+      hotkey: 'V',
+      disabled: !this.keyboard.hasClipboard,
+      action: () => { this.keyboard.pasteAtPointer(); },
+    };
+  }
+
+  /** Paste as temporary Token (Ctrl+Shift+V); independent sheet, hidden from inventory. */
+  makePasteTemporaryMenuAction(): ContextMenuAction | null {
+    if (this.GuestMode()) return null;
+    return {
+      name: this.i18n.t('edit.pasteTemporary'),
+      hotkey: '⇧V',
+      disabled: !this.keyboard.hasClipboard,
+      action: () => { this.keyboard.pasteTemporaryAtPointer(); },
+    };
+  }
+
+  /** Paste + paste-temporary actions for empty-table menus. */
+  makePasteMenuActions(): ContextMenuAction[] {
+    const actions: ContextMenuAction[] = [];
+    const paste = this.makePasteMenuAction();
+    const pasteTemp = this.makePasteTemporaryMenuAction();
+    if (paste) actions.push(paste);
+    if (pasteTemp) actions.push(pasteTemp);
+    return actions;
+  }
+
+  /** Prepend Copy / Cut (+ separator) for object context menus. */
+  withClipboardMenuPrefix(actions: ContextMenuAction[]): ContextMenuAction[] {
+    const clip = this.makeClipboardMenuActions();
+    if (!clip.length) return actions;
+    return [...clip, ContextMenuSeparator, ...actions];
   }
 
   createGameCharacter(position: PointerCoordinate): GameCharacter {

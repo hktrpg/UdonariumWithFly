@@ -105,7 +105,12 @@ export class TextNote extends TabletopObject {
   get title(): string { return this.getCommonValue('title', ''); }
   set title(title: string) { this.setCommonValue('title', title); }
   get text(): string { return this.getCommonValue('text', ''); }
-  set text(text: string) { this.setCommonValue('text', text); }
+  set text(text: string) {
+    this.setCommonValue('text', text);
+    // Keep note-type currentValue aligned so XML clipboard / peers see the same body.
+    const el = this.getElement('text', this.commonDataElement);
+    if (el) el.currentValue = text;
+  }
   get color(): string {
     return this.getCommonValue('color', '#444444');
   }

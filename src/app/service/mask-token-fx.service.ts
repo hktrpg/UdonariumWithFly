@@ -2,11 +2,10 @@ import { Injectable, OnDestroy } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { GameCharacter } from '@udonarium/game-character';
-import { GameTableMask } from '@udonarium/game-table-mask';
 import {
   applyMaskTokenFxToCharacter,
   MaskTokenFxSnapshot,
+  MaskTokenFxTarget,
   restoreMaskTokenFxSnapshot,
   snapshotCharacterTokenFx,
 } from '@udonarium/table-fx/mask-token-fx-apply';
@@ -34,7 +33,7 @@ const PASSIVE_FX_KEYS: (keyof MaskTokenFxConfig)[] = [
   'isContrast',
 ];
 
-function characterMatchesPassiveConfig(ch: GameCharacter, cfg: MaskTokenFxConfig): boolean {
+function characterMatchesPassiveConfig(ch: MaskTokenFxTarget, cfg: MaskTokenFxConfig): boolean {
   for (const key of PASSIVE_FX_KEYS) {
     if (!!(ch as any)[key] !== !!cfg[key]) return false;
   }
@@ -42,7 +41,7 @@ function characterMatchesPassiveConfig(ch: GameCharacter, cfg: MaskTokenFxConfig
 }
 
 /** Baseline used when FX were already baked into a loaded save while standing. */
-function clearedFxSnapshot(ch: GameCharacter, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
+function clearedFxSnapshot(ch: MaskTokenFxTarget, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
   const snap = snapshotCharacterTokenFx(ch);
   for (const key of PASSIVE_FX_KEYS) {
     (snap as any)[key] = false;
@@ -89,7 +88,7 @@ export class MaskTokenFxService implements OnDestroy {
    */
   restoreAllActiveForSave() {
     for (const [chId, zone] of Array.from(this.active.entries())) {
-      const ch = ObjectStore.instance.get<GameCharacter>(chId);
+      const ch = ObjectStore.instance.get(chId) as MaskTokenFxTarget;
       if (ch) restoreMaskTokenFxSnapshot(ch, zone.snap);
       this.active.delete(chId);
     }
@@ -118,7 +117,7 @@ export class MaskTokenFxService implements OnDestroy {
     for (const id of characterIds) {
       const zone = this.active.get(id);
       if (!zone) continue;
-      const ch = ObjectStore.instance.get<GameCharacter>(id);
+      const ch = ObjectStore.instance.get(id) as MaskTokenFxTarget;
       if (!ch) continue;
       const altitudeTouched = zone.snap.altitudeTouched;
       zone.snap = snapshotCharacterTokenFx(ch);
@@ -146,11 +145,11 @@ export class MaskTokenFxService implements OnDestroy {
   private refresh() {
     if (Network.GuestMode()) return;
     if (this.active.size === 0 && !this.hasPassiveMask()) return;
-    const characters = this.tabletopService.characters || [];
+    const tokens = this.tabletopService.characterTokens || [];
     const masks = (this.tabletopService.tableMasks || []).filter(m => m?.tokenFxPassive);
     const seen = new Set<string>();
 
-    for (const ch of characters) {
+    for (const ch of tokens) {
       if (!ch || ch.location.name !== 'table') continue;
       const top = pickTopPassiveMask(masks, ch);
       const chId = ch.identifier;
@@ -201,7 +200,7 @@ export class MaskTokenFxService implements OnDestroy {
     for (const chId of Array.from(this.active.keys())) {
       if (seen.has(chId)) continue;
       const prev = this.active.get(chId);
-      const ch = ObjectStore.instance.get<GameCharacter>(chId);
+      const ch = ObjectStore.instance.get(chId) as MaskTokenFxTarget;
       if (ch && prev) restoreMaskTokenFxSnapshot(ch, prev.snap);
       this.active.delete(chId);
     }

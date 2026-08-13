@@ -1,9 +1,18 @@
-import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { Terrain } from '@udonarium/terrain';
 
 import { collectFootprintWalls, WallPolyline } from './footprint-walls';
+
+/** Minimal table actor for FoW / lighting (GameCharacter or CharacterToken). */
+export interface VisionLightActor {
+  identifier: string;
+  location: { x: number; y: number };
+  size: number;
+  visionRangeGrid: number;
+  brightLightGrid: number;
+  dimLightGrid: number;
+}
 
 /** Foundry-style: GI on unless darkness meets/exceeds optional threshold. */
 export function isGlobalIlluminationActive(table: GameTable): boolean {
@@ -47,7 +56,7 @@ export function isLineBlockedByWalls(
   return false;
 }
 
-function charCenter(ch: GameCharacter, grid: number): { x: number; y: number } {
+function charCenter(ch: VisionLightActor, grid: number): { x: number; y: number } {
   return {
     x: ch.location.x + (ch.size * grid) / 2,
     y: ch.location.y + (ch.size * grid) / 2,
@@ -71,8 +80,8 @@ export function isPointRevealedToViewer(
   x: number,
   y: number,
   table: GameTable,
-  visionCharacters: GameCharacter[],
-  lightCharacters: GameCharacter[],
+  visionCharacters: VisionLightActor[],
+  lightCharacters: VisionLightActor[],
   masks?: GameTableMask[],
   terrains?: Terrain[],
 ): boolean {
@@ -118,16 +127,16 @@ export function isPointRevealedToViewer(
 }
 
 export function isCharacterRevealedToViewer(
-  target: GameCharacter,
+  target: VisionLightActor & { providesVisionTo?(userId: string): boolean },
   table: GameTable,
-  visionCharacters: GameCharacter[],
-  lightCharacters: GameCharacter[],
+  visionCharacters: VisionLightActor[],
+  lightCharacters: VisionLightActor[],
   viewerUserId: string,
   masks?: GameTableMask[],
   terrains?: Terrain[],
 ): boolean {
   if (!table?.visionEnabled) return true;
-  if (target.providesVisionTo(viewerUserId)) return true;
+  if (target.providesVisionTo?.(viewerUserId)) return true;
   const grid = table.gridSize || 50;
   const c = charCenter(target, grid);
   return isPointRevealedToViewer(c.x, c.y, table, visionCharacters, lightCharacters, masks, terrains);

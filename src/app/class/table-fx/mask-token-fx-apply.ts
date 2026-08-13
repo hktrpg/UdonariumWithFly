@@ -1,6 +1,12 @@
 import { GameCharacter } from '@udonarium/game-character';
 import { ImageEffectSource } from '@udonarium/table-fx/image-effect';
 import { MaskTokenFxConfig } from '@udonarium/table-fx/mask-appearance';
+import { TabletopObject } from '@udonarium/tabletop-object';
+
+export type MaskTokenFxTarget = TabletopObject & ImageEffectSource & {
+  altitude: number;
+  mutateAppearance: (mutator: () => void) => void;
+};
 
 export interface MaskTokenFxSnapshot {
   isInverse: boolean;
@@ -28,7 +34,7 @@ const FX_KEYS: (keyof ImageEffectSource)[] = [
   'isContrast',
 ];
 
-export function snapshotCharacterTokenFx(ch: GameCharacter): MaskTokenFxSnapshot {
+export function snapshotCharacterTokenFx(ch: MaskTokenFxTarget): MaskTokenFxSnapshot {
   return {
     isInverse: !!ch.isInverse,
     isHollow: !!ch.isHollow,
@@ -44,13 +50,17 @@ export function snapshotCharacterTokenFx(ch: GameCharacter): MaskTokenFxSnapshot
   };
 }
 
-function setAltitudeValue(ch: GameCharacter, altitude: number) {
-  const el = ch.commonDataElement?.getFirstElementByName('altitude');
-  if (el) el.value = altitude;
+function setAltitudeValue(ch: MaskTokenFxTarget, altitude: number) {
+  if (ch instanceof GameCharacter) {
+    const el = ch.commonDataElement?.getFirstElementByName('altitude');
+    if (el) el.value = altitude;
+    return;
+  }
+  ch.altitude = altitude;
 }
 
-/** Apply mask FX config to character; returns snapshot taken before apply. */
-export function applyMaskTokenFxToCharacter(ch: GameCharacter, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
+/** Apply mask FX config to character/token; returns snapshot taken before apply. */
+export function applyMaskTokenFxToCharacter(ch: MaskTokenFxTarget, cfg: MaskTokenFxConfig): MaskTokenFxSnapshot {
   const snap = snapshotCharacterTokenFx(ch);
   if (!ch || !cfg) return snap;
   const mode = cfg.altitudeMode || 'none';
@@ -69,7 +79,7 @@ export function applyMaskTokenFxToCharacter(ch: GameCharacter, cfg: MaskTokenFxC
   return snap;
 }
 
-export function restoreMaskTokenFxSnapshot(ch: GameCharacter, snap: MaskTokenFxSnapshot): void {
+export function restoreMaskTokenFxSnapshot(ch: MaskTokenFxTarget, snap: MaskTokenFxSnapshot): void {
   if (!ch || !snap) return;
   ch.mutateAppearance(() => {
     ch.isInverse = snap.isInverse;

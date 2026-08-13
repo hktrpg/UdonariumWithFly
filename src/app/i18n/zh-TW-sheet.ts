@@ -5,7 +5,7 @@ export const zhTW_sheet: I18nDictionary = {
   'sheet.changeAllBackImages': '變更全部卡片的背面圖片', 'sheet.changeFloorImage': '變更地板圖片', 'sheet.changeWallImage': '變更牆壁圖片',
   'sheet.changeDiceImage': '變更骰子點數圖片', 'sheet.imageReplaceDelete': '圖片置換/刪除', 'sheet.imageSet': '圖片設定',
   'sheet.faceIconAdd': '大頭貼 icon新增', 'sheet.faceIconSet': '大頭貼 icon設定', 'sheet.changeImage': '變更圖片',
-  'sheet.createCopy': '建立副本', 'sheet.download': '下載', 'sheet.exportCcfoliaJson': '匯出 JSON', 'sheet.location.table': '桌面', 'sheet.location.common': '公用倉庫',
+  'sheet.createCopy': '建立副本', 'sheet.cloneCharacter': '複製角色', 'sheet.download': '下載', 'sheet.exportCcfoliaJson': '匯出 JSON', 'sheet.location.table': '桌面', 'sheet.location.common': '公用倉庫',
   'sheet.location.personal': '個人倉庫', 'sheet.location.graveyard': '回收區', 'sheet.changeShadow': '變更圖片陰影',
   'sheet.deleteFaceIcon': '刪除大頭貼', 'sheet.switchImageSettings': '切換圖片設定', 'sheet.showChatPalette': '顯示聊天面板',
   'sheet.standSettings': '立繪設定', 'sheet.addItem': '新增項目', 'sheet.data.title': '標題', 'sheet.data.tag': '標籤',

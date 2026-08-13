@@ -214,8 +214,14 @@ img {
   }
 }
 
-span {
-  cursor: text;
+/*
+  Do NOT set cursor:text on all spans — tabletop chrome uses <span> wrappers
+  (e.g. photo/polaroid token frames). That forced an I-beam over grab pieces.
+  Text fields / chat keep their own cursor rules.
+*/
+.is-grab span,
+.is-grabbing span {
+  cursor: inherit;
 }
 
 label, input[type=checkbox], input[type=radio], option, select {

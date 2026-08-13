@@ -118,6 +118,13 @@
   margin-top: 6px;
 }
 
+.note-card note-settings {
+  display: block;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--udon-control-border, #c4b29a);
+}
+
 .note-meta {
   display: flex;
   flex-wrap: wrap;

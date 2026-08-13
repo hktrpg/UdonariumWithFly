@@ -33,6 +33,7 @@ import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TabletopActionService } from 'service/tabletop-action.service';
 
 @Component({
     selector: 'dice-symbol',
@@ -199,6 +200,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     private imageService: ImageService,
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
+    private tabletopActionService: TabletopActionService,
     private i18n: I18nService
   ) { }
 
@@ -322,6 +324,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
 
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.diceSymbol);
     let position = this.pointerDeviceService.pointers[0];
 
     let actions: ContextMenuAction[] = [];
@@ -334,6 +337,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       actions = actions.concat(this.makeSelectionContextMenu());
       actions = actions.concat(this.makeContextMenu());
     }
+    actions = this.tabletopActionService.withClipboardMenuPrefix(actions);
 
     this.contextMenuService.open(position, actions, title);
   }

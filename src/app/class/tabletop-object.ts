@@ -126,7 +126,10 @@ export class TabletopObject extends ObjectNode {
     this.location.name = 'table';
     if (syncLive) {
       const viewId = TabletopObject.resolveViewTableIdentifier();
-      if (!viewId || viewId === tableId) {
+      // Always apply live coords when this is the only placement (common for Tokens
+      // seeded onto a non-viewed map). Otherwise movable mounts at 0,0 until hydrate.
+      const onlyPlacement = Object.keys(map).length === 1;
+      if (!viewId || viewId === tableId || onlyPlacement) {
         this.location.x = pose.x;
         this.location.y = pose.y;
         this.posZ = pose.posZ;
@@ -362,7 +365,14 @@ export class TabletopObject extends ObjectNode {
   /** Destroy temporary copies; otherwise optional graveyard callback. */
   static disposeObject(obj: TabletopObject, toGraveyard?: () => void) {
     if (obj.isTemporaryCopy) {
-      obj.destroy();
+      // Temporary CharacterTokens own a hidden independent sheet — destroy both.
+      if (obj.aliasName === 'character-token') {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { CharacterToken } = require('./character-token') as typeof import('./character-token');
+        CharacterToken.destroyToken(obj as import('./character-token').CharacterToken);
+      } else {
+        obj.destroy();
+      }
       return;
     }
     if (toGraveyard) toGraveyard();

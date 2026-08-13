@@ -1,11 +1,13 @@
-import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
 
 const GRID = 50;
 
-/** Same view/active table check for mask ↔ character. */
-export function sameTableForMask(ch: GameCharacter, mask: GameTableMask): boolean {
+export type MaskOverlapPiece = TabletopObject & { size?: number };
+
+/** Same view/active table check for mask ↔ character / token. */
+export function sameTableForMask(ch: TabletopObject, mask: GameTableMask): boolean {
   if (!ch || !mask) return false;
   if (ch.location.name !== 'table' || mask.location.name !== 'table') return false;
   const viewId = TableSelecter.instance.viewTable?.identifier || '';
@@ -18,7 +20,7 @@ export function sameTableForMask(ch: GameCharacter, mask: GameTableMask): boolea
 }
 
 /** Axis-aligned overlap in table pixels (grid size 50). */
-export function isCharacterOnMask(ch: GameCharacter, mask: GameTableMask, gridSize: number = GRID): boolean {
+export function isCharacterOnMask(ch: MaskOverlapPiece, mask: GameTableMask, gridSize: number = GRID): boolean {
   if (!sameTableForMask(ch, mask)) return false;
   const poseCh = ch.getPoseForView();
   const poseMask = mask.getPoseForView();
@@ -32,13 +34,18 @@ export function isCharacterOnMask(ch: GameCharacter, mask: GameTableMask, gridSi
   return !(cx + cs <= mx || mx + mw <= cx || cy + cs <= my || my + mh <= cy);
 }
 
-export function charactersOnMask(characters: GameCharacter[], mask: GameTableMask, gridSize: number = GRID): GameCharacter[] {
+/** Pieces whose footprint overlaps the mask (CharacterToken or legacy body). */
+export function charactersOnMask<T extends MaskOverlapPiece>(
+  characters: T[],
+  mask: GameTableMask,
+  gridSize: number = GRID,
+): T[] {
   if (!mask || !characters?.length) return [];
   return characters.filter(ch => isCharacterOnMask(ch, mask, gridSize));
 }
 
 /** Prefer highest posZ when multiple passive masks cover a token. */
-export function pickTopPassiveMask(masks: GameTableMask[], ch: GameCharacter): GameTableMask | null {
+export function pickTopPassiveMask(masks: GameTableMask[], ch: TabletopObject & { size?: number }): GameTableMask | null {
   let best: GameTableMask = null;
   let bestZ = -Infinity;
   for (const mask of masks) {

@@ -1,6 +1,7 @@
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 
+import { CharacterToken } from '@udonarium/character-token';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -207,9 +208,21 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Token is on another map (still location=table, not the current view). */
+  /** Body has Tokens on other maps but none on the current view. */
   isOnOtherTable(gameObject: TabletopObject): boolean {
-    return gameObject.location?.name === 'table' && !gameObject.isVisibleOnTable;
+    if (!(gameObject instanceof GameCharacter)) {
+      return gameObject.location?.name === 'table' && !gameObject.isVisibleOnTable;
+    }
+    return CharacterToken.hasTokenOnlyOnOtherMaps(gameObject.identifier);
+  }
+
+  /** Body currently has a Token on the viewed map. */
+  hasTokenOnView(gameObject: GameCharacter): boolean {
+    return CharacterToken.tokensOnTable(gameObject.identifier).length > 0;
+  }
+
+  private placeBodyTokenOnView(gameObject: GameCharacter, temporary = false): CharacterToken {
+    return CharacterToken.create(gameObject.identifier, undefined, { temporary });
   }
 
   getInventoryTags(gameObject: GameCharacter): DataElement[] {
@@ -256,7 +269,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
             selectedCharacter().forEach(gameCharacter => {
               EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
               let isStealthMode = GameCharacter.isStealthMode;
-              gameCharacter.setLocation('table');
+              this.placeBodyTokenOnView(gameCharacter);
               this.selectionService.remove(gameCharacter);
               if (gameCharacter.isHideIn && gameCharacter.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
                 this.modalService.open(ConfirmationComponent, {
@@ -327,19 +340,26 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const inGraveyard = gameObject.location.name === 'graveyard';
 
     const identity: (ContextMenuAction | null)[] = [
-      (gameObject.isVisibleOnTable && (this.isGMMode || gameObject.isVisible)) ? {
+      (this.hasTokenOnView(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.findOnTable'),
         action: () => {
-          if (gameObject.isVisibleOnTable) EventSystem.trigger('FOCUS_TABLETOP_OBJECT', { x: gameObject.location.x, y: gameObject.location.y, z: gameObject.posZ + (gameObject.altitude > 0 ? gameObject.altitude * 50 : 0) });
+          const tok = CharacterToken.focusTokenForCharacter(gameObject.identifier);
+          if (tok) {
+            EventSystem.trigger('FOCUS_TABLETOP_OBJECT', {
+              x: tok.location.x,
+              y: tok.location.y,
+              z: tok.posZ + (tok.altitude > 0 ? tok.altitude * 50 : 0),
+            });
+          }
         },
-        default: gameObject.isVisibleOnTable,
-        disabled: !gameObject.isVisibleOnTable,
+        default: true,
+        disabled: !this.hasTokenOnView(gameObject),
         selfOnly: true
       } : null,
       (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('inv.placeOnCurrentMap'),
         action: () => {
-          gameObject.addToTable();
+          this.placeBodyTokenOnView(gameObject);
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
@@ -347,26 +367,29 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       (this.isOnOtherTable(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('inv.moveToCurrentMapOnly'),
         action: () => {
-          gameObject.moveToTableOnly();
+          CharacterToken.removeTokensOnTable(gameObject.identifier);
+          // Also clear leftover body placements if any legacy ones remain.
+          if (gameObject.location.name === 'table') gameObject.removeFromTable();
+          this.placeBodyTokenOnView(gameObject);
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      (gameObject.isVisibleOnTable && (this.isGMMode || gameObject.isVisible)) ? {
+      (this.hasTokenOnView(gameObject) && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('inv.removeFromCurrentMap'),
         action: () => {
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
-          gameObject.removeFromTable();
+          CharacterToken.removeTokensOnTable(gameObject.identifier);
           SoundEffect.play(PresetSound.piecePut);
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      (gameObject.location.name != 'table' && (this.isGMMode || gameObject.isVisible)) ? {
+      (!this.hasTokenOnView(gameObject) && gameObject.location.name != 'graveyard' && (this.isGMMode || gameObject.isVisible)) ? {
         name: this.i18n.t('char.moveToTable'),
         action: () => {
           let isStealthMode = GameCharacter.isStealthMode;
           EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
-          gameObject.setLocation('table');
+          this.placeBodyTokenOnView(gameObject);
           this.selectionService.remove(gameObject);
           if (gameObject.isHideIn && gameObject.isVisible && !isStealthMode && !PeerCursor.myCursor.isGMMode) {
             this.modalService.open(ConfirmationComponent, {
@@ -381,31 +404,41 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           EventSystem.call('UPDATE_INVENTORY', true);
         }
       } : null,
-      gameObject.isHideIn ? {
-        name: this.i18n.t('char.revealPosition'),
-        action: () => {
-          gameObject.owner = '';
-          SoundEffect.play(PresetSound.piecePut);
-          EventSystem.trigger('UPDATE_INVENTORY', null);
+      (() => {
+        const stealthHost = CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+        const isHidden = !!stealthHost.owner || !!(stealthHost as GameCharacter).isHideIn;
+        if (isHidden) {
+          return {
+            name: this.i18n.t('char.revealPosition'),
+            action: () => {
+              stealthHost.owner = '';
+              SoundEffect.play(PresetSound.piecePut);
+              EventSystem.trigger('UPDATE_INVENTORY', null);
+            }
+          };
         }
-      } : null,
-      (!gameObject.isHideIn || !gameObject.isVisible) ? {
-        name: this.i18n.t('char.selfOnlyStealth'),
-        action: () => {
-          if (gameObject.isVisibleOnTable && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
-            this.modalService.open(ConfirmationComponent, {
-              title: this.i18n.t('char.stealthTitle'),
-              text: this.i18n.t('char.stealthText'),
-              help: this.i18n.t('char.stealthHelp'),
-              type: ConfirmationType.OK,
-              materialIcon: 'disabled_visible'
-            });
+        return {
+          name: this.i18n.t('char.selfOnlyStealth'),
+          action: () => {
+            const onTable = stealthHost instanceof CharacterToken
+              ? stealthHost.isVisibleOnTable
+              : gameObject.isVisibleOnTable;
+            if (onTable && !GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
+              this.modalService.open(ConfirmationComponent, {
+                title: this.i18n.t('char.stealthTitle'),
+                text: this.i18n.t('char.stealthText'),
+                help: this.i18n.t('char.stealthHelp'),
+                type: ConfirmationType.OK,
+                materialIcon: 'disabled_visible'
+              });
+            }
+            stealthHost.owner = Network.peer.userId;
+            if (!gameObject.visionOwner) gameObject.visionOwner = Network.peer.userId;
+            SoundEffect.play(PresetSound.sweep);
+            EventSystem.call('UPDATE_INVENTORY', true);
           }
-          gameObject.owner = Network.peer.userId;
-          SoundEffect.play(PresetSound.sweep);
-          EventSystem.call('UPDATE_INVENTORY', true);
-        }
-      } : null,
+        };
+      })(),
       this.characterFxMenu.makeMyTokenMenu(gameObject),
       this.characterFxMenu.makeCombatMenu(gameObject),
     ];
@@ -563,32 +596,17 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         disabled: !gameObject.isVisible && !this.isGMMode
       },
       {
-        name: this.i18n.t('char.clone'),
+        name: this.i18n.t('char.cloneCharacter'),
         action: () => {
-          this.cloneGameObject(gameObject);
+          this.cloneCharacterBody(gameObject);
           SoundEffect.play(PresetSound.piecePut);
         },
         disabled: !gameObject.isVisible && !this.isGMMode
       },
       {
-        name: this.i18n.t('char.cloneNumbered'),
+        name: this.i18n.t('char.cloneCharacterNumbered'),
         action: () => {
-          const cloneObject = gameObject.clone();
-          const tmp = cloneObject.name.split('_');
-          let baseName;
-          if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-            baseName = tmp.slice(0, tmp.length - 1).join('_');
-          } else {
-            baseName = tmp.join('_');
-          }
-          let maxIndex = 0;
-          for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-            if (!character.name.startsWith(baseName)) continue;
-            let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-            if (index > maxIndex) maxIndex = index;
-          }
-          cloneObject.name = baseName + '_' + (maxIndex + 1);
-          cloneObject.update();
+          this.cloneCharacterBody(gameObject, true);
           SoundEffect.play(PresetSound.piecePut);
         },
         disabled: !gameObject.isVisible && !this.isGMMode
@@ -670,6 +688,25 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   private cloneGameObject(gameObject: TabletopObject) {
     if (this.GuestMode()) return;
     gameObject.clone();
+  }
+
+  /** New sheet (+ Token on current view when a map is open). */
+  private cloneCharacterBody(gameObject: GameCharacter, numbered = false) {
+    if (this.GuestMode()) return;
+    const appearance = CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+    const pose = appearance.getPoseForView
+      ? appearance.getPoseForView()
+      : { x: gameObject.location.x, y: gameObject.location.y, posZ: gameObject.posZ };
+    GameCharacter.cloneCharacter(gameObject, {
+      numbered,
+      pose: {
+        x: (pose.x || 0) + 50,
+        y: (pose.y || 0) + 50,
+        posZ: pose.posZ || 0,
+      },
+      copyAppearanceFrom: appearance as any,
+    });
+    EventSystem.call('UPDATE_INVENTORY', true);
   }
 
   private createTemporaryCopy(gameObject: GameCharacter) {
@@ -967,9 +1004,15 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const isStealthMode = GameCharacter.isStealthMode;
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
     if (location === 'table') {
-      gameObject.setLocation('table');
-    } else if (gameObject.location.name === 'table') {
-      gameObject.leaveCurrentTable(location);
+      this.placeBodyTokenOnView(gameObject);
+    } else if (this.hasTokenOnView(gameObject) || gameObject.location.name === 'table') {
+      CharacterToken.removeTokensOnTable(gameObject.identifier);
+      if (gameObject.location.name === 'table') {
+        gameObject.leaveCurrentTable(location);
+      } else {
+        const viewId = TabletopObject.resolveViewTableIdentifier() || '';
+        gameObject.setLocation(location, viewId || undefined);
+      }
     } else {
       // Off-table → off-table (or rebind to current map's inventory).
       const viewId = TabletopObject.resolveViewTableIdentifier() || '';

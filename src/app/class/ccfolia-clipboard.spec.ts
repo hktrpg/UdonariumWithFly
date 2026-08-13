@@ -4,6 +4,8 @@ import {
   toCcfoliaClipboardJson,
   tryParseCcfoliaCharacter,
 } from './ccfolia-clipboard';
+import { CharacterToken } from './character-token';
+import { GameCharacter } from './game-character';
 import {
   makeCharacter,
   makeTable,
@@ -35,6 +37,7 @@ describe('CCFOLIA clipboard', () => {
   it('createGameCharacterFromCcfolia builds a named token at pose', () => {
     makeTable('mapA');
     viewTables('mapA');
+    GameCharacter.allowLegacyBodyOnTable = false;
     const clipboard = tryParseCcfoliaCharacter(JSON.stringify({
       kind: 'character',
       data: {
@@ -51,6 +54,11 @@ describe('CCFOLIA clipboard', () => {
     const ch = createGameCharacterFromCcfolia(clipboard!, { x: 30, y: 40 });
     expect(ch.name).toBe('Bob');
     expect(ch.rotate).toBe(45);
+    expect(ch.location.name).not.toBe('table');
+    const tokens = CharacterToken.tokensOnTable(ch.identifier, 'mapA');
+    expect(tokens.length).toBe(1);
+    expect(tokens[0].location.x).toBe(5);
+    expect(tokens[0].location.y).toBe(15);
   });
 
   it('round-trips name via toCcfoliaClipboardJson / stringify', () => {

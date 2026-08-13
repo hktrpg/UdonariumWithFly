@@ -1,5 +1,6 @@
 import { Card } from './card';
 import { CardStack } from './card-stack';
+import { CharacterToken } from './character-token';
 import { ClueLink } from './clue-link';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
@@ -32,6 +33,7 @@ export class Room extends GameObject implements InnerXml {
     let objects: GameObject[] = [];
     objects = objects.concat(ObjectStore.instance.getObjects(GameTable));
     objects = objects.concat(ObjectStore.instance.getObjects(GameCharacter));
+    objects = objects.concat(ObjectStore.instance.getObjects(CharacterToken));
     objects = objects.concat(ObjectStore.instance.getObjects(RangeArea));
     objects = objects.concat(ObjectStore.instance.getObjects(TextNote));
     objects = objects.concat(ObjectStore.instance.getObjects(CardStack));
@@ -54,6 +56,7 @@ export class Room extends GameObject implements InnerXml {
     objects = objects.concat(ObjectStore.instance.getObjects(GameTableMask));
     objects = objects.concat(ObjectStore.instance.getObjects(Terrain));
     objects = objects.concat(ObjectStore.instance.getObjects(GameCharacter));
+    objects = objects.concat(ObjectStore.instance.getObjects(CharacterToken));
     objects = objects.concat(ObjectStore.instance.getObjects(RangeArea));
     objects = objects.concat(ObjectStore.instance.getObjects(TextNote));
     objects = objects.concat(ObjectStore.instance.getObjects(CardStack));
@@ -118,6 +121,7 @@ export class Room extends GameObject implements InnerXml {
     objects = objects.concat(ObjectStore.instance.getObjects(GameTableMask));
     objects = objects.concat(ObjectStore.instance.getObjects(Terrain));
     objects = objects.concat(ObjectStore.instance.getObjects(GameCharacter));
+    objects = objects.concat(ObjectStore.instance.getObjects(CharacterToken));
     objects = objects.concat(ObjectStore.instance.getObjects(RangeArea));
     objects = objects.concat(ObjectStore.instance.getObjects(TextNote));
     objects = objects.concat(ObjectStore.instance.getObjects(CardStack));

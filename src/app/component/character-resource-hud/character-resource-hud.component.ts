@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { CharacterToken } from '@udonarium/character-token';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -47,7 +48,17 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
 
   get characters(): GameCharacter[] {
     if (this.isGm && this.showAllForGm) {
-      return ObjectStore.instance.getObjects(GameCharacter).filter(ch => ch.isVisibleOnTable);
+      // Bodies are off-table; list unique sheets that have a visible Token on the current view.
+      const seen = new Set<string>();
+      const out: GameCharacter[] = [];
+      for (const tok of ObjectStore.instance.getObjects(CharacterToken)) {
+        if (!tok.isVisibleOnTable || tok.isTemporaryCopy) continue;
+        const body = tok.character;
+        if (!body || body.isTemporaryCopy || seen.has(body.identifier)) continue;
+        seen.add(body.identifier);
+        out.push(body);
+      }
+      return out;
     }
     const mine = this.claimed;
     return mine ? [mine] : [];

@@ -8,6 +8,7 @@ import {
   reconcileLayerStack,
   stackTranslateZPx,
 } from './tabletop-object-util';
+import { GameCharacter } from './game-character';
 import {
   makeCard,
   makeCharacter,
@@ -19,7 +20,10 @@ import {
 } from '../../testing/tabletop-test.util';
 
 describe('shared LAYER_STACK [ ] peers', () => {
-  beforeEach(() => resetTabletopStore());
+  beforeEach(() => {
+    resetTabletopStore();
+    GameCharacter.allowLegacyBodyOnTable = true;
+  });
   afterEach(() => resetTabletopStore());
 
   function placeDeskAndMask() {

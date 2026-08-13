@@ -12,11 +12,15 @@ import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-seri
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
+import { CharacterToken } from '@udonarium/character-token';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TableDrawing } from '@udonarium/table-fx/table-drawing';
+import { TableLight } from '@udonarium/table-fx/table-light';
+import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { moveToBackmost, moveToTopmost, reconcileLayerStack, Stackable } from '@udonarium/tabletop-object-util';
@@ -31,7 +35,7 @@ import { ContextMenuService } from './context-menu.service';
 import { ModalService } from './modal.service';
 import { PanelService } from './panel.service';
 import { SceneToolService } from './scene-tool.service';
-import { TabletopSelectionService } from './tabletop-selection.service';
+import { SelectionState, TabletopSelectionService } from './tabletop-selection.service';
 import { TokenPathMoveService } from './token-path-move.service';
 import { DeleteEntry, UndoService } from './undo.service';
 
@@ -49,6 +53,10 @@ const ALTITUDE_MAX = 12;
 export class TabletopKeyboardService {
   private readonly pressed = new Set<string>();
   private clipboardXml: string[] = [];
+  /** Source ids parallel to clipboardXml (for TextNote cross-map shared paste). */
+  private clipboardSourceIds: string[] = [];
+  /** Set when Ctrl+Shift+V is handled on keydown so the following paste event is ignored. */
+  private ignoreNextPaste = false;
   private listening = false;
   /** Acc for Alt/Ctrl+Shift wheel → one discrete step per notch. */
   private wheelAcc = 0;
@@ -181,6 +189,16 @@ export class TabletopKeyboardService {
         this.handleSelectAll(e);
         return;
       }
+    }
+
+    if (mod && e.shiftKey && !this.altHeld && code === 'KeyV') {
+      // Ctrl+Shift+V: temporary Token paste (not a shared inventory body).
+      if (this.hasTextSelection()) return;
+      if (this.pasteTemporaryAtPointer()) {
+        this.ignoreNextPaste = true;
+        this.consume(e);
+      }
+      return;
     }
 
     if (mod && e.shiftKey && !this.altHeld && code === 'KeyZ') {
@@ -455,14 +473,15 @@ export class TabletopKeyboardService {
 
   private selectAllMapTokens(): boolean {
     this.selectionService.clear();
-    const characters = ObjectStore.instance.getObjects(GameCharacter) as GameCharacter[];
+    const tokens = ObjectStore.instance.getObjects(CharacterToken);
     let count = 0;
-    let first: GameCharacter = null;
-    for (const ch of characters) {
-      if (!ch.isVisibleOnTable) continue;
-      if (!ch.isVisible && !(PeerCursor.myCursor?.isGMMode)) continue;
-      this.selectionService.add(ch);
-      if (!first) first = ch;
+    let first: CharacterToken = null;
+    const isGM = !!PeerCursor.myCursor?.isGMMode;
+    for (const tok of tokens) {
+      if (!tok.isVisibleOnTable) continue;
+      if (!tok.isVisible && !isGM) continue;
+      this.selectionService.add(tok);
+      if (!first) first = tok;
       count++;
     }
     if (first) {
@@ -661,16 +680,71 @@ export class TabletopKeyboardService {
     return false;
   }
 
-  private copySelection(): boolean {
-    if (Network.GuestMode()) return false;
-    if (this.selectionService.size < 1) return false;
-    this.clipboardXml = this.selectionService.objects.map(object => object.toXml());
+  /** True when the in-app tabletop clipboard has something to paste. */
+  get hasClipboard(): boolean {
     return this.clipboardXml.length > 0;
   }
 
-  private cutSelection(): boolean {
-    if (!this.copySelection()) return false;
+  /** True when scene tools (light / wall / drawing) have a selection. */
+  get hasSceneSelection(): boolean {
+    return this.sceneTools.selectionCount > 0;
+  }
+
+  /** Windows-style Copy: serialize current selection into the in-app clipboard. */
+  copySelection(): boolean {
+    return this.runInAngular(() => this.copySelectionInner());
+  }
+
+  private copySelectionInner(): boolean {
+    if (Network.GuestMode()) return false;
+    if (this.sceneTools.selectionCount > 0) {
+      const objs = this.sceneTools.selectedObjects;
+      this.clipboardXml = objs.map(object => object.toXml());
+      this.clipboardSourceIds = objs.map(object => object.identifier);
+      return this.clipboardXml.length > 0;
+    }
+    if (this.selectionService.size < 1) return false;
+    const objs = this.selectionService.objects;
+    this.clipboardXml = objs.map(object => object.toXml());
+    this.clipboardSourceIds = objs.map(object => object.identifier);
+    return this.clipboardXml.length > 0;
+  }
+
+  /** Windows-style Cut: copy then delete selection. */
+  cutSelection(): boolean {
+    return this.runInAngular(() => this.cutSelectionInner());
+  }
+
+  private cutSelectionInner(): boolean {
+    if (!this.copySelectionInner()) return false;
+    if (this.sceneTools.selectionCount > 0) {
+      return this.sceneTools.deleteSelection();
+    }
     return this.deleteSelection();
+  }
+
+  /** Windows-style Paste at the current pointer (same as Ctrl+V in-app path). */
+  pasteAtPointer(): boolean {
+    return this.runInAngular(() => this.pasteClipboard(false));
+  }
+
+  /**
+   * Ctrl+Shift+V: paste as temporary Token with an independent sheet
+   * (HP etc. not shared; hidden from inventory). Non-character items paste normally.
+   */
+  pasteTemporaryAtPointer(): boolean {
+    return this.runInAngular(() => this.pasteClipboard(true));
+  }
+
+  /**
+   * Right-click Windows behavior: if the target is not already selected,
+   * make it the sole selection before Copy/Cut menus run.
+   */
+  ensureObjectSelected(object: TabletopObject): void {
+    if (!object || Network.GuestMode()) return;
+    if (this.selectionService.state(object) !== SelectionState.NONE) return;
+    this.selectionService.clear();
+    this.selectionService.add(object);
   }
 
   private congregateSelectionToPointer(): boolean {
@@ -690,6 +764,13 @@ export class TabletopKeyboardService {
     if (this.shouldIgnore(e)) return;
     if (Network.GuestMode()) return;
 
+    if (this.ignoreNextPaste) {
+      this.ignoreNextPaste = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     const text = e.clipboardData?.getData('text/plain') ?? '';
     const ccfolia = tryParseCcfoliaCharacter(text);
     if (ccfolia) {
@@ -701,7 +782,7 @@ export class TabletopKeyboardService {
     }
 
     if (this.clipboardXml.length < 1) return;
-    if (this.pasteClipboard()) {
+    if (this.pasteClipboard(false)) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -711,81 +792,330 @@ export class TabletopKeyboardService {
     if (Network.GuestMode()) return false;
     const pointer = this.coordinateService.calcTabletopLocalCoordinate();
     const character = createGameCharacterFromCcfolia(clipboard, pointer);
+    const token = CharacterToken.focusTokenForCharacter(character.identifier);
     this.selectionService.clear();
-    this.selectionService.add(character);
-    this.undoService.recordCreated([character], 'paste');
+    this.selectionService.add(token || character);
+    this.undoService.recordCreated(token ? [token, character] : [character], 'paste');
     SoundEffect.play(PresetSound.piecePut);
     return true;
   }
 
-  private pasteClipboard(): boolean {
+  private pasteClipboard(temporary = false): boolean {
     if (Network.GuestMode()) return false;
     if (this.clipboardXml.length < 1) return false;
 
     const table = TableSelecter.instance.viewTable;
-    const pasted: TabletopObject[] = [];
-
-    for (const xml of this.clipboardXml) {
-      const object = ObjectSerializer.instance.parseXml(xml);
-      if (!(object instanceof TabletopObject)) continue;
-      pasted.push(object);
+    const parsed: ObjectNode[] = [];
+    for (let i = 0; i < this.clipboardXml.length; i++) {
+      const object = ObjectSerializer.instance.parseXml(this.clipboardXml[i]);
+      if (
+        object instanceof TabletopObject
+        || object instanceof TableLight
+        || object instanceof TableWall
+        || object instanceof TableDrawing
+      ) {
+        parsed.push(object as ObjectNode);
+      }
     }
-    if (pasted.length < 1) return false;
+    if (parsed.length < 1) return false;
 
     let cx = 0;
     let cy = 0;
-    for (const object of pasted) {
-      cx += object.location.x;
-      cy += object.location.y;
+    for (const object of parsed) {
+      const c = this.clipboardAnchorOf(object);
+      cx += c.x;
+      cy += c.y;
     }
-    cx /= pasted.length;
-    cy /= pasted.length;
+    cx /= parsed.length;
+    cy /= parsed.length;
 
     const pointer = this.coordinateService.calcTabletopLocalCoordinate();
     const dx = pointer.x - cx;
     const dy = pointer.y - cy;
 
-    for (const object of pasted) {
-      object.location.x += dx;
-      object.location.y += dy;
+    const created: ObjectNode[] = [];
+    const selectTabletop: TabletopObject[] = [];
+    const selectScene: { drawings: TableDrawing[]; lights: TableLight[]; walls: TableWall[] } = {
+      drawings: [], lights: [], walls: [],
+    };
 
-      if (object instanceof GameCharacter) {
-        object.update();
+    for (let i = 0; i < parsed.length; i++) {
+      const object = parsed[i];
+      this.nudgeClipboardObject(object, dx, dy);
+
+      if (object instanceof TableLight || object instanceof TableWall || object instanceof TableDrawing) {
+        if (!table) {
+          object.destroy();
+          continue;
+        }
+        table.appendChild(object);
+        created.push(object);
+        if (object instanceof TableLight) selectScene.lights.push(object);
+        else if (object instanceof TableWall) selectScene.walls.push(object);
+        else selectScene.drawings.push(object);
+        continue;
+      }
+
+      if (!(object instanceof TabletopObject)) continue;
+
+      if (object instanceof CharacterToken) {
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        if (temporary) {
+          // Independent temporary sheet (HP etc. not shared) + Token.
+          const sourceBody = object.character;
+          if (sourceBody) {
+            const token = GameCharacter.createTemporaryCopy(sourceBody, {
+              x: object.location.x,
+              y: object.location.y,
+              posZ: object.posZ,
+            }, viewId, object);
+            object.destroy();
+            created.push(token);
+            selectTabletop.push(token);
+          } else {
+            object.isTemporaryCopy = true;
+            object.tablePlacements = '';
+            object.addToTable(viewId, {
+              x: object.location.x,
+              y: object.location.y,
+              posZ: object.posZ,
+            }, true);
+            created.push(object);
+            selectTabletop.push(object);
+          }
+        } else {
+          object.tablePlacements = '';
+          object.addToTable(viewId, {
+            x: object.location.x,
+            y: object.location.y,
+            posZ: object.posZ,
+          }, true);
+          // Keep existing major; only FIRST COME if this map had none (do not steal).
+          CharacterToken.reconcileMajor(object.characterId, viewId);
+          created.push(object);
+          selectTabletop.push(object);
+        }
+      } else if (object instanceof GameCharacter) {
+        // Legacy clipboard: convert pasted body-on-table into a token projection.
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        if (temporary) {
+          // Parsed GameCharacter is already a sheet clone — mark temp and project.
+          object.isTemporaryCopy = true;
+          object.isInventoryIndicate = false;
+          CharacterToken.ensureBodyOffTable(object);
+          const token = CharacterToken.create(object.identifier, {
+            x: object.location.x,
+            y: object.location.y,
+            posZ: object.posZ,
+          }, {
+            tableId: viewId,
+            temporary: true,
+            copyAppearanceFrom: object,
+          });
+          created.push(token);
+          selectTabletop.push(token);
+        } else {
+          const token = CharacterToken.create(object.identifier, {
+            x: object.location.x,
+            y: object.location.y,
+            posZ: object.posZ,
+          }, { tableId: viewId, copyAppearanceFrom: object });
+          CharacterToken.ensureBodyOffTable(object);
+          created.push(token);
+          selectTabletop.push(token);
+        }
       } else if (object instanceof Terrain) {
         object.isLocked = false;
         if (table) table.appendChild(object);
+        created.push(object);
+        selectTabletop.push(object);
       } else if (object instanceof GameTableMask) {
         object.isLock = false;
         object.isPreview = false;
         if (table) table.appendChild(object);
+        created.push(object);
+        selectTabletop.push(object);
+      } else if (object instanceof DiceSymbol) {
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        object.tablePlacements = '';
+        object.addToTable(viewId, {
+          x: object.location.x,
+          y: object.location.y,
+          posZ: object.posZ,
+        }, true);
+        created.push(object);
+        selectTabletop.push(object);
+      } else if (object instanceof TextNote) {
+        const placed = this.pasteTextNote(object, i);
+        if (placed) {
+          if (placed !== object) {
+            // Source note rebound across maps — content stays shared; not a new create.
+            selectTabletop.push(placed);
+          } else {
+            created.push(placed);
+            selectTabletop.push(placed);
+          }
+        }
       } else if (object instanceof Card) {
         object.isLocked = false;
         object.raiseInTier();
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        if (object.location.name === 'table' || !object.parent) {
+          object.tablePlacements = '';
+          object.addToTable(viewId, {
+            x: object.location.x,
+            y: object.location.y,
+            posZ: object.posZ,
+          }, true);
+        }
+        created.push(object);
+        selectTabletop.push(object);
       } else if (object instanceof CardStack) {
         object.isLocked = false;
         object.owner = '';
         object.raiseInTier();
-      } else if (object instanceof TextNote) {
-        object.isLocked = false;
-        object.raiseInTier();
-      } else if (object instanceof DiceSymbol) {
-        object.update();
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        object.tablePlacements = '';
+        object.addToTable(viewId, {
+          x: object.location.x,
+          y: object.location.y,
+          posZ: object.posZ,
+        }, true);
+        created.push(object);
+        selectTabletop.push(object);
       } else if (object instanceof RangeArea) {
         object.isLocked = false;
         object.toTopmost();
+        const viewId = TabletopObject.resolveViewTableIdentifier();
+        object.tablePlacements = '';
+        object.addToTable(viewId, {
+          x: object.location.x,
+          y: object.location.y,
+          posZ: object.posZ,
+        }, true);
+        created.push(object);
+        selectTabletop.push(object);
       } else {
         object.update();
+        created.push(object);
+        selectTabletop.push(object);
       }
     }
 
+    if (created.length < 1 && selectTabletop.length < 1
+      && selectScene.drawings.length + selectScene.lights.length + selectScene.walls.length < 1) {
+      return false;
+    }
+
     this.selectionService.clear();
-    for (const object of pasted) {
+    this.sceneTools.clearSelection();
+    for (const object of selectTabletop) {
       this.selectionService.add(object);
     }
+    if (selectScene.drawings.length || selectScene.lights.length || selectScene.walls.length) {
+      this.sceneTools.setMultiSelection(selectScene.drawings, selectScene.lights, selectScene.walls);
+    }
     reconcileLayerStack();
-    this.undoService.recordCreated(pasted as ObjectNode[], 'paste');
+    if (created.length) this.undoService.recordCreated(created, 'paste');
+    if (selectScene.drawings.length || selectScene.lights.length || selectScene.walls.length) {
+      this.sceneTools.notifyTableUpdate();
+    }
     SoundEffect.play(PresetSound.piecePut);
     return true;
+  }
+
+  /** Anchor used to center a clipboard paste group on the pointer. */
+  private clipboardAnchorOf(object: ObjectNode): { x: number; y: number } {
+    if (object instanceof TabletopObject) {
+      return { x: object.location.x, y: object.location.y };
+    }
+    if (object instanceof TableLight) {
+      return { x: object.x, y: object.y };
+    }
+    if (object instanceof TableDrawing) {
+      return { x: object.x, y: object.y };
+    }
+    if (object instanceof TableWall) {
+      const pts = object.points || [];
+      if (!pts.length) return { x: 0, y: 0 };
+      let sx = 0;
+      let sy = 0;
+      for (const p of pts) { sx += p.x; sy += p.y; }
+      return { x: sx / pts.length, y: sy / pts.length };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  private nudgeClipboardObject(object: ObjectNode, dx: number, dy: number) {
+    if (object instanceof TabletopObject) {
+      object.location.x += dx;
+      object.location.y += dy;
+      return;
+    }
+    if (object instanceof TableLight) {
+      object.x += dx;
+      object.y += dy;
+      return;
+    }
+    if (object instanceof TableDrawing) {
+      object.x += dx;
+      object.y += dy;
+      const geom = object.geom || {};
+      const pts: { x: number; y: number }[] = geom.points || [];
+      if (pts.length) {
+        geom.points = pts.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        object.geom = geom;
+      }
+      return;
+    }
+    if (object instanceof TableWall) {
+      const pts = object.points || [];
+      if (pts.length) object.points = pts.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    }
+  }
+
+  /**
+   * Paste a shared note:
+   * - Cross-map (source still on another map): add placement to the same note so text stays common.
+   * - Room-scoped source: relocate the shared note (already visible everywhere).
+   * - Same-map / cut-restore: keep the parsed clone with copied content.
+   */
+  private pasteTextNote(clone: TextNote, clipboardIndex: number): TextNote | null {
+    const viewId = TabletopObject.resolveViewTableIdentifier();
+    const x = clone.location.x;
+    const y = clone.location.y;
+    const posZ = clone.posZ;
+    const srcId = this.clipboardSourceIds[clipboardIndex];
+    const source = srcId ? ObjectStore.instance.get<TextNote>(srcId) : null;
+
+    if (source instanceof TextNote && source !== clone && source.location.name === 'table') {
+      if (source.scope === 'room') {
+        clone.destroy();
+        source.isLocked = false;
+        source.raiseInTier();
+        source.addToTable(viewId, { x, y, posZ }, true);
+        return source;
+      }
+      if (viewId && !source.hasPlacement(viewId)) {
+        // Cross-map copy: same note body on the new map → content stays common.
+        clone.destroy();
+        source.isLocked = false;
+        source.raiseInTier();
+        source.addToTable(viewId, { x, y, posZ }, false);
+        return source;
+      }
+    }
+
+    clone.isLocked = false;
+    clone.raiseInTier();
+    // Ensure note body survives clipboard (value + currentValue).
+    const body = clone.text;
+    const title = clone.title;
+    clone.tablePlacements = '';
+    clone.addToTable(viewId, { x, y, posZ }, true);
+    if (body) clone.text = body;
+    if (title) clone.title = title;
+    return clone;
   }
 
   private deleteSelection(): boolean {
@@ -799,7 +1129,21 @@ export class TabletopKeyboardService {
     for (const object of targets) {
       if (this.isLocked(object)) continue;
 
+      if (object instanceof CharacterToken) {
+        entries.push({
+          kind: 'destroy',
+          xml: object.toXml(),
+          parentId: TableSelecter.instance.viewTable?.identifier || '',
+          liveId: object.identifier,
+        });
+        this.selectionService.remove(object);
+        CharacterToken.destroyToken(object);
+        deleted = true;
+        continue;
+      }
+
       if (object instanceof GameCharacter) {
+        CharacterToken.destroyTokensForCharacter(object.identifier);
         entries.push({
           kind: 'graveyard',
           id: object.identifier,
@@ -807,7 +1151,11 @@ export class TabletopKeyboardService {
           fromTableIdentifier: object.tableIdentifier || TabletopObject.resolveViewTableIdentifier() || '',
         });
         EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: object.identifier });
-        object.leaveCurrentTable('graveyard');
+        if (object.location.name === 'table') {
+          object.leaveCurrentTable('graveyard');
+        } else {
+          object.setLocation('graveyard');
+        }
         this.selectionService.remove(object);
         deleted = true;
         continue;
@@ -909,22 +1257,29 @@ export class TabletopKeyboardService {
     return flippedCard || rolledCoin || rolledDice;
   }
 
-  /** GM only: hide / reveal selected characters (owner stealth). */
+  /** GM only: hide / reveal selected tokens (owner stealth on Token when present). */
   private toggleHideSelection(): boolean {
     if (!PeerCursor.myCursor?.isGMMode) return false;
-    const characters = this.selectionService.objects.filter(
-      (o): o is GameCharacter => o instanceof GameCharacter
+    const hosts = this.selectionService.objects.filter(
+      (o): o is GameCharacter | CharacterToken =>
+        o instanceof GameCharacter || o instanceof CharacterToken
     );
-    if (characters.length < 1) return false;
+    if (hosts.length < 1) return false;
 
-    const anyVisible = characters.some(ch => !ch.isHideIn);
+    const anyVisible = hosts.some(ch => !ch.owner);
     const userId = Network.peer.userId;
-    for (const ch of characters) {
+    for (const ch of hosts) {
       if (anyVisible) {
-        if (ch.isHideIn) continue;
+        if (ch.owner) continue;
         ch.owner = userId;
-        if (!ch.visionOwner) ch.visionOwner = userId;
-        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
+        if (ch instanceof GameCharacter && !ch.visionOwner) ch.visionOwner = userId;
+        if (ch instanceof CharacterToken) {
+          const body = ch.character;
+          if (body && !body.visionOwner) body.visionOwner = userId;
+          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.characterId });
+        } else {
+          EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
+        }
       } else {
         ch.owner = '';
       }
@@ -959,6 +1314,7 @@ export class TabletopKeyboardService {
   private isLocked(object: TabletopObject): boolean {
     if (!!(object as any).isLocked || !!(object as any).isLock) return true;
     if (object instanceof GameCharacter && object.isLockedByPlayerOwner) return true;
+    if (object instanceof CharacterToken && object.isLockedByPlayerOwner) return true;
     return false;
   }
 }

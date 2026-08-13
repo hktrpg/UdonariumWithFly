@@ -1,6 +1,7 @@
 import { Room } from './room';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { GameObject } from './core/synchronize-object/game-object';
+import { GameCharacter } from './game-character';
 import { TableSelecter } from './table-selecter';
 import {
   makeCharacter,
@@ -14,7 +15,10 @@ function syncCtx(obj: GameObject): { majorVersion: number; minorVersion: number 
 }
 
 describe('Room join / load sync authority', () => {
-  beforeEach(() => resetTabletopStore());
+  beforeEach(() => {
+    resetTabletopStore();
+    GameCharacter.allowLegacyBodyOnTable = true;
+  });
   afterEach(() => resetTabletopStore());
 
   it('clearLocalTabletopForJoin destroys lobby tabletop pieces and clears selecter', () => {

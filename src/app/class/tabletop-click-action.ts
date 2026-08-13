@@ -1,8 +1,8 @@
+import { CharacterToken } from '@udonarium/character-token';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { CutIn } from '@udonarium/cut-in';
-import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { Jukebox } from '@udonarium/Jukebox';
@@ -250,14 +250,15 @@ function runOne(
       if (!(host instanceof GameTableMask)) return false;
       const cfg = host.tokenFxConfig;
       if (!tokenFxConfigHasWork(cfg)) return false;
-      const characters = ObjectStore.instance.getObjects(GameCharacter).filter(c => c.isVisibleOnTable);
-      const targets = charactersOnMask(characters, host);
+      // On-table pieces are CharacterTokens (bodies stay off-table).
+      const tokens = ObjectStore.instance.getObjects(CharacterToken).filter(t => t.isVisibleOnTable);
+      const targets = charactersOnMask(tokens, host);
       if (!targets.length) return false;
-      for (const ch of targets) {
-        applyMaskTokenFxToCharacter(ch, cfg);
+      for (const tok of targets) {
+        applyMaskTokenFxToCharacter(tok, cfg);
       }
       // Keep leave-restore in sync on all peers so walking off won't undo click FX.
-      const adopt = { characterIds: targets.map(ch => ch.identifier) };
+      const adopt = { characterIds: targets.map(tok => tok.identifier) };
       EventSystem.call('MASK_TOKEN_FX_ADOPT', adopt);
       EventSystem.trigger('MASK_TOKEN_FX_ADOPT', adopt);
       return true;

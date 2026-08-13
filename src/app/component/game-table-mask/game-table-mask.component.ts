@@ -506,6 +506,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
 
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.gameTableMask);
     let menuPosition = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
@@ -518,6 +519,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       menuActions = menuActions.concat(this.makeSelectionContextMenu());
       menuActions = menuActions.concat(this.makeContextMenu());
     }
+    menuActions = this.tabletopActionService.withClipboardMenuPrefix(menuActions);
 
     this.contextMenuService.open(menuPosition, menuActions, title);
   }
