@@ -250,17 +250,32 @@ export class GameCharacter extends TabletopObject {
       });
       return;
     }
-    if (location === 'graveyard') this.destroyMapTokens();
+    if (location === 'graveyard') {
+      this.destroyMapTokens();
+      super.setLocation(location, tableIdentifier);
+      // Room-wide trash: never bind the sheet to a single map.
+      if (this.tableIdentifier) {
+        this.tableIdentifier = '';
+        this.update();
+      }
+      return;
+    }
     super.setLocation(location, tableIdentifier);
   }
 
   /**
    * leaveCurrentTable → removeFromTable may set location.name to graveyard without
-   * going through setLocation; still tear down map Tokens.
+   * going through setLocation; still tear down map Tokens and unbind the map.
    */
   override removeFromTable(tableId?: string, inventoryLocation = 'common') {
     super.removeFromTable(tableId, inventoryLocation);
-    if (this.location.name === 'graveyard') this.destroyMapTokens();
+    if (this.location.name === 'graveyard') {
+      this.destroyMapTokens();
+      if (this.tableIdentifier) {
+        this.tableIdentifier = '';
+        this.update();
+      }
+    }
   }
 
   /** Sheet in graveyard must not leave orphan map projections. */
@@ -279,7 +294,8 @@ export class GameCharacter extends TabletopObject {
       return;
     }
     if (this.tablePlacements) this.tablePlacements = '';
-    if (!this.location.name || this.location.name === 'table') {
+    // Revive from graveyard (or unbound) into common when placing a map Token.
+    if (!this.location.name || this.location.name === 'table' || this.location.name === 'graveyard') {
       this.tableIdentifier = tableId || this.tableIdentifier || TabletopObject.resolveViewTableIdentifier() || '';
       this.location.name = 'common';
       this.update();

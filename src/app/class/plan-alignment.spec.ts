@@ -116,4 +116,29 @@ describe('Plan alignment gaps', () => {
     expect(body.isDropShadow).toBeTrue();
     expect(body.aura).toBe(-1);
   });
+
+  it('placing a Token revives the sheet out of the graveyard', () => {
+    const body = makeCharacter('revive_body');
+    body.setLocation('graveyard');
+    expect(body.location.name).toBe('graveyard');
+
+    CharacterToken.create(body.identifier, { x: 10, y: 20 }, { tableId: 'mapA' });
+
+    expect(body.location.name).toBe('common');
+    expect(CharacterToken.tokensOnTable(body.identifier, 'mapA').length).toBe(1);
+  });
+
+  it('graveyard is room-wide (visible regardless of viewed map)', () => {
+    makeTable('mapB');
+    const body = makeCharacter('grave_shared');
+    body.tableIdentifier = 'mapA';
+    body.setLocation('graveyard');
+
+    expect(body.location.name).toBe('graveyard');
+    expect(body.tableIdentifier).toBe('');
+
+    viewTables('mapB');
+    // Inventory filter is location===graveyard only (no per-map check).
+    expect(body.location.name === 'graveyard' && !body.isTemporaryCopy).toBeTrue();
+  });
 });

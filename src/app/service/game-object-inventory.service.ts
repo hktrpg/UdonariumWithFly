@@ -52,9 +52,9 @@ export class GameObjectInventoryService {
     !object.isTemporaryCopy && !this.isAnyLocation(object.location.name) && object.isInventoryForCurrentView());
   privateInventory: ObjectInventory = new ObjectInventory(object =>
     !object.isTemporaryCopy && object.location.name === Network.peerId && object.isInventoryForCurrentView());
-  /** Graveyard for the currently viewed map only. */
+  /** Room-wide graveyard (shared across all maps). */
   graveyardInventory: ObjectInventory = new ObjectInventory(object =>
-    !object.isTemporaryCopy && object.location.name === 'graveyard' && object.isInventoryForCurrentView());
+    !object.isTemporaryCopy && object.location.name === 'graveyard');
 
   indicateAll: boolean = false;
   

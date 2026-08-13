@@ -302,7 +302,20 @@ export class CharacterToken extends TabletopObject {
     } else {
       CharacterToken.reconcileMajor(characterId, tableId);
     }
+    CharacterToken.reviveBodyFromGraveyard(characterId, tableId);
     return token;
+  }
+
+  /**
+   * Placing a Token on the map revives a trashed sheet into common inventory
+   * so it no longer appears under the graveyard tab.
+   */
+  static reviveBodyFromGraveyard(characterId: string, tableId?: string) {
+    if (!characterId) return;
+    const body = ObjectStore.instance.get(characterId);
+    if (!(body instanceof GameCharacter)) return;
+    if (body.location.name !== 'graveyard') return;
+    body.setLocation('common', tableId || undefined);
   }
 
   /** Duplicate this token onto the current (or given) map. */
