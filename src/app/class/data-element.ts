@@ -29,9 +29,10 @@ export class DataElement extends ObjectNode {
     }
     dataElement.attributes = attributes;
     dataElement.name = name;
-    // XML / getAttribute('name') read the attributes bag; keep SyncVar + attribute aligned.
-    if (name && dataElement.getAttribute('name') !== name) {
-      dataElement.setAttribute('name', name);
+    // XML / getAttribute('name') read the attributes bag; keep SyncVar + attribute aligned
+    // without setAttribute() (which would call update() before initialize()).
+    if (name && dataElement.attributes['name'] !== name) {
+      dataElement.attributes['name'] = name;
     }
     if (attributes) {
       if (attributes['type'] != null && !dataElement.type) dataElement.type = String(attributes['type']);

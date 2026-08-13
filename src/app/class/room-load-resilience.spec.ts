@@ -1,14 +1,20 @@
 import { ObjectSerializer } from './core/synchronize-object/object-serializer';
 import { ObjectStore } from './core/synchronize-object/object-store';
+import { DataElement } from './data-element';
 import { DiceSymbol } from './dice-symbol';
 import { GameCharacter } from './game-character';
 import { GameTable } from './game-table';
 import { Room } from './room';
 import { TextNote } from './text-note';
-import { resetTabletopStore } from '../../testing/tabletop-test.util';
+import { makeTable, resetTabletopStore } from '../../testing/tabletop-test.util';
 
 describe('Room load resilience', () => {
-  beforeEach(() => resetTabletopStore());
+  beforeEach(() => {
+    resetTabletopStore();
+    Room.lastLoadReport = { loaded: 0, skipped: [] };
+    Room.lastSaveReport = { written: 0, skipped: [] };
+    Room.pendingLoadUserNotice = false;
+  });
   afterEach(() => resetTabletopStore());
 
   it('skips unknown / corrupt top-level objects and keeps the rest', () => {
@@ -48,6 +54,28 @@ describe('Room load resilience', () => {
 
     expect(Room.lastLoadReport.loaded).toBeGreaterThanOrEqual(3);
     expect(Room.lastLoadReport.skipped.some(s => s.tag === 'not-a-real-alias')).toBeTrue();
+    expect(Room.pendingLoadUserNotice).toBeTrue();
+  });
+
+  it('records save skips when toXml fails and keeps writing siblings', () => {
+    makeTable('keepTable');
+    const char = GameCharacter.create('BrokenChar', 1, '');
+    spyOn(char, 'toXml').and.throwError('serialize boom');
+
+    const room = new Room();
+    const xml = room.innerXml();
+
+    expect(xml).toContain('game-table');
+    expect(xml).not.toContain(char.identifier);
+    expect(Room.lastSaveReport.written).toBeGreaterThan(0);
+    expect(Room.lastSaveReport.skipped.some(s => s.identifier === char.identifier)).toBeTrue();
+  });
+
+  it('DataElement.create aligns attribute name without requiring initialize first', () => {
+    const el = DataElement.create('hp', 10, { type: 'numberResource', currentValue: 10 });
+    expect(el.name).toBe('hp');
+    expect(el.getAttribute('name')).toBe('hp');
+    expect(el.type).toBe('numberResource');
   });
 
   it('ObjectSerializer.parseXml never throws for unknown aliases', () => {

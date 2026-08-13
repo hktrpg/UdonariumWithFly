@@ -12,7 +12,7 @@
     (dragstart)="onInventoryDragStart($event, $any(gameObject))"
     (dragend)="onInventoryDragEnd()"
     [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier), 'muluti-selected': checkSelected(gameObject), 'is-hide-in': invIsHideIn($any(gameObject)), 'is-inventory-no-indicate': !gameObject.isInventoryIndicate, 'is-other-table': isOnOtherTable(gameObject), 'is-draggable': canDragInventory($any(gameObject))}" [@SlideInOut]="i">
-    <div *ngIf="invIsHideIn($any(gameObject))" class="owner-tag" [style.background-color]="invOwnerColor($any(gameObject))">{{invOwnerName($any(gameObject)) || ('char.unnamedPlayer' | i18n)}}</div>
+    <div *ngIf="invHasOwnerTag($any(gameObject))" class="owner-tag" [style.background-color]="invOwnerColor($any(gameObject))">{{invOwnerName($any(gameObject)) || ('char.unnamedPlayer' | i18n)}}</div>
     <div *ngIf="$any(gameObject).playerOwner" class="player-owner-tag" [style.background-color]="$any(gameObject).playerOwnerColor"
       [title]="('char.selectAsMine' | i18n:{ name: $any(gameObject).playerOwnerName })">
       {{ $any(gameObject).playerOwnerName }}

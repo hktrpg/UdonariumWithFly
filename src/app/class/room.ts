@@ -29,10 +29,23 @@ export type RoomLoadReport = {
   skipped: RoomLoadSkip[];
 };
 
+/** One object skipped during resilient room save ({@link Room.innerXml}). */
+export type RoomSaveSkip = { aliasName: string; identifier: string; reason: string };
+
+/** Summary of the last {@link Room.innerXml} call. */
+export type RoomSaveReport = {
+  written: number;
+  skipped: RoomSaveSkip[];
+};
+
 @SyncObject('room')
 export class Room extends GameObject implements InnerXml {
   /** Last room XML load outcome (for diagnostics / UI). */
   static lastLoadReport: RoomLoadReport = { loaded: 0, skipped: [] };
+  /** Set when the latest load skipped objects; cleared after UI/log consumption. */
+  static pendingLoadUserNotice = false;
+  /** Last room XML save outcome (for diagnostics / UI). */
+  static lastSaveReport: RoomSaveReport = { written: 0, skipped: [] };
 
   // GameObject Lifecycle
   onStoreAdded() {
@@ -56,12 +69,28 @@ export class Room extends GameObject implements InnerXml {
     objects.push(CombatTracker.instance);
     objects.push(SceneToolPermission.instance);
     objects.push(TableSelecter.instance);
+    const report: RoomSaveReport = { written: 0, skipped: [] };
     for (let object of objects) {
       try {
         xml += object.toXml();
+        report.written++;
       } catch (e) {
-        console.warn('[Room] skip object during save (toXml failed)', object?.aliasName, object?.identifier, e);
+        const aliasName = object?.aliasName || '';
+        const identifier = object?.identifier || '';
+        report.skipped.push({
+          aliasName,
+          identifier,
+          reason: String((e as Error)?.message || e),
+        });
+        console.warn('[Room] skip object during save (toXml failed)', aliasName, identifier, e);
       }
+    }
+    Room.lastSaveReport = report;
+    if (report.skipped.length) {
+      console.warn(
+        `[Room] wrote ${report.written} object(s); skipped ${report.skipped.length}`,
+        report.skipped
+      );
     }
     return xml;
   }
@@ -117,6 +146,7 @@ export class Room extends GameObject implements InnerXml {
       }
     }
     Room.lastLoadReport = report;
+    Room.pendingLoadUserNotice = report.skipped.length > 0;
     if (report.skipped.length) {
       console.warn(
         `[Room] loaded ${report.loaded} object(s); skipped ${report.skipped.length}`,

@@ -88,6 +88,50 @@ export class SaveDataService {
   ) {
     // Register early so ARCHIVE_LOAD_COMPLETE can sync poses after ZIP load.
     MovableDirective.ensurePoseFlushHook();
+    EventSystem.register(this).on('ARCHIVE_LOAD_COMPLETE', () => {
+      this.notifyRoomLoadIssuesIfNeeded();
+    });
+  }
+
+  /** After a room archive load, surface skipped objects once (if any). */
+  private notifyRoomLoadIssuesIfNeeded() {
+    if (!Room.pendingLoadUserNotice) return;
+    Room.pendingLoadUserNotice = false;
+    const report = Room.lastLoadReport;
+    if (!report?.skipped?.length) return;
+    const skipped = report.skipped.length;
+    const text = this.i18n.t('save.roomPartialLoad.text', {
+      loaded: report.loaded,
+      skipped,
+    });
+    this.chatMessageService.sendOperationLog(text);
+    if (!ModalService.defaultParentViewContainerRef) return;
+    void this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('save.roomPartialLoad.title'),
+      text,
+      materialIcon: 'warning',
+      type: ConfirmationType.OK,
+      okLabel: this.i18n.t('confirm.ok'),
+    });
+  }
+
+  /** After room XML serialize, surface skipped objects (modal only for interactive ZIP). */
+  private notifyRoomSaveIssuesIfNeeded(showModal: boolean) {
+    const report = Room.lastSaveReport;
+    if (!report?.skipped?.length) return;
+    const text = this.i18n.t('save.roomPartialSave.text', {
+      written: report.written,
+      skipped: report.skipped.length,
+    });
+    this.chatMessageService.sendOperationLog(text);
+    if (!showModal || !ModalService.defaultParentViewContainerRef) return;
+    void this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('save.roomPartialSave.title'),
+      text,
+      materialIcon: 'warning',
+      type: ConfirmationType.OK,
+      okLabel: this.i18n.t('confirm.ok'),
+    });
   }
 
   /** Sync view of preference for settings toggles (defaults to true before load / when unset). */
@@ -379,7 +423,9 @@ export class SaveDataService {
   private async _saveRoomAsync(fileName?: string, updateCallback?: UpdateCallback, includeAudio?: boolean): Promise<void> {
     fileName = fileName ?? this.i18n.t('save.roomFilePrefix');
     const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
-    return this.saveAsync(await this.buildRoomFiles(packAudio), this.appendTimestamp(fileName), updateCallback);
+    const files = await this.buildRoomFiles(packAudio);
+    this.notifyRoomSaveIssuesIfNeeded(true);
+    return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
   }
 
   private async _saveRoomToDirectoryAsync(
@@ -401,6 +447,8 @@ export class SaveDataService {
   ): Promise<void> {
     const packAudio = includeAudio != null ? includeAudio : await this.getIncludeAudio();
     const files = await this.buildRoomFiles(packAudio);
+    // Folder / auto-backup: log only — avoid modal spam on periodic writes.
+    this.notifyRoomSaveIssuesIfNeeded(false);
     await this.writeRoomFolderLayout(dirHandle, roomId, displayName, files, auth, packAudio, updateCallback);
   }
 
