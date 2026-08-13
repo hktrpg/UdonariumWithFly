@@ -173,16 +173,14 @@ export class GameTableMask extends TabletopObject {
   }
 
   get ownerName(): string {
-    let object = PeerCursor.findByUserId(this.owner);
-    return object ? object.name : '';
+    return PeerCursor.findByUserId(this.owner)?.name || '';
   }
 
   get ownerColor(): string {
-    let object = PeerCursor.findByUserId(this.owner);
-    return object ? object.color : '#444444';
+    return PeerCursor.findByUserId(this.owner)?.color || '#444444';
   }
 
-  get hasOwner(): boolean { return 0 < this.owner.length; }
+  get hasOwner(): boolean { return !!(this.owner && this.owner.length); }
   get ownerIsOnline(): boolean { return this.hasOwner && (this.isMine || Network.peers.some(peer => peer.userId === this.owner && peer.isOpen)); }
   get isMine(): boolean { return Network.peer.userId === this.owner; }
 

@@ -6,7 +6,7 @@ import { CompareOption, StringUtil } from './core/system/util/string-util';
 
 @SyncObject('data')
 export class DataElement extends ObjectNode {
-  @SyncVar() name: string;
+  @SyncVar() name: string = '';
   @SyncVar() type: string;
   @SyncVar() currentValue: number | string;
 

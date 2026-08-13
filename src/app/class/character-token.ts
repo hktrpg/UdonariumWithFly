@@ -116,8 +116,7 @@ export class CharacterToken extends TabletopObject {
   }
 
   get ownerColor(): string {
-    const object = PeerCursor.findByUserId(this.owner);
-    return object ? object.color : '#444444';
+    return PeerCursor.findByUserId(this.owner)?.color || '#444444';
   }
 
   /** Bodies that have at least one Token on the current view. */

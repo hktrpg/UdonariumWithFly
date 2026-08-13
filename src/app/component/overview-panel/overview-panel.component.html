@@ -60,7 +60,7 @@
       <button class="zoom-button" (click)="chanageImageView(true)" style="z-index: 10">
         <i class="material-icons">zoom_in</i>
       </button>
-      <div *ngIf="card.ownerIsOnline && 0 < card.ownerName.length" class="component-owner position-right-bottom" style="z-index: 10"
+      <div *ngIf="card.ownerIsOnline && 0 < card.ownerName?.length" class="component-owner position-right-bottom" style="z-index: 10"
         [ngClass]="{'with-button-marign': hasImage}">
         <div class="owner-tag" [style.background-color]="card.ownerColor">{{card.ownerName}}</div>
       </div>
@@ -154,7 +154,7 @@
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
       <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">{{ 'dice.hidden' | i18n }}</ng-container>
     </div>
-    <div *ngIf="dice.hasOwner && 0 < dice.ownerName.length" class="owner-name-area component-owner"
+    <div *ngIf="dice.hasOwner && 0 < dice.ownerName?.length" class="owner-name-area component-owner"
       [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
       <div class="owner-tag" [style.background-color]="dice.ownerColor">{{dice.ownerName}}
       </div>
@@ -275,7 +275,7 @@
   <ng-container *ngIf="0 < dataElm.children.length; then thenBlock; else elseBlock"></ng-container>
   <ng-template #thenBlock>
     <div class="section" style="padding-top: 0.5em;">
-      <div *ngIf="0 < dataElm.name.trim().length" class="section-text" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+      <div *ngIf="0 < (dataElm.name || '').trim().length" class="section-text" [attr.title]="dataElm.name">{{dataElm.name}}</div>
       <div class="grid-container indetnt">
         <ng-container *ngFor="let childElm of dataElm.children">
           <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: childElm, name: name }"></ng-container>

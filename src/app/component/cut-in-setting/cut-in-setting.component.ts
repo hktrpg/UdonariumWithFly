@@ -83,7 +83,7 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   get cutInAudioIdentifier(): string { return this.selectedCutIn.audioIdentifier; }
   set cutInAudioIdentifier(audioIdentifier: string) { if (this.isEditable) this.selectedCutIn.audioIdentifier = audioIdentifier; }
   
-  get cutInAudioFileName(): string { return this.selectedCutIn.audioFileName; }
+  get cutInAudioFileName(): string { return this.selectedCutIn?.audioFileName || ''; }
   set cutInAudioFileName(audioFileName: string) { if (this.isEditable) this.selectedCutIn.audioFileName = audioFileName; }
 
   //get cutInSEIsLoop(): boolean { return this.selectedCutIn.endedAction == 2; }

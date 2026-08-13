@@ -442,8 +442,7 @@ export class GameCharacter extends TabletopObject {
   }
 
   get ownerColor(): string {
-    let object = PeerCursor.findByUserId(this.owner);
-    return object ? object.color : '#444444';
+    return PeerCursor.findByUserId(this.owner)?.color || '#444444';
   }
 
   get playerOwnerName(): string {

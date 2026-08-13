@@ -6,7 +6,7 @@
     [attr.aria-label]="'hud.resizeSheet' | i18n">
     <div class="sheet-handle" aria-hidden="true"></div>
   </div>
-  <div *ngIf="(!isIconsMenu && 0 < title.length) || altitudeHande || canDrillBack || isMobileActionSheet" class="title-row">
+  <div *ngIf="(!isIconsMenu && 0 < title?.length) || altitudeHande || canDrillBack || isMobileActionSheet" class="title-row">
     <button *ngIf="canDrillBack" type="button" class="sheet-back"
       (click)="drillBack($event)"
       [attr.title]="'menu.back' | i18n"

@@ -378,7 +378,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   hasOverviewFaceIcon(): boolean {
-    return !!(this.faceIcon && 0 < this.faceIcon.url.length);
+    return !!(this.faceIcon && 0 < this.faceIcon.url?.length);
   }
 
   get ownerName(): string {
