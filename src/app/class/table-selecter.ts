@@ -125,13 +125,18 @@ export class TableSelecter extends GameObject implements InnerXml {
         t.selected = t.identifier === targetId;
       }
       this.viewTableIdentifier = targetId;
-      TabletopObject.migrateUnboundTablePieces(targetId);
-      CharacterToken.migrateLegacyOnTableCharacters();
-      CharacterToken.pruneOrphanTokens();
+      try { TabletopObject.migrateUnboundTablePieces(targetId); }
+      catch (e) { console.warn('[TableSelecter] migrateUnboundTablePieces failed', e); }
+      try { CharacterToken.migrateLegacyOnTableCharacters(); }
+      catch (e) { console.warn('[TableSelecter] migrateLegacyOnTableCharacters failed', e); }
+      try { CharacterToken.pruneOrphanTokens(); }
+      catch (e) { console.warn('[TableSelecter] pruneOrphanTokens failed', e); }
       EventSystem.trigger('PREPARE_VIEW_TABLE_CHANGE', { tableId: targetId });
       this.viewedTableIdentifier = targetId;
-      TabletopObject.hydrateAllForView(targetId, true);
-      reconcileLayerStack();
+      try { TabletopObject.hydrateAllForView(targetId, true); }
+      catch (e) { console.warn('[TableSelecter] hydrateAllForView failed', e); }
+      try { reconcileLayerStack(); }
+      catch (e) { console.warn('[TableSelecter] reconcileLayerStack failed', e); }
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: targetId });
       // Clear cameras / remount *before* SELECT so shared table ids (e.g. gameTable)
       // do not briefly restore the previous room's saved camera.

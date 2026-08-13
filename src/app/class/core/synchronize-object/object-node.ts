@@ -277,8 +277,13 @@ export class ObjectNode extends GameObject implements XmlAttributes, InnerXml {
     let length = children.length;
     if (0 < length) {
       for (let i = 0; i < length; i++) {
-        let child = ObjectSerializer.instance.parseXml(children[i]);
-        if (child instanceof ObjectNode) this.appendChild(child);
+        try {
+          let child = ObjectSerializer.instance.parseXml(children[i]);
+          if (child instanceof ObjectNode) this.appendChild(child);
+        } catch (e) {
+          // parseXml already traps most failures; keep parent usable if append throws.
+          console.warn('[ObjectNode] skip corrupt child', children[i]?.tagName, e);
+        }
       }
     } else {
       this.value = XmlUtil.decodeEntityReference(element.innerHTML);
