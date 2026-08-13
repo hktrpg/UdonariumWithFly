@@ -111,8 +111,8 @@ export class CharacterToken extends TabletopObject {
   }
 
   get ownerName(): string {
-    const object = PeerCursor.findByUserId(this.owner);
-    return object ? object.name : null;
+    // Never return null: templates use ownerName.length during remount / room load.
+    return PeerCursor.findByUserId(this.owner)?.name || '';
   }
 
   get ownerColor(): string {

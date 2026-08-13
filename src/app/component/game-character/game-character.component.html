@@ -35,7 +35,7 @@
           <div class="aura is-3d" style="pointer-events: none;" [ngClass]="{black: aura == 0, blue: aura == 1, green: aura == 2, cyan: aura == 3, red: aura == 4, magenta: aura == 5, yellow: aura == 6, white: aura == 7}">
             <div class="is-3d" style="pointer-events: none; transition: transform 132ms 0s ease;"
               [ngStyle]="{'transform': 'scaleX(' + (isInverse ? '-1' : '1') + ')'}">
-                <img *ngIf="isDropShadow && (0 < imageFile.url.length || 0 < shadowImageFile.url.length)" [style.height.px]="characterShadowImageHeight" class="image drop-shadow is-3d chrome-smooth-image-trick" style="pointer-events: none" [src]="((0 < shadowImageFile.url.length) ? shadowImageFile.url : imageFile.url) | safe: 'resourceUrl'"
+                <img *ngIf="isDropShadow && (0 < imageFile?.url?.length || 0 < shadowImageFile?.url?.length)" [style.height.px]="characterShadowImageHeight" class="image drop-shadow is-3d chrome-smooth-image-trick" style="pointer-events: none" [src]="((0 < shadowImageFile?.url?.length) ? shadowImageFile.url : imageFile.url) | safe: 'resourceUrl'"
                   [style.filter]="'brightness(0) blur(' + shadowBlurPx + 'px)' + (isHideIn ? ' invert(85%)' : '')"
                   [ngStyle]="{'opacity': shadowOpacity}" [@switchImageShadow]="gameCharacter.currntImageIndex">
             </div>
@@ -49,7 +49,7 @@
           appRotable [rotable.option]="rollOption" [rotable.disable]="isRollLocked"
           (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
           <div class="rotate-inner is-3d" [style.transform]="is2DMode ? null : ('translateZ(' + (-size * gridSize / 2) + 'px)')">
-            <div *ngIf="isGMMode && isHideIn && 0 < ownerName.length" class="owner-tag is-nowrap is-black-background is-3d"
+            <div *ngIf="isGMMode && isHideIn && 0 < ownerName?.length" class="owner-tag is-nowrap is-black-background is-3d"
               [ngStyle]="{'background-color': ownerColor + 'dd', 'transform': 'translateX(-50%) translateX(' + size * gridSize / 2 +'px) translateY(6px) rotateX(' + nameTagRotate + 'deg)'}">
               <div class="fornt-tag is-3d" style="color: whitesmoke"><b>{{ownerName}}</b></div>
               <div class="back-tag is-3d" style="color: whitesmoke"><b>{{ownerName}}</b></div>
@@ -93,7 +93,7 @@
                   [style.width.px]="tokenBoxWidthPx"
                   [style.height.px]="tokenBoxHeightPx"
                   [style.transform]="is2DMode ? null : ('translateX(' + ((size * gridSize - characterImageWidth) / 2) + 'px)')">
-                  <img #characterImage *ngIf="0 < imageFile.url.length" class="image is-3d chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" [ngClass]="{'is-hide-in': isHideIn}"
+                  <img #characterImage *ngIf="0 < imageFile?.url?.length" class="image is-3d chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" [ngClass]="{'is-hide-in': isHideIn}"
                     [style.height.px]="(is2DMode || hasTokenFrame) ? null : characterImageHeight"
                     [style.filter]="imageEffectFilter"
                     [style.opacity]="hasInvisibleStatus ? 0.35 : null" (load)="onImageLoad()">
