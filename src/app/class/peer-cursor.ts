@@ -34,6 +34,8 @@ export class PeerCursor extends GameObject {
   static get CHAT_DEFAULT_NAME(): string { return translate('peer.defaultName'); }
   static readonly CHAT_TRANSPARENT_COLOR = '#ffffff';
   static readonly PASTEL_PALETTE = PEER_PASTEL_PALETTE;
+  /** Alias: mid-tone readable peer colors (same array as PASTEL_PALETTE). */
+  static readonly COLOR_PALETTE = PEER_PASTEL_PALETTE;
   /** e.g. `玩家3847` / `Player0421` — used when no nickname has been saved yet. */
   static generateDefaultName(): string {
     const n = Math.floor(Math.random() * 10000);
@@ -52,18 +54,17 @@ export class PeerCursor extends GameObject {
     }
   }
 
-  /** Pick a pastel not used by peers currently in the room (fallback: random from palette). */
+  /** Pick a random mid-tone color not used by peers in the room (fallback: random from full palette). */
   static pickAvailablePastelColor(): string {
-    const palette = PeerCursor.PASTEL_PALETTE;
+    const palette = PeerCursor.COLOR_PALETTE;
     const used = new Set(
       ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)
         .map(p => (p.color || '').trim().toLowerCase())
         .filter(c => !!c),
     );
-    for (const c of palette) {
-      if (!used.has(c.toLowerCase())) return c;
-    }
-    return palette[Math.floor(Math.random() * palette.length)];
+    const available = palette.filter(c => !used.has(c.toLowerCase()));
+    const pool = available.length ? available : palette;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   /**
