@@ -16,6 +16,7 @@ import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceSymbol } from '@udonarium/dice-symbol';
+import { CharacterToken } from '@udonarium/character-token';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
@@ -50,6 +51,12 @@ export class TabletopService {
   private indexMap: Map<ObjectIdentifier, ObjecNodeIndex> = new Map();
   private tableIdMap: Map<ObjectIdentifier, string> = new Map();
   private placementsMap: Map<ObjectIdentifier, string> = new Map();
+  private characterTokenCache = new TabletopCache<CharacterToken>(() =>
+    ObjectStore.instance.getObjects(CharacterToken)
+      .filter(obj => obj.isVisibleOnTable)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier))
+  );
+  /** @deprecated Prefer {@link characterTokens} — bodies are no longer on-table pieces. */
   private characterCache = new TabletopCache<GameCharacter>(() =>
     ObjectStore.instance.getObjects(GameCharacter)
       .filter(obj => obj.isVisibleOnTable)
@@ -86,6 +93,8 @@ export class TabletopService {
   private _clueLinks: ClueLink[] = [];
   private _clueLinksDirty = true;
 
+  get characterTokens(): CharacterToken[] { return this.characterTokenCache.objects; }
+  /** Bodies still marked visible on table (should be empty after migration). */
   get characters(): GameCharacter[] { return this.characterCache.objects; }
   get cards(): Card[] { return this.cardCache.objects; }
   get cardStacks(): CardStack[] { return this.cardStackCache.objects; }
@@ -185,6 +194,7 @@ export class TabletopService {
           || object instanceof RangeArea
           || object instanceof GameTableMask
           || object instanceof GameCharacter
+          || object instanceof CharacterToken
           || this.shouldRefreshCache(object)
         ) {
           this.refreshCache(event.data.aliasName);
@@ -206,7 +216,12 @@ export class TabletopService {
           this.refreshCacheAll();
         } else {
           this.refreshCache(aliasName);
-          if (aliasName === GameCharacter.aliasName || aliasName === TextNote.aliasName || aliasName === ClueLink.aliasName) {
+          if (
+            aliasName === GameCharacter.aliasName
+            || aliasName === CharacterToken.aliasName
+            || aliasName === TextNote.aliasName
+            || aliasName === ClueLink.aliasName
+          ) {
             this.refreshClueLinks();
           }
         }
@@ -245,6 +260,8 @@ export class TabletopService {
 
   private findCache(aliasName: string): TabletopCache<any> {
     switch (aliasName) {
+      case CharacterToken.aliasName:
+        return this.characterTokenCache;
       case GameCharacter.aliasName:
         return this.characterCache;
       case Card.aliasName:
@@ -270,12 +287,18 @@ export class TabletopService {
     let cache = this.findCache(aliasName);
     if (cache) cache.refresh();
     // Endpoint moves / pin toggles refresh clue strings.
-    if (aliasName === GameCharacter.aliasName || aliasName === TextNote.aliasName || aliasName === ClueLink.aliasName) {
+    if (
+      aliasName === GameCharacter.aliasName
+      || aliasName === CharacterToken.aliasName
+      || aliasName === TextNote.aliasName
+      || aliasName === ClueLink.aliasName
+    ) {
       this.refreshClueLinks();
     }
   }
 
   private refreshCacheAll() {
+    this.characterTokenCache.refresh();
     this.characterCache.refresh();
     this.cardCache.refresh();
     this.cardStackCache.refresh();

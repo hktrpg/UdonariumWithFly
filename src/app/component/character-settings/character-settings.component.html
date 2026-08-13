@@ -1,6 +1,6 @@
 <div class="settings-ui dense character-settings" *ngIf="character; else emptyBlock" appFitPanel [fitMinHeight]="280">
   <section class="card card-dense actions-card">
-    <button type="button" class="btn btn-sm" (click)="clone()" [disabled]="GuestMode()">{{ 'sheet.createCopy' | i18n }}</button>
+    <button type="button" class="btn btn-sm" (click)="clone()" [disabled]="GuestMode()">{{ 'sheet.cloneCharacter' | i18n }}</button>
     <button type="button" class="btn btn-sm" [disabled]="isSaveing || GuestMode()" (click)="saveToXML()">
       {{ isSaveing ? (progresPercent + '%') : ('sheet.download' | i18n) }}
     </button>
@@ -103,32 +103,32 @@
   <!-- Options -->
   <section class="card card-dense opts-card">
     <div class="check-row tight">
-      <label><input type="checkbox" [ngModel]="character.isShowName" (ngModelChange)="setPlacementFlag('isShowName', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.showName' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="placementFlag('isShowName', true)" (ngModelChange)="setPlacementFlag('isShowName', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.showName' | i18n }}</label>
       <label><input type="checkbox" [(ngModel)]="character.isAllowsChat" [disabled]="GuestMode()" /> {{ 'char.settings.allowsChat' | i18n }}</label>
-      <label><input type="checkbox" [ngModel]="character.isShowChatBubble" (ngModelChange)="setPlacementFlag('isShowChatBubble', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.chatBubble' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="placementFlag('isShowChatBubble', true)" (ngModelChange)="setPlacementFlag('isShowChatBubble', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.chatBubble' | i18n }}</label>
       <label><input type="checkbox" [(ngModel)]="character.isInventoryIndicate" [disabled]="GuestMode()" /> {{ 'char.settings.inventory' | i18n }}</label>
-      <label><input type="checkbox" [ngModel]="character.isAltitudeIndicate" (ngModelChange)="setPlacementFlag('isAltitudeIndicate', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.altitudeIndicate' | i18n }}</label>
-      <label><input type="checkbox" [ngModel]="character.isDropShadow" (ngModelChange)="setPlacementFlag('isDropShadow', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.dropShadow' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="placementFlag('isAltitudeIndicate', true)" (ngModelChange)="setPlacementFlag('isAltitudeIndicate', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.altitudeIndicate' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="placementFlag('isDropShadow', true)" (ngModelChange)="setPlacementFlag('isDropShadow', $event)" [disabled]="GuestMode()" /> {{ 'char.settings.dropShadow' | i18n }}</label>
     </div>
-    <label class="field" *ngIf="character.tokenFrame === 'polaroid'">
+    <label class="field" *ngIf="placementFlag('tokenFrame', 'none') === 'polaroid'">
       <span>{{ 'char.settings.polaroidCaption' | i18n }}</span>
-      <input type="text" [ngModel]="character.tokenFrameCaption" (ngModelChange)="setPlacementFlag('tokenFrameCaption', $event)" [disabled]="GuestMode() || !character.isShowName"
+      <input type="text" [ngModel]="placementFlag('tokenFrameCaption', '')" (ngModelChange)="setPlacementFlag('tokenFrameCaption', $event)" [disabled]="GuestMode() || !placementFlag('isShowName', true)"
         [attr.placeholder]="character.name || ''" />
     </label>
     <div class="field-row metrics vision-row">
       <label class="field">
         <span>{{ 'char.settings.vision' | i18n }}</span>
-        <input type="number" min="0" step="1" [ngModel]="character.visionRange"
+        <input type="number" min="0" step="1" [ngModel]="visionRange"
           (ngModelChange)="setVisionRange($event)" [disabled]="GuestMode()" />
       </label>
       <label class="field">
         <span>{{ 'char.settings.bright' | i18n }}</span>
-        <input type="number" min="0" step="1" [ngModel]="character.brightLight"
+        <input type="number" min="0" step="1" [ngModel]="brightLight"
           (ngModelChange)="setBrightLight($event)" [disabled]="GuestMode()" />
       </label>
       <label class="field">
         <span>{{ 'char.settings.dim' | i18n }}</span>
-        <input type="number" min="0" step="1" [ngModel]="character.dimLight"
+        <input type="number" min="0" step="1" [ngModel]="dimLight"
           (ngModelChange)="setDimLight($event)" [disabled]="GuestMode()" />
       </label>
       <div class="tool-actions">

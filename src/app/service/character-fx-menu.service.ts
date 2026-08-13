@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { CharacterToken } from '@udonarium/character-token';
 import { ClueLink } from '@udonarium/clue-link';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
@@ -40,6 +41,9 @@ const RING_OPTIONS = ['none', 'fire', 'magic', 'tech', 'eldritch', 'holy'];
 const AURA_COLOR_KEYS = ['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'] as const;
 const AURA_SAMPLE_COLORS = ['#000', '#00f', '#0f0', '#0ff', '#f00', '#f0f', '#ff0', '#fff'];
 
+/** Table cosmetics / stealth / FoW ranges — Token when on the map, else body. */
+type CosmeticsHost = GameCharacter | CharacterToken;
+
 @Injectable({ providedIn: 'root' })
 export class CharacterFxMenuService {
   constructor(
@@ -54,7 +58,7 @@ export class CharacterFxMenuService {
     return this.i18n.t(`chat.aura.${AURA_COLOR_KEYS[index]}`);
   }
 
-  makeAuraMenu(character: GameCharacter): ContextMenuAction {
+  makeAuraMenu(character: CosmeticsHost): ContextMenuAction {
     const names = this.auraNames;
     const auraLabel = (i: number) => `${character.aura == i ? '◉' : '○'} ${i < 0 ? this.i18n.t('fx.none') : this.auraDisplayName(i, names[i])}`;
     const setAura = (i: number) => {
@@ -90,7 +94,7 @@ export class CharacterFxMenuService {
     };
   }
 
-  makeRingMenu(character: GameCharacter): ContextMenuAction {
+  makeRingMenu(character: CosmeticsHost): ContextMenuAction {
     return {
       name: this.i18n.t('fx.ring'),
       action: null,
@@ -106,7 +110,7 @@ export class CharacterFxMenuService {
     };
   }
 
-  makeTokenFrameMenu(character: GameCharacter): ContextMenuAction {
+  makeTokenFrameMenu(character: CosmeticsHost): ContextMenuAction {
     return {
       name: this.i18n.t('fx.tokenFrame'),
       action: null,
@@ -127,7 +131,7 @@ export class CharacterFxMenuService {
     };
   }
 
-  makePushPinMenu(host: GameCharacter | TextNote): ContextMenuAction {
+  makePushPinMenu(host: CosmeticsHost | TextNote): ContextMenuAction {
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     return {
       name: this.i18n.t('fx.pushPin'),
@@ -150,13 +154,13 @@ export class CharacterFxMenuService {
   }
 
   /** Assign angle + style + position when enabling a pin. */
-  private ensureHostPushPin(host: GameCharacter | TextNote) {
+  private ensureHostPushPin(host: CosmeticsHost | TextNote) {
     if (!host.pushPinAngle) host.pushPinAngle = pinAngleFromId(host.identifier);
     if (!isActivePushPinStyle(host.pushPinStyle)) host.pushPinStyle = randomPushPinStyle();
     this.applyRandomPinOffset(host);
   }
 
-  private applyRandomPinOffset(host: GameCharacter | TextNote) {
+  private applyRandomPinOffset(host: CosmeticsHost | TextNote) {
     const GRID = 50;
     let widthPx = GRID;
     if (host instanceof TextNote) {
@@ -171,12 +175,12 @@ export class CharacterFxMenuService {
     host.pushPinTop = off.top;
   }
 
-  makeClueLinkMenu(from: GameCharacter | TextNote): ContextMenuAction {
+  makeClueLinkMenu(from: GameCharacter | CharacterToken | TextNote): ContextMenuAction {
     const viewId = TableSelecter.instance.viewTable?.identifier || '';
     const targets = this.pinnedEndpointsOnView().filter(t => t.identifier !== from.identifier);
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     const onView = (l: ClueLink) => !l.tableIdentifier || l.tableIdentifier === viewId;
-    const isLinked = (t: GameCharacter | TextNote) => ClueLink.all().some(l =>
+    const isLinked = (t: GameCharacter | CharacterToken | TextNote) => ClueLink.all().some(l =>
       onView(l)
       && ((l.fromIdentifier === from.identifier && l.toIdentifier === t.identifier)
         || (l.fromIdentifier === t.identifier && l.toIdentifier === from.identifier)));
@@ -225,14 +229,14 @@ export class CharacterFxMenuService {
     };
   }
 
-  private pinnedEndpointsOnView(): Array<GameCharacter | TextNote> {
-    const chars = ObjectStore.instance.getObjects(GameCharacter).filter(c => c.isVisibleOnTable);
+  private pinnedEndpointsOnView(): Array<GameCharacter | CharacterToken | TextNote> {
+    const tokens = ObjectStore.instance.getObjects(CharacterToken).filter(c => c.isVisibleOnTable);
     const notes = ObjectStore.instance.getObjects(TextNote).filter(n => n.isVisibleOnTable);
-    return [...chars, ...notes];
+    return [...tokens, ...notes];
   }
 
-  private endpointLabel(obj: GameCharacter | TextNote): string {
-    if (obj instanceof GameCharacter) return obj.name || this.i18n.t('fx.unnamed');
+  private endpointLabel(obj: GameCharacter | CharacterToken | TextNote): string {
+    if (obj instanceof GameCharacter || obj instanceof CharacterToken) return obj.name || this.i18n.t('fx.unnamed');
     return obj.title || this.i18n.t('action.noteName');
   }
 
@@ -292,8 +296,7 @@ export class CharacterFxMenuService {
   }
 
   makeCombatMenu(character: GameCharacter): ContextMenuAction {
-    const selectedCount = () =>
-      this.selectionService.objects.filter(o => o instanceof GameCharacter).length;
+    const selectedCount = () => this.bodiesFromSelection().length;
     return {
       name: this.i18n.t('fx.addToCombat'),
       action: () => {
@@ -317,23 +320,38 @@ export class CharacterFxMenuService {
     };
   }
 
-  /** All selected character tokens, ensuring the context-menu target is included. */
+  /** Unique bodies from Token and/or GameCharacter selection. */
+  private bodiesFromSelection(): GameCharacter[] {
+    const byId = new Map<string, GameCharacter>();
+    for (const o of this.selectionService.objects) {
+      if (o instanceof CharacterToken) {
+        const body = o.character;
+        if (body) byId.set(body.identifier, body);
+      } else if (o instanceof GameCharacter) {
+        byId.set(o.identifier, o);
+      }
+    }
+    return Array.from(byId.values());
+  }
+
+  /** All selected character sheets, ensuring the context-menu target is included. */
   private combatCharactersFor(character: GameCharacter): GameCharacter[] {
-    const selected = this.selectionService.objects.filter((o): o is GameCharacter => o instanceof GameCharacter);
+    const selected = this.bodiesFromSelection();
     if (!selected.length) return [character];
     if (selected.some(c => c.identifier === character.identifier)) return selected;
     return [...selected, character];
   }
 
-  makeVisionMenu(character: GameCharacter): ContextMenuAction {
+  makeVisionMenu(host: CosmeticsHost): ContextMenuAction {
     const mine = Network.peer?.userId || '';
-    // Manual claim only — chat auto-vision must not drive this checkbox.
-    const isMyVision = !!mine && character.visionOwner === mine;
+    const body = host instanceof CharacterToken ? host.character : host;
+    // Manual claim only — chat auto-vision must not drive this checkbox. Claim lives on body.
+    const isMyVision = !!mine && !!body && body.visionOwner === mine;
     const title = () =>
       this.i18n.t('fx.visionLighting', {
-        vision: character.visionRangeGrid,
-        bright: character.brightLightGrid,
-        dim: character.dimLightGrid,
+        vision: host.visionRangeGrid,
+        bright: host.brightLightGrid,
+        dim: host.dimLightGrid,
       });
 
     const rangeSub = (
@@ -364,49 +382,49 @@ export class CharacterFxMenuService {
         {
           name: this.i18n.t('fx.myVision', { mark: isMyVision ? '☑' : '☐' }),
           action: () => {
-            if (!mine) return;
-            character.visionOwner = character.visionOwner === mine ? '' : mine;
+            if (!mine || !body) return;
+            body.visionOwner = body.visionOwner === mine ? '' : mine;
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
           nameUpdate: () => {
-            const on = !!mine && character.visionOwner === mine;
+            const on = !!mine && !!body && body.visionOwner === mine;
             return this.i18n.t('fx.myVision', { mark: on ? '☑' : '☐' });
           },
           checkBox: 'check',
-          disabled: GuestSession.isGuest,
+          disabled: GuestSession.isGuest || !body,
         },
         ContextMenuSeparator,
         rangeSub(this.i18n.t('fx.visionRange'), VISION_RANGE_PRESETS,
-          () => character.visionRangeGrid,
-          n => { character.mutateAppearance(() => { character.visionRange = n; }); }),
+          () => host.visionRangeGrid,
+          n => { host.mutateAppearance(() => { host.visionRange = n; }); }),
         rangeSub(this.i18n.t('fx.brightLight'), BRIGHT_LIGHT_PRESETS,
-          () => character.brightLightGrid,
+          () => host.brightLightGrid,
           n => {
-            character.mutateAppearance(() => {
-              character.brightLight = n;
-              if (character.dimLightGrid < n) character.dimLight = n;
+            host.mutateAppearance(() => {
+              host.brightLight = n;
+              if (host.dimLightGrid < n) host.dimLight = n;
             });
           }),
         rangeSub(this.i18n.t('fx.dimLight'), DIM_LIGHT_PRESETS,
-          () => character.dimLightGrid,
-          n => { character.mutateAppearance(() => { character.dimLight = n; }); }),
+          () => host.dimLightGrid,
+          n => { host.mutateAppearance(() => { host.dimLight = n; }); }),
         ContextMenuSeparator,
         {
           name: this.i18n.t('fx.clearLight'),
           action: () => {
-            character.mutateAppearance(() => {
-              character.brightLight = 0;
-              character.dimLight = 0;
+            host.mutateAppearance(() => {
+              host.brightLight = 0;
+              host.dimLight = 0;
             });
             EventSystem.trigger('UPDATE_INVENTORY', null);
           },
-          disabled: character.brightLightGrid <= 0 && character.dimLightGrid <= 0,
+          disabled: host.brightLightGrid <= 0 && host.dimLightGrid <= 0,
         },
       ],
     };
   }
 
-  makeImageEffectMenu(character: GameCharacter): ContextMenuAction {
+  makeImageEffectMenu(character: CosmeticsHost): ContextMenuAction {
     const after = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     const setFx = (fn: () => void) => character.mutateAppearance(fn);
     return {
@@ -537,8 +555,9 @@ export class CharacterFxMenuService {
     EventSystem.trigger('UPDATE_INVENTORY', null);
   }
 
-  statusesOf(character: GameCharacter): CharacterStatusEntry[] {
-    return parseStatusesJson(character.statusesJson);
+  statusesOf(character: GameCharacter | null | undefined): CharacterStatusEntry[] {
+    if (!character) return [];
+    return parseStatusesJson(character.statusesJson || '[]');
   }
 
   ringAsset(ring: string): string {

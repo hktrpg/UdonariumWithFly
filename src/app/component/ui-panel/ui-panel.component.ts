@@ -364,6 +364,8 @@ export class UIPanelComponent implements OnInit, OnDestroy {
     if (this.isMinimized || this.isFullScreen) return;
     const panel = this.draggablePanel?.nativeElement;
     if (!panel) return;
+    const prevW = this.width;
+    const prevH = this.height;
     if (this.isMobileSheet) {
       const h = panel.offsetHeight;
       const minH = this.mobileLayout.sheetHeightPx('peek');
@@ -372,12 +374,17 @@ export class UIPanelComponent implements OnInit, OnDestroy {
       this.isSheetCustomHeight = true;
       this.height = clamped;
       this.top = Math.max(0, this.mobileLayout.viewportHeight - clamped - this.mobileLayout.bottomChromePx);
+      // Only lock content-fit when the user actually changed size (not mere drag-move).
+      if (clamped !== prevH) this.panelService.lockFitToContent();
       return;
     }
     this.left = panel.offsetLeft;
     this.top = panel.offsetTop;
     this.width = panel.offsetWidth;
     this.height = panel.offsetHeight;
+    if (this.width !== prevW || this.height !== prevH) {
+      this.panelService.lockFitToContent();
+    }
     if (this.panelService.tourPanelId === 'menu.chat') {
       ChatWindowComponent.saveGeometry(this.width, this.height, this.left, this.top);
       return;

@@ -1,3 +1,4 @@
+import { CharacterToken } from '@udonarium/character-token';
 import { ClueLink } from '@udonarium/clue-link';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
@@ -27,15 +28,22 @@ describe('BNZ golden fly_data fixture', () => {
 
     const c = ObjectStore.instance.get<GameCharacter>('testCharacter_3');
     expect(c).toBeTruthy();
-    expect(c.hasPlacement('gameTable')).toBeTrue();
-    expect(c.hasPlacement('gameTable_clue2d')).toBeTrue();
-    expect(c.getPoseForTable('gameTable_clue2d')?.y).toBe(400);
+    // Room load migrates on-table bodies → CharacterTokens; sheet stays off-table.
+    expect(c.location.name).not.toBe('table');
+
+    const tokC = ObjectStore.instance.get<CharacterToken>(CharacterToken.legacyTokenId('testCharacter_3'));
+    const tokA = ObjectStore.instance.get<CharacterToken>(CharacterToken.legacyTokenId('testCharacter_1'));
+    expect(tokC).toBeTruthy();
+    expect(tokA).toBeTruthy();
+    expect(tokC.characterId).toBe('testCharacter_3');
+    // Legacy multi-map body placements collapse to the first map Token.
+    expect(tokC.hasPlacement('gameTable') || tokC.hasPlacement('gameTable_clue2d')).toBeTrue();
 
     const link = ObjectStore.instance.get<ClueLink>('battleClueLink_1');
     expect(link).toBeTruthy();
     expect(link.tableIdentifier).toBe('gameTable');
-    expect(link.fromIdentifier).toBe('testCharacter_3');
-    expect(link.toIdentifier).toBe('testCharacter_1');
+    expect(link.fromIdentifier).toBe(CharacterToken.legacyTokenId('testCharacter_3'));
+    expect(link.toIdentifier).toBe(CharacterToken.legacyTokenId('testCharacter_1'));
   });
 });
 

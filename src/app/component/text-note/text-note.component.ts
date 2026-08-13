@@ -22,6 +22,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
@@ -431,10 +432,12 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     e.stopPropagation();
     e.preventDefault();
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.textNote);
     const position = this.pointerDeviceService.pointers[0];
     let menuActions: ContextMenuAction[] = [];
     menuActions = menuActions.concat(this.makeSelectionContextMenu());
     menuActions = menuActions.concat(this.makeContextMenu());
+    menuActions = this.tabletopActionService.withClipboardMenuPrefix(menuActions);
     this.contextMenuService.open(position, menuActions, this.title);
   }
 
@@ -676,9 +679,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         name: this.i18n.t('textNote.menu.15'), action: () => {
           const cloneObject = this.textNote.clone();
           cloneObject.isLocked = false;
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
           cloneObject.raiseInTier();
+          const viewId = TabletopObject.resolveViewTableIdentifier();
+          cloneObject.tablePlacements = '';
+          cloneObject.addToTable(viewId, {
+            x: this.textNote.location.x + this.gridSize,
+            y: this.textNote.location.y + this.gridSize,
+            posZ: this.textNote.posZ,
+          }, true);
+          const body = this.textNote.text;
+          const title = this.textNote.title;
+          if (body) cloneObject.text = body;
+          if (title) cloneObject.title = title;
           SoundEffect.play(PresetSound.cardPut);
         }
       },

@@ -298,7 +298,10 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
       this.shouldUpdateCharacterList = false;
       this._gameCharacters = ObjectStore.instance
         .getObjects<GameCharacter>(GameCharacter)
-        .filter(character => (this.allowsChat(character) || (this.character && this.character.identifier === character.identifier)));
+        .filter(character =>
+          !character.isTemporaryCopy
+          && (this.allowsChat(character) || (this.character && this.character.identifier === character.identifier))
+        );
     }
     return this._gameCharacters;
   }

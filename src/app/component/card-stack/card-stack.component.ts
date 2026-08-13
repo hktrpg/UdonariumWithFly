@@ -35,6 +35,7 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TabletopActionService } from 'service/tabletop-action.service';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 
 @Component({
@@ -143,6 +144,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
+    private tabletopActionService: TabletopActionService,
     private i18n: I18nService
   ) { }
 
@@ -309,6 +311,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.cardStack);
     let position = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
@@ -321,6 +324,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       menuActions = menuActions.concat(this.makeSelectionContextMenu());
       menuActions = menuActions.concat(this.makeContextMenu());
     }
+    menuActions = this.tabletopActionService.withClipboardMenuPrefix(menuActions);
 
     this.contextMenuService.open(position, menuActions, title);
   }

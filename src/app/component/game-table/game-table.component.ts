@@ -9,6 +9,7 @@ import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
+import { CharacterToken } from '@udonarium/character-token';
 import { GameCharacter } from '@udonarium/game-character';
 import { FilterType, GameTable, GridType } from '@udonarium/game-table';
 import { GameTableMask } from '@udonarium/game-table-mask';
@@ -384,7 +385,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   characterViewEpoch = 0;
 
-  get characters(): GameCharacter[] { return this.tabletopService.characters; }
+  get characters(): CharacterToken[] { return this.tabletopService.characterTokens; }
 
   /**
    * Card / note / mask / character (+ stacks) in one peer list.
@@ -468,7 +469,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const ids = new Set<string>();
     for (const piece of this.desktopLayerPieces) {
       if (!piece?.identifier) continue;
-      if (piece instanceof GameCharacter && !(piece.isVisible || isGm)) continue;
+      if ((piece instanceof GameCharacter || piece instanceof CharacterToken) && !(piece.isVisible || isGm)) continue;
       if (occlude && !(piece instanceof GameTableMask) && this.isFootprintCoveredByMask(piece, masks, gridSize)) {
         continue;
       }
@@ -589,7 +590,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       : { x: obj.location?.x ?? 0, y: obj.location?.y ?? 0 };
     let w = gridSize;
     let h = gridSize;
-    if (obj instanceof GameCharacter) {
+    if (obj instanceof GameCharacter || obj instanceof CharacterToken) {
       w = h = Math.max(0.25, obj.size || 1) * gridSize;
     } else if (obj instanceof GameTableMask || obj instanceof TextNote) {
       w = Math.max(0.25, obj.width || 1) * gridSize;
@@ -625,11 +626,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   isLayerNote(piece: Stackable): piece is TextNote { return piece instanceof TextNote; }
   isLayerCard(piece: Stackable): piece is Card { return piece instanceof Card; }
   isLayerCardStack(piece: Stackable): piece is CardStack { return piece instanceof CardStack; }
-  isLayerCharacter(piece: Stackable): piece is GameCharacter { return piece instanceof GameCharacter; }
+  isLayerCharacter(piece: Stackable): piece is CharacterToken { return piece instanceof CharacterToken; }
   isLayerMask(piece: Stackable): piece is GameTableMask { return piece instanceof GameTableMask; }
 
   trackByLayerPiece = (_index: number, piece: Stackable) => {
-    if (piece instanceof GameCharacter) {
+    if (piece instanceof CharacterToken || piece instanceof GameCharacter) {
       return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
     }
     return piece.identifier;
@@ -660,11 +661,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     gridSize: number,
   ): { x: number; y: number; z: number } | null {
     if (!id) return null;
-    const obj = ObjectStore.instance.get(id);
+    // Prefer Token when links still store body ids (seed / unmigrated rooms).
+    const resolved = ClueLink.resolveEndpoint(id);
+    const obj = resolved || ObjectStore.instance.get(id);
     const is2D = !!this.currentTable?.is2DMode
       || !!TableSelecter.instance?.viewTable?.is2DMode;
 
-    if (obj instanceof GameCharacter && !is2D) {
+    if ((obj instanceof GameCharacter || obj instanceof CharacterToken) && !is2D) {
       const foot = (obj.size || 1) * gridSize;
       const pose = obj.getPoseForView();
       return tokenCenterAnchorPx(
@@ -675,7 +678,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       );
     }
 
-    if (obj instanceof GameCharacter) {
+    if (obj instanceof GameCharacter || obj instanceof CharacterToken) {
       const s = (obj.size || 1) * gridSize;
       const model = pinAnchorPx(this.pinHostFromView(obj), s, s);
       return { x: model.x, y: model.y, z: this.clueStringsZ };
@@ -695,9 +698,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /** Pin math must use the viewed-map pose, not possibly-stale location SyncVar. */
-  private pinHostFromView(obj: GameCharacter | TextNote) {
+  private pinHostFromView(obj: GameCharacter | CharacterToken | TextNote) {
     const pose = obj.getPoseForView();
-    const tokenFrame = (obj instanceof GameCharacter) ? (obj.tokenFrame || 'none') : 'none';
+    const tokenFrame = (obj instanceof GameCharacter || obj instanceof CharacterToken)
+      ? (obj.tokenFrame || 'none')
+      : 'none';
     return {
       pushPin: !!obj.pushPin,
       pushPinAngle: obj.pushPinAngle || 0,
@@ -847,7 +852,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!table?.visionEnabled) return false;
     const userId = Network.peer?.userId;
     if (!userId) return false;
-    return !ObjectStore.instance.getObjects(GameCharacter).some(ch => ch.providesVisionTo(userId));
+    return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
   }
   get pathPointsAttr(): string {
     const pts: string[] = [];
@@ -882,6 +887,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         });
         this.ngZone.run(() => queueMicrotask(() => {
           // Remount dual-map survivors (same cache membership → same trackBy otherwise).
+          // Suppress bounce: remount while visibility:hidden aborts bounceInOut at scale(0).
+          GameCharacterComponent.suppressEnterBounce = true;
           const epochBefore = this.characterViewEpoch;
           this.characterViewEpoch++;
           GameCharacterComponent.resetMountLogBudget(16);
@@ -902,6 +909,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
             mountBudget: 16,
           });
           this.applyViewedTable();
+          MovableDirective.syncAllPosesFromObjects();
+          this.changeDetector.detectChanges();
+          queueMicrotask(() => {
+            MovableDirective.syncAllPosesFromObjects();
+            this.changeDetector.detectChanges();
+            GameCharacterComponent.suppressEnterBounce = false;
+          });
           // Immediate DOM count (before bounce finishes).
           setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +0ms', {
             tableId: id,
@@ -1547,6 +1561,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     let extraActions: ContextMenuAction[] = [];
 
+    const pasteActions = this.tabletopActionService.makePasteMenuActions();
+    if (pasteActions.length) {
+      extraActions.push(...pasteActions);
+      extraActions.push(ContextMenuSeparator);
+    }
+
+    const clipActions = this.tabletopActionService.makeClipboardMenuActions();
+    if (clipActions.length && (this.selectionService.size > 0 || this.sceneTools.selectionCount > 0)) {
+      extraActions.push(...clipActions);
+      extraActions.push(ContextMenuSeparator);
+    }
+
     if (0 < this.selectionService.size) {
       extraActions.push({
         name: this.i18n.t('gt.congregate'),
@@ -1986,8 +2012,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Update which tokens players may see under FoW; returns true if the set changed. */
   private refreshVisionRevealed(
-    onTable: GameCharacter[],
-    visionChars: GameCharacter[],
+    onTable: CharacterToken[],
+    visionChars: CharacterToken[],
     userId: string,
   ): boolean {
     const next = new Set<string>();
@@ -2012,7 +2038,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /** Players with FoW: hide tokens outside vision (and lit area when GI is off). */
-  isTokenRevealedByVision(character: GameCharacter): boolean {
+  isTokenRevealedByVision(character: CharacterToken | GameCharacter): boolean {
     if (!character) return false;
     if (this.isGMMode || !this.currentTable?.visionEnabled) return true;
     return this.visionRevealedIds.has(character.identifier);
@@ -2670,7 +2696,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const grid = this.currentTable?.gridSize || 50;
     const isTemp = this.readInventoryTempCopy(e);
     let placed = 0;
-    const placedChars: GameCharacter[] = [];
+    const placedTokens: CharacterToken[] = [];
 
     for (let i = 0; i < ids.length; i++) {
       const ch = ObjectStore.instance.get(ids[i]);
@@ -2683,31 +2709,26 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       const y = pos.y - (ch.size * grid) / 2 + row * grid;
 
       if (isTemp) {
-        GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ });
+        placedTokens.push(GameCharacter.createTemporaryCopy(ch, { x, y, posZ: ch.posZ }, undefined, ch));
       } else {
-        // Selected tokens ignore self UPDATE in MovableDirective — clear first, then force pose sync.
-        this.selectionService.remove(ch);
-        EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: ch.identifier });
-        // Keep other-map placements when dragging a token that is already on a table.
-        // Exclusive only for true inventory → table (no existing placements).
-        const exclusive = ch.location.name !== 'table' && ch.placementTableIds.length < 1;
-        ch.addToTable(undefined, { x, y, posZ: ch.posZ }, exclusive);
-        MovableDirective.syncPoseFromUndo(ch, x, y, ch.posZ);
-        placedChars.push(ch);
+        placedTokens.push(CharacterToken.create(ch.identifier, { x, y, posZ: ch.posZ }, {
+          copyAppearanceFrom: ch,
+        }));
       }
       placed++;
     }
 
     if (placed > 0) {
-      // Restore multi-select so the dropped group stays boxed like a table selection.
-      if (placedChars.length > 0) {
-        this.selectionService.clear();
-        for (const ch of placedChars) {
-          this.selectionService.add(ch);
-        }
+      // Select the tokens just dropped — not focus/major (must not jump the yarn).
+      this.selectionService.clear();
+      for (const tok of placedTokens) {
+        this.selectionService.add(tok);
+      }
+      const first = placedTokens[0];
+      if (first) {
         EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
-          identifier: placedChars[0].identifier,
-          className: placedChars[0].aliasName,
+          identifier: first.identifier,
+          className: first.aliasName,
           highlighting: true,
         });
       }

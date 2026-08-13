@@ -1,4 +1,5 @@
 import { Card, CardState } from '@udonarium/card';
+import { CharacterToken } from '@udonarium/character-token';
 import { ClueLink } from '@udonarium/clue-link';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
@@ -11,12 +12,16 @@ import { Terrain } from '@udonarium/terrain';
 
 /** Destroy tabletop-related objects between specs (ObjectStore is a process singleton). */
 export function resetTabletopStore(): void {
+  // Product default: bodies never sit on the table. Specs that still exercise
+  // GameCharacter TabletopObject placement APIs must opt in explicitly.
+  GameCharacter.allowLegacyBodyOnTable = false;
   const destroyAll = (list: { destroy(): void }[]) => {
     for (const o of [...list]) {
       try { o.destroy(); } catch { /* ignore */ }
     }
   };
   destroyAll(ObjectStore.instance.getObjects(ClueLink));
+  destroyAll(ObjectStore.instance.getObjects(CharacterToken));
   destroyAll(ObjectStore.instance.getObjects(GameCharacter));
   destroyAll(ObjectStore.instance.getObjects(TextNote));
   destroyAll(ObjectStore.instance.getObjects(Terrain));
@@ -41,6 +46,22 @@ export function makeCharacter(id: string, name = id, size = 1): GameCharacter {
   ch.initialize();
   ch.createTestGameDataElement(name, size, '');
   return ch;
+}
+
+/** Place a CharacterToken for a body on the given (or current) map. */
+export function makeToken(
+  body: GameCharacter,
+  pose: { x?: number; y?: number; posZ?: number } = {},
+  tableId?: string,
+  opts?: { temporary?: boolean; major?: boolean; identifier?: string }
+): CharacterToken {
+  return CharacterToken.create(body.identifier, pose, {
+    tableId,
+    temporary: opts?.temporary,
+    major: opts?.major,
+    identifier: opts?.identifier,
+    copyAppearanceFrom: body,
+  });
 }
 
 export function makeTextNote(id: string, title = id): TextNote {

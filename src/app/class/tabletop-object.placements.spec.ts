@@ -4,6 +4,7 @@ import { TabletopObject } from './tabletop-object';
 import { PLACEMENT_VIEW_STATE_KEYS } from './table-placement-view-state';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { DataElement } from './data-element';
+import { GameCharacter } from './game-character';
 import {
   makeCard,
   makeCharacter,
@@ -17,7 +18,11 @@ import {
 } from '../../testing/tabletop-test.util';
 
 describe('TabletopObject placements / migrate / repair', () => {
-  beforeEach(() => resetTabletopStore());
+  beforeEach(() => {
+    resetTabletopStore();
+    // These specs exercise multi-map TabletopObject placement APIs via GameCharacter.
+    GameCharacter.allowLegacyBodyOnTable = true;
+  });
   afterEach(() => resetTabletopStore());
 
   it('migrateUnboundTablePieces does not rebind objects that already have placements', () => {

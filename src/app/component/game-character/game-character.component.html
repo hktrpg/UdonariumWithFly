@@ -149,6 +149,13 @@
           </div>
         </div>
       </div>
+      <!-- After upright/frame so the ring paints above photo/polaroid chrome (not under it). -->
+      <div class="combat-turn-ring is-pointer-events-none"
+        *ngIf="combatTurnMark"
+        [class.is-current]="combatTurnMark === 'current'"
+        [class.is-next]="combatTurnMark === 'next'"
+        [class.is-flat-2d]="is2DMode"
+        [class.is-over-frame]="hasTokenFrame"></div>
     </div>
     <div class="is-3d" *ngIf="!is2DMode && isAltitudeIndicate && (altitude <= -0.5 || 0.5 <= altitude)"
       style="display: flex; flex-flow: column nowrap; justify-content: space-between; border-left: 2px dashed black; transform-origin: top left"

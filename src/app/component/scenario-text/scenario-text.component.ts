@@ -49,7 +49,7 @@ export class ScenarioTextComponent implements OnInit, OnDestroy {
       this.shouldUpdateCharacterList = false;
       this._gameCharacters = ObjectStore.instance
         .getObjects<GameCharacter>(GameCharacter)
-        .filter(character => this.allowsChat(character));
+        .filter(character => !character.isTemporaryCopy && this.allowsChat(character));
       this.ensureCharacterSelection();
     }
     return this._gameCharacters;

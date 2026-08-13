@@ -14,7 +14,9 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameCharacter } from '@udonarium/game-character';
+import { CharacterToken } from '@udonarium/character-token';
 import { layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
+import { TabletopObject } from '@udonarium/tabletop-object';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
@@ -35,10 +37,12 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
+import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
+import { TabletopActionService } from 'service/tabletop-action.service';
 
 @Component({
     selector: 'game-character',
@@ -120,15 +124,36 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   @Input() gameCharacter: GameCharacter = null;
+  /** When set, this component is a map token projection; sheet data comes from {@link gameCharacter}. */
+  @Input() characterToken: CharacterToken = null;
   @Input() is3D: boolean = false;
+
+  /** Object that owns table pose / layer (token when present). */
+  get tablePiece(): TabletopObject {
+    return this.characterToken || this.gameCharacter;
+  }
+
+  /**
+   * Stealth / FoW ranges / table cosmetics host.
+   * Sheet fields (name size image status chat) stay on {@link gameCharacter}.
+   */
+  get appearanceHost(): GameCharacter | CharacterToken {
+    return this.characterToken || this.gameCharacter;
+  }
 
   get skipEnterBounce(): boolean { return GameCharacterComponent.suppressEnterBounce; }
 
-  get name(): string { return this.gameCharacter.name; }
-  get size(): number { return MathUtil.clampMin(this.gameCharacter.size); }
-  get altitude(): number { return this.gameCharacter.altitude; }
-  set altitude(altitude: number) { this.gameCharacter.altitude = altitude; }
-  get height(): number { return MathUtil.clampMin(this.gameCharacter.height); }
+  get name(): string {
+    if (this.characterToken?.displayNameOverride) return this.characterToken.displayNameOverride;
+    return this.gameCharacter?.name || '';
+  }
+  get size(): number { return MathUtil.clampMin(this.gameCharacter?.size ?? 1); }
+  get altitude(): number { return this.appearanceHost?.altitude ?? 0; }
+  set altitude(altitude: number) {
+    if (!this.appearanceHost) return;
+    this.appearanceHost.altitude = altitude;
+  }
+  get height(): number { return MathUtil.clampMin(this.gameCharacter?.height ?? 0); }
   /** Room 2D mode: face-up token centered on the pedestal (top-down). */
   get is2DMode(): boolean { return !!TableSelecter.instance?.viewTable?.is2DMode; }
   get uprightTransform(): string {
@@ -142,19 +167,28 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   
-  get imageFile(): ImageFile { return this.gameCharacter.imageFile; }
-  get rotate(): number { return this.gameCharacter.rotate; }
+  get imageFile(): ImageFile { return this.gameCharacter?.imageFile; }
+  get rotate(): number {
+    return this.appearanceHost?.rotate ?? 0;
+  }
   set rotate(rotate: number) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.rotate = rotate; });
+    const piece = this.appearanceHost;
+    if (!piece) return;
+    piece.mutateAppearance(() => { piece.rotate = rotate; });
   }
   /** 2D mode: roll SyncVar is forced to 0 (no tip/tilt). */
-  get roll(): number { return this.is2DMode ? 0 : this.gameCharacter.roll; }
+  get roll(): number {
+    if (this.is2DMode) return 0;
+    return (this.appearanceHost as any)?.roll ?? 0;
+  }
   set roll(roll: number) {
     if (this.is2DMode) {
       // Display-only: never wipe the shared SyncVar (other maps keep their tip).
       return;
     }
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.roll = roll; });
+    const piece = this.appearanceHost;
+    if (!piece) return;
+    piece.mutateAppearance(() => { (piece as any).roll = roll; });
   }
   get isRollLocked(): boolean { return this.is2DMode || this.isMoveLocked; }
 
@@ -162,38 +196,49 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private enforce2DRollZero() {
     // no-op — getter already returns 0 in 2D
   }
-  get isDropShadow(): boolean { return this.gameCharacter.isDropShadow; }
+  get isDropShadow(): boolean { return !!this.appearanceHost?.isDropShadow; }
   set isDropShadow(isDropShadow: boolean) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isDropShadow = isDropShadow; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.isDropShadow = isDropShadow; });
   }
-  get isAltitudeIndicate(): boolean { return this.gameCharacter.isAltitudeIndicate; }
+  get isAltitudeIndicate(): boolean { return !!this.appearanceHost?.isAltitudeIndicate; }
   set isAltitudeIndicate(isAltitudeIndicate: boolean) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isAltitudeIndicate = isAltitudeIndicate; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.isAltitudeIndicate = isAltitudeIndicate; });
   }
-  get isInverse(): boolean { return this.gameCharacter.isInverse; }
+  get isInverse(): boolean { return !!this.appearanceHost?.isInverse; }
   set isInverse(isInverse: boolean) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isInverse = isInverse; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.isInverse = isInverse; });
   }
-  get isHollow(): boolean { return this.gameCharacter.isHollow; }
+  get isHollow(): boolean { return !!this.appearanceHost?.isHollow; }
   set isHollow(isHollow: boolean) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isHollow = isHollow; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.isHollow = isHollow; });
   }
-  get isBlackPaint(): boolean { return this.gameCharacter.isBlackPaint; }
+  get isBlackPaint(): boolean { return !!this.appearanceHost?.isBlackPaint; }
   set isBlackPaint(isBlackPaint: boolean) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isBlackPaint = isBlackPaint; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.isBlackPaint = isBlackPaint; });
   }
 
   private imageEffectSource() {
+    const host = this.appearanceHost;
     return {
-      isInverse: this.gameCharacter.isInverse,
-      isHollow: this.gameCharacter.isHollow,
-      isBlackPaint: this.gameCharacter.isBlackPaint,
-      isGrayscale: this.gameCharacter.isGrayscale,
-      isSepia: this.gameCharacter.isSepia,
-      isWhitePaint: this.gameCharacter.isWhitePaint,
-      isMatrix: this.gameCharacter.isMatrix,
-      isFlipVertical: this.gameCharacter.isFlipVertical,
-      isContrast: this.gameCharacter.isContrast,
+      isInverse: !!host?.isInverse,
+      isHollow: !!host?.isHollow,
+      isBlackPaint: !!host?.isBlackPaint,
+      isGrayscale: !!host?.isGrayscale,
+      isSepia: !!host?.isSepia,
+      isWhitePaint: !!host?.isWhitePaint,
+      isMatrix: !!host?.isMatrix,
+      isFlipVertical: !!host?.isFlipVertical,
+      isContrast: !!host?.isContrast,
       isDead: this.hasDeadStatus,
     };
   }
@@ -204,10 +249,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   private _matrixRainCacheKey = '';
   private _matrixRainColumns: MatrixRainColumn[] = [];
   get matrixRainColumns(): MatrixRainColumn[] {
-    if (!this.gameCharacter?.isMatrix) return [];
+    const host = this.appearanceHost;
+    if (!host?.isMatrix) return [];
     const w = this.characterImageWidth || this.size * this.gridSize;
     const count = Math.max(4, Math.min(16, Math.round(w / 9)));
-    const key = `${this.gameCharacter.identifier}:${count}`;
+    const key = `${host.identifier}:${count}`;
     if (key !== this._matrixRainCacheKey) {
       this._matrixRainCacheKey = key;
       this._matrixRainColumns = buildMatrixRainColumns(key, count);
@@ -216,22 +262,49 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
   trackByMatrixCol = (_: number, col: MatrixRainColumn) => `${col.duration}:${col.delay}:${col.text.length}`;
 
-  get aura(): number { return this.gameCharacter.aura; }
+  get aura(): number { return this.appearanceHost?.aura ?? -1; }
   set aura(aura: number) {
-    this.gameCharacter.mutateAppearance(() => { this.gameCharacter.aura = aura; });
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => { host.aura = aura; });
   }
 
   private syncViewPlacement() {
-    this.gameCharacter?.syncAppearanceToCurrentViewPlacement();
+    this.appearanceHost?.syncAppearanceToCurrentViewPlacement();
   }
-  get floorRing(): string { return this.gameCharacter.floorRing || 'none'; }
+  get floorRing(): string { return (this.appearanceHost as any)?.floorRing || 'none'; }
   get floorRingUrl(): string { return this.characterFxMenu.ringAsset(this.floorRing); }
-  get floorRingSpeed(): number { return this.gameCharacter.floorRingSpeed || 1; }
-  get floorRingColor(): string { return this.gameCharacter.floorRingColor || ''; }
-  get tokenFrame(): string { return this.gameCharacter.tokenFrame || 'none'; }
+  get floorRingSpeed(): number { return (this.appearanceHost as any)?.floorRingSpeed || 1; }
+  get floorRingColor(): string { return (this.appearanceHost as any)?.floorRingColor || ''; }
+
+  /**
+   * Ephemeral underfoot turn mark from CombatTracker (not synced floorRing FX).
+   * Matches body id — all Tokens of that sheet share the mark.
+   */
+  get combatTurnMark(): 'current' | 'next' | null {
+    const bodyId = this.gameCharacter?.identifier;
+    if (!bodyId) return null;
+    const tracker = CombatTracker.instance;
+    const e = tracker.activeEncounter;
+    if (!e?.isStarted) return null;
+    const isGM = !!PeerCursor.myCursor?.isGMMode;
+    const cur = tracker.currentCombatant();
+    if (cur?.characterIdentifier === bodyId) {
+      if (cur.isHidden && !isGM) return null;
+      return 'current';
+    }
+    const next = tracker.nextCombatant();
+    if (next?.characterIdentifier === bodyId) {
+      if (next.isHidden && !isGM) return null;
+      return 'next';
+    }
+    return null;
+  }
+
+  get tokenFrame(): string { return (this.appearanceHost as any)?.tokenFrame || 'none'; }
   get hasTokenFrame(): boolean { return this.is2DMode && this.tokenFrame !== 'none'; }
-  get isShowName(): boolean { return this.gameCharacter.isShowName !== false; }
-  get tokenFrameCaption(): string { return this.gameCharacter.tokenFrameCaption || this.name || ''; }
+  get isShowName(): boolean { return (this.appearanceHost as any)?.isShowName !== false; }
+  get tokenFrameCaption(): string { return (this.appearanceHost as any)?.tokenFrameCaption || this.name || ''; }
   /** Polaroid film strip: name lives in the white margin (not the floating tag). */
   get showPolaroidCaption(): boolean {
     return this.hasTokenFrame && this.tokenFrame === 'polaroid' && this.isShowName && 0 < this.tokenFrameCaption.length;
@@ -246,24 +319,29 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get tokenBoxHeightPx(): number {
     return this.is2DMode ? this.size * this.gridSize : this.characterImageHeight;
   }
-  get pushPin(): boolean { return !!this.gameCharacter.pushPin && this.is2DMode; }
-  get pushPinAngle(): number { return this.gameCharacter.pushPinAngle || 0; }
+  get pushPin(): boolean { return !!(this.appearanceHost as any)?.pushPin && this.is2DMode; }
+  get pushPinAngle(): number { return (this.appearanceHost as any)?.pushPinAngle || 0; }
   get pushPinLeft(): number {
-    return typeof this.gameCharacter.pushPinLeft === 'number' ? this.gameCharacter.pushPinLeft : -4;
+    const v = (this.appearanceHost as any)?.pushPinLeft;
+    return typeof v === 'number' ? v : -4;
   }
   get pushPinTop(): number {
-    return typeof this.gameCharacter.pushPinTop === 'number' ? this.gameCharacter.pushPinTop : -20;
+    const v = (this.appearanceHost as any)?.pushPinTop;
+    return typeof v === 'number' ? v : -20;
   }
-  get pushPinColor(): string { return this.gameCharacter.pushPinColor || 'red'; }
+  get pushPinColor(): string { return (this.appearanceHost as any)?.pushPinColor || 'red'; }
   get pushPinSrc(): string {
+    const host = this.appearanceHost;
     return pushPinAssetUrl(
       this.pushPinColor,
       this.pushPinAngle,
-      this.gameCharacter.pushPinStyle,
-      this.gameCharacter.identifier,
+      (host as any)?.pushPinStyle,
+      host?.identifier,
     );
   }
-  get statusEntries() { return this.characterFxMenu.statusesOf(this.gameCharacter); }
+  get statusEntries() {
+    return this.gameCharacter ? this.characterFxMenu.statusesOf(this.gameCharacter) : [];
+  }
   /** Cap name-tag / status icon strip to roughly the token footprint. */
   get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
@@ -284,12 +362,16 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.changeDetector.markForCheck();
   }
 
-  get isNotRide(): boolean { return this.gameCharacter.isNotRide; }
-  set isNotRide(isNotRide: boolean) { this.gameCharacter.isNotRide = isNotRide; }
-  get isUseIconToOverviewImage(): boolean { return this.gameCharacter.isUseIconToOverviewImage; }
+  get isNotRide(): boolean { return !!this.appearanceHost?.isNotRide; }
+  set isNotRide(isNotRide: boolean) {
+    if (this.appearanceHost) this.appearanceHost.isNotRide = isNotRide;
+  }
+  get isUseIconToOverviewImage(): boolean { return !!this.appearanceHost?.isUseIconToOverviewImage; }
   set isUseIconToOverviewImage(isUseIconToOverviewImage: boolean) {
-    this.gameCharacter.mutateAppearance(() => {
-      this.gameCharacter.isUseIconToOverviewImage = isUseIconToOverviewImage;
+    const host = this.appearanceHost;
+    if (!host) return;
+    host.mutateAppearance(() => {
+      host.isUseIconToOverviewImage = isUseIconToOverviewImage;
     });
   }
 
@@ -297,28 +379,42 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return !!(this.faceIcon && 0 < this.faceIcon.url.length);
   }
 
-  get ownerName(): string { return this.gameCharacter.ownerName; }
-  get ownerColor(): string { return this.gameCharacter.ownerColor; }
-  get isHideIn(): boolean { return !!this.gameCharacter.owner; }
-  get isVisible(): boolean { return this.gameCharacter.isVisible; }
+  get ownerName(): string {
+    return (this.appearanceHost as any)?.ownerName ?? this.gameCharacter?.ownerName;
+  }
+  get ownerColor(): string {
+    return (this.appearanceHost as any)?.ownerColor ?? this.gameCharacter?.ownerColor;
+  }
+  get isHideIn(): boolean {
+    if (this.characterToken) return this.characterToken.isHideIn;
+    return !!this.gameCharacter?.owner;
+  }
+  get isVisible(): boolean {
+    if (this.characterToken) return this.characterToken.isVisible;
+    return this.gameCharacter?.isVisible;
+  }
   get isGMMode(): boolean{ return PeerCursor.myCursor ? PeerCursor.myCursor.isGMMode : false; }
   /** Other players cannot drag a token claimed as someone's PC. */
-  get isMoveLocked(): boolean { return this.gameCharacter.isLockedByPlayerOwner; }
+  get isMoveLocked(): boolean {
+    if (this.characterToken) return this.characterToken.isLockedByPlayerOwner;
+    return !!this.gameCharacter?.isLockedByPlayerOwner;
+  }
 
-  get faceIcon(): ImageFile { return this.gameCharacter.faceIcon; }
+  get faceIcon(): ImageFile { return this.gameCharacter?.faceIcon; }
   
   get dialogFaceIcon(): ImageFile {
     if (!this.dialog || !this.dialog.faceIconIdentifier) return null;
     return ImageStorage.instance.get(<string>this.dialog.faceIconIdentifier);
   }
 
-  get shadowImageFile(): ImageFile { return this.gameCharacter.shadowImageFile; }
+  get shadowImageFile(): ImageFile { return this.gameCharacter?.shadowImageFile; }
 
   get elevation(): number {
-    return +((this.gameCharacter.posZ + (this.altitude * this.gridSize)) / this.gridSize).toFixed(1);
+    return +((this.tablePiece.posZ + (this.altitude * this.gridSize)) / this.gridSize).toFixed(1);
   }
 
-  get selectionState(): SelectionState { return this.selectionService.state(this.gameCharacter); }
+  /** Selection keys the on-table piece (Token), not the off-table sheet body. */
+  get selectionState(): SelectionState { return this.selectionService.state(this.tablePiece); }
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }
   get isMagnetic(): boolean { return this.selectionState === SelectionState.MAGNETIC; }
 
@@ -566,7 +662,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   get isEmote(): boolean {
-    return this.gameCharacter.isEmote;
+    return !!this.gameCharacter?.isEmote;
     //return this.dialog && StringUtil.isEmote(this.dialog.text);
   }
 
@@ -591,6 +687,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private modalService: ModalService,
     private selectionService: TabletopSelectionService,
     private characterFxMenu: CharacterFxMenuService,
+    private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
   ) { }
 
@@ -627,9 +724,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private clearChatDialogLocal() {
     this.lastChatDialogStamp = 0;
-    this.gameCharacter.dialog = null;
-    this.gameCharacter.text = '';
-    this.gameCharacter.isEmote = false;
+    if (this.gameCharacter) {
+      this.gameCharacter.dialog = null;
+      this.gameCharacter.text = '';
+      this.gameCharacter.isEmote = false;
+    }
     clearTimeout(this.dialogTimeOutId);
     clearInterval(this.chatIntervalId);
   }
@@ -654,6 +753,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   ) { }
 */
   ngOnChanges(): void {
+    if (this.characterToken) {
+      const body = this.characterToken.character;
+      if (body) this.gameCharacter = body;
+    }
     EventSystem.unregister(this);
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.gameCharacter?.identifier}`, event => {
@@ -663,6 +766,19 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.naturaHeightWidthRatio = 1;
         }
         this.applySyncedChatDialog();
+        this.changeDetector.markForCheck();
+      });
+    if (this.characterToken) {
+      EventSystem.register(this)
+        .on(`UPDATE_GAME_OBJECT/identifier/${this.characterToken.identifier}`, () => {
+          this.changeDetector.markForCheck();
+        })
+        .on(`UPDATE_SELECTION/identifier/${this.characterToken.identifier}`, () => {
+          this.changeDetector.markForCheck();
+        });
+    }
+    EventSystem.register(this)
+      .on(`UPDATE_GAME_OBJECT/identifier/${CombatTracker.instance.identifier}`, () => {
         this.changeDetector.markForCheck();
       })
       .on('UPDATE_GAME_OBJECT', event => {
@@ -718,7 +834,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       .on<object>('SELECT_TABLETOP_OBJECT', -1000, event => {
         // 暫且如此
         this.ngZone.run(() => {
-          if (event.data['highlighting'] && event.data['identifier'] === this.gameCharacter.identifier) {
+          const id = event.data?.['identifier'];
+          const pieceId = this.tablePiece?.identifier;
+          const bodyId = this.gameCharacter?.identifier;
+          if (event.data['highlighting'] && id && (id === pieceId || id === bodyId)) {
             this.selected = true;
           } else {
             this.selected = false;
@@ -731,6 +850,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       })
       .on('POPUP_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
+          // Same body can have multiple Tokens; only the major on this view shows the balloon.
+          if (this.characterToken && !this.characterToken.isMajorMarker) return;
           this.ngZone.run(() => {
             this.applyChatDialogPayload(event.data);
             this.changeDetector.markForCheck();
@@ -739,6 +860,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       })
       .on('FAREWELL_CHAT_BALLOON', -1000, event => {
         if (this.gameCharacter && this.gameCharacter.identifier == event.data.characterIdentifier) {
+          if (this.characterToken && !this.characterToken.isMajorMarker) return;
           this.ngZone.run(() => {
             this.clearChatDialogLocal();
             this.changeDetector.markForCheck();
@@ -751,15 +873,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.applySyncedChatDialog();
     this.enforce2DRollZero();
     this.movableOption = {
-      tabletopObject: this.gameCharacter,
+      tabletopObject: this.tablePiece,
       transformCssOffset: layerPeerMovableTransform(),
-      colideLayers: ['terrain', 'text-note', 'character']
+      colideLayers: ['terrain', 'text-note', 'character', 'character-token']
     };
     this.rotableOption = {
-      tabletopObject: this.gameCharacter
+      tabletopObject: this.tablePiece
     };
     this.rollOption = {
-      tabletopObject: this.gameCharacter,
+      tabletopObject: this.tablePiece,
       targetPropertyName: 'roll',
     };
     // Room ZIP reuses syncIds; recycled views skip ngAfterViewInit — mark loaded here too.
@@ -775,6 +897,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     // Defer: parent binds [style.visibility] to isLoaded; sync flip in the same CD
     // pass causes NG0100. visibility:hidden still allows bounceInOut to finish.
     queueMicrotask(() => {
+      if (this.characterToken) {
+        if (this.characterToken.isLoaded) return;
+        this.characterToken.isLoaded = true;
+        this.logMount('markLoaded');
+        this.changeDetector.markForCheck();
+        return;
+      }
       if (!this.gameCharacter || this.gameCharacter.isLoaded) return;
       this.gameCharacter.isLoaded = true;
       this.logMount('markLoaded');
@@ -851,24 +980,28 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
+    this.tabletopActionService.ensureObjectSelected(this.tablePiece);
+
     let position = this.pointerDeviceService.pointers[0];
     let menuActions: ContextMenuAction[] = [];
     let title = this.name;
 
     if (this.isMultiSelectedCharacters()) {
       menuActions = this.makeMultiSelectionContextMenu();
-      title = this.i18n.t('char.selectedCount', { count: this.selectedCharacters().length });
+      title = this.i18n.t('char.selectedCount', { count: this.selectedTablePieces().length });
     } else {
       menuActions = menuActions.concat(this.makeSelectionContextMenu());
       menuActions = menuActions.concat(this.makeContextMenu());
     }
+    menuActions = this.tabletopActionService.withClipboardMenuPrefix(menuActions);
     this.contextMenuService.open(position, menuActions, title);
   }
 
   onInteractStart() {
     // Same as card/note: pointer down brings token to shared [ ] front.
     if (!this.GuestMode() && !this.isMoveLocked) {
-      this.gameCharacter.raiseInTier();
+      const piece = this.characterToken || this.gameCharacter;
+      piece?.raiseInTier();
     }
   }
 
@@ -893,28 +1026,69 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     //EventSystem.trigger('UPDATE_GAME_OBJECT', this.gameCharacter);
   }
 
-  private selectedCharacters(): GameCharacter[] {
+  /** Selected map pieces: Tokens when this view is a token, else GameCharacters. */
+  private selectedTablePieces(): Array<GameCharacter | CharacterToken> {
+    if (this.characterToken) {
+      return this.selectionService.objects.filter(
+        (o): o is CharacterToken => o instanceof CharacterToken
+      );
+    }
     return this.selectionService.objects.filter(
-      object => object.aliasName === this.gameCharacter.aliasName
-    ) as GameCharacter[];
+      (o): o is GameCharacter => o instanceof GameCharacter
+    );
+  }
+
+  /** Unique bodies from current selection (Token → sheet). */
+  private selectedBodiesFromSelection(): GameCharacter[] {
+    const byId = new Map<string, GameCharacter>();
+    for (const o of this.selectionService.objects) {
+      if (o instanceof CharacterToken) {
+        const body = o.character;
+        if (body) byId.set(body.identifier, body);
+      } else if (o instanceof GameCharacter) {
+        byId.set(o.identifier, o);
+      }
+    }
+    return Array.from(byId.values());
+  }
+
+  /** @deprecated Use {@link selectedTablePieces} / {@link selectedBodiesFromSelection}. */
+  private selectedCharacters(): GameCharacter[] {
+    return this.selectedBodiesFromSelection();
+  }
+
+  /** Selected map pieces for altitude / cosmetics batch actions. */
+  private selectedAppearanceHosts(): Array<GameCharacter | CharacterToken> {
+    return this.selectedTablePieces();
   }
 
   private isMultiSelectedCharacters(): boolean {
-    return this.isSelected && this.selectedCharacters().length > 1;
+    return this.isSelected && this.selectedTablePieces().length > 1;
+  }
+
+  private removeTokenFromTable(token: CharacterToken) {
+    this.selectionService.remove(token);
+    CharacterToken.destroyToken(token);
   }
 
   private moveCharacterOffTable(gameCharacter: GameCharacter, location: string) {
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameCharacter.identifier });
     this.selectionService.remove(gameCharacter);
     if (location === 'graveyard' && gameCharacter.isTemporaryCopy) {
+      CharacterToken.destroyTokensForCharacter(gameCharacter.identifier);
       gameCharacter.destroy();
       return;
     }
     if (location === 'table') {
       gameCharacter.setLocation('table');
     } else {
-      // Per-map: keep placements on other maps.
-      gameCharacter.leaveCurrentTable(location);
+      CharacterToken.removeTokensOnTable(gameCharacter.identifier);
+      // Per-map: keep placements on other maps for legacy; body stays in inventory.
+      if (gameCharacter.location.name === 'table') {
+        gameCharacter.leaveCurrentTable(location);
+      } else {
+        gameCharacter.setLocation(location);
+      }
     }
   }
 
@@ -923,9 +1097,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     if (this.selectionService.size <= 1) return [];
 
     let objectPosition = {
-      x: this.gameCharacter.location.x + (this.gameCharacter.size * this.gridSize) / 2,
-      y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
-      z: this.gameCharacter.posZ
+      x: this.tablePiece.location.x + (this.size * this.gridSize) / 2,
+      y: this.tablePiece.location.y + (this.size * this.gridSize) / 2,
+      z: this.tablePiece.posZ
     };
     return [
       { name: this.i18n.t('char.congregate'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) },
@@ -935,11 +1109,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   /** Right-click menu when 2+ selected characters include this token. */
   private makeMultiSelectionContextMenu(): ContextMenuAction[] {
-    const selectedCharacter = () => this.selectedCharacters();
+    const pieces = () => this.selectedTablePieces();
+    const bodies = () => this.selectedBodiesFromSelection();
     let objectPosition = {
-      x: this.gameCharacter.location.x + (this.gameCharacter.size * this.gridSize) / 2,
-      y: this.gameCharacter.location.y + (this.gameCharacter.size * this.gridSize) / 2,
-      z: this.gameCharacter.posZ
+      x: this.tablePiece.location.x + (this.size * this.gridSize) / 2,
+      y: this.tablePiece.location.y + (this.size * this.gridSize) / 2,
+      z: this.tablePiece.posZ
+    };
+
+    const removePiece = (piece: GameCharacter | CharacterToken, location: string) => {
+      if (piece instanceof CharacterToken) {
+        this.removeTokenFromTable(piece);
+        return;
+      }
+      this.moveCharacterOffTable(piece, location);
     };
 
     return [
@@ -954,21 +1137,21 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           {
             name: this.i18n.t('char.moveAllToCommon'),
             action: () => {
-              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'common'));
+              pieces().forEach(p => removePiece(p, 'common'));
               SoundEffect.play(PresetSound.piecePut);
             }
           },
           {
             name: this.i18n.t('char.moveAllToPersonal'),
             action: () => {
-              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, Network.peerId));
+              pieces().forEach(p => removePiece(p, Network.peerId));
               SoundEffect.play(PresetSound.piecePut);
             }
           },
           {
             name: this.i18n.t('char.moveAllToGraveyard'),
             action: () => {
-              selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'graveyard'));
+              pieces().forEach(p => removePiece(p, 'graveyard'));
               SoundEffect.play(PresetSound.sweep);
             }
           },
@@ -977,42 +1160,30 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       {
         name: this.i18n.t('char.inventoryAllOn'),
         action: () => {
-          selectedCharacter().forEach(ch => { ch.isInventoryIndicate = true; });
+          bodies().forEach(ch => { ch.isInventoryIndicate = true; });
           EventSystem.trigger('UPDATE_INVENTORY', null);
         }
       },
       {
         name: this.i18n.t('char.inventoryAllOff'),
         action: () => {
-          selectedCharacter().forEach(ch => { ch.isInventoryIndicate = false; });
+          bodies().forEach(ch => { ch.isInventoryIndicate = false; });
           EventSystem.trigger('UPDATE_INVENTORY', null);
         }
       },
       ...(this.is2DMode ? [] : [{
         name: this.i18n.t('char.resetAltitudeAll'),
         action: () => {
-          selectedCharacter().forEach(ch => { ch.altitude = 0; });
+          this.selectedAppearanceHosts().forEach(ch => { ch.altitude = 0; });
           SoundEffect.play(PresetSound.sweep);
         }
       }]),
       ContextMenuSeparator,
       {
-        name: this.i18n.t('char.cloneAll'),
-        action: () => {
-          selectedCharacter().forEach(ch => {
-            const cloneObject = ch.clone();
-            cloneObject.location.x += this.gridSize;
-            cloneObject.location.y += this.gridSize;
-            cloneObject.update();
-          });
-          SoundEffect.play(PresetSound.piecePut);
-        }
-      },
-      {
         name: this.i18n.t('char.deleteAllToGraveyard'),
         hotkey: 'Del',
         action: () => {
-          selectedCharacter().forEach(ch => this.moveCharacterOffTable(ch, 'graveyard'));
+          pieces().forEach(p => removePiece(p, 'graveyard'));
           SoundEffect.play(PresetSound.sweep);
         }
       },
@@ -1037,8 +1208,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           name: this.isHideIn ? this.i18n.t('char.revealPosition') : this.i18n.t('char.selfOnlyStealth'),
           hotkey: 'H',
           action: () => {
+            const host = this.appearanceHost;
+            if (!host) return;
             if (this.isHideIn) {
-              this.gameCharacter.owner = '';
+              host.owner = '';
               SoundEffect.play(PresetSound.piecePut);
             } else {
               if (!GameCharacter.isStealthMode && !PeerCursor.myCursor.isGMMode) {
@@ -1050,8 +1223,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
                   materialIcon: 'disabled_visible'
                 });
               }
-              this.gameCharacter.owner = Network.peer.userId;
-              if (!this.gameCharacter.visionOwner) {
+              host.owner = Network.peer.userId;
+              // FoW claim stays on the body sheet.
+              if (this.gameCharacter && !this.gameCharacter.visionOwner) {
                 this.gameCharacter.visionOwner = Network.peer.userId;
               }
               SoundEffect.play(PresetSound.sweep);
@@ -1100,18 +1274,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           off: this.i18n.t('char.shadowOff'),
           after,
         }),
-        this.characterFxMenu.makeImageEffectMenu(this.gameCharacter),
+        this.characterFxMenu.makeImageEffectMenu(this.appearanceHost),
       ],
       // FX / lighting / status
       [
-        this.characterFxMenu.makeAuraMenu(this.gameCharacter),
-        this.characterFxMenu.makeRingMenu(this.gameCharacter),
+        this.characterFxMenu.makeAuraMenu(this.appearanceHost),
+        this.characterFxMenu.makeRingMenu(this.appearanceHost),
         ...(this.is2DMode ? [
-          this.characterFxMenu.makeTokenFrameMenu(this.gameCharacter),
-          this.characterFxMenu.makePushPinMenu(this.gameCharacter),
+          this.characterFxMenu.makeTokenFrameMenu(this.appearanceHost),
+          this.characterFxMenu.makePushPinMenu(this.appearanceHost),
         ] : []),
-        this.characterFxMenu.makeClueLinkMenu(this.gameCharacter),
-        this.characterFxMenu.makeVisionMenu(this.gameCharacter),
+        this.characterFxMenu.makeClueLinkMenu(this.appearanceHost),
+        this.characterFxMenu.makeVisionMenu(this.appearanceHost),
         this.characterFxMenu.makeStatusMenu(this.gameCharacter),
       ],
       // Pose (3D only — corkboard has no ride/altitude)
@@ -1138,14 +1312,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               if (!this.isHideIn) SoundEffect.play(PresetSound.sweep);
             }
           },
-          altitudeHande: this.gameCharacter
+          altitudeHande: this.appearanceHost
         },
       ],
       // Chat / panels
       [
         contextMenuToggleCheck({
-          get: () => this.gameCharacter.isShowChatBubble,
-          set: (v) => { this.gameCharacter.mutateAppearance(() => { this.gameCharacter.isShowChatBubble = v; }); },
+          get: () => !!(this.appearanceHost as any)?.isShowChatBubble,
+          set: (v) => {
+            const host = this.appearanceHost;
+            if (!host) return;
+            host.mutateAppearance(() => { (host as any).isShowChatBubble = v; });
+          },
           on: this.i18n.t('char.chatBubbleOn'),
           off: this.i18n.t('char.chatBubbleOff'),
           tip: this.i18n.t('char.chatBubbleTip'),
@@ -1192,6 +1370,23 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           off: this.i18n.t('char.inventoryOff'),
           after,
         }),
+        ...(this.characterToken ? [contextMenuToggleCheck({
+          get: () => !!this.characterToken.isMajorMarker,
+          set: (v) => {
+            if (!this.characterToken) return;
+            const viewId = TabletopObject.resolveViewTableIdentifier();
+            if (v) {
+              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId, this.characterToken.identifier);
+            } else {
+              this.characterToken.isMajorMarker = false;
+              this.characterToken.update();
+              CharacterToken.reconcileMajor(this.characterToken.characterId, viewId);
+            }
+          },
+          on: this.i18n.t('char.majorMarkerOn'),
+          off: this.i18n.t('char.majorMarkerOff'),
+          after,
+        })] : []),
         {
           name: this.i18n.t('char.moveTo'),
           action: null,
@@ -1199,6 +1394,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
             {
               name: this.i18n.t('char.commonInventory'),
               action: () => {
+                if (this.characterToken) {
+                  this.removeTokenFromTable(this.characterToken);
+                  SoundEffect.play(PresetSound.piecePut);
+                  return;
+                }
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
                 this.gameCharacter.leaveCurrentTable('common');
                 this.selectionService.remove(this.gameCharacter);
@@ -1208,6 +1408,11 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
             {
               name: this.i18n.t('char.personalInventory'),
               action: () => {
+                if (this.characterToken) {
+                  this.removeTokenFromTable(this.characterToken);
+                  SoundEffect.play(PresetSound.piecePut);
+                  return;
+                }
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
                 this.gameCharacter.leaveCurrentTable(Network.peerId);
                 this.selectionService.remove(this.gameCharacter);
@@ -1215,10 +1420,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
               }
             },
             {
-              name: this.gameCharacter.isTemporaryCopy
+              name: this.characterToken?.isTemporaryCopy || this.gameCharacter.isTemporaryCopy
                 ? this.i18n.t('char.deleteTemporaryCopy')
                 : this.i18n.t('char.graveyard'),
               action: () => {
+                if (this.characterToken) {
+                  this.removeTokenFromTable(this.characterToken);
+                  SoundEffect.play(PresetSound.sweep);
+                  return;
+                }
                 EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
                 this.selectionService.remove(this.gameCharacter);
                 if (this.gameCharacter.isTemporaryCopy) {
@@ -1232,62 +1442,114 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           ]
         },
       ],
-      // Clone / delete
+      // Clone / delete — instant clones live under Advanced copy; Copy/Cut use clipboard
       [
         {
-          name: this.i18n.t('char.createTemporaryCopy'),
-          action: () => {
-            const pose = this.gameCharacter.getPoseForView();
-            GameCharacter.createTemporaryCopy(this.gameCharacter, {
-              x: pose.x + this.gridSize,
-              y: pose.y + this.gridSize,
-              posZ: pose.posZ,
-            });
-            SoundEffect.play(PresetSound.piecePut);
-          }
+          name: this.i18n.t('char.copyAdvanced'),
+          action: null,
+          subActions: [
+            {
+              name: this.i18n.t('char.createTemporaryCopy'),
+              action: () => {
+                const body = this.characterToken?.character || this.gameCharacter;
+                if (!body) return;
+                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+                GameCharacter.createTemporaryCopy(body, {
+                  x: pose.x + this.gridSize,
+                  y: pose.y + this.gridSize,
+                  posZ: pose.posZ,
+                }, undefined, this.characterToken || body);
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.cloneToken'),
+              action: () => {
+                const body = this.characterToken?.character || this.gameCharacter;
+                if (!body) return;
+                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+                CharacterToken.create(body.identifier, {
+                  x: pose.x + this.gridSize,
+                  y: pose.y + this.gridSize,
+                  posZ: pose.posZ,
+                }, { copyAppearanceFrom: this.characterToken || body, major: false });
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.cloneTokenNumbered'),
+              action: () => {
+                const body = this.characterToken?.character || this.gameCharacter;
+                if (!body) return;
+                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+                const names = ObjectStore.instance.getObjects(CharacterToken)
+                  .filter(t => t.characterId === body.identifier)
+                  .map(t => t.displayNameOverride || body.name);
+                names.push(body.name);
+                const token = CharacterToken.create(body.identifier, {
+                  x: pose.x + this.gridSize,
+                  y: pose.y + this.gridSize,
+                  posZ: pose.posZ,
+                }, { copyAppearanceFrom: this.characterToken || body, major: false });
+                token.displayNameOverride = GameCharacter.nextNumberedName(body.name, names);
+                token.update();
+                SoundEffect.play(PresetSound.piecePut);
+              }
+            },
+            {
+              name: this.i18n.t('char.cloneCharacter'),
+              action: () => {
+                const body = this.characterToken?.character || this.gameCharacter;
+                if (!body) return;
+                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+                GameCharacter.cloneCharacter(body, {
+                  pose: {
+                    x: pose.x + this.gridSize,
+                    y: pose.y + this.gridSize,
+                    posZ: pose.posZ,
+                  },
+                  copyAppearanceFrom: this.characterToken || body,
+                });
+                SoundEffect.play(PresetSound.piecePut);
+                EventSystem.call('UPDATE_INVENTORY', true);
+              }
+            },
+            {
+              name: this.i18n.t('char.cloneCharacterNumbered'),
+              action: () => {
+                const body = this.characterToken?.character || this.gameCharacter;
+                if (!body) return;
+                const pose = (this.characterToken || this.gameCharacter).getPoseForView();
+                GameCharacter.cloneCharacter(body, {
+                  numbered: true,
+                  pose: {
+                    x: pose.x + this.gridSize,
+                    y: pose.y + this.gridSize,
+                    posZ: pose.posZ,
+                  },
+                  copyAppearanceFrom: this.characterToken || body,
+                });
+                SoundEffect.play(PresetSound.piecePut);
+                EventSystem.call('UPDATE_INVENTORY', true);
+              }
+            },
+          ],
         },
         {
-          name: this.i18n.t('char.clone'),
-          action: () => {
-            let cloneObject = this.gameCharacter.clone();
-            cloneObject.location.x += this.gridSize;
-            cloneObject.location.y += this.gridSize;
-            cloneObject.update();
-            SoundEffect.play(PresetSound.piecePut);
-          }
-        },
-        {
-          name: this.i18n.t('char.cloneNumbered'),
-          action: () => {
-            const cloneObject = this.gameCharacter.clone();
-            const tmp = cloneObject.name.split('_');
-            let baseName;
-            if (tmp.length > 1 && /\d+/.test(tmp[tmp.length - 1])) {
-              baseName = tmp.slice(0, tmp.length - 1).join('_');
-            } else {
-              baseName = tmp.join('_');
-            }
-            let maxIndex = 0;
-            for (const character of ObjectStore.instance.getObjects(GameCharacter)) {
-              if (!character.name.startsWith(baseName)) continue;
-              let index = character.name.match(/_(\d+)$/) ? +RegExp.$1 : 0;
-              if (index > maxIndex) maxIndex = index;
-            }
-            cloneObject.name = baseName + '_' + (maxIndex + 1);
-            cloneObject.location.x += this.gridSize;
-            cloneObject.location.y += this.gridSize;
-            cloneObject.update();
-            SoundEffect.play(PresetSound.piecePut);
-          }
-        },
-        {
-          name: this.gameCharacter.isTemporaryCopy
+          name: this.characterToken?.isTemporaryCopy || this.gameCharacter.isTemporaryCopy
             ? this.i18n.t('char.deleteTemporaryCopy')
             : this.i18n.t('char.deleteToGraveyard'),
           hotkey: 'Del',
           action: () => {
+            if (this.characterToken) {
+              this.selectionService.remove(this.characterToken);
+              CharacterToken.destroyToken(this.characterToken);
+              SoundEffect.play(PresetSound.sweep);
+              return;
+            }
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
             this.selectionService.remove(this.gameCharacter);
+            CharacterToken.destroyTokensForCharacter(this.gameCharacter.identifier);
             if (this.gameCharacter.isTemporaryCopy) {
               this.gameCharacter.destroy();
             } else {
@@ -1331,6 +1593,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     };
     let component = this.panelService.open<CharacterSettingsComponent>(CharacterSettingsComponent, option);
     component.character = gameObject;
+    component.token = this.characterToken;
   }
 
   private showChatPalette(gameObject: GameCharacter) {

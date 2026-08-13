@@ -712,3 +712,105 @@ p.is-wisper .face-icon {
   from { transform: translateZ(0.05px) rotate(0deg); }
   to { transform: translateZ(0.05px) rotate(360deg); }
 }
+
+/* Combat turn marks — high-contrast underfoot rings (readable on wood / cork / dark maps). */
+.combat-turn-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 148%;
+  height: 148%;
+  margin-left: -74%;
+  margin-top: -74%;
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: transparent;
+  transform: translateZ(0.03px);
+  z-index: 2;
+}
+
+/* Current turn: warm gold band + white rim + glow (pulse brightness, not opacity fade). */
+.combat-turn-ring.is-current {
+  border: 5px solid #ffc14a;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 5px rgba(20, 12, 0, 0.55),
+    0 0 16px 4px rgba(255, 180, 40, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+  animation: combat-turn-glow 1.5s ease-in-out infinite;
+}
+
+/* Next turn: cool cyan dashed preview — still solid enough to spot at a glance. */
+.combat-turn-ring.is-next {
+  border: 4px dashed #4ec3ff;
+  opacity: 0.92;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.7),
+    0 0 0 4px rgba(0, 40, 70, 0.35),
+    0 0 10px 2px rgba(78, 195, 255, 0.55);
+  animation: combat-next-spin 6s linear infinite;
+}
+
+.combat-turn-ring.is-flat-2d {
+  /* Peek past photo/polaroid chrome. */
+  width: 168%;
+  height: 168%;
+  margin-left: -84%;
+  margin-top: -84%;
+  /* Above upright-transform (Z=0) and push-pin (Z=4). */
+  transform: translateZ(6px);
+  z-index: 12;
+}
+
+.combat-turn-ring.is-flat-2d.is-over-frame {
+  /* Framed tokens: ring must sit clearly above matte / border chrome. */
+  transform: translateZ(8px);
+  z-index: 14;
+}
+
+.combat-turn-ring.is-flat-2d.is-current {
+  border-width: 6px;
+}
+
+.combat-turn-ring.is-flat-2d.is-next {
+  animation-name: combat-next-spin-2d;
+}
+
+.combat-turn-ring.is-flat-2d.is-over-frame.is-next {
+  animation-name: combat-next-spin-2d-frame;
+}
+
+@keyframes combat-turn-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.95),
+      0 0 0 5px rgba(20, 12, 0, 0.55),
+      0 0 14px 3px rgba(255, 180, 40, 0.7),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 1),
+      0 0 0 6px rgba(20, 12, 0, 0.45),
+      0 0 22px 7px rgba(255, 200, 60, 1),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes combat-next-spin {
+  from { transform: translateZ(0.03px) rotate(0deg); }
+  to { transform: translateZ(0.03px) rotate(360deg); }
+}
+
+@keyframes combat-next-spin-2d {
+  from { transform: translateZ(6px) rotate(0deg); }
+  to { transform: translateZ(6px) rotate(360deg); }
+}
+
+@keyframes combat-next-spin-2d-frame {
+  from { transform: translateZ(8px) rotate(0deg); }
+  to { transform: translateZ(8px) rotate(360deg); }
+}

@@ -18,6 +18,7 @@ export const LAYER_STACK_ALIASES: readonly AliasName[] = [
   'card-stack',
   'table-mask',
   'character',
+  'character-token',
 ];
 
 /**
@@ -34,7 +35,7 @@ export const LAYER_TIER_RANK = {
 export const LAYER_TIER = LAYER_TIER_RANK;
 
 export function layerTierRank(aliasName: string): number {
-  if (aliasName === 'character') return LAYER_TIER_RANK.CHARACTER;
+  if (aliasName === 'character' || aliasName === 'character-token') return LAYER_TIER_RANK.CHARACTER;
   if (aliasName === 'table-mask') return LAYER_TIER_RANK.MASK;
   return LAYER_TIER_RANK.DESK;
 }
@@ -273,6 +274,7 @@ export function stackTranslateZPx(zindex: number | null | undefined): number {
 /** Layers that participate in shared [ ] peer lift (not dice etc.). */
 export const LAYER_PEER_ALIASES = new Set([
   'character',
+  'character-token',
   'card',
   'card-stack',
   'text-note',

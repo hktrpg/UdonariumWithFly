@@ -4,6 +4,7 @@
  * (rename / swap to restore that layout).
  */
 import { ClueLink } from '@udonarium/clue-link';
+import { CharacterToken } from '@udonarium/character-token';
 import { ImageContext, ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -90,6 +91,13 @@ export function seedDefaultRoomObjects(t: DefaultRoomTranslate): void {
   seedClassicBattleObjects(DEFAULT_TABLE_3D_ID, t);
   seedClueBoardObjects(DEFAULT_TABLE_2D_ID, t);
   TabletopObject.migrateUnboundTablePieces(DEFAULT_TABLE_3D_ID);
+  // Densify both maps: seed runs while viewing 3D, so 2D peers would stay at z=0
+  // (mask would paint over Tokens by DOM id order).
+  reconcileLayerStack();
+  const prevView = TableSelecter.instance.viewedTableIdentifier;
+  TableSelecter.instance.viewedTableIdentifier = DEFAULT_TABLE_2D_ID;
+  reconcileLayerStack();
+  TableSelecter.instance.viewedTableIdentifier = prevView || DEFAULT_TABLE_3D_ID;
   reconcileLayerStack();
 }
 
@@ -182,13 +190,23 @@ function seedClassicBattleObjects(tableId: string, t: DefaultRoomTranslate): voi
   ch6.floorRing = 'fire';
   ch6.moveToTableOnly(tableId);
 
-  // Red strings on the 3D battle map (monster C ↔ A / B).
-  ClueLink.create(ch3.identifier, ch1.identifier, {
-    sag: 0.22, tableIdentifier: tableId, identifier: 'battleClueLink_1',
-  });
-  ClueLink.create(ch3.identifier, ch2.identifier, {
-    sag: 0.22, tableIdentifier: tableId, identifier: 'battleClueLink_2',
-  });
+  // Red strings on the 3D battle map (monster C ↔ A / B) — store Token ids.
+  const tokC = CharacterToken.focusTokenForCharacter(ch3.identifier, tableId)
+    || CharacterToken.tokensOnTable(ch3.identifier, tableId)[0];
+  const tokA = CharacterToken.focusTokenForCharacter(ch1.identifier, tableId)
+    || CharacterToken.tokensOnTable(ch1.identifier, tableId)[0];
+  const tokB = CharacterToken.focusTokenForCharacter(ch2.identifier, tableId)
+    || CharacterToken.tokensOnTable(ch2.identifier, tableId)[0];
+  if (tokC && tokA) {
+    ClueLink.create(tokC.identifier, tokA.identifier, {
+      sag: 0.22, tableIdentifier: tableId, identifier: 'battleClueLink_1',
+    });
+  }
+  if (tokC && tokB) {
+    ClueLink.create(tokC.identifier, tokB.identifier, {
+      sag: 0.22, tableIdentifier: tableId, identifier: 'battleClueLink_2',
+    });
+  }
 }
 
 function ensureDefaultTerrainTexture(t: DefaultRoomTranslate): string {
@@ -213,7 +231,12 @@ function seedClueBoardObjects(tableId: string, t: DefaultRoomTranslate): void {
     monsterC.pushPin = true;
     monsterC.pushPinAngle = 13;
     monsterC.pushPinStyle = 2;
-    monsterC.addToTable(tableId, { x: 175, y: 400, posZ: 0 }, false);
+    // Explicit second Token on the clue board (do not rely on body.addToTable while viewing 3D).
+    CharacterToken.create(monsterC.identifier, { x: 175, y: 400, posZ: 0 }, {
+      tableId,
+      copyAppearanceFrom: monsterC,
+      major: true,
+    });
   }
 
   const clueA = seedClueCharacter('clueCharacter_1', './assets/images/mon_150.gif',

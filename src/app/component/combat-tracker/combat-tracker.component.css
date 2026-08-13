@@ -6,6 +6,32 @@
   gap: 4px;
 }
 
+/* Sticky eye-level turn bar (scrolls with .scrollable-panel). */
+.combat-controls {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #fff8ee 0%, #efe0c8 100%);
+  border-color: #8a6a45;
+  box-shadow: 0 2px 8px rgba(60, 40, 20, 0.18);
+}
+
+.combat-controls.is-running {
+  border-color: #5c4630;
+  background: linear-gradient(180deg, #fff3df 0%, #e8d0a8 100%);
+}
+
+.combat-controls .controls {
+  gap: 6px;
+  padding-top: 0;
+}
+
+.combat-controls .btn {
+  font-weight: 700;
+}
+
 .enc-nav {
   margin-bottom: 4px;
 }
@@ -83,8 +109,8 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 360px;
-  overflow: auto;
+  /* Let the panel scroll so sticky turn controls stay visible. */
+  overflow: visible;
 }
 
 .combatant-list li {
@@ -334,13 +360,21 @@
   flex-shrink: 0;
 }
 
-.controls {
-  padding-top: 0;
-}
-
 /* —— Mobile Play: denser combat sheet —— */
 :host-context(html.udon-mobile-layout) .combat-tracker {
   gap: 4px;
+}
+
+:host-context(html.udon-mobile-layout) .combat-controls {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: 6px 8px;
+}
+
+:host-context(html.udon-mobile-layout) .combat-controls .btn {
+  min-height: 32px;
+  font-size: 12px;
 }
 
 :host-context(html.udon-mobile-layout) .tool-actions {

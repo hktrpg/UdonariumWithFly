@@ -14,6 +14,7 @@ import { captureMapPreviewDataUrl } from './scene-preset-preview';
 import { StringUtil } from './core/system/util/string-util';
 import { translate } from 'i18n';
 import { TabletopLocation, TabletopObject } from './tabletop-object';
+import { CharacterToken } from './character-token';
 import { GameCharacter } from './game-character';
 import { GameTable } from './game-table';
 import { MovableDirective } from 'directive/movable.directive';
@@ -319,6 +320,7 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
   /** Character tokens on the table (not cards / dice / notes / ranges). */
   private isTokenSnap(entry: SceneObjectSnap): boolean {
     if (!entry) return false;
+    if (entry.aliasName === CharacterToken.aliasName || entry.aliasName === 'character-token') return true;
     if (entry.aliasName === GameCharacter.aliasName || entry.aliasName === 'character') return true;
     if (!entry.identifier) return false;
     const obj = ObjectStore.instance.get(entry.identifier);
@@ -327,23 +329,26 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
 
   private isTokenObject(obj: GameObject | null | undefined): boolean {
     if (!obj) return false;
-    return obj instanceof GameCharacter || obj.aliasName === 'character';
+    return obj instanceof CharacterToken
+      || obj instanceof GameCharacter
+      || obj.aliasName === 'character'
+      || obj.aliasName === 'character-token';
   }
 
   /** Currently visible character tokens and their screen poses (before map switch). */
   private captureVisibleTokenPoses(): PendingPose[] {
     const kept: PendingPose[] = [];
-    for (const ch of ObjectStore.instance.getObjects(GameCharacter) as GameCharacter[]) {
-      if (!ch.isVisibleOnTable) continue;
-      const pose = ch.getPoseForView();
+    for (const tok of ObjectStore.instance.getObjects(CharacterToken) as CharacterToken[]) {
+      if (!tok.isVisibleOnTable) continue;
+      const pose = tok.getPoseForView();
       const entry: PendingPose = {
-        obj: ch,
+        obj: tok,
         x: toNum(pose.x),
         y: toNum(pose.y),
         posZ: toNum(pose.posZ),
       };
-      if (typeof ch.rotate === 'number' && !Number.isNaN(ch.rotate)) {
-        entry.rotate = ch.rotate;
+      if (typeof tok.rotate === 'number' && !Number.isNaN(tok.rotate)) {
+        entry.rotate = tok.rotate;
       }
       kept.push(entry);
     }
@@ -355,14 +360,14 @@ export class ScenePresetList extends ObjectNode implements InnerXml {
     if (!tableId || kept.length < 1) return;
     const pending: PendingPose[] = [];
     for (const pose of kept) {
-      const ch = ObjectStore.instance.get(pose.obj.identifier);
-      if (!(ch instanceof GameCharacter)) continue;
-      ch.addToTable(tableId, { x: pose.x, y: pose.y, posZ: pose.posZ }, false);
+      const tok = ObjectStore.instance.get(pose.obj.identifier);
+      if (!(tok instanceof CharacterToken) && !(tok instanceof GameCharacter)) continue;
+      tok.addToTable(tableId, { x: pose.x, y: pose.y, posZ: pose.posZ }, false);
       if (pose.rotate != null) {
-        try { ch.rotate = pose.rotate; } catch { /* optional */ }
+        try { tok.rotate = pose.rotate; } catch { /* optional */ }
       }
       pending.push({
-        obj: ch,
+        obj: tok,
         x: pose.x,
         y: pose.y,
         posZ: pose.posZ,

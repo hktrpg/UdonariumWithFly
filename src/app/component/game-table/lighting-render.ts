@@ -1,9 +1,8 @@
-import { GameCharacter } from '@udonarium/game-character';
 import { GameTable } from '@udonarium/game-table';
 import { TableLight } from '@udonarium/table-fx/table-light';
 
 import { WallPolyline } from './footprint-walls';
-import { isGlobalIlluminationActive } from './vision-math';
+import { isGlobalIlluminationActive, VisionLightActor } from './vision-math';
 
 const MAX_LIGHTS = 48;
 const MAX_OCCLUDERS = 80;
@@ -35,8 +34,8 @@ export class LightingRender {
 
   render(
     table: GameTable,
-    visionCharacters: GameCharacter[],
-    lightCharacters: GameCharacter[],
+    visionCharacters: VisionLightActor[],
+    lightCharacters: VisionLightActor[],
     occluders: LightOccluder[],
     isGM: boolean,
     /** Mask/terrain footprints as 4-edge wall loops (same as scene walls). */
@@ -80,7 +79,7 @@ export class LightingRender {
       ctx.fillRect(0, 0, width, height);
 
       ctx.globalCompositeOperation = 'destination-out';
-      // Foundry GI: LoS is treated as brightly lit — punch full vision cones out of darkness.
+      // Foundry GI: LoS is treated as brightly lit ??punch full vision cones out of darkness.
       if (giActive && table.visionEnabled && visionCharacters.length) {
         this.punchVisionAsLight(ctx, table, visionCharacters, wallsVision, visionOccluders, width, height);
       }
@@ -126,7 +125,7 @@ export class LightingRender {
 
   private collectLightSources(
     table: GameTable,
-    lightCharacters: GameCharacter[],
+    lightCharacters: VisionLightActor[],
     darkness: number,
   ): PointLightSource[] {
     const grid = table.gridSize || 50;
@@ -166,7 +165,7 @@ export class LightingRender {
   private punchVisionAsLight(
     ctx: CanvasRenderingContext2D,
     table: GameTable,
-    characters: GameCharacter[],
+    characters: VisionLightActor[],
     wallsLight: WallPolyline[],
     occluders: LightOccluder[],
     width: number,
@@ -292,7 +291,7 @@ export class LightingRender {
   private applyVisionMask(
     ctx: CanvasRenderingContext2D,
     table: GameTable,
-    characters: GameCharacter[],
+    characters: VisionLightActor[],
     wallsVision: WallPolyline[],
     wallsLight: WallPolyline[],
     occluders: LightOccluder[],
@@ -353,7 +352,7 @@ export class LightingRender {
       rctx.restore();
     }
 
-    // Foundry GI off: vision only reveals illuminated areas (vision ∩ lit).
+    // Foundry GI off: vision only reveals illuminated areas (vision ??lit).
     if (!giActive) {
       const litPos = document.createElement('canvas');
       litPos.width = width;

@@ -6,6 +6,7 @@ import {
 import { CardState } from './card';
 import { TerrainViewState } from './terrain';
 import { ObjectStore } from './core/synchronize-object/object-store';
+import { GameCharacter } from './game-character';
 import {
   makeCard,
   makeCharacter,
@@ -19,7 +20,10 @@ import {
 } from '../../testing/tabletop-test.util';
 
 describe('table-placement-view-state', () => {
-  beforeEach(() => resetTabletopStore());
+  beforeEach(() => {
+    resetTabletopStore();
+    GameCharacter.allowLegacyBodyOnTable = true;
+  });
   afterEach(() => resetTabletopStore());
 
   it('captures and reapplies rotate/roll/fx/width-related footprint', () => {

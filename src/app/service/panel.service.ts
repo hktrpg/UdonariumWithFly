@@ -831,10 +831,18 @@ export class PanelService {
   }
 
   private fitToken = 0;
+  /** After the user resizes/moves the panel, content-fit must not override their size. */
+  private fitLocked = false;
 
   /** Cancel any in-flight scheduleFitToContent retries for this panel. */
   cancelFitToContent() {
     this.fitToken++;
+  }
+
+  /** Stop future content-fit (call after user drag-resize / geometry end). */
+  lockFitToContent() {
+    this.fitLocked = true;
+    this.cancelFitToContent();
   }
 
   /**
@@ -843,6 +851,7 @@ export class PanelService {
    * @returns applied height, or 0 if skipped
    */
   fitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): number {
+    if (this.fitLocked) return 0;
     if (!host?.isConnected) return 0;
     const panelEl = host.closest('.draggable-panel') as HTMLElement | null;
     const scrollEl = panelEl?.querySelector('.scrollable-panel') as HTMLElement | null;
@@ -888,7 +897,7 @@ export class PanelService {
    * Retry fit until layout stabilizes (nested OnPush / async content).
    */
   scheduleFitToContent(host: HTMLElement, opts?: { minHeight?: number; maxHeight?: number; save?: boolean }): void {
-    if (!host) return;
+    if (!host || this.fitLocked) return;
     const token = ++this.fitToken;
     let attempts = 0;
     let lastNext = -1;

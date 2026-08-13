@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { CharacterToken } from '@udonarium/character-token';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -25,18 +26,35 @@ export class GameObjectInventoryService {
   set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
   get dataTags(): string[] { return this.summarySetting.dataTags; }
 
+  /**
+   * Build inventory-summary DataElements for any character body.
+   * Used by overview for temporary copies that are excluded from inventory lists.
+   */
+  summaryElementsFor(object: TabletopObject): DataElement[] {
+    if (!object?.detailDataElement) return [];
+    const newLine = '/';
+    return this.dataTags.map(tag =>
+      (newLine === StringUtil.toHalfWidth(tag))
+        ? this.newLineDataElement
+        : object.detailDataElement.getFirstElementByNameUnsensitive(tag)
+    );
+  }
+
   /** Every character (all maps + inventories + graveyard). Temporary copies stay off the list. */
   allInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy);
-  /** Tokens on the currently viewed map only. */
-  tableInventory: ObjectInventory = new ObjectInventory(object => object.isVisibleOnTable && !object.isTemporaryCopy);
+  /** Bodies that have a Token on the currently viewed map. */
+  tableInventory: ObjectInventory = new ObjectInventory(object => {
+    if (!(object instanceof GameCharacter) || object.isTemporaryCopy) return false;
+    return CharacterToken.tokensOnTable(object.identifier).length > 0;
+  });
   /** Common inventory for the currently viewed map only. */
   commonInventory: ObjectInventory = new ObjectInventory(object =>
     !object.isTemporaryCopy && !this.isAnyLocation(object.location.name) && object.isInventoryForCurrentView());
   privateInventory: ObjectInventory = new ObjectInventory(object =>
     !object.isTemporaryCopy && object.location.name === Network.peerId && object.isInventoryForCurrentView());
-  /** Graveyard for the currently viewed map only. */
+  /** Room-wide graveyard (shared across all maps). */
   graveyardInventory: ObjectInventory = new ObjectInventory(object =>
-    !object.isTemporaryCopy && object.location.name === 'graveyard' && object.isInventoryForCurrentView());
+    !object.isTemporaryCopy && object.location.name === 'graveyard');
 
   indicateAll: boolean = false;
   
@@ -52,6 +70,7 @@ export class GameObjectInventoryService {
   private tableIdMap: Map<ObjectIdentifier, string> = new Map();
   private placementsMap: Map<ObjectIdentifier, string> = new Map();
   private tagNameMap: Map<ObjectIdentifier, ElementName> = new Map();
+  private tokenPresenceMap: Map<ObjectIdentifier, string> = new Map();
 
   static _newLineDataElement = createMockElement('/');
   get newLineDataElement(): DataElement { return GameObjectInventoryService._newLineDataElement; }
@@ -70,7 +89,14 @@ export class GameObjectInventoryService {
         let object = ObjectStore.instance.get(event.data.identifier);
         if (!object) return;
 
-        if (object instanceof GameCharacter) {
+        if (object instanceof CharacterToken) {
+          const key = `${object.characterId}|${object.tablePlacements || ''}|${object.location.name}|${object.isTemporaryCopy}`;
+          const prev = this.tokenPresenceMap.get(object.identifier);
+          if (key !== prev) {
+            this.tokenPresenceMap.set(object.identifier, key);
+            this.refresh();
+          }
+        } else if (object instanceof GameCharacter) {
           let prevLocation = this.locationMap.get(object.identifier);
           let prevTableId = this.tableIdMap.get(object.identifier);
           const placementsKey = object.tablePlacements || '';
@@ -108,6 +134,7 @@ export class GameObjectInventoryService {
         this.locationMap.delete(event.data.identifier);
         this.tableIdMap.delete(event.data.identifier);
         this.tagNameMap.delete(event.data.identifier);
+        this.tokenPresenceMap.delete(event.data.identifier);
         this.refresh();
       })
       .on('SYNCHRONIZE_FILE_LIST', event => {

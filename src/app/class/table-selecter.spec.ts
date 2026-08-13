@@ -5,6 +5,8 @@ import { TableSelecter } from './table-selecter';
 import {
   makeCharacter,
   makeTable,
+  makeTextNote,
+  makeToken,
   resetTabletopStore,
   viewTables,
 } from '../../testing/tabletop-test.util';
@@ -39,41 +41,43 @@ describe('TableSelecter view / reload', () => {
   });
 
   it('A→B→A keeps pose on A after flush + hydrate (applyViewLocal path)', () => {
+    // Multi-map placements remain for non-character ITEMS (notes etc.).
     makeTable('mapA');
     makeTable('mapB');
     viewTables('mapA');
 
-    const ch = makeCharacter('traveler');
-    ch.location = { name: 'table', x: 10, y: 20 };
-    ch.addToTable('mapA', { x: 10, y: 20, posZ: 0 }, false);
-    ch.addToTable('mapB', { x: 30, y: 40, posZ: 0 }, false);
-    ch.hydratePoseForView('mapA');
+    const note = makeTextNote('traveler');
+    note.location = { name: 'table', x: 10, y: 20 };
+    note.addToTable('mapA', { x: 10, y: 20, posZ: 0 }, false);
+    note.addToTable('mapB', { x: 30, y: 40, posZ: 0 }, false);
+    note.hydratePoseForView('mapA');
 
-    ch.location.x = 15;
-    ch.location.y = 25;
+    note.location.x = 15;
+    note.location.y = 25;
     TabletopObject.flushLivePosesToView('mapA');
 
     (TableSelecter.instance as any).applyViewLocal('mapB');
-    expect(ch.location.x).toBe(30);
-    expect(ch.location.y).toBe(40);
+    expect(note.location.x).toBe(30);
+    expect(note.location.y).toBe(40);
 
     (TableSelecter.instance as any).applyViewLocal('mapA');
-    expect(ch.location.x).toBe(15);
-    expect(ch.location.y).toBe(25);
+    expect(note.location.x).toBe(15);
+    expect(note.location.y).toBe(25);
   });
 
-  it('piece only on B is not visible when viewing A', () => {
+  it('token only on B is not visible when viewing A', () => {
     makeTable('mapA');
     makeTable('mapB');
     viewTables('mapA');
 
-    const onlyB = makeCharacter('onlyB');
-    onlyB.location = { name: 'table', x: 1, y: 1 };
-    onlyB.addToTable('mapB', { x: 1, y: 1, posZ: 0 }, true);
+    const body = makeCharacter('onlyB');
+    body.location = { name: 'common', x: 0, y: 0 };
+    const tok = makeToken(body, { x: 1, y: 1, posZ: 0 }, 'mapB');
 
-    expect(onlyB.isVisibleOnTable).toBeFalse();
+    expect(tok.isVisibleOnTable).toBeFalse();
+    expect(body.location.name).not.toBe('table');
     viewTables('mapB');
-    expect(onlyB.isVisibleOnTable).toBeTrue();
+    expect(tok.isVisibleOnTable).toBeTrue();
   });
 
   it('viewTableLocal changes viewed without changing room active', () => {

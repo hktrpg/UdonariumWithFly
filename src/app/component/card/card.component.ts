@@ -33,6 +33,7 @@ import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopService } from 'service/tabletop.service';
 import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
@@ -176,6 +177,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
+    private tabletopActionService: TabletopActionService,
     private i18n: I18nService
   ) { }
 
@@ -298,6 +300,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
     if (this.GuestMode()) return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    this.tabletopActionService.ensureObjectSelected(this.card);
     let position = this.pointerDeviceService.pointers[0];
 
     let menuActions: ContextMenuAction[] = [];
@@ -309,6 +312,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       menuActions = menuActions.concat(this.makeSelectionContextMenu());
       menuActions = menuActions.concat(this.makeContextMenu());
     }
+    menuActions = this.tabletopActionService.withClipboardMenuPrefix(menuActions);
 
     this.contextMenuService.open(position, menuActions, title);
   }

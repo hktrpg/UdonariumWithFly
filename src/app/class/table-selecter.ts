@@ -8,7 +8,9 @@ import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
 import { poseDebug } from './table-fx/pose-debug';
 import { folderBackupDebug, summarizeCharPlacements } from '../service/folder-backup-debug';
+import { CharacterToken } from './character-token';
 import { GameCharacter } from './game-character';
+import { reconcileLayerStack } from './tabletop-object-util';
 
 /**
  * Foundry-style scene selection:
@@ -124,9 +126,12 @@ export class TableSelecter extends GameObject implements InnerXml {
       }
       this.viewTableIdentifier = targetId;
       TabletopObject.migrateUnboundTablePieces(targetId);
+      CharacterToken.migrateLegacyOnTableCharacters();
+      CharacterToken.pruneOrphanTokens();
       EventSystem.trigger('PREPARE_VIEW_TABLE_CHANGE', { tableId: targetId });
       this.viewedTableIdentifier = targetId;
       TabletopObject.hydrateAllForView(targetId, true);
+      reconcileLayerStack();
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: targetId });
       // Clear cameras / remount *before* SELECT so shared table ids (e.g. gameTable)
       // do not briefly restore the previous room's saved camera.
@@ -319,6 +324,8 @@ export class TableSelecter extends GameObject implements InnerXml {
     // Clear selection before hydrate — selected tokens ignore self UPDATE and keep the old map's screen pose.
     EventSystem.trigger('PREPARE_VIEW_TABLE_CHANGE', { tableId: identifier });
     TabletopObject.hydrateAllForView(identifier, true);
+    // Densify desk < mask < character for peers visible on this view (Tokens above covers).
+    reconcileLayerStack();
     EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: identifier });
     if (PeerCursor.myCursor) {
       PeerCursor.myCursor.viewedSceneIdentifier = identifier;

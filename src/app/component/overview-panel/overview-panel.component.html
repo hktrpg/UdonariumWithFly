@@ -21,7 +21,14 @@
       <ng-container *ngTemplateOutlet="overviewNote; context: { note: tabletopObject }"></ng-container>
     </ng-container>
     <ng-container *ngSwitchCase="'character'">
-      <ng-container *ngTemplateOutlet="overviewCharacter; context: { character: tabletopObject }"></ng-container>
+      <ng-container *ngIf="overviewCharacterBody as body">
+        <ng-container *ngTemplateOutlet="overviewCharacter; context: { character: body }"></ng-container>
+      </ng-container>
+    </ng-container>
+    <ng-container *ngSwitchCase="'character-token'">
+      <ng-container *ngIf="overviewCharacterBody as body">
+        <ng-container *ngTemplateOutlet="overviewCharacter; context: { character: body }"></ng-container>
+      </ng-container>
     </ng-container>
     <ng-container *ngSwitchCase="'dice-symbol'">
       <ng-container *ngTemplateOutlet="overviewDiceSymbol; context: { dice: tabletopObject }"></ng-container>
