@@ -43,7 +43,7 @@ export const en_tip: I18nDictionary = {
 
   'tour.welcome.title': 'Welcome — guided tour',
   'tour.welcome.body': 'Read each intro, then open / try the main features once.\nYou can skip anytime. Hover tips stay available afterward.\nDesktop Chrome recommended. Save (ZIP or folder backup) before leaving.',
-  'tour.welcome.bodyMobile': 'Phone/tablet: use the bottom menu; one- or two-finger drag pans; pinch to zoom; long-press empty = ping; add objects via map HUD.\nSkip anytime. Save before leaving.',
+  'tour.welcome.bodyMobile': 'Phone/tablet: use the bottom menu; one-finger drag pans; two-finger drag rotates the view; pinch to zoom; long-press empty = ping; add objects via map HUD.\nSkip anytime. Save before leaving.',
   'tour.welcome.language': '🌐 Language / 語言',
   'tour.welcome.start': 'Start',
   'tour.welcome.skip': 'Skip',
@@ -100,7 +100,7 @@ export const en_tip: I18nDictionary = {
 
   'tour.step.mapPan.title': 'Pan the map',
   'tour.step.mapPan.body': 'Right-drag = pan.\nMiddle-drag / Ctrl+right-drag = rotate view.\nTry right-drag once.',
-  'tour.step.mapPan.bodyMobile': 'One-finger drag on the map = pan.\nTwo-finger drag also pans; pinch = zoom; two-finger twist = yaw.\nTry a one-finger pan once.',
+  'tour.step.mapPan.bodyMobile': 'One-finger drag on the map = pan.\nTwo-finger drag = free view rotate (same as desktop middle-drag); pinch = zoom.\nTry a one-finger pan once.',
   'tour.step.mapWheel.title': 'Wheel pan',
   'tour.step.mapWheel.body': 'Shift + wheel = move view left/right.\nCtrl + wheel = move view up/down.\n(Plain wheel = zoom — next step.)\nTry Shift or Ctrl + wheel once.',
   'tour.step.mapZoom.title': 'Zoom',
@@ -137,7 +137,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.more.body': 'Tap More for secondary features.',
   'tour.step.roomChapter.bodyMobile': 'Start with Connection on the bottom bar: join a room and save.\n(Folder backup may be unavailable on mobile — use ZIP.)',
   'tour.step.saveZip.bodyMobile': 'Use Download ZIP to back up. Folder backup is often unavailable on phones/tablets.',
-  'tour.step.tableChapter.bodyMobile': 'Map: one- or two-finger drag to pan; pinch or HUD zoom.\nLong-press empty = ping; HUD + = add objects.',
+  'tour.step.tableChapter.bodyMobile': 'Map: one-finger drag pans; two-finger drag rotates the view; pinch or HUD zoom.\nLong-press empty = ping; HUD + = add objects.',
   'tour.step.controlsChapter.bodyMobile': 'Tap a token to select.\nDrag to move; HUD + = add; long-press empty = ping.',
   'tour.step.controlsPing.bodyMobile': 'Long-press empty map (~0.5s) to ping. Try a long-press once.',
   'tour.step.saveGuide.bodyMobile': 'Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nReplay the tour from More → Settings. ZIP before leaving.',

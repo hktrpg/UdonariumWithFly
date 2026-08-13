@@ -1319,15 +1319,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onTableTouchTransform(transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: string, srcEvent: TouchEvent | MouseEvent | PointerEvent) {
-    // Object drag wins over map pan/pinch.
-    if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging) return;
-    if (!this.isTableTransformMode) return;
     // Cancel ping only for multi-touch / pinch / rotate — not 1-finger pan jitter
     // (pan1p threshold is 0; movement cancel uses PING_MOVE_THRESHOLD_SQ instead).
     const touchCount = srcEvent instanceof TouchEvent ? srcEvent.touches.length : 0;
-    if (touchCount > 1 || event === 'pinch' || event === 'rotate' || event === 'tappinch') {
+    const isMultiView =
+      touchCount > 1 || event === 'pinch' || event === 'rotate' || event === 'tappinch';
+    if (isMultiView) {
       this.clearPingHold();
+      // First finger on a token claims ObjectDrag; second finger must still rotate/zoom freely.
+      this.releaseObjectDragForViewGesture(event === 'pinch' || Math.abs(transformZ) > 0);
     }
+
+    // Object drag wins over 1-finger map pan only.
+    if (this.touchMode === TableTouchMode.ObjectDrag || this.pointerDeviceService.isDragging) return;
+    if (!this.isTableTransformMode) return;
     if (event === 'pinch' || Math.abs(transformZ) > 0) this.touchMode = TableTouchMode.Pinch;
     else if (this.touchMode === TableTouchMode.Idle) this.touchMode = TableTouchMode.Pan;
     // Desktop keeps the strict focus gate; touch already blurred on empty-table start.
@@ -1343,16 +1348,28 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     let scale = (1000 + Math.abs(this.viewPotisonZ)) / 1000;
     transformX *= scale;
     transformY *= scale;
+    // Match mouse middle-drag: free pitch/yaw except 2D top-down lock.
     if (this.currentTable?.is2DMode) {
       rotateX = -this.viewRotateX; // force pitch to 0
-    } else {
-      if (80 < rotateX + this.viewRotateX) rotateX += 80 - (rotateX + this.viewRotateX);
-      if (rotateX + this.viewRotateX < 0) rotateX += 0 - (rotateX + this.viewRotateX);
     }
     if (750 < transformZ + this.viewPotisonZ) transformZ += 750 - (transformZ + this.viewPotisonZ);
 
     this.setTransform(transformX, transformY, transformZ, rotateX, rotateY, rotateZ);
     this.isTableTransformed = true;
+  }
+
+  /** Multi-touch view control wins over a 1-finger object grab. */
+  private releaseObjectDragForViewGesture(asPinch: boolean) {
+    if (
+      this.touchMode !== TableTouchMode.ObjectDrag
+      && !this.pointerDeviceService.isDragging
+      && this.isTableTransformMode
+    ) {
+      return;
+    }
+    this.touchMode = asPinch ? TableTouchMode.Pinch : TableTouchMode.Pan;
+    this.isTableTransformMode = true;
+    this.pointerDeviceService.isDragging = false;
   }
 
   onTableMouseStart(e: any) {
@@ -2448,9 +2465,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     this.activePointerIds.add(e.pointerId);
-    // Second+ finger: cancel ping hold so two-finger pan/pinch can take over.
+    // Second+ finger: cancel ping hold so two-finger rotate/pinch can take over.
     if (e.pointerType === 'touch' && (e.isPrimary === false || this.activePointerIds.size > 1)) {
       this.clearPingHold();
+      this.releaseObjectDragForViewGesture(false);
       return;
     }
     // Use event page coords (PointerDevice may still be stale before touchstart).
