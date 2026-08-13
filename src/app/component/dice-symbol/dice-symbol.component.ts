@@ -563,15 +563,6 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
       actions.push(ContextMenuSeparator);
     }
     actions.push({
-      name: this.i18n.t('dice.menu.11'), action: () => {
-        let cloneObject = this.diceSymbol.clone();
-        cloneObject.location.x += this.gridSize;
-        cloneObject.location.y += this.gridSize;
-        cloneObject.update();
-        SoundEffect.play(PresetSound.dicePut);
-      }
-    });
-    actions.push({
       name: this.i18n.t('dice.menu.12'), action: () => {
         this.diceSymbol.destroy();
         SoundEffect.play(PresetSound.sweep);

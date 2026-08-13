@@ -497,6 +497,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
         t('changelog.2026note'),
         t('changelog.2026ux'),
         t('changelog.2026sync'),
+        t('changelog.2026menu'),
         t('changelog.links'),
       ], true),
     ];

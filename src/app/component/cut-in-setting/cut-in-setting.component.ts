@@ -240,6 +240,10 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     }, 500);
   }
 
+  importXml() {
+    this.saveDataService.pickAndLoadXmlOrZip();
+  }
+
   delete() {
     if (!this.selectedCutIn) return;
     EventSystem.call('STOP_CUT_IN', { 

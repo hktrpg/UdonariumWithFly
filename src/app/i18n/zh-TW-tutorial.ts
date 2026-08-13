@@ -52,6 +52,7 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　T＝集中已選物件到滑鼠位置
 　　　　Delete＝刪除（角色進回收區）
 　　　　Ctrl＋C　Ctrl＋X　Ctrl＋V＝複製／剪下／貼上（貼在游標處；選取文字時仍可複製文字）
+　　　　Ctrl＋Shift＋V＝貼上為暫存 Token（僅剪貼簿含角色／Token）
 　　　　[＝送到後層
 　　　　]＝送到前層
 　　　　Alt＋滾輪＝面向 ±3°
@@ -176,7 +177,7 @@ Patreon：https://www.patreon.com/HKTRPG
 ・ZIP／資料夾備份可選是否含音樂（彈窗＋個人設定＊；略過時檔案較小）
 ・Esc：有選取時先取消選取；否則關選單／對話框／草稿後，再關閉最前可關視窗`,
   'changelog.2026json': `2026/08/08 角色 JSON
-・JSON 方便匯入／匯出，兼容 CCFOLIA 格式（桌面 Ctrl＋V 貼上；角色詳情可匯出）`,
+・JSON 方便匯入；角色詳情「下載為 JSON」（CCFOLIA；桌面 Ctrl＋V 可貼上）`,
   'changelog.2026note': `2026/08/08 共用筆記・地圖遮罩動作
 ・共用筆記支援文字／圖片／影片（≤50MB mp4・webm）／PDF（≤20MB）；可拖曳匯入與切換顯示內容
 ・筆記倉庫可開專用設定（正背面圖、範圍：目前地圖／全房間、鎖定、翻面等）
@@ -199,6 +200,12 @@ Patreon：https://www.patreon.com/HKTRPG
 ・進房 busy：偵測到第一個 live peer 即結束等待（較不易卡在連線中）
 ・筆記翻面：有背面圖→顯示背面；無背面圖→鏡像正面（針腳／縮放把手保持正向）；handout 跟隨背面
 ・右鍵開關項統一為「☑／☐＋功能名稱」（顯示目前狀態）`,
+  'changelog.2026menu': `2026/08/13 選單・剪貼簿・匯入匯出
+・右鍵選單整理：常按項一級；「外觀／特效」「TOKEN 設定」分層；戰鬥靠近隱身；「移動位置」在進階複製下；空白地圖「新增物件」收合二級
+・地圖外觀／高度以 Token 為主；角色設定改高度會同步表種子（之後放到地圖不會丟）
+・移除與複製貼上重複的「建立副本」；請用 Ctrl＋C／V，角色另有進階複製（暫存 Token／編號等）
+・「貼上為暫存 Token」與 Ctrl＋Shift＋V：僅剪貼簿含角色／Token 時出現（骰子等不再誤顯示）
+・物件設定統一「匯入」「匯出」（ZIP）；角色另有「下載為 JSON」（CCFOLIA；並寫入系統剪貼簿）`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教學：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

@@ -683,21 +683,6 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     }
     menuArray.push(
       {
-        name: this.i18n.t('range.menu.22'), action: () => {
-          let cloneObject = this.range.clone();
-          //console.log('複製', cloneObject);
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.toTopmost();
-          cloneObject.isLocked = false;
-          cloneObject.followingCharctorIdentifier = null;
-          if (this.range.parent) this.range.parent.appendChild(cloneObject);
-          SoundEffect.play(PresetSound.cardPut);
-        }
-      }
-    );
-    menuArray.push(
-      {
         name: this.i18n.t('range.menu.23'), action: () => {
           this.range.destroy();
           SoundEffect.play(PresetSound.sweep);

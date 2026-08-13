@@ -123,6 +123,11 @@ export class DiceRollTableSettingComponent implements OnInit, OnDestroy, AfterVi
     }, 500);
   }
 
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
+  }
+
   async saveAll() {
     if (this.isSaveing) return;
     this.isSaveing = true;

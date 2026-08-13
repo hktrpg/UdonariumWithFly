@@ -68,7 +68,7 @@
   </section>
 
   <section class="card card-dense footer-actions actions tight">
-    <button type="button" class="btn btn-sm" (click)="clone()" [disabled]="GuestMode()">{{ 'sheet.createCopy' | i18n }}</button>
+    <button type="button" class="btn btn-sm" (click)="importXml()" [disabled]="GuestMode()">{{ 'sheet.import' | i18n }}</button>
     <button type="button" class="btn btn-sm" [disabled]="isSaveing || GuestMode()" (click)="saveToXML()">
       {{ isSaveing ? (progresPercent + '%') : ('sheet.download' | i18n) }}
     </button>

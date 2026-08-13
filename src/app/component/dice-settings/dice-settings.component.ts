@@ -4,7 +4,6 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceSymbol } from '@udonarium/dice-symbol';
-import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -134,16 +133,6 @@ export class DiceSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.facePreviewY = y;
   }
 
-  clone() {
-    if (!this.dice || this.GuestMode()) return;
-    const cloneObject = this.dice.clone() as DiceSymbol;
-    cloneObject.location.x += 50;
-    cloneObject.location.y += 50;
-    if (this.dice.parent) this.dice.parent.appendChild(cloneObject);
-    cloneObject.update();
-    SoundEffect.play(PresetSound.dicePut);
-  }
-
   async saveToXML() {
     if (!this.dice || this.isSaveing) return;
     this.isSaveing = true;
@@ -157,6 +146,11 @@ export class DiceSettingsComponent implements OnInit, OnChanges, OnDestroy {
       this.progresPercent = 0;
       this.changeDetector.markForCheck();
     }, 500);
+  }
+
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
   }
 
   private refreshTitle() {

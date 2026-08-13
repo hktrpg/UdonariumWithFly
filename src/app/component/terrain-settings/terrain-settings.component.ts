@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
-import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -89,17 +88,6 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
-  clone() {
-    if (!this.terrain || this.GuestMode()) return;
-    const cloneObject = this.terrain.clone() as Terrain;
-    cloneObject.location.x += 50;
-    cloneObject.location.y += 50;
-    if (this.terrain.parent) this.terrain.parent.appendChild(cloneObject);
-    cloneObject.isLocked = false;
-    cloneObject.update();
-    SoundEffect.play(PresetSound.blockPut);
-  }
-
   async saveToXML() {
     if (!this.terrain || this.isSaveing) return;
     this.isSaveing = true;
@@ -113,6 +101,11 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
       this.progresPercent = 0;
       this.changeDetector.markForCheck();
     }, 500);
+  }
+
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
   }
 
   setMode(value: number) {

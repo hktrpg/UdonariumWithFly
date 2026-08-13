@@ -676,25 +676,6 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       }),
       (this.textNote.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: this.i18n.t('textNote.menu.15'), action: () => {
-          const cloneObject = this.textNote.clone();
-          cloneObject.isLocked = false;
-          cloneObject.raiseInTier();
-          const viewId = TabletopObject.resolveViewTableIdentifier();
-          cloneObject.tablePlacements = '';
-          cloneObject.addToTable(viewId, {
-            x: this.textNote.location.x + this.gridSize,
-            y: this.textNote.location.y + this.gridSize,
-            posZ: this.textNote.posZ,
-          }, true);
-          const body = this.textNote.text;
-          const title = this.textNote.title;
-          if (body) cloneObject.text = body;
-          if (title) cloneObject.title = title;
-          SoundEffect.play(PresetSound.cardPut);
-        }
-      },
-      {
         name: this.i18n.t('textNote.menu.16'), action: () => {
           this.textNote.destroy();
           SoundEffect.play(PresetSound.sweep);

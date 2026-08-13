@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges
 
 import { Card } from '@udonarium/card';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -91,19 +90,6 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
-  clone() {
-    if (!this.card || this.GuestMode()) return;
-    const cloneObject = this.card.clone() as Card;
-    cloneObject.location.x += 50;
-    cloneObject.location.y += 50;
-    if (this.card.parent) this.card.parent.appendChild(cloneObject);
-    cloneObject.owner = '';
-    cloneObject.isLocked = false;
-    cloneObject.raiseInTier();
-    cloneObject.update();
-    SoundEffect.play(PresetSound.cardPut);
-  }
-
   async saveToXML() {
     if (!this.card || this.isSaveing) return;
     this.isSaveing = true;
@@ -118,6 +104,11 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
       this.progresPercent = 0;
       this.changeDetector.markForCheck();
     }, 500);
+  }
+
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
   }
 
   private refreshTitle() {

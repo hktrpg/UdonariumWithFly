@@ -49,7 +49,9 @@
 | 筆記倉庫 | 依桌面／共用／私人／墳場整理；文字／圖片／影片／PDF、handout、僅自己可見（同 Token） |
 | 地圖遮罩動作 | Alt＋雙擊觸發（可複選）：聊天／骰子、音樂、Cut-in、筆記出示、切地圖、套用場面、外觀 A/B、Token 效果 |
 | 快速擲骰 | 角色卡欄位一鍵送到聊天給 BCDice 結算 |
-| 鍵盤操控棋子 | 選取後 WASD／方向鍵移動；Shift+WASD 面向；Delete；Ctrl+C/X/V；Ctrl+Z 復原／Ctrl+Y（或 Ctrl+Shift+Z）重做；`[`/`]` 圖層；Alt(+Shift)／Ctrl+Shift+滾輪旋轉；Ctrl+Shift+D 開關 DEBUG pose；Shift 放下不吸附 |
+| 鍵盤操控棋子 | 選取後 WASD／方向鍵移動；Shift+WASD 面向；Delete；Ctrl+C/X/V；Ctrl+Shift+V 暫存 Token（僅角色）；Ctrl+Z 復原／Ctrl+Y（或 Ctrl+Shift+Z）重做；`[`/`]` 圖層；Alt(+Shift)／Ctrl+Shift+滾輪旋轉；Ctrl+Shift+D 開關 DEBUG pose；Shift 放下不吸附 |
+| 物件匯入／匯出 | 設定面板「匯入」「匯出」ZIP；角色另有「下載為 JSON」（CCFOLIA；Ctrl+V 可貼上） |
+| 右鍵選單整理 | 常按項一級；外觀／特效與 TOKEN 設定分層；空白地圖「新增物件」收合；與複製貼上重複的建立副本已移除 |
 | 浮動預覽釘選 | Hover Token 顯示預覽；釘選可固定；移開約 0.5 秒淡出；刪除／回收後關閉 |
 | 復原／重做 | 本機堆疊：移動／旋轉／刪除／剪下貼上／圖層／路徑移動；場景工具建立／刪除／微移。訪客不可用；輸入框內不攔截（由瀏覽器處理文字復原） |
 | 路徑移動 | 選取單一 Token → Ctrl+左鍵設路點（放開 Ctrl 仍保留）→ 左鍵點終點或 Space 開始移動；右鍵取消最後路點；Esc 取消路徑 |

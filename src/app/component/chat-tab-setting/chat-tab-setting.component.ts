@@ -147,6 +147,11 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     }, 500);
   }
 
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
+  }
+
   delete() {
     if (this.GuestMode()) return;
     if (!this.isEmpty && this.selectedTab) {

@@ -708,17 +708,6 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       }),
       (this.cardStack.getUrls().length <= 0 ? null : ContextMenuSeparator),
       {
-        name: this.i18n.t('stack.menu.27'), action: () => {
-          let cloneObject = this.cardStack.clone();
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.owner = '';
-          cloneObject.isLocked = false;
-          cloneObject.raiseInTier();
-          SoundEffect.play(PresetSound.cardPut);
-        }
-      },
-      {
         name: this.i18n.t('stack.menu.28'), action: () => {
           this.cardStack.setLocation('graveyard');
           this.cardStack.destroy();

@@ -579,16 +579,6 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
 
     actions.push({
-      name: this.i18n.t('card.menu.18'), action: () => {
-        let cloneObject = this.card.clone();
-        cloneObject.location.x += this.gridSize;
-        cloneObject.location.y += this.gridSize;
-        cloneObject.raiseInTier();
-        cloneObject.isLocked = false;
-        SoundEffect.play(PresetSound.cardPut);
-      }
-    },
-    {
       name: this.i18n.t('card.menu.19'), action: () => {
         this.card.destroy();
         SoundEffect.play(PresetSound.sweep);

@@ -1,6 +1,6 @@
 <div class="settings-ui dense character-settings" *ngIf="character; else emptyBlock" appFitPanel [fitMinHeight]="280">
   <section class="card card-dense actions-card">
-    <button type="button" class="btn btn-sm" (click)="clone()" [disabled]="GuestMode()">{{ 'sheet.cloneCharacter' | i18n }}</button>
+    <button type="button" class="btn btn-sm" (click)="importXml()" [disabled]="GuestMode()">{{ 'sheet.import' | i18n }}</button>
     <button type="button" class="btn btn-sm" [disabled]="isSaveing || GuestMode()" (click)="saveToXML()">
       {{ isSaveing ? (progresPercent + '%') : ('sheet.download' | i18n) }}
     </button>

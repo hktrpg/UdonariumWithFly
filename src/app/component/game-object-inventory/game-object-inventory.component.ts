@@ -730,12 +730,6 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     });
   }
 
-  private cloneGameObject(gameObject: TabletopObject) {
-    if (this.GuestMode()) return;
-    gameObject.clone();
-  }
-
-  /** New sheet (+ Token on current view when a map is open). */
   private cloneCharacterBody(gameObject: GameCharacter, numbered = false) {
     if (this.GuestMode()) return;
     const appearance = this.appearanceHost(gameObject);

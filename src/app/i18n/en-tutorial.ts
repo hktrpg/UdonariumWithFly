@@ -52,6 +52,7 @@ Drag images or music into the browser to import.`,
 　　　　T = gather selected objects to mouse position
 　　　　Delete = delete (characters go to trash)
 　　　　Ctrl+C　Ctrl+X　Ctrl+V = copy / cut / paste (paste at cursor; text selection still copies text)
+　　　　Ctrl+Shift+V = paste as temporary Token (only when clipboard has character/Token)
 　　　　[ = send back
 　　　　] = bring front
 　　　　Alt+wheel = facing ±3°
@@ -176,7 +177,7 @@ Upgraded to 1.13.2`,
 ・ZIP / folder backup can omit music (prompt + Settings*; smaller files when skipped)
 ・Esc: clear selection first when selected; otherwise dismiss menu/dialog/draft, then close the frontmost closable window`,
   'changelog.2026json': `2026/08/08 Character JSON
-・JSON for easy import/export; CCFOLIA-compatible (Ctrl+V on the table; export from character sheet)`,
+・JSON for easy import; character sheet “Download as JSON” (CCFOLIA; Ctrl+V on the table to paste)`,
   'changelog.2026note': `2026/08/08 Shared notes・map-mask actions
 ・Shared notes: text / image / video (≤50MB mp4・webm) / PDF (≤20MB); drag-import and switch content type
 ・Note inventory opens a dedicated settings panel (front/back, scope: this map / all maps, lock, flip, etc.)
@@ -199,6 +200,12 @@ Upgraded to 1.13.2`,
 ・Room-join busy ends on first live peer (less stuck “connecting”)
 ・Note flip: back art when set; otherwise mirror the face (pins／handles stay upright); handouts follow the back
 ・Context-menu toggles use “☑／☐ + feature name” (current state)`,
+  'changelog.2026menu': `2026/08/13 Menus・clipboard・import/export
+・Context menus cleaned up: frequent actions on L1; Appearance/FX and Token settings nested; combat next to stealth; Move under Advanced copy; empty-map creates under Add object
+・Map cosmetics/altitude live on the Token; sheet altitude edits also seed the character body
+・Removed redundant Create copy (use Ctrl+C/V; characters still have Advanced copy for temp Token / numbering)
+・Paste as temporary Token and Ctrl+Shift+V only when clipboard has a character/Token (no longer shown for dice etc.)
+・Object panels use Import / Export (ZIP); characters also Download as JSON (CCFOLIA; copies to system clipboard)`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

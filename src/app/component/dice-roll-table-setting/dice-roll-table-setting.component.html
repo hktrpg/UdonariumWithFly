@@ -72,8 +72,9 @@
         <button type="button" class="btn btn-sm" (click)="upTabIndex()">↑</button>
         <button type="button" class="btn btn-sm" (click)="downTabIndex()">↓</button>
         <span class="actions-spacer">
+          <button type="button" class="btn" (click)="importXml()">{{ 'sheet.import' | i18n }}</button>
           <button type="button" class="btn" [disabled]="isSaveing" (click)="save()">
-            <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'diceTable.save' | i18n }}</span>
+            <span class="btn-label" [class.is-hidden]="isSaveing">{{ 'sheet.download' | i18n }}</span>
             <span *ngIf="isSaveing" class="btn-progress">{{progresPercent}}%</span>
           </button>
           <button type="button" class="btn btn-danger" (click)="delete()">{{ 'diceTable.delete' | i18n }}</button>

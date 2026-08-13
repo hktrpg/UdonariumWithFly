@@ -606,18 +606,6 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
                 SoundEffect.play(PresetSound.lock);
               }
             },
-            {
-              name: this.i18n.t('mask.menu.4'), action: () => {
-                selectedGameTableMasks().forEach(gameTableMask => {
-                  let cloneObject = gameTableMask.clone();
-                  cloneObject.location.x += this.gridSize;
-                  cloneObject.location.y += this.gridSize;
-                  cloneObject.isLock = false;
-                  if (gameTableMask.parent) gameTableMask.parent.appendChild(cloneObject);
-                });
-                SoundEffect.play(PresetSound.cardPut);
-              }
-            },
           ]
         },
         ContextMenuSeparator,
@@ -906,18 +894,6 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         })
       }),
       (this.gameTableMask.getUrls().length <= 0 ? null : ContextMenuSeparator),
-      {
-        name: this.i18n.t('mask.menu.32'), action: () => {
-          let cloneObject = this.gameTableMask.clone();
-          console.log('複製', cloneObject);
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.isLock = false;
-          cloneObject.isPreview = false;
-          if (this.gameTableMask.parent) this.gameTableMask.parent.appendChild(cloneObject);
-          SoundEffect.play(PresetSound.cardPut);
-        }
-      },
       {
         name: this.i18n.t('mask.menu.33'), action: () => {
           this.chatMessageService.sendOperationLog(this.i18n.t('mask.deleted', { name: this.maskDisplayName() }));

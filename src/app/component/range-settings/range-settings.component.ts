@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges
 
 import { EventSystem, Network } from '@udonarium/core/system';
 import { RangeArea } from '@udonarium/range';
-import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 
 import { I18nService } from 'service/i18n.service';
 import { PanelService } from 'service/panel.service';
@@ -112,17 +111,6 @@ export class RangeSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
-  clone() {
-    if (!this.range || this.GuestMode()) return;
-    const cloneObject = this.range.clone() as RangeArea;
-    cloneObject.location.x += 50;
-    cloneObject.location.y += 50;
-    if (this.range.parent) this.range.parent.appendChild(cloneObject);
-    cloneObject.isLocked = false;
-    cloneObject.update();
-    SoundEffect.play(PresetSound.piecePut);
-  }
-
   async saveToXML() {
     if (!this.range || this.isSaveing) return;
     this.isSaveing = true;
@@ -136,6 +124,11 @@ export class RangeSettingsComponent implements OnInit, OnChanges, OnDestroy {
       this.progresPercent = 0;
       this.changeDetector.markForCheck();
     }, 500);
+  }
+
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
   }
 
   private refreshTitle() {

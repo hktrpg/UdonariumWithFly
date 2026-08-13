@@ -557,6 +557,19 @@ export class SaveDataService {
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveGameObjectAsync(gameObject, fileName, updateCallback)));
   }
 
+  /** File picker for XML/ZIP object data (pairs with saveGameObjectAsync / room ZIP load). */
+  pickAndLoadXmlOrZip(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/xml,text/xml,application/zip';
+    input.onchange = (event: Event) => {
+      const files = (event.target as HTMLInputElement).files;
+      if (files?.length) FileArchiver.instance.load(files);
+    };
+    input.click();
+  }
+
   private async _saveGameObjectAsync(gameObject: GameObject, fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
     let files: File[] = [];
     let xml: string = this.convertToXml(gameObject);

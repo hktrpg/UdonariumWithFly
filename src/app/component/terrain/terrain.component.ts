@@ -349,18 +349,6 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
                 SoundEffect.play(PresetSound.lock);
               }
             },
-            {
-              name: this.i18n.t('terrain.menu.4'), action: () => {
-                selectedGameTableMasks().forEach(terrain => {
-                  let cloneObject = terrain.clone();
-                  cloneObject.location.x += this.gridSize;
-                  cloneObject.location.y += this.gridSize;
-                  cloneObject.isLocked = false;
-                  if (terrain.parent) terrain.parent.appendChild(cloneObject);
-                });
-                SoundEffect.play(PresetSound.blockPut);
-              }
-            }
           ]
         },
         ContextMenuSeparator,
@@ -539,16 +527,6 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         })
       }),
       (this.terrain.getUrls().length <= 0 ? null : ContextMenuSeparator),
-      {
-        name: this.i18n.t('terrain.menu.22'), action: () => {
-          let cloneObject = this.terrain.clone();
-          cloneObject.location.x += this.gridSize;
-          cloneObject.location.y += this.gridSize;
-          cloneObject.isLocked = false;
-          if (this.terrain.parent) this.terrain.parent.appendChild(cloneObject);
-          SoundEffect.play(PresetSound.blockPut);
-        }
-      },
       {
         name: this.i18n.t('terrain.menu.23'), action: () => {
           this.terrain.destroy();

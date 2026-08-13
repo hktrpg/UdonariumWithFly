@@ -378,23 +378,6 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
 
   identify(_index: number, obj: { identifier: string }) { return obj.identifier; }
 
-  clone() {
-    if (!this.character || this.GuestMode()) return;
-    const appearance = CharacterToken.appearanceHostFor(this.character, { preferredToken: this.token }) || this.character;
-    const pose = appearance.getPoseForView
-      ? appearance.getPoseForView()
-      : { x: this.character.location.x, y: this.character.location.y, posZ: this.character.posZ };
-    GameCharacter.cloneCharacter(this.character, {
-      pose: {
-        x: (pose.x || 0) + 50,
-        y: (pose.y || 0) + 50,
-        posZ: pose.posZ || 0,
-      },
-      copyAppearanceFrom: appearance,
-    });
-    SoundEffect.play(PresetSound.piecePut);
-  }
-
   async saveToXML() {
     if (!this.character || this.isSaveing) return;
     this.isSaveing = true;
@@ -408,6 +391,11 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
       this.progresPercent = 0;
       this.changeDetector.markForCheck();
     }, 500);
+  }
+
+  importXml() {
+    if (this.GuestMode()) return;
+    this.saveDataService.pickAndLoadXmlOrZip();
   }
 
   async exportCcfoliaJson() {
