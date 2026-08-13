@@ -98,12 +98,25 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   private bottomIndex = 0;
 
   //private minMessageHeight: number = 26;
+  /** Floor for index stepping — keep ≤ real height so the virtual window over-renders. */
   private get minMessageHeight(): number {
-    let chatMessage = this.chatTab?.chatMessages[this.chatTab.chatMessages.length - 1];
-    const isOpLog = !!(chatMessage && chatMessage.isOperationLog);
-    // Operation logs render compact but stacked (name + body).
-    if (this.compact) return isOpLog ? 40 : 26;
-    return isOpLog ? 40 : 61;
+    return this.compact ? 26 : 40;
+  }
+
+  /** Per-message height estimate for spacers / minHeight (op logs grow with wraps). */
+  private estimateMessageHeight(chatMessage: ChatMessage): number {
+    if (!chatMessage?.isDisplayable) return 0;
+    if (!chatMessage.isOperationLog) {
+      return this.compact ? 26 : 61;
+    }
+    // Stacked compact: title row + body lines (explicit newlines and soft wraps).
+    const text = String(chatMessage.text || '');
+    const parts = text.length ? text.split(/\n/) : [''];
+    let bodyLines = 0;
+    for (const part of parts) {
+      bodyLines += Math.max(1, Math.ceil(Math.max(part.length, 1) / 36));
+    }
+    return 10 + 18 + bodyLines * 18;
   }
 
   private preScrollTop = 0;
@@ -125,19 +138,21 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   }
 
   get minScrollHeight(): number {
-    return this.chatTab.chatMessages.reduce((height, chatMessage) => {
-      if (!chatMessage.isDisplayable) return height;
-      if (chatMessage.isOperationLog) return height + 40;
-      return height + (this.compact ? 26 : 61);
-    }, 0);
+    if (!this.chatTab) return 0;
+    return this.chatTab.chatMessages.reduce(
+      (height, chatMessage) => height + this.estimateMessageHeight(chatMessage), 0);
   }
 
   get topSpace(): number { return this.minScrollHeight - this.bottomSpace; }
 
   get bottomSpace(): number {
-    return 0 < this.chatMessages.length
-      ? (this.chatTab.chatMessages.length - this.bottomIndex - 1) * this.minMessageHeight
-      : 0;
+    if (!this.chatTab || this.chatMessages.length < 1) return 0;
+    const messages = this.chatTab.chatMessages;
+    let space = 0;
+    for (let i = this.bottomIndex + 1; i < messages.length; i++) {
+      space += this.estimateMessageHeight(messages[i]);
+    }
+    return space;
   }
 
   get isEmpty(): boolean { return this.chatTab.chatMessages.every(chatMessage => !chatMessage.isDisplayable); }
