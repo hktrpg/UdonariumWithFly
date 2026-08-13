@@ -566,7 +566,12 @@ export class TabletopObject extends ObjectNode {
       if (tables.length === 1) {
         for (const id of orphanIds) remap.set(id, tables[0].identifier);
       } else if (orphanIds.length === tables.length) {
-        for (let i = 0; i < orphanIds.length; i++) remap.set(orphanIds[i], tables[i].identifier);
+        // Pair by sorted id — ObjectStore / getAll() order is not stable across browsers.
+        const sortedOrphans = [...orphanIds].sort();
+        const sortedTableIds = tables.map(t => t.identifier).sort();
+        for (let i = 0; i < sortedOrphans.length; i++) {
+          remap.set(sortedOrphans[i], sortedTableIds[i]);
+        }
       } else {
         const viewId = TabletopObject.resolveViewTableIdentifier() || tables[0].identifier;
         for (const id of orphanIds) remap.set(id, viewId);

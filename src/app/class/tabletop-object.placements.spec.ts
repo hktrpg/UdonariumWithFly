@@ -96,8 +96,8 @@ describe('TabletopObject placements / migrate / repair', () => {
   });
 
   it('repairOrphanedPieceBindings remaps 1:1 when orphan count equals table count', () => {
-    const t0 = makeTable('realTable0');
-    const t1 = makeTable('realTable1');
+    makeTable('realTable0');
+    makeTable('realTable1');
     viewTables('realTable0');
 
     const ch0 = makeCharacter('piece0');
@@ -111,10 +111,14 @@ describe('TabletopObject placements / migrate / repair', () => {
     ch1.tablePlacements = JSON.stringify({ orphan1: { x: 2, y: 2, posZ: 0 } });
 
     const remap = TabletopObject.repairOrphanedPieceBindings();
-    expect(remap.get('orphan0')).toBe(t0.identifier);
-    expect(remap.get('orphan1')).toBe(t1.identifier);
+    // Sorted orphan ids ↔ sorted table ids (stable across ObjectStore iteration order).
+    expect(remap.get('orphan0')).toBe('realTable0');
+    expect(remap.get('orphan1')).toBe('realTable1');
+    expect(new Set(remap.values())).toEqual(new Set(['realTable0', 'realTable1']));
     expect(ch0.hasPlacement('realTable0')).toBeTrue();
     expect(ch1.hasPlacement('realTable1')).toBeTrue();
+    expect(ch0.hasPlacement('orphan0')).toBeFalse();
+    expect(ch1.hasPlacement('orphan1')).toBeFalse();
   });
 
   it('repairOrphanedPieceBindings collapses mismatched orphans onto view/first table', () => {
