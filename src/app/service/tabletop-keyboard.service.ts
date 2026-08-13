@@ -192,8 +192,9 @@ export class TabletopKeyboardService {
     }
 
     if (mod && e.shiftKey && !this.altHeld && code === 'KeyV') {
-      // Ctrl+Shift+V: temporary Token paste (not a shared inventory body).
+      // Ctrl+Shift+V: temporary Token paste — only when clipboard has character/Token.
       if (this.hasTextSelection()) return;
+      if (!this.hasCharacterClipboard) return;
       if (this.pasteTemporaryAtPointer()) {
         this.ignoreNextPaste = true;
         this.consume(e);
@@ -685,6 +686,20 @@ export class TabletopKeyboardService {
     return this.clipboardXml.length > 0;
   }
 
+  /**
+   * True when clipboard includes a character sheet or Token
+   * (temporary-paste only applies to those).
+   */
+  get hasCharacterClipboard(): boolean {
+    const charAlias = GameCharacter.aliasName;
+    const tokenAlias = CharacterToken.aliasName;
+    return this.clipboardXml.some(xml => {
+      const m = /^\s*<([^\s/>]+)/.exec(xml || '');
+      const tag = m?.[1] || '';
+      return tag === charAlias || tag === tokenAlias;
+    });
+  }
+
   /** True when scene tools (light / wall / drawing) have a selection. */
   get hasSceneSelection(): boolean {
     return this.sceneTools.selectionCount > 0;
@@ -730,10 +745,13 @@ export class TabletopKeyboardService {
 
   /**
    * Ctrl+Shift+V: paste as temporary Token with an independent sheet
-   * (HP etc. not shared; hidden from inventory). Non-character items paste normally.
+   * (HP etc. not shared; hidden from inventory). No-op unless clipboard has character/Token.
    */
   pasteTemporaryAtPointer(): boolean {
-    return this.runInAngular(() => this.pasteClipboard(true));
+    return this.runInAngular(() => {
+      if (!this.hasCharacterClipboard) return false;
+      return this.pasteClipboard(true);
+    });
   }
 
   /**

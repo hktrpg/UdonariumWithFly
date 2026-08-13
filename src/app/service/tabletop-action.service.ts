@@ -87,9 +87,10 @@ export class TabletopActionService {
     };
   }
 
-  /** Paste as temporary Token (Ctrl+Shift+V); independent sheet, hidden from inventory. */
+  /** Paste as temporary Token (Ctrl+Shift+V); only when clipboard has a character/Token. */
   makePasteTemporaryMenuAction(): ContextMenuAction | null {
     if (this.GuestMode()) return null;
+    if (!this.keyboard.hasCharacterClipboard) return null;
     return {
       name: this.i18n.t('edit.pasteTemporary'),
       hotkey: '⇧V',
