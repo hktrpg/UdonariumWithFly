@@ -313,8 +313,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           name: this.i18n.t('char.moveAllToGraveyard'), action: () => {
             selectedCharacter().forEach(gameCharacter => {
               TabletopObject.disposeObject(gameCharacter, () => {
-                if (gameCharacter.location.name === 'table') gameCharacter.leaveCurrentTable('graveyard');
-                else gameCharacter.setLocation('graveyard');
+                this.moveCharacterToLocation(gameCharacter, 'graveyard', { silent: true });
               });
               this.selectionService.remove(gameCharacter);
             });
@@ -334,8 +333,9 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     const afterInv = () => EventSystem.trigger('UPDATE_INVENTORY', null);
     const hasMultiImage = gameObject.imageFiles.length > 1;
     const hasFace = this.hasOverviewFaceIcon(gameObject);
-    if (!hasFace && gameObject.isUseIconToOverviewImage) {
-      gameObject.isUseIconToOverviewImage = false;
+    const fxHost = this.appearanceHost(gameObject);
+    if (!hasFace && fxHost.isUseIconToOverviewImage) {
+      fxHost.mutateAppearance(() => { fxHost.isUseIconToOverviewImage = false; });
     }
     const inGraveyard = gameObject.location.name === 'graveyard';
 
@@ -460,10 +460,10 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         })),
       } : null,
       contextMenuToggleCheck({
-        get: () => hasFace && gameObject.isUseIconToOverviewImage,
+        get: () => hasFace && fxHost.isUseIconToOverviewImage,
         set: (v) => {
           if (!this.hasOverviewFaceIcon(gameObject)) return;
-          gameObject.mutateAppearance(() => { gameObject.isUseIconToOverviewImage = v; });
+          fxHost.mutateAppearance(() => { fxHost.isUseIconToOverviewImage = v; });
         },
         on: this.i18n.t('char.overviewFaceOn'),
         off: this.i18n.t('char.overviewFaceOff'),
@@ -472,33 +472,33 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
         error: hasFace ? null : this.i18n.t('char.overviewFaceRequired'),
       }),
       contextMenuToggleCheck({
-        get: () => gameObject.isDropShadow,
-        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isDropShadow = v; }); },
+        get: () => fxHost.isDropShadow,
+        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isDropShadow = v; }); },
         on: this.i18n.t('char.shadowOn'),
         off: this.i18n.t('char.shadowOff'),
         after: afterInv,
       }),
-      this.characterFxMenu.makeImageEffectMenu(gameObject),
+      this.characterFxMenu.makeImageEffectMenu(fxHost),
     ];
 
     const fx: ContextMenuAction[] = [
-      this.characterFxMenu.makeAuraMenu(gameObject),
-      this.characterFxMenu.makeRingMenu(gameObject),
+      this.characterFxMenu.makeAuraMenu(fxHost),
+      this.characterFxMenu.makeRingMenu(fxHost),
       this.characterFxMenu.makeStatusMenu(gameObject),
     ];
 
     const is2D = !!TableSelecter.instance?.viewTable?.is2DMode;
     const pose: ContextMenuAction[] = is2D ? [] : [
       contextMenuToggleCheck({
-        get: () => !gameObject.isNotRide,
-        set: (v) => { gameObject.isNotRide = !v; },
+        get: () => !fxHost.isNotRide,
+        set: (v) => { fxHost.isNotRide = !v; },
         on: this.i18n.t('char.stackOn'),
         off: this.i18n.t('char.stackOff'),
         after: afterInv,
       }),
       contextMenuToggleCheck({
-        get: () => gameObject.isAltitudeIndicate,
-        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isAltitudeIndicate = v; }); },
+        get: () => fxHost.isAltitudeIndicate,
+        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isAltitudeIndicate = v; }); },
         on: this.i18n.t('char.altitudeOn'),
         off: this.i18n.t('char.altitudeOff'),
         after: afterInv,
@@ -506,19 +506,19 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
       {
         name: this.i18n.t('char.resetAltitude'),
         action: () => {
-          if (gameObject.altitude != 0) {
-            gameObject.altitude = 0;
-            if (gameObject.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
+          if (fxHost.altitude != 0) {
+            fxHost.altitude = 0;
+            if (fxHost.isVisibleOnTable) SoundEffect.play(PresetSound.sweep);
           }
         },
-        altitudeHande: gameObject
+        altitudeHande: fxHost
       },
     ];
 
     const chatPanels: ContextMenuAction[] = [
       contextMenuToggleCheck({
-        get: () => gameObject.isShowChatBubble,
-        set: (v) => { gameObject.mutateAppearance(() => { gameObject.isShowChatBubble = v; }); },
+        get: () => fxHost.isShowChatBubble,
+        set: (v) => { fxHost.mutateAppearance(() => { fxHost.isShowChatBubble = v; }); },
         on: this.i18n.t('char.chatBubbleOn'),
         off: this.i18n.t('char.chatBubbleOff'),
         tip: this.i18n.t('char.chatBubbleTip'),
@@ -627,10 +627,8 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
           this.selectionService.remove(gameObject);
           if (gameObject.isTemporaryCopy) {
             this.deleteGameObject(gameObject);
-          } else if (gameObject.location.name === 'table') {
-            gameObject.leaveCurrentTable('graveyard');
           } else {
-            gameObject.setLocation('graveyard');
+            this.moveCharacterToLocation(gameObject, 'graveyard', { silent: true });
           }
           SoundEffect.play(PresetSound.sweep);
           EventSystem.call('UPDATE_INVENTORY', true);
@@ -807,22 +805,24 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   invImageFilter(gameObject: GameCharacter): string | null {
+    const host = this.appearanceHost(gameObject);
     return imageEffectFilter({
-      ...gameObject,
+      ...host,
       isDead: hasStatus(gameObject.statusesJson, 'dead'),
     });
   }
   invImageOpacity(gameObject: GameCharacter): number | null {
-    return imageEffectOpacity(gameObject);
+    return imageEffectOpacity(this.appearanceHost(gameObject));
   }
   invImageTransform(gameObject: GameCharacter): string | null {
-    return imageEffectTransform(gameObject);
+    return imageEffectTransform(this.appearanceHost(gameObject));
   }
 
   private _invMatrixRain = new Map<string, MatrixRainColumn[]>();
   invMatrixRainColumns(gameObject: GameCharacter): MatrixRainColumn[] {
-    if (!gameObject?.isMatrix) return [];
-    const key = gameObject.identifier;
+    const host = this.appearanceHost(gameObject);
+    if (!host?.isMatrix) return [];
+    const key = host.identifier;
     let cols = this._invMatrixRain.get(key);
     if (!cols) {
       cols = buildMatrixRainColumns(`inv:${key}`, 5, 10);
@@ -841,19 +841,37 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     return this.i18n.t('char.overviewFaceHint');
   }
 
-  toggleOverviewFaceIcon(gameObject: TabletopObject) {
+  /** Map Token cosmetics when present; otherwise the sheet (seed / off-map). */
+  appearanceHost(gameObject: GameCharacter): GameCharacter | CharacterToken {
+    return CharacterToken.focusTokenForCharacter(gameObject.identifier) || gameObject;
+  }
+
+  /** Stealth / hide-in for inventory row chrome. */
+  invIsHideIn(gameObject: GameCharacter): boolean {
+    const host = this.appearanceHost(gameObject);
+    return !!host.owner || !!(host as GameCharacter).isHideIn;
+  }
+
+  toggleOverviewFaceIcon(gameObject: GameCharacter) {
+    const host = this.appearanceHost(gameObject);
     if (!this.hasOverviewFaceIcon(gameObject)) {
-      gameObject.mutateAppearance(() => { gameObject.isUseIconToOverviewImage = false; });
+      host.mutateAppearance(() => { host.isUseIconToOverviewImage = false; });
       return;
     }
-    gameObject.mutateAppearance(() => {
-      gameObject.isUseIconToOverviewImage = !gameObject.isUseIconToOverviewImage;
+    host.mutateAppearance(() => {
+      host.isUseIconToOverviewImage = !host.isUseIconToOverviewImage;
     });
   }
 
   /** Toggle a per-map SyncVar from the template (Angular templates cannot parse arrow blocks). */
-  togglePlacementFlag(gameObject: TabletopObject, key: 'isShowChatBubble' | 'isDropShadow' | 'isAltitudeIndicate') {
-    gameObject.mutateAppearance(() => { (gameObject as any)[key] = !(gameObject as any)[key]; });
+  togglePlacementFlag(gameObject: GameCharacter, key: 'isShowChatBubble' | 'isDropShadow' | 'isAltitudeIndicate') {
+    const host = this.appearanceHost(gameObject);
+    host.mutateAppearance(() => { (host as any)[key] = !(host as any)[key]; });
+  }
+
+  toggleNotRide(gameObject: GameCharacter) {
+    const host = this.appearanceHost(gameObject);
+    host.isNotRide = !host.isNotRide;
   }
 
   /** Footprint fields (size/altitude/…) stay per-map via mutateAppearance. */
@@ -1005,6 +1023,15 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: gameObject.identifier });
     if (location === 'table') {
       this.placeBodyTokenOnView(gameObject);
+    } else if (location === 'graveyard') {
+      // setLocation('graveyard') cascades Token destroy; clear view tokens first is redundant but safe.
+      CharacterToken.destroyTokensForCharacter(gameObject.identifier);
+      if (gameObject.location.name === 'table') {
+        gameObject.leaveCurrentTable('graveyard');
+      } else {
+        const viewId = TabletopObject.resolveViewTableIdentifier() || '';
+        gameObject.setLocation('graveyard', viewId || undefined);
+      }
     } else if (this.hasTokenOnView(gameObject) || gameObject.location.name === 'table') {
       CharacterToken.removeTokensOnTable(gameObject.identifier);
       if (gameObject.location.name === 'table') {

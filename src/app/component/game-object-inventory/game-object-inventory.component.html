@@ -86,12 +86,12 @@
   </ng-container>
 </ng-template>
 <ng-template #gameObjectTags let-gameObject="gameObject">
-  <div class="inventory-object">
+  <div class="inventory-object" *ngIf="appearanceHost(gameObject) as host">
     <div class="object-name">
       <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier || !hasOverviewFaceIcon(gameObject)"
         style="font-size: 0.8em; padding: 1px 0px; width: 24px; height: 16px; margin-bottom: 1px"
         [title]="overviewFaceIconTitle(gameObject)"
-        [ngClass]="{'is-active': gameObject.isUseIconToOverviewImage && hasOverviewFaceIcon(gameObject)}"
+        [ngClass]="{'is-active': host.isUseIconToOverviewImage && hasOverviewFaceIcon(gameObject)}"
         (click)="toggleOverviewFaceIcon(gameObject)">
         <i *ngIf="hasOverviewFaceIcon(gameObject); else altImage" class="face-icon"><img [src]="gameObject.faceIcon.url | safe: 'resourceUrl'" alt=""></i>
         <ng-template #altImage>
@@ -99,20 +99,20 @@
         </ng-template>
       </button>
       <span class="game-object-name" style="margin-left: 3px; margin-right: 3px">{{gameObject.name}}</span>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 2px" [title]="('inv.showChatBubble' | i18n) + ' — ' + ('inv.showChatBubbleTip' | i18n)" [ngClass]="{'is-active': gameObject.isShowChatBubble}" (click)="togglePlacementFlag(gameObject, 'isShowChatBubble')">
-        <i class="material-icons" style="font-size: 1em;">{{ gameObject.isShowChatBubble ? 'textsms' : 'speaker_notes_off'}}</i>
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 2px" [title]="('inv.showChatBubble' | i18n) + ' — ' + ('inv.showChatBubbleTip' | i18n)" [ngClass]="{'is-active': host.isShowChatBubble}" (click)="togglePlacementFlag(gameObject, 'isShowChatBubble')">
+        <i class="material-icons" style="font-size: 1em;">{{ host.isShowChatBubble ? 'textsms' : 'speaker_notes_off'}}</i>
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px; width: 22px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.shadowOn' | i18n" [ngClass]="{'is-active': gameObject.isDropShadow}" (click)="togglePlacementFlag(gameObject, 'isDropShadow')">
-        <i *ngIf="gameObject.shadowImageFile && 0 < gameObject.shadowImageFile.url.length; else altShadow" class="face-icon"><img style="filter: brightness(0);" [ngStyle]="{'opacity': gameObject.isDropShadow ? 0.7 : 0.3}" [src]="gameObject.shadowImageFile.url | safe: 'resourceUrl'" alt=""></i>
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px; width: 22px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.shadowOn' | i18n" [ngClass]="{'is-active': host.isDropShadow}" (click)="togglePlacementFlag(gameObject, 'isDropShadow')">
+        <i *ngIf="gameObject.shadowImageFile && 0 < gameObject.shadowImageFile.url.length; else altShadow" class="face-icon"><img style="filter: brightness(0);" [ngStyle]="{'opacity': host.isDropShadow ? 0.7 : 0.3}" [src]="gameObject.shadowImageFile.url | safe: 'resourceUrl'" alt=""></i>
         <ng-template #altShadow>
-          <i class="material-icons" style="font-size: 1em;">{{ gameObject.isDropShadow ? 'star_half' : 'star_border'}}</i>
+          <i class="material-icons" style="font-size: 1em;">{{ host.isDropShadow ? 'star_half' : 'star_border'}}</i>
         </ng-template>      
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.stackOn' | i18n" [ngClass]="{'is-active': !gameObject.isNotRide}" (click)="gameObject.isNotRide = !gameObject.isNotRide">
-        <i class="material-icons" style="font-size: 1em;">{{ !gameObject.isNotRide ? 'directions_bike' : 'directions_run'}}</i>
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.stackOn' | i18n" [ngClass]="{'is-active': !host.isNotRide}" (click)="toggleNotRide(gameObject)">
+        <i class="material-icons" style="font-size: 1em;">{{ !host.isNotRide ? 'directions_bike' : 'directions_run'}}</i>
       </button>
-      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.altitudeOn' | i18n" [ngClass]="{'is-active': gameObject.isAltitudeIndicate}" (click)="togglePlacementFlag(gameObject, 'isAltitudeIndicate')">
-        <i class="material-icons rotate" style="font-size: 1em;">straighten</i><span style="display: inline-block; text-align: center; font-size: xx-small; color: gray; min-width: 2em;">{{ gameObject.altitude }}</span>
+      <button class="indicate" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.8em; padding: 2px 5px; height: 18px; margin: 0px 2px 1px 0px" [title]="'char.altitudeOn' | i18n" [ngClass]="{'is-active': host.isAltitudeIndicate}" (click)="togglePlacementFlag(gameObject, 'isAltitudeIndicate')">
+        <i class="material-icons rotate" style="font-size: 1em;">straighten</i><span style="display: inline-block; text-align: center; font-size: xx-small; color: gray; min-width: 2em;">{{ host.altitude }}</span>
       </button>
       <button class="indicate inventory-indicate-btn" [disabled]="selectedIdentifier !== gameObject.identifier" style="font-size: 0.75em; padding: 1px 5px; height: 18px; margin: 0px 1px 1px 0px; white-space: nowrap"
         [title]="gameObject.isInventoryIndicate ? ('char.inventoryHide' | i18n) : ('char.inventoryShow' | i18n)"
@@ -124,17 +124,17 @@
         <i class="material-icons" style="font-size: 1em; pointer-events: none">settings</i>
       </button>
     </div>
-    <div class="object-tags-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
-      <div class="table-cell image-box" [ngClass]="{'is-hide-in': gameObject.isHideIn}">
+    <div class="object-tags-box" [ngClass]="{'is-hide-in': invIsHideIn(gameObject)}">
+      <div class="table-cell image-box" [ngClass]="{'is-hide-in': invIsHideIn(gameObject)}">
         <span *ngIf="!gameObject.isAllowsChat" style="margin-top:-2px; margin-left: -2px; position: absolute; pointer-events: none; font-size: 16px; filter: grayscale(100%); opacity: 0.8">🤐</span>
-        <span class="aura matrix-rain-host" [ngClass]="{black: gameObject.aura == 0, blue: gameObject.aura == 1, green: gameObject.aura == 2, cyan: gameObject.aura == 3, red: gameObject.aura == 4, magenta: gameObject.aura == 5, yellow: gameObject.aura == 6, white: gameObject.aura == 7}">
+        <span class="aura matrix-rain-host" [ngClass]="{black: host.aura == 0, blue: host.aura == 1, green: host.aura == 2, cyan: host.aura == 3, red: host.aura == 4, magenta: host.aura == 5, yellow: host.aura == 6, white: host.aura == 7}">
           <img *ngIf="gameObject.imageFile.url" class="inverser" [src]="gameObject.imageFile.url | safe: 'resourceUrl'"
             [style.filter]="invImageFilter(gameObject)"
             [style.opacity]="invImageOpacity(gameObject)"
             [style.transform]="invImageTransform(gameObject)"
-            [ngClass]="{'is-hide-in': gameObject.isHideIn}"
+            [ngClass]="{'is-hide-in': invIsHideIn(gameObject)}"
             draggable="false" />
-          <div *ngIf="gameObject.isMatrix" class="matrix-rain" aria-hidden="true">
+          <div *ngIf="host.isMatrix" class="matrix-rain" aria-hidden="true">
             <span *ngFor="let col of invMatrixRainColumns(gameObject); trackBy: trackByMatrixCol"
               class="matrix-rain-col"
               [class.up]="col.up"

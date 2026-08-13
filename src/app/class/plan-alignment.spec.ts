@@ -77,4 +77,43 @@ describe('Plan alignment gaps', () => {
     expect(CharacterToken.isStealthMode).toBeTrue();
     expect(GameCharacter.isStealthMode).toBeTrue();
   });
+
+  it('setLocation(graveyard) destroys all map Tokens', () => {
+    const body = makeCharacter('grave_body');
+    body.location.name = 'common';
+    const a = CharacterToken.create(body.identifier, { x: 0, y: 0 }, { tableId: 'mapA' });
+    const b = CharacterToken.create(body.identifier, { x: 40, y: 40 }, { tableId: 'mapA' });
+    const aId = a.identifier;
+    const bId = b.identifier;
+
+    body.setLocation('graveyard');
+
+    expect(body.location.name).toBe('graveyard');
+    expect(CharacterToken.tokensOnTable(body.identifier, 'mapA').length).toBe(0);
+    expect(ObjectStore.instance.get(aId)).toBeNull();
+    expect(ObjectStore.instance.get(bId)).toBeNull();
+    expect(ObjectStore.instance.get(body.identifier)).toBeTruthy();
+  });
+
+  it('Token cosmetics stay on Token when mutated via appearance host', () => {
+    const body = makeCharacter('fx_body');
+    body.isDropShadow = true;
+    body.aura = -1;
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, {
+      tableId: 'mapA',
+      copyAppearanceFrom: body,
+    });
+    expect(tok.isDropShadow).toBeTrue();
+
+    tok.mutateAppearance(() => {
+      tok.isDropShadow = false;
+      tok.aura = 3;
+    });
+
+    expect(tok.isDropShadow).toBeFalse();
+    expect(tok.aura).toBe(3);
+    // Sheet seed unchanged — map projection owns live cosmetics.
+    expect(body.isDropShadow).toBeTrue();
+    expect(body.aura).toBe(-1);
+  });
 });

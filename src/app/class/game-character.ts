@@ -250,7 +250,24 @@ export class GameCharacter extends TabletopObject {
       });
       return;
     }
+    if (location === 'graveyard') this.destroyMapTokens();
     super.setLocation(location, tableIdentifier);
+  }
+
+  /**
+   * leaveCurrentTable → removeFromTable may set location.name to graveyard without
+   * going through setLocation; still tear down map Tokens.
+   */
+  override removeFromTable(tableId?: string, inventoryLocation = 'common') {
+    super.removeFromTable(tableId, inventoryLocation);
+    if (this.location.name === 'graveyard') this.destroyMapTokens();
+  }
+
+  /** Sheet in graveyard must not leave orphan map projections. */
+  private destroyMapTokens() {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { CharacterToken } = require('./character-token') as typeof import('./character-token');
+    CharacterToken.destroyTokensForCharacter(this.identifier);
   }
 
   /** Keep sheet in inventory (common by default) with no table placements. */
