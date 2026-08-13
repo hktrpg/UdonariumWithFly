@@ -99,6 +99,7 @@ describe('TabletopObject placements / migrate / repair', () => {
     makeTable('realTable0');
     makeTable('realTable1');
     viewTables('realTable0');
+    expect(ObjectStore.instance.getObjects('game-table').length).toBe(2);
 
     const ch0 = makeCharacter('piece0');
     ch0.location = { name: 'table', x: 1, y: 1 };
@@ -112,9 +113,9 @@ describe('TabletopObject placements / migrate / repair', () => {
 
     const remap = TabletopObject.repairOrphanedPieceBindings();
     // Sorted orphan ids ↔ sorted table ids (stable across ObjectStore iteration order).
+    expect(remap.size).toBe(2);
     expect(remap.get('orphan0')).toBe('realTable0');
     expect(remap.get('orphan1')).toBe('realTable1');
-    expect(new Set(remap.values())).toEqual(new Set(['realTable0', 'realTable1']));
     expect(ch0.hasPlacement('realTable0')).toBeTrue();
     expect(ch1.hasPlacement('realTable1')).toBeTrue();
     expect(ch0.hasPlacement('orphan0')).toBeFalse();
