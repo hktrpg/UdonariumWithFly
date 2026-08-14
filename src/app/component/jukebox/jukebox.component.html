@@ -60,6 +60,18 @@
   <section class="jb-block jb-deck">
     <header class="jb-row-head">
       <span class="jb-row-title">{{ 'jukebox.tracks' | i18n }}</span>
+      <label class="jb-fade-sec" *ngIf="!GuestMode()" [title]="'jukebox.trackFadeHint' | i18n">
+        <span>{{ 'jukebox.trackFade' | i18n }}</span>
+        <input
+          type="number"
+          min="0"
+          max="15"
+          step="0.5"
+          [ngModel]="trackFadeSec"
+          (ngModelChange)="setTrackFadeSec($event)"
+        />
+        <span>{{ 'jukebox.trackFadeUnit' | i18n }}</span>
+      </label>
       <ng-container *ngIf="!GuestMode()">
         <button type="button" class="jb-icon-act" (click)="stopAllTracks()" [disabled]="!jukebox"
           [title]="'jukebox.stopAll' | i18n">
@@ -71,9 +83,11 @@
       <div
         class="jb-track"
         *ngFor="let i of trackIndexes"
-        [class.is-playing]="tracks[i]?.isPlaying || (i === weatherTrackIndex && weatherSePlaying)"
+        [class.is-playing]="(tracks[i]?.isPlaying && !tracks[i]?.isPaused) || (i === weatherTrackIndex && weatherSePlaying)"
+        [class.is-paused]="tracks[i]?.isPlaying && tracks[i]?.isPaused"
         [class.is-guest]="GuestMode()"
         [class.is-weather]="i === weatherTrackIndex"
+        [class.is-transport]="i !== weatherTrackIndex"
         [class.is-drop-target]="dropTrackIndex === i"
         (dragover)="onTrackDragOver($event, i)"
         (dragleave)="onTrackDragLeave($event, i)"
@@ -103,20 +117,50 @@
           </label>
         </ng-container>
         <ng-container *ngIf="i !== weatherTrackIndex && tracks[i]?.audioIdentifier && trackAudio(i) as playing">
-          <button
-            *ngIf="!GuestMode()"
-            type="button"
-            class="jb-icon-act"
-            [class.is-on]="tracks[i]?.isPlaying"
-            (click)="toggleTrackSlot(i, playing)"
-            [title]="tracks[i]?.isPlaying ? ('jukebox.stopAll' | i18n) : ('jukebox.bgm' | i18n)"
-          >
-            <i class="material-icons">{{ tracks[i]?.isPlaying ? 'stop' : 'play_arrow' }}</i>
-          </button>
+          <ng-container *ngIf="!GuestMode()">
+            <button
+              type="button"
+              class="jb-icon-act"
+              [class.is-on]="tracks[i]?.isPlaying && !tracks[i]?.isPaused"
+              (click)="playOrResumeTrack(i, playing)"
+              [title]="tracks[i]?.isPlaying && tracks[i]?.isPaused ? ('jukebox.resume' | i18n) : ('jukebox.play' | i18n)"
+            >
+              <i class="material-icons">play_arrow</i>
+            </button>
+            <button
+              type="button"
+              class="jb-icon-act"
+              [disabled]="!tracks[i]?.isPlaying || tracks[i]?.isPaused"
+              (click)="pauseTrack(i)"
+              [title]="'jukebox.pause' | i18n"
+            >
+              <i class="material-icons">pause</i>
+            </button>
+            <button
+              type="button"
+              class="jb-icon-act"
+              [disabled]="!tracks[i]?.isPlaying"
+              (click)="stopTrack(i)"
+              [title]="'jukebox.stopAll' | i18n"
+            >
+              <i class="material-icons">stop</i>
+            </button>
+          </ng-container>
           <span class="jb-track-status-icon" *ngIf="GuestMode() && tracks[i]?.isPlaying" aria-hidden="true">
-            <i class="material-icons">volume_up</i>
+            <i class="material-icons">{{ tracks[i]?.isPaused ? 'pause' : 'volume_up' }}</i>
           </span>
           <span class="jb-track-title" [title]="displayName(playing)">{{ displayName(playing) }}</span>
+          <input
+            class="jb-track-scrub"
+            type="range"
+            min="0"
+            [max]="trackDuration(i) || 1"
+            step="0.1"
+            [ngModel]="trackProgress(i)"
+            (ngModelChange)="seekTrack(i, $event)"
+            [disabled]="GuestMode() || !tracks[i]?.isPlaying"
+            [title]="formatTime(trackProgress(i)) + ' / ' + formatTime(trackDuration(i))"
+          />
           <input
             *ngIf="!GuestMode()"
             class="jb-track-gain"
@@ -130,6 +174,44 @@
           />
         </ng-container>
         <span class="jb-track-idle" *ngIf="i !== weatherTrackIndex && !tracks[i]?.audioIdentifier">{{ 'jukebox.dropTrackHint' | i18n }}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="jb-block jb-soundboard">
+    <header class="jb-row-head">
+      <span class="jb-row-title">{{ 'jukebox.soundboard' | i18n }}</span>
+      <span class="jb-fold-hint">{{ 'jukebox.soundboardHint' | i18n }}</span>
+    </header>
+    <div class="jb-pad-grid">
+      <div
+        class="jb-pad"
+        *ngFor="let slot of soundboardSlots; let pi = index"
+        [class.is-filled]="!!slot.audioIdentifier"
+        [class.is-drop-target]="dropPadIndex === pi"
+        (dragover)="onPadDragOver($event, pi)"
+        (dragleave)="onPadDragLeave($event, pi)"
+        (drop)="onPadDrop($event, pi)"
+      >
+        <button
+          type="button"
+          class="jb-pad-hit"
+          (click)="triggerPad(pi)"
+          [disabled]="GuestMode() || !slot.audioIdentifier"
+          [title]="padTitle(pi)"
+        >
+          <span class="jb-pad-index">{{ pi + 1 }}</span>
+          <span class="jb-pad-name">{{ padDisplayName(pi) }}</span>
+        </button>
+        <button
+          *ngIf="!GuestMode() && slot.audioIdentifier"
+          type="button"
+          class="jb-icon-act jb-pad-clear"
+          (click)="clearPad(pi, $event)"
+          [title]="'jukebox.soundboardClear' | i18n"
+        >
+          <i class="material-icons">close</i>
+        </button>
       </div>
     </div>
   </section>

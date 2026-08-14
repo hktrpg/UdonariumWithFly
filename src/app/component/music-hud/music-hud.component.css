@@ -117,6 +117,15 @@
   transition: background 120ms ease, outline 120ms ease;
 }
 
+.slot-scrub {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  height: 12px;
+  margin: 0 0 2px;
+  accent-color: #7cbc68;
+}
+
 .slot-row.is-playing {
   background: rgba(90, 138, 74, 0.22);
   border-left-color: #7cbc68;

@@ -246,9 +246,134 @@
   transition: background 120ms ease, outline 120ms ease;
 }
 
+.jb-track.is-transport {
+  grid-template-columns: 3.2em 22px 22px 22px minmax(0, 1fr) minmax(4em, 1fr) minmax(3em, 4.5em);
+  min-height: 28px;
+}
+
+.jb-track.is-transport.is-guest {
+  grid-template-columns: 3.2em 18px minmax(0, 1fr) minmax(4em, 1fr);
+}
+
 .jb-track.is-playing {
   background: var(--jb-playing);
   border-left-color: var(--jb-playing-edge);
+}
+
+.jb-track.is-paused {
+  background: color-mix(in srgb, var(--jb-soft) 70%, #fff);
+  border-left-color: var(--jb-muted);
+}
+
+.jb-fade-sec {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  margin-right: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--jb-muted);
+  white-space: nowrap;
+}
+
+.jb-fade-sec input[type="number"] {
+  width: 3.2em;
+  height: 20px;
+  padding: 0 2px;
+  border: 1px solid var(--jb-line);
+  border-radius: 3px;
+  background: var(--jb-paper);
+  color: var(--jb-ink);
+  font-size: 11px;
+  text-align: right;
+}
+
+.jb-track-scrub {
+  width: 100%;
+  min-width: 0;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--jb-accent);
+}
+
+.jb-soundboard .jb-fold-hint {
+  margin-left: auto;
+}
+
+.jb-pad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px;
+}
+
+.jb-pad {
+  position: relative;
+  min-height: 44px;
+  border: 1px dashed var(--jb-line);
+  border-radius: 4px;
+  background: var(--jb-paper);
+}
+
+.jb-pad.is-filled {
+  border-style: solid;
+  background: linear-gradient(180deg, #fffaf2 0%, #f3ebe0 100%);
+}
+
+.jb-pad.is-drop-target {
+  outline: 2px solid var(--jb-accent);
+  outline-offset: -1px;
+}
+
+.jb-pad-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: 4px 22px 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--jb-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.jb-pad-hit:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.jb-pad-index {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--jb-muted);
+}
+
+.jb-pad-name {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.jb-pad-clear {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+}
+
+.jb-pad-clear .material-icons {
+  font-size: 14px;
 }
 
 .jb-track.is-weather {

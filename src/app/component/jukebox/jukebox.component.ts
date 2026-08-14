@@ -8,8 +8,8 @@ import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
-import { Jukebox, JUKEBOX_TRACK_COUNT, JUKEBOX_WEATHER_TRACK, JukeboxTrackState } from '@udonarium/Jukebox';
-import { PresetSound } from '@udonarium/sound-effect';
+import { Jukebox, JUKEBOX_TRACK_COUNT, JUKEBOX_WEATHER_TRACK, JUKEBOX_TRANSPORT_MAX, SOUNDBOARD_SLOT_COUNT, JukeboxTrackState, SoundboardSlot } from '@udonarium/Jukebox';
+import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 
@@ -43,6 +43,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   dragAudioIds: string[] = [];
   dropFolderId: string | null = null;
   dropTrackIndex: number | null = null;
+  /** Soundboard pad drop highlight. */
+  dropPadIndex: number | null = null;
   /** Insert index in folder list (before removal); null = not in reorder mode. */
   dropInsertIndex: number | null = null;
   dropReorderFolderId: string | null = null;
@@ -193,6 +195,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   readonly auditionPlayer: AudioPlayer = new AudioPlayer();
   private lazyUpdateTimer: NodeJS.Timeout = null;
+  private progressTimer: ReturnType<typeof setInterval> | null = null;
   private readonly soundTestPlayer: AudioPlayer = new AudioPlayer();
   private readonly noticeTestPlayer: AudioPlayer = new AudioPlayer();
 
@@ -259,13 +262,126 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.weatherSe.setOverlapSec(Number(sec));
   }
 
+  get trackFadeSec(): number {
+    return this.jukebox?.effectiveTrackFadeSec ?? 2.5;
+  }
+
+  setTrackFadeSec(sec: number) {
+    if (this.GuestMode()) return;
+    this.jukebox?.setTrackFadeSec(Number(sec));
+  }
+
   get weatherSePlaying(): boolean {
     return this.weatherSe.isEnabled && this.weatherSe.isPlaying;
+  }
+
+  get soundboardSlots(): SoundboardSlot[] {
+    return this.jukebox?.soundboard || Array.from({ length: SOUNDBOARD_SLOT_COUNT }, () => ({ audioIdentifier: '', label: '' }));
+  }
+
+  playOrResumeTrack(index: number, audio: AudioFile) {
+    if (this.GuestMode() || !this.jukebox || index > JUKEBOX_TRANSPORT_MAX) return;
+    const t = this.tracks[index];
+    if (t?.isPlaying && t.isPaused) {
+      this.jukebox.resumeTrack(index);
+      return;
+    }
+    if (t?.isPlaying && !t.isPaused) return;
+    if (audio) this.assignAndPlay(audio, index);
+  }
+
+  pauseTrack(index: number) {
+    if (this.GuestMode()) return;
+    this.jukebox?.pauseTrack(index);
+  }
+
+  trackProgress(index: number): number {
+    const t = this.tracks[index];
+    if (!t?.isPlaying) return 0;
+    if (t.isPaused) return t.currentTime || 0;
+    return this.jukebox?.localCurrentTime(index) || t.currentTime || 0;
+  }
+
+  trackDuration(index: number): number {
+    return this.jukebox?.localDuration(index) || 0;
+  }
+
+  seekTrack(index: number, time: number) {
+    if (this.GuestMode()) return;
+    this.jukebox?.seekTrack(index, Number(time));
+  }
+
+  formatTime(sec: number): string {
+    if (!sec || !isFinite(sec)) return '0:00';
+    const s = Math.max(0, Math.floor(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r < 10 ? '0' : ''}${r}`;
+  }
+
+  padDisplayName(index: number): string {
+    const slot = this.soundboardSlots[index];
+    if (!slot?.audioIdentifier) return this.i18n.t('jukebox.soundboardEmpty');
+    if (slot.label) return slot.label;
+    const audio = AudioStorage.instance.get(slot.audioIdentifier);
+    return audio ? this.displayName(audio) : slot.audioIdentifier;
+  }
+
+  padTitle(index: number): string {
+    const slot = this.soundboardSlots[index];
+    if (!slot?.audioIdentifier) return this.i18n.t('jukebox.soundboardDropHint');
+    return this.padDisplayName(index);
+  }
+
+  triggerPad(index: number) {
+    if (this.GuestMode()) return;
+    const slot = this.soundboardSlots[index];
+    if (!slot?.audioIdentifier) return;
+    const audio = AudioStorage.instance.get(slot.audioIdentifier);
+    if (audio?.isReady) SoundEffect.play(audio);
+  }
+
+  clearPad(index: number, event?: Event) {
+    event?.stopPropagation();
+    if (this.GuestMode()) return;
+    this.jukebox?.clearSoundboardSlot(index);
+  }
+
+  onPadDragOver(event: DragEvent, index: number) {
+    if (!this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    if (this.dropPadIndex !== index) this.dropPadIndex = index;
+  }
+
+  onPadDragLeave(event: DragEvent, index: number) {
+    const related = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement | null;
+    if (current && related && current.contains(related)) return;
+    if (this.dropPadIndex === index) this.dropPadIndex = null;
+  }
+
+  onPadDrop(event: DragEvent, index: number) {
+    if (!this.isAudioDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const ids = this.readDragAudioIds(event);
+    this.clearDropState();
+    const id = ids[0];
+    if (!id || this.GuestMode() || !this.jukebox) return;
+    const audio = AudioStorage.instance.get(id);
+    if (!audio?.isReady) return;
+    this.jukebox.setSoundboardSlot(index, id, this.displayName(audio));
   }
 
   ngOnInit() {
     Promise.resolve().then(() => this.refreshPanelTitle());
     this.auditionPlayer.volumeType = VolumeType.AUDITION;
+    this.progressTimer = setInterval(() => {
+      const playing = this.tracks.some((t, i) => i <= 3 && t?.isPlaying && !t?.isPaused);
+      if (playing) this.ngZone.run(() => { });
+    }, 250);
     EventSystem.register(this)
       .on('*', event => {
         if (event.eventName.startsWith('FILE_') || event.eventName.startsWith('UPDATE_GAME_OBJECT')) this.lazyNgZoneUpdate();
@@ -275,6 +391,10 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+    if (this.progressTimer != null) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
     this.stop();
   }
 
@@ -1023,6 +1143,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.dragAudioIds = [];
     this.dropFolderId = null;
     this.dropTrackIndex = null;
+    this.dropPadIndex = null;
     this.dropInsertIndex = null;
     this.dropReorderFolderId = null;
     this.dropFileFolderId = null;

@@ -6,12 +6,15 @@ import { GameObject, ObjectContext } from './core/synchronize-object/game-object
 import { InnerXml } from './core/synchronize-object/object-serializer';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem } from './core/system';
-import { AudioLibrary } from './audio-library';
 
 export const JUKEBOX_TRACK_COUNT = 5;
 /** Local-only weather SE slot (index 4 / track 5). Does not sync tracksJson. */
 export const JUKEBOX_WEATHER_TRACK = 4;
+/** Highest index that supports room-synced pause/scrub/fade (tracks 0–3). */
+export const JUKEBOX_TRANSPORT_MAX = 3;
 export const MUSIC_HUD_SLOT_COUNT = 3;
+export const SOUNDBOARD_SLOT_COUNT = 8;
+export const JUKEBOX_DUCK_FACTOR = 0.25;
 
 export type JukeboxQueueMode =
   | 'single'
@@ -23,6 +26,8 @@ export type JukeboxQueueMode =
 export interface JukeboxTrackState {
   audioIdentifier: string;
   isPlaying: boolean;
+  isPaused: boolean;
+  currentTime: number;
   isLoop: boolean;
   roomGain: number;
   label: string;
@@ -30,16 +35,27 @@ export interface JukeboxTrackState {
   queueMode: JukeboxQueueMode;
 }
 
+export interface SoundboardSlot {
+  audioIdentifier: string;
+  label: string;
+}
+
 function emptyTrack(): JukeboxTrackState {
   return {
     audioIdentifier: '',
     isPlaying: false,
+    isPaused: false,
+    currentTime: 0,
     isLoop: true,
     roomGain: 1,
     label: '',
     queue: [],
     queueMode: 'single',
   };
+}
+
+function emptyPad(): SoundboardSlot {
+  return { audioIdentifier: '', label: '' };
 }
 
 function normalizeQueueMode(raw: any): JukeboxQueueMode {
@@ -59,9 +75,14 @@ function normalizeTracks(raw: any): JukeboxTrackState[] {
     const queue = Array.isArray(t.queue)
       ? t.queue.filter((id: any) => typeof id === 'string' && id)
       : [];
+    const isPlaying = !!t.isPlaying;
     list.push({
       audioIdentifier: typeof t.audioIdentifier === 'string' ? t.audioIdentifier : '',
-      isPlaying: !!t.isPlaying,
+      isPlaying,
+      isPaused: isPlaying && !!t.isPaused && i <= JUKEBOX_TRANSPORT_MAX,
+      currentTime: typeof t.currentTime === 'number' && isFinite(t.currentTime)
+        ? Math.max(0, t.currentTime)
+        : 0,
       isLoop: t.isLoop !== false,
       roomGain: typeof t.roomGain === 'number' && isFinite(t.roomGain)
         ? Math.max(0, Math.min(1, t.roomGain))
@@ -69,6 +90,19 @@ function normalizeTracks(raw: any): JukeboxTrackState[] {
       label: typeof t.label === 'string' ? t.label : '',
       queue,
       queueMode: normalizeQueueMode(t.queueMode),
+    });
+  }
+  return list;
+}
+
+function normalizeSoundboard(raw: any): SoundboardSlot[] {
+  const src = Array.isArray(raw) ? raw : [];
+  const list: SoundboardSlot[] = [];
+  for (let i = 0; i < SOUNDBOARD_SLOT_COUNT; i++) {
+    const s = src[i] || {};
+    list.push({
+      audioIdentifier: typeof s.audioIdentifier === 'string' ? s.audioIdentifier : '',
+      label: typeof s.label === 'string' ? s.label : '',
     });
   }
   return list;
@@ -83,6 +117,11 @@ function shuffleIds(ids: string[]): string[] {
     arr[j] = tmp;
   }
   return arr;
+}
+
+function clampTrackFadeSec(sec: number): number {
+  if (!isFinite(sec)) return 2.5;
+  return Math.max(0, Math.min(15, Math.round(sec * 10) / 10));
 }
 
 @SyncObject('jukebox')
@@ -101,9 +140,18 @@ export class Jukebox extends GameObject implements InnerXml {
    */
   @SyncVar() weatherLoopOverlapSec: number = 6;
 
+  /** Room-synced fade / crossfade seconds for tracks 0–3 (0 = hard cut). */
+  @SyncVar() trackFadeSec: number = 2.5;
+
+  /** Room-synced soundboard pads (8 slots). */
+  @SyncVar() soundboardJson: string = '';
+
   private audioPlayers: AudioPlayer[] = [];
+  /** Outgoing player during crossfade (per track). */
+  private crossfadePlayers: (AudioPlayer | null)[] = [];
   private waitingFileUpdate: boolean[] = [];
   private migrated = false;
+  private duckRefCount = 0;
 
   /** Singleton used by ZIP save/load (fly_jukebox.xml). */
   static get instance(): Jukebox {
@@ -134,6 +182,18 @@ export class Jukebox extends GameObject implements InnerXml {
 
   set tracks(value: JukeboxTrackState[]) {
     this.tracksJson = JSON.stringify(normalizeTracks(value));
+  }
+
+  get soundboard(): SoundboardSlot[] {
+    try {
+      return normalizeSoundboard(this.soundboardJson ? JSON.parse(this.soundboardJson) : []);
+    } catch {
+      return normalizeSoundboard([]);
+    }
+  }
+
+  set soundboard(value: SoundboardSlot[]) {
+    this.soundboardJson = JSON.stringify(normalizeSoundboard(value));
   }
 
   /** Compat: currently playing BGM on track 0. */
@@ -187,7 +247,7 @@ export class Jukebox extends GameObject implements InnerXml {
     try {
       AudioPlayer.ensureContextRunning();
       this.ensurePlayer(index);
-      this._stopTrack(index, false);
+      this._stopTrack(index, false, true);
       const audio = AudioFile.create(url);
       const player = this.audioPlayers[index];
       player.loop = !!isLoop;
@@ -203,7 +263,7 @@ export class Jukebox extends GameObject implements InnerXml {
   /** Stop local built-in playback without clearing synced assignment. */
   stopBuiltInLocal(index: number) {
     if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
-    this._stopTrack(index);
+    this._stopTrack(index, true, true);
   }
 
   /** True when the local player for a track is currently audible (not paused). */
@@ -213,6 +273,17 @@ export class Jukebox extends GameObject implements InnerXml {
     return !!(player && !player.paused);
   }
 
+  /** Local playback clock for UI progress (0 if idle). */
+  localCurrentTime(index: number): number {
+    if (index < 0 || index >= this.audioPlayers.length) return 0;
+    return this.audioPlayers[index]?.currentTime ?? 0;
+  }
+
+  localDuration(index: number): number {
+    if (index < 0 || index >= this.audioPlayers.length) return 0;
+    return this.audioPlayers[index]?.duration ?? 0;
+  }
+
   /** Clamp and publish weather SE crossfade seconds (room-synced). */
   setWeatherLoopOverlapSec(sec: number) {
     const n = typeof sec === 'number' ? sec : Number(sec);
@@ -220,6 +291,16 @@ export class Jukebox extends GameObject implements InnerXml {
     const clamped = Math.max(0, Math.min(30, Math.round(n * 10) / 10));
     if (this.weatherLoopOverlapSec === clamped) return;
     this.weatherLoopOverlapSec = clamped;
+  }
+
+  setTrackFadeSec(sec: number) {
+    const clamped = clampTrackFadeSec(typeof sec === 'number' ? sec : Number(sec));
+    if (this.trackFadeSec === clamped) return;
+    this.trackFadeSec = clamped;
+  }
+
+  get effectiveTrackFadeSec(): number {
+    return clampTrackFadeSec(this.trackFadeSec);
   }
 
   /** Assign audio to a track without starting playback. */
@@ -242,18 +323,22 @@ export class Jukebox extends GameObject implements InnerXml {
     const audio = AudioStorage.instance.get(identifier);
     if (!audio || !audio.isReady) return;
     this.ensureMigrated();
+    const prev = this.tracks[index];
+    const switching = !!(prev?.isPlaying && prev.audioIdentifier && prev.audioIdentifier !== identifier);
     const next = this.tracks;
     next[index] = {
       ...next[index],
       audioIdentifier: identifier,
       isPlaying: true,
+      isPaused: false,
+      currentTime: 0,
       isLoop: !!isLoop,
       queue: [],
       queueMode: 'single',
     };
     this.tracks = next;
     this.syncLegacyFields();
-    this._playTrack(index);
+    this._playTrack(index, { crossfade: switching && index <= JUKEBOX_TRANSPORT_MAX });
   }
 
   /**
@@ -281,19 +366,23 @@ export class Jukebox extends GameObject implements InnerXml {
         ...next[index],
         audioIdentifier: queue[0],
         isPlaying: true,
+        isPaused: false,
+        currentTime: 0,
         isLoop: false,
         queue,
         queueMode: mode,
       };
       this.tracks = next;
       this.syncLegacyFields();
-      this._playTrack(index);
+      this._playTrack(index, { crossfade: index <= JUKEBOX_TRANSPORT_MAX && !!this.audioPlayers[index] && !this.audioPlayers[index].paused });
       return;
     } else {
       next[index] = {
         ...next[index],
         audioIdentifier: ids[0],
         isPlaying: true,
+        isPaused: false,
+        currentTime: 0,
         isLoop: !!isLoopSingle,
         queue: [],
         queueMode: 'single',
@@ -312,12 +401,64 @@ export class Jukebox extends GameObject implements InnerXml {
       ...next[index],
       audioIdentifier: next[index].audioIdentifier,
       isPlaying: false,
+      isPaused: false,
+      currentTime: 0,
       queue: [],
       queueMode: 'single',
     };
     this.tracks = next;
     this.syncLegacyFields();
-    this._stopTrack(index);
+    this._stopTrack(index, true, false);
+  }
+
+  /** Pause a transport track (0–3); room-synced. */
+  pauseTrack(index: number) {
+    if (index < 0 || index > JUKEBOX_TRANSPORT_MAX) return;
+    this.ensureMigrated();
+    const track = this.tracks[index];
+    if (!track?.isPlaying || track.isPaused) return;
+    this.ensurePlayer(index);
+    const t = this.audioPlayers[index]?.currentTime ?? track.currentTime ?? 0;
+    this.audioPlayers[index]?.pause();
+    const next = this.tracks;
+    next[index] = { ...next[index], isPaused: true, currentTime: t };
+    this.tracks = next;
+    this.syncLegacyFields();
+  }
+
+  /** Resume a paused transport track; room-synced. */
+  resumeTrack(index: number) {
+    if (index < 0 || index > JUKEBOX_TRANSPORT_MAX) return;
+    this.ensureMigrated();
+    const track = this.tracks[index];
+    if (!track?.isPlaying || !track.isPaused) return;
+    const next = this.tracks;
+    next[index] = { ...next[index], isPaused: false };
+    this.tracks = next;
+    this.syncLegacyFields();
+    this.ensurePlayer(index);
+    const player = this.audioPlayers[index];
+    if (player && !player.paused) return;
+    if (player && player.audio?.identifier === track.audioIdentifier) {
+      player.currentTime = track.currentTime || 0;
+      player.resume();
+      return;
+    }
+    this._playTrack(index, { startAt: track.currentTime || 0, fadeIn: false });
+  }
+
+  /** Seek a transport track; room-synced. */
+  seekTrack(index: number, time: number) {
+    if (index < 0 || index > JUKEBOX_TRANSPORT_MAX) return;
+    this.ensureMigrated();
+    const track = this.tracks[index];
+    if (!track?.audioIdentifier) return;
+    const t = Math.max(0, isFinite(time) ? time : 0);
+    this.ensurePlayer(index);
+    if (this.audioPlayers[index]) this.audioPlayers[index].currentTime = t;
+    const next = this.tracks;
+    next[index] = { ...next[index], currentTime: t };
+    this.tracks = next;
   }
 
   /** Stop and clear assigned audio. */
@@ -328,7 +469,7 @@ export class Jukebox extends GameObject implements InnerXml {
     next[index] = { ...emptyTrack(), roomGain: next[index].roomGain, label: next[index].label };
     this.tracks = next;
     this.syncLegacyFields();
-    this._stopTrack(index);
+    this._stopTrack(index, true, true);
   }
 
   stopAll() {
@@ -336,6 +477,8 @@ export class Jukebox extends GameObject implements InnerXml {
     this.tracks = normalizeTracks([]).map((t, i) => ({
       ...t,
       isPlaying: false,
+      isPaused: false,
+      currentTime: 0,
       audioIdentifier: '',
       queue: [],
       queueMode: 'single' as JukeboxQueueMode,
@@ -366,16 +509,50 @@ export class Jukebox extends GameObject implements InnerXml {
     this.tracks = next;
   }
 
+  setSoundboardSlot(index: number, audioIdentifier: string, label = '') {
+    if (index < 0 || index >= SOUNDBOARD_SLOT_COUNT) return;
+    const next = this.soundboard;
+    next[index] = {
+      audioIdentifier: audioIdentifier || '',
+      label: label || '',
+    };
+    this.soundboard = next;
+  }
+
+  clearSoundboardSlot(index: number) {
+    this.setSoundboardSlot(index, '', '');
+  }
+
   /** Toggle play/stop for a track that already has an assigned audio (HUD). */
   toggleTrackPlayback(index: number) {
     if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
     const track = this.tracks[index];
     if (!track?.audioIdentifier) return;
-    if (track.isPlaying) {
-      this.stopTrack(index);
+    if (track.isPlaying && !track.isPaused) {
+      if (index <= JUKEBOX_TRANSPORT_MAX) this.pauseTrack(index);
+      else this.stopTrack(index);
+      return;
+    }
+    if (track.isPlaying && track.isPaused) {
+      this.resumeTrack(index);
       return;
     }
     this.playTrack(index, track.audioIdentifier, track.isLoop !== false);
+  }
+
+  beginDuck() {
+    this.duckRefCount++;
+    if (this.duckRefCount === 1) this.applyDuckFactors();
+  }
+
+  endDuck() {
+    if (this.duckRefCount < 1) return;
+    this.duckRefCount--;
+    if (this.duckRefCount === 0) this.applyDuckFactors();
+  }
+
+  get isDucked(): boolean {
+    return this.duckRefCount > 0;
   }
 
   snapshotTracksJson(): string {
@@ -393,11 +570,18 @@ export class Jukebox extends GameObject implements InnerXml {
       const was = prev[i];
       const now = next[i];
       if (now.isPlaying && (was.audioIdentifier !== now.audioIdentifier || !was.isPlaying || was.isLoop !== now.isLoop)) {
-        this._playTrack(i);
+        const switching = was.isPlaying && was.audioIdentifier !== now.audioIdentifier;
+        this._playTrack(i, {
+          crossfade: switching && i <= JUKEBOX_TRANSPORT_MAX,
+          startAt: now.currentTime || 0,
+          paused: now.isPaused,
+        });
       } else if (was.isPlaying && !now.isPlaying) {
-        this._stopTrack(i);
+        this._stopTrack(i, true, false);
       } else if (now.isPlaying && was.roomGain !== now.roomGain) {
         this.applyRoomGain(i);
+      } else if (now.isPlaying) {
+        this.syncTransportLocal(i, was, now);
       }
     }
   }
@@ -416,14 +600,22 @@ export class Jukebox extends GameObject implements InnerXml {
         const was = prev[i] || emptyTrack();
         const now = next[i];
         if (now.isPlaying && (was.audioIdentifier !== now.audioIdentifier || !was.isPlaying)) {
-          this._playTrack(i);
+          const switching = was.isPlaying && was.audioIdentifier !== now.audioIdentifier;
+          this._playTrack(i, {
+            crossfade: switching && i <= JUKEBOX_TRANSPORT_MAX,
+            startAt: now.currentTime || 0,
+            paused: now.isPaused,
+            fadeIn: !was.isPlaying,
+          });
         } else if (was.isPlaying && !now.isPlaying) {
-          this._stopTrack(i);
+          this._stopTrack(i, true, false);
         } else if (now.isPlaying && was.roomGain !== now.roomGain) {
           this.applyRoomGain(i);
         } else if (now.isPlaying && was.isLoop !== now.isLoop) {
           this.ensurePlayer(i);
           this.audioPlayers[i].loop = now.isLoop;
+        } else if (now.isPlaying) {
+          this.syncTransportLocal(i, was, now);
         }
       }
     }
@@ -436,8 +628,10 @@ export class Jukebox extends GameObject implements InnerXml {
       const i = this.audioPlayers.length;
       const player = new AudioPlayer();
       player.volumeType = i === 0 ? VolumeType.MASTER : VolumeType.AMBIENT;
+      player.setDuckFactor(this.duckRefCount > 0 && i <= JUKEBOX_TRANSPORT_MAX ? JUKEBOX_DUCK_FACTOR : 1);
       this.audioPlayers.push(player);
     }
+    while (this.crossfadePlayers.length <= index) this.crossfadePlayers.push(null);
     while (this.waitingFileUpdate.length <= index) {
       this.waitingFileUpdate.push(false);
     }
@@ -481,25 +675,103 @@ export class Jukebox extends GameObject implements InnerXml {
     this.isLoop = t0.isLoop;
   }
 
-  private _playTrack(index: number) {
+  private syncTransportLocal(index: number, was: JukeboxTrackState, now: JukeboxTrackState) {
+    if (index > JUKEBOX_TRANSPORT_MAX) return;
     this.ensurePlayer(index);
-    this._stopTrack(index, false);
+    const player = this.audioPlayers[index];
+    if (!player) return;
+
+    if (was.isPaused !== now.isPaused) {
+      if (now.isPaused) {
+        player.pause();
+      } else {
+        player.currentTime = now.currentTime || 0;
+        player.resume();
+      }
+    } else if (Math.abs((was.currentTime || 0) - (now.currentTime || 0)) > 0.35) {
+      player.currentTime = now.currentTime || 0;
+    }
+  }
+
+  private _playTrack(
+    index: number,
+    opts: { crossfade?: boolean; startAt?: number; paused?: boolean; fadeIn?: boolean } = {},
+  ) {
+    this.ensurePlayer(index);
     const track = this.tracks[index];
     const audio = track.audioIdentifier ? AudioStorage.instance.get(track.audioIdentifier) : null;
     if (!audio || !audio.isReady) {
       this.playAfterFileUpdate(index);
       return;
     }
+
+    const fadeSec = index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveTrackFadeSec : 0;
+    const useCrossfade = !!(opts.crossfade && fadeSec > 0 && this.audioPlayers[index] && !this.audioPlayers[index].paused);
+    const fadeIn = opts.fadeIn !== false && index <= JUKEBOX_TRANSPORT_MAX && fadeSec > 0 && !opts.paused;
+
+    if (useCrossfade) {
+      this.beginCrossfade(index, audio, track, opts.startAt || 0);
+      return;
+    }
+
+    this.disposeCrossfade(index);
     const player = this.audioPlayers[index];
+    player.endedAction = null;
     player.loop = track.isLoop;
     player.volume = track.roomGain;
+    player.setDuckFactor(this.duckRefCount > 0 && index <= JUKEBOX_TRANSPORT_MAX ? JUKEBOX_DUCK_FACTOR : 1);
     player.endedAction = () => this.onTrackEnded(index);
-    player.play(audio);
+
+    if (fadeIn) {
+      player.playWithFadeIn(audio, fadeSec, opts.startAt || 0);
+    } else {
+      player.play(audio);
+      if (opts.startAt) player.currentTime = opts.startAt;
+    }
+
+    if (opts.paused) {
+      // Allow element to load then pause.
+      window.setTimeout(() => {
+        if (!this.tracks[index]?.isPaused) return;
+        player.currentTime = opts.startAt || this.tracks[index].currentTime || 0;
+        player.pause();
+      }, 80);
+    }
+  }
+
+  private beginCrossfade(index: number, audio: AudioFile, track: JukeboxTrackState, startAt: number) {
+    const fadeSec = this.effectiveTrackFadeSec;
+    const outgoing = this.audioPlayers[index];
+    outgoing.endedAction = null;
+
+    const incoming = new AudioPlayer();
+    incoming.volumeType = index === 0 ? VolumeType.MASTER : VolumeType.AMBIENT;
+    incoming.loop = track.isLoop;
+    incoming.volume = track.roomGain;
+    incoming.setDuckFactor(this.duckRefCount > 0 ? JUKEBOX_DUCK_FACTOR : 1);
+    incoming.endedAction = () => this.onTrackEnded(index);
+
+    this.disposeCrossfade(index);
+    this.crossfadePlayers[index] = outgoing;
+    this.audioPlayers[index] = incoming;
+
+    incoming.playWithFadeIn(audio, fadeSec, startAt);
+    void outgoing.stopWithFadeOut(fadeSec).then(() => {
+      if (this.crossfadePlayers[index] === outgoing) this.crossfadePlayers[index] = null;
+    });
+  }
+
+  private disposeCrossfade(index: number) {
+    const xf = this.crossfadePlayers[index];
+    if (!xf) return;
+    xf.endedAction = null;
+    xf.stop();
+    this.crossfadePlayers[index] = null;
   }
 
   private onTrackEnded(index: number) {
     const track = this.tracks[index];
-    if (!track || !track.isPlaying) return;
+    if (!track || !track.isPlaying || track.isPaused) return;
 
     if (
       track.queueMode === 'shuffle-loop' || track.queueMode === 'shuffle-once'
@@ -528,12 +800,14 @@ export class Jukebox extends GameObject implements InnerXml {
         queue: nextQueue,
         audioIdentifier: nextId,
         isPlaying: true,
+        isPaused: false,
+        currentTime: 0,
         isLoop: false,
         queueMode: track.queueMode,
       };
       this.tracks = next;
       this.syncLegacyFields();
-      this._playTrack(index);
+      this._playTrack(index, { crossfade: index <= JUKEBOX_TRANSPORT_MAX });
       return;
     }
 
@@ -545,16 +819,22 @@ export class Jukebox extends GameObject implements InnerXml {
     }
   }
 
-  private _stopTrack(index: number, unregister = true) {
+  private _stopTrack(index: number, unregister = true, hard = false) {
     if (unregister) this.unregisterFileWait(index);
-    if (this.audioPlayers[index]) {
-      this.audioPlayers[index].endedAction = null;
-      this.audioPlayers[index].stop();
+    this.disposeCrossfade(index);
+    if (!this.audioPlayers[index]) return;
+    const player = this.audioPlayers[index];
+    player.endedAction = null;
+    const fadeSec = !hard && index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveTrackFadeSec : 0;
+    if (fadeSec > 0 && !player.paused) {
+      void player.stopWithFadeOut(fadeSec);
+    } else {
+      player.stop();
     }
   }
 
   private stopAllLocal() {
-    for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) this._stopTrack(i);
+    for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) this._stopTrack(i, true, true);
   }
 
   private applyRoomGain(index: number) {
@@ -562,6 +842,24 @@ export class Jukebox extends GameObject implements InnerXml {
     const track = this.tracks[index];
     if (this.audioPlayers[index]) {
       this.audioPlayers[index].volume = track.roomGain;
+    }
+    if (this.crossfadePlayers[index]) {
+      this.crossfadePlayers[index].volume = track.roomGain;
+    }
+  }
+
+  private applyDuckFactors() {
+    const factor = this.duckRefCount > 0 ? JUKEBOX_DUCK_FACTOR : 1;
+    const fadeSec = this.effectiveTrackFadeSec;
+    for (let i = 0; i <= JUKEBOX_TRANSPORT_MAX; i++) {
+      if (!this.audioPlayers[i]) continue;
+      // Snap duck factor; perceptual ramp via playbackFactor would fight track fades.
+      this.audioPlayers[i].setDuckFactor(factor);
+      if (this.crossfadePlayers[i]) this.crossfadePlayers[i].setDuckFactor(factor);
+      if (fadeSec > 0) {
+        // Mild soften when engaging/releasing duck by nudging playbackFactor briefly.
+        void this.audioPlayers[i].fadePlaybackFactorTo(1, Math.min(fadeSec, 1.5));
+      }
     }
   }
 
@@ -579,7 +877,8 @@ export class Jukebox extends GameObject implements InnerXml {
         const audio = this.audioAt(index);
         if (audio && audio.isReady) {
           this.unregisterFileWait(index);
-          this._playTrack(index);
+          const t = this.tracks[index];
+          this._playTrack(index, { startAt: t.currentTime || 0, paused: t.isPaused });
         }
       });
   }
@@ -599,7 +898,8 @@ export class Jukebox extends GameObject implements InnerXml {
         if (!this.tracks[i]?.isPlaying) continue;
         this.ensurePlayer(i);
         this.audioPlayers[i].stop();
-        this._playTrack(i);
+        const t = this.tracks[i];
+        this._playTrack(i, { startAt: t.currentTime || 0, paused: t.isPaused, fadeIn: false });
       }
       // Weather SE is local-only (not tracksJson.isPlaying); ask service to retry.
       EventSystem.trigger('JUKEBOX_AUDIO_UNLOCKED', null);
