@@ -35,6 +35,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   private dragOffsetY = 0;
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
+  private progressTimer: ReturnType<typeof setInterval> | null = null;
   private positionedDefault = false;
   private mobileSub: { unsubscribe: () => void } | null = null;
 
@@ -97,6 +98,9 @@ export class MusicHudComponent implements OnInit, OnDestroy {
       .on('UPDATE_GAME_OBJECT', () => this.lazyNgZoneUpdate())
       .on('UPDATE_AUDIO_RESOURE', () => this.lazyNgZoneUpdate())
       .on('FILE_LOADED', () => this.lazyNgZoneUpdate());
+    this.progressTimer = setInterval(() => {
+      if (this.slotIndexes.some(i => this.isPlaying(i))) this.changeDetector.markForCheck();
+    }, 250);
     document.addEventListener('pointermove', this.onPointerMove);
     document.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('resize', this.onResize);
@@ -105,6 +109,10 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.mobileSub?.unsubscribe();
     this.mobileSub = null;
+    if (this.progressTimer != null) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
     EventSystem.unregister(this);
     document.removeEventListener('pointermove', this.onPointerMove);
     document.removeEventListener('pointerup', this.onPointerUp);
@@ -133,7 +141,32 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   }
 
   isPlaying(index: number): boolean {
-    return !!this.jukebox?.tracks[index]?.isPlaying;
+    const t = this.jukebox?.tracks[index];
+    return !!(t?.isPlaying && !t?.isPaused);
+  }
+
+  trackProgress(index: number): number {
+    const t = this.jukebox?.tracks[index];
+    if (!t?.isPlaying) return 0;
+    if (t.isPaused) return t.currentTime || 0;
+    return this.jukebox?.localCurrentTime(index) || t.currentTime || 0;
+  }
+
+  trackDuration(index: number): number {
+    return this.jukebox?.localDuration(index) || 0;
+  }
+
+  seekTrack(index: number, time: number) {
+    if (!this.canControl) return;
+    this.jukebox?.seekTrack(index, Number(time));
+  }
+
+  formatTime(sec: number): string {
+    if (!sec || !isFinite(sec)) return '0:00';
+    const s = Math.max(0, Math.floor(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r < 10 ? '0' : ''}${r}`;
   }
 
   hasAudio(index: number): boolean {

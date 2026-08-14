@@ -88,6 +88,9 @@ export class FileArchiver {
     this.load(files);
   };
 
+  /** True when the outermost load batch opened at least one ZIP (room archive path). */
+  private loadHadZip = false;
+
   async load(files: File[]): Promise<void>
   async load(files: FileList): Promise<void>
   async load(files: any): Promise<void> {
@@ -95,6 +98,7 @@ export class FileArchiver {
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
     this.loadDepth++;
+    if (this.loadDepth === 1) this.loadHadZip = false;
     const nameService = AudioImportNameService.instance;
     nameService?.beginBatch();
     try {
@@ -105,14 +109,14 @@ export class FileArchiver {
         await this.handleVideo(file);
         await this.handleAudioUrlManifest(file);
         await this.handleText(file);
-        await this.handleZip(file);
+        if (await this.handleZip(file)) this.loadHadZip = true;
         EventSystem.trigger('FILE_LOADED', { file: file });
       }
     } finally {
       nameService?.endBatch();
       this.loadDepth--;
-      // Fire once after the outermost load (whole ZIP or single file batch) finishes.
-      if (this.loadDepth === 0) {
+      // Only after a ZIP batch: audio/image drops must not remount table tokens.
+      if (this.loadDepth === 0 && this.loadHadZip) {
         poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
           fileCount: loadFiles.length,
           names: loadFiles.map(f => f.name).slice(0, 20),
@@ -226,19 +230,26 @@ export class FileArchiver {
     }
   }
 
-  private async handleZip(file: File) {
-    if (!(0 <= file.type.indexOf('application/') || file.type.length < 1)) return;
+  /** @returns true when the file was opened as a ZIP with at least one entry. */
+  private async handleZip(file: File): Promise<boolean> {
+    if (!(0 <= file.type.indexOf('application/') || file.type.length < 1)) return false;
 
-    let zipReader = new ZipReader(new BlobReader(file));
-    let entries = await zipReader.getEntries();
+    try {
+      const zipReader = new ZipReader(new BlobReader(file));
+      const entries = await zipReader.getEntries();
+      if (!entries?.length) return false;
 
-    for (let entry of entries) {
-      try {
-        let blob = await entry.getData(new BlobWriter());
-        await this.load([new File([blob], entry.filename, { type: MimeType.type(entry.filename) })]);
-      } catch (reason) {
-        console.warn(reason);
+      for (let entry of entries) {
+        try {
+          let blob = await entry.getData(new BlobWriter());
+          await this.load([new File([blob], entry.filename, { type: MimeType.type(entry.filename) })]);
+        } catch (reason) {
+          console.warn(reason);
+        }
       }
+      return true;
+    } catch {
+      return false;
     }
   }
 

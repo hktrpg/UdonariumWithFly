@@ -70,6 +70,18 @@
       >
         <i class="material-icons">{{ isPlaying(i) ? 'stop' : 'play_arrow' }}</i>
       </button>
+      <input
+        *ngIf="isPlaying(i)"
+        class="slot-scrub"
+        type="range"
+        min="0"
+        [max]="trackDuration(i) || 1"
+        step="0.1"
+        [ngModel]="trackProgress(i)"
+        (ngModelChange)="seekTrack(i, $event)"
+        [disabled]="!canControl"
+        [attr.title]="formatTime(trackProgress(i)) + ' / ' + formatTime(trackDuration(i))"
+      />
     </div>
   </div>
 </div>

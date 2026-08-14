@@ -1,5 +1,4 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import * as localForage from 'localforage';
 
 import { Jukebox, JUKEBOX_WEATHER_TRACK } from '@udonarium/Jukebox';
 import { GameTable, WeatherType } from '@udonarium/game-table';
@@ -32,36 +31,25 @@ function resolveAssetUrl(relativePath: string): string {
 }
 
 /**
- * Local weather ambience on Jukebox track 5 (index 4).
- * Local-only playback with crossfade loop — does not sync room BGM assignment.
- * Crossfade length (weatherLoopOverlapSec) is room-synced via Jukebox.
+ * Weather ambience on Jukebox track 5 (index 4).
+ * Enable flag + overlap seconds are room-synced via Jukebox; each client plays locally.
  */
 @Injectable({ providedIn: 'root' })
 export class WeatherSeService implements OnDestroy {
-  static readonly STORAGE_KEY = 'udon.weatherSe.enabled';
-
-  private enabled = true;
   private lastType: WeatherType | null = null;
   private lastUrl = '';
-  private ready = false;
   private needsUnlockRetry = false;
   private readonly loopPlayer = new WeatherLoopPlayer();
 
   constructor() {
-    localForage.getItem<boolean>(WeatherSeService.STORAGE_KEY).then(v => {
-      this.enabled = v !== false; // default true
-      this.ready = true;
-      this.syncFromTable();
-    }).catch(() => {
-      this.ready = true;
-      this.syncFromTable();
-    });
-
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', event => {
         const alias = event?.data?.aliasName;
         if (alias === Jukebox.aliasName || (!alias && event?.data?.identifier === 'Jukebox')) {
           this.applyOverlapFromJukebox();
+          this.applyVolumeFromJukebox();
+          this.syncFromTable();
+          return;
         }
         if (alias && alias !== GameTable.aliasName) return;
         this.syncFromTable();
@@ -69,6 +57,7 @@ export class WeatherSeService implements OnDestroy {
       .on('SELECT_GAME_TABLE', () => this.syncFromTable())
       .on('VIEW_GAME_TABLE', () => this.syncFromTable())
       .on('JUKEBOX_AUDIO_UNLOCKED', () => this.retryAfterUnlock());
+    this.syncFromTable();
   }
 
   ngOnDestroy() {
@@ -77,7 +66,9 @@ export class WeatherSeService implements OnDestroy {
   }
 
   get isEnabled(): boolean {
-    return this.enabled;
+    const j = this.jukebox();
+    if (!j) return true;
+    return j.weatherSeEnabled !== false;
   }
 
   /** True when the local weather loop is currently audible. */
@@ -86,8 +77,7 @@ export class WeatherSeService implements OnDestroy {
   }
 
   setEnabled(enabled: boolean) {
-    this.enabled = !!enabled;
-    localForage.setItem(WeatherSeService.STORAGE_KEY, this.enabled).catch(() => {});
+    this.jukebox()?.setWeatherSeEnabled(!!enabled);
     this.lastType = null;
     this.lastUrl = '';
     this.needsUnlockRetry = false;
@@ -96,10 +86,9 @@ export class WeatherSeService implements OnDestroy {
 
   /** Current room-synced crossfade seconds (falls back to default). */
   get overlapSec(): number {
-    const raw = this.jukebox()?.weatherLoopOverlapSec;
-    return WeatherLoopPlayer.clampOverlapSec(
-      typeof raw === 'number' ? raw : WeatherLoopPlayer.DEFAULT_OVERLAP_SEC,
-    );
+    const j = this.jukebox();
+    if (j) return j.effectiveOverlapSec(JUKEBOX_WEATHER_TRACK);
+    return WeatherLoopPlayer.DEFAULT_OVERLAP_SEC;
   }
 
   setOverlapSec(sec: number) {
@@ -108,8 +97,8 @@ export class WeatherSeService implements OnDestroy {
   }
 
   syncFromTable() {
-    if (!this.ready) return;
     this.applyOverlapFromJukebox();
+    this.applyVolumeFromJukebox();
     const table = TableSelecter.instance?.viewTable;
     const type: WeatherType = table?.weatherType || 'none';
     this.applyWeatherType(type);
@@ -123,8 +112,22 @@ export class WeatherSeService implements OnDestroy {
     this.loopPlayer.setOverlapSeconds(this.overlapSec);
   }
 
+  /** Room-synced weather track roomGain (0–1). */
+  private weatherRoomGain(): number {
+    const g = this.jukebox()?.tracks[JUKEBOX_WEATHER_TRACK]?.roomGain;
+    return typeof g === 'number' && isFinite(g) ? Math.max(0, Math.min(1, g)) : 1;
+  }
+
+  private applyVolumeFromJukebox() {
+    const gain = this.weatherRoomGain();
+    this.loopPlayer.setVolume(gain);
+    if (gain > 0 && this.needsUnlockRetry && this.lastUrl) {
+      this.startPlayback(this.lastUrl);
+    }
+  }
+
   private applyWeatherType(type: WeatherType) {
-    if (!this.enabled || type === 'none') {
+    if (!this.isEnabled || type === 'none') {
       if (this.lastType !== 'none' || this.lastUrl) this.stop();
       this.lastType = 'none';
       this.lastUrl = '';
@@ -158,21 +161,23 @@ export class WeatherSeService implements OnDestroy {
       this.jukebox()?.stopBuiltInLocal(JUKEBOX_WEATHER_TRACK);
     } catch { /* ignore */ }
 
-    if (AudioPlayer.isAmbientMute || AudioPlayer.ambientVolume <= 0) {
+    const roomGain = this.weatherRoomGain();
+    if (roomGain <= 0) {
+      this.loopPlayer.setVolume(0);
       this.needsUnlockRetry = true;
       return;
     }
 
-    const ok = this.loopPlayer.play(url, 1, this.overlapSec);
+    const ok = this.loopPlayer.play(url, roomGain, this.overlapSec);
     this.needsUnlockRetry = !ok;
     window.setTimeout(() => {
-      if (!this.enabled || this.lastUrl !== url) return;
+      if (!this.isEnabled || this.lastUrl !== url) return;
       this.needsUnlockRetry = !this.loopPlayer.isPlaying();
     }, 250);
   }
 
   private retryAfterUnlock() {
-    if (!this.enabled || !this.lastUrl || this.lastType === 'none' || !this.lastType) {
+    if (!this.isEnabled || !this.lastUrl || this.lastType === 'none' || !this.lastType) {
       this.needsUnlockRetry = false;
       return;
     }

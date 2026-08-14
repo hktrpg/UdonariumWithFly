@@ -331,8 +331,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     ImageTag.create(standNoIconImage.identifier).tag = this.i18n.t('sample.tagStand');
 
     try {
-      localForage.getItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY).then(volume => { 
-        if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.volume = volume;
+      localForage.getItem(AudioPlayer.MAIN_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
+        if (typeof volume === 'number' && 0 <= volume && volume <= 1) {
+          AudioPlayer.syncMusicBuses(volume, AudioPlayer.isMute);
+        }
+      });
+      localForage.getItem(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => {
+        AudioPlayer.syncMusicBuses(AudioPlayer.volume, !!isMute);
       });
       localForage.getItem(AudioPlayer.AUDITION_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
         if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.auditionVolume = volume;
@@ -340,17 +345,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       localForage.getItem(AudioPlayer.SOUND_EFFECT_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
         if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.soundEffectVolume = volume;
       });
+      localForage.getItem(AudioPlayer.SOUNDBOARD_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
+        if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.soundboardVolume = volume;
+      });
       localForage.getItem(AudioPlayer.NOTICE_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
         if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.noticeVolume = volume;
       });
-      localForage.getItem(AudioPlayer.AMBIENT_VOLUME_LOCAL_STORAGE_KEY).then(volume => {
-        if (typeof volume === 'number' && 0 <= volume && volume <= 1) AudioPlayer.ambientVolume = volume;
-      });
-      localForage.getItem(AudioPlayer.MAIN_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isMute = !!isMute);
       localForage.getItem(AudioPlayer.AUDITION_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAuditionMute = !!isMute);
       localForage.getItem(AudioPlayer.SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundEffectMute = !!isMute);
+      localForage.getItem(AudioPlayer.SOUNDBOARD_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isSoundboardMute = !!isMute);
       localForage.getItem(AudioPlayer.NOTICE_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isNoticeMute = !!isMute);
-      localForage.getItem(AudioPlayer.AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY).then(isMute => AudioPlayer.isAmbientMute = !!isMute);
       localForage.getItem(ChatWindowComponent.CHAT_IS_NOTICE_ON_LOCAL_STORAGE_KEY).then(isNoticeOn => {
         // Default ON when unset; honor explicit boolean from storage.
         // Keep chat notice toggle and AudioPlayer notice mute in sync.
