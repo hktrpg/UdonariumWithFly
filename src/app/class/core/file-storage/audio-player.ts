@@ -6,7 +6,9 @@ export enum VolumeType {
   AUDITION,
   SOUND_EFFECT,
   NOTICE,
-  AMBIENT
+  AMBIENT,
+  /** Jukebox soundboard pads (separate from system SE). */
+  SOUNDBOARD,
 }
 
 declare global {
@@ -23,12 +25,14 @@ export class AudioPlayer {
   static readonly AUDITION_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-audition-volume-local-storage';
   static readonly MAIN_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-main-volume-local-storage';
   static readonly SOUND_EFFECT_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-sound-effect-volume-local-storage';
+  static readonly SOUNDBOARD_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-soundboard-volume-local-storage';
   static readonly NOTICE_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-notice-volume-local-storage';
   static readonly AMBIENT_VOLUME_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-ambient-volume-local-storage';
 
   static readonly AUDITION_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-audition-is-mute-local-storage';
   static readonly MAIN_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-main-is-mute-local-storage';
   static readonly SOUND_EFFECT_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-sound-effect-is-mute-local-storage';
+  static readonly SOUNDBOARD_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-soundboard-is-mute-local-storage';
   static readonly NOTICE_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-notice-is-mute-local-storage';
   static readonly AMBIENT_IS_MUTE_LOCAL_STORAGE_KEY = 'udonanaumu-audio-player-ambient-is-mute-local-storage';
 
@@ -89,6 +93,21 @@ export class AudioPlayer {
   static set soundEffectVolume(soundEffectVolume: number) {
     AudioPlayer._soundEffectVolume = soundEffectVolume;
     AudioPlayer.applyGain(AudioPlayer._soundEffectGainNode, AudioPlayer.isSoundEffectMute, AudioPlayer._soundEffectVolume);
+    AudioPlayer.refreshElementDirectVolumes();
+  }
+
+  private static _isSoundboardMute: boolean = false;
+  static get isSoundboardMute(): boolean { return AudioPlayer._isSoundboardMute; }
+  static set isSoundboardMute(isSoundboardMute: boolean) {
+    AudioPlayer._isSoundboardMute = isSoundboardMute;
+    AudioPlayer.soundboardVolume = AudioPlayer._soundboardVolume;
+  }
+
+  private static _soundboardVolume: number = 0.5;
+  static get soundboardVolume(): number { return AudioPlayer._soundboardVolume; }
+  static set soundboardVolume(soundboardVolume: number) {
+    AudioPlayer._soundboardVolume = soundboardVolume;
+    AudioPlayer.applyGain(AudioPlayer._soundboardGainNode, AudioPlayer.isSoundboardMute, AudioPlayer._soundboardVolume);
     AudioPlayer.refreshElementDirectVolumes();
   }
 
@@ -178,6 +197,20 @@ export class AudioPlayer {
     return AudioPlayer._soundEffectGainNode;
   }
 
+  private static _soundboardGainNode: GainNode
+  private static get soundboardGainNode(): GainNode {
+    if (!AudioPlayer._soundboardGainNode) {
+      let soundboardGain = AudioPlayer.audioContext.createGain();
+      soundboardGain.gain.setValueAtTime(
+        AudioPlayer.channelGain(AudioPlayer.isSoundboardMute, AudioPlayer._soundboardVolume),
+        AudioPlayer.audioContext.currentTime,
+      );
+      soundboardGain.connect(AudioPlayer.audioContext.destination);
+      AudioPlayer._soundboardGainNode = soundboardGain;
+    }
+    return AudioPlayer._soundboardGainNode;
+  }
+
   private static _noticeGainNode: GainNode
   private static get noticeGainNode(): GainNode {
     if (!AudioPlayer._noticeGainNode) {
@@ -209,8 +242,21 @@ export class AudioPlayer {
   static get rootNode(): AudioNode { return AudioPlayer.masterGainNode; }
   static get auditionNode(): AudioNode { return AudioPlayer.auditionGainNode; }
   static get soundEffectNode(): AudioNode { return AudioPlayer.soundEffectGainNode; }
+  static get soundboardNode(): AudioNode { return AudioPlayer.soundboardGainNode; }
   static get noticeNode(): AudioNode { return AudioPlayer.noticeGainNode; }
   static get ambientNode(): AudioNode { return AudioPlayer.ambientGainNode; }
+
+  /**
+   * Keep MASTER and AMBIENT personal buses at the same level.
+   * Jukebox track 0 uses MASTER; tracks 1–3 and weather use AMBIENT.
+   */
+  static syncMusicBuses(volume: number, muted = false) {
+    const v = Math.max(0, Math.min(1, volume));
+    AudioPlayer.isMute = muted || v <= 0;
+    AudioPlayer.volume = v;
+    AudioPlayer.isAmbientMute = muted || v <= 0;
+    AudioPlayer.ambientVolume = v;
+  }
 
   private _audioElm: HTMLAudioElement;
   private get audioElm(): HTMLAudioElement {
@@ -323,6 +369,40 @@ export class AudioPlayer {
     );
   }
 
+  static playSoundboard(audio: AudioFile, volume: number = 1.0) {
+    if (AudioPlayer.isSoundboardMute || AudioPlayer.soundboardVolume <= 0) return;
+    void AudioPlayer.soundboardNode;
+    const startEpoch = AudioPlayer.soundboardEpoch;
+    void AudioPlayer.playBufferAsyncBase(
+      AudioPlayer.soundboardNode,
+      audio,
+      volume,
+      () => AudioPlayer.isSoundboardMute || AudioPlayer.soundboardVolume <= 0,
+      {
+        epoch: () => AudioPlayer.soundboardEpoch,
+        startEpoch,
+        voices: AudioPlayer.soundboardVoices,
+      },
+    );
+  }
+
+  /** Force-stop every active soundboard one-shot (local). Bumps epoch to cancel in-flight starts. */
+  static stopSoundboard() {
+    AudioPlayer.soundboardEpoch += 1;
+    const voices = AudioPlayer.soundboardVoices.splice(0);
+    for (const voice of voices) {
+      try { voice.source.onended = null; } catch { /* ignore */ }
+      try { voice.source.stop(); } catch { /* already stopped */ }
+      try { voice.source.disconnect(); } catch { /* ignore */ }
+      try { voice.gain.disconnect(); } catch { /* ignore */ }
+      voice.source.buffer = null;
+    }
+  }
+
+  private static soundboardEpoch = 0;
+  private static readonly soundboardVoices: { source: AudioBufferSourceNode; gain: GainNode }[] = [];
+
+
   static playNotice(audio: AudioFile, volume: number = 1.0) {
     if (AudioPlayer.isNoticeMute || AudioPlayer.noticeVolume <= 0) return;
     void AudioPlayer.noticeNode;
@@ -351,6 +431,8 @@ export class AudioPlayer {
         return AudioPlayer.channelGain(AudioPlayer.isAuditionMute, AudioPlayer.auditionVolume);
       case VolumeType.SOUND_EFFECT:
         return AudioPlayer.channelGain(AudioPlayer.isSoundEffectMute, AudioPlayer.soundEffectVolume);
+      case VolumeType.SOUNDBOARD:
+        return AudioPlayer.channelGain(AudioPlayer.isSoundboardMute, AudioPlayer.soundboardVolume);
       case VolumeType.NOTICE:
         return AudioPlayer.channelGain(AudioPlayer.isNoticeMute, AudioPlayer.noticeVolume);
       case VolumeType.AMBIENT:
@@ -537,6 +619,8 @@ export class AudioPlayer {
         return AudioPlayer.auditionNode;
       case VolumeType.SOUND_EFFECT:
         return AudioPlayer.soundEffectNode;
+      case VolumeType.SOUNDBOARD:
+        return AudioPlayer.soundboardNode;
       case VolumeType.NOTICE:
         return AudioPlayer.noticeNode;
       case VolumeType.AMBIENT:
@@ -574,12 +658,17 @@ export class AudioPlayer {
     audio: AudioFile,
     volume: number = 1.0,
     isCancelled?: () => boolean,
+    track?: {
+      epoch: () => number;
+      startEpoch: number;
+      voices: { source: AudioBufferSourceNode; gain: GainNode }[];
+    },
   ) {
     AudioPlayer.ensureContextRunning();
     let source = await AudioPlayer.createBufferSourceAsync(audio);
     if (!source) return;
     // Re-check after async decode — mute is per-client and may flip while loading.
-    if (isCancelled?.()) {
+    if (isCancelled?.() || (track && track.epoch() !== track.startEpoch)) {
       source.buffer = null;
       return;
     }
@@ -590,11 +679,18 @@ export class AudioPlayer {
     gain.connect(audioNode);
     source.connect(gain);
 
+    const voice = track ? { source, gain } : null;
+    if (voice) track.voices.push(voice);
+
     source.onended = () => {
-      source.stop();
+      try { source.stop(); } catch { /* already stopped */ }
       source.disconnect();
       gain.disconnect();
       source.buffer = null;
+      if (voice && track) {
+        const i = track.voices.indexOf(voice);
+        if (i >= 0) track.voices.splice(i, 1);
+      }
     };
 
     source.start();

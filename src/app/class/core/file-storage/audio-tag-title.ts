@@ -85,11 +85,7 @@ function parseId3v1Title(tag: Uint8Array): string {
   let end = raw.length;
   while (end > 0 && (raw[end - 1] === 0x00 || raw[end - 1] === 0x20)) end--;
   if (end < 1) return '';
-  try {
-    return new TextDecoder('latin1').decode(raw.subarray(0, end)).trim();
-  } catch {
-    return '';
-  }
+  return decodeLegacyId3Bytes(raw.subarray(0, end));
 }
 
 function synchsafeSize(b0: number, b1: number, b2: number, b3: number): number {
@@ -100,21 +96,87 @@ function decodeId3Text(body: Uint8Array, _unsync: boolean): string {
   if (body.length < 1) return '';
   const encoding = body[0];
   let data = body.subarray(1);
-  // Skip BOM / null terminators later via trim
+  // Drop trailing NULs used as terminators / padding.
+  while (data.length > 0 && data[data.length - 1] === 0x00) {
+    data = data.subarray(0, data.length - 1);
+  }
+  if (data.length < 1) return '';
   try {
     let text = '';
     if (encoding === 0) {
-      text = new TextDecoder('latin1').decode(data);
+      // ISO-8859-1 per spec — but many JP/CN tags store UTF-8 or Shift_JIS here.
+      text = decodeLegacyId3Bytes(data);
     } else if (encoding === 1) {
-      // UTF-16 with BOM
       text = new TextDecoder('utf-16').decode(data);
     } else if (encoding === 2) {
       text = new TextDecoder('utf-16be').decode(data);
     } else {
       text = new TextDecoder('utf-8').decode(data);
     }
-    return text.replace(/\0+$/g, '').trim();
+    return cleanId3Text(text);
   } catch {
     return '';
   }
+}
+
+/** Normalize ID3 text: stop at first NUL, trim. */
+function cleanId3Text(text: string): string {
+  const cut = text.split('\0')[0] ?? '';
+  return cut.replace(/\uFEFF/g, '').trim();
+}
+
+/**
+ * Encoding byte 0 / ID3v1: try UTF-8 (mislabelled), then Shift_JIS, then Latin-1.
+ * Fixes mojibake like "å¤‰ãª…" (UTF-8 read as Latin-1).
+ */
+function decodeLegacyId3Bytes(data: Uint8Array): string {
+  if (looksLikeUtf8(data)) {
+    try {
+      const utf8 = new TextDecoder('utf-8', { fatal: true }).decode(data);
+      const cleaned = cleanId3Text(utf8);
+      if (cleaned) return cleaned;
+    } catch { /* fall through */ }
+  }
+
+  try {
+    const sjis = new TextDecoder('shift_jis').decode(data);
+    const cleaned = cleanId3Text(sjis);
+    // Prefer Shift_JIS when it yields CJK and isn't just Latin-1 noise.
+    if (cleaned && /[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9d]/.test(cleaned)) {
+      return cleaned;
+    }
+  } catch { /* shift_jis unavailable or invalid */ }
+
+  return cleanId3Text(new TextDecoder('latin1').decode(data));
+}
+
+/** True when bytes are valid UTF-8 and contain at least one multi-byte sequence (or pure ASCII). */
+export function looksLikeUtf8(data: Uint8Array): boolean {
+  let i = 0;
+  let multi = 0;
+  let asciiOnly = true;
+  while (i < data.length) {
+    const b = data[i];
+    if (b === 0x00) {
+      i += 1;
+      continue;
+    }
+    if (b < 0x80) {
+      i += 1;
+      continue;
+    }
+    asciiOnly = false;
+    let need = 0;
+    if ((b & 0xe0) === 0xc0) need = 1;
+    else if ((b & 0xf0) === 0xe0) need = 2;
+    else if ((b & 0xf8) === 0xf0) need = 3;
+    else return false;
+    if (i + need >= data.length) return false;
+    for (let k = 1; k <= need; k++) {
+      if ((data[i + k] & 0xc0) !== 0x80) return false;
+    }
+    i += 1 + need;
+    multi += 1;
+  }
+  return asciiOnly || multi > 0;
 }

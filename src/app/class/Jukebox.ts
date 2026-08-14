@@ -14,7 +14,15 @@ export const JUKEBOX_WEATHER_TRACK = 4;
 export const JUKEBOX_TRANSPORT_MAX = 3;
 export const MUSIC_HUD_SLOT_COUNT = 3;
 export const SOUNDBOARD_SLOT_COUNT = 8;
+/** Soft guide for soundboard pad length (seconds); longer clips ask for OVER. */
+export const SOUNDBOARD_MAX_DURATION_SEC = 8;
+/** Per-pad retrigger cooldown (ms). */
+export const SOUNDBOARD_PAD_COOLDOWN_MS = 100;
 export const JUKEBOX_DUCK_FACTOR = 0.25;
+/** Default play/stop fade seconds. */
+export const JUKEBOX_DEFAULT_FADE_SEC = 2.5;
+/** Default overlap / crossfade seconds (all tracks including weather). */
+export const JUKEBOX_DEFAULT_OVERLAP_SEC = 6;
 
 export type JukeboxQueueMode =
   | 'single'
@@ -33,6 +41,10 @@ export interface JukeboxTrackState {
   label: string;
   queue: string[];
   queueMode: JukeboxQueueMode;
+  /** Fade in/out seconds (play/stop). */
+  fadeSec: number;
+  /** Overlap / crossfade seconds (switch track or weather loop). */
+  overlapSec: number;
 }
 
 export interface SoundboardSlot {
@@ -51,6 +63,8 @@ function emptyTrack(): JukeboxTrackState {
     label: '',
     queue: [],
     queueMode: 'single',
+    fadeSec: JUKEBOX_DEFAULT_FADE_SEC,
+    overlapSec: JUKEBOX_DEFAULT_OVERLAP_SEC,
   };
 }
 
@@ -67,15 +81,24 @@ function normalizeQueueMode(raw: any): JukeboxQueueMode {
   return 'single';
 }
 
-function normalizeTracks(raw: any): JukeboxTrackState[] {
+function normalizeTracks(
+  raw: any,
+  defaultFadeSec = JUKEBOX_DEFAULT_FADE_SEC,
+  defaultOverlapSec = JUKEBOX_DEFAULT_OVERLAP_SEC,
+): JukeboxTrackState[] {
   const list: JukeboxTrackState[] = [];
   const src = Array.isArray(raw) ? raw : [];
+  const fallbackFade = clampTrackFadeSec(defaultFadeSec);
+  const fallbackOverlap = clampTrackOverlapSec(defaultOverlapSec);
   for (let i = 0; i < JUKEBOX_TRACK_COUNT; i++) {
     const t = src[i] || {};
     const queue = Array.isArray(t.queue)
       ? t.queue.filter((id: any) => typeof id === 'string' && id)
       : [];
     const isPlaying = !!t.isPlaying;
+    const fadeSec = typeof t.fadeSec === 'number' && isFinite(t.fadeSec)
+      ? clampTrackFadeSec(t.fadeSec)
+      : fallbackFade;
     list.push({
       audioIdentifier: typeof t.audioIdentifier === 'string' ? t.audioIdentifier : '',
       isPlaying,
@@ -90,6 +113,10 @@ function normalizeTracks(raw: any): JukeboxTrackState[] {
       label: typeof t.label === 'string' ? t.label : '',
       queue,
       queueMode: normalizeQueueMode(t.queueMode),
+      fadeSec,
+      overlapSec: typeof t.overlapSec === 'number' && isFinite(t.overlapSec)
+        ? clampTrackOverlapSec(t.overlapSec)
+        : fallbackOverlap,
     });
   }
   return list;
@@ -124,6 +151,11 @@ function clampTrackFadeSec(sec: number): number {
   return Math.max(0, Math.min(15, Math.round(sec * 10) / 10));
 }
 
+function clampTrackOverlapSec(sec: number): number {
+  if (!isFinite(sec)) return 2.5;
+  return Math.max(0, Math.min(30, Math.round(sec * 10) / 10));
+}
+
 @SyncObject('jukebox')
 export class Jukebox extends GameObject implements InnerXml {
   /** @deprecated Legacy single-track fields; migrated into tracksJson track0. */
@@ -138,10 +170,13 @@ export class Jukebox extends GameObject implements InnerXml {
    * Room-synced weather SE loop crossfade (seconds).
    * Applies to every client's local WeatherLoopPlayer.
    */
-  @SyncVar() weatherLoopOverlapSec: number = 6;
+  @SyncVar() weatherLoopOverlapSec: number = JUKEBOX_DEFAULT_OVERLAP_SEC;
 
-  /** Room-synced fade / crossfade seconds for tracks 0–3 (0 = hard cut). */
-  @SyncVar() trackFadeSec: number = 2.5;
+  /** Room-synced fade / crossfade seconds for tracks 0–3 (0 = hard cut). Legacy default for migrate. */
+  @SyncVar() trackFadeSec: number = JUKEBOX_DEFAULT_FADE_SEC;
+
+  /** Room-synced: when false, all clients mute built-in weather SE. */
+  @SyncVar() weatherSeEnabled: boolean = true;
 
   /** Room-synced soundboard pads (8 slots). */
   @SyncVar() soundboardJson: string = '';
@@ -174,14 +209,18 @@ export class Jukebox extends GameObject implements InnerXml {
   get tracks(): JukeboxTrackState[] {
     this.ensureMigrated();
     try {
-      return normalizeTracks(this.tracksJson ? JSON.parse(this.tracksJson) : []);
+      return normalizeTracks(
+        this.tracksJson ? JSON.parse(this.tracksJson) : [],
+        this.trackFadeSec,
+        JUKEBOX_DEFAULT_OVERLAP_SEC,
+      );
     } catch {
-      return normalizeTracks([]);
+      return normalizeTracks([], this.trackFadeSec, JUKEBOX_DEFAULT_OVERLAP_SEC);
     }
   }
 
   set tracks(value: JukeboxTrackState[]) {
-    this.tracksJson = JSON.stringify(normalizeTracks(value));
+    this.tracksJson = JSON.stringify(normalizeTracks(value, this.trackFadeSec, JUKEBOX_DEFAULT_OVERLAP_SEC));
   }
 
   get soundboard(): SoundboardSlot[] {
@@ -284,13 +323,18 @@ export class Jukebox extends GameObject implements InnerXml {
     return this.audioPlayers[index]?.duration ?? 0;
   }
 
-  /** Clamp and publish weather SE crossfade seconds (room-synced). */
+  /** Clamp and publish weather SE loop overlap (also mirrors onto weather track state). */
   setWeatherLoopOverlapSec(sec: number) {
     const n = typeof sec === 'number' ? sec : Number(sec);
     if (!isFinite(n)) return;
-    const clamped = Math.max(0, Math.min(30, Math.round(n * 10) / 10));
-    if (this.weatherLoopOverlapSec === clamped) return;
-    this.weatherLoopOverlapSec = clamped;
+    const clamped = clampTrackOverlapSec(n);
+    if (this.weatherLoopOverlapSec !== clamped) this.weatherLoopOverlapSec = clamped;
+    this.ensureMigrated();
+    const next = this.tracks;
+    if (next[JUKEBOX_WEATHER_TRACK].overlapSec !== clamped) {
+      next[JUKEBOX_WEATHER_TRACK] = { ...next[JUKEBOX_WEATHER_TRACK], overlapSec: clamped };
+      this.tracks = next;
+    }
   }
 
   setTrackFadeSec(sec: number) {
@@ -299,8 +343,69 @@ export class Jukebox extends GameObject implements InnerXml {
     this.trackFadeSec = clamped;
   }
 
+  /** Per-track fade in/out seconds (all tracks including weather). */
+  setTrackFadeSecAt(index: number, sec: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    this.ensureMigrated();
+    const clamped = clampTrackFadeSec(typeof sec === 'number' ? sec : Number(sec));
+    const next = this.tracks;
+    if (next[index].fadeSec === clamped) return;
+    next[index] = { ...next[index], fadeSec: clamped };
+    this.tracks = next;
+  }
+
+  /** Per-track overlap / crossfade seconds. Weather also updates weatherLoopOverlapSec. */
+  setTrackOverlapSecAt(index: number, sec: number) {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
+    this.ensureMigrated();
+    const clamped = clampTrackOverlapSec(typeof sec === 'number' ? sec : Number(sec));
+    if (index === JUKEBOX_WEATHER_TRACK) {
+      this.setWeatherLoopOverlapSec(clamped);
+      return;
+    }
+    const next = this.tracks;
+    if (next[index].overlapSec === clamped) return;
+    next[index] = { ...next[index], overlapSec: clamped };
+    this.tracks = next;
+  }
+
   get effectiveTrackFadeSec(): number {
     return clampTrackFadeSec(this.trackFadeSec);
+  }
+
+  /** Fade in/out for a track (weather included for UI / future start fade). */
+  effectiveFadeSec(index: number): number {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return 0;
+    if (index > JUKEBOX_TRANSPORT_MAX && index !== JUKEBOX_WEATHER_TRACK) return 0;
+    const t = this.tracks[index];
+    if (t && typeof t.fadeSec === 'number' && isFinite(t.fadeSec)) {
+      return clampTrackFadeSec(t.fadeSec);
+    }
+    return this.effectiveTrackFadeSec;
+  }
+
+  /** Overlap / crossfade for a track. */
+  effectiveOverlapSec(index: number): number {
+    if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return 0;
+    if (index === JUKEBOX_WEATHER_TRACK) {
+      const t = this.tracks[index];
+      if (t && typeof t.overlapSec === 'number' && isFinite(t.overlapSec)) {
+        return clampTrackOverlapSec(t.overlapSec);
+      }
+      return clampTrackOverlapSec(this.weatherLoopOverlapSec);
+    }
+    if (index > JUKEBOX_TRANSPORT_MAX) return 0;
+    const t = this.tracks[index];
+    if (t && typeof t.overlapSec === 'number' && isFinite(t.overlapSec)) {
+      return clampTrackOverlapSec(t.overlapSec);
+    }
+    return this.effectiveFadeSec(index);
+  }
+
+  setWeatherSeEnabled(enabled: boolean) {
+    const next = !!enabled;
+    if (this.weatherSeEnabled === next) return;
+    this.weatherSeEnabled = next;
   }
 
   /** Assign audio to a track without starting playback. */
@@ -705,8 +810,9 @@ export class Jukebox extends GameObject implements InnerXml {
       return;
     }
 
-    const fadeSec = index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveTrackFadeSec : 0;
-    const useCrossfade = !!(opts.crossfade && fadeSec > 0 && this.audioPlayers[index] && !this.audioPlayers[index].paused);
+    const fadeSec = index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveFadeSec(index) : 0;
+    const overlapSec = index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveOverlapSec(index) : 0;
+    const useCrossfade = !!(opts.crossfade && overlapSec > 0 && this.audioPlayers[index] && !this.audioPlayers[index].paused);
     const fadeIn = opts.fadeIn !== false && index <= JUKEBOX_TRANSPORT_MAX && fadeSec > 0 && !opts.paused;
 
     if (useCrossfade) {
@@ -740,7 +846,7 @@ export class Jukebox extends GameObject implements InnerXml {
   }
 
   private beginCrossfade(index: number, audio: AudioFile, track: JukeboxTrackState, startAt: number) {
-    const fadeSec = this.effectiveTrackFadeSec;
+    const overlapSec = this.effectiveOverlapSec(index);
     const outgoing = this.audioPlayers[index];
     outgoing.endedAction = null;
 
@@ -755,8 +861,8 @@ export class Jukebox extends GameObject implements InnerXml {
     this.crossfadePlayers[index] = outgoing;
     this.audioPlayers[index] = incoming;
 
-    incoming.playWithFadeIn(audio, fadeSec, startAt);
-    void outgoing.stopWithFadeOut(fadeSec).then(() => {
+    incoming.playWithFadeIn(audio, overlapSec, startAt);
+    void outgoing.stopWithFadeOut(overlapSec).then(() => {
       if (this.crossfadePlayers[index] === outgoing) this.crossfadePlayers[index] = null;
     });
   }
@@ -825,7 +931,7 @@ export class Jukebox extends GameObject implements InnerXml {
     if (!this.audioPlayers[index]) return;
     const player = this.audioPlayers[index];
     player.endedAction = null;
-    const fadeSec = !hard && index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveTrackFadeSec : 0;
+    const fadeSec = !hard && index <= JUKEBOX_TRANSPORT_MAX ? this.effectiveFadeSec(index) : 0;
     if (fadeSec > 0 && !player.paused) {
       void player.stopWithFadeOut(fadeSec);
     } else {
@@ -840,6 +946,10 @@ export class Jukebox extends GameObject implements InnerXml {
   private applyRoomGain(index: number) {
     this.ensurePlayer(index);
     const track = this.tracks[index];
+    if (index === JUKEBOX_WEATHER_TRACK) {
+      // WeatherLoopPlayer reads roomGain via WeatherSeService on UPDATE_GAME_OBJECT.
+      return;
+    }
     if (this.audioPlayers[index]) {
       this.audioPlayers[index].volume = track.roomGain;
     }
@@ -850,12 +960,12 @@ export class Jukebox extends GameObject implements InnerXml {
 
   private applyDuckFactors() {
     const factor = this.duckRefCount > 0 ? JUKEBOX_DUCK_FACTOR : 1;
-    const fadeSec = this.effectiveTrackFadeSec;
     for (let i = 0; i <= JUKEBOX_TRANSPORT_MAX; i++) {
       if (!this.audioPlayers[i]) continue;
       // Snap duck factor; perceptual ramp via playbackFactor would fight track fades.
       this.audioPlayers[i].setDuckFactor(factor);
       if (this.crossfadePlayers[i]) this.crossfadePlayers[i].setDuckFactor(factor);
+      const fadeSec = this.effectiveFadeSec(i);
       if (fadeSec > 0) {
         // Mild soften when engaging/releasing duck by nudging playbackFactor briefly.
         void this.audioPlayers[i].fadePlaybackFactorTo(1, Math.min(fadeSec, 1.5));

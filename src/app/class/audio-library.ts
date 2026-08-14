@@ -9,6 +9,8 @@ import { InnerXml } from './core/synchronize-object/object-serializer';
 export const JUKEBOX_AUDIO_DRAG_MIME = 'application/x-udonarium-jukebox-audio';
 /** JSON string[] of audio ids when dragging a multi-selection. */
 export const JUKEBOX_AUDIO_DRAG_LIST_MIME = 'application/x-udonarium-jukebox-audio-list';
+/** Stable library folder id for soundboard pads (created on first pad assign / drop). */
+export const SOUNDBOARD_FOLDER_ID = 'soundboard';
 
 export interface AudioLibraryFolder {
   id: string;
@@ -278,6 +280,30 @@ export class AudioLibrary extends GameObject implements InnerXml {
     const data = this.data;
     const folder: AudioLibraryFolder = {
       id: newFolderId(),
+      name: (name || '').trim() || 'Folder',
+    };
+    data.folders.push(folder);
+    data.orders[folder.id] = [];
+    this.data = data;
+    return folder;
+  }
+
+  /**
+   * Ensure a folder with a stable id exists (e.g. soundboard).
+   * Does not rename an existing folder so user edits stick.
+   */
+  ensureFolder(id: string, name: string): AudioLibraryFolder {
+    const fid = (id || '').trim();
+    if (!fid) return this.createFolder(name);
+    const data = this.data;
+    const existing = data.folders.find(f => f.id === fid);
+    if (existing) {
+      ensureOrderList(data, fid);
+      this.data = data;
+      return existing;
+    }
+    const folder: AudioLibraryFolder = {
+      id: fid,
       name: (name || '').trim() || 'Folder',
     };
     data.folders.push(folder);
