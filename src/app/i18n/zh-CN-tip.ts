@@ -43,7 +43,7 @@ export const zhCN_tip: I18nDictionary = {
 
   'tour.welcome.title': '欢迎 — 引导教学',
   'tour.welcome.body': '请先阅读说明，再打开／尝试各主要功能。\n可随时跳过。之后滑过按钮仍会立刻显示教学 BOX。\n建议桌面版 Chrome。离开前请存档（ZIP 或文件夹备份）。',
-  'tour.welcome.bodyMobile': '手机／平板版：底部选单开启功能；单指／双指拖曳平移地图；双指捏合缩放；长按空白＝Ping；新增物件用地图 HUD。\n可随时跳过。离开前请存档。',
+  'tour.welcome.bodyMobile': '手机／平板版：底部选单开启功能；单指拖曳平移地图；双指拖曳旋转视角；双指捏合缩放；长按空白＝Ping；新增物件用地图 HUD。\n可随时跳过。离开前请存档。',
   'tour.welcome.language': '🌐 Language / 语言',
   'tour.welcome.start': '开始',
   'tour.welcome.skip': '跳过',
@@ -100,7 +100,7 @@ export const zhCN_tip: I18nDictionary = {
 
   'tour.step.mapPan.title': '平移地图',
   'tour.step.mapPan.body': '右键拖曳＝平移地图。\n中键拖曳／Ctrl＋右键拖曳＝旋转视角。\n请试一次右键拖曳。',
-  'tour.step.mapPan.bodyMobile': '单指在地图上拖曳＝平移画面。\n双指拖曳也可平移；双指捏合＝缩放；双指旋转＝转向。\n请试一次单指拖曳平移。',
+  'tour.step.mapPan.bodyMobile': '单指在地图上拖曳＝平移画面。\n双指拖曳＝自由旋转视角（同桌面中键）；双指捏合＝缩放。\n请试一次单指拖曳平移。',
   'tour.step.mapWheel.title': '滚轮移动画面',
   'tour.step.mapWheel.body': 'Shift＋滚轮＝左右移动画面。\nCtrl＋滚轮＝上下移动画面。\n（普通滚轮＝缩放，下一步练习）\n请试一次 Shift 或 Ctrl＋滚轮。',
   'tour.step.mapZoom.title': '缩放',
@@ -137,7 +137,7 @@ export const zhCN_tip: I18nDictionary = {
   'tour.step.more.body': '点「更多」可打开次要功能清单。',
   'tour.step.roomChapter.bodyMobile': '先从底部「连线」开始：进入房间与存档。\n（文件夹备份在手机浏览器可能不可用，请用 ZIP。）',
   'tour.step.saveZip.bodyMobile': '请用「下载 ZIP」备份。手机／平板上文件夹备份常不可用。',
-  'tour.step.tableChapter.bodyMobile': '地图：单指／双指拖曳平移；双指捏合或 HUD 缩放。\n长按空白＝Ping；HUD「＋」＝新增物件。',
+  'tour.step.tableChapter.bodyMobile': '地图：单指拖曳平移；双指拖曳旋转视角；双指捏合或 HUD 缩放。\n长按空白＝Ping；HUD「＋」＝新增物件。',
   'tour.step.controlsChapter.bodyMobile': '点选桌面物件即可选取。\n拖曳物件可移动；HUD「＋」＝新增；长按空白＝Ping。',
   'tour.step.controlsPing.bodyMobile': '在空白地图长按约半秒发送 Ping。请试一次长按。',
   'tour.step.saveGuide.bodyMobile': '更多说明：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\n可在「更多 → 设定」重播教学。离开前请 ZIP 存档。',

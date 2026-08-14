@@ -43,7 +43,7 @@ export const ja_tip: I18nDictionary = {
 
   'tour.welcome.title': 'ようこそ — ガイドツアー',
   'tour.welcome.body': '各機能の説明を読んでから、開く／一度試します。\nいつでもスキップ可。以後はホバーで教學 BOX が出ます。\nデスクトップ版 Chrome 推奨。退出前に保存（ZIP またはフォルダバックアップ）。',
-  'tour.welcome.bodyMobile': 'スマホ／タブレット：下部メニューで機能を開く。1／2本指ドラッグでパン、ピンチでズーム、空白長押し＝Ping、追加は地図 HUD。\nいつでもスキップ可。退出前に保存してください。',
+  'tour.welcome.bodyMobile': 'スマホ／タブレット：下部メニューで機能を開く。1本指ドラッグでパン、2本指ドラッグで視点回転、ピンチでズーム、空白長押し＝Ping、追加は地図 HUD。\nいつでもスキップ可。退出前に保存してください。',
   'tour.welcome.language': '🌐 Language / 言語',
   'tour.welcome.start': '開始',
   'tour.welcome.skip': 'スキップ',
@@ -100,7 +100,7 @@ export const ja_tip: I18nDictionary = {
 
   'tour.step.mapPan.title': 'パン',
   'tour.step.mapPan.body': '右ドラッグ＝パン。\n中ドラッグ／Ctrl＋右ドラッグ＝視点回転。\n右ドラッグを一度試してください。',
-  'tour.step.mapPan.bodyMobile': 'マップ上を1本指でドラッグ＝パン。\n2本指ドラッグでもパン；ピンチ＝ズーム；2本指回転＝ヨー。\n1本指パンを一度試してください。',
+  'tour.step.mapPan.bodyMobile': 'マップ上を1本指でドラッグ＝パン。\n2本指ドラッグ＝視点の自由回転（デスクトップ中ドラッグと同じ）；ピンチ＝ズーム。\n1本指パンを一度試してください。',
   'tour.step.mapWheel.title': 'ホイール移動',
   'tour.step.mapWheel.body': 'Shift＋ホイール＝左右移動。\nCtrl＋ホイール＝上下移動。\n（通常ホイール＝ズーム：次のステップ）\nShift または Ctrl＋ホイールを一度試してください。',
   'tour.step.mapZoom.title': 'ズーム',
@@ -137,7 +137,7 @@ export const ja_tip: I18nDictionary = {
   'tour.step.more.body': '「その他」で副機能一覧を開きます。',
   'tour.step.roomChapter.bodyMobile': '下部の「接続」から部屋と保存を。\n（スマホではフォルダバックアップ不可の場合あり → ZIP）',
   'tour.step.saveZip.bodyMobile': 'ZIP で保存。スマホ／タブレットではフォルダバックアップが使えないことが多いです。',
-  'tour.step.tableChapter.bodyMobile': 'マップ：1／2本指ドラッグでパン、ピンチまたは HUD ズーム。\n空白長押し＝Ping、HUD「＋」＝追加。',
+  'tour.step.tableChapter.bodyMobile': 'マップ：1本指ドラッグでパン、2本指ドラッグで視点回転、ピンチまたは HUD ズーム。\n空白長押し＝Ping、HUD「＋」＝追加。',
   'tour.step.controlsChapter.bodyMobile': '駒をタップで選択。\nドラッグで移動、HUD「＋」＝追加、空白長押し＝Ping。',
   'tour.step.controlsPing.bodyMobile': '空白を約0.5秒長押しで Ping。一度試してください。',
   'tour.step.saveGuide.bodyMobile': '詳細：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學\nその他→設定 からツアー再開。退出前に ZIP を。',

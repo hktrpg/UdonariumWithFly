@@ -251,6 +251,46 @@
   border-left-color: var(--jb-playing-edge);
 }
 
+.jb-track.is-weather {
+  grid-template-columns: 3.2em 18px minmax(0, 1fr) auto;
+}
+
+.jb-weather-overlap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  min-width: 0;
+  color: var(--jb-muted);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.jb-weather-overlap-label {
+  color: #5c4630;
+}
+
+.jb-weather-overlap input[type="number"] {
+  width: 3.4em;
+  height: 20px;
+  padding: 0 2px;
+  border: 1px solid var(--jb-line);
+  border-radius: 3px;
+  background: var(--jb-paper);
+  color: var(--jb-ink);
+  font-size: 11px;
+  text-align: right;
+}
+
+.jb-weather-overlap input[type="number"]:disabled {
+  opacity: 0.55;
+}
+
+.jb-weather-overlap-unit {
+  color: var(--jb-muted);
+}
+
 .jb-track.is-guest.is-playing {
   grid-template-columns: 3.2em 18px minmax(0, 1fr);
 }
@@ -267,6 +307,11 @@
 .jb-track-status-icon {
   display: inline-flex;
   color: var(--jb-playing-edge);
+}
+
+.jb-track-status-icon.is-quiet {
+  color: var(--jb-muted);
+  opacity: 0.55;
 }
 
 .jb-track-status-icon .material-icons {
