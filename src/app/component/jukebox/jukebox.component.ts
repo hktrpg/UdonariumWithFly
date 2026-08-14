@@ -8,7 +8,7 @@ import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
-import { Jukebox, JUKEBOX_TRACK_COUNT, JukeboxTrackState } from '@udonarium/Jukebox';
+import { Jukebox, JUKEBOX_TRACK_COUNT, JUKEBOX_WEATHER_TRACK, JukeboxTrackState } from '@udonarium/Jukebox';
 import { PresetSound } from '@udonarium/sound-effect';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
@@ -16,6 +16,7 @@ import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'ser
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { I18nService } from 'service/i18n.service';
+import { WeatherSeService } from 'service/weather-se.service';
 
 import * as localForage from 'localforage';
 
@@ -28,6 +29,7 @@ import * as localForage from 'localforage';
 export class JukeboxComponent implements OnInit, OnDestroy {
 
   readonly trackCount = JUKEBOX_TRACK_COUNT;
+  readonly weatherTrackIndex = JUKEBOX_WEATHER_TRACK;
   playTargetTrack = 0;
   /** Formal play mode: true = LOOP, false = once */
   playLoop = true;
@@ -200,7 +202,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private contextMenuService: ContextMenuService,
     private i18n: I18nService,
-    private hostRef: ElementRef<HTMLElement>
+    private hostRef: ElementRef<HTMLElement>,
+    private weatherSe: WeatherSeService,
   ) {
     this.soundTestPlayer.volumeType = VolumeType.SOUND_EFFECT;
     this.noticeTestPlayer.volumeType = VolumeType.NOTICE;
@@ -245,6 +248,19 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   setTrackRoomGainPercent(index: number, percent: number) {
     if (this.GuestMode()) return;
     this.jukebox?.setTrackRoomGain(index, percent / 100);
+  }
+
+  get weatherOverlapSec(): number {
+    return this.weatherSe.overlapSec;
+  }
+
+  setWeatherOverlapSec(sec: number) {
+    if (this.GuestMode()) return;
+    this.weatherSe.setOverlapSec(Number(sec));
+  }
+
+  get weatherSePlaying(): boolean {
+    return this.weatherSe.isEnabled && this.weatherSe.isPlaying;
   }
 
   ngOnInit() {
@@ -322,7 +338,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event?.stopPropagation();
     event?.preventDefault();
     if (this.GuestMode() || !audio) return;
-    const next = (this.trackTypeOf(audio, folderId) + 1) % this.trackCount;
+    let next = (this.trackTypeOf(audio, folderId) + 1) % this.trackCount;
+    if (next === JUKEBOX_WEATHER_TRACK) next = (next + 1) % this.trackCount;
     this.library.setTrackType(audio.identifier, next, folderId || '');
   }
 
@@ -330,7 +347,8 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     event?.stopPropagation();
     event?.preventDefault();
     if (this.GuestMode()) return;
-    const next = (this.folderTrackType(folderId) + 1) % this.trackCount;
+    let next = (this.folderTrackType(folderId) + 1) % this.trackCount;
+    if (next === JUKEBOX_WEATHER_TRACK) next = (next + 1) % this.trackCount;
     this.library.setFolderTrackType(folderId || '', next);
     this.ngZone.run(() => { });
   }
@@ -824,6 +842,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   }
 
   onTrackDragOver(event: DragEvent, trackIndex: number) {
+    if (trackIndex === JUKEBOX_WEATHER_TRACK) return;
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -844,6 +863,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   }
 
   onTrackDrop(event: DragEvent, trackIndex: number) {
+    if (trackIndex === JUKEBOX_WEATHER_TRACK) return;
     if (!this.isAudioDrag(event)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1055,14 +1075,18 @@ export class JukeboxComponent implements OnInit, OnDestroy {
         action: () => this.library.moveToFolder(audio.identifier, folder.id)
       });
     }
-    const assignTracks: ContextMenuAction[] = this.trackIndexes.map(i => ({
-      name: this.trackName(i),
-      action: () => this.assignToTrack(audio, i)
-    }));
-    const playTracks: ContextMenuAction[] = this.trackIndexes.map(i => ({
-      name: this.trackName(i),
-      action: () => this.assignAndPlay(audio, i)
-    }));
+    const assignTracks: ContextMenuAction[] = this.trackIndexes
+      .filter(i => i !== JUKEBOX_WEATHER_TRACK)
+      .map(i => ({
+        name: this.trackName(i),
+        action: () => this.assignToTrack(audio, i)
+      }));
+    const playTracks: ContextMenuAction[] = this.trackIndexes
+      .filter(i => i !== JUKEBOX_WEATHER_TRACK)
+      .map(i => ({
+        name: this.trackName(i),
+        action: () => this.assignAndPlay(audio, i)
+      }));
     const menu: ContextMenuAction[] = [
       { name: t('jukebox.audition'), action: () => this.play(audio), selfOnly: true },
       { name: t('jukebox.playOnce'), action: () => { this.library.setPlayLoop(audio.identifier, false, fid); this.playFormal(audio, fid); } },

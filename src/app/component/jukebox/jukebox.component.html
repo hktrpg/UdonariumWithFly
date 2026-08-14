@@ -71,16 +71,38 @@
       <div
         class="jb-track"
         *ngFor="let i of trackIndexes"
-        [class.is-playing]="tracks[i]?.isPlaying"
+        [class.is-playing]="tracks[i]?.isPlaying || (i === weatherTrackIndex && weatherSePlaying)"
         [class.is-guest]="GuestMode()"
+        [class.is-weather]="i === weatherTrackIndex"
         [class.is-drop-target]="dropTrackIndex === i"
         (dragover)="onTrackDragOver($event, i)"
         (dragleave)="onTrackDragLeave($event, i)"
         (drop)="onTrackDrop($event, i)"
-        [attr.title]="GuestMode() ? null : (('jukebox.dropOnTrack' | i18n))"
+        [attr.title]="i === weatherTrackIndex
+          ? ('jukebox.weatherLoopHint' | i18n)
+          : (GuestMode() ? null : ('jukebox.dropOnTrack' | i18n))"
       >
         <span class="jb-track-badge">{{ trackName(i) }}</span>
-        <ng-container *ngIf="tracks[i]?.audioIdentifier && trackAudio(i) as playing">
+        <ng-container *ngIf="i === weatherTrackIndex">
+          <span class="jb-track-status-icon" [class.is-quiet]="!weatherSePlaying" aria-hidden="true">
+            <i class="material-icons">{{ weatherSePlaying ? 'volume_up' : 'cloud' }}</i>
+          </span>
+          <span class="jb-track-title" [title]="'jukebox.weatherLoopHint' | i18n">{{ 'jukebox.weatherLoopLocal' | i18n }}</span>
+          <label class="jb-weather-overlap" [title]="'jukebox.weatherOverlapHint' | i18n">
+            <span class="jb-weather-overlap-label">{{ 'jukebox.weatherOverlap' | i18n }}</span>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              step="0.5"
+              [ngModel]="weatherOverlapSec"
+              (ngModelChange)="setWeatherOverlapSec($event)"
+              [disabled]="GuestMode()"
+            />
+            <span class="jb-weather-overlap-unit">{{ 'jukebox.weatherOverlapUnit' | i18n }}</span>
+          </label>
+        </ng-container>
+        <ng-container *ngIf="i !== weatherTrackIndex && tracks[i]?.audioIdentifier && trackAudio(i) as playing">
           <button
             *ngIf="!GuestMode()"
             type="button"
@@ -107,7 +129,7 @@
             [title]="('jukebox.roomGain' | i18n) + ' ' + trackRoomGainPercent(i) + '%'"
           />
         </ng-container>
-        <span class="jb-track-idle" *ngIf="!tracks[i]?.audioIdentifier">{{ 'jukebox.dropTrackHint' | i18n }}</span>
+        <span class="jb-track-idle" *ngIf="i !== weatherTrackIndex && !tracks[i]?.audioIdentifier">{{ 'jukebox.dropTrackHint' | i18n }}</span>
       </div>
     </div>
   </section>

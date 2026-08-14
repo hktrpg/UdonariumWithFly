@@ -95,6 +95,12 @@ export class Jukebox extends GameObject implements InnerXml {
 
   @SyncVar() tracksJson: string = '';
 
+  /**
+   * Room-synced weather SE loop crossfade (seconds).
+   * Applies to every client's local WeatherLoopPlayer.
+   */
+  @SyncVar() weatherLoopOverlapSec: number = 6;
+
   private audioPlayers: AudioPlayer[] = [];
   private waitingFileUpdate: boolean[] = [];
   private migrated = false;
@@ -205,6 +211,15 @@ export class Jukebox extends GameObject implements InnerXml {
     if (index < 0 || index >= this.audioPlayers.length) return false;
     const player = this.audioPlayers[index];
     return !!(player && !player.paused);
+  }
+
+  /** Clamp and publish weather SE crossfade seconds (room-synced). */
+  setWeatherLoopOverlapSec(sec: number) {
+    const n = typeof sec === 'number' ? sec : Number(sec);
+    if (!isFinite(n)) return;
+    const clamped = Math.max(0, Math.min(30, Math.round(n * 10) / 10));
+    if (this.weatherLoopOverlapSec === clamped) return;
+    this.weatherLoopOverlapSec = clamped;
   }
 
   /** Assign audio to a track without starting playback. */

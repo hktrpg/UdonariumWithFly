@@ -34,6 +34,7 @@ function resolveAssetUrl(relativePath: string): string {
 /**
  * Local weather ambience on Jukebox track 5 (index 4).
  * Local-only playback with crossfade loop — does not sync room BGM assignment.
+ * Crossfade length (weatherLoopOverlapSec) is room-synced via Jukebox.
  */
 @Injectable({ providedIn: 'root' })
 export class WeatherSeService implements OnDestroy {
@@ -59,6 +60,9 @@ export class WeatherSeService implements OnDestroy {
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', event => {
         const alias = event?.data?.aliasName;
+        if (alias === Jukebox.aliasName || (!alias && event?.data?.identifier === 'Jukebox')) {
+          this.applyOverlapFromJukebox();
+        }
         if (alias && alias !== GameTable.aliasName) return;
         this.syncFromTable();
       })
@@ -76,6 +80,11 @@ export class WeatherSeService implements OnDestroy {
     return this.enabled;
   }
 
+  /** True when the local weather loop is currently audible. */
+  get isPlaying(): boolean {
+    return this.loopPlayer.isPlaying();
+  }
+
   setEnabled(enabled: boolean) {
     this.enabled = !!enabled;
     localForage.setItem(WeatherSeService.STORAGE_KEY, this.enabled).catch(() => {});
@@ -85,8 +94,22 @@ export class WeatherSeService implements OnDestroy {
     this.syncFromTable();
   }
 
+  /** Current room-synced crossfade seconds (falls back to default). */
+  get overlapSec(): number {
+    const raw = this.jukebox()?.weatherLoopOverlapSec;
+    return WeatherLoopPlayer.clampOverlapSec(
+      typeof raw === 'number' ? raw : WeatherLoopPlayer.DEFAULT_OVERLAP_SEC,
+    );
+  }
+
+  setOverlapSec(sec: number) {
+    this.jukebox()?.setWeatherLoopOverlapSec(sec);
+    this.applyOverlapFromJukebox();
+  }
+
   syncFromTable() {
     if (!this.ready) return;
+    this.applyOverlapFromJukebox();
     const table = TableSelecter.instance?.viewTable;
     const type: WeatherType = table?.weatherType || 'none';
     this.applyWeatherType(type);
@@ -94,6 +117,10 @@ export class WeatherSeService implements OnDestroy {
 
   private jukebox(): Jukebox | null {
     return ObjectStore.instance.get<Jukebox>('Jukebox') || null;
+  }
+
+  private applyOverlapFromJukebox() {
+    this.loopPlayer.setOverlapSeconds(this.overlapSec);
   }
 
   private applyWeatherType(type: WeatherType) {
@@ -136,7 +163,7 @@ export class WeatherSeService implements OnDestroy {
       return;
     }
 
-    const ok = this.loopPlayer.play(url, 1);
+    const ok = this.loopPlayer.play(url, 1, this.overlapSec);
     this.needsUnlockRetry = !ok;
     window.setTimeout(() => {
       if (!this.enabled || this.lastUrl !== url) return;
