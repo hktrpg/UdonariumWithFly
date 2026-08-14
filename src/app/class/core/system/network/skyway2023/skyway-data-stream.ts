@@ -212,11 +212,11 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       // Peer left mid-subscribe is common with stale peer lists; keep it quiet.
       if (/already left|onStreamAdded|timeout/i.test(msg)) {
-        netDebug(`initializeSubscription aborted ${member.name}: ${msg}`);
+        netDebug(`[skyWay] ${member.name}: subscribe skipped (${e instanceof Error ? e.message : 'timeout'})`);
       } else if (e instanceof Error) {
-        console.warn(`initializeSubscription failed ${member.name}: ${msg}`);
+        console.warn(`[skyWay] subscribe failed ${member.name}: ${e.name}: ${e.message}`);
       } else {
-        console.error(e);
+        console.warn('[skyWay] subscribe failed', e);
       }
 
       this.subscription = null;

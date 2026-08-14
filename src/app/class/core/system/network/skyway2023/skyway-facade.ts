@@ -13,6 +13,7 @@ import {
 import { CryptoUtil } from '../../util/crypto-util';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
+import { installSkyWayQuietLogger } from './skyway-log';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
@@ -74,6 +75,8 @@ export class SkyWayFacade {
   private async createContext() {
     await this.disposeContext();
     if (this.isDestroyed) return;
+
+    installSkyWayQuietLogger();
 
     let backend = new SkyWayBackend(this.url);
     let channelName = this.peer.isRoom
