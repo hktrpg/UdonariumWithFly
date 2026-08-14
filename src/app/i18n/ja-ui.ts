@@ -679,7 +679,7 @@ export const ja_ui: I18nDictionary = {
   'jukebox.pause': '一時停止',
   'jukebox.resume': '再開',
   'jukebox.soundboard': 'サウンドボード',
-  'jukebox.soundboardHint': 'ワンショット・部屋同期',
+  'jukebox.soundboardHint': 'ワンショット',
   'jukebox.soundboardEmpty': '音を置く',
   'jukebox.soundboardDropHint': 'ライブラリから、または音声ファイルをドロップ',
   'jukebox.soundboardClear': 'パッドをクリア',

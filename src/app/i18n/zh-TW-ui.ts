@@ -690,7 +690,7 @@ export const zhTW_ui: I18nDictionary = {
   'jukebox.pause': '暫停',
   'jukebox.resume': '繼續',
   'jukebox.soundboard': '音效墊板',
-  'jukebox.soundboardHint': '單次 · 房間同步',
+  'jukebox.soundboardHint': '單次播放',
   'jukebox.soundboardEmpty': '放入音效',
   'jukebox.soundboardDropHint': '從曲庫拖放，或直接拖音訊檔到此',
   'jukebox.soundboardClear': '清空格位',

@@ -679,7 +679,7 @@ export const zhCN_ui: I18nDictionary = {
   'jukebox.pause': '暂停',
   'jukebox.resume': '继续',
   'jukebox.soundboard': '音效垫板',
-  'jukebox.soundboardHint': '单次 · 房间同步',
+  'jukebox.soundboardHint': '单次播放',
   'jukebox.soundboardEmpty': '放入音效',
   'jukebox.soundboardDropHint': '从曲库拖放，或直接拖音频文件到此',
   'jukebox.soundboardClear': '清空格位',

@@ -679,7 +679,7 @@ export const en_ui: I18nDictionary = {
   'jukebox.pause': 'Pause',
   'jukebox.resume': 'Resume',
   'jukebox.soundboard': 'Soundboard',
-  'jukebox.soundboardHint': 'One-shot · synced',
+  'jukebox.soundboardHint': 'One-shot',
   'jukebox.soundboardEmpty': 'Drop audio',
   'jukebox.soundboardDropHint': 'Drop from library or drop audio files here',
   'jukebox.soundboardClear': 'Clear pad',
