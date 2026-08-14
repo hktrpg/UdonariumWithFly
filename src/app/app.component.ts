@@ -601,7 +601,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       })
       .on('CONNECT_PEER', event => {
-        if (event.isSendFromSelf) { 
+        // Local CONNECT_PEER always has isSendFromSelf (Event defaults sendFrom to self).
+        // Announce room join once per OPEN_NETWORK session — not on every DataConnection flap.
+        if (event.isSendFromSelf) {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
@@ -612,7 +614,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('DISCONNECT_PEER', event => {
         this.lazyNgZoneUpdate(event.isSendFromSelf);
-        if (event.isSendFromSelf) this.isLoggedin = false;
+        // Do not clear isLoggedin here. Any peer DataConnection close used to reset it,
+        // which re-logged "connected to room" on the next reconnect (spam in chat).
+        // Reset happens on OPEN_NETWORK / NETWORK_ERROR instead.
       })
       .on('MESSAGE_NORTIFICATION', event => {
         //console.log(event)
