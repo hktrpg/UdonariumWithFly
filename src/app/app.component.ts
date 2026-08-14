@@ -95,6 +95,19 @@ import { ConnectionBusyService } from 'service/connection-busy.service';
 import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
 
+interface MobileNavItemDef {
+  tourId: string;
+  icon: string;
+  labelKey: string;
+  tipKey: string;
+  mode: 'play' | 'edit';
+  action: 'open' | 'more';
+  component?: string;
+  /** When true, hide unless canShowMenu(tourId). */
+  gated?: boolean;
+  chatBadge?: boolean;
+}
+
 @Component({
     selector: 'app-root',
     templateUrl: './app.component.html',
@@ -135,6 +148,39 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private lobbyAutoOpened = false;
   private isRefreshPromptOpen = false;
   private mobileSub: Subscription = null;
+
+  /** Bottom / rail items — Play vs Edit is a filter, not duplicated markup. */
+  private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = [
+    { tourId: 'menu.connection', icon: 'people', labelKey: 'menu.connection', tipKey: 'tip.menu.connection', mode: 'play', action: 'open', component: 'PeerMenuComponent' },
+    { tourId: 'menu.chat', icon: 'speaker_notes', labelKey: 'menu.chat', tipKey: 'tip.menu.chat', mode: 'play', action: 'open', component: 'ChatWindowComponent', chatBadge: true },
+    { tourId: 'menu.combat', icon: 'sports_mma', labelKey: 'menu.combat', tipKey: 'tip.menu.combat', mode: 'play', action: 'open', component: 'CombatTrackerComponent' },
+    { tourId: 'menu.inventory', icon: 'folder_shared', labelKey: 'menu.inventory', tipKey: 'tip.menu.inventory', mode: 'play', action: 'open', component: 'GameObjectInventoryComponent', gated: true },
+    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'play', action: 'open', component: 'NoteInventoryComponent', gated: true },
+    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'play', action: 'more' },
+    { tourId: 'menu.table', icon: 'layers', labelKey: 'menu.table', tipKey: 'tip.menu.table', mode: 'edit', action: 'open', component: 'GameTableSettingComponent', gated: true },
+    { tourId: 'menu.images', icon: 'photo_library', labelKey: 'menu.images', tipKey: 'tip.menu.images', mode: 'edit', action: 'open', component: 'FileStorageComponent', gated: true },
+    { tourId: 'menu.music', icon: 'queue_music', labelKey: 'menu.music', tipKey: 'tip.menu.music', mode: 'edit', action: 'open', component: 'JukeboxComponent', gated: true },
+    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'edit', action: 'open', component: 'NoteInventoryComponent', gated: true },
+    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'edit', action: 'more' },
+  ];
+
+  /** Visible mobile nav for current Play/Edit (+ guest forces Play). */
+  get mobileNavItems(): MobileNavItemDef[] {
+    const mode: 'play' | 'edit' = (this.isMobileEdit && !this.GuestMode()) ? 'edit' : 'play';
+    return AppComponent.MOBILE_NAV_DEFS.filter(item => {
+      if (item.mode !== mode) return false;
+      if (item.gated && !this.canShowMenu(item.tourId)) return false;
+      return true;
+    });
+  }
+
+  onMobileNavClick(item: MobileNavItemDef, event: Event) {
+    if (item.action === 'more') {
+      this.openMoreMenu(event);
+      return;
+    }
+    if (item.component) this.openOrToggle(item.component);
+  }
 
   static imageUrl = '';
   get imageUrl(): string {

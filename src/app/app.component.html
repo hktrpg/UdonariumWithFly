@@ -13,151 +13,24 @@
   </nav>
 </ui-panel>
 
-<!-- Phone / tablet portrait: Play or Edit bottom nav -->
-<nav *ngIf="isMobileLayout && !isTabletLandscape" class="mobile-bottom-nav" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'"
+<!-- Phone / tablet: Play or Edit — bottom nav or side rail via chromeMode class -->
+<nav *ngIf="isMobileLayout"
+  [class.mobile-bottom-nav]="!isTabletLandscape"
+  [class.mobile-side-rail]="isTabletLandscape"
+  [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'"
   (contextmenu)="$event.preventDefault()">
-  <ul *ngIf="!isMobileEdit || GuestMode()">
-    <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
+  <ul>
+    <li *ngFor="let item of mobileNavItems"
+      [attr.data-tour-id]="item.tourId"
+      [class.is-active]="isNavActive(item.tourId)"
+      [appTeachingTip]="item.tipKey"
+      (click)="onMobileNavClick(item, $event)">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">people</i></div>
-        <div>{{ 'menu.connection' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.chat" [class.is-active]="isNavActive('menu.chat')" [appTeachingTip]="'tip.menu.chat'" (click)="openOrToggle('ChatWindowComponent')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div class="menu-chat-icon"><i class="material-icons icon-size">speaker_notes</i><span *ngIf="showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span></div>
-        <div>{{ 'menu.chat' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.combat" [class.is-active]="isNavActive('menu.combat')" [appTeachingTip]="'tip.menu.combat'" (click)="openOrToggle('CombatTrackerComponent')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">sports_mma</i></div>
-        <div>{{ 'menu.combat' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.inventory" [class.is-active]="isNavActive('menu.inventory')" [appTeachingTip]="'tip.menu.inventory'" (click)="openOrToggle('GameObjectInventoryComponent')" *ngIf="canShowMenu('menu.inventory')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">folder_shared</i></div>
-        <div>{{ 'menu.inventory' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">note</i></div>
-        <div>{{ 'menu.notes' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">more_horiz</i></div>
-        <div>{{ 'menu.more' | i18n }}</div>
-      </a>
-    </li>
-  </ul>
-  <ul *ngIf="isMobileEdit && !GuestMode()">
-    <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')" *ngIf="canShowMenu('menu.table')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">layers</i></div>
-        <div>{{ 'menu.table' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.images" [class.is-active]="isNavActive('menu.images')" [appTeachingTip]="'tip.menu.images'" (click)="openOrToggle('FileStorageComponent')" *ngIf="canShowMenu('menu.images')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">photo_library</i></div>
-        <div>{{ 'menu.images' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.music" [class.is-active]="isNavActive('menu.music')" [appTeachingTip]="'tip.menu.music'" (click)="openOrToggle('JukeboxComponent')" *ngIf="canShowMenu('menu.music')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">queue_music</i></div>
-        <div>{{ 'menu.music' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">note</i></div>
-        <div>{{ 'menu.notes' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons icon-size">more_horiz</i></div>
-        <div>{{ 'menu.more' | i18n }}</div>
-      </a>
-    </li>
-  </ul>
-</nav>
-
-<!-- Tablet landscape: left icon rail (Play / Edit) -->
-<nav *ngIf="isMobileLayout && isTabletLandscape" class="mobile-side-rail" [attr.aria-label]="isMobileEdit ? 'Edit menu' : 'Play menu'"
-  (contextmenu)="$event.preventDefault()">
-  <ul *ngIf="!isMobileEdit || GuestMode()">
-    <li data-tour-id="menu.connection" [class.is-active]="isNavActive('menu.connection')" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">people</i></div>
-        <div>{{ 'menu.connection' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.chat" [class.is-active]="isNavActive('menu.chat')" [appTeachingTip]="'tip.menu.chat'" (click)="openOrToggle('ChatWindowComponent')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div class="menu-chat-icon"><i class="material-icons">speaker_notes</i><span *ngIf="showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span></div>
-        <div>{{ 'menu.chat' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.combat" [class.is-active]="isNavActive('menu.combat')" [appTeachingTip]="'tip.menu.combat'" (click)="openOrToggle('CombatTrackerComponent')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">sports_mma</i></div>
-        <div>{{ 'menu.combat' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.inventory" [class.is-active]="isNavActive('menu.inventory')" [appTeachingTip]="'tip.menu.inventory'" (click)="openOrToggle('GameObjectInventoryComponent')" *ngIf="canShowMenu('menu.inventory')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">folder_shared</i></div>
-        <div>{{ 'menu.inventory' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">note</i></div>
-        <div>{{ 'menu.notes' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">more_horiz</i></div>
-        <div>{{ 'menu.more' | i18n }}</div>
-      </a>
-    </li>
-  </ul>
-  <ul *ngIf="isMobileEdit && !GuestMode()">
-    <li data-tour-id="menu.table" [class.is-active]="isNavActive('menu.table')" [appTeachingTip]="'tip.menu.table'" (click)="openOrToggle('GameTableSettingComponent')" *ngIf="canShowMenu('menu.table')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">layers</i></div>
-        <div>{{ 'menu.table' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.images" [class.is-active]="isNavActive('menu.images')" [appTeachingTip]="'tip.menu.images'" (click)="openOrToggle('FileStorageComponent')" *ngIf="canShowMenu('menu.images')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">photo_library</i></div>
-        <div>{{ 'menu.images' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.music" [class.is-active]="isNavActive('menu.music')" [appTeachingTip]="'tip.menu.music'" (click)="openOrToggle('JukeboxComponent')" *ngIf="canShowMenu('menu.music')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">queue_music</i></div>
-        <div>{{ 'menu.music' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.notes" [class.is-active]="isNavActive('menu.notes')" [appTeachingTip]="'tip.menu.notes'" (click)="openOrToggle('NoteInventoryComponent')" *ngIf="canShowMenu('menu.notes')">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">note</i></div>
-        <div>{{ 'menu.notes' | i18n }}</div>
-      </a>
-    </li>
-    <li data-tour-id="menu.more" [appTeachingTip]="'tip.menu.more'" (click)="openMoreMenu($event)">
-      <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div><i class="material-icons">more_horiz</i></div>
-        <div>{{ 'menu.more' | i18n }}</div>
+        <div [class.menu-chat-icon]="item.chatBadge">
+          <i class="material-icons" [class.icon-size]="!isTabletLandscape">{{ item.icon }}</i>
+          <span *ngIf="item.chatBadge && showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span>
+        </div>
+        <div>{{ item.labelKey | i18n }}</div>
       </a>
     </li>
   </ul>

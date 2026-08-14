@@ -1,6 +1,7 @@
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ContextMenuAction, ContextMenuService } from 'service/context-menu.service';
 import { MobileLayoutService, MobileSheetSnap } from 'service/mobile-layout.service';
+import { ACTION_SHEET_SNAP_KEY, MobileSheetChrome } from 'service/mobile-sheet-chrome';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -53,23 +54,18 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Root mobile bottom action sheet (More / toolbox / token menu). */
   isMobileActionSheet = false;
-  sheetResizing = false;
   /**
    * More / toolbox sheet snaps sized to the icon grid (3-col):
    * half (default / restored) = 4 rows; peek (minimized) = 2 rows.
    */
-  sheetSnap: MobileSheetSnap = 'half';
-  private isSheetCustomHeight = false;
-  private static readonly ACTION_SHEET_SNAP_KEY = 'udon.actionSheet.snap';
+  private readonly sheetChrome: MobileSheetChrome;
   private static readonly GRID_ROWS_HALF = 4;
   private static readonly GRID_ROWS_PEEK = 2;
-  private sheetResizeStartY = 0;
-  private sheetResizeStartH = 0;
-  private readonly onSheetResizeMove = (e: PointerEvent) => this.moveSheetResize(e);
-  private readonly onSheetResizeUp = () => this.endSheetResize();
 
+  get sheetResizing(): boolean { return this.sheetChrome.resizing; }
+  get sheetSnap(): MobileSheetSnap { return this.sheetChrome.snap; }
   get isSheetPeek(): boolean {
-    return this.isMobileActionSheet && !this.isSheetCustomHeight && this.sheetSnap === 'peek';
+    return this.isMobileActionSheet && this.sheetChrome.isPeek;
   }
 
   /** Mobile dark chrome: skip default #444 so CSS muted title shows; keep custom peer colors. */
@@ -86,7 +82,20 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService,
     private mobileLayout: MobileLayoutService,
     private changeDetector: ChangeDetectorRef,
-  ) { }
+  ) {
+    this.sheetChrome = new MobileSheetChrome(this.mobileLayout, {
+      storageKey: ACTION_SHEET_SNAP_KEY,
+      heightForSnap: (snap) => this.actionSheetHeightPx(snap),
+      applyHeight: (h) => this.applyPanelHeight(h),
+      currentHeight: () => {
+        const panel = this.rootElementRef?.nativeElement;
+        return panel ? panel.getBoundingClientRect().height : 0;
+      },
+      onResizeEnd: () => this.changeDetector.markForCheck(),
+      minHeight: () => this.actionSheetHeightPx('peek'),
+      maxHeight: () => this.sheetMaxHeight(),
+    });
+  }
 
   /** Mobile sheet: stack for drill-down (Weather / Cut-in / …) instead of nested flyouts. */
   private drillStack: { title: string; actions: ContextMenuAction[] }[] = [];
@@ -127,7 +136,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy() {
     document.removeEventListener('touchstart', this.callbackOnOutsideClick, true);
     document.removeEventListener('mousedown', this.callbackOnOutsideClick, true);
-    this.endSheetResize();
+    this.sheetChrome.destroy();
   }
 
   onOutsideClick(event) {
@@ -166,81 +175,40 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private applySheetSnap(snap: MobileSheetSnap) {
-    this.sheetSnap = snap;
-    this.isSheetCustomHeight = false;
-    this.rememberActionSheetSnap(snap);
-    this.applyPanelHeight(this.actionSheetHeightPx(snap));
+    this.sheetChrome.applySnap(snap);
+    this.changeDetector.markForCheck();
     // Remeasure after grid paints — cell labels/separators can exceed the CSS min-height.
     queueMicrotask(() => {
-      if (this.sheetSnap !== snap || this.isSheetCustomHeight) return;
-      this.applyPanelHeight(this.actionSheetHeightPx(snap));
+      if (this.sheetChrome.snap !== snap || this.sheetChrome.isCustomHeight) return;
+      this.sheetChrome.reapplyCurrentSnapHeight();
     });
   }
 
   private applyPanelHeight(height: number) {
     const panel = this.rootElementRef?.nativeElement;
     if (!panel) return;
-    const h = this.clampSheetHeight(height);
+    const h = this.sheetChrome.clamp(height);
     panel.classList.remove('is-sheet-fit');
     panel.style.height = `${h}px`;
     panel.style.maxHeight = `${h}px`;
-    this.changeDetector.markForCheck();
   }
 
   startSheetResize(e: PointerEvent) {
-    if (!this.isMobileActionSheet || this.isSubmenu || e.button === 2) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const panel = this.rootElementRef.nativeElement;
-    this.sheetResizing = true;
-    this.isSheetCustomHeight = true;
-    this.sheetResizeStartY = e.clientY;
-    this.sheetResizeStartH = panel.getBoundingClientRect().height;
-    document.addEventListener('pointermove', this.onSheetResizeMove, { capture: true });
-    document.addEventListener('pointerup', this.onSheetResizeUp, { capture: true });
-    document.addEventListener('pointercancel', this.onSheetResizeUp, { capture: true });
-  }
-
-  private moveSheetResize(e: PointerEvent) {
-    if (!this.sheetResizing) return;
-    e.preventDefault();
-    const panel = this.rootElementRef.nativeElement;
-    const dy = this.sheetResizeStartY - e.clientY; // drag up → taller
-    const next = this.clampSheetHeight(this.sheetResizeStartH + dy);
-    panel.style.height = `${next}px`;
-    panel.style.maxHeight = `${next}px`;
-  }
-
-  private endSheetResize() {
-    if (!this.sheetResizing) {
-      document.removeEventListener('pointermove', this.onSheetResizeMove, true);
-      document.removeEventListener('pointerup', this.onSheetResizeUp, true);
-      document.removeEventListener('pointercancel', this.onSheetResizeUp, true);
-      return;
+    if (!this.isMobileActionSheet || this.isSubmenu) return;
+    if (this.sheetChrome.startResize(e)) {
+      this.changeDetector.markForCheck();
     }
-    this.sheetResizing = false;
-    document.removeEventListener('pointermove', this.onSheetResizeMove, true);
-    document.removeEventListener('pointerup', this.onSheetResizeUp, true);
-    document.removeEventListener('pointercancel', this.onSheetResizeUp, true);
-    const panel = this.rootElementRef?.nativeElement;
-    if (!panel) return;
-    const h = this.clampSheetHeight(panel.getBoundingClientRect().height);
-    panel.style.height = `${h}px`;
-    panel.style.maxHeight = `${h}px`;
-    this.isSheetCustomHeight = true;
-    this.changeDetector.markForCheck();
   }
 
   /** Default = 4-row More height; restore last peek/half for this sheet family only. */
   private applySheetHeight(_panel: HTMLElement) {
-    this.applySheetSnap(this.readActionSheetSnap());
+    this.applySheetSnap(this.sheetChrome.readStoredSnap());
   }
 
   /** Keep height across drill; only re-apply snap if not custom. */
   private refreshSheetHeightIfFitting() {
     if (!this.isMobileActionSheet || this.isSubmenu) return;
-    if (this.isSheetCustomHeight) return;
-    this.applyPanelHeight(this.actionSheetHeightPx(this.sheetSnap));
+    this.sheetChrome.reapplyCurrentSnapHeight();
   }
 
   /**
@@ -273,25 +241,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       + sepRows * sepRow
       + Math.max(0, gridRows - 1) * gap;
     return resizeBar + titleRow + gridH + padBottom;
-  }
-
-  private readActionSheetSnap(): MobileSheetSnap {
-    try {
-      return sessionStorage.getItem(ContextMenuComponent.ACTION_SHEET_SNAP_KEY) === 'peek' ? 'peek' : 'half';
-    } catch {
-      return 'half';
-    }
-  }
-
-  private rememberActionSheetSnap(snap: MobileSheetSnap) {
-    try {
-      sessionStorage.setItem(ContextMenuComponent.ACTION_SHEET_SNAP_KEY, snap);
-    } catch { /* ignore */ }
-  }
-
-  private clampSheetHeight(h: number): number {
-    const min = this.actionSheetHeightPx('peek');
-    return Math.max(min, Math.min(this.sheetMaxHeight(), Math.round(h)));
   }
 
   private sheetMaxHeight(): number {

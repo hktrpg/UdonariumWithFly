@@ -2,7 +2,8 @@ import { animate, keyframes, style, transition, trigger } from '@angular/animati
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
-import { MobileLayoutService } from 'service/mobile-layout.service';
+import { MobileLayoutService, MobileSheetSnap } from 'service/mobile-layout.service';
+import { MobileSheetChrome } from 'service/mobile-sheet-chrome';
 import { PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -87,16 +88,14 @@ export class UIPanelComponent implements OnInit, OnDestroy {
   isMobileSheet: boolean = false;
   /** Bottom half-sheet (e.g. chat) — leaves map visible above. Always true on mobile. */
   isMobileSheetHalf: boolean = false;
+  private readonly sheetChrome: MobileSheetChrome;
+
   /** peek | half — only meaningful when isMobileSheet (no fullscreen). */
-  mobileSheetSnap: 'peek' | 'half' = 'half';
+  get mobileSheetSnap(): MobileSheetSnap { return this.sheetChrome.snap; }
+  set mobileSheetSnap(v: MobileSheetSnap) { this.sheetChrome.snap = v; }
   /** True after user drags sheet height away from peek/half snaps. */
-  isSheetCustomHeight: boolean = false;
-  private sheetResizing = false;
-  private sheetResizeStartY = 0;
-  private sheetResizeStartH = 0;
-  private sheetDidDrag = false;
-  private readonly onSheetResizeMove = (e: PointerEvent) => this.moveSheetResize(e);
-  private readonly onSheetResizeUp = () => this.endSheetResize();
+  get isSheetCustomHeight(): boolean { return this.sheetChrome.isCustomHeight; }
+  set isSheetCustomHeight(v: boolean) { this.sheetChrome.isCustomHeight = v; }
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
@@ -104,14 +103,25 @@ export class UIPanelComponent implements OnInit, OnDestroy {
     public panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
     private mobileLayout: MobileLayoutService,
-  ) { }
+  ) {
+    this.sheetChrome = new MobileSheetChrome(this.mobileLayout, {
+      heightForSnap: (snap) => this.mobileLayout.sheetHeightPx(snap),
+      applyHeight: (h) => {
+        this.height = h;
+        this.top = Math.max(0, this.mobileLayout.viewportHeight - h - this.mobileLayout.bottomChromePx);
+        this.isMobileSheetHalf = true;
+      },
+      currentHeight: () => this.draggablePanel?.nativeElement?.offsetHeight || this.height,
+      onResizeEnd: () => this.syncMobileSheetGeometryAfterResize(),
+    });
+  }
 
   ngOnInit() {
     this.panelService.scrollablePanel = this.scrollablePanel.nativeElement;
   }
 
   ngOnDestroy() {
-    this.endSheetResize();
+    this.sheetChrome.destroy();
   }
 
   /** Suppress browser context menu on panels (custom menus handle right-click). */
@@ -135,8 +145,7 @@ export class UIPanelComponent implements OnInit, OnDestroy {
         e.preventDefault();
       }
       // − collapses to peek; restore expands to half (same as title snap).
-      const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' && !this.isSheetCustomHeight ? 'half' : 'peek';
-      this.applyMobileSheetSnap(next);
+      this.sheetChrome.toggleSnap();
       return;
     }
     if (e) {
@@ -295,60 +304,18 @@ export class UIPanelComponent implements OnInit, OnDestroy {
     if (!this.isMobileSheet) return;
     const t = e.target as HTMLElement | null;
     if (t?.closest('button, .sheet-resize-bar')) return;
-    if (this.sheetDidDrag) {
-      this.sheetDidDrag = false;
+    if (this.sheetChrome.didDrag) {
+      this.sheetChrome.didDrag = false;
       return;
     }
     e.stopPropagation();
-    const next: 'peek' | 'half' = this.mobileSheetSnap === 'peek' && !this.isSheetCustomHeight ? 'half' : 'peek';
-    this.applyMobileSheetSnap(next);
+    this.sheetChrome.toggleSnap();
   }
 
   /** Drag the top handle to set a custom sheet height (bottom-anchored). */
   startSheetResize(e: PointerEvent) {
-    if (!this.isMobileSheet || e.button === 2) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.sheetResizing = true;
-    this.sheetDidDrag = false;
-    this.sheetResizeStartY = e.clientY;
-    const panel = this.draggablePanel?.nativeElement;
-    this.sheetResizeStartH = panel?.offsetHeight || this.height;
-    this.isSheetCustomHeight = true;
-    document.addEventListener('pointermove', this.onSheetResizeMove, { capture: true });
-    document.addEventListener('pointerup', this.onSheetResizeUp, { capture: true });
-    document.addEventListener('pointercancel', this.onSheetResizeUp, { capture: true });
-  }
-
-  private moveSheetResize(e: PointerEvent) {
-    if (!this.sheetResizing) return;
-    e.preventDefault();
-    const dy = this.sheetResizeStartY - e.clientY;
-    if (Math.abs(dy) > 4) this.sheetDidDrag = true;
-    const minH = this.mobileLayout.sheetHeightPx('peek');
-    const maxH = Math.max(minH, this.mobileLayout.viewportHeight - this.mobileLayout.bottomChromePx - 8);
-    const next = Math.max(minH, Math.min(maxH, Math.round(this.sheetResizeStartH + dy)));
-    this.height = next;
-    this.top = Math.max(0, this.mobileLayout.viewportHeight - next - this.mobileLayout.bottomChromePx);
-  }
-
-  private endSheetResize() {
-    document.removeEventListener('pointermove', this.onSheetResizeMove, true);
-    document.removeEventListener('pointerup', this.onSheetResizeUp, true);
-    document.removeEventListener('pointercancel', this.onSheetResizeUp, true);
-    if (!this.sheetResizing) return;
-    this.sheetResizing = false;
-    this.onPanelGeometryEnd();
-  }
-
-  private applyMobileSheetSnap(next: 'peek' | 'half') {
-    this.isSheetCustomHeight = false;
-    this.mobileSheetSnap = next;
-    this.isMobileSheetHalf = true;
-    this.mobileLayout.rememberSheetSnap(next);
-    const h = this.mobileLayout.sheetHeightPx(next);
-    this.height = h;
-    this.top = Math.max(0, this.mobileLayout.viewportHeight - h - this.mobileLayout.bottomChromePx);
+    if (!this.isMobileSheet) return;
+    this.sheetChrome.startResize(e);
   }
 
   /** Enter custom-height mode before drag so snap CSS !important does not block resize. */
@@ -359,6 +326,19 @@ export class UIPanelComponent implements OnInit, OnDestroy {
     this.isSheetCustomHeight = true;
   }
 
+  /** After sheet handle resize — clamp + lock fit (geometry persistence is desktop-only). */
+  private syncMobileSheetGeometryAfterResize() {
+    if (!this.isMobileSheet || this.isMinimized || this.isFullScreen) return;
+    const panel = this.draggablePanel?.nativeElement;
+    if (!panel) return;
+    const prevH = this.height;
+    const clamped = this.sheetChrome.clamp(panel.offsetHeight);
+    this.isSheetCustomHeight = true;
+    this.height = clamped;
+    this.top = Math.max(0, this.mobileLayout.viewportHeight - clamped - this.mobileLayout.bottomChromePx);
+    if (clamped !== prevH) this.panelService.lockFitToContent();
+  }
+
   /** Sync Angular bindings after drag/resize so CD does not snap size back; persist panel geometry. */
   onPanelGeometryEnd() {
     if (this.isMinimized || this.isFullScreen) return;
@@ -367,10 +347,7 @@ export class UIPanelComponent implements OnInit, OnDestroy {
     const prevW = this.width;
     const prevH = this.height;
     if (this.isMobileSheet) {
-      const h = panel.offsetHeight;
-      const minH = this.mobileLayout.sheetHeightPx('peek');
-      const maxH = Math.max(minH, this.mobileLayout.viewportHeight - this.mobileLayout.bottomChromePx - 8);
-      const clamped = Math.max(minH, Math.min(maxH, h));
+      const clamped = this.sheetChrome.clamp(panel.offsetHeight);
       this.isSheetCustomHeight = true;
       this.height = clamped;
       this.top = Math.max(0, this.mobileLayout.viewportHeight - clamped - this.mobileLayout.bottomChromePx);
