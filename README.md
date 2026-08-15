@@ -8,6 +8,12 @@
 
 This project is an [HKTRPG](https://www.hktrpg.com/) fork of [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly): multi-language UI (default Traditional Chinese), plus VTT-oriented tools (lighting, combat, keyboard controls, etc.), while keeping With Fly extensions such as altitude, standees (Stand), Cut-in, and chat text colors.
 
+<p align="center">
+  <img src="docs/images/2d.jpg" alt="2D clue board" width="32%">
+  <img src="docs/images/music.jpg" alt="Multi-track BGM" width="32%">
+  <img src="docs/images/save.jpg" alt="Fully automatic folder backup" width="32%">
+</p>
+
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
 ## Try it now
@@ -26,7 +32,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
   - Tokens, cards, shared notes
   - Chat and Chat Palette
   - Dice bot ([BCDice](https://github.com/bcdice/bcdice-js))
-  - Shared images, BGM (ZIP saves include uploaded audio), ZIP save data, local folder backup (File System Access API)
+  - Shared images, BGM (ZIP saves include uploaded audio), ZIP save data, fully automatic local folder backup (File System Access API)
 
 - **Browser-to-browser networking**
   - WebRTC via [SkyWay](https://skyway.ntt.com/); work after connect stays mostly in the browser
@@ -68,7 +74,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Image FX | Grayscale, sepia, contrast, flip, silhouette, Matrix, … on tokens / stands / chat icons / sheets |
 | Status / aura / ring / dead | Token status icons, auras, ring FX; dead synced with combat defeated |
 | Reload save prompt | F5 / Ctrl+R offers ZIP download; with a bound folder, flushes backup before reload (skipped for guests) |
-| Local folder backup | File System Access API: bind a folder and auto-overwrite per-room ZIPs; Connection panel can bind / save / load / delete (see below) |
+| Fully automatic local folder backup | File System Access API: bind a folder once, then auto-overwrite per-room ZIPs; Connection panel can bind / save / load / delete (see below) |
 | Multi-track BGM / ambience | Up to 4 tracks; **max 20MB per file**; room track volume; local ambience volume; audition is local-only |
 | Preset scenes | Save / one-click restore token poses, table atmosphere (darkness, weather, lights, walls, masks, …), and multi-track BGM (optional switch chat text); chat windows can open multiple copies |
 | Character resource HUD | ± / drag numberResource for claimed PCs (toggle in Settings) |
@@ -96,9 +102,9 @@ Inherited from With Fly: altitude, chat text color, standees (Stand), Cut-in, di
 - Full user guide (Traditional Chinese): [Udonarium guide (wiki)](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學) (repo: [`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md))
 - Feature checklist: [`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
-### Local folder backup
+### Fully automatic local folder backup
 
-Room state is still live P2P sync; empty rooms disappear from the lobby, so continuity needs a local ZIP or folder backup. On Chrome / Edge (HTTPS), the **File System Access API** can bind a local folder and write multi-room saves automatically.
+Room state is still live P2P sync; empty rooms disappear from the lobby, so continuity needs a local ZIP or folder backup. On Chrome / Edge (HTTPS), bind a folder once via the **File System Access API** — after that, multi-room saves write fully automatically.
 
 **Entry points (Connection panel, non-guest)**
 

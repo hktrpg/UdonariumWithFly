@@ -8,6 +8,12 @@
 
 本プロジェクトは [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) をベースにした [HKTRPG](https://www.hktrpg.com/) 改造版です。多言語 UI（既定は繁体字中国語）に加え、照明・戦闘トラッカー・キーボード操作などの VTT 向け機能を追加。With Fly の高度・立ち絵（スタンド）・Cut-in・チャット文字色なども引き継いでいます。
 
+<p align="center">
+  <img src="docs/images/2d.jpg" alt="2D手がかりボード" width="32%">
+  <img src="docs/images/music.jpg" alt="マルチトラックBGM" width="32%">
+  <img src="docs/images/save.jpg" alt="フォルダ全自動バックアップ" width="32%">
+</p>
+
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
 ## いますぐ試す
@@ -26,7 +32,7 @@
   - コマ、カード、共有メモ
   - チャット送受信、チャットパレット
   - ダイスボット（[BCDice](https://github.com/bcdice/bcdice-js)）
-  - 画像共有、BGM（ZIP にアップロードした音声を含む）、ZIP セーブ、ローカルフォルダバックアップ（File System Access API）
+  - 画像共有、BGM（ZIP にアップロードした音声を含む）、ZIP セーブ、ローカルフォルダ全自動バックアップ（File System Access API）
 
 - **ブラウザ間通信**
   - WebRTC（[SkyWay](https://skyway.ntt.com/)）で接続；接続後の処理はできるだけブラウザ側で完結
@@ -68,7 +74,7 @@
 | 画像 FX | グレースケール、セピア、コントラスト、反転、シルエット、Matrix…（コマ／スタンド／チャットアイコン／シート） |
 | ステータス／オーラ／リング／死亡 | 状態アイコン、オーラ、リング FX；死亡は戦闘の撃破と同期 |
 | 再読込時の保存確認 | F5／Ctrl+R で ZIP ダウンロードを提案；フォルダ設定時は flush 後に再読込（ゲストはスキップ） |
-| ローカルフォルダバックアップ | File System Access API：フォルダを指定し部屋ごとに ZIP を自動上書き；接続パネルで指定／保存／読込／削除（下記） |
+| ローカルフォルダ全自動バックアップ | File System Access API：フォルダを一度指定すれば部屋ごとに ZIP を自動上書き；接続パネルで指定／保存／読込／削除（下記） |
 | マルチトラック BGM／環境音 | 最大 4 トラック；1 ファイル最大 **20MB**；部屋曲音量；ローカル環境音；試聴は非共有 |
 | プリセットシーン | 現在マップの駒配置・雰囲気（暗さ・天候・ライト・壁・マスクなど）・マルチトラック BGM を保存／ワンクリック復元（切替チャット可）；チャット窓は複数可 |
 | キャラ資源 HUD | 申告キャラの numberResource ±／ドラッグ（設定で切替） |
@@ -96,9 +102,9 @@ With Fly から継承：高度、チャット文字色、立ち絵（スタン�
 - 詳細ユーザーガイド（繁体字中国語）：[Udonarium 烏冬教學（Wiki）](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學)（repo：[`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md)）
 - 機能チェックリスト：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
-### ローカルフォルダバックアップ
+### ローカルフォルダ全自動バックアップ
 
-部屋状態は P2P 同期が本体です。空室はロビーから消えるため、継続にはローカル ZIP／フォルダバックアップが必要です。Chrome／Edge（HTTPS）では **File System Access API** でローカルフォルダを指定し、複数部屋を自動保存できます。
+部屋状態は P2P 同期が本体です。空室はロビーから消えるため、継続にはローカル ZIP／フォルダバックアップが必要です。Chrome／Edge（HTTPS）では **File System Access API** でローカルフォルダを一度指定すれば、複数部屋を全自動で保存できます。
 
 **入口（接続パネル、ゲスト以外）**
 

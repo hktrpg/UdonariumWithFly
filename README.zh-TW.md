@@ -8,6 +8,12 @@
 
 本專案是以 [Udonarium with Fly](https://github.com/NanasuNANA/UdonariumWithFly) 為基底的 [HKTRPG](https://www.hktrpg.com/) 改造版：多語介面（預設繁體中文），並加入光照、戰鬥追蹤、鍵盤操控等 VTT 向工具；同時保留 With Fly 的高度、立繪（Stand）、Cut-in、聊天文字顏色等擴充。
 
+<p align="center">
+  <img src="docs/images/2d.jpg" alt="2D 線索版" width="32%">
+  <img src="docs/images/music.jpg" alt="多軌 BGM" width="32%">
+  <img src="docs/images/save.jpg" alt="資料夾全自動備份" width="32%">
+</p>
+
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TK11235/udonarium/blob/master/LICENSE)
 
 ## 立即試用
@@ -26,7 +32,7 @@
   - 棋子、卡片、共用備忘
   - 聊天與指令板（Chat Palette）
   - 骰子機器人（[BCDice](https://github.com/bcdice/bcdice-js)）
-  - 圖片共用、BGM（ZIP 含已上傳的音訊）、ZIP 存檔、本機資料夾備份（File System Access API）
+  - 圖片共用、BGM（ZIP 含已上傳的音訊）、ZIP 存檔、本機資料夾全自動備份（File System Access API）
 
 - **瀏覽器間通訊**
   - 以 WebRTC（[SkyWay](https://skyway.ntt.com/)）連接；連線後處理盡量在瀏覽器完成
@@ -68,7 +74,7 @@
 | 圖片特效 | 灰階、懷舊、對比、翻轉、剪影、Matrix…（棋子／立繪／聊天圖示／角色卡） |
 | 狀態／光環／環／死亡 | 狀態圖示、光環、環特效；死亡與戰鬥擊敗同步 |
 | 重新整理存檔提示 | F5／Ctrl+R 可先下載 ZIP；已綁定資料夾時會先 flush 再重新整理（訪客略過） |
-| 本機資料夾備份 | File System Access API：綁定資料夾後依房間自動覆寫 ZIP；連線面板可綁定／儲存／讀取／刪除（見下方） |
+| 本機資料夾全自動備份 | File System Access API：綁定一次後依房間自動覆寫 ZIP；連線面板可綁定／儲存／讀取／刪除（見下方） |
 | 多軌 BGM／環境音 | 最多 4 軌並行；每檔最大 **20MB**；房間曲目音量；本機環境音音量；試聽不廣播 |
 | 預設場面 | 儲存／一鍵還原目前地圖上的 token 位置、桌面氣氛（黑暗、天氣、燈光、牆、遮罩等）與多軌 BGM（可附切場文字）；聊天視窗可多開 |
 | 角色資源 HUD | 認領角色的 numberResource ±／拖曳（設定中開關） |
@@ -99,9 +105,9 @@
 - 完整使用教學：[Udonarium 烏冬教學（百科）](https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學)（repo：[`docs/hktrpg-tutorial.zh-TW.md`](docs/hktrpg-tutorial.zh-TW.md)）
 - 功能驗收清單：[`docs/hktrpg-feature-inventory.md`](docs/hktrpg-feature-inventory.md)
 
-### 本機資料夾備份（Folder Backup）
+### 本機資料夾全自動備份（Folder Backup）
 
-房間狀態仍以 P2P 即時同步為主；空房從大廳消失後，需靠本機 ZIP／資料夾備份延續。Chrome／Edge（HTTPS）可透過 **File System Access API** 綁定本機資料夾，自動寫入多房間存檔。
+房間狀態仍以 P2P 即時同步為主；空房從大廳消失後，需靠本機 ZIP／資料夾備份延續。Chrome／Edge（HTTPS）可透過 **File System Access API** 綁定本機資料夾一次，之後全自動寫入多房間存檔。
 
 **入口（連線面板，非訪客）**
 
