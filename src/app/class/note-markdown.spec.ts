@@ -18,6 +18,12 @@ describe('noteMarkdownToHtml', () => {
   it('does not leave a leading blank from default paragraph margins', () => {
     const html = noteMarkdownToHtml('hello');
     expect(html).toBe('<div class="note-md-p">hello</div>');
+    expect(html.indexOf('<p')).toBe(-1);
+  });
+
+  it('skips leading blank lines so the first visible line is content', () => {
+    const html = noteMarkdownToHtml('\n\nhello');
+    expect(html).toBe('<div class="note-md-p">hello</div>');
   });
 
   it('renders lists quotes hr and fenced code', () => {

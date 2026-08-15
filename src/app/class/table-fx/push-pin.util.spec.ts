@@ -1,4 +1,5 @@
 import {
+  PAPER_STYLES,
   PIN_BOX,
   framePinOriginOffset,
   notePinAnchorPx,
@@ -11,6 +12,10 @@ import {
 } from './push-pin.util';
 
 describe('push-pin.util', () => {
+  it('keeps note paper styles to none / a4 / sticky (extra styles deferred)', () => {
+    expect(PAPER_STYLES).toEqual(['none', 'a4', 'sticky']);
+  });
+
   it('pinAnchorPx uses default tip when offsets are default', () => {
     const host = {
       pushPin: true,

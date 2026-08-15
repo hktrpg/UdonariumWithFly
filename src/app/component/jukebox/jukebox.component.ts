@@ -11,6 +11,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { Jukebox, JUKEBOX_TRACK_COUNT, JUKEBOX_WEATHER_TRACK, JUKEBOX_TRANSPORT_MAX, SOUNDBOARD_SLOT_COUNT, SOUNDBOARD_MAX_DURATION_SEC, SOUNDBOARD_PAD_COOLDOWN_MS, JukeboxTrackState, SoundboardSlot } from '@udonarium/Jukebox';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { isSoundboardOverDuration, planSoundboardAssign } from '@udonarium/soundboard-assign';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
@@ -638,7 +639,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
         id,
         audio,
         duration,
-        over: duration > maxSec + 0.05,
+        over: isSoundboardOverDuration(duration, maxSec),
       });
     }
     if (!candidates.length) return;
@@ -667,16 +668,24 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       allowOver = confirmed === true;
     }
 
-    for (const c of candidates) {
-      if (c.over && !allowOver) continue;
-      if (pad >= SOUNDBOARD_SLOT_COUNT) {
+    const plan = planSoundboardAssign(
+      candidates.map(c => ({ id: c.id, over: c.over })),
+      allowOver,
+      pad,
+      SOUNDBOARD_SLOT_COUNT,
+    );
+    const byId = new Map(candidates.map(c => [c.id, c]));
+    for (const action of plan) {
+      if (action.type === 'skip') continue;
+      const c = byId.get(action.id);
+      if (!c) continue;
+      if (action.type === 'folder') {
         const folder = this.ensureSoundboardFolder();
         this.library.ensureListed(c.id, folder.id);
         this.expandedFolders[folder.id] = true;
         continue;
       }
-      this.assignToSoundboard(pad, c.id, this.displayName(c.audio));
-      pad += 1;
+      this.assignToSoundboard(action.pad, c.id, this.displayName(c.audio));
     }
   }
 
