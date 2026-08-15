@@ -55,17 +55,21 @@ export class MovableSelectionSynchronizer {
     const key: object = isMovable ? asMovable : object;
     if (hit) {
       MovableSelectionSynchronizer.floorRideActive.set(key, true);
+      // SyncVar setters always version-bump — skip no-op writes to avoid peer flood on WASD/path.
       if (isMovable) {
         if (Math.abs(asMovable.posZ - hit.posZ) >= 0.05) asMovable.posZ = hit.posZ;
-      } else {
+      } else if (Math.abs(object.posZ - hit.posZ) >= 0.05) {
         object.posZ = hit.posZ;
       }
       return;
     }
     if (MovableSelectionSynchronizer.floorRideActive.get(key)) {
       MovableSelectionSynchronizer.floorRideActive.set(key, false);
-      if (isMovable) asMovable.posZ = 0;
-      else object.posZ = 0;
+      if (isMovable) {
+        if (Math.abs(asMovable.posZ) >= 0.05) asMovable.posZ = 0;
+      } else if (Math.abs(object.posZ) >= 0.05) {
+        object.posZ = 0;
+      }
     }
   }
 

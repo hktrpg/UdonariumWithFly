@@ -293,10 +293,15 @@ export class Terrain extends TabletopObject {
     if (!element && this.commonDataElement) {
       this.commonDataElement.appendChild(DataElement.create('altitude', 0, {}, 'altitude_' + this.identifier));
     }
-    this.ensureFaceImageElements();
+    // Do NOT ensureFaceImageElements here: empty face DataElements would
+    // ObjectStore.add+broadcast on every ZIP/XML load and storm peers.
+    // Slots are created lazily in setFaceImage / settings openImage.
   }
 
-  /** Lazily add optional face slots so old saves stay valid without forcing images. */
+  /**
+   * Lazily add optional face slots when the user edits a face.
+   * Avoid calling from complement()/load — each DataElement.create broadcasts.
+   */
   ensureFaceImageElements(): void {
     if (!this.imageDataElement) return;
     const optional: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
@@ -335,7 +340,7 @@ export class Terrain extends TabletopObject {
     object.commonDataElement.appendChild(DataElement.create('altitude', 0, {}, 'altitude_' + object.identifier));
     object.imageDataElement.appendChild(DataElement.create('wall', wall, { type: 'image' }, 'wall_' + object.identifier));
     object.imageDataElement.appendChild(DataElement.create('floor', floor, { type: 'image' }, 'floor_' + object.identifier));
-    object.ensureFaceImageElements();
+    // Face slots stay lazy (see ensureFaceImageElements) to keep CREATE payloads small.
     object.initialize();
 
     return object;
