@@ -338,6 +338,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     if (this.shouldSnapToGrid(e)) this.snapToGrid();
 
+    // After XY snap, re-sample analytic slope Z so feet stay on the ramp.
+    MovableSelectionSynchronizer.applyTerrainRideZToMovable(this);
+
     let delta = {
       x: this.posX - prev.x,
       y: this.posY - prev.y,

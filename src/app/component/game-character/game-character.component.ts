@@ -35,6 +35,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { sampleHighestTerrainSurface, slopeAlignCss } from '@udonarium/terrain-surface';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
@@ -166,6 +167,36 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }
     const alt = (-this.altitude) * this.gridSize;
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
+  }
+
+  /**
+   * Local-only tip so the pedestal sits on a slope deck (skybridge).
+   * Does not write SyncVar pitch/roll — those remain user sign lean.
+   */
+  get slopeAlignTransform(): string {
+    if (this.is2DMode) return '';
+    return this._slopeAlignCss;
+  }
+  private _slopeAlignCss = '';
+
+  private refreshSlopeAlign() {
+    if (this.is2DMode) {
+      this._slopeAlignCss = '';
+      return;
+    }
+    const piece = this.tablePiece;
+    if (!piece || piece.location?.name !== 'table') {
+      this._slopeAlignCss = '';
+      return;
+    }
+    const size = this.size || 1;
+    const g = this.gridSize;
+    const cx = piece.location.x + (size * g) / 2;
+    const cy = piece.location.y + (size * g) / 2;
+    const terrains = TableSelecter.instance?.viewTable?.terrains ?? [];
+    const sample = sampleHighestTerrainSurface(terrains, cx, cy, g);
+    // Only tip on true slopes; flat roofs stay upright.
+    this._slopeAlignCss = sample && sample.slopeDeg >= 0.05 ? slopeAlignCss(sample) : '';
   }
 
   
@@ -780,11 +811,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.naturaHeightWidthRatio = 1;
         }
         this.applySyncedChatDialog();
+        this.refreshSlopeAlign();
         this.changeDetector.markForCheck();
       });
     if (this.characterToken) {
       EventSystem.register(this)
         .on(`UPDATE_GAME_OBJECT/identifier/${this.characterToken.identifier}`, () => {
+          this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         })
         .on(`UPDATE_SELECTION/identifier/${this.characterToken.identifier}`, () => {
@@ -799,12 +832,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         const tableId = TableSelecter.instance?.viewTable?.identifier;
         if (tableId && event.data?.identifier === tableId) {
           this.enforce2DRollZero();
+          this.refreshSlopeAlign();
+          this.changeDetector.markForCheck();
+        }
+        // Terrain moved / slope changed under our feet.
+        const id = event.data?.identifier;
+        if (id && TableSelecter.instance?.viewTable?.terrains?.some(t => t.identifier === id)) {
+          this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         }
       })
       .on('AFTER_VIEW_TABLE_CHANGE', () => {
         // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
         this.enforce2DRollZero();
+        this.refreshSlopeAlign();
         const maps = this.gameCharacter?.placementTableIds || [];
         if (maps.length > 1) {
           folderBackupDebug('char AFTER_VIEW_TABLE_CHANGE dual', {
@@ -886,6 +927,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       });
     this.applySyncedChatDialog();
     this.enforce2DRollZero();
+    this.refreshSlopeAlign();
     this.movableOption = {
       tabletopObject: this.tablePiece,
       transformCssOffset: layerPeerMovableTransform(),
@@ -1031,6 +1073,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }
     if (!this.isHideIn) SoundEffect.play(PresetSound.piecePut);
     this.selected = false;
+    this.refreshSlopeAlign();
+    this.changeDetector.markForCheck();
   }
 
   onImageLoad() {
