@@ -3,7 +3,7 @@ import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { sampleHighestTerrainSurface } from '@udonarium/terrain-surface';
+import { Terrain } from '@udonarium/terrain';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
@@ -370,7 +370,7 @@ export class MovableSelectionSynchronizer {
         if (MovableSelectionSynchronizer.isLocked(object)) continue;
         object.location.x += dx;
         object.location.y += dy;
-        MovableSelectionSynchronizer.applyTerrainRideZToObject(object);
+        MovableSelectionSynchronizer.syncTerrainFloor(object);
         object.update();
         moved = true;
         continue;
@@ -379,7 +379,7 @@ export class MovableSelectionSynchronizer {
         if (movable.isDisable) continue;
         movable.posX += dx;
         movable.posY += dy;
-        MovableSelectionSynchronizer.applyTerrainRideZToMovable(movable);
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
         moved = true;
       }
     }
@@ -406,7 +406,7 @@ export class MovableSelectionSynchronizer {
         const half = (size * grid) / 2;
         object.location.x = x - half;
         object.location.y = y - half;
-        MovableSelectionSynchronizer.applyTerrainRideZToObject(object);
+        MovableSelectionSynchronizer.syncTerrainFloor(object);
         object.update();
         moved = true;
         continue;
@@ -418,61 +418,63 @@ export class MovableSelectionSynchronizer {
         movable.setAnimatedTransition(true, durationMs);
         movable.posX = x - movable.width / 2;
         movable.posY = y - movable.height / 2;
-        MovableSelectionSynchronizer.applyTerrainRideZToMovable(movable);
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
         moved = true;
       }
     }
     return moved;
   }
 
-  /** Characters / tokens: feet follow analytic slope Z (WASD / path); others unchanged. */
-  static shouldTerrainRide(object: TabletopObject | null | undefined): boolean {
-    if (!object) return false;
+  /**
+   * Keep character/token feet on Terrain.floorHitAt while nudging / pathing.
+   * No new SyncVars; only adjusts posZ when over an interactable floor.
+   * Leaving a previously tracked floor drops to 0 without touching character-stack rides
+   * that never used this path.
+   */
+  private static readonly floorRideActive = new WeakMap<object, boolean>();
+
+  static syncTerrainFloor(target: MovableDirective | TabletopObject): void {
+    const asMovable = target as MovableDirective;
+    const isMovable = !!asMovable && typeof asMovable.posX === 'number' && !!asMovable.tabletopObject
+      && asMovable.nativeElement != null;
+    const object = isMovable ? asMovable.tabletopObject : target as TabletopObject;
+    if (!object) return;
     const alias = object.aliasName;
-    return alias === 'character' || alias === 'character-token';
-  }
-
-  private static readonly wasOnTerrain = new WeakMap<object, boolean>();
-
-  static applyTerrainRideZToMovable(movable: MovableDirective): void {
-    const object = movable.tabletopObject;
-    if (!MovableSelectionSynchronizer.shouldTerrainRide(object)) return;
+    if (alias !== 'character' && alias !== 'character-token') return;
     if (TableSelecter.instance?.viewTable?.is2DMode) return;
-    if (movable.width < 0) movable.width = movable.nativeElement?.clientWidth ?? 50;
-    if (movable.height < 0) movable.height = movable.nativeElement?.clientHeight ?? 50;
-    const cx = movable.posX + movable.width / 2;
-    const cy = movable.posY + movable.height / 2;
-    const terrains = TableSelecter.instance?.viewTable?.terrains ?? [];
-    const sample = sampleHighestTerrainSurface(terrains, cx, cy, 50);
-    if (sample) {
-      MovableSelectionSynchronizer.wasOnTerrain.set(movable, true);
-      if (Math.abs(movable.posZ - sample.posZ) >= 0.05) movable.posZ = sample.posZ;
+
+    const terrains = TableSelecter.instance?.viewTable?.terrains;
+    if (!terrains?.length) return;
+
+    let cx: number;
+    let cy: number;
+    if (isMovable) {
+      if (asMovable.width < 0) asMovable.width = asMovable.nativeElement?.clientWidth ?? 50;
+      if (asMovable.height < 0) asMovable.height = asMovable.nativeElement?.clientHeight ?? 50;
+      cx = asMovable.posX + asMovable.width / 2;
+      cy = asMovable.posY + asMovable.height / 2;
+    } else {
+      const size = typeof (object as any).size === 'number' ? (object as any).size : 1;
+      const half = (size * 50) / 2;
+      cx = object.location.x + half;
+      cy = object.location.y + half;
+    }
+
+    const hit = Terrain.floorHitAt(terrains, cx, cy, 50);
+    const key: object = isMovable ? asMovable : object;
+    if (hit) {
+      MovableSelectionSynchronizer.floorRideActive.set(key, true);
+      if (isMovable) {
+        if (Math.abs(asMovable.posZ - hit.posZ) >= 0.05) asMovable.posZ = hit.posZ;
+      } else {
+        object.posZ = hit.posZ;
+      }
       return;
     }
-    // Stepped off a deck/bridge → return to table; do not clobber character-stack rides.
-    if (MovableSelectionSynchronizer.wasOnTerrain.get(movable)) {
-      MovableSelectionSynchronizer.wasOnTerrain.set(movable, false);
-      movable.posZ = 0;
-    }
-  }
-
-  static applyTerrainRideZToObject(object: TabletopObject): void {
-    if (!MovableSelectionSynchronizer.shouldTerrainRide(object)) return;
-    if (TableSelecter.instance?.viewTable?.is2DMode) return;
-    const size = typeof (object as any).size === 'number' ? (object as any).size : 1;
-    const grid = 50;
-    const cx = object.location.x + (size * grid) / 2;
-    const cy = object.location.y + (size * grid) / 2;
-    const terrains = TableSelecter.instance?.viewTable?.terrains ?? [];
-    const sample = sampleHighestTerrainSurface(terrains, cx, cy, grid);
-    if (sample) {
-      MovableSelectionSynchronizer.wasOnTerrain.set(object, true);
-      object.posZ = sample.posZ;
-      return;
-    }
-    if (MovableSelectionSynchronizer.wasOnTerrain.get(object)) {
-      MovableSelectionSynchronizer.wasOnTerrain.set(object, false);
-      object.posZ = 0;
+    if (MovableSelectionSynchronizer.floorRideActive.get(key)) {
+      MovableSelectionSynchronizer.floorRideActive.set(key, false);
+      if (isMovable) asMovable.posZ = 0;
+      else object.posZ = 0;
     }
   }
 

@@ -275,47 +275,11 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   get floorModCss() {
-    let ret = '';
-    let tmp = 0;
-    switch (this.slopeDirection) {
-      case SlopeDirection.TOP:
-        tmp = Math.atan(this.height / this.depth);
-        ret = ' rotateX(' + tmp + 'rad) scaleY(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.BOTTOM:
-        tmp = Math.atan(this.height / this.depth);
-        ret = ' rotateX(' + -tmp + 'rad) scaleY(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.LEFT:
-        tmp = Math.atan(this.height / this.width);
-        ret = ' rotateY(' + -tmp + 'rad) scaleX(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.RIGHT:
-        tmp = Math.atan(this.height / this.width);
-        ret = ' rotateY(' + tmp + 'rad) scaleX(' + (1 / Math.cos(tmp)) + ')';
-        break;
-    }
-    return ret;
+    return this.terrain.floorModCss;
   }
 
   get floorBrightness() {
-    let ret = 1.0;
-    if (!this.isSurfaceShading) return ret;
-    switch (this.slopeDirection) {
-      case SlopeDirection.TOP:
-        ret = 0.4;
-        break;
-      case SlopeDirection.BOTTOM:
-        ret = 1.0;
-        break;
-      case SlopeDirection.LEFT:
-        ret = 0.6;
-        break;
-      case SlopeDirection.RIGHT:
-        ret = 0.9;
-        break;
-    }
-    return ret;
+    return this.terrain.floorBrightness;
   }
 
   private selectedTerrains(): Terrain[] {

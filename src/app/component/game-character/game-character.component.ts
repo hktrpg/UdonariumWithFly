@@ -35,7 +35,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { sampleHighestTerrainSurface, slopeAlignCss } from '@udonarium/terrain-surface';
+import { Terrain } from '@udonarium/terrain';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
@@ -170,8 +170,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   /**
-   * Local-only tip so the pedestal sits on a slope deck (skybridge).
-   * Does not write SyncVar pitch/roll — those remain user sign lean.
+   * Local-only pedestal tip from Terrain.floorHitAt (skybridge).
+   * Does not write SyncVar pitch/roll. Refreshed only on own pose / move — not every terrain tick.
    */
   get slopeAlignTransform(): string {
     if (this.is2DMode) return '';
@@ -181,22 +181,29 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   private refreshSlopeAlign() {
     if (this.is2DMode) {
-      this._slopeAlignCss = '';
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
       return;
     }
     const piece = this.tablePiece;
     if (!piece || piece.location?.name !== 'table') {
-      this._slopeAlignCss = '';
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
+      return;
+    }
+    const terrains = TableSelecter.instance?.viewTable?.terrains;
+    if (!terrains?.length) {
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
       return;
     }
     const size = this.size || 1;
     const g = this.gridSize;
-    const cx = piece.location.x + (size * g) / 2;
-    const cy = piece.location.y + (size * g) / 2;
-    const terrains = TableSelecter.instance?.viewTable?.terrains ?? [];
-    const sample = sampleHighestTerrainSurface(terrains, cx, cy, g);
-    // Only tip on true slopes; flat roofs stay upright.
-    this._slopeAlignCss = sample && sample.slopeDeg >= 0.05 ? slopeAlignCss(sample) : '';
+    const hit = Terrain.floorHitAt(
+      terrains,
+      piece.location.x + (size * g) / 2,
+      piece.location.y + (size * g) / 2,
+      g,
+    );
+    const next = hit?.alignCss || '';
+    if (next !== this._slopeAlignCss) this._slopeAlignCss = next;
   }
 
   
@@ -832,12 +839,6 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         const tableId = TableSelecter.instance?.viewTable?.identifier;
         if (tableId && event.data?.identifier === tableId) {
           this.enforce2DRollZero();
-          this.refreshSlopeAlign();
-          this.changeDetector.markForCheck();
-        }
-        // Terrain moved / slope changed under our feet.
-        const id = event.data?.identifier;
-        if (id && TableSelecter.instance?.viewTable?.terrains?.some(t => t.identifier === id)) {
           this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         }
