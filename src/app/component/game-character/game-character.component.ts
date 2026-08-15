@@ -35,7 +35,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { sampleTerrainSurface, surfaceAlignCss } from '@udonarium/terrain-surface';
+import { Terrain } from '@udonarium/terrain';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
@@ -169,18 +169,41 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
   }
 
-  /** Client-side incline match for isSlope bridges (does not write SyncVar roll). */
-  get surfaceAlignTransform(): string {
+  /**
+   * Local-only pedestal tip from Terrain.floorHitAt (skybridge).
+   * Does not write SyncVar pitch/roll. Refreshed only on own pose / move — not every terrain tick.
+   */
+  get slopeAlignTransform(): string {
     if (this.is2DMode) return '';
+    return this._slopeAlignCss;
+  }
+  private _slopeAlignCss = '';
+
+  private refreshSlopeAlign() {
+    if (this.is2DMode) {
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
+      return;
+    }
     const piece = this.tablePiece ?? this.appearanceHost;
-    if (!piece) return '';
-    const half = (this.size * this.gridSize) / 2;
-    const sample = sampleTerrainSurface(
-      piece.location.x + half,
-      piece.location.y + half,
+    if (!piece || piece.location?.name !== 'table') {
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
+      return;
+    }
+    const terrains = TableSelecter.instance?.viewTable?.terrains;
+    if (!terrains?.length) {
+      if (this._slopeAlignCss) this._slopeAlignCss = '';
+      return;
+    }
+    const size = this.size || 1;
+    const g = this.gridSize;
+    const hit = Terrain.floorHitAt(
+      terrains,
+      piece.location.x + (size * g) / 2,
+      piece.location.y + (size * g) / 2,
+      g,
     );
-    if (!sample) return '';
-    return surfaceAlignCss(sample, sample.terrain.rotate || 0);
+    const next = hit?.alignCss || '';
+    if (next !== this._slopeAlignCss) this._slopeAlignCss = next;
   }
 
   
@@ -783,11 +806,13 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.naturaHeightWidthRatio = 1;
         }
         this.applySyncedChatDialog();
+        this.refreshSlopeAlign();
         this.changeDetector.markForCheck();
       });
     if (this.characterToken) {
       EventSystem.register(this)
         .on(`UPDATE_GAME_OBJECT/identifier/${this.characterToken.identifier}`, () => {
+          this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         })
         .on(`UPDATE_SELECTION/identifier/${this.characterToken.identifier}`, () => {
@@ -802,12 +827,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         const tableId = TableSelecter.instance?.viewTable?.identifier;
         if (tableId && event.data?.identifier === tableId) {
           this.enforce2DRollZero();
+          this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         }
       })
       .on('AFTER_VIEW_TABLE_CHANGE', () => {
         // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
         this.enforce2DRollZero();
+        this.refreshSlopeAlign();
         const maps = this.gameCharacter?.placementTableIds || [];
         if (maps.length > 1) {
           folderBackupDebug('char AFTER_VIEW_TABLE_CHANGE dual', {
@@ -1034,6 +1061,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }
     if (!this.isHideIn) SoundEffect.play(PresetSound.piecePut);
     this.selected = false;
+    this.refreshSlopeAlign();
   }
 
   onImageLoad() {

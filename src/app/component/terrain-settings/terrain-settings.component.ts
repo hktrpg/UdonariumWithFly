@@ -1,15 +1,7 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
-import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR } from '@udonarium/terrain';
-import {
-  SLOPE_DEG_MAX,
-  SLOPE_DEG_MIN,
-  TERRAIN_SIZE_MIN,
-  TerrainFaceName,
-  setSlopeDegrees,
-  slopeDegrees,
-} from '@udonarium/terrain-surface';
+import { SlopeDirection, Terrain, TerrainFaceName, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR, TERRAIN_SIZE_MIN, SLOPE_DEG_MIN, SLOPE_DEG_MAX } from '@udonarium/terrain';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { I18nService } from 'service/i18n.service';
@@ -120,31 +112,31 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   get slopeDeg(): number {
     if (!this.terrain?.isSlope) return 0;
-    return Math.round(slopeDegrees(this.terrain) * 10) / 10;
+    return Math.round(this.terrain.slopeDegrees * 10) / 10;
   }
 
   setSlopeDeg(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    setSlopeDegrees(this.terrain, +value);
+    this.terrain.setSlopeDegrees(+value);
     this.changeDetector.markForCheck();
   }
 
   onWidthChange(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
+    const prevDeg = this.terrain.isSlope ? this.terrain.slopeDegrees : 0;
     this.terrain.width = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
     if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
-      setSlopeDegrees(this.terrain, prevDeg);
+      this.terrain.setSlopeDegrees(prevDeg);
     }
     this.changeDetector.markForCheck();
   }
 
   onDepthChange(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
+    const prevDeg = this.terrain.isSlope ? this.terrain.slopeDegrees : 0;
     this.terrain.depth = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
     if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
-      setSlopeDegrees(this.terrain, prevDeg);
+      this.terrain.setSlopeDegrees(prevDeg);
     }
     this.changeDetector.markForCheck();
   }
@@ -207,13 +199,13 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   setSlopeDirection(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
+    const prevDeg = this.terrain.isSlope ? this.terrain.slopeDegrees : 0;
     this.terrain.mutateAppearance(() => {
       this.terrain.slopeDirection = value;
       this.terrain.isSlope = value !== SlopeDirection.NONE;
     });
     if (value !== SlopeDirection.NONE && this.lockSlopeDegrees && prevDeg >= SLOPE_DEG_MIN) {
-      setSlopeDegrees(this.terrain, prevDeg);
+      this.terrain.setSlopeDegrees(prevDeg);
     }
     this.changeDetector.markForCheck();
   }

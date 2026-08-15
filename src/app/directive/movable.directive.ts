@@ -30,7 +30,6 @@ import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { folderBackupDebug } from 'service/folder-backup-debug';
-import { refineSlopePosZ } from '@udonarium/terrain-surface';
 
 type LayerName = string;
 
@@ -289,18 +288,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     pointer3d.x -= this.width / 2;
     pointer3d.y -= this.height / 2;
 
-    const pickedZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
-    const nextX = pointer3d.x;
-    const nextY = pointer3d.y;
-    const nextZ = refineSlopePosZ(
-      this.tabletopObject,
-      nextX,
-      nextY,
-      this.width,
-      this.height,
-      pickedZ,
-    );
-    if (this.posX === nextX && this.posY === nextY && this.posZ === nextZ) return;
+    const nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === nextZ) return;
 
     if (!this.input.isDragging) this.ondragstart.emit(e as PointerEvent);
     this.ondrag.emit(e as PointerEvent);
@@ -315,6 +304,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     const viewTable = TableSelecter.instance.viewTable;
     viewTable.gridClipRect = null;
     viewTable.gridHeight = this.posZ + 0.5;
+    const nextX = pointer3d.x;
+    const nextY = pointer3d.y;
     let delta = {
       x: nextX - this.posX,
       y: nextY - this.posY,
@@ -340,17 +331,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     if (this.shouldSnapToGrid(e)) this.snapToGrid();
 
-    // Re-sample slope after grid snap so the token rests on the incline.
-    if (this.width > 0 && this.height > 0) {
-      this.posZ = refineSlopePosZ(
-        this.tabletopObject,
-        this.posX,
-        this.posY,
-        this.width,
-        this.height,
-        this.posZ,
-      );
-    }
+    // After XY snap, re-sample analytic slope Z so feet stay on the ramp.
+    MovableSelectionSynchronizer.syncTerrainFloor(this);
 
     let delta = {
       x: this.posX - prev.x,

@@ -2,9 +2,10 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
-import { refineSlopePosZ, applySlopePosZToObject, applySlopeFollowToMovablePose } from '@udonarium/terrain-surface';
+import { Terrain } from '@udonarium/terrain';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
@@ -12,21 +13,61 @@ import { TransformPose, UndoService } from 'service/undo.service';
 
 import { MovableDirective } from './movable.directive';
 
-function applySlopeToMovable(movable: MovableDirective) {
-  if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
-  if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
-  movable.posZ = applySlopeFollowToMovablePose(
-    movable.tabletopObject,
-    movable.posX,
-    movable.posY,
-    movable.width,
-    movable.height,
-    movable.posZ,
-  );
-}
-
 export class MovableSelectionSynchronizer {
   private static readonly objectMap: Map<TabletopObject, Set<MovableDirective>> = new Map();
+  /** Tracks whether the last sync placed this token on a terrain floor. */
+  private static readonly floorRideActive = new WeakMap<object, boolean>();
+
+  /**
+   * Keep character/token feet on Terrain.floorHitAt while nudging / pathing.
+   * No new SyncVars; only adjusts posZ when over an interactable floor.
+   * Leaving a previously tracked floor drops to 0 without touching character-stack rides
+   * that never used this path.
+   */
+  static syncTerrainFloor(target: MovableDirective | TabletopObject): void {
+    const asMovable = target as MovableDirective;
+    const isMovable = !!asMovable && typeof asMovable.posX === 'number' && !!asMovable.tabletopObject
+      && asMovable.nativeElement != null;
+    const object = isMovable ? asMovable.tabletopObject : target as TabletopObject;
+    if (!object) return;
+    const alias = object.aliasName;
+    if (alias !== 'character' && alias !== 'character-token') return;
+    if (TableSelecter.instance?.viewTable?.is2DMode) return;
+
+    const terrains = TableSelecter.instance?.viewTable?.terrains;
+    if (!terrains?.length) return;
+
+    let cx: number;
+    let cy: number;
+    if (isMovable) {
+      if (asMovable.width < 0) asMovable.width = asMovable.nativeElement?.clientWidth ?? 50;
+      if (asMovable.height < 0) asMovable.height = asMovable.nativeElement?.clientHeight ?? 50;
+      cx = asMovable.posX + asMovable.width / 2;
+      cy = asMovable.posY + asMovable.height / 2;
+    } else {
+      const size = typeof (object as any).size === 'number' ? (object as any).size : 1;
+      const half = (size * 50) / 2;
+      cx = object.location.x + half;
+      cy = object.location.y + half;
+    }
+
+    const hit = Terrain.floorHitAt(terrains, cx, cy, 50);
+    const key: object = isMovable ? asMovable : object;
+    if (hit) {
+      MovableSelectionSynchronizer.floorRideActive.set(key, true);
+      if (isMovable) {
+        if (Math.abs(asMovable.posZ - hit.posZ) >= 0.05) asMovable.posZ = hit.posZ;
+      } else {
+        object.posZ = hit.posZ;
+      }
+      return;
+    }
+    if (MovableSelectionSynchronizer.floorRideActive.get(key)) {
+      MovableSelectionSynchronizer.floorRideActive.set(key, false);
+      if (isMovable) asMovable.posZ = 0;
+      else object.posZ = 0;
+    }
+  }
 
   get selectedMovables(): Set<MovableDirective> {
     let selected: Set<MovableDirective> = new Set();
@@ -382,7 +423,7 @@ export class MovableSelectionSynchronizer {
         if (MovableSelectionSynchronizer.isLocked(object)) continue;
         object.location.x += dx;
         object.location.y += dy;
-        applySlopePosZToObject(object as any);
+        MovableSelectionSynchronizer.syncTerrainFloor(object);
         object.update();
         moved = true;
         continue;
@@ -391,7 +432,7 @@ export class MovableSelectionSynchronizer {
         if (movable.isDisable) continue;
         movable.posX += dx;
         movable.posY += dy;
-        applySlopeToMovable(movable);
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
         moved = true;
       }
     }
@@ -418,6 +459,7 @@ export class MovableSelectionSynchronizer {
         const half = (size * grid) / 2;
         object.location.x = x - half;
         object.location.y = y - half;
+        MovableSelectionSynchronizer.syncTerrainFloor(object);
         object.update();
         moved = true;
         continue;
@@ -429,7 +471,7 @@ export class MovableSelectionSynchronizer {
         movable.setAnimatedTransition(true, durationMs);
         movable.posX = x - movable.width / 2;
         movable.posY = y - movable.height / 2;
-        applySlopeToMovable(movable);
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
         moved = true;
       }
     }

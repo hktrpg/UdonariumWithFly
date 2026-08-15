@@ -1,8 +1,8 @@
 <div class="component is-3d is-grab is-pointer-events-none" [style.width.px]="size * gridSize"
   [style.height.px]="size * gridSize" appMovable [movable.option]="movableOption" [movable.disable]="isMoveLocked"
   (movable.onstart)="onInteractStart()" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
-  <div class="component-content is-3d surface-align" [@bounceInOut]="'in'" [@.disabled]="skipEnterBounce"
-    [ngStyle]="{'transform': surfaceAlignTransform || null}">
+  <div class="is-3d slope-align" [style.transform]="slopeAlignTransform || null">
+  <div class="component-content is-3d" [@bounceInOut]="'in'" [@.disabled]="skipEnterBounce">
     <div class="component-content is-3d is-pointer-events-auto" appRotable [rotable.option]="rotableOption"
       [rotable.disable]="isMoveLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()"
       (dblclick)="onDoubleClick($event)">
@@ -175,5 +175,6 @@
         <span class="elevation-indicator is-3d" style="position: absolute; transform: rotateY(-180deg)"><i>{{ elevation }}</i></span>
       </div>
     </div>
+  </div>
   </div>
 </div>

@@ -15,13 +15,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR } from '@udonarium/terrain';
-import {
-  TERRAIN_GRID_SIZE,
-  TERRAIN_SIZE_MIN,
-  floorModCss as sharedFloorModCss,
-  slopeDegrees,
-} from '@udonarium/terrain-surface';
+import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR, TERRAIN_SIZE_MIN } from '@udonarium/terrain';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TerrainSettingsComponent } from 'component/terrain-settings/terrain-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -147,7 +141,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }
   get isMagnetic(): boolean { return this.selectionState === SelectionState.MAGNETIC; }
 
-  gridSize: number = TERRAIN_GRID_SIZE;
+  gridSize: number = 50;
 
   get isWallExist(): boolean {
     if (!this.hasWall) return false;
@@ -338,31 +332,15 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   get floorModCss() {
-    return this.terrain ? sharedFloorModCss(this.terrain) : '';
+    return this.terrain?.floorModCss || '';
   }
 
   get slopeDegrees(): number {
-    return this.terrain ? slopeDegrees(this.terrain) : 0;
+    return this.terrain?.slopeDegrees || 0;
   }
 
   get floorBrightness() {
-    let ret = 1.0;
-    if (!this.isSurfaceShading) return ret;
-    switch (this.slopeDirection) {
-      case SlopeDirection.TOP:
-        ret = 0.4;
-        break;
-      case SlopeDirection.BOTTOM:
-        ret = 1.0;
-        break;
-      case SlopeDirection.LEFT:
-        ret = 0.6;
-        break;
-      case SlopeDirection.RIGHT:
-        ret = 0.9;
-        break;
-    }
-    return ret;
+    return this.terrain?.floorBrightness ?? 1.0;
   }
 
   /** Floor filter; neon class owns filter when glowing. */
