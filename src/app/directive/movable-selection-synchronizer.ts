@@ -52,6 +52,11 @@ export class MovableSelectionSynchronizer {
       MovableSelectionSynchronizer.floorRidePosZ.delete(key);
       return;
     }
+    // Fast path: no interactable floors and not currently riding → skip O(n) sample.
+    if (!MovableSelectionSynchronizer.floorRideActive.get(key)
+      && !terrains.some(t => t?.hasFloor && t.isInteract && t.location?.name === 'table')) {
+      return;
+    }
 
     let cx: number;
     let cy: number;

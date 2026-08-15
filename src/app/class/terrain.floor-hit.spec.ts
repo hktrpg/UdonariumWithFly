@@ -113,3 +113,24 @@ describe('MovableSelectionSynchronizer leave-floor policy', () => {
     expect(MovableSelectionSynchronizer.shouldClearFloorRideOnLeave(100, undefined)).toBeFalse();
   });
 });
+
+describe('Terrain.mayAffectWorldPoint', () => {
+  beforeEach(() => resetTabletopStore());
+  afterEach(() => resetTabletopStore());
+
+  it('rejects non-interact and far points', () => {
+    makeTable('t5');
+    viewTables('t5');
+    const t = makeTerrain('deck');
+    t.location.name = 'table';
+    t.location.x = 0;
+    t.location.y = 0;
+    t.width = 2;
+    t.depth = 2;
+    t.mode = 1;
+    expect(t.mayAffectWorldPoint(50, 50, 50)).toBeTrue();
+    expect(t.mayAffectWorldPoint(500, 500, 50)).toBeFalse();
+    t.isInteract = false;
+    expect(t.mayAffectWorldPoint(50, 50, 50)).toBeFalse();
+  });
+});

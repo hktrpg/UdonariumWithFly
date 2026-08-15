@@ -833,9 +833,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.changeDetector.markForCheck();
           return;
         }
-        // Terrain pose/slope changed underfoot: refresh local tip CSS only.
-        // Do not rewrite posZ here — every peer would SyncVar-fight; height catches up on next move.
+        // Terrain pose/slope changed: refresh tip only if this token may be affected
+        // (avoids N characters × M terrain edits thrashing CD / looking like room lag).
         if (event.data?.aliasName === 'terrain') {
+          const terrain = ObjectStore.instance.get<Terrain>(id);
+          if (!(terrain instanceof Terrain)) return;
+          const piece = this.tablePiece ?? this.appearanceHost;
+          if (!piece || piece.location?.name !== 'table') return;
+          const size = this.size || 1;
+          const g = this.gridSize;
+          const cx = piece.location.x + (size * g) / 2;
+          const cy = piece.location.y + (size * g) / 2;
+          if (!this._slopeAlignCss && !terrain.mayAffectWorldPoint(cx, cy, g)) return;
           this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         }

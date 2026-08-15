@@ -288,6 +288,24 @@ export class Terrain extends TabletopObject {
     return best;
   }
 
+  /**
+   * Cheap AABB (+ diagonal pad when rotated) for tip-refresh filtering.
+   * Not a substitute for floorHitAt — only skips irrelevant terrain UPDATEs.
+   */
+  mayAffectWorldPoint(worldX: number, worldY: number, gridSize: number = 50, padPx: number = 25): boolean {
+    if (!this.hasFloor || !this.isInteract) return false;
+    if (this.location?.name !== 'table') return false;
+    const g = gridSize;
+    const w = Math.max(0, (this.width || 1) * g);
+    const d = Math.max(0, (this.depth || 1) * g);
+    const x0 = this.location?.x ?? 0;
+    const y0 = this.location?.y ?? 0;
+    const rotPad = (this.rotate || 0) % 90 !== 0 ? Math.hypot(w, d) * 0.5 - Math.max(w, d) * 0.5 : 0;
+    const pad = padPx + Math.max(0, rotPad);
+    return worldX >= x0 - pad && worldX <= x0 + w + pad
+      && worldY >= y0 - pad && worldY <= y0 + d + pad;
+  }
+
   complement(): void {
     let element = this.getElement('altitude', this.commonDataElement);
     if (!element && this.commonDataElement) {
