@@ -2,6 +2,7 @@ import { ImageFile } from './core/file-storage/image-file';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { DataElement } from './data-element';
 import { TabletopObject } from './tabletop-object';
+import { TerrainFaceName } from './terrain-surface';
 
 export enum TerrainViewState {
   NULL = 0,
@@ -17,6 +18,17 @@ export enum SlopeDirection {
   RIGHT = 4,
 }
 
+/** Optional per-face image element names (fallback to wall / floor). */
+export const TERRAIN_FACE_ELEMENTS: TerrainFaceName[] = [
+  'floor',
+  'underside',
+  'wall',
+  'wallTop',
+  'wallBottom',
+  'wallLeft',
+  'wallRight',
+];
+
 @SyncObject('terrain')
 export class Terrain extends TabletopObject {
   @SyncVar() isLocked: boolean = false;
@@ -29,6 +41,12 @@ export class Terrain extends TabletopObject {
   @SyncVar() affectsLight: boolean = false;
   @SyncVar() isSlope: boolean = false;
   @SyncVar() slopeDirection: number = SlopeDirection.NONE;
+  /**
+   * Historical wall CSS uses scaleX(-1) on top/left faces (can mirror sign text).
+   * Default true keeps old look; turn off for readable neon / sign faces.
+   */
+  @SyncVar() mirrorWallTop: boolean = true;
+  @SyncVar() mirrorWallLeft: boolean = true;
 
   get width(): number { return this.getCommonValue('width', 1); }
   set width(width: number) { this.setCommonValue('width', width); }
@@ -41,6 +59,34 @@ export class Terrain extends TabletopObject {
 
   get wallImage(): ImageFile { return this.getImageFile('wall'); }
   get floorImage(): ImageFile { return this.getImageFile('floor'); }
+  get undersideImage(): ImageFile { return this.getImageFile('underside'); }
+  get wallTopImage(): ImageFile { return this.getImageFile('wallTop'); }
+  get wallBottomImage(): ImageFile { return this.getImageFile('wallBottom'); }
+  get wallLeftImage(): ImageFile { return this.getImageFile('wallLeft'); }
+  get wallRightImage(): ImageFile { return this.getImageFile('wallRight'); }
+
+  /**
+   * Resolve a face texture: per-face override if set, else wall (vertical) or floor (horizontal).
+   */
+  faceImage(face: TerrainFaceName): ImageFile {
+    if (face === 'floor') return this.floorImage;
+    if (face === 'wall') return this.wallImage;
+    const own = this.getImageFile(face);
+    if (own && !own.isEmpty) return own;
+    if (face === 'underside') return this.floorImage;
+    return this.wallImage;
+  }
+
+  /** True when a dedicated (non-fallback) image id is stored for the face. */
+  hasOwnFaceImage(face: TerrainFaceName): boolean {
+    if (face === 'floor' || face === 'wall') {
+      const img = this.getImageFile(face);
+      return !!(img && img.identifier);
+    }
+    const el = this.imageDataElement?.getFirstElementByName(face);
+    const v = el ? (el.value + '') : '';
+    return !!(v && v !== 'null');
+  }
 
   get hasWall(): boolean { return this.mode & TerrainViewState.WALL ? true : false; }
   get hasFloor(): boolean { return this.mode & TerrainViewState.FLOOR ? true : false; }
@@ -50,6 +96,29 @@ export class Terrain extends TabletopObject {
     if (!element && this.commonDataElement) {
       this.commonDataElement.appendChild(DataElement.create('altitude', 0, {}, 'altitude_' + this.identifier));
     }
+    this.ensureFaceImageElements();
+  }
+
+  /** Lazily add optional face slots so old saves stay valid without forcing images. */
+  ensureFaceImageElements(): void {
+    if (!this.imageDataElement) return;
+    const optional: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
+    for (const name of optional) {
+      if (this.imageDataElement.getFirstElementByName(name)) continue;
+      this.imageDataElement.appendChild(
+        DataElement.create(name, '', { type: 'image' }, `${name}_${this.identifier}`)
+      );
+    }
+  }
+
+  setFaceImage(face: TerrainFaceName, imageIdentifier: string): void {
+    this.ensureFaceImageElements();
+    let el = this.imageDataElement?.getFirstElementByName(face);
+    if (!el && this.imageDataElement) {
+      el = DataElement.create(face, '', { type: 'image' }, `${face}_${this.identifier}`);
+      this.imageDataElement.appendChild(el);
+    }
+    if (el) el.value = imageIdentifier ?? '';
   }
 
   static create(name: string, width: number, depth: number, height: number, wall: string, floor: string, identifier?: string): Terrain {
@@ -69,6 +138,7 @@ export class Terrain extends TabletopObject {
     object.commonDataElement.appendChild(DataElement.create('altitude', 0, {}, 'altitude_' + object.identifier));
     object.imageDataElement.appendChild(DataElement.create('wall', wall, { type: 'image' }, 'wall_' + object.identifier));
     object.imageDataElement.appendChild(DataElement.create('floor', floor, { type: 'image' }, 'floor_' + object.identifier));
+    object.ensureFaceImageElements();
     object.initialize();
 
     return object;

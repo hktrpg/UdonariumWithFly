@@ -10,12 +10,18 @@ import {
   OnChanges,
   OnDestroy
 } from '@angular/core';
-import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
+import { ImageState } from '@udonarium/core/file-storage/image-file';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
+import {
+  TERRAIN_GRID_SIZE,
+  TERRAIN_SIZE_MIN,
+  floorModCss as sharedFloorModCss,
+  slopeDegrees,
+} from '@udonarium/terrain-surface';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TerrainSettingsComponent } from 'component/terrain-settings/terrain-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -31,6 +37,8 @@ import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+
+type FaceKey = 'floor' | 'underside' | 'wallTop' | 'wallBottom' | 'wallLeft' | 'wallRight';
 
 @Component({
     selector: 'terrain',
@@ -52,12 +60,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   get hasWall(): boolean { return this.terrain.hasWall; }
   get hasFloor(): boolean { return this.terrain.hasFloor; }
 
-  get wallImage(): ImageFile { return this.imageService.getSkeletonOr(this.terrain.wallImage); }
-  get floorImage(): ImageFile { return this.imageService.getSkeletonOr(this.terrain.floorImage); }
-
-  get height(): number { return MathUtil.clampMin(this.terrain.height); }
-  get width(): number { return MathUtil.clampMin(this.terrain.width); }
-  get depth(): number { return MathUtil.clampMin(this.terrain.depth); }
+  get height(): number { return Math.max(TERRAIN_SIZE_MIN, MathUtil.clampMin(this.terrain.height)); }
+  get width(): number { return Math.max(TERRAIN_SIZE_MIN, MathUtil.clampMin(this.terrain.width)); }
+  get depth(): number { return Math.max(TERRAIN_SIZE_MIN, MathUtil.clampMin(this.terrain.depth)); }
   get altitude(): number { return this.terrain.altitude; }
   set altitude(altitude: number) { this.terrain.altitude = altitude; }
 
@@ -102,6 +107,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     this.terrain.mutateAppearance(() => { this.terrain.isAltitudeIndicate = isAltitudeIndicate; });
   }
 
+  get mirrorWallTop(): boolean { return this.terrain.mirrorWallTop !== false; }
+  get mirrorWallLeft(): boolean { return this.terrain.mirrorWallLeft !== false; }
 
   get isVisibleFloor(): boolean { return 0 < this.width * this.depth; }
   get isVisibleWallTopBottom(): boolean { return 0 < this.width * this.height; }
@@ -111,10 +118,12 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }
   get isMagnetic(): boolean { return this.selectionState === SelectionState.MAGNETIC; }
 
-  gridSize: number = 50;
+  gridSize: number = TERRAIN_GRID_SIZE;
 
   get isWallExist(): boolean {
-    return this.hasWall && this.wallImage && this.wallImage.url && this.wallImage.url.length > 0;
+    if (!this.hasWall) return false;
+    const img = this.terrain.faceImage('wallBottom');
+    return !!(img && !img.isEmpty && img.url);
   }
 
   get terreinAltitude(): number {
@@ -123,28 +132,52 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     return ret;
   }
 
-  private _tmpImages: ImageFile[] = [];
-  private _tmpImageUrls: string[] = ['', ''];
-  private _tmpImageState: number[] = [0, 0];
-  private _tmpUrl(pos: number) {
-    const imageFiles = [this.floorImage, this.wallImage];
-    let revokeUrl = '';
-    if (this._tmpImages[pos]?.identifier != imageFiles[pos].identifier || this._tmpImageState[pos] != imageFiles[pos].state) {
-      this._tmpImages[pos] = imageFiles[pos];
-      if (this._tmpImages[pos].state === ImageState.THUMBNAIL || this._tmpImages[pos].state === ImageState.COMPLETE) {
-        this._tmpImageState[pos] = this._tmpImages[pos].state;
-        if (this._tmpImageUrls[pos]) revokeUrl = this._tmpImageUrls[pos];
-        this._tmpImageUrls[pos] = URL.createObjectURL(this._tmpImages[pos].blob);
-      } else {
-        this._tmpImageUrls[pos] = this._tmpImages[pos].url;
-      }
-    }
-    if (revokeUrl) queueMicrotask(() => URL.revokeObjectURL(revokeUrl));
-    return this._tmpImageUrls[pos];
+  get isVisibleUnderside(): boolean {
+    if (!this.hasFloor || this.isSlope || !this.isVisibleFloor) return false;
+    // Skip paper-thin ground tiles; show for boxes / elevated signs.
+    if (Math.abs(this.altitude) < 0.01 && this.height < 0.5) return false;
+    return this.undersideImageUrl.length > 0;
   }
 
-  get wallImageUrl(): string { return this._tmpUrl(1); }
-  get floorImageUrl(): string { return this._tmpUrl(0); }
+  /** Invisible hit pad so thin signs remain selectable. */
+  get hitPadScaleX(): number {
+    const px = this.width * this.gridSize;
+    return px < 28 ? 28 / px : 1;
+  }
+  get hitPadScaleY(): number {
+    const px = this.depth * this.gridSize;
+    return px < 28 ? 28 / px : 1;
+  }
+  get needsHitPad(): boolean {
+    return this.hitPadScaleX > 1.01 || this.hitPadScaleY > 1.01;
+  }
+
+  private _faceCache = new Map<string, { id: string; state: number; url: string }>();
+
+  private faceUrl(face: FaceKey | 'wall'): string {
+    const raw = face === 'wall'
+      ? this.imageService.getSkeletonOr(this.terrain.wallImage)
+      : this.imageService.getSkeletonOr(this.terrain.faceImage(face));
+    const key = face;
+    const prev = this._faceCache.get(key);
+    if (prev && prev.id === raw.identifier && prev.state === raw.state) return prev.url;
+
+    let revokeUrl = prev?.url && prev.url.startsWith('blob:') ? prev.url : '';
+    let url = raw.url || '';
+    if (raw.state === ImageState.THUMBNAIL || raw.state === ImageState.COMPLETE) {
+      if (raw.blob) url = URL.createObjectURL(raw.blob);
+    }
+    this._faceCache.set(key, { id: raw.identifier, state: raw.state, url });
+    if (revokeUrl && revokeUrl !== url) queueMicrotask(() => URL.revokeObjectURL(revokeUrl));
+    return url;
+  }
+
+  get floorImageUrl(): string { return this.faceUrl('floor'); }
+  get undersideImageUrl(): string { return this.faceUrl('underside'); }
+  get wallTopImageUrl(): string { return this.faceUrl('wallTop'); }
+  get wallBottomImageUrl(): string { return this.faceUrl('wallBottom'); }
+  get wallLeftImageUrl(): string { return this.faceUrl('wallLeft'); }
+  get wallRightImageUrl(): string { return this.faceUrl('wallRight'); }
 
   movableOption: MovableOption = {};
   rotableOption: RotableOption = {};
@@ -219,9 +252,10 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   ngOnDestroy() {
     this.input.destroy();
     EventSystem.unregister(this);
-    for (const url of this._tmpImageUrls) {
-      if (url) URL.revokeObjectURL(url);
+    for (const entry of this._faceCache.values()) {
+      if (entry.url?.startsWith('blob:')) URL.revokeObjectURL(entry.url);
     }
+    this._faceCache.clear();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -275,27 +309,11 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   get floorModCss() {
-    let ret = '';
-    let tmp = 0;
-    switch (this.slopeDirection) {
-      case SlopeDirection.TOP:
-        tmp = Math.atan(this.height / this.depth);
-        ret = ' rotateX(' + tmp + 'rad) scaleY(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.BOTTOM:
-        tmp = Math.atan(this.height / this.depth);
-        ret = ' rotateX(' + -tmp + 'rad) scaleY(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.LEFT:
-        tmp = Math.atan(this.height / this.width);
-        ret = ' rotateY(' + -tmp + 'rad) scaleX(' + (1 / Math.cos(tmp)) + ')';
-        break;
-      case SlopeDirection.RIGHT:
-        tmp = Math.atan(this.height / this.width);
-        ret = ' rotateY(' + tmp + 'rad) scaleX(' + (1 / Math.cos(tmp)) + ')';
-        break;
-    }
-    return ret;
+    return this.terrain ? sharedFloorModCss(this.terrain) : '';
+  }
+
+  get slopeDegrees(): number {
+    return this.terrain ? slopeDegrees(this.terrain) : 0;
   }
 
   get floorBrightness() {

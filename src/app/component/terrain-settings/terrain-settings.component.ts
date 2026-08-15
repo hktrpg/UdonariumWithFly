@@ -2,6 +2,14 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges
 
 import { EventSystem, Network } from '@udonarium/core/system';
 import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
+import {
+  SLOPE_DEG_MAX,
+  SLOPE_DEG_MIN,
+  TERRAIN_SIZE_MIN,
+  TerrainFaceName,
+  setSlopeDegrees,
+  slopeDegrees,
+} from '@udonarium/terrain-surface';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { I18nService } from 'service/i18n.service';
@@ -21,6 +29,13 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   isSaveing = false;
   progresPercent = 0;
+  showFaceImages = false;
+  /** When resizing run length, keep incline degrees and rewrite height. */
+  lockSlopeDegrees = true;
+
+  readonly sizeMin = TERRAIN_SIZE_MIN;
+  readonly slopeDegMin = SLOPE_DEG_MIN;
+  readonly slopeDegMax = SLOPE_DEG_MAX;
 
   readonly modeOptions = [
     { value: TerrainViewState.ALL, labelKey: 'terrain.settings.modeAll' },
@@ -34,6 +49,14 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     { value: SlopeDirection.BOTTOM, labelKey: 'terrain.settings.slopeBottom' },
     { value: SlopeDirection.LEFT, labelKey: 'terrain.settings.slopeLeft' },
     { value: SlopeDirection.RIGHT, labelKey: 'terrain.settings.slopeRight' },
+  ];
+
+  readonly faceSlots: { face: TerrainFaceName; labelKey: string }[] = [
+    { face: 'underside', labelKey: 'terrain.settings.faceUnderside' },
+    { face: 'wallTop', labelKey: 'terrain.settings.faceWallTop' },
+    { face: 'wallBottom', labelKey: 'terrain.settings.faceWallBottom' },
+    { face: 'wallLeft', labelKey: 'terrain.settings.faceWallLeft' },
+    { face: 'wallRight', labelKey: 'terrain.settings.faceWallRight' },
   ];
 
   constructor(
@@ -74,16 +97,63 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     EventSystem.unregister(this);
   }
 
-  openImage(name: 'floor' | 'wall') {
+  get slopeDeg(): number {
+    if (!this.terrain?.isSlope) return 0;
+    return Math.round(slopeDegrees(this.terrain) * 10) / 10;
+  }
+
+  setSlopeDeg(value: number) {
     if (!this.terrain || this.GuestMode()) return;
+    setSlopeDegrees(this.terrain, +value);
+    this.changeDetector.markForCheck();
+  }
+
+  onWidthChange(value: number) {
+    if (!this.terrain || this.GuestMode()) return;
+    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
+    this.terrain.width = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
+      setSlopeDegrees(this.terrain, prevDeg);
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  onDepthChange(value: number) {
+    if (!this.terrain || this.GuestMode()) return;
+    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
+    this.terrain.depth = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
+      setSlopeDegrees(this.terrain, prevDeg);
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  onHeightChange(value: number) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.height = Math.max(0, +value || 0);
+    this.changeDetector.markForCheck();
+  }
+
+  facePreviewUrl(face: TerrainFaceName): string {
+    if (!this.terrain) return '';
+    // Own override if set, else fallback face (wall/floor) via Terrain.faceImage.
+    return this.terrain.faceImage(face)?.url || '';
+  }
+
+  faceIsOverride(face: TerrainFaceName): boolean {
+    return !!this.terrain?.hasOwnFaceImage(face);
+  }
+
+  openImage(name: TerrainFaceName) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.ensureFaceImageElements();
     const current = this.terrain.imageDataElement?.getFirstElementByName(name)?.value + '' || '';
     this.modalService.open<string>(FileSelecterComponent, {
       isAllowedEmpty: true,
       currentImageIdentifires: current && current !== 'null' ? [current] : []
     }).then(value => {
       if (!this.terrain || value == null) return;
-      const el = this.terrain.imageDataElement?.getFirstElementByName(name);
-      if (el) el.value = value;
+      this.terrain.setFaceImage(name, value);
       this.changeDetector.markForCheck();
     });
   }
@@ -116,16 +186,20 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   setSlopeDirection(value: number) {
     if (!this.terrain || this.GuestMode()) return;
+    const prevDeg = this.terrain.isSlope ? slopeDegrees(this.terrain) : 0;
     this.terrain.mutateAppearance(() => {
       this.terrain.slopeDirection = value;
       this.terrain.isSlope = value !== SlopeDirection.NONE;
     });
+    if (value !== SlopeDirection.NONE && this.lockSlopeDegrees && prevDeg >= SLOPE_DEG_MIN) {
+      setSlopeDegrees(this.terrain, prevDeg);
+    }
     this.changeDetector.markForCheck();
   }
 
   setAppearanceFlag(key:
     'isSlope' | 'isSurfaceShading' | 'isDropShadow' | 'isInteract' |
-    'affectsLight' | 'isLocked' | 'isAltitudeIndicate', value: boolean) {
+    'affectsLight' | 'isLocked' | 'isAltitudeIndicate' | 'mirrorWallTop' | 'mirrorWallLeft', value: boolean) {
     if (!this.terrain || this.GuestMode()) return;
     this.terrain.mutateAppearance(() => {
       (this.terrain as any)[key] = value;

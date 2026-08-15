@@ -104,6 +104,29 @@
   filter: brightness(0.8);
 }
 
+.of-underside {
+  top: 0px;
+  left: 0px;
+  transform-origin: 50% 50%;
+  transform: rotateX(180deg);
+  filter: brightness(0.55);
+  backface-visibility: hidden;
+}
+
+.of-underside.no-shadow {
+  filter: brightness(1.0);
+}
+
+.thin-hit-pad {
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+  opacity: 0;
+  /* Keep pickable while invisible */
+  pointer-events: auto;
+  z-index: 0;
+}
+
 .of-wall-top.is-slope, .of-wall-bottom.is-slope , .of-wall-left.is-slope, .of-wall-right.is-slope {
   clip-path: polygon(100% 0%, 0% 100%, 100% 100%);
 }

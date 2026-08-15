@@ -73,6 +73,8 @@ export const PLACEMENT_VIEW_STATE_KEYS = [
   'affectsLight',
   'isSlope',
   'slopeDirection',
+  'mirrorWallTop',
+  'mirrorWallLeft',
   // Mask desktop look
   'blendType',
   'borderType',
@@ -168,6 +170,8 @@ export function defaultPlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'affectsLight')) out.affectsLight = false;
   if (hasProp(obj, 'isSlope')) out.isSlope = false;
   if (hasProp(obj, 'slopeDirection')) out.slopeDirection = 0;
+  if (hasProp(obj, 'mirrorWallTop')) out.mirrorWallTop = true;
+  if (hasProp(obj, 'mirrorWallLeft')) out.mirrorWallLeft = true;
   if (hasProp(obj, 'blendType')) out.blendType = 0;
   if (hasProp(obj, 'borderType')) out.borderType = 1;
   if (hasProp(obj, 'textPosition')) out.textPosition = 'middle-center';
@@ -232,7 +236,7 @@ export function capturePlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'isLock')) out.isLock = !!obj.isLock;
 
   if (hasProp(obj, 'mode') && typeof obj.mode === 'number') out.terrainMode = readNum(obj, 'mode');
-  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope'] as const) {
+  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope', 'mirrorWallTop', 'mirrorWallLeft'] as const) {
     if (hasProp(obj, k)) out[k] = !!obj[k];
   }
   if (hasProp(obj, 'slopeDirection')) out.slopeDirection = readNum(obj, 'slopeDirection');
@@ -322,7 +326,7 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
     && !same(obj.mode, effective.terrainMode)) {
     obj.mode = effective.terrainMode;
   }
-  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope'] as const) {
+  for (const k of ['isSurfaceShading', 'isInteract', 'affectsLight', 'isSlope', 'mirrorWallTop', 'mirrorWallLeft'] as const) {
     setSync(k, effective[k]);
   }
   setSync('slopeDirection', effective.slopeDirection);

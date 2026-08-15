@@ -30,6 +30,7 @@ import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { folderBackupDebug } from 'service/folder-backup-debug';
+import { refineSlopePosZ } from '@udonarium/terrain-surface';
 
 type LayerName = string;
 
@@ -288,8 +289,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     pointer3d.x -= this.width / 2;
     pointer3d.y -= this.height / 2;
 
-    const nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
-    if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === nextZ) return;
+    const pickedZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    const nextX = pointer3d.x;
+    const nextY = pointer3d.y;
+    const nextZ = refineSlopePosZ(
+      this.tabletopObject,
+      nextX,
+      nextY,
+      this.width,
+      this.height,
+      pickedZ,
+    );
+    if (this.posX === nextX && this.posY === nextY && this.posZ === nextZ) return;
 
     if (!this.input.isDragging) this.ondragstart.emit(e as PointerEvent);
     this.ondrag.emit(e as PointerEvent);
@@ -300,19 +311,10 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       this.ratio += (ratio - this.ratio) * 0.1;
     }
 
-    //this.posX = this.pointer3d.x + (this.pointerOffset3d.x * this.ratio) + (-(this.width / 2) * (1.0 - this.ratio));
-    //this.posY = this.pointer3d.y + (this.pointerOffset3d.y * this.ratio) + (-(this.height / 2) * (1.0 - this.ratio));
-    //this.posZ = this.pointer3d.z;
-    //this.posX = pointer3d.x;
-    //this.posY = pointer3d.y;
-    //this.posZ = pointer3d.z;
-    
     //let tableSelecter = ObjectStore.instance.get<TableSelecter>('tableSelecter');
     const viewTable = TableSelecter.instance.viewTable;
     viewTable.gridClipRect = null;
     viewTable.gridHeight = this.posZ + 0.5;
-    const nextX = pointer3d.x;
-    const nextY = pointer3d.y;
     let delta = {
       x: nextX - this.posX,
       y: nextY - this.posY,
@@ -337,6 +339,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     };
 
     if (this.shouldSnapToGrid(e)) this.snapToGrid();
+
+    // Re-sample slope after grid snap so the token rests on the incline.
+    if (this.width > 0 && this.height > 0) {
+      this.posZ = refineSlopePosZ(
+        this.tabletopObject,
+        this.posX,
+        this.posY,
+        this.width,
+        this.height,
+        this.posZ,
+      );
+    }
 
     let delta = {
       x: this.posX - prev.x,

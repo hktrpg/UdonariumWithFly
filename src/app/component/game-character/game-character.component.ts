@@ -35,6 +35,7 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { sampleTerrainSurface, surfaceAlignCss } from '@udonarium/terrain-surface';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-status';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
@@ -166,6 +167,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }
     const alt = (-this.altitude) * this.gridSize;
     return `rotateY(90deg) rotateZ(-90deg) rotateY(-90deg) translateY(-50%) translateY(${alt}px)`;
+  }
+
+  /** Client-side incline match for isSlope bridges (does not write SyncVar roll). */
+  get surfaceAlignTransform(): string {
+    if (this.is2DMode) return '';
+    const piece = this.tablePiece ?? this.appearanceHost;
+    if (!piece) return '';
+    const half = (this.size * this.gridSize) / 2;
+    const sample = sampleTerrainSurface(
+      piece.location.x + half,
+      piece.location.y + half,
+    );
+    if (!sample) return '';
+    return surfaceAlignCss(sample, sample.terrain.rotate || 0);
   }
 
   

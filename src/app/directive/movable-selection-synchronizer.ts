@@ -4,12 +4,26 @@ import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
+import { refineSlopePosZ, applySlopePosZToObject, applySlopeFollowToMovablePose } from '@udonarium/terrain-surface';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TransformPose, UndoService } from 'service/undo.service';
 
 import { MovableDirective } from './movable.directive';
+
+function applySlopeToMovable(movable: MovableDirective) {
+  if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
+  if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
+  movable.posZ = applySlopeFollowToMovablePose(
+    movable.tabletopObject,
+    movable.posX,
+    movable.posY,
+    movable.width,
+    movable.height,
+    movable.posZ,
+  );
+}
 
 export class MovableSelectionSynchronizer {
   private static readonly objectMap: Map<TabletopObject, Set<MovableDirective>> = new Map();
@@ -368,6 +382,7 @@ export class MovableSelectionSynchronizer {
         if (MovableSelectionSynchronizer.isLocked(object)) continue;
         object.location.x += dx;
         object.location.y += dy;
+        applySlopePosZToObject(object as any);
         object.update();
         moved = true;
         continue;
@@ -376,6 +391,7 @@ export class MovableSelectionSynchronizer {
         if (movable.isDisable) continue;
         movable.posX += dx;
         movable.posY += dy;
+        applySlopeToMovable(movable);
         moved = true;
       }
     }
@@ -413,6 +429,7 @@ export class MovableSelectionSynchronizer {
         movable.setAnimatedTransition(true, durationMs);
         movable.posX = x - movable.width / 2;
         movable.posY = y - movable.height / 2;
+        applySlopeToMovable(movable);
         moved = true;
       }
     }
