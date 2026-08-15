@@ -171,7 +171,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   /**
    * Local-only pedestal tip from Terrain.floorHitAt (skybridge).
-   * Does not write SyncVar pitch/roll. Refreshed only on own pose / move — not every terrain tick.
+   * Does not write SyncVar pitch/roll. Refreshed on own pose / move and when terrain SyncVars update.
    */
   get slopeAlignTransform(): string {
     if (this.is2DMode) return '';
@@ -824,9 +824,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.changeDetector.markForCheck();
       })
       .on('UPDATE_GAME_OBJECT', event => {
-        const tableId = TableSelecter.instance?.viewTable?.identifier;
-        if (tableId && event.data?.identifier === tableId) {
+        const table = TableSelecter.instance?.viewTable;
+        const id = event.data?.identifier;
+        if (!table || !id) return;
+        if (id === table.identifier) {
           this.enforce2DRollZero();
+          this.refreshSlopeAlign();
+          this.changeDetector.markForCheck();
+          return;
+        }
+        // Terrain pose/slope changed underfoot: refresh local tip CSS only.
+        // Do not rewrite posZ here — every peer would SyncVar-fight; height catches up on next move.
+        if (event.data?.aliasName === 'terrain') {
           this.refreshSlopeAlign();
           this.changeDetector.markForCheck();
         }

@@ -5,6 +5,7 @@ import {
   resetTabletopStore,
   viewTables,
 } from '../../testing/tabletop-test.util';
+import { MovableSelectionSynchronizer } from '../directive/movable-selection-synchronizer';
 
 describe('Terrain.floorHitAt (compat ride surface)', () => {
   beforeEach(() => resetTabletopStore());
@@ -101,5 +102,14 @@ describe('Terrain.floorHitAt (compat ride surface)', () => {
     expect(t.height).toBeCloseTo(Math.tan((20 * Math.PI) / 180) * 4, 5);
     t.setSlopeDegrees(0);
     expect(t.isSlope).toBeFalse();
+  });
+});
+
+describe('MovableSelectionSynchronizer leave-floor policy', () => {
+  it('clears only when still on last ride Z (protects character stacks)', () => {
+    expect(MovableSelectionSynchronizer.shouldClearFloorRideOnLeave(100, 100)).toBeTrue();
+    expect(MovableSelectionSynchronizer.shouldClearFloorRideOnLeave(100.02, 100)).toBeTrue();
+    expect(MovableSelectionSynchronizer.shouldClearFloorRideOnLeave(150, 100)).toBeFalse();
+    expect(MovableSelectionSynchronizer.shouldClearFloorRideOnLeave(100, undefined)).toBeFalse();
   });
 });

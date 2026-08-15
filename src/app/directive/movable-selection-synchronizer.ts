@@ -17,12 +17,15 @@ export class MovableSelectionSynchronizer {
   private static readonly objectMap: Map<TabletopObject, Set<MovableDirective>> = new Map();
   /** Tracks whether the last sync placed this token on a terrain floor. */
   private static readonly floorRideActive = new WeakMap<object, boolean>();
+  /** Last terrain floor Z we wrote while riding — used so leave-to-0 does not wipe stacks. */
+  private static readonly floorRidePosZ = new WeakMap<object, number>();
+  private static readonly FLOOR_Z_EPS = 0.05;
 
   /**
    * Keep character/token feet on Terrain.floorHitAt while nudging / pathing.
    * No new SyncVars; only adjusts posZ when over an interactable floor.
-   * Leaving a previously tracked floor drops to 0 without touching character-stack rides
-   * that never used this path.
+   * Leaving a floor drops to 0 only when posZ still matches the last ride Z
+   * (character-stack / manual lifts that diverged are left alone).
    */
   static syncTerrainFloor(target: MovableDirective | TabletopObject): void {
     const asMovable = target as MovableDirective;
@@ -34,8 +37,21 @@ export class MovableSelectionSynchronizer {
     if (alias !== 'character' && alias !== 'character-token') return;
     if (TableSelecter.instance?.viewTable?.is2DMode) return;
 
+    const key: object = isMovable ? asMovable : object;
+    const readZ = () => (isMovable ? asMovable.posZ : object.posZ);
+    const writeZ = (z: number) => {
+      if (Math.abs(readZ() - z) < MovableSelectionSynchronizer.FLOOR_Z_EPS) return;
+      if (isMovable) asMovable.posZ = z;
+      else object.posZ = z;
+    };
+
     const terrains = TableSelecter.instance?.viewTable?.terrains;
-    if (!terrains?.length) return;
+    if (!terrains?.length) {
+      // Map switch / empty table: drop ride tracking only — do not force posZ.
+      MovableSelectionSynchronizer.floorRideActive.delete(key);
+      MovableSelectionSynchronizer.floorRidePosZ.delete(key);
+      return;
+    }
 
     let cx: number;
     let cy: number;
@@ -52,25 +68,27 @@ export class MovableSelectionSynchronizer {
     }
 
     const hit = Terrain.floorHitAt(terrains, cx, cy, 50);
-    const key: object = isMovable ? asMovable : object;
     if (hit) {
       MovableSelectionSynchronizer.floorRideActive.set(key, true);
-      // SyncVar setters always version-bump — skip no-op writes to avoid peer flood on WASD/path.
-      if (isMovable) {
-        if (Math.abs(asMovable.posZ - hit.posZ) >= 0.05) asMovable.posZ = hit.posZ;
-      } else if (Math.abs(object.posZ - hit.posZ) >= 0.05) {
-        object.posZ = hit.posZ;
-      }
+      MovableSelectionSynchronizer.floorRidePosZ.set(key, hit.posZ);
+      writeZ(hit.posZ);
       return;
     }
-    if (MovableSelectionSynchronizer.floorRideActive.get(key)) {
-      MovableSelectionSynchronizer.floorRideActive.set(key, false);
-      if (isMovable) {
-        if (Math.abs(asMovable.posZ) >= 0.05) asMovable.posZ = 0;
-      } else if (Math.abs(object.posZ) >= 0.05) {
-        object.posZ = 0;
-      }
+    if (!MovableSelectionSynchronizer.floorRideActive.get(key)) return;
+    MovableSelectionSynchronizer.floorRideActive.delete(key);
+    const lastZ = MovableSelectionSynchronizer.floorRidePosZ.get(key);
+    MovableSelectionSynchronizer.floorRidePosZ.delete(key);
+    // Only clear when still sitting on the ride height we last wrote.
+    if (lastZ == null) return;
+    if (Math.abs(readZ() - lastZ) < MovableSelectionSynchronizer.FLOOR_Z_EPS) {
+      writeZ(0);
     }
+  }
+
+  /** @internal test helper — true when leave should drop posZ to ground. */
+  static shouldClearFloorRideOnLeave(currentPosZ: number, lastFloorPosZ: number | undefined, eps = 0.05): boolean {
+    if (lastFloorPosZ == null) return false;
+    return Math.abs(currentPosZ - lastFloorPosZ) < eps;
   }
 
   get selectedMovables(): Set<MovableDirective> {
