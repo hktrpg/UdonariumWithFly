@@ -18,6 +18,19 @@ export enum SlopeDirection {
   RIGHT = 4,
 }
 
+/** CSS neon styles for signs / emissive facades (no WebGL bloom). */
+export enum TerrainNeonType {
+  NONE = 0,
+  SOFT = 1,
+  TUBE = 2,
+  EDGE = 3,
+  FLICKER = 4,
+  PULSE = 5,
+  STROBE = 6,
+}
+
+export const TERRAIN_NEON_DEFAULT_COLOR = '#33ffff';
+
 /** Optional per-face image element names (fallback to wall / floor). */
 export const TERRAIN_FACE_ELEMENTS: TerrainFaceName[] = [
   'floor',
@@ -47,6 +60,12 @@ export class Terrain extends TabletopObject {
    */
   @SyncVar() mirrorWallTop: boolean = true;
   @SyncVar() mirrorWallLeft: boolean = true;
+  /** Neon glow style; 0 = off. See TerrainNeonType. */
+  @SyncVar() neonType: number = TerrainNeonType.NONE;
+  /** CSS color for neon halo; empty uses default cyan. */
+  @SyncVar() neonColor: string = '';
+  @SyncVar() neonOnWalls: boolean = true;
+  @SyncVar() neonOnFloor: boolean = false;
 
   get width(): number { return this.getCommonValue('width', 1); }
   set width(width: number) { this.setCommonValue('width', width); }

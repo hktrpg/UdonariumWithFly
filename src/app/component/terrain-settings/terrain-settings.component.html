@@ -84,6 +84,30 @@
   </section>
 
   <section class="card card-dense">
+    <div class="field-row wrap">
+      <label class="field grow">
+        <span>{{ 'terrain.settings.neonType' | i18n }}</span>
+        <select [ngModel]="terrain.neonType" (ngModelChange)="setNeonType(+$event)" [disabled]="GuestMode()">
+          <option *ngFor="let opt of neonOptions" [ngValue]="opt.value">{{ opt.labelKey | i18n }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>{{ 'terrain.settings.neonColor' | i18n }}</span>
+        <input type="color" [ngModel]="neonColorInput" (ngModelChange)="setNeonColor($event)"
+          [disabled]="GuestMode() || terrain.neonType === 0" />
+      </label>
+    </div>
+    <div class="check-row tight neon-presets" *ngIf="terrain.neonType !== 0">
+      <button type="button" class="btn btn-sm" *ngFor="let p of neonPresets"
+        (click)="setNeonColor(p.value)" [disabled]="GuestMode()">{{ p.labelKey | i18n }}</button>
+    </div>
+    <div class="check-row tight">
+      <label><input type="checkbox" [ngModel]="terrain.neonOnWalls" (ngModelChange)="setAppearanceFlag('neonOnWalls', $event)" [disabled]="GuestMode() || terrain.neonType === 0" /> {{ 'terrain.settings.neonOnWalls' | i18n }}</label>
+      <label><input type="checkbox" [ngModel]="terrain.neonOnFloor" (ngModelChange)="setAppearanceFlag('neonOnFloor', $event)" [disabled]="GuestMode() || terrain.neonType === 0" /> {{ 'terrain.settings.neonOnFloor' | i18n }}</label>
+    </div>
+  </section>
+
+  <section class="card card-dense">
     <button type="button" class="btn btn-sm" (click)="showFaceImages = !showFaceImages">
       {{ (showFaceImages ? 'terrain.settings.hideFaces' : 'terrain.settings.showFaces') | i18n }}
     </button>

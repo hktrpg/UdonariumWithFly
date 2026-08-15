@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
-import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
+import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR } from '@udonarium/terrain';
 import {
   SLOPE_DEG_MAX,
   SLOPE_DEG_MIN,
@@ -58,6 +58,27 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     { face: 'wallLeft', labelKey: 'terrain.settings.faceWallLeft' },
     { face: 'wallRight', labelKey: 'terrain.settings.faceWallRight' },
   ];
+
+  readonly neonOptions = [
+    { value: TerrainNeonType.NONE, labelKey: 'terrain.settings.neonNone' },
+    { value: TerrainNeonType.SOFT, labelKey: 'terrain.settings.neonSoft' },
+    { value: TerrainNeonType.TUBE, labelKey: 'terrain.settings.neonTube' },
+    { value: TerrainNeonType.EDGE, labelKey: 'terrain.settings.neonEdge' },
+    { value: TerrainNeonType.FLICKER, labelKey: 'terrain.settings.neonFlicker' },
+    { value: TerrainNeonType.PULSE, labelKey: 'terrain.settings.neonPulse' },
+    { value: TerrainNeonType.STROBE, labelKey: 'terrain.settings.neonStrobe' },
+  ];
+
+  readonly neonPresets = [
+    { value: '#33ffff', labelKey: 'terrain.settings.neonPresetCyan' },
+    { value: '#ff3399', labelKey: 'terrain.settings.neonPresetMagenta' },
+    { value: '#ff3333', labelKey: 'terrain.settings.neonPresetRed' },
+    { value: '#33ff66', labelKey: 'terrain.settings.neonPresetGreen' },
+    { value: '#ffcc33', labelKey: 'terrain.settings.neonPresetAmber' },
+    { value: '#ffffff', labelKey: 'terrain.settings.neonPresetWhite' },
+  ];
+
+  readonly neonDefaultColor = TERRAIN_NEON_DEFAULT_COLOR;
 
   constructor(
     private changeDetector: ChangeDetectorRef,
@@ -197,9 +218,26 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  setNeonType(value: number) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.mutateAppearance(() => { this.terrain.neonType = value; });
+    this.changeDetector.markForCheck();
+  }
+
+  setNeonColor(value: string) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.mutateAppearance(() => { this.terrain.neonColor = value || ''; });
+    this.changeDetector.markForCheck();
+  }
+
+  get neonColorInput(): string {
+    return (this.terrain?.neonColor || '').trim() || this.neonDefaultColor;
+  }
+
   setAppearanceFlag(key:
     'isSlope' | 'isSurfaceShading' | 'isDropShadow' | 'isInteract' |
-    'affectsLight' | 'isLocked' | 'isAltitudeIndicate' | 'mirrorWallTop' | 'mirrorWallLeft', value: boolean) {
+    'affectsLight' | 'isLocked' | 'isAltitudeIndicate' | 'mirrorWallTop' | 'mirrorWallLeft' |
+    'neonOnWalls' | 'neonOnFloor', value: boolean) {
     if (!this.terrain || this.GuestMode()) return;
     this.terrain.mutateAppearance(() => {
       (this.terrain as any)[key] = value;

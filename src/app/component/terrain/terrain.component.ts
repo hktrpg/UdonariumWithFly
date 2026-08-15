@@ -15,7 +15,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { SlopeDirection, Terrain, TerrainViewState } from '@udonarium/terrain';
+import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR } from '@udonarium/terrain';
 import {
   TERRAIN_GRID_SIZE,
   TERRAIN_SIZE_MIN,
@@ -109,6 +109,35 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   get mirrorWallTop(): boolean { return this.terrain.mirrorWallTop !== false; }
   get mirrorWallLeft(): boolean { return this.terrain.mirrorWallLeft !== false; }
+
+  get neonType(): number { return this.terrain?.neonType || TerrainNeonType.NONE; }
+  get neonColorCss(): string {
+    const c = (this.terrain?.neonColor || '').trim();
+    return c || TERRAIN_NEON_DEFAULT_COLOR;
+  }
+  get neonStyle(): { [key: string]: string } | null {
+    if (this.neonType === TerrainNeonType.NONE) return null;
+    return { '--neon-color': this.neonColorCss };
+  }
+  get neonWallClass(): string {
+    if (this.neonType === TerrainNeonType.NONE || this.terrain?.neonOnWalls === false) return '';
+    return this.neonTypeClass;
+  }
+  get neonFloorClass(): string {
+    if (this.neonType === TerrainNeonType.NONE || !this.terrain?.neonOnFloor) return '';
+    return this.neonTypeClass;
+  }
+  private get neonTypeClass(): string {
+    switch (this.neonType) {
+      case TerrainNeonType.SOFT: return 'neon neon-soft';
+      case TerrainNeonType.TUBE: return 'neon neon-tube';
+      case TerrainNeonType.EDGE: return 'neon neon-edge';
+      case TerrainNeonType.FLICKER: return 'neon neon-flicker';
+      case TerrainNeonType.PULSE: return 'neon neon-pulse';
+      case TerrainNeonType.STROBE: return 'neon neon-strobe';
+      default: return '';
+    }
+  }
 
   get isVisibleFloor(): boolean { return 0 < this.width * this.depth; }
   get isVisibleWallTopBottom(): boolean { return 0 < this.width * this.height; }
@@ -334,6 +363,12 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         break;
     }
     return ret;
+  }
+
+  /** Floor filter; neon class owns filter when glowing. */
+  get floorFilterCss(): string {
+    if (this.neonFloorClass) return null;
+    return `brightness(${this.floorBrightness}) sharpen(1)`;
   }
 
   private selectedTerrains(): Terrain[] {

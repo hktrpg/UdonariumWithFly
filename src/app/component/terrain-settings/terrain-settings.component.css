@@ -10,3 +10,8 @@
   opacity: 0.65;
   font-weight: normal;
 }
+
+.terrain-settings .neon-presets {
+  gap: 4px;
+  flex-wrap: wrap;
+}
