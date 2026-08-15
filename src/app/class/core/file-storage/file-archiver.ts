@@ -170,17 +170,40 @@ export class FileArchiver {
     }
   }
 
+  /** True when this file should be imported as jukebox audio. */
+  private static isAudioFile(file: File): boolean {
+    return MimeType.isAudioFile(file);
+  }
+
   private async handleAudio(file: File) {
-    if (file.type.indexOf('audio/') < 0) return;
+    if (!FileArchiver.isAudioFile(file)) return;
     if (this.maxAudioeSize < file.size) {
       console.warn(`File size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    const nameService = AudioImportNameService.instance;
-    const displayName = nameService
-      ? await nameService.resolveDisplayName(file)
-      : undefined;
-    const created = await AudioFile.createAsync(file, displayName);
+    // Room ZIP / folder media are "<sha256>.ext". Display names + folders live in
+    // fly_audioLibrary.xml — do not treat restore as a fresh import (no name dialog,
+    // do not overwrite library names with the hash or re-parsed tags).
+    const restorePacked = MimeType.isRoomPackedAudioFileName(file.name)
+      || MimeType.isLegacyMisnamedAudioFile(file.name);
+
+    let displayName: string | undefined;
+    if (!restorePacked) {
+      const nameService = AudioImportNameService.instance;
+      displayName = nameService
+        ? await nameService.resolveDisplayName(file)
+        : undefined;
+    }
+
+    // Normalize legacy "<hash>.mpeg" (typed video/mpeg) to audio/mpeg + .mp3
+    // so the next save does not re-emit a video-colliding extension.
+    let importFile: File = file;
+    if (MimeType.isLegacyMisnamedAudioFile(file.name)) {
+      const base = MimeType.fileBaseName(file.name);
+      const ab = await file.arrayBuffer();
+      importFile = new File([ab], base.replace(/\.mpeg$/i, '.mp3'), { type: 'audio/mpeg' });
+    }
+    const created = await AudioFile.createAsync(importFile, restorePacked ? undefined : displayName);
     const existed = !!AudioStorage.instance.get(created.identifier);
     const audio = AudioStorage.instance.add(created);
     if (!audio) return;
@@ -189,7 +212,9 @@ export class FileArchiver {
       AudioLibrary.instance.ensureListed(audio.identifier);
       return;
     }
-    if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+    if (!restorePacked && displayName) {
+      AudioLibrary.instance.renameAudio(audio.identifier, displayName);
+    }
     AudioLibrary.instance.ensureListed(audio.identifier);
   }
 
@@ -204,8 +229,10 @@ export class FileArchiver {
   }
 
   private async handleVideo(file: File) {
+    // Audio wins when both handlers could match (esp. legacy "<hash>.mpeg" MP3s).
+    if (FileArchiver.isAudioFile(file)) return;
     const isVideo = (file.type && file.type.indexOf('video/') === 0)
-      || /\.(mp4|webm|mov|m4v|ogv)$/i.test(file.name);
+      || /\.(mp4|webm|mov|m4v|ogv|mpg|mpeg)$/i.test(file.name);
     if (!isVideo) return;
     if (this.maxVideoSize < file.size) {
       console.warn(`Video size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);

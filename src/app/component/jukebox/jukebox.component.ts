@@ -12,6 +12,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { Jukebox, JUKEBOX_TRACK_COUNT, JUKEBOX_WEATHER_TRACK, JUKEBOX_TRANSPORT_MAX, SOUNDBOARD_SLOT_COUNT, SOUNDBOARD_MAX_DURATION_SEC, SOUNDBOARD_PAD_COOLDOWN_MS, JukeboxTrackState, SoundboardSlot } from '@udonarium/Jukebox';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
@@ -619,7 +620,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   /**
    * Place ids on consecutive pads starting at `startIndex`, replacing whatever is there.
    * Clips longer than SOUNDBOARD_MAX_DURATION_SEC prompt once for OVER (allow onto pads).
-   * Declining OVER → soundboard folder only. Leftovers past slot 8 → folder only.
+   * Declining OVER → skip those files (no pad, no folder move). Leftovers past slot 8 → folder only.
    * Multi-file drops keep order; one confirm covers all over-limit files in the batch.
    */
   private async assignManyToSoundboard(startIndex: number, ids: string[]) {
@@ -651,20 +652,23 @@ export class JukeboxComponent implements OnInit, OnDestroy {
           : '';
         return `${this.displayName(c.audio)}${dur}`;
       }).join('\n');
-      allowOver = window.confirm(this.i18n.t('jukebox.soundboardOverConfirm', {
-        max: maxSec,
-        count: overList.length,
-        names,
-      }));
+      const confirmed = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('jukebox.soundboardOverConfirmTitle'),
+        text: this.i18n.t('jukebox.soundboardOverConfirm', {
+          max: maxSec,
+          count: overList.length,
+          names,
+        }),
+        materialIcon: 'timer',
+        type: ConfirmationType.OK_CANCEL,
+        okLabel: this.i18n.t('jukebox.soundboardOverConfirmOk'),
+        cancelLabel: this.i18n.t('confirm.cancel'),
+      });
+      allowOver = confirmed === true;
     }
 
     for (const c of candidates) {
-      if (c.over && !allowOver) {
-        const folder = this.ensureSoundboardFolder();
-        this.library.ensureListed(c.id, folder.id);
-        this.expandedFolders[folder.id] = true;
-        continue;
-      }
+      if (c.over && !allowOver) continue;
       if (pad >= SOUNDBOARD_SLOT_COUNT) {
         const folder = this.ensureSoundboardFolder();
         this.library.ensureListed(c.id, folder.id);
@@ -682,19 +686,14 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const files = event.dataTransfer?.files;
     this.clearDropState();
     if (!files?.length || this.GuestMode()) return;
-    const folder = this.ensureSoundboardFolder();
-    const beforeFolder = new Set(this.library.orderedIdsInFolder(folder.id));
+    // Import to library root first; assignMany moves confirmed clips into the soundboard folder.
+    // Avoid pre-listing into the soundboard folder so Cancel on OVER can abort with no move.
     const beforeAll = new Set(AudioStorage.instance.audios.map(a => a.identifier));
-    await this.importFilesToFolder(folder.id, files);
-    const after = this.library.orderedIdsInFolder(folder.id);
-    const newlyListed = after.filter(id => !beforeFolder.has(id));
+    await this.importFilesToFolder('', files);
     const newlyStored = AudioStorage.instance.audios
       .map(a => a.identifier)
       .filter(id => !beforeAll.has(id));
-    const ids = newlyListed.length
-      ? newlyListed
-      : (newlyStored.length ? newlyStored : after.slice(-files.length));
-    if (ids.length) void this.assignManyToSoundboard(index, ids);
+    if (newlyStored.length) void this.assignManyToSoundboard(index, newlyStored);
   }
 
   ngOnInit() {

@@ -4,6 +4,7 @@ import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-norma
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
+import { classifyNoteFile } from '@udonarium/note-file-kind';
 import { TextNote } from '@udonarium/text-note';
 
 import { PointerCoordinate } from 'service/pointer-device.service';
@@ -43,10 +44,10 @@ export class NoteImportService {
   private async importOne(file: File): Promise<TextNote | null> {
     if (!file) return null;
     const name = (file.name || '').replace(/\.[^.]+$/, '') || 'Note';
-    const type = (file.type || '').toLowerCase();
-    const lower = (file.name || '').toLowerCase();
+    const kind = classifyNoteFile(file);
+    if (!kind) return null;
 
-    if (type === 'application/pdf' || lower.endsWith('.pdf')) {
+    if (kind === 'pdf') {
       if (file.size > 20 * MEGA) return null;
       const pdf = await PdfStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 4, 5);
@@ -54,7 +55,7 @@ export class NoteImportService {
       return note;
     }
 
-    if (type.indexOf('video/') === 0 || /\.(mp4|webm|mov|m4v|ogv)$/i.test(lower)) {
+    if (kind === 'video') {
       if (file.size > 50 * MEGA) return null;
       const video = await VideoStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 5, 4);
@@ -62,7 +63,7 @@ export class NoteImportService {
       return note;
     }
 
-    if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(lower)) {
+    if (kind === 'image') {
       if (file.size > IMAGE_SOURCE_MAX_BYTES) return null;
       const image = await ImageStorage.instance.addAsync(file);
       const note = TextNote.create(name, '', 14, 3, 3);
@@ -71,15 +72,7 @@ export class NoteImportService {
       return note;
     }
 
-    if (
-      type.indexOf('text/') === 0
-      || type === 'application/json'
-      || /\.(txt|md|csv|json|html?|xml)$/i.test(lower)
-    ) {
-      const text = await file.text();
-      return TextNote.create(name, text.slice(0, 20000), 14, 3, 3);
-    }
-
-    return null;
+    const text = await file.text();
+    return TextNote.create(name, text.slice(0, 20000), 14, 3, 3);
   }
 }

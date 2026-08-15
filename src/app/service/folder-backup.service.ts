@@ -1580,7 +1580,10 @@ export class FolderBackupService implements OnDestroy {
     for (const name of mediaNames) {
       try {
         const file = await (await mediaDir.getFileHandle(name)).getFile();
-        loadFiles.unshift(new File([file], name, { type: file.type || MimeType.type(name) }));
+        // Prefer extension-based MIME: File System Access often leaves file.type empty,
+        // and empty||video/mpeg would mis-route legacy "<hash>.mpeg" MP3s.
+        const type = MimeType.type(name) || file.type || '';
+        loadFiles.unshift(new File([file], name, { type }));
       } catch {
         missing.push(name);
       }

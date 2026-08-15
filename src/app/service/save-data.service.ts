@@ -331,8 +331,9 @@ export class SaveDataService {
       for (const audio of AudioStorage.instance.audios) {
         if (audio.isHidden) continue;
         if (audio.state === AudioState.COMPLETE && audio.blob) {
-          const ext = MimeType.extension(audio.blob.type) || 'mp3';
-          files.push(new File([audio.blob], audio.identifier + '.' + ext, { type: audio.blob.type }));
+          const ext = MimeType.audioExtension(audio.blob.type || 'audio/mpeg');
+          const type = MimeType.audioMimeForExtension(ext);
+          files.push(new File([audio.blob], audio.identifier + '.' + ext, { type }));
         } else if (audio.state === AudioState.URL && StringUtil.validUrl(audio.url)) {
           urlAudioManifest.push({
             identifier: audio.identifier,

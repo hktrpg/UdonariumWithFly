@@ -14,6 +14,7 @@ import { ImageTag } from '@udonarium/image-tag';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
+import { classifyNoteFile, NoteFileKind } from '@udonarium/note-file-kind';
 
 import { DropCreateChooserComponent, DropCreateChoice } from 'component/drop-create-chooser/drop-create-chooser.component';
 import { I18nService } from 'service/i18n.service';
@@ -26,7 +27,7 @@ const MAX_IMAGE = IMAGE_SOURCE_MAX_BYTES;
 const MAX_PDF = 20 * MEGA;
 const MAX_VIDEO = 50 * MEGA;
 
-type DropKind = 'image' | 'pdf' | 'video' | 'text';
+type DropKind = NoteFileKind;
 type DropChoice =
   | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'mask' | 'coin' | 'library'
   | 'tableMap' | 'tableBackground';
@@ -378,18 +379,7 @@ export class TabletopFileDropService {
   }
 
   private classify(file: File): DropKind | null {
-    if (!file) return null;
-    const type = (file.type || '').toLowerCase();
-    const name = (file.name || '').toLowerCase();
-    if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(name)) return 'image';
-    if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
-    if (type.indexOf('video/') === 0 || /\.(mp4|webm|mov|m4v|ogv)$/i.test(name)) return 'video';
-    if (
-      type.indexOf('text/') === 0
-      || type === 'application/json'
-      || /\.(txt|md|csv|json|html?|xml)$/i.test(name)
-    ) return 'text';
-    return null;
+    return classifyNoteFile(file);
   }
 
   private isNoteCapable(file: File): boolean {

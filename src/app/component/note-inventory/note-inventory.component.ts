@@ -6,6 +6,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
+import { NOTE_FILE_ACCEPT } from '@udonarium/note-file-kind';
 
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
@@ -284,7 +285,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = 'image/*,video/*,application/pdf,text/plain,.md,.txt,.pdf,.mp4,.webm,.mov';
+    input.accept = NOTE_FILE_ACCEPT;
     input.onchange = async () => {
       if (!input.files?.length) return;
       await this.noteImport.importFiles(input.files, { addToTable: true });

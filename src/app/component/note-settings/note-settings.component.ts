@@ -4,6 +4,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
+import { classifyNoteFile, NOTE_FILE_ACCEPT } from '@udonarium/note-file-kind';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote, TextNoteContentMode, TextNoteScope } from '@udonarium/text-note';
@@ -153,7 +154,7 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
     if (this.GuestMode() || !this.note) return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*,application/pdf,text/plain,.md,.txt,.pdf,.mp4,.webm,.mov';
+    input.accept = NOTE_FILE_ACCEPT;
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
@@ -165,30 +166,28 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   private async applyFileToNote(file: File) {
     if (!this.note || !file) return;
-    const type = (file.type || '').toLowerCase();
-    const lower = (file.name || '').toLowerCase();
+    const kind = classifyNoteFile(file);
+    if (!kind) return;
     try {
-      if (type === 'application/pdf' || lower.endsWith('.pdf')) {
+      if (kind === 'pdf') {
         const pdf = await PdfStorage.instance.addAsync(file);
         this.note.setPdf(pdf.identifier);
         return;
       }
-      if (type.indexOf('video/') === 0 || /\.(mp4|webm|mov|m4v)$/i.test(lower)) {
+      if (kind === 'video') {
         const video = await VideoStorage.instance.addAsync(file);
         this.note.setVideo(video.identifier);
         return;
       }
-      if (type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp)$/i.test(lower)) {
+      if (kind === 'image') {
         const image = await ImageStorage.instance.addAsync(file);
         this.note.setFrontImage(image.identifier);
         this.note.contentMode = 'image';
         return;
       }
-      if (type.indexOf('text/') === 0 || /\.(txt|md)$/i.test(lower)) {
-        const text = await file.text();
-        this.note.text = text.slice(0, 20000);
-        this.note.contentMode = 'text';
-      }
+      const text = await file.text();
+      this.note.text = text.slice(0, 20000);
+      this.note.contentMode = 'text';
     } catch (err) {
       console.warn('note file apply failed', err);
     }

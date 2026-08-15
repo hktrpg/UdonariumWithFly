@@ -19,6 +19,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -173,7 +174,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get selectionState(): SelectionState { return this.selectionService.state(this.textNote); }
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }
   get isMagnetic(): boolean { return this.selectionState === SelectionState.MAGNETIC; }
-  get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.text)); }
+  get rubiedText(): string { return noteMarkdownToHtml(this.text); }
+
 
   private callbackOnMouseUp = (e) => this.onMouseUp(e);
   gridSize = 50;

@@ -14,6 +14,7 @@ import { renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
+import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { TextNote } from '@udonarium/text-note';
 
 export type NoteHandoutPayload = {
@@ -96,6 +97,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   get isPdf(): boolean { return !!this.pdfIdentifier; }
   get isVideo(): boolean { return !!this.resolvedVideoUrl; }
   get isText(): boolean { return !this.isPdf && !this.isVideo && !this.imageUrl && !!this.text; }
+  get textHtml(): string { return this.isText ? noteMarkdownToHtml(this.text) : ''; }
   get resolvedVideoUrl(): string {
     if (this.videoIdentifier) {
       const file = VideoStorage.instance.get(this.videoIdentifier);

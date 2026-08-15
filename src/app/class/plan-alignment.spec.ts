@@ -8,6 +8,7 @@ import {
   resetTabletopStore,
   viewTables,
 } from '../../testing/tabletop-test.util';
+import { OverviewPanelComponent } from 'component/overview-panel/overview-panel.component';
 
 describe('Plan alignment gaps', () => {
   beforeEach(() => {
@@ -176,5 +177,46 @@ describe('Plan alignment gaps', () => {
     tok.aura = 2;
     expect(CharacterToken.appearanceHostFor(body)).toBe(tok);
     expect(CharacterToken.appearanceHostFor(body, { preferredToken: tok })).toBe(tok);
+  });
+
+  it('overview face flag is on Token appearance host, not the sheet SyncVar', () => {
+    const body = makeCharacter('overview_face_body');
+    body.isUseIconToOverviewImage = false;
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, {
+      tableId: 'mapA',
+      copyAppearanceFrom: body,
+    });
+    tok.mutateAppearance(() => { tok.isUseIconToOverviewImage = true; });
+
+    expect(body.isUseIconToOverviewImage).toBeFalse();
+    expect(tok.isUseIconToOverviewImage).toBeTrue();
+    const host = CharacterToken.appearanceHostFor(body);
+    expect(host).toBe(tok);
+    expect(!!(host && host.isUseIconToOverviewImage)).toBeTrue();
+  });
+
+  it('OverviewPanel isUseIcon follows Token flag (not sheet SyncVar)', () => {
+    const body = makeCharacter('ov_panel_face');
+    Object.defineProperty(body, 'faceIcon', {
+      configurable: true,
+      get: () => ({ url: 'blob:test-face-icon' }),
+    });
+    body.isUseIconToOverviewImage = false;
+    const tok = CharacterToken.create(body.identifier, { x: 0, y: 0 }, {
+      tableId: 'mapA',
+      copyAppearanceFrom: body,
+    });
+    tok.mutateAppearance(() => { tok.isUseIconToOverviewImage = true; });
+
+    const panel = Object.create(OverviewPanelComponent.prototype) as OverviewPanelComponent;
+    panel.tabletopObject = tok;
+    expect(panel.isUseIcon).toBeTrue();
+
+    tok.mutateAppearance(() => { tok.isUseIconToOverviewImage = false; });
+    expect(panel.isUseIcon).toBeFalse();
+
+    tok.mutateAppearance(() => { tok.isUseIconToOverviewImage = true; });
+    panel.tabletopObject = body;
+    expect(panel.isUseIcon).toBeTrue();
   });
 });

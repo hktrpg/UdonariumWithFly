@@ -26,6 +26,6 @@
     <video *ngIf="isVideo" class="handout-video" [src]="resolvedVideoUrl | safe: 'resourceUrl'"
       controls playsinline [attr.autoplay]="isPreview ? null : ''"></video>
     <canvas *ngIf="isPdf" #pdfCanvas class="handout-pdf" (click)="close()"></canvas>
-    <pre *ngIf="isText" class="handout-text" (click)="close()">{{ text }}</pre>
+    <div *ngIf="isText" class="handout-text note-md" [innerHTML]="textHtml | safe: 'html'" (click)="close()"></div>
   </div>
 </div>

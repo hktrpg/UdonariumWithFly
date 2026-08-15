@@ -22,6 +22,7 @@ import { CharacterToken } from '@udonarium/character-token';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ModalService } from 'service/modal.service';
 import { Card, CardState } from '@udonarium/card';
@@ -71,10 +72,11 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     return null;
   }
 
-  /** Appearance host (Token preferred for FX / aura on map pieces). */
+  /** Appearance host (Token preferred for FX / aura / overview-face flag). */
   private get overviewAppearance(): GameCharacter | CharacterToken | null {
-    if (this.tabletopObject instanceof CharacterToken || this.tabletopObject instanceof GameCharacter) {
-      return this.tabletopObject;
+    if (this.tabletopObject instanceof CharacterToken) return this.tabletopObject;
+    if (this.tabletopObject instanceof GameCharacter) {
+      return CharacterToken.appearanceHostFor(this.tabletopObject) || this.tabletopObject;
     }
     return this.overviewCharacterBody;
   }
@@ -144,7 +146,15 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   get hasImage(): boolean { return 0 < this.imageUrl.length; }
   get isUseIcon(): boolean {
     const body = this.overviewCharacterBody;
-    return !!(body && body.isUseIconToOverviewImage && body.faceIcon && 0 < body.faceIcon.url?.length);
+    const host = this.overviewAppearance;
+    // Flag is per-map cosmetics on the Token; faceIcon image stays on the sheet.
+    return !!(
+      body &&
+      host &&
+      host.isUseIconToOverviewImage &&
+      body.faceIcon &&
+      0 < body.faceIcon.url?.length
+    );
   }
 
   get roll(): number {
@@ -516,9 +526,8 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
 
   adjustedRubiedNote(text, isRubied=true) {
     if (!text) return '';
-    let ret = StringUtil.escapeHtml(text);
-    if (isRubied) ret = StringUtil.rubyToHtml(ret);
-    return (ret.lastIndexOf("\n") == ret.length - 1) ? ret + "\n" : ret;
+    let ret = noteMarkdownToHtml(text, { ruby: isRubied });
+    return (ret.lastIndexOf('\n') == ret.length - 1) ? ret + '\n' : ret;
   }
 
   textAreaActivate() {
