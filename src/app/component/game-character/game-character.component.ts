@@ -178,6 +178,18 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     if (!piece) return;
     piece.mutateAppearance(() => { piece.rotate = rotate; });
   }
+  /** Lean from upright (degrees). 2D mode forces 0. */
+  get pitch(): number {
+    if (this.is2DMode) return 0;
+    return (this.appearanceHost as any)?.pitch ?? 0;
+  }
+  set pitch(pitch: number) {
+    if (this.is2DMode) return;
+    const host = this.appearanceHost as any;
+    if (!host || !('pitch' in host)) return;
+    const clamped = Math.max(-60, Math.min(90, pitch));
+    host.mutateAppearance(() => { host.pitch = clamped; });
+  }
   /** 2D mode: roll SyncVar is forced to 0 (no tip/tilt). */
   get roll(): number {
     if (this.is2DMode) return 0;
@@ -1315,6 +1327,16 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
             off: this.i18n.t('char.altitudeOff'),
             after,
           }),
+          {
+            name: this.i18n.t('char.pitch'),
+            action: null,
+            tip: this.i18n.t('char.pitchTip'),
+            subActions: [
+              { name: `${Math.abs(this.pitch) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.upright')}`, action: () => { this.pitch = 0; after(); } },
+              { name: `${Math.abs(this.pitch - 30) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.lean30')}`, action: () => { this.pitch = 30; after(); } },
+              { name: `${Math.abs(this.pitch - (-20)) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.awning')}`, action: () => { this.pitch = -20; after(); } },
+            ],
+          },
         ]),
         contextMenuToggleCheck({
           get: () => this.isDropShadow,

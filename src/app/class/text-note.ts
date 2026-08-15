@@ -18,6 +18,11 @@ export type TextNoteContentKind = 'text' | 'image' | 'video' | 'pdf';
 @SyncObject('text-note')
 export class TextNote extends TabletopObject {
   @SyncVar() rotate: number = 0;
+  /**
+   * Tip from upright toward the table (degrees). 0 = upright, 90 = flat.
+   * Negative leans past vertical (awning / hanging sign). Only used when isUpright.
+   */
+  @SyncVar() pitch: number = 0;
   @SyncVar() zindex: number = 0;
   @SyncVar() password: string = '';
   @SyncVar() isUpright: boolean = true;

@@ -44,7 +44,7 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　Shift＋WASD＝向き
 　　　　Q／E＝回転 ±45°
 　　　　Shift＋Q／E＝±15°
-　　　　R＝全角度リセット（向き／傾き）0°
+　　　　R＝全角度リセット（向き／roll／pitch）0°
 　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）
 　　　　F＝裏表反転（カード／コイン）またはダイス
 　　　　L＝ロック／解除
@@ -56,7 +56,8 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　[＝背面へ
 　　　　]＝前面へ
 　　　　Alt＋ホイール＝向き±3°
-　　　　Alt＋Shift＋ホイール＝傾き（roll）±3°
+　　　　Alt＋Shift＋ホイール＝傾き（roll）±3°／メモ pitch ±3°
+　　　　Ctrl＋Alt＋Shift＋ホイール＝キャラ pitch ±3°
 　　　　Ctrl＋Shift＋ホイール＝向き±45°
 　　　　ドロップ時 Shift＝一時グリッド非吸着
 　　　　Esc＝メニュー／ダイアログ閉じ → 下書き／選択解除（パネル閉じより先）→ 最前面パネル閉じ
@@ -138,7 +139,7 @@ Patreon：https://www.patreon.com/HKTRPG
 ・キーボード（選択中）：WASD 移動、Shift＋WASD 向き、Q／E 回転、R 全角度リセット、PageUp／Down 高さ、F 裏表、L ロック、H 秘匿（GM）、T マウス位置へ集める、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
 ・チャット：1–9 で閲覧可能タブ切替（チャットを開く；選択不要）
 ・C＝パネルをすべて閉じる；右クリックにショートカット表示（T）（L）など
-・[ / ] 前後層；Alt長押し＝卓上オブジェクトの枠表示（マップマスク下はGMのみ）；Alt＋ホイール（選択＝向き3°／未選択＝左右）；Alt＋Shift＋ホイール（選択＝roll／未選択＝上下）；Ctrl＋Shift＋ホイール 45°
+・[ / ] 前後層；Alt長押し＝卓上オブジェクトの枠表示（マップマスク下はGMのみ）；Alt＋ホイール（選択＝向き3°／未選択＝左右）；Alt＋Shift＋ホイール（選択＝roll またはメモ pitch／未選択＝上下）；Ctrl＋Alt＋Shift＋ホイール＝キャラ pitch；Ctrl＋Shift＋ホイール 45°；R＝向き／roll／pitch リセット
 ・Ctrl＋Shift＋D：DEBUG pose（視点／選択姿勢）；ホバー概要はピン留め可
 ・Shift＋ホイール左右パン；Ctrl＋ホイール上下パン
 ・経路：Token 選択 → Ctrl＋左経由点（Ctrl 離可）→ 左クリック終点または Space で移動；右クリックで最後の点を取消；Esc で取消

@@ -111,7 +111,29 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   get isUpright(): boolean { return this.is2DMode ? false : this.textNote.isUpright; }
   set isUpright(isUpright: boolean) {
     if (this.is2DMode) return; // 2D boards always render flat; keep stored preference for 3D maps
-    this.textNote.mutateAppearance(() => { this.textNote.isUpright = isUpright; });
+    this.textNote.mutateAppearance(() => {
+      this.textNote.isUpright = isUpright;
+      // Flat = tip 90°; restoring upright keeps last lean unless it was flat-only.
+      if (!isUpright) this.textNote.pitch = 90;
+      else if (this.textNote.pitch >= 90) this.textNote.pitch = 0;
+    });
+  }
+
+  /**
+   * Tip angle used in the upright→flat chain (degrees).
+   * 0 = upright billboard, 90 = table-flat; negative = past vertical (awning).
+   */
+  get pitch(): number {
+    if (this.is2DMode || !this.textNote.isUpright) return 90;
+    return this.textNote.pitch || 0;
+  }
+  set pitch(pitch: number) {
+    if (this.is2DMode) return;
+    const clamped = Math.max(-60, Math.min(90, pitch));
+    this.textNote.mutateAppearance(() => {
+      this.textNote.pitch = clamped;
+      this.textNote.isUpright = clamped < 90;
+    });
   }
   get isAltitudeIndicate(): boolean { return this.textNote.isAltitudeIndicate; }
   set isAltitudeIndicate(isAltitudeIndicate: boolean) {
@@ -537,6 +559,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
         disabled: this.is2DMode,
         tip: this.is2DMode ? this.i18n.t('note.upright2dLocked') : undefined,
       }),
+      ...(this.is2DMode ? [] : [{
+        name: this.i18n.t('note.pitch'),
+        action: null,
+        tip: this.i18n.t('note.pitchTip'),
+        subActions: [
+          { name: `${Math.abs(this.textNote.pitch || 0) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.upright')}`, action: () => { this.pitch = 0; after(); } },
+          { name: `${Math.abs((this.textNote.pitch || 0) - 30) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.lean30')}`, action: () => { this.pitch = 30; after(); } },
+          { name: `${Math.abs((this.textNote.pitch || 0) - 45) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.lean45')}`, action: () => { this.pitch = 45; after(); } },
+          { name: `${Math.abs((this.textNote.pitch || 0) - (-20)) < 0.5 ? '◉' : '○'} ${this.i18n.t('note.pitch.awning')}`, action: () => { this.pitch = -20; after(); } },
+          { name: `${Math.abs((this.textNote.pitch || 0) - 90) < 0.5 || !this.textNote.isUpright ? '◉' : '○'} ${this.i18n.t('note.pitch.flat')}`, action: () => { this.isUpright = false; after(); } },
+        ],
+      }]),
       contextMenuToggleCheck({
         get: () => this.isShowTitle,
         set: (v) => { this.isShowTitle = v; },

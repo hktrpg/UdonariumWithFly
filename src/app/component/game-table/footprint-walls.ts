@@ -56,7 +56,7 @@ export function collectFootprintWalls(
     if (!mask.affectsLight) continue;
     const w = Math.max(1, (mask.width || 1) * grid);
     const h = Math.max(1, (mask.height || 1) * grid);
-    out.push(rectToClosedWall(mask.location.x, mask.location.y, w, h));
+    out.push(rectToClosedWall(mask.location.x, mask.location.y, w, h, mask.rotate || 0));
   }
   for (const terrain of terrains || []) {
     if (terrain.location?.name !== 'table') continue;

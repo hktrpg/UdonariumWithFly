@@ -163,21 +163,32 @@ export class RotableSelectionSynchronizer {
     return RotableSelectionSynchronizer.applyAngle(targets, 'roll', current => current + delta);
   }
 
+  /** Lean from upright (notes / character billboards). No-ops without `pitch`. */
+  static pitchBy(targets: TabletopObject[], delta: number): boolean {
+    if (delta === 0) return false;
+    return RotableSelectionSynchronizer.applyAngle(
+      targets,
+      'pitch',
+      current => Math.max(-60, Math.min(90, current + delta)),
+    );
+  }
+
   static face(targets: TabletopObject[], angle: number): boolean {
     return RotableSelectionSynchronizer.applyAngle(targets, 'rotate', () => angle);
   }
 
-  /** Reset facing (`rotate`) and character tilt (`roll`) to 0° in one undo step. */
+  /** Reset facing (`rotate`), tilt (`roll`), and lean (`pitch`) to 0° in one undo step. */
   static resetAngles(targets: TabletopObject[]): boolean {
     const before = new Map<string, TransformPose>();
     for (const object of targets) {
-      if (!('rotate' in object) && !('roll' in object)) continue;
+      if (!('rotate' in object) && !('roll' in object) && !('pitch' in object)) continue;
       if ((object as any).isLocked || (object as any).isLock) continue;
       if (object instanceof GameCharacter && object.isLockedByPlayerOwner) continue;
       const pose = poseFromObjectAngles(object);
       const rotate = pose.rotate ?? 0;
       const roll = pose.roll ?? 0;
-      if (rotate === 0 && roll === 0) continue;
+      const pitch = pose.pitch ?? 0;
+      if (rotate === 0 && roll === 0 && pitch === 0) continue;
       before.set(object.identifier, pose);
     }
     if (before.size < 1) return false;
@@ -187,7 +198,7 @@ export class RotableSelectionSynchronizer {
       if (!before.has(object.identifier)) continue;
       const rotables = RotableSelectionSynchronizer.rotablesMap.get(object);
 
-      const applyProp = (property: 'rotate' | 'roll') => {
+      const applyProp = (property: 'rotate' | 'roll' | 'pitch') => {
         if (!(property in object)) return;
         if (rotables == null || rotables.size < 1) {
           (object as any)[property] = 0;
@@ -212,6 +223,7 @@ export class RotableSelectionSynchronizer {
 
       applyProp('rotate');
       applyProp('roll');
+      applyProp('pitch');
     }
 
     if (reset) {
@@ -227,7 +239,7 @@ export class RotableSelectionSynchronizer {
 
   private static applyAngle(
     targets: TabletopObject[],
-    property: 'rotate' | 'roll',
+    property: 'rotate' | 'roll' | 'pitch',
     nextAngle: (current: number) => number,
   ): boolean {
     const before = new Map<string, TransformPose>();
@@ -264,6 +276,9 @@ export class RotableSelectionSynchronizer {
       // Object has rotables but none for this property (e.g. roll on non-character): set data directly.
       if (!hit && property in object) {
         (object as any)[property] = nextAngle(+(object as any)[property] || 0);
+        if (property === 'pitch' && 'isUpright' in object) {
+          (object as any).isUpright = ((object as any).pitch ?? 0) < 90;
+        }
         rotated = true;
       }
     }
@@ -297,6 +312,9 @@ function poseFromRotable(rotable: RotableDirective): TransformPose {
       ? rotable.rotate
       : (+(object as any).roll || 0);
   }
+  if (object && 'pitch' in object) {
+    pose.pitch = +(object as any).pitch || 0;
+  }
   return pose;
 }
 
@@ -308,5 +326,6 @@ function poseFromObjectAngles(object: TabletopObject): TransformPose {
   };
   if ('rotate' in object) pose.rotate = +(object as any).rotate || 0;
   if ('roll' in object) pose.roll = +(object as any).roll || 0;
+  if ('pitch' in object) pose.pitch = +(object as any).pitch || 0;
   return pose;
 }

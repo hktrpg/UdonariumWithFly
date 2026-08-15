@@ -23,6 +23,8 @@ export interface TransformPose {
   rotate?: number;
   /** Character pedestal tilt (top rotate-grab uses targetPropertyName `roll`). */
   roll?: number;
+  /** Note / character lean from upright (degrees; 0 upright, 90 flat). */
+  pitch?: number;
 }
 
 export type DeleteEntry =
@@ -368,6 +370,9 @@ export function captureObjectPose(object: TabletopObject, rotate?: number): Tran
   if ('roll' in object) {
     pose.roll = +(object as any).roll || 0;
   }
+  if ('pitch' in object) {
+    pose.pitch = +(object as any).pitch || 0;
+  }
   return pose;
 }
 
@@ -394,6 +399,9 @@ function applyPoseMap(poses: Map<string, TransformPose>) {
     if (pose.roll != null && 'roll' in obj) {
       (obj as any).roll = pose.roll;
     }
+    if (pose.pitch != null && 'pitch' in obj) {
+      (obj as any).pitch = pose.pitch;
+    }
     // Movable/Rotable ignore self-UPDATE while selected — sync visuals directly.
     undo?.syncPoseVisual(obj, pose);
     obj.update();
@@ -403,7 +411,8 @@ function applyPoseMap(poses: Map<string, TransformPose>) {
 function posesEqual(a: TransformPose, b: TransformPose): boolean {
   return a.x === b.x && a.y === b.y && a.posZ === b.posZ
     && (a.rotate == null || b.rotate == null || a.rotate === b.rotate)
-    && (a.roll == null || b.roll == null || a.roll === b.roll);
+    && (a.roll == null || b.roll == null || a.roll === b.roll)
+    && (a.pitch == null || b.pitch == null || a.pitch === b.pitch);
 }
 
 function clonePoseMap(src: Map<string, TransformPose>): Map<string, TransformPose> {

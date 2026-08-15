@@ -22,10 +22,10 @@
         .push-pin translateZ(4px) can sit above the yarn plane (photo < yarn < pin).
       -->
       <div class="note-visual is-3d" [class.note-visual-pe-pass]="useFlatHitPlate"
-        [ngClass]="is2DMode ? null : {'fall': altitude == 0, 'softy': !isUpright}"
+        [ngClass]="is2DMode ? null : {'fall': altitude == 0, 'softy': pitch >= 45}"
         [ngStyle]="{'transform': 'translateZ(' + (is2DMode ? 0 : altitude * gridSize) + 'px)' + (is2DMode ? '' : ' rotateY(90deg)')}">
         <div class="is-3d" [class.is-transition]="!is2DMode"
-          [ngStyle]="is2DMode ? null : {'transform': 'rotateZ(' + (isUpright ? 0 : 90) + 'deg) rotateY(-90deg)'}">
+          [ngStyle]="is2DMode ? null : {'transform': 'rotateZ(' + pitch + 'deg) rotateY(-90deg)'}">
           <div class="upright-transform is-3d is-bg-color"
             [class.is-front]="!is2DMode"
             [class.note-flat-face-2d]="is2DMode"

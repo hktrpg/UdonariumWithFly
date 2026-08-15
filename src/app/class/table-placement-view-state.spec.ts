@@ -32,12 +32,14 @@ describe('table-placement-view-state', () => {
     const ch = makeCharacter('vs_char');
     ch.rotate = 12;
     ch.roll = 8;
+    ch.pitch = -15;
     ch.isInverse = true;
     ch.tokenFrame = 'polaroid';
 
     const snap = capturePlacementViewState(ch);
     expect(snap.rotate).toBe(12);
     expect(snap.roll).toBe(8);
+    expect(snap.pitch).toBe(-15);
     expect(snap.isInverse).toBeTrue();
     expect(snap.tokenFrame).toBe('polaroid');
     expect(snap.size).toBe(1);
@@ -48,12 +50,14 @@ describe('table-placement-view-state', () => {
 
     ch.rotate = 0;
     ch.roll = 0;
+    ch.pitch = 0;
     ch.isInverse = false;
     ch.tokenFrame = 'none';
     applyPlacementViewState(ch, snap);
 
     expect(ch.rotate).toBe(12);
     expect(ch.roll).toBe(8);
+    expect(ch.pitch).toBe(-15);
     expect(ch.isInverse).toBeTrue();
     expect(ch.tokenFrame).toBe('polaroid');
     expect(viewStatesEqual(snap, capturePlacementViewState(ch))).toBeTrue();

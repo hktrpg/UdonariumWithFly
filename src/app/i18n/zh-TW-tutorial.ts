@@ -44,7 +44,7 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　Shift＋WASD＝改變面向
 　　　　Q／E＝旋轉 ±45°
 　　　　Shift＋Q／E＝±15°
-　　　　R＝重置全部角度（面向／傾角）至 0°
+　　　　R＝重置全部角度（面向／roll／pitch）至 0°
 　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）
 　　　　F＝翻面（卡／硬幣）或擲骰
 　　　　L＝鎖定／解鎖
@@ -56,7 +56,8 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　[＝送到後層
 　　　　]＝送到前層
 　　　　Alt＋滾輪＝面向 ±3°
-　　　　Alt＋Shift＋滾輪＝立繪傾角（roll）±3°
+　　　　Alt＋Shift＋滾輪＝立繪傾角（roll）±3°／筆記仰角（pitch）±3°
+　　　　Ctrl＋Alt＋Shift＋滾輪＝角色仰角（pitch）±3°
 　　　　Ctrl＋Shift＋滾輪＝面向 ±45°
 　　　　拖曳放開時按住 Shift＝暫時不吸附格線
 　　　　Esc＝關選單／對話框 → 取消草稿／選取（優先於關視窗）→ 關閉最前視窗
@@ -138,7 +139,7 @@ Patreon：https://www.patreon.com/HKTRPG
 ・鍵盤（選取後）：WASD 移動、Shift＋WASD 面向、Q／E 旋轉、R 重置全部角度、PageUp／Down 高度、F 翻面、L 鎖定、H 顯隱（GM）、T 集中到滑鼠、Delete、Ctrl＋C　Ctrl＋X　Ctrl＋V、Ctrl＋Z／Y
 ・聊天：1–9 切換可檢視頻道（並開啟聊天；不需選取物件）
 ・C＝清空桌面視窗；右鍵選單顯示快捷鍵提示（T）（L）等
-・[ / ] 調整前後層；按住 Alt＝外框標示桌上物件（地圖遮罩下僅 GM 可見）；Alt＋滾輪（選取＝面向 3°／無選取＝視角左右）；Alt＋Shift＋滾輪（選取＝roll／無選取＝俯仰）；Ctrl＋Shift＋滾輪 45°
+・[ / ] 調整前後層；按住 Alt＝外框標示桌上物件（地圖遮罩下僅 GM 可見）；Alt＋滾輪（選取＝面向 3°／無選取＝視角左右）；Alt＋Shift＋滾輪（選取＝roll 或筆記 pitch／無選取＝俯仰）；Ctrl＋Alt＋Shift＋滾輪＝角色 pitch；Ctrl＋Shift＋滾輪 45°；R＝重置面向／roll／pitch
 ・Ctrl＋Shift＋D：DEBUG pose（視角／選取姿態）；浮動預覽可釘選固定
 ・Shift＋滾輪左右移動畫面；Ctrl＋滾輪上下移動畫面
 ・路徑移動：選取 Token → Ctrl＋左鍵加路點（可放開 Ctrl）→ 左鍵點終點或 Space 開始移動；右鍵取消最後路點；Esc 取消路徑

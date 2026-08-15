@@ -283,7 +283,7 @@ export class TabletopKeyboardService {
       return;
     }
 
-    // R: reset facing + tilt (roll) to 0°.
+    // R: reset facing + tilt (roll) + lean (pitch) to 0°.
     if (code === 'KeyR' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       if (this.selectionService.size < 1) return;
@@ -391,15 +391,17 @@ export class TabletopKeyboardService {
     if (Network.GuestMode()) return;
     // With selection:
     //   Alt+wheel → facing ±3° per notch
-    //   Alt+Shift+wheel → roll ±3° per notch
+    //   Alt+Shift+wheel → roll ±3° (characters) or pitch ±3° (notes / billboards)
+    //   Ctrl+Alt+Shift+wheel → pitch ±3° (characters that also have roll)
     //   Ctrl+Shift+wheel → facing ±45° per notch
     // Empty selection: Alt / Alt+Shift view rotate (±3°) is handled by TableMouseGesture.
     // Prefer live e.altKey for the gesture; also accept tracked altHeld.
     const alt = e.altKey || this.altHeld;
-    const isCtrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey;
+    const isCtrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey && !alt;
+    const isCtrlAltShift = alt && e.shiftKey && (e.ctrlKey || e.metaKey);
     const isAltOnly = alt && !e.ctrlKey && !e.metaKey && !e.shiftKey;
     const isAltShift = alt && e.shiftKey && !e.ctrlKey && !e.metaKey;
-    const stepDeg = isCtrlShift ? 45 : (isAltOnly || isAltShift) ? 3 : null;
+    const stepDeg = (isCtrlShift || isCtrlAltShift || isAltOnly || isAltShift) ? (isCtrlShift ? 45 : 3) : null;
     if (stepDeg == null) return;
     if (this.selectionService.size < 1) return;
 
@@ -422,8 +424,13 @@ export class TabletopKeyboardService {
     this.wheelAcc -= dir * notch;
     const delta = dir * stepDeg;
 
-    if (isAltShift) {
-      RotableSelectionSynchronizer.rollBy(this.selectionService.objects, delta);
+    if (isCtrlAltShift) {
+      RotableSelectionSynchronizer.pitchBy(this.selectionService.objects, delta);
+    } else if (isAltShift) {
+      // Prefer roll when present; otherwise lean (pitch) for notes / sign billboards.
+      if (!RotableSelectionSynchronizer.rollBy(this.selectionService.objects, delta)) {
+        RotableSelectionSynchronizer.pitchBy(this.selectionService.objects, delta);
+      }
     } else {
       RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta);
     }

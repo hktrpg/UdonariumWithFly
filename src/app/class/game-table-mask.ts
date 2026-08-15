@@ -28,6 +28,8 @@ import { TableSelecter } from './table-selecter';
 @SyncObject('table-mask')
 export class GameTableMask extends TabletopObject {
   @SyncVar() isLock: boolean = false;
+  /** Yaw on the table plane (degrees). Used for angled rooftop / street overlays. */
+  @SyncVar() rotate: number = 0;
   /** Dense paint order among layer peers (reconcile puts masks above desk). */
   @SyncVar() zindex: number = 0;
   @SyncVar() blendType: number = 0;

@@ -35,6 +35,8 @@ export class CharacterToken extends TabletopObject {
 
   @SyncVar() rotate: number = 0;
   @SyncVar() roll: number = 0;
+  /** Lean toward/away from vertical (degrees). Used for image billboards / signs. */
+  @SyncVar() pitch: number = 0;
   @SyncVar() zindex: number = 0;
   @SyncVar() isDropShadow: boolean = true;
   @SyncVar() isShowChatBubble: boolean = true;
@@ -391,6 +393,7 @@ export class CharacterToken extends TabletopObject {
   static copyTableAppearance(dest: CharacterToken, src: GameCharacter | CharacterToken) {
     dest.rotate = src.rotate ?? 0;
     dest.roll = (src as any).roll ?? 0;
+    dest.pitch = (src as any).pitch ?? 0;
     dest.zindex = src.zindex ?? 0;
     dest.isDropShadow = (src as any).isDropShadow ?? true;
     dest.isShowChatBubble = (src as any).isShowChatBubble ?? true;

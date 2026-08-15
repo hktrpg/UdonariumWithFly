@@ -18,6 +18,7 @@ export const PLACEMENT_VIEW_STATE_KEYS = [
   // Orientation / stack
   'rotate',
   'roll',
+  'pitch',
   'zindex',
   // Image face / FX
   'currntImageIndex',
@@ -122,6 +123,7 @@ export function defaultPlacementViewState(obj: any): PlacementViewState {
   if (!obj) return out;
   if (hasProp(obj, 'rotate')) out.rotate = 0;
   if (hasProp(obj, 'roll')) out.roll = 0;
+  if (hasProp(obj, 'pitch')) out.pitch = 0;
   // Dense layer order is owned by reconcileLayerStack / [ ]; placement default stays 0.
   if (hasProp(obj, 'zindex')) out.zindex = 0;
   if (hasProp(obj, 'currntImageIndex')) out.currntImageIndex = 0;
@@ -202,6 +204,7 @@ export function capturePlacementViewState(obj: any): PlacementViewState {
   if (hasProp(obj, 'rotate')) out.rotate = readNum(obj, 'rotate');
   // Store SyncVar roll as-is. 2D display forces 0 via component getter — never wipe tip here.
   if (hasProp(obj, 'roll')) out.roll = readNum(obj, 'roll');
+  if (hasProp(obj, 'pitch')) out.pitch = readNum(obj, 'pitch');
   if (hasProp(obj, 'zindex')) out.zindex = readNum(obj, 'zindex');
 
   if (hasProp(obj, 'currntImageIndex')) out.currntImageIndex = readNum(obj, 'currntImageIndex');
@@ -290,6 +293,7 @@ export function applyPlacementViewState(obj: any, pose: PlacementViewState | nul
 
   setSync('rotate', effective.rotate);
   setSync('roll', effective.roll);
+  setSync('pitch', effective.pitch);
   setSync('zindex', effective.zindex);
   setSync('currntImageIndex', effective.currntImageIndex);
   setSync('currntIconIndex', effective.currntIconIndex);

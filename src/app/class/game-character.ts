@@ -21,6 +21,8 @@ export class GameCharacter extends TabletopObject {
 
   @SyncVar() rotate: number = 0;
   @SyncVar() roll: number = 0;
+  /** Lean toward/away from vertical (degrees). Used for image billboards / signs. */
+  @SyncVar() pitch: number = 0;
   /**
    * Dense paint order among layer peers (0..n-1 after reconcile / [ ] / click).
    * Default hierarchy is applied by reconcileLayerStack (desk < mask < character).

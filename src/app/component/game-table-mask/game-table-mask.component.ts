@@ -22,6 +22,7 @@ import { MaskSettingsComponent } from 'component/mask-settings/mask-settings.com
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
+import { RotableOption } from 'directive/rotable.directive';
 import { ModalService } from 'service/modal.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
@@ -113,6 +114,11 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   get imageFile(): ImageFile { return this.gameTableMask.imageFile; }
   get isLock(): boolean { return this.gameTableMask.isLock; }
   set isLock(isLock: boolean) { this.gameTableMask.mutateAppearance(() => { this.gameTableMask.isLock = isLock; }); }
+
+  get rotate(): number { return this.gameTableMask.rotate || 0; }
+  set rotate(rotate: number) {
+    this.gameTableMask.mutateAppearance(() => { this.gameTableMask.rotate = rotate; });
+  }
   get blendType(): number { return this.gameTableMask.blendType; }
   set blendType(blendType: number) {
     this.gameTableMask.mutateAppearance(() => { this.gameTableMask.blendType = blendType; });
@@ -293,6 +299,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   viewRotateZ = 10;
 
   movableOption: MovableOption = {};
+  rotableOption: RotableOption = {};
 
   private input: InputHandler = null;
   
@@ -374,6 +381,10 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
       // Same height as note/card peers; [ ] order is DOM/z-index, not altitude.
       transformCssOffset: layerPeerMovableTransform(),
       colideLayers: ['terrain']
+    };
+    this.rotableOption = {
+      tabletopObject: this.gameTableMask,
+      grabbingSelecter: '.rotate-grab',
     };
     this.panelId = UUID.generateUuid();
   }

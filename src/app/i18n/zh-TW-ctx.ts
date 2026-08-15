@@ -33,6 +33,8 @@ export const zhTW_ctx: I18nDictionary = {
   'char.stackOff': '☐ 可疊在其他角色上',
   'char.altitudeOn': '☑ 顯示高度',
   'char.altitudeOff': '☐ 顯示高度',
+  'char.pitch': '仰角（招牌感）',
+  'char.pitchTip': 'Ctrl+Alt+Shift+滾輪微調（Alt+Shift 仍為左右傾 roll）。R 重設。',
   'char.resetAltitude': '將高度設為0',
   'char.resetAltitudeAll': '全部將高度設為0',
   'char.selectedCount': '已選擇 {{count}} 個角色',

@@ -56,8 +56,10 @@ Drag images or music into the browser to import.`,
 　　　　[ = send back
 　　　　] = bring front
 　　　　Alt+wheel = facing ±3°
-　　　　Alt+Shift+wheel = roll ±3°
+　　　　Alt+Shift+wheel = roll ±3° (characters) or pitch ±3° (notes)
+　　　　Ctrl+Alt+Shift+wheel = pitch ±3° (character billboards / signs)
 　　　　Ctrl+Shift+wheel = facing ±45°
+　　　　R = reset facing / roll / pitch to 0°
 　　　　Hold Shift on drop = temporary no grid snap
 　　　　Esc = close menu/dialog → clear draft/selection (before closing panels) → close frontmost panel
 <Keyboard (general)> C = close all desktop panels
@@ -138,7 +140,7 @@ Upgraded to 1.13.2`,
 ・Keyboard (with selection): WASD move, Shift+WASD face, Q/E rotate, R reset all angles, PageUp/Down altitude, F flip, L lock, H hide (GM), T gather to mouse, Delete, Ctrl+C　Ctrl+X　Ctrl+V, Ctrl+Z/Y
 ・Chat: 1–9 switch viewable tab (opens chat; no selection required)
 ・C = close all panels; context menu shows shortcut hints (T) (L) etc.
-・[ / ] layer order; hold Alt = outline table objects (under map masks: GM only); Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll / empty = pitch); Ctrl+Shift+wheel 45°
+・[ / ] layer order; hold Alt = outline table objects (under map masks: GM only); Alt+wheel (select = facing 3° / empty = yaw); Alt+Shift+wheel (select = roll or note pitch / empty = pitch); Ctrl+Alt+Shift+wheel = character pitch; Ctrl+Shift+wheel 45°; R = reset facing/roll/pitch
 ・Ctrl+Shift+D: DEBUG pose (view / selection pose); hover preview can be pinned
 ・Shift+wheel pan horizontal; Ctrl+wheel pan vertical
 ・Path move: select token → Ctrl+left waypoints (Ctrl can be released) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels
