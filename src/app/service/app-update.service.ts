@@ -32,7 +32,7 @@ export class AppUpdateService {
             if (permission === 'granted') {
               notification = new Notification('Udonarium with Fly', {
                 body: this.i18n.t('update.downloading'),
-                icon: 'card.png'
+                icon: 'hktrpg-icon.png'
               });
               notification.addEventListener('click', e => {
                 e.preventDefault();

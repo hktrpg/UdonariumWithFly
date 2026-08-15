@@ -28,7 +28,6 @@
               "src/hktrpg-icon.png",
               "src/assets",
               "src/manifest.webmanifest",
-              "src/card.png",
               "src/mobile.jpg",
               {
                 "glob": "pdf.worker.min.mjs",
