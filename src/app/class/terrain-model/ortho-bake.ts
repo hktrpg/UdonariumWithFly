@@ -1,17 +1,15 @@
-import { MeshIR, MODEL_BAKE_SIZE_DEFAULT, MODEL_BAKE_SIZE_MAX } from './mesh-ir';
 import { TerrainFaceName } from '@udonarium/terrain';
 
-export type BakedFaceBlobs = Partial<Record<TerrainFaceName, Blob>>;
+import { MeshAabb, MeshIR, MODEL_BAKE_SIZE_DEFAULT, MODEL_BAKE_SIZE_MAX } from './mesh-ir';
+import {
+  FACE_VIEWS,
+  aabbCenter as aabbCenterOf,
+  aabbMaxExtent,
+  canvasSizeForFace,
+  faceOrthoSize,
+} from './ortho-face-views';
 
-/** Internal Y-up orthographic views → Terrain face slots (validate with marked cube). */
-const FACE_VIEWS: { face: TerrainFaceName; eye: [number, number, number]; up: [number, number, number] }[] = [
-  { face: 'floor', eye: [0, 1, 0], up: [0, 0, -1] },
-  { face: 'underside', eye: [0, -1, 0], up: [0, 0, 1] },
-  { face: 'wallBottom', eye: [0, 0, -1], up: [0, 1, 0] },
-  { face: 'wallTop', eye: [0, 0, 1], up: [0, 1, 0] },
-  { face: 'wallLeft', eye: [-1, 0, 0], up: [0, 1, 0] },
-  { face: 'wallRight', eye: [1, 0, 0], up: [0, 1, 0] },
-];
+export type BakedFaceBlobs = Partial<Record<TerrainFaceName, Blob>>;
 
 /**
  * Bake six orthographic PNGs. Uses a temporary WebGL context then loses it.
@@ -19,6 +17,7 @@ const FACE_VIEWS: { face: TerrainFaceName; eye: [number, number, number]; up: [n
 export async function bakeSixOrthoFaces(
   mesh: MeshIR,
   size: number = MODEL_BAKE_SIZE_DEFAULT,
+  aabb: MeshAabb = mesh.aabb,
 ): Promise<BakedFaceBlobs> {
   const dim = Math.max(64, Math.min(MODEL_BAKE_SIZE_MAX, size | 0));
   const canvas = document.createElement('canvas');
@@ -33,21 +32,36 @@ export async function bakeSixOrthoFaces(
   if (!gl) throw new Error('MODEL_NO_WEBGL');
 
   try {
+    // Drop triangles outside this footprint box so sibling wings do not bleed
+    // into wall photos (same idea as glTF AABB clipping planes).
+    const clipped = filterMeshIrToAabb(mesh, aabb);
     const program = createProgram(gl);
-    const buffers = uploadMesh(gl, mesh);
-    const albedoTex = mesh.albedoImage ? createTexture(gl, mesh.albedoImage) : null;
-    const center = aabbCenter(mesh);
-    const half = aabbHalfExtent(mesh);
+    const buffers = uploadMesh(gl, clipped);
+    const albedoTex = clipped.albedoImage ? createTexture(gl, clipped.albedoImage) : null;
+    const center = aabbCenterOf(aabb);
+    const maxExtent = aabbMaxExtent(aabb);
     const out: BakedFaceBlobs = {};
 
     for (const view of FACE_VIEWS) {
-      drawView(gl, program, buffers, albedoTex, !!mesh.albedoImage, {
+      const face = faceOrthoSize(aabb, view.eye);
+      const { width, height } = canvasSizeForFace(
+        face.width,
+        face.height,
         dim,
+        aabbMaxExtent(mesh.aabb),
+      );
+      canvas.width = width;
+      canvas.height = height;
+      drawView(gl, program, buffers, albedoTex, !!clipped.albedoImage, {
+        width,
+        height,
         center,
-        half,
+        maxExtent,
+        faceWidth: face.width,
+        faceHeight: face.height,
         eyeDir: view.eye,
         up: view.up,
-        useVertexColor: !!mesh.vertexColors,
+        useVertexColor: !!clipped.vertexColors,
       });
       out[view.face] = await canvasToPngBlob(canvas);
     }
@@ -56,6 +70,58 @@ export async function bakeSixOrthoFaces(
     const lose = (gl as any).getExtension?.('WEBGL_lose_context');
     lose?.loseContext?.();
   }
+}
+
+/** Keep triangles whose XZ centroid is near/inside the box (Y unrestricted). */
+export function filterMeshIrToAabb(mesh: MeshIR, aabb: MeshAabb): MeshIR {
+  const pos = mesh.positions;
+  if (!pos?.length) return mesh;
+  // Generous XZ slack so shared cut faces / parapets are not dropped (tight
+  // filters caused transparent terrain edges). Far siblings still excluded.
+  const slack = Math.max(
+    (aabb.max[0] - aabb.min[0]) * 0.05,
+    (aabb.max[2] - aabb.min[2]) * 0.05,
+    aabbMaxExtent(aabb) * 0.02,
+    1e-4,
+  );
+  const keepIdx: number[] = [];
+  for (let i = 0; i + 8 < pos.length; i += 9) {
+    const cx = (pos[i] + pos[i + 3] + pos[i + 6]) / 3;
+    const cz = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3;
+    if (cx < aabb.min[0] - slack || cx > aabb.max[0] + slack) continue;
+    if (cz < aabb.min[2] - slack || cz > aabb.max[2] + slack) continue;
+    keepIdx.push(i);
+  }
+  if (!keepIdx.length) return mesh;
+  if (keepIdx.length * 9 === pos.length) return mesh;
+  const positions = new Float32Array(keepIdx.length * 9);
+  let o = 0;
+  for (const i of keepIdx) {
+    for (let k = 0; k < 9; k++) positions[o++] = pos[i + k];
+  }
+  const triangleCount = keepIdx.length;
+  const sliceAttr = (src: Float32Array | undefined, comps: number): Float32Array | undefined => {
+    if (!src) return undefined;
+    const out = new Float32Array(triangleCount * 3 * comps);
+    let d = 0;
+    for (const i of keepIdx) {
+      const base = (i / 9) * 3 * comps;
+      for (let k = 0; k < 3 * comps; k++) out[d++] = src[base + k];
+    }
+    return out;
+  };
+  return {
+    ...mesh,
+    positions,
+    normals: sliceAttr(mesh.normals, 3),
+    uvs: sliceAttr(mesh.uvs, 2),
+    vertexColors: sliceAttr(mesh.vertexColors, 3),
+    triangleCount,
+    aabb: {
+      min: [aabb.min[0], aabb.min[1], aabb.min[2]],
+      max: [aabb.max[0], aabb.max[1], aabb.max[2]],
+    },
+  };
 }
 
 type GpuBuffers = {
@@ -174,15 +240,18 @@ function drawView(
   albedoTex: WebGLTexture | null,
   useAlbedo: boolean,
   opts: {
-    dim: number;
+    width: number;
+    height: number;
     center: [number, number, number];
-    half: number;
+    maxExtent: number;
+    faceWidth: number;
+    faceHeight: number;
     eyeDir: [number, number, number];
     up: [number, number, number];
     useVertexColor: boolean;
   },
 ): void {
-  gl.viewport(0, 0, opts.dim, opts.dim);
+  gl.viewport(0, 0, opts.width, opts.height);
   gl.clearColor(0, 0, 0, 0);
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
@@ -195,14 +264,17 @@ function drawView(
   bindAttrib(gl, program, 'aUv', buffers.uv, 2);
   bindAttrib(gl, program, 'aCol', buffers.col, 3);
 
-  const extent = Math.max(opts.half * 1.05, 1e-3);
+  // Match terrain face exactly (no 1.05 pad — that left empty rims after stretch).
+  const hw = Math.max(opts.faceWidth * 0.5, 1e-3);
+  const hh = Math.max(opts.faceHeight * 0.5, 1e-3);
+  const camDist = Math.max(opts.maxExtent * 2, 1e-3);
   const eye: [number, number, number] = [
-    opts.center[0] + opts.eyeDir[0] * extent * 2,
-    opts.center[1] + opts.eyeDir[1] * extent * 2,
-    opts.center[2] + opts.eyeDir[2] * extent * 2,
+    opts.center[0] + opts.eyeDir[0] * camDist,
+    opts.center[1] + opts.eyeDir[1] * camDist,
+    opts.center[2] + opts.eyeDir[2] * camDist,
   ];
   const view = lookAt(eye, opts.center, opts.up);
-  const proj = ortho(-extent, extent, -extent, extent, 0.01, extent * 4);
+  const proj = ortho(-hw, hw, -hh, hh, 0.01, camDist * 2);
   const mvp = mul4(proj, view);
   const nMat = [
     view[0], view[1], view[2],
@@ -234,20 +306,6 @@ function bindAttrib(
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
-}
-
-function aabbCenter(mesh: MeshIR): [number, number, number] {
-  const { min, max } = mesh.aabb;
-  return [
-    (min[0] + max[0]) * 0.5,
-    (min[1] + max[1]) * 0.5,
-    (min[2] + max[2]) * 0.5,
-  ];
-}
-
-function aabbHalfExtent(mesh: MeshIR): number {
-  const { min, max } = mesh.aabb;
-  return 0.5 * Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2], 1e-3);
 }
 
 function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {

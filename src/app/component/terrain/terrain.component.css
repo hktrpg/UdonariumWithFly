@@ -247,14 +247,17 @@
   opacity: 0;
 }
 
-.rotate-grab-icon {
+.resize-grab {
+  opacity: 0;
+}
+
+.rotate-grab-icon,
+.resize-grab-icon {
   position: absolute;
   width: 28px;
   height: 28px;
   box-sizing: border-box;
   border: solid 2px #CCCCCC;
-  cursor: -moz-default;
-  cursor: -webkit-default;
   cursor: default;
   padding: 0;
   background-color: #CCCCCC;
@@ -266,7 +269,15 @@
   transform: translateZ(0.1px);
 }
 
-.component:hover .rotate-grab, .component:active .rotate-grab {
+.resize-grab-icon {
+  cursor: nwse-resize;
+  border-radius: 4px;
+}
+
+.component:hover .rotate-grab,
+.component:active .rotate-grab,
+.component:hover .resize-grab,
+.component:active .resize-grab {
   opacity: 1;
 }
 

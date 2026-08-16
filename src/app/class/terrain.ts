@@ -89,6 +89,16 @@ export class Terrain extends TabletopObject {
   @SyncVar() neonColor: string = '';
   @SyncVar() neonOnWalls: boolean = true;
   @SyncVar() neonOnFloor: boolean = false;
+  /**
+   * JSON: uncropped bake source image ids + W/E/S/N insets + uncropped grid size / table anchor.
+   * Empty for hand-made terrain. Used to reopen the shared crop preview.
+   */
+  @SyncVar() bakeCropJson: string = '';
+  /**
+   * Shared id for multi-box model imports. Same id → move / assemble as one group.
+   * Empty for hand-made or single-box terrain.
+   */
+  @SyncVar() bakeGroupId: string = '';
 
   get width(): number { return this.getCommonValue('width', 1); }
   set width(width: number) { this.setCommonValue('width', width); }

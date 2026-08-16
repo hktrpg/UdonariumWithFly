@@ -160,14 +160,20 @@ export class ImageFile {
     return new Promise((resolve, reject) => {
       let image: HTMLImageElement = new Image();
       image.onload = (event) => {
-        let scale: number = Math.min(128 / Math.max(image.width, image.height), 1.0);
-        let dstWidth = image.width * scale;
-        let dstHeight = image.height * scale;
+        const srcW = Math.max(0, image.width | 0);
+        const srcH = Math.max(0, image.height | 0);
+        if (srcW < 1 || srcH < 1) {
+          reject(new Error('IMAGE_EMPTY_DIMENSIONS'));
+          return;
+        }
+        let scale: number = Math.min(128 / Math.max(srcW, srcH), 1.0);
+        let dstWidth = Math.max(1, Math.round(srcW * scale));
+        let dstHeight = Math.max(1, Math.round(srcH * scale));
 
         let canvas: HTMLCanvasElement = document.createElement('canvas');
         let render: CanvasRenderingContext2D = canvas.getContext('2d');
-        canvas.width = image.width;
-        canvas.height = image.height;
+        canvas.width = srcW;
+        canvas.height = srcH;
 
         render.drawImage(image, 0, 0);
         CanvasUtil.resize(canvas, dstWidth, dstHeight, true);

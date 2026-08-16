@@ -1,8 +1,14 @@
 import { GameCharacter } from '@udonarium/game-character';
 import { TabletopObject } from '@udonarium/tabletop-object';
+import { Terrain } from '@udonarium/terrain';
+import {
+  bakeGroupPartsOf,
+  rotateBakeGroupBy,
+} from '@udonarium/terrain-model/bake-group';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TransformPose, UndoService } from 'service/undo.service';
 
+import { MovableDirective } from './movable.directive';
 import { RotableDirective } from './rotable.directive';
 
 export class RotableSelectionSynchronizer {
@@ -20,6 +26,9 @@ export class RotableSelectionSynchronizer {
   get isDestroyed(): boolean { return this._isDestroyed; }
 
   private undoTargets: Set<RotableDirective> = new Set();
+  private bakeGroupRotateStart = 0;
+  private bakeGroupParts: Terrain[] = [];
+  private bakeGroupStartPoses = new Map<string, { x: number; y: number; posZ: number; rotate: number }>();
 
   constructor(
     private rotable: RotableDirective,
@@ -38,6 +47,33 @@ export class RotableSelectionSynchronizer {
 
   prepareRotate() {
     this.beginUndoCapture();
+    this.absorbBakeGroupIntoSelection();
+    this.bakeGroupParts = [];
+    this.bakeGroupStartPoses.clear();
+    this.bakeGroupRotateStart = this.rotable.rotate;
+
+    const obj = this.rotable.tabletopObject;
+    if (obj instanceof Terrain && obj.bakeGroupId && this.rotable.targetPropertyName === 'rotate') {
+      this.bakeGroupParts = bakeGroupPartsOf(obj);
+      for (const t of this.bakeGroupParts) {
+        this.bakeGroupStartPoses.set(t.identifier, {
+          x: t.location?.x ?? 0,
+          y: t.location?.y ?? 0,
+          posZ: t.posZ || 0,
+          rotate: t.rotate || 0,
+        });
+        const set = RotableSelectionSynchronizer.rotablesMap.get(t);
+        set?.forEach(r => {
+          if (r.targetPropertyName === 'rotate') this.trackUndoTarget(r);
+        });
+        UndoService.instance?.rememberBeforePose(t.identifier, {
+          x: t.location?.x ?? 0,
+          y: t.location?.y ?? 0,
+          posZ: t.posZ || 0,
+          rotate: t.rotate || 0,
+        });
+      }
+    }
 
     if (1 < this.selection.size && this.rotable.state !== SelectionState.NONE) {
       for (let rotable of this.selectedRotables) {
@@ -47,12 +83,21 @@ export class RotableSelectionSynchronizer {
           this.trackUndoTarget(rotable);
         }
       }
-    } else {
+    } else if (!this.bakeGroupParts.length) {
       this.selection.clear();
     }
   }
 
   updateRotate() {
+    if (this.bakeGroupParts.length > 1 && this.rotable.targetPropertyName === 'rotate') {
+      const delta = this.rotable.rotate - this.bakeGroupRotateStart;
+      if (Math.abs(delta) < 1e-6) return;
+      // Reset to start pose then apply absolute delta (avoids compounding).
+      this.restoreBakeGroupStartPose();
+      rotateBakeGroupBy(this.bakeGroupParts, delta);
+      this.syncBakeGroupVisuals();
+      return;
+    }
     if (this.selection.size <= 1 || this.rotable.state === SelectionState.NONE) return;
     for (let rotable of this.selectedRotables) {
       if (rotable === this.rotable) continue;
@@ -65,6 +110,22 @@ export class RotableSelectionSynchronizer {
   }
 
   finishRotate() {
+    if (this.bakeGroupParts.length > 1 && this.rotable.targetPropertyName === 'rotate') {
+      const delta = this.rotable.rotate - this.bakeGroupRotateStart;
+      this.restoreBakeGroupStartPose();
+      rotateBakeGroupBy(this.bakeGroupParts, delta);
+      this.syncBakeGroupVisuals();
+      for (const t of this.bakeGroupParts) {
+        const set = RotableSelectionSynchronizer.rotablesMap.get(t);
+        set?.forEach(r => {
+          if (r.targetPropertyName === 'rotate') r.setAnimatedTransition(true);
+        });
+      }
+      this.commitUndoCapture();
+      this.bakeGroupParts = [];
+      this.bakeGroupStartPoses.clear();
+      return;
+    }
     if (1 < this.selection.size && this.rotable.state !== SelectionState.NONE) {
       for (let rotable of this.selectedRotables) {
         if (rotable === this.rotable) continue;
@@ -76,7 +137,38 @@ export class RotableSelectionSynchronizer {
         }
       }
     }
+    this.bakeGroupParts = [];
+    this.bakeGroupStartPoses.clear();
     this.commitUndoCapture();
+  }
+
+  private absorbBakeGroupIntoSelection() {
+    const obj = this.rotable.tabletopObject;
+    if (!(obj instanceof Terrain) || !obj.bakeGroupId) return;
+    if (this.rotable.state === SelectionState.NONE) return;
+    for (const sibling of bakeGroupPartsOf(obj)) {
+      if (sibling === obj) continue;
+      if (this.selection.state(sibling) === SelectionState.NONE) {
+        this.selection.add(sibling, SelectionState.SELECTED);
+      }
+    }
+  }
+
+  private restoreBakeGroupStartPose() {
+    for (const t of this.bakeGroupParts) {
+      const pose = this.bakeGroupStartPoses.get(t.identifier);
+      if (!pose) continue;
+      t.location = { name: 'table', x: pose.x, y: pose.y };
+      t.posZ = pose.posZ;
+      t.rotate = pose.rotate;
+    }
+  }
+
+  private syncBakeGroupVisuals() {
+    for (const t of this.bakeGroupParts) {
+      MovableDirective.syncPoseFromUndo(t, t.location.x, t.location.y, t.posZ || 0);
+      RotableSelectionSynchronizer.syncRotateFromUndo(t, { rotate: t.rotate || 0 });
+    }
   }
 
   /** Abort without committing (e.g. cancelled mid-drag). */
@@ -115,6 +207,14 @@ export class RotableSelectionSynchronizer {
     for (const rotable of this.undoTargets) {
       if (!rotable?.tabletopObject) continue;
       after.set(rotable.tabletopObject.identifier, poseFromRotable(rotable));
+    }
+    for (const t of this.bakeGroupParts) {
+      after.set(t.identifier, {
+        x: t.location?.x ?? 0,
+        y: t.location?.y ?? 0,
+        posZ: t.posZ || 0,
+        rotate: t.rotate || 0,
+      });
     }
     const label = this.rotable?.targetPropertyName === 'roll' ? 'roll' : 'rotate';
     this.undoTargets.clear();

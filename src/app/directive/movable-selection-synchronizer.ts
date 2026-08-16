@@ -6,6 +6,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Stackable } from '@udonarium/tabletop-object-util';
 import { Terrain } from '@udonarium/terrain';
+import { assembleBakeGroupAt, terrainsInBakeGroup } from '@udonarium/terrain-model/bake-group';
 import { IPoint2D, Transform } from '@udonarium/transform/transform';
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
@@ -146,9 +147,11 @@ export class MovableSelectionSynchronizer {
 
     if (this.selection.excludeElement == null) {
       this.toggleState();
+      this.syncBakeGroupSelectionAfterToggle();
       this.selection.excludeElement = this.movable.nativeElement;
     } else {
       this.movable.state = SelectionState.SELECTED;
+      this.absorbBakeGroupIntoSelection();
     }
   }
 
@@ -216,6 +219,7 @@ export class MovableSelectionSynchronizer {
 
   prepareMove() {
     this.beginUndoCapture();
+    this.absorbBakeGroupIntoSelection();
 
     if (!this.shouldSynchronize()) return;
 
@@ -230,6 +234,31 @@ export class MovableSelectionSynchronizer {
         this.trackUndoTarget(movable);
       }
     }
+  }
+
+  /** Multi-box model parts share bakeGroupId — select siblings so they drag as one. */
+  private absorbBakeGroupIntoSelection() {
+    const obj = this.movable.tabletopObject;
+    if (!(obj instanceof Terrain) || !obj.bakeGroupId) return;
+    if (this.movable.state === SelectionState.NONE) return;
+    for (const sibling of terrainsInBakeGroup(obj.bakeGroupId)) {
+      if (sibling === obj) continue;
+      if (this.selection.state(sibling) === SelectionState.NONE) {
+        this.selection.add(sibling, SelectionState.SELECTED);
+      }
+    }
+  }
+
+  private syncBakeGroupSelectionAfterToggle() {
+    const obj = this.movable.tabletopObject;
+    if (!(obj instanceof Terrain) || !obj.bakeGroupId) return;
+    if (this.movable.state === SelectionState.NONE) {
+      for (const sibling of terrainsInBakeGroup(obj.bakeGroupId)) {
+        this.selection.remove(sibling);
+      }
+      return;
+    }
+    this.absorbBakeGroupIntoSelection();
   }
 
   updateMove(delta: PointerCoordinate) {
@@ -295,7 +324,19 @@ export class MovableSelectionSynchronizer {
       return zindexA - zindexB;
     }).filter(movable => movable.state === SelectionState.MAGNETIC && movable !== this.movable);
 
-    let polygonal = 360 / movables.length;
+    // Bake-group parts must keep modeled spacing — do not ring-scatter them.
+    const dragTerrain = this.movable.tabletopObject instanceof Terrain
+      ? this.movable.tabletopObject
+      : null;
+    const bakeGroupId = dragTerrain?.bakeGroupId || '';
+    if (bakeGroupId) {
+      movables = movables.filter(m => {
+        const t = m.tabletopObject;
+        return !(t instanceof Terrain && t.bakeGroupId === bakeGroupId);
+      });
+    }
+
+    let polygonal = 360 / Math.max(1, movables.length);
     let angle = Math.random() * 360;
     let distance = Math.min(Math.max((this.movable.width + this.movable.height) / 2, 50), 75);
     let center = { x: this.movable.posX + this.movable.width / 2, y: this.movable.posY + this.movable.height / 2, z: this.movable.posZ };
@@ -409,6 +450,30 @@ export class MovableSelectionSynchronizer {
   }
 
   static congregate(center: PointerCoordinate, targets: TabletopObject[]) {
+    const bakeGrouped = targets.filter(
+      (t): t is Terrain => t instanceof Terrain && !!t.bakeGroupId,
+    );
+    if (bakeGrouped.length >= 2) {
+      const byId = new Map<string, Terrain[]>();
+      for (const t of bakeGrouped) {
+        const list = byId.get(t.bakeGroupId) || [];
+        list.push(t);
+        byId.set(t.bakeGroupId, list);
+      }
+      let assembled = false;
+      for (const [, parts] of byId) {
+        if (parts.length >= 2) {
+          assembleBakeGroupAt(parts, center);
+          assembled = true;
+        }
+      }
+      // Non-grouped leftovers still ring-gather.
+      const groupedIds = new Set(bakeGrouped.map(t => t.identifier));
+      targets = targets.filter(t => !groupedIds.has(t.identifier));
+      if (!targets.length) return;
+      if (assembled && targets.length < 2) return;
+    }
+
     let objects = targets.sort((a, b) => {
       let zindexA = (a as any).zindex;
       let zindexB = (b as any).zindex;

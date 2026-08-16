@@ -8,9 +8,11 @@ import {
   Input,
   NgZone,
   OnChanges,
-  OnDestroy
+  OnDestroy,
+  ViewChild,
 } from '@angular/core';
 import { ImageState } from '@udonarium/core/file-storage/image-file';
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
@@ -20,7 +22,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TerrainSettingsComponent } from 'component/terrain-settings/terrain-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
-import { MovableOption } from 'directive/movable.directive';
+import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ModalService } from 'service/modal.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
@@ -31,6 +33,17 @@ import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TerrainBakeCropService, TERRAIN_BAKE_CROP_PREVIEW } from 'service/terrain-bake-crop.service';
+import { emptyInsets, faceCropBackgroundStyle, parseBakeCropState } from '@udonarium/terrain-model/bake-crop';
+import {
+  assembleBakeGroupAt,
+  bakeGroupBoundsPx,
+  bakeGroupPartsOf,
+  clearBakeGroup,
+  scaleBakeGroupFrom,
+  terrainsInBakeGroup,
+} from '@udonarium/terrain-model/bake-group';
+import { wallLeftCssTransform } from '@udonarium/terrain-wall-transform';
 
 type FaceKey = 'floor' | 'underside' | 'wallTop' | 'wallBottom' | 'wallLeft' | 'wallRight';
 
@@ -44,6 +57,8 @@ type FaceKey = 'floor' | 'underside' | 'wallTop' | 'wallBottom' | 'wallLeft' | '
 export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   @Input() terrain: Terrain = null;
   @Input() is3D: boolean = false;
+  @ViewChild('scaleGrabLT') scaleGrabLTRef: ElementRef<HTMLElement>;
+  @ViewChild('scaleGrabRB') scaleGrabRBRef: ElementRef<HTMLElement>;
 
   get name(): string { return this.terrain.name; }
   get mode(): TerrainViewState { return this.terrain.mode; }
@@ -178,10 +193,16 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   private _faceCache = new Map<string, { id: string; state: number; url: string }>();
 
   private faceUrl(face: FaceKey | 'wall'): string {
-    const raw = face === 'wall'
-      ? this.imageService.getSkeletonOr(this.terrain.wallImage)
-      : this.imageService.getSkeletonOr(this.terrain.faceImage(face));
-    const key = face;
+    const live = this.bakeCrop.livePreviewFor(this.terrain?.identifier);
+    const state = live ? parseBakeCropState(this.terrain.bakeCropJson) : null;
+    const srcId = face === 'wall' ? state?.sources?.wallBottom : state?.sources?.[face];
+    const srcFile = srcId ? ImageStorage.instance.get(srcId) : null;
+    const raw = (live && srcFile)
+      ? this.imageService.getSkeletonOr(srcFile)
+      : (face === 'wall'
+        ? this.imageService.getSkeletonOr(this.terrain.wallImage)
+        : this.imageService.getSkeletonOr(this.terrain.faceImage(face)));
+    const key = live && srcId ? `${face}:src:${srcId}` : face;
     const prev = this._faceCache.get(key);
     if (prev && prev.id === raw.identifier && prev.state === raw.state) return prev.url;
 
@@ -201,6 +222,23 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   get wallBottomImageUrl(): string { return this.faceUrl('wallBottom'); }
   get wallLeftImageUrl(): string { return this.faceUrl('wallLeft'); }
   get wallRightImageUrl(): string { return this.faceUrl('wallRight'); }
+  get wallLeftTransform(): string { return wallLeftCssTransform(this.mirrorWallLeft); }
+
+  cropBgSize(face: FaceKey): string {
+    return this.faceCropStyle(face)['background-size'];
+  }
+
+  cropBgPos(face: FaceKey): string {
+    return this.faceCropStyle(face)['background-position'];
+  }
+
+  private faceCropStyle(face: FaceKey) {
+    const live = this.bakeCrop.livePreviewFor(this.terrain?.identifier);
+    if (!live) {
+      return { 'background-size': '100% 100%', 'background-position': '0% 0%', 'background-repeat': 'no-repeat' };
+    }
+    return faceCropBackgroundStyle(live[face] || emptyInsets());
+  }
 
   movableOption: MovableOption = {};
   rotableOption: RotableOption = {};
@@ -209,6 +247,17 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   slopeDirectionState = SlopeDirection;
 
   private input: InputHandler = null;
+  private scaleInputs: InputHandler[] = [];
+  private scaleCorner: 'lt' | 'rb' = 'rb';
+  private scaleStartTable = { x: 0, y: 0 };
+  private scaleStartBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0, cx: 0, cy: 0 };
+  private scaleStartSnapshots: Array<{
+    terrain: Terrain;
+    x: number;
+    y: number;
+    w: number;
+    d: number;
+  }> = [];
 
   constructor(
     private ngZone: NgZone,
@@ -222,7 +271,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService,
     private modalService: ModalService,
     private coordinateService: CoordinateService,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private bakeCrop: TerrainBakeCropService,
   ) { }
 
   GuestMode() {
@@ -255,6 +305,9 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       })
       .on(`UPDATE_SELECTION/identifier/${this.terrain?.identifier}`, event => {
         this.changeDetector.markForCheck();
+      })
+      .on(TERRAIN_BAKE_CROP_PREVIEW, event => {
+        if (event.data?.identifier === this.terrain?.identifier) this.changeDetector.markForCheck();
       });
     this.movableOption = {
       tabletopObject: this.terrain,
@@ -263,6 +316,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     this.rotableOption = {
       tabletopObject: this.terrain
     };
+    queueMicrotask(() => this.bindScaleGrabs());
   }
 
   ngAfterViewInit() {
@@ -270,15 +324,110 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       this.input = new InputHandler(this.elementRef.nativeElement);
     });
     this.input.onStart = this.onInputStart.bind(this);
+    queueMicrotask(() => this.bindScaleGrabs());
   }
 
   ngOnDestroy() {
-    this.input.destroy();
+    this.input?.destroy();
+    this.destroyScaleInputs();
     EventSystem.unregister(this);
     for (const entry of this._faceCache.values()) {
       if (entry.url?.startsWith('blob:')) URL.revokeObjectURL(entry.url);
     }
     this._faceCache.clear();
+  }
+
+  private destroyScaleInputs() {
+    for (const h of this.scaleInputs) h.destroy();
+    this.scaleInputs = [];
+  }
+
+  private bindScaleGrabs() {
+    if (this.isLocked || this.GuestMode()) {
+      this.destroyScaleInputs();
+      return;
+    }
+    const els: Array<{ el: HTMLElement | null; corner: 'lt' | 'rb' }> = [
+      { el: this.scaleGrabLTRef?.nativeElement || null, corner: 'lt' },
+      { el: this.scaleGrabRBRef?.nativeElement || null, corner: 'rb' },
+    ];
+    if (!els[0].el && !els[1].el) return;
+    if (this.scaleInputs.length >= 2) return;
+    this.destroyScaleInputs();
+    this.ngZone.runOutsideAngular(() => {
+      for (const { el, corner } of els) {
+        if (!el) continue;
+        const handler = new InputHandler(el);
+        handler.onStart = (ev) => this.onScaleStart(ev, corner);
+        handler.onMove = () => this.onScaleMove();
+        handler.onEnd = () => this.onScaleEnd();
+        this.scaleInputs.push(handler);
+      }
+    });
+  }
+
+  private onScaleStart(ev: MouseEvent | TouchEvent, corner: 'lt' | 'rb') {
+    ev?.stopPropagation?.();
+    if (this.GuestMode() || this.isLocked || !this.terrain) {
+      this.scaleInputs.forEach(h => h.cancel());
+      return;
+    }
+    this.scaleCorner = corner;
+    const table = this.coordinateService.calcTabletopLocalCoordinate();
+    this.scaleStartTable = { x: table.x, y: table.y };
+    const parts = bakeGroupPartsOf(this.terrain);
+    this.scaleStartBounds = bakeGroupBoundsPx(parts);
+    this.scaleStartSnapshots = parts.map(t => ({
+      terrain: t,
+      x: t.location?.x ?? 0,
+      y: t.location?.y ?? 0,
+      w: Math.max(TERRAIN_SIZE_MIN, t.width || 1),
+      d: Math.max(TERRAIN_SIZE_MIN, t.depth || 1),
+    }));
+  }
+
+  private onScaleMove() {
+    if (this.GuestMode() || this.isLocked || !this.scaleStartSnapshots.length) return;
+    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const dx = cur.x - this.scaleStartTable.x;
+    const dy = cur.y - this.scaleStartTable.y;
+    const b = this.scaleStartBounds;
+    const w0 = Math.max(1, b.maxX - b.minX);
+    const d0 = Math.max(1, b.maxY - b.minY);
+
+    let scaleX: number;
+    let scaleY: number;
+    let anchor: { x: number; y: number };
+    if (this.scaleCorner === 'rb') {
+      anchor = { x: b.minX, y: b.minY };
+      scaleX = Math.max(0.05, (w0 + dx) / w0);
+      scaleY = Math.max(0.05, (d0 + dy) / d0);
+    } else {
+      anchor = { x: b.maxX, y: b.maxY };
+      scaleX = Math.max(0.05, (w0 - dx) / w0);
+      scaleY = Math.max(0.05, (d0 - dy) / d0);
+    }
+
+    this.ngZone.run(() => {
+      for (const s of this.scaleStartSnapshots) {
+        s.terrain.mutateAppearance(() => {
+          s.terrain.width = s.w;
+          s.terrain.depth = s.d;
+        });
+        s.terrain.location = { name: 'table', x: s.x, y: s.y };
+      }
+      const parts = this.scaleStartSnapshots.map(s => s.terrain);
+      scaleBakeGroupFrom(parts, anchor, scaleX, scaleY);
+      for (const t of parts) {
+        MovableDirective.syncPoseFromUndo(t, t.location.x, t.location.y, t.posZ || 0);
+      }
+      this.changeDetector.markForCheck();
+    });
+  }
+
+  private onScaleEnd() {
+    this.scaleStartSnapshots = [];
+    this.changeDetector.markForCheck();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -365,7 +514,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let actions: ContextMenuAction[] = [];
 
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
-    actions.push({ name: this.i18n.t('terrain.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
+    const congregateLabel = this.selectionHasBakeGroup()
+      ? this.i18n.t('terrain.menu.25')
+      : this.i18n.t('terrain.menu.1');
+    actions.push({
+      name: congregateLabel,
+      hotkey: 'T',
+      action: () => this.selectionService.congregate(objectPosition),
+    });
 
     if (this.isMultiSelectedTerrains()) {
       let selectedGameTableMasks = () => this.selectedTerrains();
@@ -393,6 +549,10 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     return actions;
   }
 
+  private selectionHasBakeGroup(): boolean {
+    return this.selectedTerrains().some(t => !!t.bakeGroupId);
+  }
+
   private makeContextMenu(): ContextMenuAction[] {
     let objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
     let actions: ContextMenuAction[] = [
@@ -406,6 +566,23 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         off: this.i18n.t('terrain.menu.6'),
         hotkey: 'L',
       }),
+      ...(this.terrain?.bakeGroupId ? [
+        {
+          name: this.i18n.t('terrain.menu.25'),
+          action: () => {
+            const parts = terrainsInBakeGroup(this.terrain.bakeGroupId);
+            assembleBakeGroupAt(parts, objectPosition);
+          },
+        },
+        {
+          name: this.i18n.t('terrain.menu.26'),
+          action: () => {
+            clearBakeGroup(terrainsInBakeGroup(this.terrain.bakeGroupId));
+            this.selectionService.clear();
+          },
+        },
+        ContextMenuSeparator,
+      ] : []),
       (this.isLocked ? null : { name: this.i18n.t('terrain.overlapOrder', { flatOnly: this.height === 0 ? '' : this.i18n.t('terrain.dynamic.1') }), action: null, subActions: [
         {
           name: this.i18n.t('terrain.menu.7'), action: () => {
@@ -538,6 +715,11 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       ]),
       ContextMenuSeparator,
       { name: this.i18n.t('terrain.menu.20'), action: () => { this.showDetail(this.terrain); } },
+      (this.bakeCrop.hasSources(this.terrain) ? {
+        name: this.i18n.t('terrain.settings.cropPreview'),
+        action: () => { void this.bakeCrop.openEdit(this.terrain); },
+        disabled: this.GuestMode(),
+      } : null),
       (this.terrain.getUrls().length <= 0 ? null : {
         name: this.i18n.t('terrain.menu.21'), action: null,
         subActions: this.terrain.getUrls().map((urlElement) => {

@@ -8,6 +8,7 @@ import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
+import { TerrainBakeCropService } from 'service/terrain-bake-crop.service';
 
 @Component({
   selector: 'terrain-settings',
@@ -77,7 +78,8 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private saveDataService: SaveDataService,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private bakeCrop: TerrainBakeCropService,
   ) { }
 
   GuestMode() { return Network.GuestMode(); }
@@ -155,6 +157,16 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   faceIsOverride(face: TerrainFaceName): boolean {
     return !!this.terrain?.hasOwnFaceImage(face);
+  }
+
+  get hasBakeCrop(): boolean {
+    return this.bakeCrop.hasSources(this.terrain);
+  }
+
+  async openBakeCrop() {
+    if (!this.terrain || this.GuestMode() || !this.hasBakeCrop) return;
+    await this.bakeCrop.openEdit(this.terrain);
+    this.changeDetector.markForCheck();
   }
 
   openImage(name: TerrainFaceName) {

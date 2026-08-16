@@ -4,6 +4,7 @@ import {
   assertTriangleBudget,
   computeSmoothNormals,
 } from './mesh-ir';
+import { dirOfPackagePath, packagePathOf, resolvePackageFile } from './model-package-files';
 
 type Vec3 = [number, number, number];
 type Vec2 = [number, number];
@@ -15,9 +16,9 @@ type ObjIndex = { v: number; vt: number; vn: number };
  * Files are matched by basename (case-insensitive).
  */
 export async function parseObjPackage(files: File[]): Promise<MeshIR> {
-  const byName = indexFilesByBaseName(files);
-  const objFile = files.find(f => /\.obj$/i.test(f.name));
+  const objFile = files.find(f => /\.obj$/i.test(packagePathOf(f)) || /\.obj$/i.test(f.name));
   if (!objFile) throw new Error('MODEL_NO_OBJ');
+  const baseDir = dirOfPackagePath(packagePathOf(objFile));
 
   const objText = await objFile.text();
   const warnings: string[] = [];
@@ -79,17 +80,16 @@ export async function parseObjPackage(files: File[]): Promise<MeshIR> {
   let hadColor = false;
   let kd: Vec3 = [0.75, 0.75, 0.75];
 
-  const mtlBase = mtlFileName ? baseName(mtlFileName) : '';
-  const mtlFile = mtlBase
-    ? (byName.get(mtlBase.toLowerCase()) || byName.get(stripDir(mtlBase).toLowerCase()))
-    : files.find(f => /\.mtl$/i.test(f.name));
+  const mtlFile = mtlFileName
+    ? resolvePackageFile(files, mtlFileName, baseDir)
+    : files.find(f => /\.mtl$/i.test(packagePathOf(f)) || /\.mtl$/i.test(f.name));
 
   if (mtlFile) {
     const mtl = await mtlFile.text();
     const mat = parseMtl(mtl);
     kd = mat.kd;
     if (mat.mapKd) {
-      const tex = findTexture(byName, mat.mapKd);
+      const tex = resolvePackageFile(files, mat.mapKd, baseDir);
       if (tex) {
         albedoImage = await loadImageFromFile(tex);
         hadColor = true;
@@ -149,29 +149,6 @@ function parseMtl(text: string): { kd: Vec3; mapKd: string } {
     }
   }
   return { kd, mapKd };
-}
-
-function indexFilesByBaseName(files: File[]): Map<string, File> {
-  const map = new Map<string, File>();
-  for (const f of files) {
-    const base = stripDir(f.name).toLowerCase();
-    map.set(base, f);
-    map.set(f.name.toLowerCase(), f);
-  }
-  return map;
-}
-
-function findTexture(byName: Map<string, File>, ref: string): File | undefined {
-  const base = stripDir(ref).toLowerCase();
-  return byName.get(base) || byName.get(ref.toLowerCase());
-}
-
-function stripDir(path: string): string {
-  return path.replace(/^.*[\\/]/, '');
-}
-
-function baseName(path: string): string {
-  return stripDir(path);
 }
 
 function hasNonZeroNormals(n: Float32Array): boolean {

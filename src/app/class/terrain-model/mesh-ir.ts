@@ -24,11 +24,14 @@ export type MeshIR = {
 };
 
 export const MODEL_MAX_TRIANGLES = 80_000;
-export const MODEL_MAX_FILE_BYTES = 20 * 1024 * 1024;
+export const MODEL_MAX_FILE_BYTES = 192 * 1024 * 1024;
 export const MODEL_BAKE_SIZE_DEFAULT = 256;
-export const MODEL_BAKE_SIZE_MAX = 512;
+export const MODEL_BAKE_SIZE_MAX = 1024;
+export const MODEL_PHOTO_BAKE_SIZE = 1024;
 /** 1 STL/OBJ unit = 1mm; 50mm = 1 table grid. */
 export const MODEL_MM_PER_GRID_DEFAULT = 50;
+/** Imported models smaller than this (meters-as-mm, etc.) become unusable on the table. */
+export const MODEL_GRID_EDGE_MIN = 2;
 export const MODEL_GRID_EDGE_MAX = 40;
 export const MODEL_IMAGE_TAG = 'terrain-bake';
 
@@ -112,4 +115,55 @@ export function aabbToGridSize(
     height: sy / g,
     depth: sz / g,
   };
+}
+
+export function clampModelGridEdge(v: number): number {
+  if (!Number.isFinite(v) || v < MODEL_GRID_EDGE_MIN) return MODEL_GRID_EDGE_MIN;
+  return Math.min(MODEL_GRID_EDGE_MAX, v);
+}
+
+/** Uniform scale into [MODEL_GRID_EDGE_MIN, MODEL_GRID_EDGE_MAX]. */
+export function fitModelGridSize(
+  width: number,
+  depth: number,
+  height: number,
+): { width: number; depth: number; height: number } {
+  let w = Math.max(0, width);
+  let d = Math.max(0, depth);
+  let h = Math.max(0, height);
+  const biggest = Math.max(w, d, h, 1e-9);
+  if (biggest > MODEL_GRID_EDGE_MAX) {
+    const s = MODEL_GRID_EDGE_MAX / biggest;
+    w *= s;
+    d *= s;
+    h *= s;
+  }
+  const smallest = Math.min(w, d, h);
+  if (smallest > 0 && smallest < MODEL_GRID_EDGE_MIN) {
+    const s = MODEL_GRID_EDGE_MIN / smallest;
+    w *= s;
+    d *= s;
+    h *= s;
+    const biggest2 = Math.max(w, d, h);
+    if (biggest2 > MODEL_GRID_EDGE_MAX) {
+      const s2 = MODEL_GRID_EDGE_MAX / biggest2;
+      w *= s2;
+      d *= s2;
+      h *= s2;
+    }
+  }
+  return {
+    width: clampModelGridEdge(w),
+    depth: clampModelGridEdge(d),
+    height: clampModelGridEdge(h),
+  };
+}
+
+/** Uniform scale implied by {@link fitModelGridSize} (dominant axis). */
+export function uniformFitScale(width: number, depth: number, height: number): number {
+  const fitted = fitModelGridSize(width, depth, height);
+  if (width >= depth && width >= height && width > 1e-9) return fitted.width / width;
+  if (depth >= width && depth >= height && depth > 1e-9) return fitted.depth / depth;
+  if (height > 1e-9) return fitted.height / height;
+  return 1;
 }

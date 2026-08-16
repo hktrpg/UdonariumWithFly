@@ -91,6 +91,7 @@ import { NoteHandoutComponent } from './component/note-handout/note-handout.comp
 import { NoteSettingsComponent } from './component/note-settings/note-settings.component';
 import { MaskSettingsComponent } from './component/mask-settings/mask-settings.component';
 import { TerrainSettingsComponent } from './component/terrain-settings/terrain-settings.component';
+import { TerrainBakeCropComponent } from './component/terrain-bake-crop/terrain-bake-crop.component';
 import { CardSettingsComponent } from './component/card-settings/card-settings.component';
 import { CardStackSettingsComponent } from './component/card-stack-settings/card-stack-settings.component';
 import { DiceSettingsComponent } from './component/dice-settings/dice-settings.component';
@@ -184,6 +185,7 @@ import '@udonarium/table-fx/combat-tracker';
     NoteSettingsComponent,
     MaskSettingsComponent,
     TerrainSettingsComponent,
+    TerrainBakeCropComponent,
     CardSettingsComponent,
     CardStackSettingsComponent,
     DiceSettingsComponent,

@@ -45,6 +45,11 @@
         <input type="number" step="0.5" [(ngModel)]="terrain.altitude" [disabled]="GuestMode()" />
       </label>
     </div>
+    <div class="field-row wrap" *ngIf="hasBakeCrop">
+      <button type="button" class="btn btn-sm" (click)="openBakeCrop()" [disabled]="GuestMode()">
+        {{ 'terrain.settings.cropPreview' | i18n }}
+      </button>
+    </div>
   </section>
 
   <section class="card card-dense">

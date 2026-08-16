@@ -21,12 +21,17 @@ import {
   modelImportErrorI18nKey,
 } from '@udonarium/terrain-model/model-terrain-import';
 import { MODEL_MAX_FILE_BYTES } from '@udonarium/terrain-model/mesh-ir';
+import { expandModelDropFiles, isZipFile, packagePathOf } from '@udonarium/terrain-model/model-package-files';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { DropCreateChooserComponent, DropCreateChoice } from 'component/drop-create-chooser/drop-create-chooser.component';
+import { footprintDebug } from '@udonarium/terrain-model/footprint-debug';
+import { MovableDirective } from 'directive/movable.directive';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { NoteImportService } from 'service/note-import.service';
 import { PointerCoordinate } from 'service/pointer-device.service';
+import { TabletopSelectionService } from 'service/tabletop-selection.service';
+import { TerrainBakeCropService } from 'service/terrain-bake-crop.service';
 
 const MEGA = 1024 * 1024;
 const MAX_IMAGE = IMAGE_SOURCE_MAX_BYTES;
@@ -47,6 +52,8 @@ export class TabletopFileDropService {
     private modalService: ModalService,
     private noteImport: NoteImportService,
     private i18n: I18nService,
+    private bakeCrop: TerrainBakeCropService,
+    private selection: TabletopSelectionService,
   ) { }
 
   hasFileDrag(e: DragEvent): boolean {
@@ -64,12 +71,24 @@ export class TabletopFileDropService {
   async handleDrop(files: FileList | File[], position: PointerCoordinate): Promise<void> {
     if (this.busy || Network.GuestMode()) return;
     const raw = Array.from(files || []);
-    const asModelPackage = dropLooksLikeModelPackage(raw);
-    const accepted = this.filterAccepted(raw, asModelPackage);
-    if (!accepted.length) return;
-
     this.busy = true;
     try {
+      let expanded: File[];
+      try {
+        expanded = await expandModelDropFiles(raw);
+      } catch (err) {
+        const key = modelImportErrorI18nKey(err);
+        void this.modalService.open(ConfirmationComponent, {
+          title: this.i18n.t('modelImport.errorTitle'),
+          text: this.i18n.t(key),
+          type: ConfirmationType.OK,
+          okLabel: this.i18n.t('common.ok'),
+        });
+        return;
+      }
+      const asModelPackage = dropLooksLikeModelPackage(expanded);
+      const accepted = this.filterAccepted(expanded, asModelPackage);
+      if (!accepted.length) return;
       const images = accepted.filter(f => this.classify(f, asModelPackage) === 'image');
       const notes = accepted.filter(f => this.isNoteCapable(f, asModelPackage));
       const modelFiles = asModelPackage ? accepted : [];
@@ -237,9 +256,48 @@ export class TabletopFileDropService {
 
   private async createTerrainFromModel(files: File[], position: PointerCoordinate): Promise<boolean> {
     try {
-      await importModelAsTerrain(files, position);
+      const preview = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('modelImport.previewAskTitle'),
+        text: this.i18n.t('modelImport.previewAsk'),
+        type: ConfirmationType.OK_CANCEL,
+        okLabel: this.i18n.t('modelImport.previewAskOk'),
+        cancelLabel: this.i18n.t('modelImport.previewAskSkip'),
+      });
+      await importModelAsTerrain(files, position, {
+        previewBox: preview === true ? (ctx) => this.bakeCrop.previewImportBox(ctx) : undefined,
+      }).then(result => {
+        if (result.terrains.length > 1) {
+          // Sync screen poses after Angular mounts movables; select afterward so
+          // self-UPDATE while selected cannot skip the footprint layout.
+          setTimeout(() => {
+            const before = result.terrains.map(t => ({
+              name: t.name,
+              location: { ...t.location },
+              pose: t.getPoseForView(),
+            }));
+            for (const t of result.terrains) {
+              const pose = t.getPoseForView();
+              MovableDirective.syncPoseFromUndo(t, pose.x, pose.y, pose.posZ);
+            }
+            footprintDebug('fileDrop syncMovable+select', {
+              before,
+              afterPose: result.terrains.map(t => ({
+                name: t.name,
+                pose: t.getPoseForView(),
+              })),
+              poseYSpan: (() => {
+                const ys = result.terrains.map(t => t.getPoseForView().y);
+                return +(Math.max(...ys) - Math.min(...ys)).toFixed(2);
+              })(),
+            });
+            this.selection.clear();
+            for (const t of result.terrains) this.selection.add(t);
+          }, 0);
+        }
+      });
       return true;
     } catch (err) {
+      if (err instanceof Error && err.message === 'MODEL_IMPORT_CANCELLED') return false;
       const key = modelImportErrorI18nKey(err);
       void this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('modelImport.errorTitle'),
@@ -430,10 +488,12 @@ export class TabletopFileDropService {
 
   private classify(file: File, asModelPackage = false): DropKind | null {
     const name = (file.name || '').toLowerCase();
-    if (/\.(stl|obj|glb|gltf)$/i.test(name)) return 'model';
-    if (/\.(mtl|bin)$/i.test(name)) return asModelPackage ? 'model-sidecar' : null;
+    const path = packagePathOf(file);
+    if (/\.(stl|obj|glb|gltf)$/i.test(name) || /\.(stl|obj|glb|gltf)$/i.test(path)) return 'model';
+    if (/\.(mtl|bin)$/i.test(name) || /\.(mtl|bin)$/i.test(path)) return asModelPackage ? 'model-sidecar' : null;
     // Textures only join the bag when this drop is already a model package.
     if (asModelPackage && /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) return 'model-sidecar';
+    if (isZipFile(file)) return null;
     return classifyNoteFile(file);
   }
 

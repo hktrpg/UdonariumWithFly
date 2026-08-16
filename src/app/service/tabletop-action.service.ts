@@ -13,6 +13,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { reconcileLayerStack } from '@udonarium/tabletop-object-util';
+import { environment } from '../../environments/environment';
 
 import { ContextMenuAction, ContextMenuSeparator } from './context-menu.service';
 import {
@@ -353,6 +354,9 @@ export class TabletopActionService {
 
   makeDefaultTabletopObjects() {
     seedDefaultRoomObjects(key => this.i18n.t(key));
+    if (!environment.production) {
+      void import('./default-room/dev-3dmodel-seed').then(m => m.seedDev3dModelsOnFirstMap());
+    }
   }
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {

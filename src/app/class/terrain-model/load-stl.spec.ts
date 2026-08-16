@@ -1,5 +1,5 @@
 import { parseStl } from './load-stl';
-import { aabbToGridSize, transformPositionsZUpToYUp } from './mesh-ir';
+import { aabbToGridSize, clampModelGridEdge, transformPositionsZUpToYUp } from './mesh-ir';
 
 function makeBinaryStlCube(): ArrayBuffer {
   // Unit cube 0..1 on XYZ, 12 triangles.
@@ -75,6 +75,14 @@ describe('aabbToGridSize', () => {
     expect(size.width).toBeCloseTo(2, 5);
     expect(size.height).toBeCloseTo(1, 5);
     expect(size.depth).toBeCloseTo(4, 5);
+  });
+});
+
+describe('clampModelGridEdge', () => {
+  it('raises sub-grid imports to at least 2', () => {
+    expect(clampModelGridEdge(0.1)).toBe(2);
+    expect(clampModelGridEdge(1.9)).toBe(2);
+    expect(clampModelGridEdge(5)).toBe(5);
   });
 });
 
