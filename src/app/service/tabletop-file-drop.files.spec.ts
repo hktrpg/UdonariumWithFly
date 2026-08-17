@@ -1,4 +1,4 @@
-import { filesFromDataTransfer } from './tabletop-file-drop.service';
+import { filesFromDataTransfer, TabletopFileDropService } from './tabletop-file-drop.service';
 
 function fakeTransfer(opts: {
   files?: File[];
@@ -53,5 +53,31 @@ describe('filesFromDataTransfer', () => {
       items: [{ kind: 'string', type: 'text/plain', file: null }],
     });
     expect(filesFromDataTransfer(dt)).toEqual([]);
+  });
+});
+
+describe('TabletopFileDropService.looksAcceptable', () => {
+  const svc = Object.create(TabletopFileDropService.prototype) as TabletopFileDropService;
+
+  it('accepts images and models', () => {
+    expect(svc.looksAcceptable([
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }),
+    ])).toBeTrue();
+    expect(svc.looksAcceptable([
+      new File([new Uint8Array([1])], 'a.glb', { type: 'model/gltf-binary' }),
+    ])).toBeTrue();
+  });
+
+  it('rejects blend-only batches so Ctrl+V can fall through', () => {
+    expect(svc.looksAcceptable([
+      new File(['BLENDER'], 'x.blend', { type: 'application/octet-stream' }),
+    ])).toBeFalse();
+  });
+
+  it('accepts mixed blend + usable file', () => {
+    expect(svc.looksAcceptable([
+      new File(['BLENDER'], 'x.blend', { type: 'application/octet-stream' }),
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }),
+    ])).toBeTrue();
   });
 });

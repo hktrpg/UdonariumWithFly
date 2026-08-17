@@ -118,6 +118,20 @@ describe('expandModelDropFiles', () => {
     await expectAsync(expandModelDropFiles([blend])).toBeRejectedWithError('MODEL_BLEND_ONLY');
   });
 
+  it('skips bare .blend when the batch also has a usable model', async () => {
+    const blend = new File(['BLENDER-v306'], 'building.blend', { type: 'application/octet-stream' });
+    const glb = new File([new Uint8Array([1, 2, 3])], 'building.glb', { type: 'model/gltf-binary' });
+    const files = await expandModelDropFiles([blend, glb]);
+    expect(files.map(f => f.name)).toEqual(['building.glb']);
+  });
+
+  it('skips bare .blend when the batch has non-model files for the chooser', async () => {
+    const blend = new File(['BLENDER-v306'], 'building.blend', { type: 'application/octet-stream' });
+    const png = new File([new Uint8Array([1])], 'map.png', { type: 'image/png' });
+    const files = await expandModelDropFiles([blend, png]);
+    expect(files.map(f => f.name)).toEqual(['map.png']);
+  });
+
   it('recognizes FBX as a primary model in a zip', async () => {
     const zip = await zipFile([
       { name: 'source/Building.fbx', body: 'fake-fbx' },

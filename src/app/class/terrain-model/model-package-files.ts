@@ -69,9 +69,14 @@ export function isPrimaryModelFile(file: File): boolean {
 export async function expandModelDropFiles(files: File[], depth = 0): Promise<File[]> {
   const out: File[] = [];
   let zipWithoutModel = false;
+  let sawBlendOnly = false;
 
   for (const file of files || []) {
-    if (isBlendFile(file)) throw new Error('MODEL_BLEND_ONLY');
+    // Skip bare .blend so mixed drops (glb + blend, png + blend) still proceed.
+    if (isBlendFile(file)) {
+      sawBlendOnly = true;
+      continue;
+    }
 
     if (!isZipFile(file) && !/\.zip$/i.test(packagePathOf(file))) {
       out.push(file);
@@ -99,15 +104,15 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
     if (extracted.some(isPrimaryModelFile)) {
       out.push(...extracted);
     } else if (sawBlend) {
-      throw new Error('MODEL_BLEND_ONLY');
+      sawBlendOnly = true;
     } else {
       zipWithoutModel = true;
     }
   }
 
-  if (zipWithoutModel && !out.some(isPrimaryModelFile)) {
-    throw new Error('MODEL_NO_MODEL_IN_ZIP');
-  }
+  if (out.length > 0) return out;
+  if (sawBlendOnly) throw new Error('MODEL_BLEND_ONLY');
+  if (zipWithoutModel) throw new Error('MODEL_NO_MODEL_IN_ZIP');
   return out;
 }
 

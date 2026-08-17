@@ -777,7 +777,8 @@ export class TabletopKeyboardService {
   }
 
   /**
-   * OS clipboard paste: CCFOLIA JSON → OS files/screenshot (same as table drop) → in-app XML.
+   * OS clipboard paste: CCFOLIA JSON → in-app XML → OS files/screenshot.
+   * In-app XML wins over lingering Explorer "Files" after Ctrl+C on the table.
    * Skips INPUT/TEXTAREA so chat and forms keep normal paste.
    */
   private handlePaste(e: ClipboardEvent) {
@@ -801,19 +802,21 @@ export class TabletopKeyboardService {
       return;
     }
 
+    // Prefer tabletop copy over OS file items (often stale from Explorer).
+    if (this.clipboardXml.length > 0) {
+      if (this.pasteClipboard(false)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
+
     const files = filesFromDataTransfer(e.clipboardData);
-    if (files.length) {
+    if (files.length && this.tabletopFileDrop.looksAcceptable(files)) {
       e.preventDefault();
       e.stopPropagation();
       const pointer = this.coordinateService.calcTabletopLocalCoordinate();
       this.runInAngular(() => { void this.tabletopFileDrop.handleDrop(files, pointer); });
-      return;
-    }
-
-    if (this.clipboardXml.length < 1) return;
-    if (this.pasteClipboard(false)) {
-      e.preventDefault();
-      e.stopPropagation();
     }
   }
 

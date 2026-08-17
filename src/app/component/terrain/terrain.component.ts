@@ -43,7 +43,7 @@ import {
   formBakeGroup,
   scaleBakeGroupFrom,
   terrainsInBakeGroup,
-  uniformScaleFromCornerDrag,
+  cornerDragScaleFactors,
 } from '@udonarium/terrain-model/bake-group';
 import { wallLeftCssTransform } from '@udonarium/terrain-wall-transform';
 
@@ -419,19 +419,20 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       anchor = { x: b.maxX, y: b.maxY };
     }
 
-    if (freeAspect) {
-      if (this.scaleCorner === 'rb') {
-        scaleX = Math.max(0.05, (w0 + dx) / w0);
-        scaleY = Math.max(0.05, (d0 + dy) / d0);
-      } else {
-        scaleX = Math.max(0.05, (w0 - dx) / w0);
-        scaleY = Math.max(0.05, (d0 - dy) / d0);
-      }
-    } else {
-      // Distance to fixed opposite corner — stable for wide/flat islands.
-      const scale = uniformScaleFromCornerDrag(anchor, this.scaleStartTable, cur);
-      scaleX = scaleY = scale;
-    }
+    // Single terrain: free width/depth (classic resize). Bake groups: uniform.
+    ({ scaleX, scaleY } = cornerDragScaleFactors({
+      freeAspect,
+      partCount: this.scaleStartSnapshots.length,
+      corner: this.scaleCorner,
+      w0,
+      d0,
+      dx,
+      dy,
+      anchor,
+      start: this.scaleStartTable,
+      cur,
+      bounds: b,
+    }));
 
     this.ngZone.run(() => {
       for (const s of this.scaleStartSnapshots) {

@@ -1,6 +1,7 @@
 import {
   assembleBakeGroupAt,
   clearBakeGroup,
+  cornerDragScaleFactors,
   formBakeGroup,
   isBakeGroupComplete,
   rotateBakeGroupBy,
@@ -114,6 +115,53 @@ describe('bake-group', () => {
       { x: 300, y: 300 },
     );
     expect(scale).toBeCloseTo(1.5, 5);
+  });
+
+  it('uniformScaleFromCornerDrag falls back to geometric corner when start≈anchor', () => {
+    const anchor = { x: 100, y: 100 };
+    const geom = { x: 200, y: 200 };
+    const start = { x: 100.0001, y: 100 }; // unusable — near anchor
+    const cur = { x: 250, y: 250 };
+    expect(uniformScaleFromCornerDrag(anchor, start, cur)).toBe(1);
+    const scale = uniformScaleFromCornerDrag(anchor, start, cur, geom);
+    expect(scale).toBeCloseTo(Math.hypot(150, 150) / Math.hypot(100, 100), 5);
+    expect(scale).toBeGreaterThan(1);
+  });
+
+  it('cornerDragScaleFactors: single terrain uses free width/depth', () => {
+    const factors = cornerDragScaleFactors({
+      freeAspect: false,
+      partCount: 1,
+      corner: 'rb',
+      w0: 100,
+      d0: 100,
+      dx: 50,
+      dy: 0,
+      anchor: { x: 0, y: 0 },
+      start: { x: 100, y: 100 },
+      cur: { x: 150, y: 100 },
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    });
+    expect(factors.scaleX).toBeCloseTo(1.5, 5);
+    expect(factors.scaleY).toBeCloseTo(1, 5);
+  });
+
+  it('cornerDragScaleFactors: bake group stays uniform', () => {
+    const factors = cornerDragScaleFactors({
+      freeAspect: false,
+      partCount: 2,
+      corner: 'rb',
+      w0: 100,
+      d0: 100,
+      dx: 50,
+      dy: 0,
+      anchor: { x: 0, y: 0 },
+      start: { x: 100, y: 100 },
+      cur: { x: 150, y: 100 },
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    });
+    expect(factors.scaleX).toBe(factors.scaleY);
+    expect(factors.scaleX).toBeCloseTo(Math.hypot(150, 100) / Math.hypot(100, 100), 5);
   });
 
   it('multi-box scale stays uniform, keeps abutment, and scales height', () => {

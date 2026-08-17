@@ -22,7 +22,7 @@ import {
   modelImportErrorI18nKey,
 } from '@udonarium/terrain-model/model-terrain-import';
 import { MODEL_MAX_FILE_BYTES } from '@udonarium/terrain-model/mesh-ir';
-import { expandModelDropFiles, isZipFile, packagePathOf } from '@udonarium/terrain-model/model-package-files';
+import { expandModelDropFiles, isBlendFile, isZipFile, packagePathOf } from '@udonarium/terrain-model/model-package-files';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { DropCreateChooserComponent, DropCreateChoice } from 'component/drop-create-chooser/drop-create-chooser.component';
 import { footprintDebug } from '@udonarium/terrain-model/footprint-debug';
@@ -112,6 +112,20 @@ export class TabletopFileDropService {
     if (!items) return false;
     for (let i = 0; i < items.length; i++) {
       if (items[i].kind === 'file') return true;
+    }
+    return false;
+  }
+
+  /**
+   * Sync gate for Ctrl+V: only claim the paste when at least one file looks usable.
+   * Avoids preventDefault on blend-only / junk file items that would block further handling.
+   */
+  looksAcceptable(files: File[]): boolean {
+    for (const file of files || []) {
+      if (isBlendFile(file)) continue;
+      if (isZipFile(file) || /\.zip$/i.test(packagePathOf(file))) return true;
+      if (this.classify(file, false)) return true;
+      if (/\.(stl|obj|glb|gltf|fbx)$/i.test(file.name || '')) return true;
     }
     return false;
   }

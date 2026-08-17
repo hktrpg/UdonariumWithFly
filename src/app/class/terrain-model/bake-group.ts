@@ -382,19 +382,68 @@ function commitTerrainPoseInner(terrain: Terrain, x: number, y: number, posZ: nu
 }
 
 /**
- * Uniform scale from a corner grab.
+ * Uniform scale from a corner grab (bake groups).
  * Use distance(anchor → pointer), not hypot(w+dx, d+dy): for wide/flat
  * footprints a slight perpendicular drift made hypot grow while shrinking.
+ *
+ * When `start` lands on/near the anchor (bad pointer sample on small pieces),
+ * `fallbackStart` (geometric grabbed corner) keeps scaling responsive.
  */
 export function uniformScaleFromCornerDrag(
   anchor: { x: number; y: number },
   start: { x: number; y: number },
   cur: { x: number; y: number },
+  fallbackStart?: { x: number; y: number },
 ): number {
-  const startDist = Math.hypot(start.x - anchor.x, start.y - anchor.y);
+  const minStartDist = 8; // px — below this, treat start as unusable
+  let ref = start;
+  let startDist = Math.hypot(start.x - anchor.x, start.y - anchor.y);
+  if (startDist < minStartDist && fallbackStart) {
+    ref = fallbackStart;
+    startDist = Math.hypot(ref.x - anchor.x, ref.y - anchor.y);
+  }
   if (startDist < 1e-6) return 1;
   const curDist = Math.hypot(cur.x - anchor.x, cur.y - anchor.y);
   return Math.max(0.05, curDist / startDist);
+}
+
+/**
+ * Corner-drag scale factors.
+ * - Single terrain (or Shift): free width/depth from pointer delta (classic resize).
+ * - Bake group (2+), no Shift: uniform via distance-to-anchor.
+ */
+export function cornerDragScaleFactors(args: {
+  freeAspect: boolean;
+  partCount: number;
+  corner: 'lt' | 'rb';
+  w0: number;
+  d0: number;
+  dx: number;
+  dy: number;
+  anchor: { x: number; y: number };
+  start: { x: number; y: number };
+  cur: { x: number; y: number };
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
+}): { scaleX: number; scaleY: number } {
+  const useUniform = !args.freeAspect && args.partCount > 1;
+  if (!useUniform) {
+    if (args.corner === 'rb') {
+      return {
+        scaleX: Math.max(0.05, (args.w0 + args.dx) / args.w0),
+        scaleY: Math.max(0.05, (args.d0 + args.dy) / args.d0),
+      };
+    }
+    return {
+      scaleX: Math.max(0.05, (args.w0 - args.dx) / args.w0),
+      scaleY: Math.max(0.05, (args.d0 - args.dy) / args.d0),
+    };
+  }
+  const geom =
+    args.corner === 'rb'
+      ? { x: args.bounds.maxX, y: args.bounds.maxY }
+      : { x: args.bounds.minX, y: args.bounds.minY };
+  const scale = uniformScaleFromCornerDrag(args.anchor, args.start, args.cur, geom);
+  return { scaleX: scale, scaleY: scale };
 }
 
 /**
