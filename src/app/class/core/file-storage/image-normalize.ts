@@ -58,8 +58,13 @@ export async function normalizeImageBlob(blob: Blob): Promise<NormalizeImageResu
     out = await encodeToMaxEdge(img, w, h, FALLBACK_MAX_EDGE, hasAlpha, JPEG_QUALITY_FALLBACK);
   }
 
-  if (out.size > IMAGE_STORED_MAX_BYTES) {
-    // Last resort: force JPEG at lower quality even for alpha sources.
+  if (out.size > IMAGE_STORED_MAX_BYTES && hasAlpha) {
+    // Never flatten alpha to white JPEG (terrain bake holes became solid white slabs).
+    for (const edge of [1024, 768, 512, 384, 256]) {
+      out = await encodeToMaxEdge(img, w, h, edge, true, JPEG_QUALITY);
+      if (out.size <= IMAGE_STORED_MAX_BYTES) break;
+    }
+  } else if (out.size > IMAGE_STORED_MAX_BYTES) {
     out = await encodeToMaxEdge(img, w, h, FALLBACK_MAX_EDGE, false, 0.65);
   }
 

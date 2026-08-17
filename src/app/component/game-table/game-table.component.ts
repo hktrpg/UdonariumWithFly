@@ -1388,6 +1388,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       this.pointerDeviceService.isDragging = false;
     } else if (e.button === 1 || e.button === 2) {
       this.isTableTransformMode = true;
+    } else if (e.button === 0 && e.shiftKey) {
+      // Shift+click additive pick — do not claim object-drag (movable ignores Shift).
+      this.isTableTransformMode = false;
+      this.pointerDeviceService.isDragging = false;
     } else if (e.target.contains(this.gameObjects.nativeElement)) {
       this.isTableTransformMode = false;
     } else {

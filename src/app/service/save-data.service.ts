@@ -606,6 +606,20 @@ export class SaveDataService {
     return SaveDataService.queue.add((resolve, reject) => resolve(this._saveGameObjectAsync(gameObject, fileName, updateCallback)));
   }
 
+  /**
+   * Export several objects in one ZIP (`terrain-group` root) so import restores them together.
+   */
+  saveGameObjectsAsync(gameObjects: GameObject[], fileName: string = 'fly_xml_data', updateCallback?: UpdateCallback): Promise<void> {
+    const list = (gameObjects || []).filter(o => !!o);
+    if (!list.length) return Promise.resolve();
+    if (list.length === 1) return this.saveGameObjectAsync(list[0], fileName, updateCallback);
+    this.chatMessageService.sendOperationLog(this.i18n.t('save.objectDownloaded', {
+      type: this.aliasLabel(list[0].aliasName),
+      file: fileName
+    }));
+    return SaveDataService.queue.add((resolve) => resolve(this._saveGameObjectsAsync(list, fileName, updateCallback)));
+  }
+
   /** File picker for XML/ZIP object data (pairs with saveGameObjectAsync / room ZIP load). */
   pickAndLoadXmlOrZip(): void {
     const input = document.createElement('input');
@@ -632,6 +646,27 @@ export class SaveDataService {
     if (idRemap.size) imageTagXml = this.remapImageIdentifiers(imageTagXml, idRemap);
     files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
     return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
+  }
+
+  private async _saveGameObjectsAsync(gameObjects: GameObject[], fileName: string, updateCallback?: UpdateCallback): Promise<void> {
+    let files: File[] = [];
+    let xml = this.convertObjectsToGroupXml(gameObjects);
+    const images = this.searchImageFiles(xml);
+    const { imageFiles, idRemap } = await this.packImagesForZip(images);
+    if (idRemap.size) xml = this.remapImageIdentifiers(xml, idRemap);
+
+    files.push(new File([xml], 'fly_data.xml', { type: 'text/plain' }));
+    files.push(...imageFiles);
+    let imageTagXml = this.convertToXml(ImageTagList.create(images));
+    if (idRemap.size) imageTagXml = this.remapImageIdentifiers(imageTagXml, idRemap);
+    files.push(new File([imageTagXml], 'fly_imageTag.xml', { type: 'text/plain' }));
+    return this.saveAsync(files, this.appendTimestamp(fileName), updateCallback);
+  }
+
+  /** Wrap multiple object XML trees so one ZIP import can place them as a group. */
+  private convertObjectsToGroupXml(gameObjects: GameObject[]): string {
+    const bodies = gameObjects.map(o => Beautify.xml(o.toXml(), 2)).join('\n');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<terrain-group>\n${bodies}\n</terrain-group>`;
   }
 
   /**

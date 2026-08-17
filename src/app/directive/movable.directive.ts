@@ -300,13 +300,6 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       this.ratio += (ratio - this.ratio) * 0.1;
     }
 
-    //this.posX = this.pointer3d.x + (this.pointerOffset3d.x * this.ratio) + (-(this.width / 2) * (1.0 - this.ratio));
-    //this.posY = this.pointer3d.y + (this.pointerOffset3d.y * this.ratio) + (-(this.height / 2) * (1.0 - this.ratio));
-    //this.posZ = this.pointer3d.z;
-    //this.posX = pointer3d.x;
-    //this.posY = pointer3d.y;
-    //this.posZ = pointer3d.z;
-    
     //let tableSelecter = ObjectStore.instance.get<TableSelecter>('tableSelecter');
     const viewTable = TableSelecter.instance.viewTable;
     viewTable.gridClipRect = null;
@@ -337,6 +330,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     };
 
     if (this.shouldSnapToGrid(e)) this.snapToGrid();
+
+    // After XY snap, re-sample analytic slope Z so feet stay on the ramp.
+    MovableSelectionSynchronizer.syncTerrainFloor(this);
 
     let delta = {
       x: this.posX - prev.x,
