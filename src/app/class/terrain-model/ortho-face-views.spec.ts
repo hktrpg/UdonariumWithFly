@@ -28,12 +28,6 @@ describe('canvasSizeForFace', () => {
   it('scales canvas by face size vs refLongEdge for uniform world texels', () => {
     expect(canvasSizeForFace(5, 2.5, 1024, 10)).toEqual({ width: 512, height: 256 });
   });
-
-  it('keeps a usable short side for needle-thin faces (thumbnail-safe)', () => {
-    const size = canvasSizeForFace(0.01, 10, 1024, 10);
-    expect(size.height).toBe(1024);
-    expect(size.width).toBeGreaterThanOrEqual(8);
-  });
 });
 
 describe('uniformFitScale', () => {

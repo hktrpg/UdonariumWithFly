@@ -45,18 +45,21 @@
   </section>
 
   <section class="card footer-actions actions tight">
+    <button type="button" class="btn" (click)="autoCrop()" [disabled]="autoBusy">
+      <i class="material-icons" aria-hidden="true">auto_fix_high</i>{{ 'terrainBakeCrop.auto' | i18n }}
+    </button>
     <button *ngIf="mode === 'import'" type="button" class="btn" (click)="abort()">
       {{ 'terrainBakeCrop.abort' | i18n }}
-    </button>
-    <button *ngIf="mode === 'edit'" type="button" class="btn" (click)="cancel()">
-      {{ 'common.cancel' | i18n }}
     </button>
     <span class="actions-spacer"></span>
     <button *ngIf="mode === 'import'" type="button" class="btn" (click)="skip()">
       {{ 'terrainBakeCrop.skipBox' | i18n }}
     </button>
-    <button type="button" class="btn btn-primary" (click)="confirm()">
+    <button *ngIf="mode === 'import'" type="button" class="btn btn-primary" (click)="confirm()">
       <i class="material-icons" aria-hidden="true">check</i>{{ 'terrainBakeCrop.confirm' | i18n }}
+    </button>
+    <button *ngIf="mode === 'edit'" type="button" class="btn btn-primary" (click)="confirm()">
+      <i class="material-icons" aria-hidden="true">check</i>{{ 'terrainBakeCrop.done' | i18n }}
     </button>
   </section>
 </div>

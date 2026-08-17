@@ -1,4 +1,3 @@
-import { aabbClipPlanes, siblingBleedClipPlanes } from './aabb-clip-planes';
 import { MeshAabb, MODEL_BAKE_SIZE_MAX, MODEL_PHOTO_BAKE_SIZE } from './mesh-ir';
 import { loadGltfScene } from './load-gltf';
 import { BakedFaceBlobs } from './ortho-bake';
@@ -32,10 +31,8 @@ const EDGE_DILATE_PX = 2;
 
 /**
  * Photograph a glTF scene from six orthographic sides (real materials).
- * Transparent PNG: empty space stays empty (L courtyard, glass).
- *
- * Sibling F/U wings are kept out of wall photos with gap-only clip planes
- * (not a tight 6-plane AABB — that shaved seams into transparent edges).
+ * Transparent PNG: empty space stays empty (L courtyard, glass). Tightens the
+ * box to opaque pixels so leftover helper padding does not become a hole.
  */
 export async function photoGltfFaces(
   files: File[],
@@ -43,7 +40,6 @@ export async function photoGltfFaces(
 ): Promise<PhotoGltfFacesResult> {
   const { THREE, scene, dispose } = await loadGltfScene(files);
   let renderer: import('three').WebGLRenderer | undefined;
-  let root: import('three').Scene | undefined;
   try {
     await waitForMaps(scene);
     hidePhotoSkippedMeshes(scene);
@@ -65,9 +61,8 @@ export async function photoGltfFaces(
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1;
-    renderer.localClippingEnabled = true;
 
-    root = new THREE.Scene();
+    const root = new THREE.Scene();
     root.add(scene);
     const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.85);
     const fill = new THREE.AmbientLight(0xffffff, 0.25);
@@ -82,7 +77,6 @@ export async function photoGltfFaces(
     const splitAabbs = splitFootprintFromPositions(positions, meshAabb);
     const fullAabb = meshAabb;
     const refLongEdge = aabbMaxExtent(fullAabb);
-    const seamSlack = Math.max(refLongEdge * 0.02, 1e-3);
     const z0 = splitAabbs.map(b => b.min[2]);
     const zSpan = z0.length ? Math.max(...z0) - Math.min(...z0) : 0;
     const fullSz = Math.max(1e-9, fullAabb.max[2] - fullAabb.min[2]);
@@ -97,25 +91,17 @@ export async function photoGltfFaces(
     });
 
     const boxes: PhotoGltfBox[] = [];
-    for (let i = 0; i < splitAabbs.length; i++) {
-      const boxAabb = splitAabbs[i];
-      const siblings = splitAabbs.filter((_, j) => j !== i);
-      const planes = siblingBleedClipPlanes(boxAabb, siblings, seamSlack);
-      setRendererClipPlanes(THREE, renderer, root, planes);
-      try {
-        const blobs = await renderFaceSet(
-          THREE,
-          renderer,
-          root,
-          key,
-          boxAabb,
-          bakeSize,
-          { collectVisual: null, emitBlobs: true, dilatePx: EDGE_DILATE_PX, refLongEdge },
-        );
-        boxes.push({ blobs, aabb: boxAabb });
-      } finally {
-        clearRendererClip(renderer, root);
-      }
+    for (const boxAabb of splitAabbs) {
+      const blobs = await renderFaceSet(
+        THREE,
+        renderer,
+        root,
+        key,
+        boxAabb,
+        bakeSize,
+        { collectVisual: null, emitBlobs: true, dilatePx: EDGE_DILATE_PX, refLongEdge },
+      );
+      boxes.push({ blobs, aabb: boxAabb });
     }
     if (!boxes.length) throw new Error('MODEL_BAKE_FAILED');
 
@@ -128,7 +114,6 @@ export async function photoGltfFaces(
     };
   } finally {
     if (renderer) {
-      clearRendererClip(renderer, root);
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.width = 0;
@@ -136,49 +121,6 @@ export async function photoGltfFaces(
     }
     dispose();
   }
-}
-
-function setRendererClipPlanes(
-  THREE: typeof import('three'),
-  renderer: import('three').WebGLRenderer,
-  root: import('three').Object3D,
-  clipPlanes: ReturnType<typeof aabbClipPlanes>,
-): void {
-  const planes = clipPlanes.map(
-    p => new THREE.Plane(
-      new THREE.Vector3(p.normal[0], p.normal[1], p.normal[2]),
-      p.constant,
-    ),
-  );
-  renderer.clippingPlanes = planes;
-  root.traverse((obj: any) => {
-    const mats = obj.material
-      ? (Array.isArray(obj.material) ? obj.material : [obj.material])
-      : [];
-    for (const m of mats) {
-      if (!m || typeof m !== 'object') continue;
-      m.clippingPlanes = planes.length ? planes : null;
-      m.clipShadows = true;
-      m.needsUpdate = true;
-    }
-  });
-}
-
-function clearRendererClip(
-  renderer: import('three').WebGLRenderer,
-  root?: import('three').Object3D,
-): void {
-  renderer.clippingPlanes = [];
-  root?.traverse((obj: any) => {
-    const mats = obj.material
-      ? (Array.isArray(obj.material) ? obj.material : [obj.material])
-      : [];
-    for (const m of mats) {
-      if (!m || typeof m !== 'object') continue;
-      m.clippingPlanes = null;
-      m.needsUpdate = true;
-    }
-  });
 }
 
 type RenderFaceOpts = {
@@ -217,10 +159,9 @@ async function renderFaceSet(
     );
     renderer.setSize(width, height, false);
 
-    // Frustum must match the terrain face exactly. pad>1 shrinks the mesh in
-    // the photo → empty rim after CSS stretch (roof/wall seams look wrong).
-    const hw = face.width / 2;
-    const hh = face.height / 2;
+    const pad = 1.001;
+    const hw = (face.width * pad) / 2;
+    const hh = (face.height * pad) / 2;
     const halfAlongView =
       Math.abs(view.eye[0]) * sx * 0.5
       + Math.abs(view.eye[1]) * sy * 0.5

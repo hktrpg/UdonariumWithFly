@@ -193,16 +193,17 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   private _faceCache = new Map<string, { id: string; state: number; url: string }>();
 
   private faceUrl(face: FaceKey | 'wall'): string {
-    const live = this.bakeCrop.livePreviewFor(this.terrain?.identifier);
-    const state = live ? parseBakeCropState(this.terrain.bakeCropJson) : null;
+    // Prefer bake-crop sources whenever present so CSS insets match live preview
+    // (display bitmaps must stay uncropped; otherwise save double-crops).
+    const state = parseBakeCropState(this.terrain?.bakeCropJson);
     const srcId = face === 'wall' ? state?.sources?.wallBottom : state?.sources?.[face];
     const srcFile = srcId ? ImageStorage.instance.get(srcId) : null;
-    const raw = (live && srcFile)
+    const raw = srcFile
       ? this.imageService.getSkeletonOr(srcFile)
       : (face === 'wall'
         ? this.imageService.getSkeletonOr(this.terrain.wallImage)
         : this.imageService.getSkeletonOr(this.terrain.faceImage(face)));
-    const key = live && srcId ? `${face}:src:${srcId}` : face;
+    const key = srcId ? `${face}:src:${srcId}` : face;
     const prev = this._faceCache.get(key);
     if (prev && prev.id === raw.identifier && prev.state === raw.state) return prev.url;
 
@@ -234,10 +235,19 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   private faceCropStyle(face: FaceKey) {
     const live = this.bakeCrop.livePreviewFor(this.terrain?.identifier);
-    if (!live) {
-      return { 'background-size': '100% 100%', 'background-position': '0% 0%', 'background-repeat': 'no-repeat' };
+    if (live) return faceCropBackgroundStyle(live[face] || emptyInsets());
+    // Apply stored auto-insets so sky/padding is clipped without re-baking
+    // (fixes white band under the roof + mismatched wall scales).
+    const stored = parseBakeCropState(this.terrain?.bakeCropJson);
+    const insets = stored?.faces?.[face];
+    if (insets && !this.insetsAreEmpty(insets)) {
+      return faceCropBackgroundStyle(insets);
     }
-    return faceCropBackgroundStyle(live[face] || emptyInsets());
+    return { 'background-size': '100% 100%', 'background-position': '0% 0%', 'background-repeat': 'no-repeat' };
+  }
+
+  private insetsAreEmpty(insets: { west?: number; east?: number; north?: number; south?: number }): boolean {
+    return (insets.west || 0) + (insets.east || 0) + (insets.north || 0) + (insets.south || 0) < 1e-6;
   }
 
   movableOption: MovableOption = {};

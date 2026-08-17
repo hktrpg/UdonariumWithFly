@@ -59,21 +59,13 @@ export function canvasSizeForFace(
   refLongEdge?: number,
 ): { width: number; height: number } {
   const dim = Math.max(64, Math.min(MODEL_BAKE_SIZE_MAX, maxSize | 0));
-  const fw = Number.isFinite(faceWidth) && faceWidth > 0 ? faceWidth : 1e-6;
-  const fh = Number.isFinite(faceHeight) && faceHeight > 0 ? faceHeight : 1e-6;
+  const fw = Math.max(1e-6, faceWidth);
+  const fh = Math.max(1e-6, faceHeight);
   const faceLong = Math.max(fw, fh);
   const ref = Math.max(faceLong, refLongEdge || faceLong);
   const longPx = Math.max(32, Math.round(dim * (faceLong / ref)));
-  // Keep both sides ≥8 so Hermite thumbnails never round a 1px edge to 0.
-  const minSide = 8;
   if (fw >= fh) {
-    return {
-      width: longPx,
-      height: Math.max(minSide, Math.round(longPx * (fh / fw))),
-    };
+    return { width: longPx, height: Math.max(1, Math.round(longPx * (fh / fw))) };
   }
-  return {
-    width: Math.max(minSide, Math.round(longPx * (fw / fh))),
-    height: longPx,
-  };
+  return { width: Math.max(1, Math.round(longPx * (fw / fh))), height: longPx };
 }

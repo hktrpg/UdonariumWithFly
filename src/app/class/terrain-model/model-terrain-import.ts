@@ -10,7 +10,6 @@ import {
   applyBakeCropToTerrain,
   autoPerFaceInsets,
   cropAllFaceBlobs,
-  insetsLookLikeSiblingBleed,
   serializeBakeCropState,
 } from './bake-crop';
 import { newBakeGroupId, assembleBakeGroupAt, placeTerrainAt } from './bake-group';
@@ -121,13 +120,6 @@ export async function importModelAsTerrain(
   for (let i = 0; i < baked.boxes.length; i++) {
     const box = baked.boxes[i];
     const autoFaces = await autoPerFaceInsets(box.blobs);
-    for (const [face, insets] of Object.entries(autoFaces)) {
-      if (insets && insetsLookLikeSiblingBleed(insets)) {
-        baked.warnings.push(
-          `Box ${i + 1} ${face} still looks like sibling-wing bleed after clip; check AABB split.`,
-        );
-      }
-    }
     const terrain = await createTerrainBox(box, autoFaces, {
       baseName,
       index: i,

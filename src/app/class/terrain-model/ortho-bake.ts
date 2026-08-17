@@ -32,12 +32,9 @@ export async function bakeSixOrthoFaces(
   if (!gl) throw new Error('MODEL_NO_WEBGL');
 
   try {
-    // Drop triangles outside this footprint box so sibling wings do not bleed
-    // into wall photos (same idea as glTF AABB clipping planes).
-    const clipped = filterMeshIrToAabb(mesh, aabb);
     const program = createProgram(gl);
-    const buffers = uploadMesh(gl, clipped);
-    const albedoTex = clipped.albedoImage ? createTexture(gl, clipped.albedoImage) : null;
+    const buffers = uploadMesh(gl, mesh);
+    const albedoTex = mesh.albedoImage ? createTexture(gl, mesh.albedoImage) : null;
     const center = aabbCenterOf(aabb);
     const maxExtent = aabbMaxExtent(aabb);
     const out: BakedFaceBlobs = {};
@@ -52,7 +49,7 @@ export async function bakeSixOrthoFaces(
       );
       canvas.width = width;
       canvas.height = height;
-      drawView(gl, program, buffers, albedoTex, !!clipped.albedoImage, {
+      drawView(gl, program, buffers, albedoTex, !!mesh.albedoImage, {
         width,
         height,
         center,
@@ -61,7 +58,7 @@ export async function bakeSixOrthoFaces(
         faceHeight: face.height,
         eyeDir: view.eye,
         up: view.up,
-        useVertexColor: !!clipped.vertexColors,
+        useVertexColor: !!mesh.vertexColors,
       });
       out[view.face] = await canvasToPngBlob(canvas);
     }
@@ -70,58 +67,6 @@ export async function bakeSixOrthoFaces(
     const lose = (gl as any).getExtension?.('WEBGL_lose_context');
     lose?.loseContext?.();
   }
-}
-
-/** Keep triangles whose XZ centroid is near/inside the box (Y unrestricted). */
-export function filterMeshIrToAabb(mesh: MeshIR, aabb: MeshAabb): MeshIR {
-  const pos = mesh.positions;
-  if (!pos?.length) return mesh;
-  // Generous XZ slack so shared cut faces / parapets are not dropped (tight
-  // filters caused transparent terrain edges). Far siblings still excluded.
-  const slack = Math.max(
-    (aabb.max[0] - aabb.min[0]) * 0.05,
-    (aabb.max[2] - aabb.min[2]) * 0.05,
-    aabbMaxExtent(aabb) * 0.02,
-    1e-4,
-  );
-  const keepIdx: number[] = [];
-  for (let i = 0; i + 8 < pos.length; i += 9) {
-    const cx = (pos[i] + pos[i + 3] + pos[i + 6]) / 3;
-    const cz = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3;
-    if (cx < aabb.min[0] - slack || cx > aabb.max[0] + slack) continue;
-    if (cz < aabb.min[2] - slack || cz > aabb.max[2] + slack) continue;
-    keepIdx.push(i);
-  }
-  if (!keepIdx.length) return mesh;
-  if (keepIdx.length * 9 === pos.length) return mesh;
-  const positions = new Float32Array(keepIdx.length * 9);
-  let o = 0;
-  for (const i of keepIdx) {
-    for (let k = 0; k < 9; k++) positions[o++] = pos[i + k];
-  }
-  const triangleCount = keepIdx.length;
-  const sliceAttr = (src: Float32Array | undefined, comps: number): Float32Array | undefined => {
-    if (!src) return undefined;
-    const out = new Float32Array(triangleCount * 3 * comps);
-    let d = 0;
-    for (const i of keepIdx) {
-      const base = (i / 9) * 3 * comps;
-      for (let k = 0; k < 3 * comps; k++) out[d++] = src[base + k];
-    }
-    return out;
-  };
-  return {
-    ...mesh,
-    positions,
-    normals: sliceAttr(mesh.normals, 3),
-    uvs: sliceAttr(mesh.uvs, 2),
-    vertexColors: sliceAttr(mesh.vertexColors, 3),
-    triangleCount,
-    aabb: {
-      min: [aabb.min[0], aabb.min[1], aabb.min[2]],
-      max: [aabb.max[0], aabb.max[1], aabb.max[2]],
-    },
-  };
 }
 
 type GpuBuffers = {
@@ -264,9 +209,8 @@ function drawView(
   bindAttrib(gl, program, 'aUv', buffers.uv, 2);
   bindAttrib(gl, program, 'aCol', buffers.col, 3);
 
-  // Match terrain face exactly (no 1.05 pad — that left empty rims after stretch).
-  const hw = Math.max(opts.faceWidth * 0.5, 1e-3);
-  const hh = Math.max(opts.faceHeight * 0.5, 1e-3);
+  const hw = Math.max(opts.faceWidth * 0.5 * 1.05, 1e-3);
+  const hh = Math.max(opts.faceHeight * 0.5 * 1.05, 1e-3);
   const camDist = Math.max(opts.maxExtent * 2, 1e-3);
   const eye: [number, number, number] = [
     opts.center[0] + opts.eyeDir[0] * camDist,

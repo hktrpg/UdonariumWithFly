@@ -18,7 +18,8 @@ import {
   TerrainBakeCropResolve,
   TerrainBakeCropThumb,
 } from 'component/terrain-bake-crop/terrain-bake-crop.component';
-import { ModalService } from 'service/modal.service';
+import { PanelOption, PanelService } from 'service/panel.service';
+import { PointerDeviceService } from 'service/pointer-device.service';
 
 export const TERRAIN_BAKE_CROP_PREVIEW = 'TERRAIN_BAKE_CROP_PREVIEW';
 
@@ -27,7 +28,8 @@ export class TerrainBakeCropService {
   private live = new Map<string, PerFaceInsets>();
 
   constructor(
-    private modalService: ModalService,
+    private panelService: PanelService,
+    private pointerDeviceService: PointerDeviceService,
   ) { }
 
   hasSources(terrain: Terrain | null | undefined): boolean {
@@ -54,7 +56,7 @@ export class TerrainBakeCropService {
     const urls = blobUrls(ctx.blobs);
     this.setLivePreview(id, ctx.faces || {});
     try {
-      const result = await this.modalService.open<TerrainBakeCropResolve | false>(TerrainBakeCropComponent, {
+      const result = await this.openPanel({
         mode: 'import',
         thumbs: thumbsFromUrls(urls),
         faces: ctx.faces || {},
@@ -62,8 +64,8 @@ export class TerrainBakeCropService {
         index: ctx.index,
         total: ctx.total,
         boxName: ctx.name,
-        panelWidth: '520px',
         livePreview: (faces: PerFaceInsets) => this.setLivePreview(id, faces),
+        faceBlob: async (face) => ctx.blobs[face] || null,
       });
       if (!result || result.action === 'abort') return { action: 'abort' };
       if (result.action === 'skip') return { action: 'skip' };
@@ -78,11 +80,17 @@ export class TerrainBakeCropService {
     const state = parseBakeCropState(terrain.bakeCropJson);
     if (!state) return;
     const id = terrain.identifier;
+    const tourId = `terrain.bake-crop.${id}`;
+    if (PanelService.bringTourPanelToFront(tourId)) return;
+
     const urls = sourceUrls(state.sources);
     const faces = clonePerFaceInsets(state.faces);
     this.setLivePreview(id, faces);
+    // Restore sources immediately so CSS crop matches the editor (fixes prior double-crop saves).
+    void applyBakeCropToTerrain(terrain, faces);
+
     try {
-      const result = await this.modalService.open<TerrainBakeCropResolve | false>(TerrainBakeCropComponent, {
+      await this.openPanel({
         mode: 'edit',
         thumbs: thumbsFromUrls(urls),
         faces,
@@ -90,14 +98,53 @@ export class TerrainBakeCropService {
         index: 0,
         total: 1,
         boxName: terrain.name,
-        panelWidth: '520px',
         livePreview: (next: PerFaceInsets) => this.setLivePreview(id, next),
+        persist: (next: PerFaceInsets) => { void applyBakeCropToTerrain(terrain, next); },
+        faceBlob: async (face) => {
+          const sid = state.sources[face];
+          if (!sid) return null;
+          return ImageStorage.instance.get(sid)?.blob || null;
+        },
+        tourPanelId: tourId,
       });
-      if (!result || result.action !== 'confirm') return;
-      await applyBakeCropToTerrain(terrain, result.faces);
     } finally {
       this.clearLivePreview(id);
     }
+  }
+
+  private openPanel(host: {
+    mode: 'import' | 'edit';
+    thumbs: TerrainBakeCropThumb[];
+    faces: PerFaceInsets;
+    selectedFace?: TerrainFaceName;
+    index?: number;
+    total?: number;
+    boxName?: string;
+    livePreview?: (faces: PerFaceInsets) => void;
+    persist?: (faces: PerFaceInsets) => void;
+    faceBlob?: (face: TerrainFaceName) => Promise<Blob | null>;
+    tourPanelId?: string;
+  }): Promise<TerrainBakeCropResolve | false> {
+    const ptr = this.pointerDeviceService.pointers[0] || { x: 120, y: 80 };
+    const option: PanelOption = {
+      title: 'Crop',
+      left: Math.max(8, (ptr.x || 120) - 200),
+      top: Math.max(8, (ptr.y || 80) - 40),
+      width: 520,
+      height: 520,
+      tourPanelId: host.tourPanelId,
+      geometryKey: 'panel.app-terrain-bake-crop',
+    };
+    return new Promise(resolve => {
+      const component = this.panelService.open(TerrainBakeCropComponent, option);
+      let done = false;
+      const settle = (result: TerrainBakeCropResolve | false) => {
+        if (done) return;
+        done = true;
+        resolve(result);
+      };
+      component.setup({ ...host, settle });
+    });
   }
 }
 

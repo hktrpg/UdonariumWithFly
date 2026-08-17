@@ -76,11 +76,7 @@ export function splitFootprintFromPositions(
     }
   }
   const boxes = pruned.map(r => rectToAabb(r, aabb, cols, rows, sy));
-  if (!boxes.length) return [cloneAabb(aabb)];
-  // Grid rects are axis-aligned covers; empty corners become photo margins and
-  // CSS stretch makes walls/roof look wrongly scaled vs the fitted GLB.
-  // Tighten to mesh XZ, then push shared cut faces back so pieces stay 貼合.
-  return tightenSplitBoxesToMesh(positions, boxes);
+  return boxes.length ? boxes : [cloneAabb(aabb)];
 }
 
 type GridRect = { c0: number; c1: number; r0: number; r1: number };
@@ -461,108 +457,16 @@ function rectToAabb(
 ): MeshAabb {
   const sx = aabb.max[0] - aabb.min[0];
   const sz = aabb.max[2] - aabb.min[2];
-  // Exact grid edges — half-cell padding made each box larger than the
-  // solid footprint, so ortho photos had empty margins and seams no longer met.
-  const u0 = rect.c0 / cols;
-  const u1 = rect.c1 / cols;
-  const v0 = rect.r0 / rows;
-  const v1 = rect.r1 / rows;
+  const padC = 0.5 / cols;
+  const padR = 0.5 / rows;
+  const u0 = Math.max(0, rect.c0 / cols - padC);
+  const u1 = Math.min(1, rect.c1 / cols + padC);
+  const v0 = Math.max(0, rect.r0 / rows - padR);
+  const v1 = Math.min(1, rect.r1 / rows + padR);
   return {
     min: [aabb.min[0] + u0 * sx, aabb.min[1], aabb.min[2] + v0 * sz],
     max: [aabb.min[0] + u1 * sx, aabb.min[1] + sy, aabb.min[2] + v1 * sz],
   };
-}
-
-/**
- * Shrink each split box to mesh verts in its XZ slab; restore original shared
- * cut planes so neighboring boxes still abut (no gap / overlap).
- */
-export function tightenSplitBoxesToMesh(
-  positions: Float32Array,
-  boxes: MeshAabb[],
-): MeshAabb[] {
-  if (boxes.length < 1) return boxes;
-  const originals = boxes.map(cloneAabb);
-  const yMin = boxes[0].min[1];
-  const yMax = boxes[0].max[1];
-  const tight = originals.map(b => tightXzFromPositions(positions, b, yMin, yMax));
-  if (tight.length === 1) return tight;
-
-  for (let i = 0; i < originals.length; i++) {
-    for (let j = i + 1; j < originals.length; j++) {
-      restoreSharedCutFace(originals[i], originals[j], tight[i], tight[j]);
-    }
-  }
-  return tight;
-}
-
-function tightXzFromPositions(
-  positions: Float32Array,
-  box: MeshAabb,
-  yMin: number,
-  yMax: number,
-): MeshAabb {
-  const sx = Math.max(1e-9, box.max[0] - box.min[0]);
-  const sz = Math.max(1e-9, box.max[2] - box.min[2]);
-  const eps = Math.max(1e-5, Math.min(sx, sz) * 1e-4);
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
-  let found = false;
-  for (let i = 0; i + 2 < positions.length; i += 3) {
-    const x = positions[i];
-    const z = positions[i + 2];
-    if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
-    if (x < box.min[0] - eps || x > box.max[0] + eps) continue;
-    if (z < box.min[2] - eps || z > box.max[2] + eps) continue;
-    found = true;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (z < minZ) minZ = z;
-    if (z > maxZ) maxZ = z;
-  }
-  if (!found || !(maxX > minX) || !(maxZ > minZ)) return cloneAabb(box);
-  return {
-    min: [minX, yMin, minZ],
-    max: [maxX, yMax, maxZ],
-  };
-}
-
-function restoreSharedCutFace(
-  origA: MeshAabb,
-  origB: MeshAabb,
-  tightA: MeshAabb,
-  tightB: MeshAabb,
-): void {
-  const span = Math.max(
-    origA.max[0] - origA.min[0],
-    origA.max[2] - origA.min[2],
-    origB.max[0] - origB.min[0],
-    origB.max[2] - origB.min[2],
-    1e-6,
-  );
-  const tol = Math.max(1e-5, span * 1e-5);
-
-  if (Math.abs(origA.max[0] - origB.min[0]) <= tol) {
-    const x = origA.max[0];
-    tightA.max[0] = Math.max(tightA.min[0] + 1e-6, x);
-    tightB.min[0] = Math.min(tightB.max[0] - 1e-6, x);
-  } else if (Math.abs(origB.max[0] - origA.min[0]) <= tol) {
-    const x = origB.max[0];
-    tightB.max[0] = Math.max(tightB.min[0] + 1e-6, x);
-    tightA.min[0] = Math.min(tightA.max[0] - 1e-6, x);
-  }
-
-  if (Math.abs(origA.max[2] - origB.min[2]) <= tol) {
-    const z = origA.max[2];
-    tightA.max[2] = Math.max(tightA.min[2] + 1e-6, z);
-    tightB.min[2] = Math.min(tightB.max[2] - 1e-6, z);
-  } else if (Math.abs(origB.max[2] - origA.min[2]) <= tol) {
-    const z = origB.max[2];
-    tightB.max[2] = Math.max(tightB.min[2] + 1e-6, z);
-    tightA.min[2] = Math.min(tightA.max[2] - 1e-6, z);
-  }
 }
 
 function cloneAabb(aabb: MeshAabb): MeshAabb {
