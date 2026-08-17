@@ -1,20 +1,27 @@
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { UUID } from '@udonarium/core/system/util/uuid';
 import { PointerCoordinate } from 'service/pointer-device.service';
 
-import { parseBakeCropState, serializeBakeCropState } from './bake-crop';
+import { parseBakeCropState, serializeBakeCropState, TerrainBakeCropState } from './bake-crop';
 import { footprintDebug } from './footprint-debug';
 
 export function newBakeGroupId(): string {
   return UUID.generateUuid();
 }
 
+/**
+ * Members sharing bakeGroupId. Prefer view-table children; fall back to ObjectStore
+ * when none are parented yet (mid-import / mid-sync).
+ */
 export function terrainsInBakeGroup(groupId: string): Terrain[] {
   if (!groupId) return [];
+  const all = ObjectStore.instance.getObjects(Terrain).filter(t => t?.bakeGroupId === groupId);
   const table = TableSelecter.instance?.viewTable;
-  const list = table?.terrains || [];
-  return list.filter(t => t?.bakeGroupId === groupId);
+  if (!table) return all;
+  const onTable = all.filter(t => t.parent === table);
+  return onTable.length ? onTable : all;
 }
 
 export function bakeGroupLocalOf(terrain: Terrain): { x: number; y: number } | null {
@@ -26,14 +33,34 @@ export function bakeGroupLocalOf(terrain: Terrain): { x: number; y: number } | n
   return null;
 }
 
+/** Expected member count from any part's bakeCrop snapshot; null if legacy/unset. */
+export function expectedBakeGroupSize(terrains: Terrain[]): number | null {
+  for (const t of terrains) {
+    const state = parseBakeCropState(t?.bakeCropJson);
+    if (state?.groupSize && state.groupSize > 0) return state.groupSize;
+  }
+  return null;
+}
+
+/** True when the list looks complete (legacy groups without groupSize always pass if length >= 2). */
+export function isBakeGroupComplete(terrains: Terrain[]): boolean {
+  if (terrains.length < 2) return false;
+  const expected = expectedBakeGroupSize(terrains);
+  if (expected == null) return true;
+  return terrains.length >= expected;
+}
+
 /**
  * Place bake-group parts in their modeled relative layout, centered on `center`.
- * Uses groupLocalX/Y from bakeCropJson when present; otherwise keeps current
- * relative deltas between members.
+ * Restores import-time width/depth/height (and zero rotate) from bakeCropJson when
+ * present, then uses groupLocalX/Y so reassemble matches the load-time GROUP.
+ * Batches size+pose SyncVar writes per part (one UPDATE each).
  */
 export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordinate): boolean {
   const parts = terrains.filter(t => !!t);
   if (parts.length < 2) return false;
+  if (parts.some(t => !!t.isLocked)) return false;
+  if (!isBakeGroupComplete(parts)) return false;
 
   const locals = parts.map(t => {
     const local = bakeGroupLocalOf(t);
@@ -46,8 +73,7 @@ export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordina
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const p of locals) {
-    const w = Math.max(0.1, p.terrain.width || 1) * 50;
-    const d = Math.max(0.1, p.terrain.depth || 1) * 50;
+    const { w, d } = footprintPxForAssemble(p.terrain);
     if (p.lx < minX) minX = p.lx;
     if (p.ly < minY) minY = p.ly;
     if (p.lx + w > maxX) maxX = p.lx + w;
@@ -67,13 +93,14 @@ export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordina
       ly: +p.ly.toFixed(2),
       w: p.terrain.width,
       d: p.terrain.depth,
+      h: p.terrain.height,
       fromJson: !!bakeGroupLocalOf(p.terrain),
       before: { x: p.terrain.location?.x, y: p.terrain.location?.y },
     })),
   });
 
   for (const p of locals) {
-    placeTerrainAt(p.terrain, originX + p.lx, originY + p.ly, center.z);
+    commitTerrainPose(p.terrain, originX + p.lx, originY + p.ly, center.z, { restoreSize: true });
   }
 
   footprintDebug('assembleBakeGroupAt after', {
@@ -91,39 +118,168 @@ export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordina
   return true;
 }
 
-/** Table pose for one bake-group part (whole SyncVar write + optional map placement). */
-export function placeTerrainAt(terrain: Terrain, x: number, y: number, posZ: number): void {
-  const hadPlacements = !!terrain.tablePlacements;
-  terrain.location = { name: 'table', x, y };
-  terrain.posZ = posZ;
-  const tableId = TableSelecter.instance?.viewTable?.identifier;
-  if (tableId) {
-    terrain.addToTable(tableId, { x, y, posZ }, !hadPlacements);
-  } else {
-    terrain.update();
+/** Footprint in table px using bakeCrop full* when present (pre-write bounds). */
+function footprintPxForAssemble(terrain: Terrain): { w: number; d: number } {
+  const state = parseBakeCropState(terrain.bakeCropJson);
+  if (state && state.fullWidth > 0 && state.fullDepth > 0) {
+    return {
+      w: Math.max(0.1, state.fullWidth) * GRID,
+      d: Math.max(0.1, state.fullDepth) * GRID,
+    };
   }
-  footprintDebug('placeTerrainAt', {
+  return {
+    w: Math.max(0.1, terrain.width || 1) * GRID,
+    d: Math.max(0.1, terrain.depth || 1) * GRID,
+  };
+}
+
+/** Apply bakeCrop full* + zero rotate (caller should suppress sync if batching). */
+function applyRestoreBakeGroupPartSize(terrain: Terrain): void {
+  const state = parseBakeCropState(terrain.bakeCropJson);
+  if (!state) {
+    terrain.rotate = 0;
+    return;
+  }
+  const w = Math.max(0.1, state.fullWidth || 0);
+  const d = Math.max(0.1, state.fullDepth || 0);
+  const h = Math.max(0, state.fullHeight || 0);
+  terrain.mutateAppearance(() => {
+    if (state.fullWidth > 0) terrain.width = w;
+    if (state.fullDepth > 0) terrain.depth = d;
+    if (Number.isFinite(state.fullHeight)) terrain.height = h;
+    terrain.rotate = 0;
+  });
+}
+
+/**
+ * Bind independent terrains into one bake group using current poses as the
+ * modeled layout (locals + full size snapshot for later reassemble).
+ */
+export function formBakeGroup(terrains: Terrain[]): boolean {
+  const parts = terrains.filter(t => !!t);
+  if (parts.length < 2) return false;
+  if (parts.some(t => !!t.isLocked)) return false;
+  const id = newBakeGroupId();
+  const b = bakeGroupBoundsPx(parts);
+  const groupSize = parts.length;
+  for (const t of parts) {
+    const prev = parseBakeCropState(t.bakeCropJson);
+    const w = Math.max(0.1, t.width || 1);
+    const d = Math.max(0.1, t.depth || 1);
+    const h = Math.max(0, t.height || 0);
+    const state: TerrainBakeCropState = prev || {
+      sources: {},
+      faces: {},
+      fullWidth: w,
+      fullDepth: d,
+      fullHeight: h,
+      anchorX: t.location?.x ?? 0,
+      anchorY: t.location?.y ?? 0,
+    };
+    state.fullWidth = w;
+    state.fullDepth = d;
+    state.fullHeight = h;
+    state.groupLocalX = (t.location?.x ?? 0) - b.minX;
+    state.groupLocalY = (t.location?.y ?? 0) - b.minY;
+    state.groupSize = groupSize;
+    const json = serializeBakeCropState(state);
+    if (typeof t.withSyncSuppressed === 'function') {
+      t.withSyncSuppressed(() => {
+        t.bakeGroupId = id;
+        t.bakeCropJson = json;
+      });
+      t.update();
+    } else {
+      t.bakeGroupId = id;
+      t.bakeCropJson = json;
+    }
+  }
+  return true;
+}
+
+/**
+ * Write size (optional) + table pose with sync suppressed, then one UPDATE.
+ * Keeps addToTable / placement behavior of placeTerrainAt.
+ */
+export function commitTerrainPose(
+  terrain: Terrain,
+  x: number,
+  y: number,
+  posZ: number,
+  options?: { restoreSize?: boolean },
+): void {
+  const hadPlacements = !!terrain.tablePlacements;
+  const tableId = TableSelecter.instance?.viewTable?.identifier;
+  const apply = () => {
+    if (options?.restoreSize) applyRestoreBakeGroupPartSize(terrain);
+    terrain.location = { name: 'table', x, y };
+    terrain.posZ = posZ;
+    if (tableId) {
+      terrain.addToTable(tableId, { x, y, posZ }, !hadPlacements);
+    }
+  };
+  if (typeof terrain.withSyncSuppressed === 'function') {
+    terrain.withSyncSuppressed(apply);
+    terrain.update();
+  } else {
+    apply();
+    terrain.update?.();
+  }
+  footprintDebug('commitTerrainPose', {
     name: terrain.name,
     x: +x.toFixed(2),
     y: +y.toFixed(2),
     posZ,
     tableId: tableId || '(none)',
     exclusive: !hadPlacements,
+    restoreSize: !!options?.restoreSize,
     location: { ...terrain.location },
     pose: terrain.getPoseForView?.() ?? null,
     placements: (terrain.tablePlacements || '').slice(0, 180),
   });
 }
 
+/** Table pose for one bake-group part (whole SyncVar write + optional map placement). */
+export function placeTerrainAt(terrain: Terrain, x: number, y: number, posZ: number): void {
+  commitTerrainPose(terrain, x, y, posZ);
+}
+
+/** Stamp groupSize onto each part's bakeCrop (import / model bake). */
+export function writeBakeGroupSize(terrains: Terrain[], groupSize: number): void {
+  if (groupSize < 2) return;
+  for (const t of terrains) {
+    if (!t) continue;
+    const state = parseBakeCropState(t.bakeCropJson);
+    if (!state) continue;
+    state.groupSize = groupSize;
+    const json = serializeBakeCropState(state);
+    if (typeof t.withSyncSuppressed === 'function') {
+      t.withSyncSuppressed(() => { t.bakeCropJson = json; });
+      t.update();
+    } else {
+      t.bakeCropJson = json;
+    }
+  }
+}
+
 export function clearBakeGroup(terrains: Terrain[]): void {
   for (const t of terrains) {
     if (!t?.bakeGroupId) continue;
-    t.bakeGroupId = '';
     const state = parseBakeCropState(t.bakeCropJson);
-    if (!state) continue;
-    delete state.groupLocalX;
-    delete state.groupLocalY;
-    t.bakeCropJson = serializeBakeCropState(state);
+    const clear = () => {
+      t.bakeGroupId = '';
+      if (!state) return;
+      delete state.groupLocalX;
+      delete state.groupLocalY;
+      delete state.groupSize;
+      t.bakeCropJson = serializeBakeCropState(state);
+    };
+    if (typeof t.withSyncSuppressed === 'function') {
+      t.withSyncSuppressed(clear);
+      t.update();
+    } else {
+      clear();
+    }
   }
 }
 
@@ -168,21 +324,6 @@ export function bakeGroupBoundsPx(terrains: Terrain[]): {
   };
 }
 
-function writeGroupLocal(terrain: Terrain, lx: number, ly: number): void {
-  const state = parseBakeCropState(terrain.bakeCropJson);
-  if (!state) return;
-  state.groupLocalX = lx;
-  state.groupLocalY = ly;
-  terrain.bakeCropJson = serializeBakeCropState(state);
-}
-
-function refreshGroupLocalsFromPose(terrains: Terrain[]): void {
-  const b = bakeGroupBoundsPx(terrains);
-  for (const t of terrains) {
-    writeGroupLocal(t, (t.location?.x ?? 0) - b.minX, (t.location?.y ?? 0) - b.minY);
-  }
-}
-
 /**
  * Rigid rotate: orbit each part around the group center and add delta to facing.
  */
@@ -209,46 +350,91 @@ export function rotateBakeGroupBy(terrains: Terrain[], deltaDeg: number): void {
     const dy = pcy - cy;
     const nx = cx + dx * cos - dy * sin;
     const ny = cy + dx * sin + dy * cos;
-    placeTerrainAt(t, nx - w / 2, ny - d / 2, t.posZ || 0);
     let rot = ((t.rotate || 0) + deltaDeg + 720) % 360;
     if (rot > 180) rot -= 360;
-    t.rotate = rot;
+    const x = nx - w / 2;
+    const y = ny - d / 2;
+    const posZ = t.posZ || 0;
+    if (typeof t.withSyncSuppressed === 'function') {
+      t.withSyncSuppressed(() => {
+        t.rotate = rot;
+        commitTerrainPoseInner(t, x, y, posZ);
+      });
+      t.update();
+    } else {
+      t.rotate = rot;
+      placeTerrainAt(t, x, y, posZ);
+    }
   }
-  refreshGroupLocalsFromPose(parts);
+  // Keep bakeCrop groupLocal / full* as import (or formBakeGroup) snapshot so
+  // assembleBakeGroupAt can restore load-time layout.
+}
+
+/** Pose write without outer suppress/update (for nested batch). */
+function commitTerrainPoseInner(terrain: Terrain, x: number, y: number, posZ: number): void {
+  const hadPlacements = !!terrain.tablePlacements;
+  terrain.location = { name: 'table', x, y };
+  terrain.posZ = posZ;
+  const tableId = TableSelecter.instance?.viewTable?.identifier;
+  if (tableId) {
+    terrain.addToTable(tableId, { x, y, posZ }, !hadPlacements);
+  }
 }
 
 /**
- * Scale footprint around an anchor (table px). Updates size, position, groupLocal.
- * Height is unchanged.
+ * Scale footprint around an anchor (table px). Updates size and position.
+ * Default (and multi-box): uniform XY + matching height.
+ * `freeAspect: true` (Shift-drag): independent width/depth; height unchanged.
+ * Does not rewrite bakeCrop locals/full sizes — reassemble uses that snapshot.
  */
 export function scaleBakeGroupFrom(
   terrains: Terrain[],
   anchor: { x: number; y: number },
   scaleX: number,
   scaleY: number,
+  options?: { freeAspect?: boolean },
 ): void {
   const parts = terrains.filter(t => !!t);
   if (parts.length < 1) return;
-  const sx = Math.max(0.05, scaleX);
-  const sy = Math.max(0.05, scaleY);
+  let sx = Math.max(0.05, scaleX);
+  let sy = Math.max(0.05, scaleY);
+  const freeAspect = !!options?.freeAspect;
+  if (!freeAspect) {
+    const s = Math.abs(sx - sy) < 1e-6 ? sx : Math.sqrt(sx * sy);
+    sx = sy = Math.max(0.05, s);
+  }
   if (Math.abs(sx - 1) < 1e-6 && Math.abs(sy - 1) < 1e-6) return;
+  const scaleH = freeAspect ? 1 : sx;
 
   for (const t of parts) {
     const w0 = Math.max(0.1, t.width || 1);
     const d0 = Math.max(0.1, t.depth || 1);
+    const h0 = Math.max(0, t.height || 0);
     const x0 = t.location?.x ?? 0;
     const y0 = t.location?.y ?? 0;
     const w1 = Math.max(0.1, w0 * sx);
     const d1 = Math.max(0.1, d0 * sy);
+    const h1 = Math.max(0, h0 * scaleH);
     // Min-corner relative to anchor scales; size change keeps the scaled corner.
     const x1 = anchor.x + (x0 - anchor.x) * sx;
     const y1 = anchor.y + (y0 - anchor.y) * sy;
-    t.mutateAppearance(() => {
-      t.width = w1;
-      t.depth = d1;
-    });
-    placeTerrainAt(t, x1, y1, t.posZ || 0);
+    if (typeof t.withSyncSuppressed === 'function') {
+      t.withSyncSuppressed(() => {
+        t.mutateAppearance(() => {
+          t.width = w1;
+          t.depth = d1;
+          if (scaleH !== 1) t.height = h1;
+        });
+        commitTerrainPoseInner(t, x1, y1, t.posZ || 0);
+      });
+      t.update();
+    } else {
+      t.mutateAppearance(() => {
+        t.width = w1;
+        t.depth = d1;
+        if (scaleH !== 1) t.height = h1;
+      });
+      placeTerrainAt(t, x1, y1, t.posZ || 0);
+    }
   }
-  if (parts.length > 1) refreshGroupLocalsFromPose(parts);
 }
-

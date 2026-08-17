@@ -7,8 +7,11 @@ import { MODEL_MAX_FILE_BYTES } from './mesh-ir';
 /** Zip of glTF + textures is often larger than a single mesh file. */
 export const MODEL_ZIP_MAX_BYTES = 256 * 1024 * 1024;
 
-const PRIMARY_MODEL_RE = /\.(stl|obj|glb|gltf)$/i;
-const PACKAGE_MEMBER_RE = /\.(stl|obj|mtl|glb|gltf|bin|png|jpe?g|webp|gif|bmp)$/i;
+const PRIMARY_MODEL_RE = /\.(stl|obj|glb|gltf|fbx)$/i;
+const PACKAGE_MEMBER_RE = /\.(stl|obj|mtl|glb|gltf|fbx|bin|png|jpe?g|webp|gif|bmp|zip)$/i;
+/** Marketplace packs sometimes nest model.zip inside an outer zip. */
+const NESTED_ZIP_MAX_DEPTH = 2;
+
 
 type PathTaggedFile = File & { packagePath?: string };
 
@@ -62,13 +65,13 @@ export function isPrimaryModelFile(file: File): boolean {
   return isPrimaryModelPath(packagePathOf(file)) || isPrimaryModelPath(file.name || '');
 }
 
-/** Unpack model zips (one level). Non-zip files pass through. */
-export async function expandModelDropFiles(files: File[]): Promise<File[]> {
+/** Unpack model zips (nested packs allowed up to NESTED_ZIP_MAX_DEPTH). Non-zip files pass through. */
+export async function expandModelDropFiles(files: File[], depth = 0): Promise<File[]> {
   const out: File[] = [];
   let zipWithoutModel = false;
 
   for (const file of files || []) {
-    if (!isZipFile(file)) {
+    if (!isZipFile(file) && !/\.zip$/i.test(packagePathOf(file))) {
       out.push(file);
       continue;
     }
@@ -82,6 +85,12 @@ export async function expandModelDropFiles(files: File[]): Promise<File[]> {
       throw new Error('MODEL_INVALID_ZIP');
     }
 
+    if (depth < NESTED_ZIP_MAX_DEPTH) {
+      extracted = await expandNestedZips(extracted, depth);
+    } else {
+      extracted = extracted.filter(f => !isNestedZipMember(f));
+    }
+
     if (extracted.some(isPrimaryModelFile)) {
       out.push(...extracted);
     } else {
@@ -91,6 +100,35 @@ export async function expandModelDropFiles(files: File[]): Promise<File[]> {
 
   if (zipWithoutModel && !out.some(isPrimaryModelFile)) {
     throw new Error('MODEL_NO_MODEL_IN_ZIP');
+  }
+  return out;
+}
+
+function isNestedZipMember(file: File): boolean {
+  return isZipFile(file) || /\.zip$/i.test(packagePathOf(file));
+}
+
+/** Unpack zip members that are themselves zips; keep sibling textures. */
+async function expandNestedZips(files: File[], depth: number): Promise<File[]> {
+  const out: File[] = [];
+  for (const file of files) {
+    if (!isNestedZipMember(file)) {
+      out.push(file);
+      continue;
+    }
+    if (file.size > MODEL_ZIP_MAX_BYTES) continue;
+    const nestDir = dirOfPackagePath(packagePathOf(file));
+    let inner: File[];
+    try {
+      inner = await expandModelDropFiles([file], depth + 1);
+    } catch {
+      continue;
+    }
+    for (const f of inner) {
+      const rel = packagePathOf(f);
+      const prefixed = nestDir ? `${nestDir}/${rel}` : rel;
+      out.push(attachPackagePath(f, prefixed));
+    }
   }
   return out;
 }

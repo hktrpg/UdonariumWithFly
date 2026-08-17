@@ -40,6 +40,7 @@ import {
   bakeGroupBoundsPx,
   bakeGroupPartsOf,
   clearBakeGroup,
+  formBakeGroup,
   scaleBakeGroupFrom,
   terrainsInBakeGroup,
 } from '@udonarium/terrain-model/bake-group';
@@ -267,6 +268,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     y: number;
     w: number;
     d: number;
+    h: number;
   }> = [];
 
   constructor(
@@ -369,7 +371,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         if (!el) continue;
         const handler = new InputHandler(el);
         handler.onStart = (ev) => this.onScaleStart(ev, corner);
-        handler.onMove = () => this.onScaleMove();
+        handler.onMove = (ev) => this.onScaleMove(ev);
         handler.onEnd = () => this.onScaleEnd();
         this.scaleInputs.push(handler);
       }
@@ -393,11 +395,13 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       y: t.location?.y ?? 0,
       w: Math.max(TERRAIN_SIZE_MIN, t.width || 1),
       d: Math.max(TERRAIN_SIZE_MIN, t.depth || 1),
+      h: Math.max(0, t.height || 0),
     }));
   }
 
-  private onScaleMove() {
+  private onScaleMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || !this.scaleStartSnapshots.length) return;
+    const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
     const cur = this.coordinateService.calcTabletopLocalCoordinate();
     const dx = cur.x - this.scaleStartTable.x;
     const dy = cur.y - this.scaleStartTable.y;
@@ -410,12 +414,26 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let anchor: { x: number; y: number };
     if (this.scaleCorner === 'rb') {
       anchor = { x: b.minX, y: b.minY };
-      scaleX = Math.max(0.05, (w0 + dx) / w0);
-      scaleY = Math.max(0.05, (d0 + dy) / d0);
+      if (freeAspect) {
+        scaleX = Math.max(0.05, (w0 + dx) / w0);
+        scaleY = Math.max(0.05, (d0 + dy) / d0);
+      } else {
+        const nw = Math.max(1, w0 + dx);
+        const nd = Math.max(1, d0 + dy);
+        const scale = Math.max(0.05, Math.hypot(nw, nd) / Math.hypot(w0, d0));
+        scaleX = scaleY = scale;
+      }
     } else {
       anchor = { x: b.maxX, y: b.maxY };
-      scaleX = Math.max(0.05, (w0 - dx) / w0);
-      scaleY = Math.max(0.05, (d0 - dy) / d0);
+      if (freeAspect) {
+        scaleX = Math.max(0.05, (w0 - dx) / w0);
+        scaleY = Math.max(0.05, (d0 - dy) / d0);
+      } else {
+        const nw = Math.max(1, w0 - dx);
+        const nd = Math.max(1, d0 - dy);
+        const scale = Math.max(0.05, Math.hypot(nw, nd) / Math.hypot(w0, d0));
+        scaleX = scaleY = scale;
+      }
     }
 
     this.ngZone.run(() => {
@@ -423,11 +441,12 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
         s.terrain.mutateAppearance(() => {
           s.terrain.width = s.w;
           s.terrain.depth = s.d;
+          s.terrain.height = s.h;
         });
         s.terrain.location = { name: 'table', x: s.x, y: s.y };
       }
       const parts = this.scaleStartSnapshots.map(s => s.terrain);
-      scaleBakeGroupFrom(parts, anchor, scaleX, scaleY);
+      scaleBakeGroupFrom(parts, anchor, scaleX, scaleY, { freeAspect });
       for (const t of parts) {
         MovableDirective.syncPoseFromUndo(t, t.location.x, t.location.y, t.posZ || 0);
       }
@@ -536,6 +555,12 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     if (this.isMultiSelectedTerrains()) {
       let selectedGameTableMasks = () => this.selectedTerrains();
       actions.push(
+        {
+          name: this.i18n.t('terrain.menu.27'),
+          action: () => {
+            formBakeGroup(selectedGameTableMasks());
+          },
+        },
         {
           name: this.i18n.t('terrain.menu.2'), action: null, subActions: [
             {

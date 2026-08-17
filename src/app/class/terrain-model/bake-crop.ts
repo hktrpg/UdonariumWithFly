@@ -79,6 +79,8 @@ export type TerrainBakeCropState = {
   /** Offset from the multi-box model origin (table px); used to reassemble groups. */
   groupLocalX?: number;
   groupLocalY?: number;
+  /** Expected member count for this bake group (completeness checks). */
+  groupSize?: number;
 };
 
 export type PixelRect = { x: number; y: number; w: number; h: number };
@@ -561,6 +563,7 @@ export function parseBakeCropState(raw: string | null | undefined): TerrainBakeC
       anchorY: +j.anchorY || 0,
       groupLocalX: typeof j.groupLocalX === 'number' ? j.groupLocalX : undefined,
       groupLocalY: typeof j.groupLocalY === 'number' ? j.groupLocalY : undefined,
+      groupSize: typeof j.groupSize === 'number' && j.groupSize > 0 ? Math.floor(j.groupSize) : undefined,
     };
   } catch {
     return null;

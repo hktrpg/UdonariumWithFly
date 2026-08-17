@@ -53,6 +53,24 @@
   </section>
 
   <section class="card card-dense">
+    <button type="button" class="btn btn-sm" (click)="showFaceImages = !showFaceImages">
+      {{ (showFaceImages ? 'terrain.settings.hideFaces' : 'terrain.settings.showFaces') | i18n }}
+    </button>
+    <div class="image-grid face-grid" *ngIf="showFaceImages">
+      <div class="image-slot" *ngFor="let slot of faceSlots">
+        <span class="image-label">{{ slot.labelKey | i18n }}
+          <small *ngIf="!faceIsOverride(slot.face)"> ({{ 'terrain.settings.faceFallback' | i18n }})</small>
+        </span>
+        <button type="button" class="image-frame" [class.image-frame-empty]="!facePreviewUrl(slot.face)"
+          (click)="openImage(slot.face)" [disabled]="GuestMode()">
+          <img *ngIf="facePreviewUrl(slot.face)" [src]="facePreviewUrl(slot.face) | safe: 'resourceUrl'" alt="" />
+          <i *ngIf="!facePreviewUrl(slot.face)" class="material-icons">add_photo_alternate</i>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card card-dense">
     <div class="field-row wrap">
       <label class="field grow">
         <span>{{ 'terrain.settings.mode' | i18n }}</span>
@@ -112,28 +130,14 @@
     </div>
   </section>
 
-  <section class="card card-dense">
-    <button type="button" class="btn btn-sm" (click)="showFaceImages = !showFaceImages">
-      {{ (showFaceImages ? 'terrain.settings.hideFaces' : 'terrain.settings.showFaces') | i18n }}
-    </button>
-    <div class="image-grid face-grid" *ngIf="showFaceImages">
-      <div class="image-slot" *ngFor="let slot of faceSlots">
-        <span class="image-label">{{ slot.labelKey | i18n }}
-          <small *ngIf="!faceIsOverride(slot.face)"> ({{ 'terrain.settings.faceFallback' | i18n }})</small>
-        </span>
-        <button type="button" class="image-frame" [class.image-frame-empty]="!facePreviewUrl(slot.face)"
-          (click)="openImage(slot.face)" [disabled]="GuestMode()">
-          <img *ngIf="facePreviewUrl(slot.face)" [src]="facePreviewUrl(slot.face) | safe: 'resourceUrl'" alt="" />
-          <i *ngIf="!facePreviewUrl(slot.face)" class="material-icons">add_photo_alternate</i>
-        </button>
-      </div>
-    </div>
-  </section>
-
   <section class="card card-dense footer-actions actions tight">
     <button type="button" class="btn btn-sm" (click)="importXml()" [disabled]="GuestMode()">{{ 'sheet.import' | i18n }}</button>
     <button type="button" class="btn btn-sm" [disabled]="isSaveing || GuestMode()" (click)="saveToXML()">
       {{ isSaveing ? (progresPercent + '%') : ('sheet.download' | i18n) }}
+    </button>
+    <button type="button" class="btn btn-sm" *ngIf="canExportBakeGroup"
+      [disabled]="isSaveing || GuestMode()" (click)="saveGroupToXML()">
+      {{ isSaveing ? (progresPercent + '%') : ('terrain.settings.exportGroup' | i18n) }}
     </button>
   </section>
 </div>

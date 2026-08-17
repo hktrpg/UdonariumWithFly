@@ -143,7 +143,11 @@ export class MovableSelectionSynchronizer {
 
   private onPickObject(e: CustomEvent) {
     if (this.selection.excludeElement === this.movable.nativeElement) return;
-    if (this.pointerDevice.isDragging || this.movable.isDisable) return;
+    if (this.movable.isDisable) return;
+    const src = e.detail?.srcEvent;
+    const shiftPick = src instanceof MouseEvent && src.shiftKey;
+    // Shift additive pick: table may briefly mark isDragging; still allow toggle.
+    if (this.pointerDevice.isDragging && !shiftPick) return;
 
     if (this.selection.excludeElement == null) {
       this.toggleState();

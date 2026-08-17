@@ -9,6 +9,7 @@ import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
 import { TerrainBakeCropService } from 'service/terrain-bake-crop.service';
+import { isBakeGroupComplete, terrainsInBakeGroup } from '@udonarium/terrain-model/bake-group';
 
 @Component({
   selector: 'terrain-settings',
@@ -188,6 +189,33 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     this.isSaveing = true;
     this.progresPercent = 0;
     await this.saveDataService.saveGameObjectAsync(this.terrain, 'fly_xml_' + (this.terrain.name || 'terrain'), percent => {
+      this.progresPercent = percent;
+      this.changeDetector.markForCheck();
+    });
+    setTimeout(() => {
+      this.isSaveing = false;
+      this.progresPercent = 0;
+      this.changeDetector.markForCheck();
+    }, 500);
+  }
+
+  get bakeGroupTerrains(): Terrain[] {
+    if (!this.terrain?.bakeGroupId) return [];
+    return terrainsInBakeGroup(this.terrain.bakeGroupId);
+  }
+
+  get canExportBakeGroup(): boolean {
+    const parts = this.bakeGroupTerrains;
+    return isBakeGroupComplete(parts);
+  }
+
+  async saveGroupToXML() {
+    const parts = this.bakeGroupTerrains;
+    if (!parts.length || this.isSaveing) return;
+    this.isSaveing = true;
+    this.progresPercent = 0;
+    const base = this.terrain.name || 'terrain';
+    await this.saveDataService.saveGameObjectsAsync(parts, 'fly_xml_group_' + base, percent => {
       this.progresPercent = percent;
       this.changeDetector.markForCheck();
     });

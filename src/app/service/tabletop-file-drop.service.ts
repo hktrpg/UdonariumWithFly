@@ -489,7 +489,7 @@ export class TabletopFileDropService {
   private classify(file: File, asModelPackage = false): DropKind | null {
     const name = (file.name || '').toLowerCase();
     const path = packagePathOf(file);
-    if (/\.(stl|obj|glb|gltf)$/i.test(name) || /\.(stl|obj|glb|gltf)$/i.test(path)) return 'model';
+    if (/\.(stl|obj|glb|gltf|fbx)$/i.test(name) || /\.(stl|obj|glb|gltf|fbx)$/i.test(path)) return 'model';
     if (/\.(mtl|bin)$/i.test(name) || /\.(mtl|bin)$/i.test(path)) return asModelPackage ? 'model-sidecar' : null;
     // Textures only join the bag when this drop is already a model package.
     if (asModelPackage && /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) return 'model-sidecar';

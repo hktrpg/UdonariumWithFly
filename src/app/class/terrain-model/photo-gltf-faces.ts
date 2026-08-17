@@ -1,5 +1,7 @@
 import { MeshAabb, MODEL_BAKE_SIZE_MAX, MODEL_PHOTO_BAKE_SIZE } from './mesh-ir';
-import { loadGltfScene } from './load-gltf';
+import { loadFbxScene } from './load-fbx';
+import { loadGltfScene, LoadedGltf } from './load-gltf';
+import { packagePathOf } from './model-package-files';
 import { BakedFaceBlobs } from './ortho-bake';
 import {
   FACE_VIEWS,
@@ -30,7 +32,7 @@ export type PhotoGltfFacesResult = {
 const EDGE_DILATE_PX = 2;
 
 /**
- * Photograph a glTF scene from six orthographic sides (real materials).
+ * Photograph a glTF / FBX scene from six orthographic sides (real materials).
  * Transparent PNG: empty space stays empty (L courtyard, glass). Tightens the
  * box to opaque pixels so leftover helper padding does not become a hole.
  */
@@ -38,7 +40,7 @@ export async function photoGltfFaces(
   files: File[],
   maxSize: number = MODEL_PHOTO_BAKE_SIZE,
 ): Promise<PhotoGltfFacesResult> {
-  const { THREE, scene, dispose } = await loadGltfScene(files);
+  const { THREE, scene, dispose } = await loadPhotoScene(files);
   let renderer: import('three').WebGLRenderer | undefined;
   try {
     await waitForMaps(scene);
@@ -251,4 +253,18 @@ async function canvasToDilatedPng(src: HTMLCanvasElement, radius: number): Promi
   dilateAlphaInPlace(img.data, img.width, img.height, radius);
   ctx.putImageData(img, 0, 0);
   return canvasToPng(c2);
+}
+
+function isExt(file: File, re: RegExp): boolean {
+  return re.test(packagePathOf(file)) || re.test(file.name || '');
+}
+
+async function loadPhotoScene(files: File[]): Promise<LoadedGltf> {
+  if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i))) {
+    return loadGltfScene(files);
+  }
+  if (files.some(f => isExt(f, /\.fbx$/i))) {
+    return loadFbxScene(files);
+  }
+  throw new Error('MODEL_NO_GLTF');
 }

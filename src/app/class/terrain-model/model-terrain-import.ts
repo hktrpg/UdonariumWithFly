@@ -258,6 +258,7 @@ async function createTerrainBox(
     anchorY,
     groupLocalX,
     groupLocalY,
+    ...(layout.bakeGroupId && layout.total > 1 ? { groupSize: layout.total } : {}),
   };
   terrain.bakeCropJson = serializeBakeCropState(state);
   if (layout.bakeGroupId) terrain.bakeGroupId = layout.bakeGroupId;
@@ -288,7 +289,7 @@ async function addFaceImages(blobs: BakedFaceBlobs): Promise<Partial<Record<Terr
 
 export function isModelDropFile(file: File): boolean {
   const n = (file.name || '').toLowerCase();
-  return /\.(stl|obj|mtl|glb|gltf|bin)$/i.test(n)
+  return /\.(stl|obj|mtl|glb|gltf|fbx|bin)$/i.test(n)
     || (isImageName(n) && false); // textures only when part of model package
 }
 
@@ -313,7 +314,7 @@ async function bakeModelBoxes(
   files: File[],
   bakeSize?: number,
 ): Promise<{ boxes: BakedBox[]; fullAabb: MeshAabb; warnings: string[] }> {
-  if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i))) {
+  if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i) || isExt(f, /\.fbx$/i))) {
     const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE);
     return {
       boxes: photo.boxes?.length ? photo.boxes : [{ blobs: photo.blobs, aabb: photo.aabb }],
@@ -370,8 +371,10 @@ export function modelImportErrorI18nKey(err: unknown): string {
     case 'MODEL_INVALID_STL': return 'modelImport.error.invalidStl';
     case 'MODEL_INVALID_OBJ': return 'modelImport.error.invalidObj';
     case 'MODEL_INVALID_GLTF': return 'modelImport.error.invalidGltf';
+    case 'MODEL_INVALID_FBX': return 'modelImport.error.invalidFbx';
     case 'MODEL_NO_OBJ': return 'modelImport.error.noObj';
     case 'MODEL_NO_GLTF': return 'modelImport.error.noGltf';
+    case 'MODEL_NO_FBX': return 'modelImport.error.noFbx';
     case 'MODEL_NO_MODEL_IN_ZIP': return 'modelImport.error.noModelInZip';
     case 'MODEL_INVALID_ZIP': return 'modelImport.error.invalidZip';
     case 'MODEL_UNSUPPORTED': return 'modelImport.error.unsupported';

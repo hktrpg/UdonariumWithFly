@@ -88,9 +88,29 @@ describe('expandModelDropFiles', () => {
     await expectAsync(expandModelDropFiles([zip])).toBeRejectedWithError('MODEL_NO_MODEL_IN_ZIP');
   });
 
-  it('passes non-zip files through', async () => {
-    const stl = new File(['solid'], 'box.stl');
-    const files = await expandModelDropFiles([stl]);
-    expect(files).toEqual([stl]);
+  it('unpacks a nested zip that contains FBX', async () => {
+    const inner = await zipFile([
+      { name: 'old brick building.fbx', body: 'fake-fbx' },
+      { name: 'wall.png', body: 'fake-png' },
+    ]);
+    const innerBuf = new Uint8Array(await inner.arrayBuffer());
+    const outerWriter = new ZipWriter(new BlobWriter('application/zip'));
+    await outerWriter.add('source/old brick building.zip', new BlobReader(new Blob([innerBuf])));
+    await outerWriter.add('textures/wall.png', new BlobReader(new Blob(['outer-tex'])));
+    const outerBlob = await outerWriter.close();
+    const outer = new File([outerBlob], 'old-brick.zip', { type: 'application/zip' });
+
+    const files = await expandModelDropFiles([outer]);
+    expect(files.some(f => /\.fbx$/i.test(f.name))).toBeTrue();
+    expect(files.some(f => f.name === 'wall.png')).toBeTrue();
+  });
+
+  it('recognizes FBX as a primary model in a zip', async () => {
+    const zip = await zipFile([
+      { name: 'source/Building.fbx', body: 'fake-fbx' },
+      { name: 'textures/Base.png', body: 'fake-png' },
+    ]);
+    const files = await expandModelDropFiles([zip]);
+    expect(files.some(f => /\.fbx$/i.test(f.name))).toBeTrue();
   });
 });

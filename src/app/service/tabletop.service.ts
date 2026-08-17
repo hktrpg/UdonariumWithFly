@@ -28,6 +28,8 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
+import { assembleBakeGroupAt, newBakeGroupId } from '@udonarium/terrain-model/bake-group';
+import { parseBakeCropState, serializeBakeCropState } from '@udonarium/terrain-model/bake-crop';
 
 import { CoordinateService } from './coordinate.service';
 import { BatchService } from './batch.service';
@@ -228,6 +230,7 @@ export class TabletopService {
       })
       .on('XML_LOADED', event => {
         let xmlElement: Element = event.data.xmlElement;
+        if (this.tryPlaceTerrainGroup(xmlElement)) return;
         // todo: 拖放到立體地形上時的行為
         let gameObject = ObjectSerializer.instance.parseXml(xmlElement);
         if (gameObject instanceof TabletopObject) {
@@ -256,6 +259,45 @@ export class TabletopService {
           ScenarioTextList.instance.addItem(gameObject);
         }
       });
+  }
+
+  /** Import `<terrain-group>` ZIP/XML: place all parts and keep/rebuild bake GROUP. */
+  private tryPlaceTerrainGroup(xmlElement: Element): boolean {
+    if (!xmlElement || xmlElement.tagName !== 'terrain-group') return false;
+    const terrains: Terrain[] = [];
+    for (let i = 0; i < xmlElement.children.length; i++) {
+      const child = xmlElement.children[i];
+      const obj = ObjectSerializer.instance.parseXml(child);
+      if (obj instanceof Terrain) terrains.push(obj);
+    }
+    if (!terrains.length) return true;
+
+    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
+    if (terrains.length > 1) {
+      const gid = newBakeGroupId();
+      for (const t of terrains) {
+        t.withSyncSuppressed(() => {
+          t.bakeGroupId = gid;
+          const state = parseBakeCropState(t.bakeCropJson);
+          if (state) {
+            state.groupSize = terrains.length;
+            t.bakeCropJson = serializeBakeCropState(state);
+          }
+        });
+        t.update();
+      }
+    }
+    // Append once; assemble batches final size+pose (one UPDATE per part).
+    for (const t of terrains) this.placeToTabletop(t);
+    if (terrains.length > 1) {
+      assembleBakeGroupAt(terrains, pointer);
+    } else {
+      terrains[0].location.x = pointer.x - 25;
+      terrains[0].location.y = pointer.y - 25;
+      terrains[0].posZ = pointer.z;
+    }
+    SoundEffect.play(PresetSound.piecePut);
+    return true;
   }
 
   private findCache(aliasName: string): TabletopCache<any> {
