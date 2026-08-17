@@ -25,8 +25,11 @@ export const BAKE_CROP_EDGE_FILL_FRAC = 0.25;
 /**
  * Wall/floor joining edges: trim lines that are sparse, much darker than the
  * band median, or a narrow brighter quoin/corner strip.
+ *
+ * Fill floor is ~0.70 (not 0.98): L-notch roofs have south rows ~50% filled
+ * (must crop) while a shorter west wing stays ~80%+ (must keep).
  */
-export const BAKE_CROP_QUALITY_FILL_MIN = 0.98;
+export const BAKE_CROP_QUALITY_FILL_MIN = 0.7;
 /** Trim lines darker than median by this RGB-sum margin. */
 export const BAKE_CROP_QUALITY_DARK_TOL = 100;
 /** Bright quoin/corner strip: brighter than median by this RGB-sum margin. */
@@ -120,7 +123,8 @@ export function clampInsets(insets: FootprintInsets): FootprintInsets {
  * of the facade). Soft fringe columns (~25% fill) are still trimmed.
  *
  * With `qualityEdges`, also trims dark/sparse fringes and narrow bright corner
- * strips on all four edges (floors and walls) so joins have no hollow gap.
+ * strips on all four edges. Sparse means fill below ~70% of the solid band
+ * (south notches ~50% crop; shorter wings ~80% keep).
  */
 export function insetsFromOpaqueRgba(
   data: Uint8ClampedArray | Uint8Array,
@@ -465,85 +469,10 @@ export async function autoPerFaceInsets(blobs: BakedFaceBlobs): Promise<PerFaceI
   for (const face of BAKE_CROP_FACES) {
     const blob = blobs[face];
     if (!blob) continue;
-    // All six faces: quality-trim all four edges (band-limited so wall height survives).
+    // Same rules on every face: density solid-core, then quality fringe/quoin trim.
     out[face] = await insetsFromFaceBlob(blob, { qualityEdges: true });
   }
-  // Independent per-face crops break shared cube edges (looks like layers that
-  // do not meet). Force matching fractions on the same world axes.
-  alignCubeFaceSeamInsets(out);
   return out;
-}
-
-/**
- * Ortho bake mapping (image left/right/top = west/east/north):
- * - floor / underside / wallBottom / wallTop share world ±X as west/east
- * - floor / underside north/south = world ∓Z; wallRight west=south east=north;
- *   wallLeft west=north east=south (opposite cameras)
- * Wall north/south (height / roof–ground) stay per-face — different axis.
- */
-export function alignCubeFaceSeamInsets(faces: PerFaceInsets): void {
-  const floor = faces.floor;
-  const under = faces.underside;
-  const top = faces.wallTop;
-  const bottom = faces.wallBottom;
-  const left = faces.wallLeft;
-  const right = faces.wallRight;
-
-  const westX = maxInset(
-    floor?.west,
-    under?.west,
-    top?.west,
-    bottom?.west,
-  );
-  const eastX = maxInset(
-    floor?.east,
-    under?.east,
-    top?.east,
-    bottom?.east,
-  );
-  const northZ = maxInset(
-    floor?.north,
-    under?.north,
-    right?.east,
-    left?.west,
-  );
-  const southZ = maxInset(
-    floor?.south,
-    under?.south,
-    right?.west,
-    left?.east,
-  );
-
-  const applyX = (face: TerrainFaceName) => {
-    const i = faces[face];
-    if (!i) return;
-    faces[face] = clampInsets({ ...i, west: westX, east: eastX });
-  };
-  applyX('floor');
-  applyX('underside');
-  applyX('wallTop');
-  applyX('wallBottom');
-
-  if (floor) {
-    faces.floor = clampInsets({ ...faces.floor!, north: northZ, south: southZ });
-  }
-  if (under) {
-    faces.underside = clampInsets({ ...faces.underside!, north: northZ, south: southZ });
-  }
-  if (right) {
-    faces.wallRight = clampInsets({ ...faces.wallRight!, west: southZ, east: northZ });
-  }
-  if (left) {
-    faces.wallLeft = clampInsets({ ...faces.wallLeft!, west: northZ, east: southZ });
-  }
-}
-
-function maxInset(...vals: Array<number | undefined>): number {
-  let m = 0;
-  for (const v of vals) {
-    if (typeof v === 'number' && v > m) m = v;
-  }
-  return m;
 }
 
 /**

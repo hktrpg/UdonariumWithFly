@@ -1,5 +1,4 @@
 import {
-  alignCubeFaceSeamInsets,
   BAKE_CROP_PAD_MAX_PX,
   BAKE_CROP_PAD_MIN_PX,
   clampInsets,
@@ -7,7 +6,6 @@ import {
   faceCropBackgroundStyle,
   insetsFromOpaqueRgba,
   padPxForLongEdge,
-  PerFaceInsets,
 } from './bake-crop';
 
 describe('padPxForLongEdge', () => {
@@ -187,7 +185,7 @@ describe('insetsFromOpaqueRgba', () => {
     expect(right).toBeLessThanOrEqual(179);
   });
 
-  it('trims dark floor-west fringe with qualityEdges (all faces)', () => {
+  it('trims dark floor-west fringe when qualityEdges is on', () => {
     const w = 200;
     const h = 100;
     const data = new Uint8ClampedArray(w * h * 4);
@@ -210,6 +208,40 @@ describe('insetsFromOpaqueRgba', () => {
     expect(quality.west).toBeGreaterThan(plain.west);
     expect(quality.west).toBeGreaterThan(0.08);
     expect(Math.round(quality.west * w)).toBeGreaterThanOrEqual(20);
+  });
+
+  it('keeps a shorter west wing under unified quality fill (0.70)', () => {
+    const w = 200;
+    const h = 100;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 10; y <= 89; y++) {
+      for (let x = 0; x < w; x++) {
+        if (x < 80 && y > 70) continue; // ~76% col fill — above 0.70, below old 0.98
+        const i = (y * w + x) * 4;
+        data[i] = 140; data[i + 1] = 140; data[i + 2] = 140; data[i + 3] = 255;
+      }
+    }
+    const quality = insetsFromOpaqueRgba(data, w, h, 12, { qualityEdges: true });
+    expect(quality.west).toBeLessThan(0.05);
+  });
+
+  it('crops south rows that are only ~50% filled (NYC floor notches)', () => {
+    const w = 200;
+    const h = 100;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 10; y <= 89; y++) {
+      for (let x = 0; x < w; x++) {
+        // South half-width fingers: row fill 0.5 — density edge thr keeps them,
+        // quality fill min 0.70 trims.
+        if (y > 74 && x >= 100) continue;
+        const i = (y * w + x) * 4;
+        data[i] = 140; data[i + 1] = 140; data[i + 2] = 140; data[i + 3] = 255;
+      }
+    }
+    const plain = insetsFromOpaqueRgba(data, w, h);
+    const quality = insetsFromOpaqueRgba(data, w, h, 12, { qualityEdges: true });
+    expect(quality.south).toBeGreaterThan(plain.south);
+    expect(quality.south).toBeGreaterThan(0.12);
   });
 });
 
@@ -243,44 +275,5 @@ describe('faceCropBackgroundStyle', () => {
     const css = faceCropBackgroundStyle({ west: 0, east: 0, north: 0.2, south: 0 });
     expect(css['background-size']).toContain('125');
     expect(css['background-position']).toBe('50% 100%');
-  });
-});
-
-describe('alignCubeFaceSeamInsets', () => {
-  it('unifies shared X/Z crops so east-south and floor-east edges match (NYC 1303)', () => {
-    // Values from fly_xml_building-buildify-nyc 2_2026-08-17_1303.zip before align.
-    const faces: PerFaceInsets = {
-      floor: { west: 0.054, east: 0.017, south: 0, north: 0 },
-      underside: { west: 0.071, east: 0.026, south: 0, north: 0.025 },
-      wallTop: { west: 0.08, east: 0.034, south: 0, north: 0 },
-      wallBottom: { west: 0.023, east: 0.068, south: 0, north: 0 },
-      wallLeft: { west: 0, east: 0.06, south: 0.015, north: 0 },
-      wallRight: { west: 0.035, east: 0, south: 0.015, north: 0 },
-    };
-    alignCubeFaceSeamInsets(faces);
-
-    const westX = 0.08;
-    const eastX = 0.068;
-    const northZ = 0.025;
-    const southZ = 0.06;
-
-    expect(faces.floor!.west).toBeCloseTo(westX, 5);
-    expect(faces.floor!.east).toBeCloseTo(eastX, 5);
-    expect(faces.floor!.north).toBeCloseTo(northZ, 5);
-    expect(faces.floor!.south).toBeCloseTo(southZ, 5);
-
-    expect(faces.wallBottom!.west).toBeCloseTo(westX, 5);
-    expect(faces.wallBottom!.east).toBeCloseTo(eastX, 5);
-    expect(faces.wallTop!.west).toBeCloseTo(westX, 5);
-    expect(faces.wallTop!.east).toBeCloseTo(eastX, 5);
-
-    // wallRight: west=south Z, east=north Z; height south crop preserved.
-    expect(faces.wallRight!.west).toBeCloseTo(southZ, 5);
-    expect(faces.wallRight!.east).toBeCloseTo(northZ, 5);
-    expect(faces.wallRight!.south).toBeCloseTo(0.015, 5);
-
-    expect(faces.wallLeft!.west).toBeCloseTo(northZ, 5);
-    expect(faces.wallLeft!.east).toBeCloseTo(southZ, 5);
-    expect(faces.wallLeft!.south).toBeCloseTo(0.015, 5);
   });
 });
