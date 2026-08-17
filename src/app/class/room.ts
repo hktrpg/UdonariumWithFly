@@ -96,21 +96,12 @@ export class Room extends GameObject implements InnerXml {
   }
 
   parseInnerXml(element: Element) {
-    let objects: GameObject[] = [];
-    objects = objects.concat(ObjectStore.instance.getObjects(GameTable));
-    objects = objects.concat(ObjectStore.instance.getObjects(GameTableMask));
-    objects = objects.concat(ObjectStore.instance.getObjects(Terrain));
-    objects = objects.concat(ObjectStore.instance.getObjects(GameCharacter));
-    objects = objects.concat(ObjectStore.instance.getObjects(CharacterToken));
-    objects = objects.concat(ObjectStore.instance.getObjects(RangeArea));
-    objects = objects.concat(ObjectStore.instance.getObjects(TextNote));
-    objects = objects.concat(ObjectStore.instance.getObjects(CardStack));
-    objects = objects.concat(ObjectStore.instance.getObjects(Card));
-    objects = objects.concat(ObjectStore.instance.getObjects(DiceSymbol));
-    objects = objects.concat(ObjectStore.instance.getObjects(ClueLink));
-    for (let object of objects) {
+    for (const object of Room.listTabletopObjects()) {
       try {
-        object.destroy();
+        if (!ObjectStore.instance.get(object.identifier)) continue;
+        // Local-only: broadcasting DELETE here wipes an overlapping tab that still
+        // holds the house (refresh ghost), and that tab may flush the empty store.
+        object.destroyLocal();
       } catch (e) {
         console.warn('[Room] destroy before reload failed', object?.identifier, e);
       }

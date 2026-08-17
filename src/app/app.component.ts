@@ -536,8 +536,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             roomName: Network.peer.roomName,
             meshPassword: Network.peer.channelPassword || RoomAuth.getSessionMeshPassword() || '',
           });
-          // Create / join / resume room: dismiss lobby windows left from cold start.
-          this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+          // Create / resume: dismiss lobby. Probe join keeps it until a live peer is confirmed.
+          if (!RoomConnectHelper.joinInProgress) {
+            this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+          }
         } else {
           Network.clearLastRoomSession();
           if (!this.inviteHandled) {

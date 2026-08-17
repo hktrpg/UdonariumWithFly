@@ -1,3 +1,4 @@
+import { EventSystem } from '@udonarium/core/system';
 import { Room } from './room';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { GameObject } from './core/synchronize-object/game-object';
@@ -76,5 +77,25 @@ describe('Room join / load sync authority', () => {
     table.claimSyncAuthority(false);
     const floor = Math.floor(Date.now() / 1000);
     expect(syncCtx(table).majorVersion).toBeGreaterThanOrEqual(floor);
+  });
+
+  it('parseInnerXml does not DELETE syncIds the XML recreates (overlapping-tab wipe)', () => {
+    makeTable('gameTable', 'House');
+    makeTable('lobbyOnlyTable', 'LobbySample');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<room syncId="room_reload">
+  <game-table name="House" width="10" height="10" selected="true" syncId="gameTable"/>
+</room>`;
+    const deleted: string[] = [];
+    spyOn(EventSystem, 'call').and.callFake(((eventName: string, data?: { identifier?: string }) => {
+      if (eventName === 'DELETE_GAME_OBJECT' && data?.identifier) deleted.push(data.identifier);
+    }) as typeof EventSystem.call);
+    const room = new Room();
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    room.parseInnerXml(doc.documentElement);
+    expect(deleted).not.toContain('gameTable');
+    expect(deleted).not.toContain('lobbyOnlyTable');
+    expect(ObjectStore.instance.get('gameTable')).toBeTruthy();
+    expect(ObjectStore.instance.get('lobbyOnlyTable')).toBeFalsy();
   });
 });

@@ -166,6 +166,9 @@ export const ja_ui: I18nDictionary = {
   'lobby.helpSearching': '検索中...',
   'lobby.helpEmpty': '部屋が見つかりません。「新規部屋」で作成するか、「部屋を読込」でローカルフォルダから復元できます。',
   'lobby.helpConnected': '別の部屋に入るには、先に他参加者との接続を切断してください（※メニューから切断）。',
+  'lobby.helpStaleRoom': 'その部屋にオンラインの参加者はいません（ロビー一覧の更新が遅れていることがあります）。入室しておらず、卓とローカルバックアップも変更していません。「部屋を読込」を使ってください。',
+  'lobby.staleRoom.title': '入室できません',
+  'lobby.staleRoom.text': 'その部屋にオンラインの参加者はいないため、部屋データを取得できませんでした。卓とローカルデータは変更していません。「部屋を読込」を使ってください。',
 
   'roomJoin.selectRole': '役割を選択',
   'roomJoin.switchRole': '役割を切替',

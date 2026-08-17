@@ -167,6 +167,9 @@ export const zhTW_ui: I18nDictionary = {
   'lobby.helpSearching': '搜索中...',
   'lobby.helpEmpty': '找不到連線的房間。您可以使用「建立新房間」，或「讀取房間」從本機資料夾恢復。',
   'lobby.helpConnected': '如果要連線到另一個房間，請與其他參加者斷開連線。（※您可以從選單斷開連線。）',
+  'lobby.helpStaleRoom': '該房間已沒有在線成員（大廳名單可能尚未更新）。未進入，畫面與本機備份都未改寫。請改用「讀取房間」。',
+  'lobby.staleRoom.title': '無法進入房間',
+  'lobby.staleRoom.text': '這個房間目前沒有在線玩家，無法取得房間資料。您的畫面與本機資料都沒有改動。請改用「讀取房間」。',
 
   'roomJoin.selectRole': '選擇身份',
   'roomJoin.switchRole': '轉換身份',

@@ -166,6 +166,9 @@ export const en_ui: I18nDictionary = {
   'lobby.helpSearching': 'Searching...',
   'lobby.helpEmpty': 'No rooms found. You can create a new room, or Load room from a local backup folder.',
   'lobby.helpConnected': 'To join another room, disconnect from others first (* Disconnect in the menu).',
+  'lobby.helpStaleRoom': 'That room has no live players (the lobby list can lag). You were not moved in, and the tabletop and local backups were not changed. Use Load room instead.',
+  'lobby.staleRoom.title': 'Could not join room',
+  'lobby.staleRoom.text': 'That room has no live players, so room data could not be loaded. Your tabletop and local files were not changed. Use Load room instead.',
 
   'roomJoin.selectRole': 'Choose role',
   'roomJoin.switchRole': 'Switch role',
