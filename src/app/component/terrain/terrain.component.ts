@@ -43,6 +43,7 @@ import {
   formBakeGroup,
   scaleBakeGroupFrom,
   terrainsInBakeGroup,
+  uniformScaleFromCornerDrag,
 } from '@udonarium/terrain-model/bake-group';
 import { wallLeftCssTransform } from '@udonarium/terrain-wall-transform';
 
@@ -414,26 +415,22 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     let anchor: { x: number; y: number };
     if (this.scaleCorner === 'rb') {
       anchor = { x: b.minX, y: b.minY };
-      if (freeAspect) {
+    } else {
+      anchor = { x: b.maxX, y: b.maxY };
+    }
+
+    if (freeAspect) {
+      if (this.scaleCorner === 'rb') {
         scaleX = Math.max(0.05, (w0 + dx) / w0);
         scaleY = Math.max(0.05, (d0 + dy) / d0);
       } else {
-        const nw = Math.max(1, w0 + dx);
-        const nd = Math.max(1, d0 + dy);
-        const scale = Math.max(0.05, Math.hypot(nw, nd) / Math.hypot(w0, d0));
-        scaleX = scaleY = scale;
-      }
-    } else {
-      anchor = { x: b.maxX, y: b.maxY };
-      if (freeAspect) {
         scaleX = Math.max(0.05, (w0 - dx) / w0);
         scaleY = Math.max(0.05, (d0 - dy) / d0);
-      } else {
-        const nw = Math.max(1, w0 - dx);
-        const nd = Math.max(1, d0 - dy);
-        const scale = Math.max(0.05, Math.hypot(nw, nd) / Math.hypot(w0, d0));
-        scaleX = scaleY = scale;
       }
+    } else {
+      // Distance to fixed opposite corner — stable for wide/flat islands.
+      const scale = uniformScaleFromCornerDrag(anchor, this.scaleStartTable, cur);
+      scaleX = scaleY = scale;
     }
 
     this.ngZone.run(() => {

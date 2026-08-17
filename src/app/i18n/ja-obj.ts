@@ -407,6 +407,7 @@ export const ja_obj: I18nDictionary = {
   'terrain.settings.altitudeIndicate': '高度を表示',
   'terrain.settings.slopeDegrees': '傾斜（度）',
   'terrain.settings.lockSlopeDegrees': 'サイズ変更時に傾斜を維持',
+  'terrain.settings.lockAspect': '比率を固定',
   'terrain.settings.mirrorWallTop': '北壁ミラー（従来）',
   'terrain.settings.mirrorWallLeft': '西壁ミラー（従来）',
   'terrain.settings.showFaces': '面ごとの画像',

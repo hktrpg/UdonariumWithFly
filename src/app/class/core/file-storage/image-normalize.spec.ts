@@ -42,4 +42,44 @@ describe('normalizeImageBlob alpha', () => {
     expect(out.blob.type).not.toBe('image/jpeg');
     expect(out.blob.size).toBeLessThanOrEqual(IMAGE_STORED_MAX_BYTES);
   });
+
+  it('downscales sources larger than the old 8k decode guard', async () => {
+    // 9000 > former DECODE_MAX_EDGE (8192); must shrink instead of throwing.
+    const blob = await opaqueJpeg(9000, 100);
+    const out = await normalizeImageBlob(blob);
+    expect(out.didNormalize).toBeTrue();
+    expect(out.blob.size).toBeLessThanOrEqual(IMAGE_STORED_MAX_BYTES);
+    const img = await loadImage(out.blob);
+    expect(Math.max(img.naturalWidth, img.naturalHeight)).toBeLessThanOrEqual(2048);
+  });
 });
+
+function opaqueJpeg(w: number, h: number): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#336699';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#ccddee';
+  ctx.fillRect(w * 0.1, h * 0.1, w * 0.8, h * 0.8);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/jpeg', 0.92);
+  });
+}
+
+function loadImage(blob: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('decode failed'));
+    };
+    image.src = url;
+  });
+}

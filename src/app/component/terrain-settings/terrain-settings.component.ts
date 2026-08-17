@@ -26,6 +26,8 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
   showFaceImages = false;
   /** When resizing run length, keep incline degrees and rewrite height. */
   lockSlopeDegrees = true;
+  /** When editing width / depth / height, scale the other axes to keep proportions. */
+  lockAspectRatio = false;
 
   readonly sizeMin = TERRAIN_SIZE_MIN;
   readonly slopeDegMin = SLOPE_DEG_MIN;
@@ -126,8 +128,17 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   onWidthChange(value: number) {
     if (!this.terrain || this.GuestMode()) return;
+    const prevW = Math.max(TERRAIN_SIZE_MIN, this.terrain.width || TERRAIN_SIZE_MIN);
+    const prevD = Math.max(TERRAIN_SIZE_MIN, this.terrain.depth || TERRAIN_SIZE_MIN);
+    const prevH = Math.max(0, this.terrain.height || 0);
     const prevDeg = this.terrain.isSlope ? this.terrain.slopeDegrees : 0;
-    this.terrain.width = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    const nextW = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    this.terrain.width = nextW;
+    if (this.lockAspectRatio && prevW > 1e-9) {
+      const scale = nextW / prevW;
+      this.terrain.depth = this.roundSize(Math.max(TERRAIN_SIZE_MIN, prevD * scale));
+      this.terrain.height = this.roundSize(Math.max(0, prevH * scale));
+    }
     if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
       this.terrain.setSlopeDegrees(prevDeg);
     }
@@ -136,8 +147,17 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   onDepthChange(value: number) {
     if (!this.terrain || this.GuestMode()) return;
+    const prevW = Math.max(TERRAIN_SIZE_MIN, this.terrain.width || TERRAIN_SIZE_MIN);
+    const prevD = Math.max(TERRAIN_SIZE_MIN, this.terrain.depth || TERRAIN_SIZE_MIN);
+    const prevH = Math.max(0, this.terrain.height || 0);
     const prevDeg = this.terrain.isSlope ? this.terrain.slopeDegrees : 0;
-    this.terrain.depth = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    const nextD = Math.max(TERRAIN_SIZE_MIN, +value || TERRAIN_SIZE_MIN);
+    this.terrain.depth = nextD;
+    if (this.lockAspectRatio && prevD > 1e-9) {
+      const scale = nextD / prevD;
+      this.terrain.width = this.roundSize(Math.max(TERRAIN_SIZE_MIN, prevW * scale));
+      this.terrain.height = this.roundSize(Math.max(0, prevH * scale));
+    }
     if (this.lockSlopeDegrees && this.terrain.isSlope && prevDeg >= SLOPE_DEG_MIN) {
       this.terrain.setSlopeDegrees(prevDeg);
     }
@@ -146,8 +166,22 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   onHeightChange(value: number) {
     if (!this.terrain || this.GuestMode()) return;
-    this.terrain.height = Math.max(0, +value || 0);
+    const prevW = Math.max(TERRAIN_SIZE_MIN, this.terrain.width || TERRAIN_SIZE_MIN);
+    const prevD = Math.max(TERRAIN_SIZE_MIN, this.terrain.depth || TERRAIN_SIZE_MIN);
+    const prevH = Math.max(0, this.terrain.height || 0);
+    const nextH = Math.max(0, +value || 0);
+    this.terrain.height = nextH;
+    // Flat (height 0) cannot define a scale; only lock when leaving a positive height.
+    if (this.lockAspectRatio && prevH > 1e-9 && nextH > 1e-9) {
+      const scale = nextH / prevH;
+      this.terrain.width = this.roundSize(Math.max(TERRAIN_SIZE_MIN, prevW * scale));
+      this.terrain.depth = this.roundSize(Math.max(TERRAIN_SIZE_MIN, prevD * scale));
+    }
     this.changeDetector.markForCheck();
+  }
+
+  private roundSize(n: number): number {
+    return Math.round(n * 100) / 100;
   }
 
   facePreviewUrl(face: TerrainFaceName): string {

@@ -6,6 +6,7 @@ import {
   expandAabb,
   emptyAabb,
 } from './mesh-ir';
+import { convertSpecularGlossinessMaterials } from './gltf-spec-gloss';
 import { dirOfPackagePath, packagePathOf, resolvePackageFile } from './model-package-files';
 
 export type LoadedGltf = {
@@ -28,6 +29,7 @@ export async function loadGltfScene(files: File[]): Promise<LoadedGltf> {
   const gltfFile = glb || gltfJson!;
   const baseDir = dirOfPackagePath(packagePathOf(gltfFile));
   manager.setURLModifier((url) => {
+    if (/^(blob:|data:)/i.test(url || '')) return url;
     const file = resolvePackageFile(files, url, baseDir);
     if (!file) return url;
     const u = URL.createObjectURL(file);
@@ -37,8 +39,11 @@ export async function loadGltfScene(files: File[]): Promise<LoadedGltf> {
 
   const loader = new GLTFLoader(manager);
   let buffer: ArrayBuffer | string;
-  if (glb) buffer = await glb.arrayBuffer();
-  else buffer = await gltfJson!.text();
+  if (glb) {
+    buffer = await rewriteGlbSpecGloss(await glb.arrayBuffer());
+  } else {
+    buffer = rewriteGltfJsonText(await gltfJson!.text());
+  }
 
   const gltf = await new Promise<any>((resolve, reject) => {
     loader.parse(
@@ -68,6 +73,60 @@ export async function loadGltfScene(files: File[]): Promise<LoadedGltf> {
       for (const u of blobUrls) URL.revokeObjectURL(u);
     },
   };
+}
+
+function rewriteGltfJsonText(text: string): string {
+  try {
+    const json = JSON.parse(text);
+    if (!convertSpecularGlossinessMaterials(json)) return text;
+    return JSON.stringify(json);
+  } catch {
+    return text;
+  }
+}
+
+/** Rewrite the JSON chunk of a GLB when it uses archived specular-glossiness. */
+async function rewriteGlbSpecGloss(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const data = new DataView(buffer);
+  if (data.byteLength < 20) return buffer;
+  // glTF magic "glTF"
+  if (data.getUint32(0, true) !== 0x46546C67) return buffer;
+  const jsonChunkLength = data.getUint32(12, true);
+  const jsonChunkType = data.getUint32(16, true);
+  // JSON chunk type = 0x4E4F534A ("JSON")
+  if (jsonChunkType !== 0x4E4F534A) return buffer;
+  const jsonStart = 20;
+  const jsonBytes = new Uint8Array(buffer, jsonStart, jsonChunkLength);
+  // Trim trailing spaces used for GLB JSON padding.
+  let end = jsonBytes.length;
+  while (end > 0 && jsonBytes[end - 1] === 0x20) end--;
+  const text = new TextDecoder().decode(jsonBytes.subarray(0, end));
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return buffer;
+  }
+  if (!convertSpecularGlossinessMaterials(json)) return buffer;
+
+  const newJson = new TextEncoder().encode(JSON.stringify(json));
+  const paddedLen = (newJson.byteLength + 3) & ~3;
+  const pad = paddedLen - newJson.byteLength;
+  const binStart = jsonStart + jsonChunkLength;
+  const binPart = new Uint8Array(buffer, binStart);
+  const total = 12 + 8 + paddedLen + binPart.byteLength;
+  const out = new ArrayBuffer(total);
+  const view = new DataView(out);
+  const bytes = new Uint8Array(out);
+  view.setUint32(0, 0x46546C67, true); // magic
+  view.setUint32(4, data.getUint32(4, true), true); // version
+  view.setUint32(8, total, true);
+  view.setUint32(12, paddedLen, true);
+  view.setUint32(16, 0x4E4F534A, true);
+  bytes.set(newJson, 20);
+  for (let i = 0; i < pad; i++) bytes[20 + newJson.byteLength + i] = 0x20;
+  bytes.set(binPart, 20 + paddedLen);
+  return out;
 }
 
 /**

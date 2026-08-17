@@ -44,7 +44,8 @@ export class DropCreateChooserComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.refreshTitle();
+    // Defer title write so ModalComponent's first CD does not see a mid-cycle change (NG0100).
+    Promise.resolve().then(() => this.refreshTitle());
     EventSystem.register(this).on('LOCALE_CHANGED', () => this.refreshTitle());
   }
 

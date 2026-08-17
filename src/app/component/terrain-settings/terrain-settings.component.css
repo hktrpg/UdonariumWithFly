@@ -15,3 +15,16 @@
   gap: 4px;
   flex-wrap: wrap;
 }
+
+.terrain-settings .field-check {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 4.5rem;
+}
+
+.terrain-settings .field-check input[type="checkbox"] {
+  width: auto;
+  align-self: flex-start;
+  margin: 0.35rem 0 0.15rem;
+}

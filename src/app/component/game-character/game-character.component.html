@@ -56,7 +56,7 @@
               <div class="back-tag is-3d" style="color: whitesmoke"><b>{{ownerName}}</b></div>
             </div>
             <div *ngIf="showFloatingName || statusEntries.length" class="name-tag is-black-background is-3d"
-              [ngClass]="{'is-hide-in-tag': isHideIn, 'has-status-icons': statusEntries.length, 'is-above-frame': hasTokenFrame}"
+              [ngClass]="{'is-hide-in-tag': isHideIn, 'has-status-icons': statusEntries.length, 'is-above-frame': hasTokenFrame, 'is-name-wrap': nameTagWrap}"
               [style.max-width.px]="nameTagMaxWidth"
               [ngStyle]="{'transform': 'translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateX(' + nameTagRotate + 'deg)'}">
               <div class="fornt-tag is-3d name-tag-stack">
@@ -66,7 +66,7 @@
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
-                <span class="has-length-limit name-text" *ngIf="showFloatingName">{{name}}</span>
+                <span class="name-text" *ngIf="showFloatingName">{{name}}</span>
               </div>
               <div class="back-tag is-3d name-tag-stack">
                 <span class="status-icons-inline" *ngIf="statusEntries.length">
@@ -75,7 +75,7 @@
                     <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i><sup *ngIf="s.level">{{ s.level }}</sup>
                   </span>
                 </span>
-                <span class="has-length-limit name-text" *ngIf="showFloatingName">{{name}}</span>
+                <span class="name-text" *ngIf="showFloatingName">{{name}}</span>
               </div>
             </div>
             <div class="is-3d aura" [@switchImage]="gameCharacter.currntImageIndex"

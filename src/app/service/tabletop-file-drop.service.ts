@@ -5,6 +5,7 @@ import { CardStack } from '@udonarium/card-stack';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { DiceSymbol, DiceType } from '@udonarium/dice-symbol';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
@@ -37,12 +38,59 @@ const MEGA = 1024 * 1024;
 const MAX_IMAGE = IMAGE_SOURCE_MAX_BYTES;
 const MAX_PDF = 20 * MEGA;
 const MAX_VIDEO = 50 * MEGA;
+const MAX_AUDIO = 20 * MEGA;
 const MAX_MODEL = MODEL_MAX_FILE_BYTES;
 
-type DropKind = NoteFileKind | 'model' | 'model-sidecar';
+type DropKind = NoteFileKind | 'model' | 'model-sidecar' | 'audio';
 type DropChoice =
   | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'terrainBake' | 'mask' | 'coin' | 'library'
-  | 'tableMap' | 'tableBackground';
+  | 'tableMap' | 'tableBackground' | 'jukebox';
+
+const CLIPBOARD_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'application/pdf': 'pdf',
+};
+
+/** Files from a drop or Ctrl+V clipboard. Screenshots become `clipboard.png` when unnamed. */
+export function filesFromDataTransfer(dt: DataTransfer | null | undefined): File[] {
+  if (!dt) return [];
+  const out: File[] = [];
+  const seen = new Set<string>();
+  const add = (file: File | null | undefined) => {
+    if (!file) return;
+    const named = ensureClipboardFileName(file);
+    const key = `${named.name}:${named.size}:${named.lastModified}:${named.type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(named);
+  };
+  const items = dt.items;
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind !== 'file') continue;
+      add(item.getAsFile());
+    }
+  }
+  if (!out.length && dt.files) {
+    for (let i = 0; i < dt.files.length; i++) add(dt.files[i]);
+  }
+  return out;
+}
+
+function ensureClipboardFileName(file: File): File {
+  if ((file.name || '').trim()) return file;
+  const type = (file.type || '').toLowerCase();
+  const ext = CLIPBOARD_EXT[type] || (type.startsWith('image/') ? 'png' : 'bin');
+  return new File([file], `clipboard.${ext}`, {
+    type: file.type || 'application/octet-stream',
+    lastModified: file.lastModified,
+  });
+}
 
 @Injectable({ providedIn: 'root' })
 export class TabletopFileDropService {
@@ -68,6 +116,7 @@ export class TabletopFileDropService {
     return false;
   }
 
+  /** Table drop and Ctrl+V (OS files / screenshot) share this chooser. */
   async handleDrop(files: FileList | File[], position: PointerCoordinate): Promise<void> {
     if (this.busy || Network.GuestMode()) return;
     const raw = Array.from(files || []);
@@ -91,15 +140,23 @@ export class TabletopFileDropService {
       if (!accepted.length) return;
       const images = accepted.filter(f => this.classify(f, asModelPackage) === 'image');
       const notes = accepted.filter(f => this.isNoteCapable(f, asModelPackage));
+      const audios = accepted.filter(f => this.classify(f, asModelPackage) === 'audio');
       const modelFiles = asModelPackage ? accepted : [];
-      const choices = this.buildChoices(images.length, notes.length, accepted.length, modelFiles.length > 0);
+      const choices = this.buildChoices(
+        images.length,
+        notes.length,
+        audios.length,
+        accepted.length,
+        modelFiles.length > 0,
+      );
       if (!choices.length) return;
 
-      const defaultChoice = choices.some(c => c.id === 'terrainBake')
-        ? 'terrainBake'
-        : (choices.some(c => c.id === 'token')
-          ? 'token'
-          : (choices.some(c => c.id === 'note') ? 'note' : choices[0].id));
+      const defaultChoice = this.defaultChoice(choices, {
+        hasModel: modelFiles.length > 0,
+        imageCount: images.length,
+        noteCount: notes.length,
+        audioCount: audios.length,
+      });
 
       const result = await this.modalService.open<{ choice: string } | false | null>(DropCreateChooserComponent, {
         title: this.i18n.t('dropCreate.subtitle', { count: accepted.length }),
@@ -118,6 +175,7 @@ export class TabletopFileDropService {
         accepted,
         images,
         notes,
+        audios,
         modelFiles,
         position,
       );
@@ -130,6 +188,7 @@ export class TabletopFileDropService {
   private buildChoices(
     imageCount: number,
     noteCount: number,
+    audioCount: number,
     totalCount: number,
     hasModelPackage: boolean,
   ): DropCreateChoice[] {
@@ -205,7 +264,16 @@ export class TabletopFileDropService {
         hint: this.i18n.t('dropCreate.hint.note'),
       });
     }
-    if (totalCount > 0) {
+    if (audioCount > 0) {
+      choices.push({
+        id: 'jukebox',
+        label: this.i18n.t('dropCreate.jukebox', { count: audioCount }),
+        icon: 'library_music',
+        hint: this.i18n.t('dropCreate.hint.jukebox'),
+      });
+    }
+    // Skip "library only" when the batch is audio-only — jukebox is the storage path.
+    if (totalCount > 0 && totalCount > audioCount) {
       choices.push({
         id: 'library',
         label: this.i18n.t('dropCreate.library', { count: totalCount }),
@@ -216,11 +284,23 @@ export class TabletopFileDropService {
     return choices;
   }
 
+  private defaultChoice(
+    choices: DropCreateChoice[],
+    counts: { hasModel: boolean; imageCount: number; noteCount: number; audioCount: number },
+  ): string {
+    if (counts.hasModel && choices.some(c => c.id === 'terrainBake')) return 'terrainBake';
+    if (counts.imageCount > 0 && choices.some(c => c.id === 'token')) return 'token';
+    if (counts.noteCount > 0 && choices.some(c => c.id === 'note')) return 'note';
+    if (counts.audioCount > 0 && choices.some(c => c.id === 'jukebox')) return 'jukebox';
+    return choices[0]?.id || '';
+  }
+
   private async create(
     choice: DropChoice,
     accepted: File[],
     images: File[],
     notes: File[],
+    audios: File[],
     modelFiles: File[],
     position: PointerCoordinate,
   ): Promise<boolean> {
@@ -247,6 +327,8 @@ export class TabletopFileDropService {
         return this.replaceTableImage(images, 'map');
       case 'tableBackground':
         return this.replaceTableImage(images, 'background');
+      case 'jukebox':
+        return this.importToJukebox(audios);
       case 'library':
         return this.importToLibrary(accepted);
       default:
@@ -324,13 +406,20 @@ export class TabletopFileDropService {
     return true;
   }
 
+  /** Audio → FileArchiver (jukebox / audio library). */
+  private async importToJukebox(files: File[]): Promise<boolean> {
+    if (!files.length) return false;
+    await FileArchiver.instance.load(files);
+    return true;
+  }
+
   /** Media → FileArchiver; text/json/xml/html → note inventory (or room XML via archiver). */
   private async importToLibrary(files: File[]): Promise<boolean> {
     const media: File[] = [];
     const noteFiles: File[] = [];
     for (const file of files) {
       const kind = this.classify(file, false);
-      if (kind === 'image' || kind === 'pdf' || kind === 'video') media.push(file);
+      if (kind === 'image' || kind === 'pdf' || kind === 'video' || kind === 'audio') media.push(file);
       else if (kind === 'text') noteFiles.push(file);
     }
     let ok = false;
@@ -494,6 +583,8 @@ export class TabletopFileDropService {
     // Textures only join the bag when this drop is already a model package.
     if (asModelPackage && /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) return 'model-sidecar';
     if (isZipFile(file)) return null;
+    // Before note video: audio/ogg and .mp3 etc. belong in the jukebox, not notes.
+    if (MimeType.isAudioFile(file)) return 'audio';
     return classifyNoteFile(file);
   }
 
@@ -506,6 +597,7 @@ export class TabletopFileDropService {
     if (kind === 'image' && file.size > MAX_IMAGE) return false;
     if (kind === 'pdf' && file.size > MAX_PDF) return false;
     if (kind === 'video' && file.size > MAX_VIDEO) return false;
+    if (kind === 'audio' && file.size > MAX_AUDIO) return false;
     if ((kind === 'model' || kind === 'model-sidecar') && file.size > MAX_MODEL) return false;
     return true;
   }

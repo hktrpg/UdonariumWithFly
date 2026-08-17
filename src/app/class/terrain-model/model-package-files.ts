@@ -71,6 +71,8 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
   let zipWithoutModel = false;
 
   for (const file of files || []) {
+    if (isBlendFile(file)) throw new Error('MODEL_BLEND_ONLY');
+
     if (!isZipFile(file) && !/\.zip$/i.test(packagePathOf(file))) {
       out.push(file);
       continue;
@@ -78,8 +80,11 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
     if (file.size > MODEL_ZIP_MAX_BYTES) throw new Error('MODEL_FILE_TOO_LARGE');
 
     let extracted: File[];
+    let sawBlend = false;
     try {
-      extracted = await unzipModelPackage(file);
+      const unpacked = await unzipModelPackage(file);
+      extracted = unpacked.files;
+      sawBlend = unpacked.sawBlend;
     } catch (err) {
       if (err instanceof Error && err.message.startsWith('MODEL_')) throw err;
       throw new Error('MODEL_INVALID_ZIP');
@@ -93,6 +98,8 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
 
     if (extracted.some(isPrimaryModelFile)) {
       out.push(...extracted);
+    } else if (sawBlend) {
+      throw new Error('MODEL_BLEND_ONLY');
     } else {
       zipWithoutModel = true;
     }
@@ -102,6 +109,10 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
     throw new Error('MODEL_NO_MODEL_IN_ZIP');
   }
   return out;
+}
+
+export function isBlendFile(file: File): boolean {
+  return /\.blend$/i.test(packagePathOf(file)) || /\.blend$/i.test(file.name || '');
 }
 
 function isNestedZipMember(file: File): boolean {
@@ -204,15 +215,21 @@ function shouldSkipZipEntry(path: string): boolean {
   return !isModelPackageMember(path);
 }
 
-async function unzipModelPackage(zipFile: File): Promise<File[]> {
+async function unzipModelPackage(zipFile: File): Promise<{ files: File[]; sawBlend: boolean }> {
   const zipReader = new ZipReader(new BlobReader(zipFile));
   try {
     const entries = await zipReader.getEntries();
     const out: File[] = [];
+    let sawBlend = false;
     for (const entry of entries || []) {
       if (entry.directory) continue;
       const rawPath = (entry.filename || '').replace(/\\/g, '/');
       const path = normalizePackagePath(rawPath);
+      if (/\.blend$/i.test(path)) {
+        // Blender sources cannot be baked in-browser; detect without extracting (~tens of MB).
+        sawBlend = true;
+        continue;
+      }
       if (shouldSkipZipEntry(path)) continue;
       const listedSize = (entry as { uncompressedSize?: number }).uncompressedSize;
       if (listedSize && listedSize > MODEL_MAX_FILE_BYTES) continue;
@@ -222,7 +239,7 @@ async function unzipModelPackage(zipFile: File): Promise<File[]> {
       const file = new File([blob], base, { type: MimeType.type(base) });
       out.push(attachPackagePath(file, path));
     }
-    return out;
+    return { files: out, sawBlend };
   } finally {
     await zipReader.close();
   }

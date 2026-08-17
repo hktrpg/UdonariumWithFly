@@ -300,7 +300,8 @@
   bottom: 100%;
   margin-bottom: 2px;
   transform-origin: center bottom;
-  white-space: normal;
+  /* Default: one line — do not wrap ordinary names. */
+  white-space: nowrap;
   z-index: 5;
 }
 /* 2D flat tokens: name sits just above the sprite without 3D billboard pitch. */
@@ -312,8 +313,21 @@
 .upright-transform.is-flat-2d .name-tag.is-above-frame {
   bottom: calc(100% + 28px);
 }
-.name-tag:not(.has-status-icons) {
+/* Status icon grid may use multiple rows; name text still inherits nowrap unless wrap class. */
+.name-tag.has-status-icons {
+  white-space: normal;
+}
+.name-tag.has-status-icons .name-text {
   white-space: nowrap;
+}
+/* Only very long names (see nameTagWrap) wrap under a max-width ceiling. */
+.name-tag.is-name-wrap {
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+.name-tag.is-name-wrap .name-text {
+  white-space: normal;
 }
 .name-tag-stack {
   display: flex;
@@ -322,11 +336,17 @@
   justify-content: center;
   gap: 2px;
   max-width: 100%;
+  width: max-content;
+}
+.name-tag.is-name-wrap .name-tag-stack {
+  width: auto;
 }
 .name-tag .name-text {
   display: inline-block;
   vertical-align: middle;
   max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
 }
 /* At least two status badges per row above the name. */
 .status-icons-inline {

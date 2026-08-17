@@ -377,6 +377,7 @@ export const zhTW_obj: I18nDictionary = {
   'terrain.settings.altitudeIndicate': '顯示高度',
   'terrain.settings.slopeDegrees': '斜度（度）',
   'terrain.settings.lockSlopeDegrees': '改尺寸時鎖定斜度',
+  'terrain.settings.lockAspect': '鎖定比例',
   'terrain.settings.mirrorWallTop': '北牆鏡像（舊版）',
   'terrain.settings.mirrorWallLeft': '西牆鏡像（舊版）',
   'terrain.settings.showFaces': '分面貼圖',

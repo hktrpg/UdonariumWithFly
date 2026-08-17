@@ -44,6 +44,7 @@ import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { nameTagShouldWrap, NAME_TAG_WRAP_WIDTH_PX } from './name-tag-width';
 
 @Component({
     selector: 'game-character',
@@ -382,8 +383,17 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   get statusEntries() {
     return this.gameCharacter ? this.characterFxMenu.statusesOf(this.gameCharacter) : [];
   }
-  /** Cap name-tag / status icon strip to roughly the token footprint. */
-  get nameTagMaxWidth(): number { return Math.max(72, this.size * this.gridSize); }
+  /**
+   * Prefer one line for normal names (no max-width).
+   * Only very long names get a cap so they wrap.
+   */
+  get nameTagMaxWidth(): number | null {
+    if (!nameTagShouldWrap(this.name || '')) return null;
+    return NAME_TAG_WRAP_WIDTH_PX;
+  }
+  get nameTagWrap(): boolean {
+    return nameTagShouldWrap(this.name || '');
+  }
   get hasInvisibleStatus(): boolean { return this.statusEntries.some(s => s.id === 'invisible'); }
   get hasDeadStatus(): boolean { return this.statusEntries.some(s => s.id === 'dead'); }
   statusIcon(id: string): string { return getStatusDef(id as any)?.icon || 'info'; }

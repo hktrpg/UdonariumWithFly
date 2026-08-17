@@ -382,6 +382,22 @@ function commitTerrainPoseInner(terrain: Terrain, x: number, y: number, posZ: nu
 }
 
 /**
+ * Uniform scale from a corner grab.
+ * Use distance(anchor → pointer), not hypot(w+dx, d+dy): for wide/flat
+ * footprints a slight perpendicular drift made hypot grow while shrinking.
+ */
+export function uniformScaleFromCornerDrag(
+  anchor: { x: number; y: number },
+  start: { x: number; y: number },
+  cur: { x: number; y: number },
+): number {
+  const startDist = Math.hypot(start.x - anchor.x, start.y - anchor.y);
+  if (startDist < 1e-6) return 1;
+  const curDist = Math.hypot(cur.x - anchor.x, cur.y - anchor.y);
+  return Math.max(0.05, curDist / startDist);
+}
+
+/**
  * Scale footprint around an anchor (table px). Updates size and position.
  * Default (and multi-box): uniform XY + matching height.
  * `freeAspect: true` (Shift-drag): independent width/depth; height unchanged.

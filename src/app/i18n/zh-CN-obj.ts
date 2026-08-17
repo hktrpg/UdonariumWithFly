@@ -408,6 +408,7 @@ export const zhCN_obj: I18nDictionary = {
   'terrain.settings.altitudeIndicate': '显示高度',
   'terrain.settings.slopeDegrees': '坡度（度）',
   'terrain.settings.lockSlopeDegrees': '改尺寸时锁定坡度',
+  'terrain.settings.lockAspect': '锁定比例',
   'terrain.settings.mirrorWallTop': '北墙镜像（旧版）',
   'terrain.settings.mirrorWallLeft': '西墙镜像（旧版）',
   'terrain.settings.showFaces': '分面贴图',

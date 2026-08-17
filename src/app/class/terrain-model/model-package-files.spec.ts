@@ -105,6 +105,19 @@ describe('expandModelDropFiles', () => {
     expect(files.some(f => f.name === 'wall.png')).toBeTrue();
   });
 
+  it('rejects a zip that only contains Blender .blend sources', async () => {
+    const zip = await zipFile([
+      { name: 'source/building.blend', body: 'BLENDER-v306' },
+      { name: 'textures/Base_color.png', body: 'fake-png' },
+    ]);
+    await expectAsync(expandModelDropFiles([zip])).toBeRejectedWithError('MODEL_BLEND_ONLY');
+  });
+
+  it('rejects a bare .blend drop', async () => {
+    const blend = new File(['BLENDER-v306'], 'building.blend', { type: 'application/octet-stream' });
+    await expectAsync(expandModelDropFiles([blend])).toBeRejectedWithError('MODEL_BLEND_ONLY');
+  });
+
   it('recognizes FBX as a primary model in a zip', async () => {
     const zip = await zipFile([
       { name: 'source/Building.fbx', body: 'fake-fbx' },

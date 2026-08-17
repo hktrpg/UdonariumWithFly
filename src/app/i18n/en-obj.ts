@@ -375,6 +375,7 @@ export const en_obj: I18nDictionary = {
   'terrain.settings.altitudeIndicate': 'Show altitude',
   'terrain.settings.slopeDegrees': 'Slope (degrees)',
   'terrain.settings.lockSlopeDegrees': 'Lock slope when resizing',
+  'terrain.settings.lockAspect': 'Lock ratio',
   'terrain.settings.mirrorWallTop': 'Mirror north wall (legacy)',
   'terrain.settings.mirrorWallLeft': 'Mirror west wall (legacy)',
   'terrain.settings.showFaces': 'Per-face images',

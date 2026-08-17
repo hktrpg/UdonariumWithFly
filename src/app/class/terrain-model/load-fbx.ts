@@ -14,6 +14,7 @@ export async function loadFbxScene(files: File[]): Promise<LoadedGltf> {
   const blobUrls: string[] = [];
   const baseDir = dirOfPackagePath(packagePathOf(fbx));
   manager.setURLModifier((url) => {
+    if (/^(blob:|data:)/i.test(url || '')) return url;
     const file = resolvePackageFile(files, url, baseDir);
     if (!file) return url;
     const u = URL.createObjectURL(file);
@@ -26,8 +27,9 @@ export async function loadFbxScene(files: File[]): Promise<LoadedGltf> {
   let scene: import('three').Group;
   try {
     scene = loader.parse(buffer, '');
-  } catch {
+  } catch (err) {
     for (const u of blobUrls) URL.revokeObjectURL(u);
+    console.warn('FBXLoader.parse failed', err);
     throw new Error('MODEL_INVALID_FBX');
   }
   scene.updateMatrixWorld(true);

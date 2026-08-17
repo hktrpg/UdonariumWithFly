@@ -5,6 +5,7 @@ import {
   isBakeGroupComplete,
   rotateBakeGroupBy,
   scaleBakeGroupFrom,
+  uniformScaleFromCornerDrag,
 } from './bake-group';
 import { serializeBakeCropState } from './bake-crop';
 import { Terrain } from '@udonarium/terrain';
@@ -86,6 +87,33 @@ describe('bake-group', () => {
     expect(a.width).toBeCloseTo(4, 5);
     expect(b.width).toBeCloseTo(4, 5);
     expect(b.location.x).toBeCloseTo(400, 0);
+  });
+
+  it('uniformScaleFromCornerDrag shrinks when moving toward the anchor', () => {
+    const anchor = { x: 0, y: 0 };
+    // Start slightly past a wide island's RB (handle / pointer offset).
+    const start = { x: 420, y: 30 };
+    // Drift inward on X but out on Y — still closer to the anchor overall.
+    const cur = { x: 390, y: 120 };
+    const scale = uniformScaleFromCornerDrag(anchor, start, cur);
+    expect(scale).toBeLessThan(1);
+    // Regression: hypot-of-size formula incorrectly grew on this path.
+    const w0 = 400;
+    const d0 = 100;
+    const dx = cur.x - start.x;
+    const dy = cur.y - start.y;
+    const legacy = Math.hypot(Math.max(1, w0 + dx), Math.max(1, d0 + dy)) / Math.hypot(w0, d0);
+    expect(legacy).toBeGreaterThan(1);
+    expect(scale).toBeLessThan(legacy);
+  });
+
+  it('uniformScaleFromCornerDrag grows when moving away from the anchor', () => {
+    const scale = uniformScaleFromCornerDrag(
+      { x: 0, y: 0 },
+      { x: 200, y: 200 },
+      { x: 300, y: 300 },
+    );
+    expect(scale).toBeCloseTo(1.5, 5);
   });
 
   it('multi-box scale stays uniform, keeps abutment, and scales height', () => {

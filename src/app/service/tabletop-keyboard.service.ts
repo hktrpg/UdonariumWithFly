@@ -35,6 +35,7 @@ import { ContextMenuService } from './context-menu.service';
 import { ModalService } from './modal.service';
 import { PanelService } from './panel.service';
 import { SceneToolService } from './scene-tool.service';
+import { filesFromDataTransfer, TabletopFileDropService } from './tabletop-file-drop.service';
 import { SelectionState, TabletopSelectionService } from './tabletop-selection.service';
 import { TokenPathMoveService } from './token-path-move.service';
 import { DeleteEntry, UndoService } from './undo.service';
@@ -87,6 +88,7 @@ export class TabletopKeyboardService {
     private undoService: UndoService,
     private tokenPath: TokenPathMoveService,
     private contextMenu: ContextMenuService,
+    private tabletopFileDrop: TabletopFileDropService,
     private ngZone: NgZone,
   ) { }
 
@@ -775,7 +777,7 @@ export class TabletopKeyboardService {
   }
 
   /**
-   * OS clipboard paste: CCFOLIA character JSON first, then in-app XML clipboard.
+   * OS clipboard paste: CCFOLIA JSON → OS files/screenshot (same as table drop) → in-app XML.
    * Skips INPUT/TEXTAREA so chat and forms keep normal paste.
    */
   private handlePaste(e: ClipboardEvent) {
@@ -796,6 +798,15 @@ export class TabletopKeyboardService {
         e.preventDefault();
         e.stopPropagation();
       }
+      return;
+    }
+
+    const files = filesFromDataTransfer(e.clipboardData);
+    if (files.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      const pointer = this.coordinateService.calcTabletopLocalCoordinate();
+      this.runInAngular(() => { void this.tabletopFileDrop.handleDrop(files, pointer); });
       return;
     }
 

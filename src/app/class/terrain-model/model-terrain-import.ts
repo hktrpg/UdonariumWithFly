@@ -376,6 +376,7 @@ export function modelImportErrorI18nKey(err: unknown): string {
     case 'MODEL_NO_GLTF': return 'modelImport.error.noGltf';
     case 'MODEL_NO_FBX': return 'modelImport.error.noFbx';
     case 'MODEL_NO_MODEL_IN_ZIP': return 'modelImport.error.noModelInZip';
+    case 'MODEL_BLEND_ONLY': return 'modelImport.error.blendOnly';
     case 'MODEL_INVALID_ZIP': return 'modelImport.error.invalidZip';
     case 'MODEL_UNSUPPORTED': return 'modelImport.error.unsupported';
     case 'MODEL_NO_TABLE': return 'modelImport.error.noTable';
