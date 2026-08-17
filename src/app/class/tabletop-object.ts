@@ -825,7 +825,7 @@ export class TabletopObject extends ObjectNode {
   }
 
   getUrls(): DataElement[] {
-    return this.rootDataElement.getElementsByType('url');
+    return this.rootDataElement?.getElementsByType('url') ?? [];
   }
 
   protected setCommonValue(elementName: string, value: any) {

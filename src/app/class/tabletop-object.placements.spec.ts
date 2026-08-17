@@ -1,5 +1,5 @@
 import { CardState } from './card';
-import { TerrainViewState } from './terrain';
+import { Terrain, TerrainViewState } from './terrain';
 import { TabletopObject } from './tabletop-object';
 import { PLACEMENT_VIEW_STATE_KEYS } from './table-placement-view-state';
 import { ObjectStore } from './core/synchronize-object/object-store';
@@ -839,5 +839,10 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(c1.zindex).toBeGreaterThan(c2.zindex);
     expect(c1.getPoseForTable('tableA')!.zindex).toBe(c1.zindex);
     expect(c1.getPoseForTable('tableB')!.zindex).toBe(5);
+  });
+
+  it('getUrls is empty when the data tree has not synced yet', () => {
+    const terrain = new Terrain('bareTerrain');
+    expect(terrain.getUrls()).toEqual([]);
   });
 });

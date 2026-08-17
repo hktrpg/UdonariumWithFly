@@ -7,6 +7,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth, RoomJoinResult } from '@udonarium/room-auth';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { PasswordCheckComponent } from 'component/password-check/password-check.component';
 import { RoomJoinComponent } from 'component/room-join/room-join.component';
 import { RoomSettingComponent } from 'component/room-setting/room-setting.component';
@@ -244,7 +245,22 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   private async openAndConnect(room: IRoomInfo, password: string, targetPeers: any[]) {
     const connected = await RoomConnectHelper.openAndConnect(room, password, targetPeers);
-    if (connected) this.dismissLobby();
+    if (connected) {
+      this.dismissLobby();
+      return;
+    }
+    if (this.destroyed) return;
+    this.help = this.i18n.t('lobby.helpStaleRoom');
+    const popup = this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('lobby.staleRoom.title'),
+      text: this.i18n.t('lobby.staleRoom.text'),
+      help: this.i18n.t('lobby.helpStaleRoom'),
+      type: ConfirmationType.OK,
+      materialIcon: 'link_off',
+    });
+    void this.reload(true);
+    await popup;
+    if (!this.destroyed) this.help = this.i18n.t('lobby.helpStaleRoom');
   }
 
   async showRoomSetting() {

@@ -2,9 +2,11 @@ import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { Room } from '@udonarium/room';
 import { RoleAuthInput, RoomAuth } from '@udonarium/room-auth';
 import { captureMapPreviewDataUrl } from '@udonarium/scene-preset-preview';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -18,6 +20,7 @@ import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import { FolderBackupCrypto, FolderBackupSecretsBlob } from './folder-backup-crypto';
 import { folderBackupDebug } from './folder-backup-debug';
+import { shouldPersistLeaveFlush } from './folder-backup-persist';
 import {
   FOLDER_BACKUP_FORMAT_VERSION,
   FolderBackupManifest,
@@ -133,6 +136,11 @@ interface RoomSnapshot {
   providedIn: 'root'
 })
 export class FolderBackupService implements OnDestroy {
+  private static _instance: FolderBackupService | null = null;
+  static get instance(): FolderBackupService | null {
+    return FolderBackupService._instance;
+  }
+
   static readonly STORAGE_KEY = 'udonarium.folderBackup.dirHandle';
   /** Hot state writes (cheap XML). */
   private static readonly DEBOUNCE_MS = 2000;
@@ -156,6 +164,10 @@ export class FolderBackupService implements OnDestroy {
   private lastWriteRoomId = '';
   private activeRoomId = '';
   private lastRoomSnapshot: RoomSnapshot | null = null;
+  /** False until a live mesh or a successful ZIP load — blocks writing empty join leftovers. */
+  private contentTrusted = false;
+  /** True while lobby/invite join is connecting; auto-write stays off. */
+  private joinQuarantine = false;
   /** Load backup after OPEN_NETWORK flush finishes (must not race ahead of old-room write). */
   private pendingLoadAfterOpen: (() => Promise<void>) | null = null;
   /** Unified resume/load owns flush+open; skip parallel onNetworkOpen flush. */
@@ -176,7 +188,9 @@ export class FolderBackupService implements OnDestroy {
     private ngZone: NgZone,
     private modalService: ModalService,
     private i18n: I18nService
-  ) { }
+  ) {
+    FolderBackupService._instance = this;
+  }
 
   get needsBind(): boolean {
     return this.isSupported && (!this.hasFolder || this.status === 'unbound' || this.status === 'needAuth');
@@ -208,7 +222,8 @@ export class FolderBackupService implements OnDestroy {
     return !!this.dirHandle
       && (this.status === 'ready' || this.status === 'writing' || this.status === 'error')
       && !!Network.peer?.isRoom
-      && !Network.GuestMode();
+      && !Network.GuestMode()
+      && this.contentTrusted;
   }
 
   /** Unwritten or in-flight folder backup work remains. */
@@ -223,6 +238,44 @@ export class FolderBackupService implements OnDestroy {
       && !this.hasPendingWrite
       && !!this.activeRoomId
       && this.lastWriteRoomId === this.activeRoomId;
+  }
+
+  /** Lobby/invite join: do not persist tabletop until a live peer is confirmed. */
+  beginJoinQuarantine() {
+    this.joinQuarantine = true;
+    this.contentTrusted = false;
+    this.listening = false;
+    this.dirty = false;
+    this.clearTimers();
+  }
+
+  /** Failed probe: drop quarantine without writing. */
+  abortJoinQuarantine() {
+    this.joinQuarantine = false;
+    this.contentTrusted = false;
+    this.listening = false;
+    this.dirty = false;
+    this.clearTimers();
+  }
+
+  /** ZIP load finished or a live mesh stayed up — folder writes are safe. */
+  markContentTrusted() {
+    this.joinQuarantine = false;
+    this.contentTrusted = true;
+    if (Network.peer?.isRoom && !Network.GuestMode() && !this.suspendAutoWrite) {
+      this.listening = true;
+      this.captureRoomSnapshot();
+    }
+  }
+
+  private settlePeerSyncAfterLoad(loadOk: boolean, trust: boolean) {
+    ObjectSynchronizer.instance.releasePeerSync(loadOk);
+    if (trust) {
+      this.markContentTrusted();
+      return;
+    }
+    this.listening = false;
+    this.contentTrusted = false;
   }
 
   async initialize(): Promise<void> {
@@ -257,6 +310,7 @@ export class FolderBackupService implements OnDestroy {
 
     this.onVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        if (this.suspendAutoWrite) return;
         void this.flush({ timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS });
       }
     };
@@ -274,6 +328,7 @@ export class FolderBackupService implements OnDestroy {
       document.removeEventListener('visibilitychange', this.onVisibilityChange);
       this.onVisibilityChange = null;
     }
+    if (FolderBackupService._instance === this) FolderBackupService._instance = null;
   }
 
   async bindFolder(): Promise<boolean> {
@@ -359,6 +414,15 @@ export class FolderBackupService implements OnDestroy {
 
   async flush(options?: FolderFlushOptions): Promise<boolean> {
     if (!this.dirHandle) {
+      return false;
+    }
+    // Mid-load ObjectStore is lobby defaults or a half-parsed ZIP — do not persist it.
+    if (this.suspendAutoWrite && !options?.allowLeave) {
+      return false;
+    }
+    if (options?.allowLeave && !shouldPersistLeaveFlush(this.contentTrusted, !!options.snapshot)) {
+      this.dirty = false;
+      this.clearTimers();
       return false;
     }
     if (Network.GuestMode() && !options?.bypassGuest) {
@@ -678,6 +742,9 @@ export class FolderBackupService implements OnDestroy {
     this.suspendAutoWrite = true;
     this.listening = false;
     this.clearTimers();
+    ObjectSynchronizer.instance.holdPeerSync();
+    let loadOk = false;
+    let openedNewRoom = false;
     try {
       if (opts.switchFromCurrent) {
         this.captureRoomSnapshot();
@@ -709,8 +776,10 @@ export class FolderBackupService implements OnDestroy {
           suppressConnectionBusy: true,
         });
         if (created !== true) return;
+        openedNewRoom = true;
       } else {
         await this.openRoomAsGmFromBackup(room);
+        openedNewRoom = true;
       }
 
       // OPEN_NETWORK may have flipped listening on — keep writes off until load settles.
@@ -736,6 +805,7 @@ export class FolderBackupService implements OnDestroy {
         roomName: RoomAuth.displayRoomName(Network.peer?.roomName || ''),
       });
       this.closeLobbyWindows();
+      loadOk = true;
     } catch (e) {
       console.warn('FolderBackup resume/load failed', e);
       folderBackupDebug('resumeOrLoad error', { error: String((e as Error)?.message || e) });
@@ -750,10 +820,9 @@ export class FolderBackupService implements OnDestroy {
     } finally {
       this.suspendAutoWrite = false;
       this.suppressNetworkOpenFlush = false;
-      if (Network.peer?.isRoom && !Network.GuestMode()) {
-        this.listening = true;
-        this.captureRoomSnapshot();
-      }
+      const trust = loadOk || (!openedNewRoom && !!Network.peer?.isRoom);
+      this.settlePeerSyncAfterLoad(loadOk, trust);
+      if (!trust && openedNewRoom && Network.peer?.isRoom) Network.open();
       busy?.hide();
     }
   }
@@ -768,6 +837,8 @@ export class FolderBackupService implements OnDestroy {
     this.suspendAutoWrite = true;
     this.listening = false;
     this.clearTimers();
+    ObjectSynchronizer.instance.holdPeerSync();
+    let loadOk = false;
     try {
       this.logTokenVisibility('before-load');
       await this.loadRoomBackup(selected);
@@ -781,6 +852,7 @@ export class FolderBackupService implements OnDestroy {
       await new Promise<void>(resolve => setTimeout(resolve, 1500));
       this.logTokenVisibility('after-load-3500ms');
       this.closeLobbyWindows();
+      loadOk = true;
     } catch (e) {
       console.warn('FolderBackup load failed', e);
       folderBackupDebug('load error', { error: String((e as Error)?.message || e) });
@@ -794,10 +866,10 @@ export class FolderBackupService implements OnDestroy {
       });
     } finally {
       this.suspendAutoWrite = false;
-      if (Network.peer?.isRoom && !Network.GuestMode()) {
-        this.listening = true;
-        this.captureRoomSnapshot();
-      }
+      this.settlePeerSyncAfterLoad(
+        loadOk,
+        !!(loadOk && Network.peer?.isRoom && !Network.GuestMode()),
+      );
       busy?.hide();
     }
   }
@@ -838,6 +910,8 @@ export class FolderBackupService implements OnDestroy {
         .on('OPEN_NETWORK', () => {
           clearTimeout(timer);
           EventSystem.unregister(key);
+          // Drop lobby samples before any catalog can go out (holdPeerSync is already on).
+          Room.clearLocalTabletopForJoin();
           PeerCursor.myCursor.peerId = Network.peerId;
           RoomAuth.applyIdentity('gm', roomId);
           RoomAuth.rememberSession('gm', String(roles.gm || ''), meshPassword);
@@ -948,6 +1022,12 @@ export class FolderBackupService implements OnDestroy {
     const peer = Network.peer;
     if (!peer?.isRoom) {
       this.pendingLoadAfterOpen = null;
+      if (this.joinQuarantine) {
+        this.abortJoinQuarantine();
+        this.lastRoomSnapshot = null;
+        this.activeRoomId = '';
+        return;
+      }
       if (!this.leaveFlushPromise) {
         this.leaveFlushPromise = this.handleLeaveRoom().finally(() => {
           this.leaveFlushPromise = null;
@@ -961,6 +1041,7 @@ export class FolderBackupService implements OnDestroy {
     const prevSnapshot = this.lastRoomSnapshot;
     if (
       !this.suppressNetworkOpenFlush
+      && !this.joinQuarantine
       && prevSnapshot
       && prevSnapshot.roomId !== roomId
       && (this.dirty || this.writing || this.writePromise)
@@ -979,13 +1060,25 @@ export class FolderBackupService implements OnDestroy {
 
     this.captureRoomSnapshot();
     this.activeRoomId = roomId;
-    // Unified resume/load keeps writes suspended until XML/media settle.
-    this.listening = this.suspendAutoWrite ? false : !Network.GuestMode();
-    if (!this.listening) this.clearTimers();
+    if (this.suspendAutoWrite || this.joinQuarantine) {
+      this.listening = false;
+      this.clearTimers();
+    } else {
+      this.contentTrusted = true;
+      this.listening = !Network.GuestMode();
+      if (!this.listening) this.clearTimers();
+    }
     await this.runPendingLoadAfterOpen();
   }
 
   private async handleLeaveRoom() {
+    if (this.joinQuarantine) {
+      this.abortJoinQuarantine();
+      this.activeRoomId = '';
+      this.lastWriteRoomId = '';
+      this.lastRoomSnapshot = null;
+      return;
+    }
     if ((this.dirty || this.writing || this.writePromise) && this.dirHandle && this.lastRoomSnapshot) {
       await this.flush({
         timeoutMs: FolderBackupService.DEFAULT_FLUSH_TIMEOUT_MS,
@@ -1000,6 +1093,8 @@ export class FolderBackupService implements OnDestroy {
     this.dirty = false;
     this.writeAgain = false;
     this.lastRoomSnapshot = null;
+    this.contentTrusted = false;
+    this.joinQuarantine = false;
   }
 
   private async onGuestModePossiblyChanged() {

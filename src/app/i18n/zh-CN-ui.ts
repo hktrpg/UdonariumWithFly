@@ -166,6 +166,9 @@ export const zhCN_ui: I18nDictionary = {
   'lobby.helpSearching': '搜索中...',
   'lobby.helpEmpty': '找不到可连接的房间。您可以使用「创建新房间」，或「读取房间」从本机文件夹恢复。',
   'lobby.helpConnected': '如果要连接到另一个房间，请与其他参加者断开连接。（※您可以从菜单断开连接。）',
+  'lobby.helpStaleRoom': '该房间已没有在线成员（大厅名单可能尚未更新）。未进入，画面与本地备份都未改写。请改用「读取房间」。',
+  'lobby.staleRoom.title': '无法进入房间',
+  'lobby.staleRoom.text': '这个房间目前没有在线玩家，无法取得房间数据。您的画面与本地数据都没有改动。请改用「读取房间」。',
 
   'roomJoin.selectRole': '选择身份',
   'roomJoin.switchRole': '转换身份',

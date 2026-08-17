@@ -17,6 +17,8 @@ import { installSkyWayQuietLogger } from './skyway-log';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
+  /** Ghost lobby listings expire faster; too low causes false disconnects on slow links. */
+  private static readonly MEMBER_KEEPALIVE_SEC = 10;
   url = '';
   context: SkyWayContext;
   private lobby: Channel;
@@ -64,8 +66,16 @@ export class SkyWayFacade {
       this.peer = PeerContext.parse('???');
       this.isDestroyed = true;
 
-      await this.leaveLobby();
-      await this.leaveRoom();
+      // Leave membership first so the lobby listing drops even if the tab dies mid-close.
+      await Promise.all([
+        this.leaveLobbyPerson().catch(() => { /* unload */ }),
+        this.leaveRoomPerson().catch(() => { /* unload */ }),
+      ]);
+      await this.closeRoomDataStream().catch(() => { /* unload */ });
+      await Promise.all([
+        this.leaveLobbyChannel().catch(() => { /* unload */ }),
+        this.leaveRoomChannel().catch(() => { /* unload */ }),
+      ]);
       await this.disposeContext();
     } catch (err) {
       console.error(err);
@@ -168,6 +178,7 @@ export class SkyWayFacade {
 
     let lobbyPerson = await this.lobby.join({
       name: this.peer.peerId,
+      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
     });
 
     lobbyPerson.onFatalError.add(async err => {
@@ -217,7 +228,8 @@ export class SkyWayFacade {
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
 
     let roomPerson = await this.room.join({
-      name: this.peer.peerId
+      name: this.peer.peerId,
+      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
     });
 
     roomPerson.onFatalError.add(err => {
