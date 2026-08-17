@@ -234,6 +234,7 @@
   right: -14px;
   bottom: -14px;
   cursor: default;
+  pointer-events: none;
 
   box-sizing: border-box;
   border-top: solid 7px #CCC;
@@ -241,6 +242,14 @@
   border-right: solid 7px #CCC;
   border-bottom: solid 7px #CCC;
   border-radius: 14px;
+}
+
+/* Sit above the texture stack (z-index: 1) so corner hits reach scale/rotate. */
+.grab-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
 }
 
 .rotate-grab {
@@ -264,6 +273,8 @@
   border-radius: 100%;
   color: #444;
   font-size: 8px;
+  z-index: 7;
+  touch-action: none;
 
   transform-style: preserve-3d;
   transform: translateZ(0.1px);

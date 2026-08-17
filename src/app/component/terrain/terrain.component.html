@@ -67,18 +67,19 @@
       </ng-container>
     </div>
     <ng-container *ngIf="!isLocked">
-      <div class="is-3d" style="z-index: 0" [style.opacity]="isInteract ? '1.0': '0.5'" [style.height.px]="depth * gridSize">
-        <div class="pedestal-grab rotate-grab is-3d"></div>
-        <div #scaleGrabLT class="resize-grab of-left-top resize-grab-icon is-3d" [attr.title]="'terrain.scaleGrabHint' | i18n">
+      <!-- Above textures (z-index 1); layer itself is PE-none so body stays movable. -->
+      <div class="is-3d grab-layer" [style.opacity]="isInteract ? '1.0': '0.5'" [style.height.px]="depth * gridSize">
+        <div class="pedestal-grab is-3d"></div>
+        <div #scaleGrabLT class="resize-grab of-left-top resize-grab-icon is-3d is-pointer-events-auto" [attr.title]="'terrain.scaleGrabHint' | i18n">
           <i class="material-icons">open_in_full</i>
         </div>
-        <div class="rotate-grab of-left-bottom rotate-grab-icon is-3d">
+        <div class="rotate-grab of-left-bottom rotate-grab-icon is-3d is-pointer-events-auto">
           <i class="material-icons">autorenew</i>
         </div>
-        <div #scaleGrabRB class="resize-grab of-right-bottom resize-grab-icon is-3d" [attr.title]="'terrain.scaleGrabHint' | i18n">
+        <div #scaleGrabRB class="resize-grab of-right-bottom resize-grab-icon is-3d is-pointer-events-auto" [attr.title]="'terrain.scaleGrabHint' | i18n">
           <i class="material-icons">open_in_full</i>
         </div>
-        <div class="rotate-grab of-right-top rotate-grab-icon is-3d">
+        <div class="rotate-grab of-right-top rotate-grab-icon is-3d is-pointer-events-auto">
           <i class="material-icons">autorenew</i>
         </div>
       </div>

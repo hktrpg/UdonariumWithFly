@@ -1,4 +1,5 @@
 import {
+  AfterViewChecked,
   AfterViewInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -56,11 +57,12 @@ type FaceKey = 'floor' | 'underside' | 'wallTop' | 'wallBottom' | 'wallLeft' | '
     changeDetection: ChangeDetectionStrategy.OnPush,
     standalone: false
 })
-export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
+export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, AfterViewChecked {
   @Input() terrain: Terrain = null;
   @Input() is3D: boolean = false;
   @ViewChild('scaleGrabLT') scaleGrabLTRef: ElementRef<HTMLElement>;
   @ViewChild('scaleGrabRB') scaleGrabRBRef: ElementRef<HTMLElement>;
+  @ViewChild(MovableDirective) private movableDir: MovableDirective;
 
   get name(): string { return this.terrain.name; }
   get mode(): TerrainViewState { return this.terrain.mode; }
@@ -260,6 +262,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
 
   private input: InputHandler = null;
   private scaleInputs: InputHandler[] = [];
+  private scaleBoundEls: Array<HTMLElement | null> = [null, null];
   private scaleCorner: 'lt' | 'rb' = 'rb';
   private scaleStartTable = { x: 0, y: 0 };
   private scaleStartBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0, cx: 0, cy: 0 };
@@ -340,6 +343,10 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
     queueMicrotask(() => this.bindScaleGrabs());
   }
 
+  ngAfterViewChecked() {
+    this.bindScaleGrabs();
+  }
+
   ngOnDestroy() {
     this.input?.destroy();
     this.destroyScaleInputs();
@@ -353,6 +360,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
   private destroyScaleInputs() {
     for (const h of this.scaleInputs) h.destroy();
     this.scaleInputs = [];
+    this.scaleBoundEls = [null, null];
   }
 
   private bindScaleGrabs() {
@@ -364,27 +372,42 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit {
       { el: this.scaleGrabLTRef?.nativeElement || null, corner: 'lt' },
       { el: this.scaleGrabRBRef?.nativeElement || null, corner: 'rb' },
     ];
-    if (!els[0].el && !els[1].el) return;
-    if (this.scaleInputs.length >= 2) return;
+    if (!els[0].el && !els[1].el) {
+      this.destroyScaleInputs();
+      return;
+    }
+    if (
+      this.scaleInputs.length === 2
+      && this.scaleBoundEls[0] === els[0].el
+      && this.scaleBoundEls[1] === els[1].el
+    ) {
+      return;
+    }
     this.destroyScaleInputs();
     this.ngZone.runOutsideAngular(() => {
-      for (const { el, corner } of els) {
+      for (let i = 0; i < els.length; i++) {
+        const { el, corner } = els[i];
         if (!el) continue;
         const handler = new InputHandler(el);
         handler.onStart = (ev) => this.onScaleStart(ev, corner);
         handler.onMove = (ev) => this.onScaleMove(ev);
         handler.onEnd = () => this.onScaleEnd();
         this.scaleInputs.push(handler);
+        this.scaleBoundEls[i] = el;
       }
     });
   }
 
   private onScaleStart(ev: MouseEvent | TouchEvent, corner: 'lt' | 'rb') {
     ev?.stopPropagation?.();
+    if (ev?.cancelable) ev.preventDefault();
     if (this.GuestMode() || this.isLocked || !this.terrain) {
       this.scaleInputs.forEach(h => h.cancel());
       return;
     }
+    // Stop parent movable so corner drag scales instead of moving the piece.
+    this.input?.cancel();
+    this.movableDir?.cancel();
     this.scaleCorner = corner;
     const table = this.coordinateService.calcTabletopLocalCoordinate();
     this.scaleStartTable = { x: table.x, y: table.y };
