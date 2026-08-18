@@ -1,298 +1,255 @@
 # Open3Dhk → 2.5D 街景（研究筆記）
 
-Date gathered: 2026-08-18.  
-Scope: **研究／設計 only**（本輪不實作）。目標形態：**GM 在房內選街道 → 自動讀取周邊資料 → 製成街景**。  
-硬約束：**只用現成 Terrain／地圖管線**、**嚴格維持 CSS 2.5D**（不引入常駐 WebGL 城市引擎）。
+Date gathered: 2026-08-18 · Revised: 2026-08-18（review 修正）.  
+Scope: **研究／設計 only**（本輪不實作）。  
+產品目標（遠景）：GM 選街道 → 載入周邊 → 製成 2.5D 街景。  
+硬約束：只用現成 `GameTable` + `Terrain` bake；嚴格 CSS 2.5D；不引入常駐城市引擎。
 
-相關產品語境：[微縮城市搭景](../hktrpg-tutorial.zh-TW.md#miniature-city)、[devlog 香港街景動機](../devlog.md)。
+相關：[微縮城市搭景](../hktrpg-tutorial.zh-TW.md#miniature-city)、[devlog](../devlog.md)。
 
 ---
 
 ## Executive summary
 
-本站已是 **CSS perspective 虛擬桌面**：地圖底圖一張圖、樓／天橋／招牌一律是 **Terrain 盒 + 六面貼圖**。Three.js 只在匯入時把模型 **烘成六面 PNG**，不常駐 3D mesh。
+原料走 **Open3Dhk Individualised GLTF／FBX** → 現有 `photoGltfFaces`／`importModelAsTerrain` → Terrain 盒；底圖寫入 `GameTable.imageIdentifier`。**禁用** Cesium 3D Tiles 當桌面內容。
 
-Open3Dhk／地政總署資料可當「原料」，但必須經 **裁切 → 單位換算 → 逐棟 bake → 寫入 ImageStorage → 掛到新 GameTable**，才能進桌。直接串 Cesium 3D Tiles／tile mesh **不符合**「只用現成地型／嚴格 2.5D」。
+**MVP 不是真・即時 1B。** 先驗證「街景包 → bake → 可玩地圖」；選街／Download API 是同一契約上的後續 Provider。
 
-**建議主路徑（對齊 1B）：**
+| 層 | MVP | 遠景 1B |
+|---|---|---|
+| 資料 | 預製 **Streetscape Pack**（versioned manifest） | `Open3Dhk`／圖幅 Download Provider |
+| 選取 | 靜態街段清單（或拖入 pack） | 街道名／點選／半徑 |
+| 核心 | 同一個極薄 **Orchestrator** | 不變 |
 
-1. GM 選街道／座標／半徑（房內 UI）。  
-2. 後端或瀏覽器向 **Individualised models Download API**（按 1:1000 圖幅）或預先建好的 **街段索引** 取 GLTF／FBX 周邊包。  
-3. 離線／客戶端拆成「一棟一個 glTF」+ 一張俯視底圖。  
-4. **重用** `importModelAsTerrain`（photo bake）逐棟落地；底圖寫入 `GameTable.imageIdentifier`。  
-5. 新建地圖先 **View locally**，再 Activate／召喚。
-
-現有匯入管線是「一次 drop＝一個場景」，**不是**城市街段批次器；要做 1B 必須加一層 **streetscape orchestrator**（仍只呼叫現成 bake，不新造渲染器）。
+**硬閘門：** Phase 0 Spike 未過，不開 orchestrator／UI。
 
 ---
 
-## 1. 硬約束（本設計不可破）
+## 1. 硬約束
 
 | 約束 | 含義 |
 |---|---|
-| 只用現成地型 | 輸出只能是 `GameTable` 底圖 + `Terrain` 子物件（可含斜坡／霓虹／分面貼圖）。禁止常駐 glTF／Cesium／Three scene。 |
-| 嚴格 2.5D | 桌面仍是 CSS `perspective` + `preserve-3d`；Three 僅短暫用於 bake。 |
-| P2P 房間 | 圖片進 `ImageStorage` 後會同步／進 ZIP；街景必須有 **棟數／解析度／總容量上限**。 |
-| 非 WebGL 城市引擎 | 教學已寫明：微縮感靠配方拼，不是城市引擎（見 tutorial `#miniature-city`）。 |
-
-違反任一項（例如桌面直接播 3D Tiles）即視為範圍外。
+| 只用現成地型 | 只產出 `GameTable` + `Terrain`（可斜坡／霓虹／分面）。禁止常駐 glTF／Cesium／Three scene。 |
+| 嚴格 2.5D | CSS `perspective`；Three 僅短暫 bake。 |
+| P2P 容量 | 圖片進 `ImageStorage`；必須有棟數／解析度／預估 MB 上限。 |
+| 最小表面積 | 新碼只加「資料適配 + 編排」；不複製 bake／不新渲染器。 |
 
 ---
 
-## 2. 本 repo 既有 3D 模型匯入（必須重用）
+## 2. 既有 3D 匯入（必須重用，不叉開）
 
-### 2.1 End-to-end
+### 2.1 管線
 
 ```mermaid
 flowchart LR
-  drop[Drop_ZIP_or_glTF] --> expand[expandModelDropFiles]
-  expand --> chooser[Chooser_terrainBake]
-  chooser --> import[importModelAsTerrain]
-  import --> path{Primary_format}
-  path -->|STL_OBJ| ortho[bakeSixOrthoFaces]
-  path -->|glTF_FBX| photo[photoGltfFaces]
-  ortho --> boxes[splitFootprint_max_3]
-  photo --> boxes
-  boxes --> imgs[ImageStorage_addAsync_6_PNG]
-  imgs --> terr[Terrain_create_plus_bakeCropJson]
-  terr --> place[placeTerrainAt_or_assembleBakeGroupAt]
+  drop[Drop_or_fetch_File] --> expand[expandModelDropFiles]
+  expand --> import[importModelAsTerrain]
+  import --> photo[photoGltfFaces]
+  photo --> imgs[ImageStorage_addAsync]
+  imgs --> terr[Terrain_plus_bakeCropJson]
+  terr --> place[placeTerrainAt]
 ```
 
-入口：
+- 拖放：`tabletop-file-drop.service.ts` → `terrainBake`
+- 多檔原型：`dev-3dmodel-seed.ts`（迴圈 import；街景編排應長得像它，不是像城市引擎）
+- 核心：`importModelAsTerrain`（已有 `mmPerGrid`；**仍會**走 `fitModelGridSize` 2–40）
 
-- 拖放：[`tabletop-file-drop.service.ts`](../../src/app/service/tabletop-file-drop.service.ts) → 預設 `terrainBake` → `importModelAsTerrain`
-- 批次原型（dev）：[`dev-3dmodel-seed.ts`](../../src/app/service/default-room/dev-3dmodel-seed.ts) — **逐檔** `fetch` → `importModelAsTerrain` → 桌面排版（最接近未來街景 orchestrator）
+### 2.2 街景必須補的缺口
 
-核心 API：[`importModelAsTerrain`](../../src/app/class/terrain-model/model-terrain-import.ts)。
-
-### 2.2 格式與 bake 路徑
-
-| 格式 | Loader | Bake | 預設長邊 |
-|---|---|---|---|
-| STL | `parseStl` | ortho `bakeSixOrthoFaces` | 256 |
-| OBJ(+MTL) | `parseObjPackage` | ortho | 256 |
-| glTF / GLB | `loadGltfScene` | **photo** `photoGltfFaces` | **1024** |
-| FBX | `loadFbxScene` | photo（同上） | 1024 |
-| ZIP | `expandModelDropFiles`（巢狀深度 ≤ 2） | 依內含 primary | — |
-
-Open3Dhk **Individualised models（GLTF／FBX）** 對上 **photo bake**，與現有有色模型路徑一致。
-
-### 2.3 關鍵常數（實作時必須對齊）
-
-| 常數 | 值 | 檔案 |
+| 缺口 | 影響 | 最小修法 |
 |---|---|---|
-| `MODEL_MAX_FILE_BYTES` | 192 MiB／檔 | `mesh-ir.ts` |
-| `MODEL_ZIP_MAX_BYTES` | 256 MiB | `model-package-files.ts` |
-| `MODEL_MAX_TRIANGLES` | 80_000（僅 STL／OBJ soup） | `mesh-ir.ts` |
-| `MODEL_PHOTO_BAKE_SIZE` | 1024 | `mesh-ir.ts` |
-| `MODEL_MM_PER_GRID_DEFAULT` | 50（1 單位＝1 mm） | `mesh-ir.ts` |
-| `MODEL_GRID_EDGE_MIN` / `MAX` | 2 / **40** grid | `mesh-ir.ts` |
-| `FOOTPRINT_MAX_BOXES` | **3**（L→2、U→3） | `footprint-split.ts` |
-| `IMAGE_STORED_MAX_BYTES` | **2 MiB**／圖（正規化後） | `image-normalize.ts` |
-
-Bake 後 Terrain 存：六面 `ImageStorage` id、`bakeCropJson`（未裁像素 + CSS insets）、可選 `bakeGroupId`。執行時仍是 CSS 盒，不是 mesh。
-
-### 2.4 對城市資料的已知缺口（街景必須補）
-
-1. **一次 drop＝一個場景**：`loadGltfScene` 只吃袋中**第一個** glTF／FBX。整條街 ZIP 不會自動拆棟。  
-2. **Footprint split ≠ 拆樓**：最多 3 個 AABB，服務單一 L／U 佔用，不是「一棟一盒」。街段必須在 bake **之前**按棟拆檔／拆 scene graph。  
-3. **單位假設是 mm**：米制 Open3Dhk glTF 會被當極小 mm，再被 `fitModelGridSize` 拉到 2～40 grid。街景需要 **顯式 `mmPerGrid`／世界比例尺**（例如 1 m → N grid），不可靠自動 fit。  
-4. **無 Draco／meshopt／KTX2**：壓縮城市 glTF 可能失敗或無貼圖。  
-5. **同步成本**：每棟最多 6 張圖 × 2 MiB。數十棟會撐爆 P2P／ZIP。需硬上限（建議預設 ≤ 12～24 棟、低解析度牆面、重複材質 hash 共用）。  
-6. **共用高度**：同一 bake 的多盒共用整模 Y 最大高度；逐棟 bake 可避開。  
-
-**結論：** 現有管線適合「單棟／單道具微縮」；街景要加 **選取 → 下載 → 拆棟 → 比例尺 → 迴圈呼叫 `importModelAsTerrain` → 組 GameTable**，而不是改 CSS 渲染器。
+| 一次一場景 | 圖幅 ZIP 不會拆棟 | Pack／Provider 保證 **一棟一 primary** |
+| auto-fit 2–40 | 相對距離錯亂 | 街景路徑 **關閉 fit**，世界座標線性放置 |
+| 單位當 mm | 米制模型縮放錯 | Pack 宣告 `metersPerUnit`；編排換算 `mmPerGrid` |
+| 無 Draco／KTX2 | 部分官方包載不入 | Spike 判定；必要時 **離線轉檔進 Pack**（不塞進瀏覽器 loader） |
+| 同步體積 | 16 棟×6×2 MiB 不可接受 | MVP 預設 **≤8 棟、bake ≤512、可略 underside** |
+| Footprint≤3 盒 | ≠ 拆樓 | 不拿 footprint-split 當拆棟；拆棟在 Pack 建置時完成 |
 
 ---
 
-## 3. Open3Dhk／地政資料怎麼對上 2.5D
+## 3. 資料策略（鎖定）
 
-### 3.1 產品與資料層
+### 3.1 用什麼／不用什麼
 
-| 資料 | 內容 | 對本站適合度 |
-|---|---|---|
-| **Individualised models** | 單棟／設施幾何 + 貼圖；格式含 **GLTF、FBX** 等；CSDI／Open3Dhk 下載 | **高** — 可餵 photo bake |
-| Non-textured models | 幾何無貼圖 | 中 — ortho／灰階浮雕，街景感弱 |
-| Tile-based / 3D Tiles | 傾斜攝影 mesh、Cesium tileset（需 API key） | **低** — 易變成城市引擎；不符硬約束 |
-| Streetscape 360 | 車載全景 | 可當參考／Cut-in，**不是** Terrain 幾何 |
-| 3D Pedestrian Network | 行人網絡 | 可輔助「選街／半徑」，不直接成樓 |
+| 資料 | 決策 |
+|---|---|
+| Individualised GLTF／FBX | **採用**（經 Pack 或後續 Provider） |
+| 3D Tiles／tile mesh | **不用**（桌面內容） |
+| Streetscape 360 | 非幾何；可選 Cut-in，非 MVP |
+| Infrastructure（天橋等） | **Pack schema 預留 `kind`**；MVP 可 0 筆，不另開管線 |
 
-入口：
+### 3.2 底圖（鎖定 MVP）
 
-- 瀏覽：`https://3d.map.gov.hk/`（Open3Dhk）  
-- Individualised Download API 說明（data.gov.hk）：指定 **格式 + 地政 1:1000 圖幅編號** 自動化下載  
-- 串流 API（需 key，寄 `3dmap@landsd.gov.hk`）：  
-  - 3D Visualisation Map（tile）：`…/api/3d-data/3dtiles/f2/tileset.json?key=`  
-  - 3D Spatial Data：`…/api/3d-data/3dsd/WGS84/{building|infrastructure}/tileset.json?key=`
+不做真·政府正射對位（授權／對齊成本高）。
 
-**本設計預設只用 Individualised GLTF／FBX（或其圖幅 ZIP），不用 3D Tiles 當桌面內容。**
+**MVP floor：** 由編排器合成簡易俯視——路面色塊 + 各棟 footprint／頂視縮圖貼上。來源是 bake 過程的頂視（或 pack 內可選 `floor.jpg`）。遠景可換成正射 Provider，**Orchestrator 只吃 `Blob`／image id**。
 
-### 3.2 「選街道」在資料層的真實單位
+### 3.3 「選街」真實單位
 
-官方下載粒度多是 **1:1000 地形圖幅**，不是「彌敦道 123 號」。因此 1B 的「選街」需要一層索引：
+官方下載多是 **1:1000 圖幅**，沒有「街道 → glTF」端點。選街 = UX；真正契約是 **Pack 或 bbox→圖幅→拆棟**。Live Download／CORS／ToS **未端到端驗證**——屬 Phase 5，不擋 MVP。
+
+---
+
+## 4. 架構：最小核心 + 可替換邊界
+
+原則：**一個編排器、一個放置模型、一個 Pack 契約；資料來源可插拔。** 不預建 `sheet-index`／`fetch-pack`／`parcelize` 六個空模組。
 
 ```mermaid
-flowchart TD
-  ui[GM_street_or_map_click] --> geocode[Street_name_to_WGS84_or_HK1980]
-  geocode --> sheets[Intersect_1_to_1000_map_sheets]
-  sheets --> dl[Download_GLTF_FBX_sheet_zips]
-  dl --> clip[Clip_by_radius_or_bbox]
-  clip --> buildings[One_building_one_glTF_or_node]
-  buildings --> bake[Loop_importModelAsTerrain]
-  clip --> orthoImg[Render_or_compose_topdown_floor]
-  orthoImg --> table[New_GameTable_imageIdentifier]
-  bake --> kids[table.appendChild_Terrain]
+flowchart TB
+  ui[UI_thin] --> orch[StreetscapeOrchestrator]
+  orch --> src[StreetscapeSource]
+  src --> packA[PackSource_MVP]
+  src --> packB[Open3DhkSource_later]
+  orch --> place[WorldPlacement]
+  orch --> bake[importModelAsTerrain_reuse]
+  orch --> floor[FloorComposer]
+  bake --> table[GameTable_plus_Terrains]
+  floor --> table
 ```
 
-可行索引來源（實作階段再定）：
+### 4.1 模組（未來實作時只這四塊）
 
-- 圖幅索引 PDF／CSDI 圖幅服務 + 街道中心線（政府開放數據／OSM 僅作 UX，注意授權）  
-- 預先建 **街段 → 圖幅列表 + 建議 bbox** 的靜態 JSON（最穩、可離線、可控容量）  
-- Open3Dhk 互動選點後匯出座標（GM 手動貼座標作 MVP）
-
-沒有「街道字串 → glTF」的單一官方端點；**選街 UI 必須自己做 geocode／圖幅對照**。
-
-### 3.3 三類輸出對應產品需求
-
-| 使用者說的「烘成地圖」 | 對應本站物件 | 建議來源 |
+| 模組 | 職責 | 不做 |
 |---|---|---|
-| 地圖相片／底圖 | `GameTable.imageIdentifier`（可選 `backgroundImage*`） | 俯視合成：屋頂＋馬路 ortho（自 bake 頂視，或政府正射／底圖，注意授權） |
-| 背景 | `backgroundImageIdentifier`／`backgroundImageIdentifier2` | 遠景／天際線靜態圖；勿用即時 3D |
-| 地型放成建築 | `Terrain` 子物件 | Individualised 單棟 → `photoGltfFaces` → 六面盒 |
+| **`StreetscapeSource`** | `resolve(query) → StreetscapePack`（async） | bake、DOM、SyncObject |
+| **`WorldPlacement`** | 公尺／pack 座標 → 桌面 px／grid；**禁用 auto-fit** | 載檔 |
+| **`FloorComposer`** | `Pack + 可選頂視 → floor Blob` | 3D |
+| **`StreetscapeOrchestrator`** | 建表 → 取 pack → 迴圈 bake → 掛子物件 → local View | 自家 WebGL |
 
-教學建議：底圖承載「馬路／天橋投影／屋頂平面」；立體 Terrain 只補「可站／擋視線」的結構——街景生成應遵守同一分工，避免把整條街做成巨型單一 Terrain。
+可選極薄 UI：建圖旁「從街景包…」／之後「選街段…」。掛在 `game-table-setting`；先 View 再 Activate。
 
----
+### 4.2 Pack 契約（擴充點＝JSON，不是新框架）
 
-## 4. 目標 UX（1B）與 UI 掛點
+```ts
+/** Streetscape Pack v1 — 唯一跨 Phase 穩定介面 */
+type StreetscapePackV1 = {
+  version: 1;
+  id: string;
+  title: string;
+  attribution: string;           // LandsD / Open3Dhk
+  /** Pack 座標：公尺，Y-up 或宣告 axis */
+  metersPerUnit: number;         // glTF 單位 → 公尺
+  origin: { x: number; z: number }; // pack 平面原點
+  extentMeters: { width: number; depth: number };
+  floor?: { path: string };      // 可選；無則 FloorComposer 合成
+  features: StreetscapeFeatureV1[];
+  limits?: { maxFeatures?: number };
+};
 
-### 4.1 GM 流程（建議）
+type StreetscapeFeatureV1 = {
+  id: string;
+  kind: 'building' | 'infrastructure' | 'prop';
+  path: string;                  // 相對 pack 的 glb/gltf/fbx/zip
+  /** 特徵原點在 pack 平面上的公尺位移 */
+  positionMeters: { x: number; z: number };
+  yawDeg?: number;
+  /** 可選；無則 bake 後量 AABB */
+  sizeMeters?: { w: number; d: number; h: number };
+};
+```
 
-1. 地圖設定或場景列：**「從街道建立…」**  
-2. 輸入街道名／點選小地圖／貼 WGS84 + 半徑（預設 ~80–120 m）。  
-3. 預覽將下載的圖幅、預估棟數、容量警告。  
-4. 確認 → 建立 **新** `GameTable`（**不**立刻 Activate）。  
-5. 進度：下載 → 拆棟 → bake → 寫入底圖與 Terrain。  
-6. 自動 `viewTableLocal` 預覽；滿意後 Activate／Summon。
+- **MVP Source：** 讀 zip／資料夾 + `manifest.json` → `StreetscapePackV1`。  
+- **遠景 Source：** 選街 → 下載圖幅 → **建置期或服務端**拆棟 → **仍輸出同一 Pack**（瀏覽器不解析圖幅百科全書）。  
+- 擴充：加 `kind`、加 Source 實作；**不改 Orchestrator 主流程**。
 
-### 4.2 自然掛點（現有程式）
+### 4.3 對現有 API 的最小侵襲
 
-| 優先 | 位置 | 理由 |
-|---|---|---|
-| 1 | [`game-table-setting`](../../src/app/component/game-table-setting/)「建立新地圖」旁 | 唯一正式建圖入口 |
-| 2 | [`scene-nav`](../../src/app/component/scene-nav/) 加號／選單 | 生成後直接出現場景 chip |
-| 3 | 桌面右鍵地圖選單 | 次要 |
-| — | 勿掛 scene preset | preset 是快照，不建圖 |
-
-地圖啟用模型：[`TableSelecter`](../../src/app/class/table-selecter.ts)（room-active vs local viewed）。街景生成應先本地 View，與現有 GM 預覽習慣一致。
-
-### 4.3 與現有匯入的關係
-
-| 現有 | 街景 orchestrator |
+| 變更 | 理由 |
 |---|---|
-| 使用者拖一個模型 | 系統拉 N 個模型 |
-| `mmPerGrid` 預設 50 | **強制街景比例尺**（例如 1000 mm／grid＝1 m／格，再 clamp 桌面） |
-| 自動 fit 2–40 | 改為「世界座標 → 桌面 px」線性映射，桌面尺寸 `fitGameTableSizeToImage` |
-| 單次 busy lock | 佇列 + UI 進度；可參考 `seedDev3dModelsOnFirstMap` 的 `yieldToUi` |
-| 無 URL 圖庫 | 下載後一律 `ImageStorage.addAsync`（blob），避免熱連結失效 |
+| `ImportModelAsTerrainOptions` 加 `fitGrid?: boolean`（預設 `true` 保舊行為） | 街景關 fit；單棟拖放不變 |
+| 或街景只呼叫內部 bake＋自管 `placeTerrainAt` | 若不想動 fit，Orchestrator 自算 width／height 後繞過 fit——擇一，**禁止兩套都做** |
+| **不**加 DracoLoader 到主路徑，除非 Spike 證明官方 GLB 全靠 Draco | 轉檔進 Pack 更可控 |
 
----
+放置：`positionMeters` × 比例尺 → table px；與 `dev-3dmodel-seed` 的「排版游標」不同——街景用 **地理相對位置**，不是一字形擺放。
 
-## 5. 建議架構（仍 2.5D）
+### 4.4 容量護欄（MVP 預設）
 
-### 5.1 模組邊界（未來實作時）
-
-建議新碼集中（名稱示意，本輪不建檔）：
-
-- `streetscape/` 或 `open3dhk/`  
-  - `sheet-index` — 街道／座標 → 圖幅 id  
-  - `fetch-pack` — Download API／快取 ZIP（CORS 可能要 **同源 proxy**）  
-  - `parcelize` — 圖幅包 → 單棟 File[]（一棟一次 `importModelAsTerrain`）  
-  - `world-scale` — HK1980／WGS84 → 桌面 grid／px  
-  - `floor-ortho` — 合成底圖 Blob  
-  - `orchestrator` — 建 `GameTable`、迴圈 bake、`appendChild`、錯誤彙總  
-
-**禁止**新建 `CityRenderer`／常駐 Three canvas。Bake 結束即釋放 WebGL context（與現有 photo／ortho 一致）。
-
-### 5.2 容量護欄（必須寫進產品規格）
-
-| 護欄 | 建議預設 |
+| 項 | 預設 |
 |---|---|
-| 半徑 | ≤ 100 m（或 bbox 邊長 ≤ ~150 m） |
-| 最大棟數 | 16（可設；超出則只留靠近街道中心線者） |
-| 單棟檔案 | 沿用 192 MiB；超過跳過並警告 |
-| Bake 長邊 | 街景牆面可降到 512 以控同步量 |
-| 桌面格數 | ≤ 100×100；底圖經 `normalizeImageBlob` ≤ 2048 px／2 MiB |
-| 同時進行 | 一房間一次生成（對齊 drop `busy`） |
-
-### 5.3 CORS／金鑰／授權
-
-- 瀏覽器直打 `data.map.gov.hk`／`download.map.gov.hk` 極可能遇 CORS → 需要 **HKTRPG 後端或靜態 proxy**，或 GM 預先下載後「匯入街景包」。  
-- 3D Tiles API 要向地政申請 key；Individualised Download API 以圖幅參數為主——實作前需再核對現行 ToS／署名。  
-- 生成地圖應在 UI 標註資料來源（LandsD／Open3Dhk）。
-
-**務實 MVP 變體（仍屬 1B 精神）：**  
-「選街」先產出／下載 **預製街景包**（manifest + 多 glTF + floor.jpg），房內 orchestrator 只負責讀包 + bake。線上即時 Download API 可作第二階段。這比硬啃 CORS／金鑰更快驗證 2.5D 手感，且仍走「GM 選街 → 自動製景」。
+| 特徵數 | ≤ **8**（超出按距中心裁切） |
+| Bake 長邊 | **512**（可降 256） |
+| 面 | 可略 `underside` |
+| 桌面 | ≤ 100×100 grid；floor ≤ 2048px／2 MiB |
+| 併發 | 一房間一次生成 |
+| UI | 開始前顯示 **預估同步 MB** |
 
 ---
 
-## 6. 與「只研究」對齊的結論
+## 5. UX（遠景與 MVP）
+
+**MVP：**「匯入街景包」或「選預製街段」→ 新 `GameTable`（不 Activate）→ 進度 → `viewTableLocal`。
+
+**遠景 1B：** 同一入口升級為選街道／半徑；Source 換成即時／半即時，**UX 殼可共用**。
+
+掛點優先：`game-table-setting`「建立新地圖」旁 → `scene-nav` 次之。勿掛 scene preset。
+
+---
+
+## 6. Phase（硬順序）
+
+```mermaid
+flowchart LR
+  p0[P0_Spike] --> p1[P1_Placement]
+  p1 --> p2[P2_Pack_MVP]
+  p2 --> p3[P3_Guards_UX]
+  p3 --> p4[P4_Static_street_picker]
+  p4 --> p5[P5_Live_Open3Dhk]
+```
+
+| Phase | 產出 | 通過條件 | 不做 |
+|---|---|---|---|
+| **0 Spike** | 真實圖幅樣品 + 筆記 | 3～5 棟可進現有拖放 bake；單位／壓縮／單棟 MB 已知；拆棟步驟可手做記錄 | 任何正式模組 |
+| **1 Placement** | `fitGrid: false`（或等價）+ 公尺→px | 兩棟相對距離大致正確 | UI／下載 |
+| **2 Pack MVP** | Pack v1 + Orchestrator + FloorComposer | 拖入／載入一包 → 可玩 2.5D 地圖 | 選街、官方 API |
+| **3 Guards／UX** | 上限、進度、失敗跳過、預估 MB、署名 | 壞檔不整表炸掉 | Live |
+| **4 靜態選街** | 少數預製街段目錄（仍是 Pack） | GM「選街」體感，資料仍本地／CDN Pack | Download API |
+| **5 Live 1B** | `Open3DhkSource` + proxy／ToS | CORS、圖幅、拆棟服務驗證後 | 改核心編排 |
+
+P0 失敗（例如全數 Draco、單位混亂）：改為 **離線建置 Pack 的工具鏈**，瀏覽器只吃 P2——架構仍成立。
+
+---
+
+## 7. 結論
 
 | 問題 | 答案 |
 |---|---|
-| 能用 Open3Dhk 烘成地圖相片／背景／建築地型嗎？ | **能**，但必須經 Individualised 模型 → 現有 photo bake → Terrain；底圖另合成。 |
-| 能嚴格 2.5D、只用現成地型嗎？ | **能**，只要不把 3D Tiles 掛上桌面。 |
-| GM 選街自動讀周邊？ | **資料層沒有現成「街道 API」**；要圖幅索引 + bbox 裁切 +（多半）proxy。UI／流程可掛在建圖與 scene-nav。 |
-| 現有 3D 匯入夠不夠？ | **單棟夠；街段不夠**。缺：拆棟、世界比例尺、批次編排、容量護欄、底圖合成。Dev seed 已證明「多檔迴圈 import」可行。 |
-| 本輪交付 | 本文件。實作應另開 issue／PR，先做街景包 MVP 再接即時下載。 |
+| 能烘成底圖／背景／建築地型？ | 能：floor Blob + 可選 background 圖 + Terrain bake。 |
+| 嚴格 2.5D？ | 能：不掛 3D Tiles。 |
+| 真・選街即時？ | 遠景；**MVP＝Pack + 可選靜態街段**。 |
+| 現有匯入夠？ | 單棟夠；街景要 Pack 契約 + 關 fit 放置 + 薄 Orchestrator。 |
+| 架構怎麼擴？ | **Source 可換、Pack schema 版本化**；核心四模組不膨脹。 |
 
 ---
 
-## 7. 建議後續實作順序（非本 PR）
-
-1. **Spike：** 取一個 1:1000 圖幅 GLTF 包，手動拆 3～5 棟，用現有拖放 bake，量單位與貼圖是否可用（Draco？米制？）。  
-2. **比例尺：** 擴充 `ImportModelAsTerrainOptions` 支援「世界公尺 → grid」且可關閉 2–40 auto-fit（或街景專用入口）。  
-3. **Orchestrator MVP：** 讀本地／proxy `manifest.json`（仿 `dev-3dmodel-seed`）→ 新 GameTable + 底圖 + 逐棟 bake。  
-4. **選街 UI：** 街道名／點選 → 查靜態索引 → 選 manifest。  
-5. **Download API／proxy：** 圖幅自動抓取、快取、署名與 ToS。  
-6. **護欄與 UX：** 棟數上限、進度、失敗跳過、先 View 再 Activate。
-
----
-
-## 8. 主要程式索引
+## 8. 程式索引
 
 | 主題 | 路徑 |
 |---|---|
-| 匯入總入口 | `src/app/class/terrain-model/model-terrain-import.ts` |
+| 匯入 | `src/app/class/terrain-model/model-terrain-import.ts` |
 | Photo bake | `src/app/class/terrain-model/photo-gltf-faces.ts` |
-| Ortho bake | `src/app/class/terrain-model/ortho-bake.ts` |
-| 限制常數 | `src/app/class/terrain-model/mesh-ir.ts` |
-| L／U 拆盒 | `src/app/class/terrain-model/footprint-split.ts` |
+| 常數／fit | `src/app/class/terrain-model/mesh-ir.ts` |
+| 多檔原型 | `src/app/service/default-room/dev-3dmodel-seed.ts` |
 | 拖放 | `src/app/service/tabletop-file-drop.service.ts` |
-| 多模批次原型 | `src/app/service/default-room/dev-3dmodel-seed.ts` |
-| Terrain 模型 | `src/app/class/terrain.ts` |
-| 地圖／啟用 | `src/app/class/game-table.ts`, `table-selecter.ts` |
+| Terrain／地圖 | `src/app/class/terrain.ts`, `game-table.ts`, `table-selecter.ts` |
 | 建圖 UI | `src/app/component/game-table-setting/` |
-| 微縮配方 | `docs/hktrpg-tutorial.zh-TW.md` `#miniature-city` |
-
----
 
 ## 9. 外部參考
 
-- Open3Dhk：https://3d.map.gov.hk/  
-- LandsD 3D Mapping：https://www.landsd.gov.hk/en/survey-mapping/mapping/3d-mapping.html  
-- Individualised models（data.gov.hk）＋ Download API 說明：按格式與 1:1000 圖幅自動化下載  
-- 3D Visualisation Map API / 3D Spatial Data API（CSDI；Cesium 3D Tiles；需 key）  
-- 聯絡：`3dmap@landsd.gov.hk`（API key）
+- https://3d.map.gov.hk/  
+- https://www.landsd.gov.hk/en/survey-mapping/mapping/3d-mapping.html  
+- data.gov.hk Individualised models／Download API（圖幅＋格式；**待 Spike／P5 實測**）  
+- CSDI 3D Tiles API（需 key）— **非桌面路徑**  
+- `3dmap@landsd.gov.hk`
 
----
-
-## 10. 決策記錄（本輪）
+## 10. 決策記錄
 
 | 項 | 選擇 |
 |---|---|
-| 交付形態 | **1B** 房內選街自動製景（設計目標） |
-| 本輪產出 | **2A** 研究文件 only |
-| 渲染 | 嚴格 2.5D + 現成 Terrain bake |
-| 主資料 | Individualised GLTF／FBX；**不用** 3D Tiles 當桌面 |
-| 實作切入 | 先街景包 + orchestrator（仿 dev seed），再接 Download API／proxy |
+| 遠景 | 1B 選街自動製景 |
+| 本輪 | 研究文件 only |
+| 渲染 | 2.5D + 現成 Terrain |
+| 主資料 | Individualised → Pack；不用 3D Tiles |
+| MVP | Pack v1 + Orchestrator；非 Live API |
+| 底圖 | 合成俯視／pack 內 floor；非正射 MVP |
+| 擴充 | `StreetscapeSource` + versioned Pack；四模組上限 |
+| 閘門 | P0 Spike 不過不往下做 |
