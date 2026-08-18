@@ -13,13 +13,13 @@ Scope: **研究／設計 only**（本輪不實作）。
 
 原料走 **Open3Dhk Individualised GLTF／FBX** → 現有 `photoGltfFaces`／`importModelAsTerrain` → Terrain 盒；底圖寫入 `GameTable.imageIdentifier`。**禁用** Cesium 3D Tiles 當桌面內容。
 
-**MVP 不是真・即時 1B。** 先驗證「街景包 → bake → 可玩地圖」；選街／Download API 是同一契約上的後續 Provider。
+**MVP 不是真・即時 1B。** 先驗證「街景包 → bake → 可玩地圖」；選街／Download API = 註冊新 Source，契約不變。護欄與品質 **不 hardcode 進編排器**，走 Policy／Pack。
 
 | 層 | MVP | 遠景 1B |
 |---|---|---|
-| 資料 | 預製 **Streetscape Pack**（versioned manifest） | `Open3Dhk`／圖幅 Download Provider |
+| 資料 | 預製 **Streetscape Pack**（versioned manifest） | 註冊 `open3dhk` Source |
 | 選取 | 靜態街段清單（或拖入 pack） | 街道名／點選／半徑 |
-| 核心 | 同一個極薄 **Orchestrator** | 不變 |
+| 核心 | 同一 Orchestrator + **StreetscapePolicy** | 不變 |
 
 **硬閘門：** Phase 0 Spike 未過，不開 orchestrator／UI。
 
@@ -31,7 +31,7 @@ Scope: **研究／設計 only**（本輪不實作）。
 |---|---|
 | 只用現成地型 | 只產出 `GameTable` + `Terrain`（可斜坡／霓虹／分面）。禁止常駐 glTF／Cesium／Three scene。 |
 | 嚴格 2.5D | CSS `perspective`；Three 僅短暫 bake。 |
-| P2P 容量 | 圖片進 `ImageStorage`；必須有棟數／解析度／預估 MB 上限。 |
+| P2P 容量 | 圖片進 `ImageStorage`；上限由 **StreetscapePolicy**（可被 Pack／執行時覆寫）約束，不散落魔術數字。 |
 | 最小表面積 | 新碼只加「資料適配 + 編排」；不複製 bake／不新渲染器。 |
 
 ---
@@ -62,7 +62,7 @@ flowchart LR
 | auto-fit 2–40 | 相對距離錯亂 | 街景路徑 **關閉 fit**，世界座標線性放置 |
 | 單位當 mm | 米制模型縮放錯 | Pack 宣告 `metersPerUnit`；編排換算 `mmPerGrid` |
 | 無 Draco／KTX2 | 部分官方包載不入 | Spike 判定；必要時 **離線轉檔進 Pack**（不塞進瀏覽器 loader） |
-| 同步體積 | 16 棟×6×2 MiB 不可接受 | MVP 預設 **≤8 棟、bake ≤512、可略 underside** |
+| 同步體積 | 多棟×六面易爆 P2P | **Policy** 限特徵數／bake 邊／可略面；數字不散落程式 |
 | Footprint≤3 盒 | ≠ 拆樓 | 不拿 footprint-split 當拆棟；拆棟在 Pack 建置時完成 |
 
 ---
@@ -92,14 +92,18 @@ flowchart LR
 
 ## 4. 架構：最小核心 + 可替換邊界
 
-原則：**一個編排器、一個放置模型、一個 Pack 契約；資料來源可插拔。** 不預建 `sheet-index`／`fetch-pack`／`parcelize` 六個空模組。
+原則：
+
+1. **一個編排器、一個放置模型、一個 Pack 契約；Source 可註冊。**  
+2. **零魔術數字進 Orchestrator**——護欄／bake／比例尺只來自 **Policy（預設表）∪ Pack 覆寫 ∪ 執行時選項**。  
+3. 不預建 `sheet-index`／`fetch-pack`／`parcelize` 空模組。
 
 ```mermaid
 flowchart TB
   ui[UI_thin] --> orch[StreetscapeOrchestrator]
-  orch --> src[StreetscapeSource]
-  src --> packA[PackSource_MVP]
-  src --> packB[Open3DhkSource_later]
+  orch --> policy[StreetscapePolicy]
+  orch --> registry[SourceRegistry]
+  registry --> src[StreetscapeSource]
   orch --> place[WorldPlacement]
   orch --> bake[importModelAsTerrain_reuse]
   orch --> floor[FloorComposer]
@@ -107,71 +111,104 @@ flowchart TB
   floor --> table
 ```
 
-### 4.1 模組（未來實作時只這四塊）
+### 4.1 模組（未來實作時只這四塊 + 一張 Policy）
 
 | 模組 | 職責 | 不做 |
 |---|---|---|
 | **`StreetscapeSource`** | `resolve(query) → StreetscapePack`（async） | bake、DOM、SyncObject |
-| **`WorldPlacement`** | 公尺／pack 座標 → 桌面 px／grid；**禁用 auto-fit** | 載檔 |
-| **`FloorComposer`** | `Pack + 可選頂視 → floor Blob` | 3D |
-| **`StreetscapeOrchestrator`** | 建表 → 取 pack → 迴圈 bake → 掛子物件 → local View | 自家 WebGL |
+| **`WorldPlacement`** | 依 Policy／Pack 的公尺→桌面；可關 fit | 載檔、寫死 scale |
+| **`FloorComposer`** | Pack＋策略 → floor Blob | 3D、寫死路面色以外的主題（色票進 Policy） |
+| **`StreetscapeOrchestrator`** | 合併 Policy → 取 Source → bake → 掛表 → local View | 自家 WebGL、內嵌上限常數 |
+| **`StreetscapePolicy`** | 唯一預設護欄／bake／placement 表 | 業務流程 |
 
-可選極薄 UI：建圖旁「從街景包…」／之後「選街段…」。掛在 `game-table-setting`；先 View 再 Activate。
+UI：掛點用既有 i18n key；先 View 再 Activate。Source 用 **id 註冊**（`pack-file`、`pack-catalog`、`open3dhk`…），UI／Orchestrator 不 `if (source === 'open3dhk')` 分叉業務。
 
-### 4.2 Pack 契約（擴充點＝JSON，不是新框架）
+### 4.2 減少 hardcode：數字與分支都外置
+
+| 反模式 | 做法 |
+|---|---|
+| Orchestrator 內寫 `8`、`512`、`100` | 讀 `StreetscapePolicy`；Pack `policy` 可覆寫；UI 可再覆寫 |
+| `kind: 'building' \| …` 寫死聯集當唯一真相 | `kind: string`；已知 kind 只是 **預設目錄／篩選建議**，未知 kind 當 `prop` 或略過（Policy `unknownKind`） |
+| Source 用 switch 寫死 | `SourceRegistry.register(id, factory)` |
+| 比例尺／原點寫在程式 | Pack 必填 `metersPerUnit`／`origin`／`extentMeters` |
+| 路面色、署名字串寫死 | Policy `floor`／Pack `attribution`；UI 只顯示資料 |
+| 重造一套 bake 常數 | 能代理則代理現有 `MODEL_*`；街景專用項只進 Policy |
+
+**合併順序（後者覆蓋前者）：**  
+`builtinPolicyDefaults` → `pack.policy?` → `runOptions.policy?` → 得出 `EffectivePolicy`。  
+Orchestrator **只讀 EffectivePolicy**，禁止再出現字面上限。
 
 ```ts
-/** Streetscape Pack v1 — 唯一跨 Phase 穩定介面 */
+/** 執行時護欄／品質——不是業務邏輯 */
+type StreetscapePolicyV1 = {
+  maxFeatures: number;
+  bakeMaxEdgePx: number;
+  skipFaces?: TerrainFaceName[];   // e.g. ['underside']
+  fitGrid: boolean;                // streetscape 預設 false
+  /** 1 桌面格對應多少公尺；由 Pack extent 與桌面上限推也可 */
+  metersPerGrid?: number;
+  maxTableCells: number;           // 對齊 GameTable 上限時從現有常數讀，勿抄第二份
+  maxFloorEdgePx?: number;         // 無則跟現有 image normalize 上限
+  maxEstimatedSyncMiB?: number;    // 預檢用；超則拒絕或裁切
+  featureSort: 'distanceToOrigin' | 'manifestOrder';
+  unknownKind: 'import' | 'skip';
+  floor?: { pavementCssColor?: string };
+};
+
 type StreetscapePackV1 = {
   version: 1;
   id: string;
   title: string;
-  attribution: string;           // LandsD / Open3Dhk
-  /** Pack 座標：公尺，Y-up 或宣告 axis */
-  metersPerUnit: number;         // glTF 單位 → 公尺
-  origin: { x: number; z: number }; // pack 平面原點
+  attribution: string;
+  metersPerUnit: number;
+  axis?: 'y-up' | 'z-up';         // 預設 y-up；勿在程式猜
+  origin: { x: number; z: number };
   extentMeters: { width: number; depth: number };
-  floor?: { path: string };      // 可選；無則 FloorComposer 合成
+  floor?: { path: string };
   features: StreetscapeFeatureV1[];
-  limits?: { maxFeatures?: number };
+  /** 可選；覆寫 builtin defaults */
+  policy?: Partial<StreetscapePolicyV1>;
 };
 
 type StreetscapeFeatureV1 = {
   id: string;
-  kind: 'building' | 'infrastructure' | 'prop';
-  path: string;                  // 相對 pack 的 glb/gltf/fbx/zip
-  /** 特徵原點在 pack 平面上的公尺位移 */
+  kind: string;                    // building | infrastructure | prop | …
+  path: string;
   positionMeters: { x: number; z: number };
   yawDeg?: number;
-  /** 可選；無則 bake 後量 AABB */
   sizeMeters?: { w: number; d: number; h: number };
 };
 ```
 
-- **MVP Source：** 讀 zip／資料夾 + `manifest.json` → `StreetscapePackV1`。  
-- **遠景 Source：** 選街 → 下載圖幅 → **建置期或服務端**拆棟 → **仍輸出同一 Pack**（瀏覽器不解析圖幅百科全書）。  
-- 擴充：加 `kind`、加 Source 實作；**不改 Orchestrator 主流程**。
+**Builtin 預設（僅出現在 Policy 預設表／文件範例，不當分散常數）：**
 
-### 4.3 對現有 API 的最小侵襲
+| 鍵 | 建議預設 | 註 |
+|---|---|---|
+| `maxFeatures` | 8 | Pack／UI 可改 |
+| `bakeMaxEdgePx` | 512 | |
+| `fitGrid` | `false` | |
+| `featureSort` | `distanceToOrigin` | 裁切時用 |
+| `unknownKind` | `import` | |
+| `maxTableCells` | 讀現有 GameTable 上限 | **單一真相，不複製數字** |
+| 圖檔上限 | 讀 `IMAGE_*`／normalize | 同上 |
+
+### 4.3 Pack／Source（擴充點＝資料，不是 if）
+
+- **MVP Source（`pack-file`）：** zip／資料夾 + `manifest.json` → `StreetscapePackV1`。  
+- **目錄 Source（`pack-catalog`）：** 遠端／本地 index → 同一個 Pack。  
+- **遠景（`open3dhk`）：** 圖幅下載＋建置期拆棟 → **仍輸出 Pack**；瀏覽器不解析圖幅百科。  
+- 擴充 = 註冊新 Source 或加 Pack 欄位（`version` bump）；**不改 Orchestrator 主流程**。
+
+### 4.4 對現有 API 的最小侵襲
 
 | 變更 | 理由 |
 |---|---|
-| `ImportModelAsTerrainOptions` 加 `fitGrid?: boolean`（預設 `true` 保舊行為） | 街景關 fit；單棟拖放不變 |
-| 或街景只呼叫內部 bake＋自管 `placeTerrainAt` | 若不想動 fit，Orchestrator 自算 width／height 後繞過 fit——擇一，**禁止兩套都做** |
-| **不**加 DracoLoader 到主路徑，除非 Spike 證明官方 GLB 全靠 Draco | 轉檔進 Pack 更可控 |
+| `ImportModelAsTerrainOptions` 加 `fitGrid?: boolean`（預設 `true`） | 由 EffectivePolicy 傳入；不寫死街景分支 |
+| bake 邊長經既有 `bakeSize` opts 傳入 | 對齊 Policy `bakeMaxEdgePx` |
+| **擇一**放置路徑，禁止雙軌 | 要嘛關 fit 走 import，要嘛自管 place——Policy 決定行為，程式只一條 |
+| Draco 等不預裝 | Spike 後若需要，用 **可選 loader 註冊**，非預設 hard dep |
 
-放置：`positionMeters` × 比例尺 → table px；與 `dev-3dmodel-seed` 的「排版游標」不同——街景用 **地理相對位置**，不是一字形擺放。
-
-### 4.4 容量護欄（MVP 預設）
-
-| 項 | 預設 |
-|---|---|
-| 特徵數 | ≤ **8**（超出按距中心裁切） |
-| Bake 長邊 | **512**（可降 256） |
-| 面 | 可略 `underside` |
-| 桌面 | ≤ 100×100 grid；floor ≤ 2048px／2 MiB |
-| 併發 | 一房間一次生成 |
-| UI | 開始前顯示 **預估同步 MB** |
+放置：`positionMeters` × EffectivePolicy 比例尺 → table px（地理相對，非一字排）。
 
 ---
 
@@ -201,9 +238,9 @@ flowchart LR
 | **0 Spike** | 真實圖幅樣品 + 筆記 | 3～5 棟可進現有拖放 bake；單位／壓縮／單棟 MB 已知；拆棟步驟可手做記錄 | 任何正式模組 |
 | **1 Placement** | `fitGrid: false`（或等價）+ 公尺→px | 兩棟相對距離大致正確 | UI／下載 |
 | **2 Pack MVP** | Pack v1 + Orchestrator + FloorComposer | 拖入／載入一包 → 可玩 2.5D 地圖 | 選街、官方 API |
-| **3 Guards／UX** | 上限、進度、失敗跳過、預估 MB、署名 | 壞檔不整表炸掉 | Live |
-| **4 靜態選街** | 少數預製街段目錄（仍是 Pack） | GM「選街」體感，資料仍本地／CDN Pack | Download API |
-| **5 Live 1B** | `Open3DhkSource` + proxy／ToS | CORS、圖幅、拆棟服務驗證後 | 改核心編排 |
+| **3 Guards／UX** | EffectivePolicy 預檢、進度、失敗跳過、署名 | 壞檔不整表炸掉；護欄可調 | Live |
+| **4 靜態選街** | `pack-catalog` Source + 預製街段 | GM「選街」體感；資料仍 Pack | Download API |
+| **5 Live 1B** | 註冊 `open3dhk` Source + proxy／ToS | CORS、圖幅、拆棟驗證後 | 改核心編排／抄常數 |
 
 P0 失敗（例如全數 Draco、單位混亂）：改為 **離線建置 Pack 的工具鏈**，瀏覽器只吃 P2——架構仍成立。
 
@@ -216,8 +253,8 @@ P0 失敗（例如全數 Draco、單位混亂）：改為 **離線建置 Pack �
 | 能烘成底圖／背景／建築地型？ | 能：floor Blob + 可選 background 圖 + Terrain bake。 |
 | 嚴格 2.5D？ | 能：不掛 3D Tiles。 |
 | 真・選街即時？ | 遠景；**MVP＝Pack + 可選靜態街段**。 |
-| 現有匯入夠？ | 單棟夠；街景要 Pack 契約 + 關 fit 放置 + 薄 Orchestrator。 |
-| 架構怎麼擴？ | **Source 可換、Pack schema 版本化**；核心四模組不膨脹。 |
+| 現有匯入夠？ | 單棟夠；街景要 Pack + Policy 驅動放置／護欄 + 薄 Orchestrator。 |
+| 架構怎麼擴？ | **Source 註冊 + Pack／Policy 外置**；Orchestrator 無魔術數字。 |
 
 ---
 
@@ -251,5 +288,6 @@ P0 失敗（例如全數 Draco、單位混亂）：改為 **離線建置 Pack �
 | 主資料 | Individualised → Pack；不用 3D Tiles |
 | MVP | Pack v1 + Orchestrator；非 Live API |
 | 底圖 | 合成俯視／pack 內 floor；非正射 MVP |
-| 擴充 | `StreetscapeSource` + versioned Pack；四模組上限 |
+| 擴充 | Source 註冊 + versioned Pack；四模組 + Policy |
+| Hardcode | 護欄／bake／比例尺只在 Policy∪Pack∪runOptions；桌面／圖檔上限讀現有常數 |
 | 閘門 | P0 Spike 不過不往下做 |
