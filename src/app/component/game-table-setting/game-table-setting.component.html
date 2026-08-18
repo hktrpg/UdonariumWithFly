@@ -3,6 +3,7 @@
     <button type="button" class="btn btn-primary btn-block btn-sm" (click)="createGameTable()">
       <i class="material-icons">add</i>{{ 'table.create' | i18n }}
     </button>
+    <ng-container *ngIf="canActivate">
     <button type="button" class="btn btn-block btn-sm" (click)="streetscapePackInput.click()" [disabled]="streetscapeBusy">
       <i class="material-icons">location_city</i>{{ 'streetscape.importPack' | i18n }}
     </button>
@@ -18,18 +19,19 @@
       <option *ngFor="let street of streetscapeCatalog" [value]="street.id">{{ street.title }}</option>
     </select>
     <button type="button" class="btn btn-block btn-sm" (click)="createStreetscapeFromCatalog()" [disabled]="streetscapeBusy || !streetscapeCatalogId">
-      {{ 'streetscape.fromStreet' | i18n }}
+      {{ 'streetscape.loadSelected' | i18n }}
     </button>
     <input
       class="streetscape-street"
       type="text"
       [(ngModel)]="streetscapeStreet"
       [disabled]="streetscapeBusy"
-      [attr.placeholder]="'streetscape.streetPlaceholder' | i18n"
+      [placeholder]="'streetscape.streetPlaceholder' | i18n"
     >
     <button type="button" class="btn btn-block btn-sm" (click)="createStreetscapeFromStreet()" [disabled]="streetscapeBusy || !streetscapeStreet.trim()">
       {{ 'streetscape.fromStreet' | i18n }}
     </button>
+    </ng-container>
     <p class="streetscape-status" *ngIf="streetscapeStatus">{{ streetscapeStatus }}</p>
     <p class="streetscape-status" *ngIf="streetscapeAttribution">{{ 'streetscape.attribution' | i18n:{ name: streetscapeAttribution } }}</p>
     <select

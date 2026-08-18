@@ -322,6 +322,7 @@ export const en_ui: I18nDictionary = {
   'table.create': 'Create new map',
   'streetscape.importPack': 'Create from streetscape pack',
   'streetscape.fromStreet': 'Create from street',
+  'streetscape.loadSelected': 'Load selected street',
   'streetscape.catalog': 'Prepared streets',
   'streetscape.catalogPlaceholder': 'Choose a street…',
   'streetscape.streetPlaceholder': 'Street name or sheet (e.g. 11-SE-2C)',

@@ -10,7 +10,7 @@ import {
 import { PointerCoordinate } from 'service/pointer-device.service';
 
 import { StreetscapeCapsV1, mergeStreetscapeQuality, resolveStreetscapeCaps } from './caps';
-import { STREETSCAPE_ERRORS } from './errors';
+import { isStreetscapeAbort, STREETSCAPE_ERRORS } from './errors';
 import { estimateSyncMiB, maxFeaturesForSyncBudget } from './estimate';
 import { composeStreetscapeFloor } from './floor-composer';
 import { StreetscapeFeatureV1, StreetscapePackV1, StreetscapeQualityV1 } from './pack-schema';
@@ -33,6 +33,7 @@ export type StreetscapeProgress = {
   total: number;
   featureId?: string;
   message?: string;
+  mb?: number;
 };
 
 export type GenerateStreetscapeOptions = {
@@ -78,68 +79,77 @@ export async function generateStreetscapeFromLoad(
     phase: 'estimate',
     current: 0,
     total: selected.length,
+    mb: estimatedSyncMiB,
     message: `${estimatedSyncMiB.toFixed(1)} MiB`,
   });
 
-  const table = new GameTable();
-  table.name = pack.title || 'Streetscape';
-  table.initialize();
-  TableSelecter.instance.viewTableLocal(table.identifier);
-
-  const scale = streetscapeScaleFromPack(pack, caps, table.gridSize || 50);
-  table.width = scale.tableCellsX;
-  table.height = scale.tableCellsY;
-
-  const warnings: string[] = [];
-  opts.onProgress?.({ phase: 'floor', current: 0, total: selected.length });
+  let table: GameTable | null = null;
   try {
-    const floorBlob = await load.openFloor(opts.signal);
-    await applyFloorBlob(table, floorBlob, opts.addFloorImage);
-  } catch (err) {
-    warnings.push(err instanceof Error ? err.message : String(err));
-    const composed = composeStreetscapeFloor(pack, scale, selected);
-    await applyFloorBlob(table, composed, opts.addFloorImage);
-  }
+    table = new GameTable();
+    table.name = pack.title || 'Streetscape';
+    table.playerCanView = true;
+    table.initialize();
+    TableSelecter.instance.viewTableLocal(table.identifier);
 
-  const importModel = opts.importModel || importModelAsTerrain;
-  const terrains: Terrain[] = [];
-  for (let i = 0; i < selected.length; i++) {
-    throwIfAborted(opts.signal);
-    const feature = selected[i];
-    opts.onProgress?.({
-      phase: 'feature',
-      current: i + 1,
-      total: selected.length,
-      featureId: feature.id,
-    });
+    const scale = streetscapeScaleFromPack(pack, caps, table.gridSize || 50);
+    table.width = scale.tableCellsX;
+    table.height = scale.tableCellsY;
+
+    const warnings: string[] = [];
+    opts.onProgress?.({ phase: 'floor', current: 0, total: selected.length });
     try {
-      const files = await load.openFeature(feature.id, opts.signal);
-      const center = featureCenterTablePx(feature, pack, scale);
-      const result = await importModel(files, { x: center.x, y: center.y, z: 0 }, {
-        name: feature.id,
-        fitGrid: quality.fitGrid,
-        bakeSize: quality.bakeMaxEdgePx,
-        mmPerGrid: scale.mmPerGrid,
-        parentTable: table,
-        yawDeg: feature.yawDeg,
-      });
-      terrains.push(...result.terrains);
-      warnings.push(...(result.warnings || []));
+      const floorBlob = await load.openFloor(opts.signal);
+      await applyFloorBlob(table, floorBlob, opts.addFloorImage);
     } catch (err) {
-      if (err instanceof Error && err.message === STREETSCAPE_ERRORS.CANCELLED) throw err;
-      warnings.push(`${feature.id}: ${err instanceof Error ? err.message : String(err)}`);
+      if (isStreetscapeAbort(err)) throw err;
+      warnings.push(err instanceof Error ? err.message : String(err));
+      const composed = composeStreetscapeFloor(pack, scale, selected);
+      await applyFloorBlob(table, composed, opts.addFloorImage);
     }
-  }
 
-  opts.onProgress?.({ phase: 'done', current: selected.length, total: selected.length });
-  return {
-    table,
-    pack,
-    terrains,
-    warnings,
-    estimatedSyncMiB,
-    attribution: pack.attribution || '',
-  };
+    const importModel = opts.importModel || importModelAsTerrain;
+    const terrains: Terrain[] = [];
+    for (let i = 0; i < selected.length; i++) {
+      throwIfAborted(opts.signal);
+      const feature = selected[i];
+      opts.onProgress?.({
+        phase: 'feature',
+        current: i + 1,
+        total: selected.length,
+        featureId: feature.id,
+      });
+      try {
+        const files = await load.openFeature(feature.id, opts.signal);
+        const center = featureCenterTablePx(feature, pack, scale);
+        const result = await importModel(files, { x: center.x, y: center.y, z: 0 }, {
+          name: feature.id,
+          fitGrid: quality.fitGrid,
+          bakeSize: quality.bakeMaxEdgePx,
+          mmPerGrid: scale.mmPerGrid,
+          parentTable: table,
+          yawDeg: feature.yawDeg,
+        });
+        terrains.push(...result.terrains);
+        warnings.push(...(result.warnings || []));
+      } catch (err) {
+        if (isStreetscapeAbort(err)) throw err;
+        warnings.push(`${feature.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    opts.onProgress?.({ phase: 'done', current: selected.length, total: selected.length });
+    return {
+      table,
+      pack,
+      terrains,
+      warnings,
+      estimatedSyncMiB,
+      attribution: pack.attribution || '',
+    };
+  } catch (err) {
+    table?.destroy();
+    throw err;
+  }
 }
 
 function selectFeatures(

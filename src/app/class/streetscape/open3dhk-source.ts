@@ -1,5 +1,7 @@
-import { STREETSCAPE_ERRORS } from './errors';
 import { fetchStreetscapeCatalog, loadPackFromUrl, StreetscapeCatalogEntry } from './catalog-source';
+import { isStreetscapeAbort, STREETSCAPE_ERRORS } from './errors';
+import { createPackLoad, expandStreetscapePackFiles, parseManifestText } from './pack-file-source';
+import { packagePathOf } from '@udonarium/terrain-model/model-package-files';
 import { StreetscapePackLoad, StreetscapeQuery, StreetscapeSource, throwIfAborted } from './source';
 
 /** Same-origin proxy; official hosts often block browser CORS. */
@@ -12,9 +14,13 @@ export const open3dhkSource: StreetscapeSource = {
     throwIfAborted(signal);
     if (query.packUrl) return loadPackFromUrl(query.packUrl, signal);
 
-    const catalog = await fetchStreetscapeCatalog(undefined, signal);
-    const matched = matchCatalogStreet(catalog.streets, query);
-    if (matched) return loadPackFromUrl(matched.packUrl, signal);
+    try {
+      const catalog = await fetchStreetscapeCatalog(undefined, signal);
+      const matched = matchCatalogStreet(catalog.streets, query);
+      if (matched) return loadPackFromUrl(matched.packUrl, signal);
+    } catch (err) {
+      if (isStreetscapeAbort(err)) throw err;
+    }
 
     const proxied = await tryFetchOfficialAsPack(query, signal);
     if (proxied) return proxied;
@@ -58,12 +64,10 @@ async function tryFetchOfficialAsPack(
     if (!res.ok) return null;
     const blob = await res.blob();
     const file = new File([blob], 'open3dhk.zip', { type: blob.type || 'application/zip' });
-    const { expandStreetscapePackFiles, createPackLoad } = await import('./pack-file-source');
-    const { parseStreetscapePackV1 } = await import('./pack-schema');
     const files = await expandStreetscapePackFiles([file]);
-    const manifest = files.find(f => /manifest\.json$/i.test(f.name));
+    const manifest = files.find(f => /(^|\/)manifest\.json$/i.test(packagePathOf(f)));
     if (!manifest) return null;
-    return createPackLoad(parseStreetscapePackV1(JSON.parse(await manifest.text())), files);
+    return createPackLoad(parseManifestText(await manifest.text()), files);
   } catch {
     return null;
   }

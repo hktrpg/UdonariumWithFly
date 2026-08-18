@@ -322,6 +322,7 @@ export const zhCN_ui: I18nDictionary = {
   'table.create': '创建新地图',
   'streetscape.importPack': '从街景包创建',
   'streetscape.fromStreet': '从街道创建',
+  'streetscape.loadSelected': '载入所选街段',
   'streetscape.catalog': '预制街段',
   'streetscape.catalogPlaceholder': '选择街段…',
   'streetscape.streetPlaceholder': '街道名称或图幅（如 11-SE-2C）',

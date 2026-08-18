@@ -4,7 +4,9 @@ import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { MODEL_MAX_FILE_BYTES } from '@udonarium/terrain-model/mesh-ir';
 import {
   attachPackagePath,
+  dirOfPackagePath,
   expandModelDropFiles,
+  isPrimaryModelFile,
   isZipFile,
   normalizePackagePath,
   packagePathOf,
@@ -26,7 +28,7 @@ export const packFileSource: StreetscapeSource = {
     throwIfAborted(signal);
     const manifestFile = findManifest(files);
     if (!manifestFile) throw new Error(STREETSCAPE_ERRORS.NO_MANIFEST);
-    const pack = parseStreetscapePackV1(JSON.parse(await manifestFile.text()));
+    const pack = parseManifestText(await manifestFile.text());
     return createPackLoad(pack, files);
   },
 };
@@ -40,7 +42,7 @@ export function createPackLoad(pack: StreetscapePackV1, files: File[]): Streetsc
       if (!feature) throw new Error(STREETSCAPE_ERRORS.NO_FEATURE);
       const primary = resolvePackageFile(files, feature.path);
       if (!primary) throw new Error(STREETSCAPE_ERRORS.NO_FEATURE);
-      return expandModelDropFiles([primary, ...sidecarFiles(files, primary)]);
+      return expandModelDropFiles([primary, ...sidecarFilesForPrimary(files, primary)]);
     },
     async openFloor(signal?: AbortSignal): Promise<Blob> {
       throwIfAborted(signal);
@@ -95,9 +97,28 @@ function findManifest(files: File[]): File | undefined {
     || indexed.find(x => x.path.endsWith('/manifest.json')))?.file;
 }
 
-function sidecarFiles(files: File[], primary: File): File[] {
-  const dir = packagePathOf(primary).replace(/\/[^/]+$/, '');
-  if (!dir || dir === packagePathOf(primary)) return files.filter(f => f !== primary);
-  const prefix = dir + '/';
-  return files.filter(f => f !== primary && packagePathOf(f).startsWith(prefix));
+const SIDECAR_RE = /\.(mtl|bin|png|jpe?g|webp|gif|bmp)$/i;
+
+/** Textures / MTL / BIN next to a primary — never other buildings. */
+export function sidecarFilesForPrimary(files: File[], primary: File): File[] {
+  const primaryPath = packagePathOf(primary);
+  const dir = dirOfPackagePath(primaryPath);
+  const prefix = dir ? `${dir}/` : '';
+  return files.filter(f => {
+    if (f === primary) return false;
+    if (isPrimaryModelFile(f)) return false;
+    const p = packagePathOf(f);
+    if (dir && !p.startsWith(prefix)) return false;
+    if (!dir && p.includes('/')) return false;
+    return SIDECAR_RE.test(p);
+  });
+}
+
+export function parseManifestText(text: string): StreetscapePackV1 {
+  try {
+    return parseStreetscapePackV1(JSON.parse(text));
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('STREETSCAPE_')) throw err;
+    throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  }
 }

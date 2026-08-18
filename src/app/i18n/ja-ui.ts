@@ -322,6 +322,7 @@ export const ja_ui: I18nDictionary = {
   'table.create': '新規マップ作成',
   'streetscape.importPack': '街景パックから作成',
   'streetscape.fromStreet': '通りから作成',
+  'streetscape.loadSelected': '選択した通りを読み込む',
   'streetscape.catalog': '用意された通り',
   'streetscape.catalogPlaceholder': '通りを選択…',
   'streetscape.streetPlaceholder': '通り名または図郭（例 11-SE-2C）',

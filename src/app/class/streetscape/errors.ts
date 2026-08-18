@@ -13,7 +13,15 @@ export const STREETSCAPE_ERRORS = {
   NO_QUERY: 'STREETSCAPE_NO_QUERY',
 } as const;
 
+export function isStreetscapeAbort(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const name = (err as { name?: string }).name;
+  const message = err instanceof Error ? err.message : '';
+  return name === 'AbortError' || message === STREETSCAPE_ERRORS.CANCELLED;
+}
+
 export function streetscapeErrorI18nKey(err: unknown): string {
+  if (isStreetscapeAbort(err)) return 'streetscape.error.cancelled';
   const code = err instanceof Error ? err.message : String(err || '');
   switch (code) {
     case STREETSCAPE_ERRORS.INVALID_PACK: return 'streetscape.error.invalidPack';

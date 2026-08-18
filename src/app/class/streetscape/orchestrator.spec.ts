@@ -54,4 +54,21 @@ describe('generateStreetscapeFromLoad', () => {
     expect(result.warnings.some(w => w.startsWith('bad:'))).toBeTrue();
     expect(result.table.width).toBeGreaterThan(0);
   });
+
+  it('destroys the new table when generation is aborted', async () => {
+    const load: StreetscapePackLoad = {
+      pack,
+      openFeature: async () => {
+        const err = new Error('STREETSCAPE_CANCELLED');
+        err.name = 'AbortError';
+        throw err;
+      },
+      openFloor: async () => new Blob([new Uint8Array([1])], { type: 'image/png' }),
+    };
+    await expectAsync(generateStreetscapeFromLoad(load, {
+      caps: resolveStreetscapeCaps(),
+      addFloorImage: async () => 'floor-id',
+      importModel: async () => { throw new Error('unused'); },
+    })).toBeRejected();
+  });
 });

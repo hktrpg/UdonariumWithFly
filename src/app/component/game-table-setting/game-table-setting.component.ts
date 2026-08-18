@@ -216,6 +216,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   ngOnInit() {
     Promise.resolve().then(() => this.refreshPanelTitle());
     registerBuiltinStreetscapeSources();
+    GameTableSettingComponent.pendingStreetscape = false;
     void this.loadStreetscapeCatalog();
     const pending = GameTableSettingComponent.pendingEditTableId;
     GameTableSettingComponent.pendingEditTableId = null;
@@ -296,7 +297,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   async onStreetscapePack(ev: Event) {
-    if (this.GuestMode() || this.streetscapeBusy) return;
+    if (!this.canActivate || this.streetscapeBusy) return;
     const input = ev.target as HTMLInputElement;
     const files = input.files ? Array.from(input.files) : [];
     input.value = '';
@@ -305,12 +306,12 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   }
 
   async createStreetscapeFromCatalog() {
-    if (this.GuestMode() || this.streetscapeBusy || !this.streetscapeCatalogId) return;
+    if (!this.canActivate || this.streetscapeBusy || !this.streetscapeCatalogId) return;
     await this.runStreetscape({ type: 'catalog', id: this.streetscapeCatalogId });
   }
 
   async createStreetscapeFromStreet() {
-    if (this.GuestMode() || this.streetscapeBusy) return;
+    if (!this.canActivate || this.streetscapeBusy) return;
     const q = this.streetscapeStreet.trim();
     if (!q) return;
     const looksLikeSheet = /^\d{1,2}-[A-Z]{2}-\d+[A-Z]?$/i.test(q);
@@ -329,8 +330,8 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
       const result = await generateStreetscape({
         query,
         onProgress: (p: StreetscapeProgress) => {
-          if (p.phase === 'estimate' && p.message) {
-            this.streetscapeStatus = this.i18n.t('streetscape.estimate', { mb: p.message.replace(' MiB', '') });
+          if (p.phase === 'estimate' && p.mb != null) {
+            this.streetscapeStatus = this.i18n.t('streetscape.estimate', { mb: p.mb.toFixed(1) });
           } else if (p.phase === 'feature') {
             this.streetscapeStatus = this.i18n.t('streetscape.progressFeature', {
               current: p.current,

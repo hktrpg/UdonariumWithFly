@@ -323,6 +323,7 @@ export const zhTW_ui: I18nDictionary = {
   'table.create': '建立新地圖',
   'streetscape.importPack': '從街景包建立',
   'streetscape.fromStreet': '從街道建立',
+  'streetscape.loadSelected': '載入所選街段',
   'streetscape.catalog': '預製街段',
   'streetscape.catalogPlaceholder': '選擇街段…',
   'streetscape.streetPlaceholder': '街道名稱或圖幅（如 11-SE-2C）',

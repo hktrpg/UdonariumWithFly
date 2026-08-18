@@ -1,8 +1,7 @@
-import { packagePathOf } from '@udonarium/terrain-model/model-package-files';
+import { normalizePackagePath, packagePathOf } from '@udonarium/terrain-model/model-package-files';
 
 import { STREETSCAPE_ERRORS } from './errors';
-import { createPackLoad, expandStreetscapePackFiles } from './pack-file-source';
-import { parseStreetscapePackV1 } from './pack-schema';
+import { createPackLoad, expandStreetscapePackFiles, parseManifestText } from './pack-file-source';
 import { StreetscapePackLoad, StreetscapeQuery, StreetscapeSource, throwIfAborted } from './source';
 
 export const DEFAULT_STREETSCAPE_CATALOG_URL = 'assets/streetscape/catalog.json';
@@ -62,7 +61,7 @@ export async function loadPackFromUrl(url: string, signal?: AbortSignal): Promis
   const files = await expandStreetscapePackFiles([file]);
   const manifest = files.find(f => /(^|\/)manifest\.json$/i.test(packagePathOf(f)));
   if (!manifest) throw new Error(STREETSCAPE_ERRORS.NOT_A_PACK);
-  const pack = parseStreetscapePackV1(JSON.parse(await manifest.text()));
+  const pack = parseManifestText(await manifest.text());
   return createPackLoad(pack, files);
 }
 
@@ -70,7 +69,7 @@ export async function loadPackFromManifestUrl(url: string, signal?: AbortSignal)
   throwIfAborted(signal);
   const res = await fetch(url, { cache: 'no-store', signal });
   if (!res.ok) throw new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
-  const pack = parseStreetscapePackV1(await res.json());
+  const pack = parseManifestText(await res.text());
   const base = url.replace(/\/[^/]*$/, '/');
   return {
     pack,
@@ -78,14 +77,23 @@ export async function loadPackFromManifestUrl(url: string, signal?: AbortSignal)
       throwIfAborted(inner || signal);
       const feature = pack.features.find(f => f.id === id);
       if (!feature) throw new Error(STREETSCAPE_ERRORS.NO_FEATURE);
-      return [await fetchPackMember(base + feature.path, feature.path, inner || signal)];
+      return [await fetchPackMember(joinPackMemberUrl(base, feature.path), feature.path, inner || signal)];
     },
     async openFloor(inner?: AbortSignal): Promise<Blob> {
       throwIfAborted(inner || signal);
-      const file = await fetchPackMember(base + pack.floor.path, pack.floor.path, inner || signal);
+      const file = await fetchPackMember(joinPackMemberUrl(base, pack.floor.path), pack.floor.path, inner || signal);
       return file;
     },
   };
+}
+
+export function joinPackMemberUrl(base: string, rel: string): string {
+  const clean = normalizePackagePath(rel);
+  if (!clean || clean.includes('..') || /^(https?:|\/\/)/i.test(rel.trim())) {
+    throw new Error(STREETSCAPE_ERRORS.NO_FEATURE);
+  }
+  const root = base.endsWith('/') ? base : `${base}/`;
+  return new URL(clean, root).href;
 }
 
 async function fetchPackMember(url: string, path: string, signal?: AbortSignal): Promise<File> {
