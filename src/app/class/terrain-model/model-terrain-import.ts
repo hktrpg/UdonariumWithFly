@@ -66,9 +66,15 @@ export type ImportModelAsTerrainResult = {
   warnings: string[];
 };
 
-type BakedBox = {
+export type BakedBox = {
   blobs: BakedFaceBlobs;
   aabb: MeshAabb;
+};
+
+export type BakedModelBoxes = {
+  boxes: BakedBox[];
+  fullAabb: MeshAabb;
+  warnings: string[];
 };
 
 /**
@@ -97,69 +103,18 @@ export async function importModelAsTerrain(
   const gridPerWorld = scale / mm;
   const fullSx = Math.max(1e-9, baked.fullAabb.max[0] - baked.fullAabb.min[0]);
   const fullSz = Math.max(1e-9, baked.fullAabb.max[2] - baked.fullAabb.min[2]);
-  const fullSy = Math.max(0, baked.fullAabb.max[1] - baked.fullAabb.min[1]);
   const modelW = fullSx * gridPerWorld;
   const modelD = fullSz * gridPerWorld;
-  const height = Math.max(TERRAIN_SIZE_MIN, fullSy * gridPerWorld);
   const baseName = opts.name || primaryBaseName(files) || 'Terrain';
-  const terrains: Terrain[] = [];
-  const bakeGroupId = baked.boxes.length > 1 ? newBakeGroupId() : '';
-
-  footprintDebug('importModelAsTerrain layout', {
-    drop: position,
-    boxCount: baked.boxes.length,
-    bakeGroupId: bakeGroupId || '(single)',
-    gridPerWorld: +gridPerWorld.toFixed(6),
-    modelW: +modelW.toFixed(3),
-    modelD: +modelD.toFixed(3),
-    height: +height.toFixed(3),
-    fullAabb: footprintBoxSummary(baked.fullAabb),
-    boxes: baked.boxes.map((b, i) => ({ i, ...footprintBoxSummary(b.aabb, baked.fullAabb) })),
+  const terrains = await placeBakedModelBoxes(baked, position, {
+    name: baseName,
+    gridPerWorld,
+    layoutAabb: baked.fullAabb,
+    layoutWidth: modelW,
+    layoutDepth: modelD,
+    previewBox: opts.previewBox,
+    assemble: true,
   });
-
-  for (let i = 0; i < baked.boxes.length; i++) {
-    const box = baked.boxes[i];
-    const autoFaces = await autoPerFaceInsets(box.blobs);
-    const terrain = await createTerrainBox(box, autoFaces, {
-      baseName,
-      index: i,
-      total: baked.boxes.length,
-      height,
-      gridPerWorld,
-      fullAabb: baked.fullAabb,
-      center: position,
-      modelW,
-      modelD,
-      cropNow: false,
-      bakeGroupId,
-    });
-    viewTable.appendChild(terrain);
-    terrains.push(terrain);
-
-    if (opts.previewBox) {
-      const result = await opts.previewBox({
-        blobs: box.blobs,
-        faces: autoFaces,
-        index: i,
-        total: baked.boxes.length,
-        name: baked.boxes.length > 1 ? `${baseName} ${i + 1}` : baseName,
-        terrain,
-      });
-      if (result.action === 'abort') {
-        terrain.destroy();
-        terrains.pop();
-        break;
-      }
-      const faces = result.action === 'confirm' ? result.faces : autoFaces;
-      await applyBakeCropToTerrain(terrain, faces);
-    }
-  }
-
-  if (!terrains.length) throw new Error('MODEL_IMPORT_CANCELLED');
-  // Force modeled footprint layout (bar + wings), never a spaced 一字排.
-  if (terrains.length > 1 && bakeGroupId) {
-    assembleBakeGroupAt(terrains, position);
-  }
   footprintDebug('importModelAsTerrain done', {
     n: terrains.length,
     parts: terrains.map(t => {
@@ -187,6 +142,95 @@ export async function importModelAsTerrain(
   return { terrain: terrains[0], terrains, warnings: baked.warnings };
 }
 
+export type PlaceBakedModelOptions = {
+  name: string;
+  gridPerWorld: number;
+  layoutAabb: MeshAabb;
+  layoutWidth: number;
+  layoutDepth: number;
+  previewBox?: ImportModelAsTerrainOptions['previewBox'];
+  /** Re-center L/U parts on `position` (single-model import). City packs skip this. */
+  assemble?: boolean;
+  isInteract?: boolean;
+};
+
+/**
+ * Place already-baked boxes using a shared grid scale. Used by single-model import
+ * and Open3Dhk city packs (one call per building, world-relative center).
+ */
+export async function placeBakedModelBoxes(
+  baked: BakedModelBoxes,
+  position: PointerCoordinate,
+  opts: PlaceBakedModelOptions,
+): Promise<Terrain[]> {
+  const viewTable = TableSelecter.instance.viewTable;
+  if (!viewTable) throw new Error('MODEL_NO_TABLE');
+  if (!baked.boxes.length) throw new Error('MODEL_BAKE_FAILED');
+
+  const fullSy = Math.max(0, baked.fullAabb.max[1] - baked.fullAabb.min[1]);
+  const height = Math.max(TERRAIN_SIZE_MIN, fullSy * opts.gridPerWorld);
+  const terrains: Terrain[] = [];
+  const bakeGroupId = baked.boxes.length > 1 ? newBakeGroupId() : '';
+  const interact = opts.isInteract !== false;
+
+  footprintDebug('placeBakedModelBoxes layout', {
+    drop: position,
+    boxCount: baked.boxes.length,
+    bakeGroupId: bakeGroupId || '(single)',
+    gridPerWorld: +opts.gridPerWorld.toFixed(6),
+    modelW: +opts.layoutWidth.toFixed(3),
+    modelD: +opts.layoutDepth.toFixed(3),
+    height: +height.toFixed(3),
+    fullAabb: footprintBoxSummary(opts.layoutAabb),
+    boxes: baked.boxes.map((b, i) => ({ i, ...footprintBoxSummary(b.aabb, opts.layoutAabb) })),
+  });
+
+  for (let i = 0; i < baked.boxes.length; i++) {
+    const box = baked.boxes[i];
+    const autoFaces = await autoPerFaceInsets(box.blobs);
+    const terrain = await createTerrainBox(box, autoFaces, {
+      baseName: opts.name,
+      index: i,
+      total: baked.boxes.length,
+      height,
+      gridPerWorld: opts.gridPerWorld,
+      fullAabb: opts.layoutAabb,
+      center: position,
+      modelW: opts.layoutWidth,
+      modelD: opts.layoutDepth,
+      cropNow: false,
+      bakeGroupId,
+      isInteract: interact,
+    });
+    viewTable.appendChild(terrain);
+    terrains.push(terrain);
+
+    if (opts.previewBox) {
+      const result = await opts.previewBox({
+        blobs: box.blobs,
+        faces: autoFaces,
+        index: i,
+        total: baked.boxes.length,
+        name: baked.boxes.length > 1 ? `${opts.name} ${i + 1}` : opts.name,
+        terrain,
+      });
+      if (result.action === 'abort') {
+        terrain.destroy();
+        terrains.pop();
+        break;
+      }
+      const faces = result.action === 'confirm' ? result.faces : autoFaces;
+      await applyBakeCropToTerrain(terrain, faces);
+    }
+  }
+
+  if (!terrains.length) throw new Error('MODEL_IMPORT_CANCELLED');
+  if (opts.assemble !== false && terrains.length > 1 && bakeGroupId) {
+    assembleBakeGroupAt(terrains, position);
+  }
+  return terrains;
+}
+
 async function createTerrainBox(
   box: BakedBox,
   faces: PerFaceInsets,
@@ -202,6 +246,7 @@ async function createTerrainBox(
     modelD: number;
     cropNow: boolean;
     bakeGroupId: string;
+    isInteract?: boolean;
   },
 ): Promise<Terrain> {
   const sourceIds = await addFaceImages(box.blobs);
@@ -221,7 +266,7 @@ async function createTerrainBox(
   terrain.mutateAppearance(() => {
     terrain.mirrorWallTop = false;
     terrain.mirrorWallLeft = false;
-    terrain.isInteract = true;
+    terrain.isInteract = layout.isInteract !== false;
   });
 
   const faceOrder: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
@@ -310,10 +355,10 @@ function isExt(file: File, re: RegExp): boolean {
   return re.test(packagePathOf(file)) || re.test(file.name || '');
 }
 
-async function bakeModelBoxes(
+export async function bakeModelBoxes(
   files: File[],
   bakeSize?: number,
-): Promise<{ boxes: BakedBox[]; fullAabb: MeshAabb; warnings: string[] }> {
+): Promise<BakedModelBoxes> {
   if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i) || isExt(f, /\.fbx$/i))) {
     const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE);
     return {
@@ -381,6 +426,11 @@ export function modelImportErrorI18nKey(err: unknown): string {
     case 'MODEL_UNSUPPORTED': return 'modelImport.error.unsupported';
     case 'MODEL_NO_TABLE': return 'modelImport.error.noTable';
     case 'MODEL_BAKE_FAILED': return 'modelImport.error.bakeFailed';
+    case 'MODEL_3D_TILES':
+    case 'CITY_PACK_3D_TILES': return 'modelImport.error.cityPackTiles';
+    case 'CITY_PACK_TOO_MANY': return 'modelImport.error.cityPackTooMany';
+    case 'CITY_PACK_PHOTOGRAMMETRY': return 'modelImport.error.cityPackPhotogrammetry';
+    case 'CITY_PACK_NO_BUILDING': return 'modelImport.error.cityPackNoBuilding';
     default: return 'modelImport.error.generic';
   }
 }

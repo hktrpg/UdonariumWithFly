@@ -21,6 +21,8 @@ import {
   importModelAsTerrain,
   modelImportErrorI18nKey,
 } from '@udonarium/terrain-model/model-terrain-import';
+import { importCityPackAsTerrain } from '@udonarium/terrain-model/city-pack-import';
+import { dropLooksLikeCityPack } from '@udonarium/terrain-model/city-pack';
 import { MODEL_MAX_FILE_BYTES } from '@udonarium/terrain-model/mesh-ir';
 import { expandModelDropFiles, isBlendFile, isZipFile, packagePathOf } from '@udonarium/terrain-model/model-package-files';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -43,7 +45,7 @@ const MAX_MODEL = MODEL_MAX_FILE_BYTES;
 
 type DropKind = NoteFileKind | 'model' | 'model-sidecar' | 'audio';
 type DropChoice =
-  | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'terrainBake' | 'mask' | 'coin' | 'library'
+  | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'terrainBake' | 'cityPack' | 'mask' | 'coin' | 'library'
   | 'tableMap' | 'tableBackground' | 'jukebox';
 
 const CLIPBOARD_EXT: Record<string, string> = {
@@ -156,17 +158,20 @@ export class TabletopFileDropService {
       const notes = accepted.filter(f => this.isNoteCapable(f, asModelPackage));
       const audios = accepted.filter(f => this.classify(f, asModelPackage) === 'audio');
       const modelFiles = asModelPackage ? accepted : [];
+      const asCityPack = asModelPackage && dropLooksLikeCityPack(accepted);
       const choices = this.buildChoices(
         images.length,
         notes.length,
         audios.length,
         accepted.length,
         modelFiles.length > 0,
+        asCityPack,
       );
       if (!choices.length) return;
 
       const defaultChoice = this.defaultChoice(choices, {
         hasModel: modelFiles.length > 0,
+        hasCityPack: asCityPack,
         imageCount: images.length,
         noteCount: notes.length,
         audioCount: audios.length,
@@ -205,9 +210,18 @@ export class TabletopFileDropService {
     audioCount: number,
     totalCount: number,
     hasModelPackage: boolean,
+    hasCityPack = false,
   ): DropCreateChoice[] {
     const choices: DropCreateChoice[] = [];
     if (hasModelPackage) {
+      if (hasCityPack) {
+        choices.push({
+          id: 'cityPack',
+          label: this.i18n.t('dropCreate.cityPack'),
+          icon: 'location_city',
+          hint: this.i18n.t('dropCreate.hint.cityPack'),
+        });
+      }
       choices.push({
         id: 'terrainBake',
         label: this.i18n.t('dropCreate.terrainBake'),
@@ -300,8 +314,9 @@ export class TabletopFileDropService {
 
   private defaultChoice(
     choices: DropCreateChoice[],
-    counts: { hasModel: boolean; imageCount: number; noteCount: number; audioCount: number },
+    counts: { hasModel: boolean; hasCityPack?: boolean; imageCount: number; noteCount: number; audioCount: number },
   ): string {
+    if (counts.hasCityPack && choices.some(c => c.id === 'cityPack')) return 'cityPack';
     if (counts.hasModel && choices.some(c => c.id === 'terrainBake')) return 'terrainBake';
     if (counts.imageCount > 0 && choices.some(c => c.id === 'token')) return 'token';
     if (counts.noteCount > 0 && choices.some(c => c.id === 'note')) return 'note';
@@ -333,6 +348,8 @@ export class TabletopFileDropService {
         return this.createTerrain(images, position);
       case 'terrainBake':
         return this.createTerrainFromModel(modelFiles.length ? modelFiles : accepted, position);
+      case 'cityPack':
+        return this.createCityPack(modelFiles.length ? modelFiles : accepted, position);
       case 'mask':
         return this.createMasks(images, position);
       case 'coin':
@@ -350,6 +367,62 @@ export class TabletopFileDropService {
     }
   }
 
+  private async createCityPack(files: File[], position: PointerCoordinate): Promise<boolean> {
+    try {
+      const result = await importCityPackAsTerrain(files, position);
+      this.syncBakedTerrains(result.terrains);
+      const extra = result.warnings.filter(w => w === 'CITY_PACK_STACKED' || w === 'CITY_PACK_TRIMMED' || w === 'CITY_PACK_SKIPPED_TILES');
+      if (extra.length) {
+        const lines = extra.map(w => {
+          if (w === 'CITY_PACK_STACKED') return this.i18n.t('modelImport.cityPackStacked');
+          if (w === 'CITY_PACK_TRIMMED') return this.i18n.t('modelImport.cityPackTrimmed');
+          return this.i18n.t('modelImport.cityPackSkippedTiles');
+        });
+        void this.modalService.open(ConfirmationComponent, {
+          title: this.i18n.t('dropCreate.cityPack'),
+          text: lines.join('\n'),
+          type: ConfirmationType.OK,
+          okLabel: this.i18n.t('common.ok'),
+        });
+      }
+      return result.terrains.length > 0;
+    } catch (err) {
+      if (err instanceof Error && err.message === 'MODEL_IMPORT_CANCELLED') return false;
+      const key = modelImportErrorI18nKey(err);
+      void this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('modelImport.errorTitle'),
+        text: this.i18n.t(key),
+        type: ConfirmationType.OK,
+        okLabel: this.i18n.t('common.ok'),
+      });
+      return false;
+    }
+  }
+
+  private syncBakedTerrains(terrains: Terrain[]): void {
+    if (terrains.length < 2) return;
+    setTimeout(() => {
+      const before = terrains.map(t => ({
+        name: t.name,
+        location: { ...t.location },
+        pose: t.getPoseForView(),
+      }));
+      for (const t of terrains) {
+        const pose = t.getPoseForView();
+        MovableDirective.syncPoseFromUndo(t, pose.x, pose.y, pose.posZ);
+      }
+      footprintDebug('fileDrop syncMovable+select', {
+        before,
+        afterPose: terrains.map(t => ({
+          name: t.name,
+          pose: t.getPoseForView(),
+        })),
+      });
+      this.selection.clear();
+      for (const t of terrains) this.selection.add(t);
+    }, 0);
+  }
+
   private async createTerrainFromModel(files: File[], position: PointerCoordinate): Promise<boolean> {
     try {
       const preview = await this.modalService.open(ConfirmationComponent, {
@@ -362,34 +435,7 @@ export class TabletopFileDropService {
       await importModelAsTerrain(files, position, {
         previewBox: preview === true ? (ctx) => this.bakeCrop.previewImportBox(ctx) : undefined,
       }).then(result => {
-        if (result.terrains.length > 1) {
-          // Sync screen poses after Angular mounts movables; select afterward so
-          // self-UPDATE while selected cannot skip the footprint layout.
-          setTimeout(() => {
-            const before = result.terrains.map(t => ({
-              name: t.name,
-              location: { ...t.location },
-              pose: t.getPoseForView(),
-            }));
-            for (const t of result.terrains) {
-              const pose = t.getPoseForView();
-              MovableDirective.syncPoseFromUndo(t, pose.x, pose.y, pose.posZ);
-            }
-            footprintDebug('fileDrop syncMovable+select', {
-              before,
-              afterPose: result.terrains.map(t => ({
-                name: t.name,
-                pose: t.getPoseForView(),
-              })),
-              poseYSpan: (() => {
-                const ys = result.terrains.map(t => t.getPoseForView().y);
-                return +(Math.max(...ys) - Math.min(...ys)).toFixed(2);
-              })(),
-            });
-            this.selection.clear();
-            for (const t of result.terrains) this.selection.add(t);
-          }, 0);
-        }
+        this.syncBakedTerrains(result.terrains);
       });
       return true;
     } catch (err) {

@@ -9,8 +9,23 @@ export const MODEL_ZIP_MAX_BYTES = 256 * 1024 * 1024;
 
 const PRIMARY_MODEL_RE = /\.(stl|obj|glb|gltf|fbx)$/i;
 const PACKAGE_MEMBER_RE = /\.(stl|obj|mtl|glb|gltf|fbx|bin|png|jpe?g|webp|gif|bmp|zip)$/i;
+const TILES_RE = /\.(b3dm|i3dm|pnts|cmpt|osgb|3tz)$/i;
 /** Marketplace packs sometimes nest model.zip inside an outer zip. */
 const NESTED_ZIP_MAX_DEPTH = 2;
+
+export type ModelExpandFlags = { saw3dTiles: boolean };
+let lastExpandFlags: ModelExpandFlags = { saw3dTiles: false };
+
+/** Flags from the most recent {@link expandModelDropFiles} call. */
+export function lastModelExpandFlags(): ModelExpandFlags {
+  return lastExpandFlags;
+}
+
+export function is3dTilesPath(path: string): boolean {
+  const n = normalizePackagePath(path || '');
+  if (/(^|\/)tileset\.json$/.test(n)) return true;
+  return TILES_RE.test(n);
+}
 
 
 type PathTaggedFile = File & { packagePath?: string };
@@ -70,12 +85,18 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
   const out: File[] = [];
   let zipWithoutModel = false;
   let sawBlendOnly = false;
+  let saw3dTiles = false;
+  if (depth === 0) lastExpandFlags = { saw3dTiles: false };
 
   for (const file of files || []) {
     // Skip bare .blend so mixed drops (glb + blend, png + blend) still proceed.
     if (isBlendFile(file)) {
       sawBlendOnly = true;
       continue;
+    }
+
+    if (is3dTilesPath(packagePathOf(file)) || is3dTilesPath(file.name || '')) {
+      saw3dTiles = true;
     }
 
     if (!isZipFile(file) && !/\.zip$/i.test(packagePathOf(file))) {
@@ -90,6 +111,7 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
       const unpacked = await unzipModelPackage(file);
       extracted = unpacked.files;
       sawBlend = unpacked.sawBlend;
+      if (unpacked.saw3dTiles) saw3dTiles = true;
     } catch (err) {
       if (err instanceof Error && err.message.startsWith('MODEL_')) throw err;
       throw new Error('MODEL_INVALID_ZIP');
@@ -105,12 +127,19 @@ export async function expandModelDropFiles(files: File[], depth = 0): Promise<Fi
       out.push(...extracted);
     } else if (sawBlend) {
       sawBlendOnly = true;
+    } else if (saw3dTiles) {
+      // tiles-only zip: no primary to keep; error after the loop
     } else {
       zipWithoutModel = true;
     }
   }
 
+  const tiles = saw3dTiles || lastExpandFlags.saw3dTiles;
+  if (depth === 0) lastExpandFlags = { saw3dTiles: tiles };
+  else if (tiles) lastExpandFlags = { saw3dTiles: true };
+
   if (out.length > 0) return out;
+  if (saw3dTiles) throw new Error('MODEL_3D_TILES');
   if (sawBlendOnly) throw new Error('MODEL_BLEND_ONLY');
   if (zipWithoutModel) throw new Error('MODEL_NO_MODEL_IN_ZIP');
   return out;
@@ -220,16 +249,21 @@ function shouldSkipZipEntry(path: string): boolean {
   return !isModelPackageMember(path);
 }
 
-async function unzipModelPackage(zipFile: File): Promise<{ files: File[]; sawBlend: boolean }> {
+async function unzipModelPackage(zipFile: File): Promise<{ files: File[]; sawBlend: boolean; saw3dTiles: boolean }> {
   const zipReader = new ZipReader(new BlobReader(zipFile));
   try {
     const entries = await zipReader.getEntries();
     const out: File[] = [];
     let sawBlend = false;
+    let saw3dTiles = false;
     for (const entry of entries || []) {
       if (entry.directory) continue;
       const rawPath = (entry.filename || '').replace(/\\/g, '/');
       const path = normalizePackagePath(rawPath);
+      if (is3dTilesPath(path)) {
+        saw3dTiles = true;
+        continue;
+      }
       if (/\.blend$/i.test(path)) {
         // Blender sources cannot be baked in-browser; detect without extracting (~tens of MB).
         sawBlend = true;
@@ -244,7 +278,7 @@ async function unzipModelPackage(zipFile: File): Promise<{ files: File[]; sawBle
       const file = new File([blob], base, { type: MimeType.type(base) });
       out.push(attachPackagePath(file, path));
     }
-    return { files: out, sawBlend };
+    return { files: out, sawBlend, saw3dTiles };
   } finally {
     await zipReader.close();
   }

@@ -3,6 +3,7 @@ import { BlobReader, BlobWriter, ZipWriter } from '@zip.js/zip.js';
 import {
   attachPackagePath,
   expandModelDropFiles,
+  lastModelExpandFlags,
   packagePathOf,
   resolvePackageFile,
 } from './model-package-files';
@@ -78,6 +79,25 @@ describe('expandModelDropFiles', () => {
     const tex = resolvePackageFile(files, 'textures/Color_001_baseColor.jpeg', 'house');
     expect(tex).toBeTruthy();
     expect(packagePathOf(tex!)).toBe('house/textures/color_001_basecolor.jpeg');
+  });
+
+  it('rejects a tiles-only zip as 3D Tiles', async () => {
+    const zip = await zipFile([
+      { name: 'tileset.json', body: '{"asset":{}}' },
+      { name: '0/0.b3dm', body: 'not-a-real-tile' },
+    ]);
+    await expectAsync(expandModelDropFiles([zip])).toBeRejectedWithError('MODEL_3D_TILES');
+    expect(lastModelExpandFlags().saw3dTiles).toBeTrue();
+  });
+
+  it('keeps individual glTF when a zip also has a tileset', async () => {
+    const zip = await zipFile([
+      { name: 'building/a.gltf', body: '{"asset":{"version":"2.0"}}' },
+      { name: 'tileset.json', body: '{"asset":{}}' },
+    ]);
+    const files = await expandModelDropFiles([zip]);
+    expect(files.some(f => f.name === 'a.gltf')).toBeTrue();
+    expect(lastModelExpandFlags().saw3dTiles).toBeTrue();
   });
 
   it('rejects a zip with no 3D model', async () => {
