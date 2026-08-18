@@ -81,9 +81,10 @@ describe('gridPerWorldForImport', () => {
   });
 
   it('still applies fit when fitGrid is true', () => {
-    const fitted = gridPerWorldForImport(aabb, 1000, true);
-    const unfitted = gridPerWorldForImport(aabb, 1000, false);
-    expect(fitted).not.toBeCloseTo(unfitted, 5);
+    const huge = { min: [0, 0, 0] as [number, number, number], max: [200000, 40000, 80000] as [number, number, number] };
+    const fitted = gridPerWorldForImport(huge, 1000, true);
+    const unfitted = gridPerWorldForImport(huge, 1000, false);
+    expect(fitted).toBeLessThan(unfitted);
   });
 });
 
