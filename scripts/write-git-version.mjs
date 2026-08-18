@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Writes src/environments/version.ts from the current git commit
- * (or GitHub Actions env when present).
+ * Writes gitignored src/environments/version.ts from the current git commit
+ * (or GITHUB_* env when present). Run via npm prestart / prebuild / postinstall —
+ * do not commit the output or push it from CI.
  *
  * Stores an ISO instant; the UI formats it in the viewer's local timezone.
  */

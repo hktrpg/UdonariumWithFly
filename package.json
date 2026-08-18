@@ -7,13 +7,14 @@
     "version:git": "node scripts/write-git-version.mjs",
     "prestart": "node scripts/write-git-version.mjs",
     "prebuild": "node scripts/write-git-version.mjs",
+    "pretest": "node scripts/write-git-version.mjs",
     "start": "ng serve --ssl --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.js",
     "build": "ng build",
     "watch": "node scripts/write-git-version.mjs && ng build --watch --configuration development",
     "test": "ng test",
-    "test:ci": "ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
-    "e2e:smoke": "playwright test",
-    "postinstall": "patch-package"
+    "test:ci": "node scripts/write-git-version.mjs && ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
+    "e2e:smoke": "node scripts/write-git-version.mjs && playwright test",
+    "postinstall": "patch-package && node scripts/write-git-version.mjs"
   },
   "private": true,
   "dependencies": {

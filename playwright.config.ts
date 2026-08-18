@@ -22,7 +22,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npx ng serve --ssl --host 127.0.0.1 --port 4200',
+    command: 'node scripts/write-git-version.mjs && npx ng serve --ssl --host 127.0.0.1 --port 4200',
     url: 'https://127.0.0.1:4200',
     reuseExistingServer: !process.env.CI,
     ignoreHTTPSErrors: true,
