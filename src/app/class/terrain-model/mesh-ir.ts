@@ -167,3 +167,18 @@ export function uniformFitScale(width: number, depth: number, height: number): n
   if (height > 1e-9) return fitted.height / height;
   return 1;
 }
+
+/**
+ * World-units → grid-units scale used by terrain import.
+ * When `fitGrid` is false (streetscape), skip the 2–40 clamp so relative distances stay linear.
+ */
+export function gridPerWorldForImport(
+  aabb: MeshAabb,
+  mmPerGrid: number,
+  fitGrid = true,
+): number {
+  const mm = Math.max(1e-6, mmPerGrid);
+  if (!fitGrid) return 1 / mm;
+  const raw = aabbToGridSize(aabb, mm);
+  return uniformFitScale(raw.width, raw.depth, raw.height) / mm;
+}

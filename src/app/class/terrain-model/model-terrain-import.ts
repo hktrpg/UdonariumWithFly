@@ -1,4 +1,5 @@
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { GameTable } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain, TerrainFaceName, TERRAIN_SIZE_MIN } from '@udonarium/terrain';
@@ -12,7 +13,7 @@ import {
   cropAllFaceBlobs,
   serializeBakeCropState,
 } from './bake-crop';
-import { newBakeGroupId, assembleBakeGroupAt, placeTerrainAt } from './bake-group';
+import { newBakeGroupId, assembleBakeGroupAt, placeTerrainAt, rotateBakeGroupBy } from './bake-group';
 import { footprintBoxSummary, footprintDebug } from './footprint-debug';
 import { splitFootprintFromPositions } from './footprint-split';
 import { parseObjPackage } from './load-obj';
@@ -25,8 +26,7 @@ import {
   MODEL_MAX_FILE_BYTES,
   MODEL_MM_PER_GRID_DEFAULT,
   MODEL_PHOTO_BAKE_SIZE,
-  aabbToGridSize,
-  uniformFitScale,
+  gridPerWorldForImport,
 } from './mesh-ir';
 import { isPrimaryModelFile, packagePathOf } from './model-package-files';
 import { BakedFaceBlobs, bakeSixOrthoFaces } from './ortho-bake';
@@ -49,6 +49,15 @@ export type ImportModelAsTerrainOptions = {
    * Skip keeps auto insets; abort stops remaining boxes.
    */
   previewBox?: (ctx: BakeBoxPreviewContext) => Promise<BakeBoxPreviewResult>;
+  /**
+   * When true (default), clamp the model into 2–40 grids.
+   * Streetscape passes false so world distances stay linear.
+   */
+  fitGrid?: boolean;
+  /** Parent map; default is the locally viewed table. */
+  parentTable?: GameTable;
+  /** Yaw in degrees applied after place (single box or bake group). */
+  yawDeg?: number;
 };
 
 export type BakeBoxPreviewContext = {
@@ -80,7 +89,7 @@ export async function importModelAsTerrain(
   position: PointerCoordinate,
   opts: ImportModelAsTerrainOptions = {},
 ): Promise<ImportModelAsTerrainResult> {
-  const viewTable = TableSelecter.instance.viewTable;
+  const viewTable = opts.parentTable || TableSelecter.instance.viewTable;
   if (!viewTable) throw new Error('MODEL_NO_TABLE');
   if (!files?.length) throw new Error('MODEL_EMPTY');
 
@@ -92,9 +101,8 @@ export async function importModelAsTerrain(
 
   const baked = await bakeModelBoxes(files, opts.bakeSize);
   const mm = opts.mmPerGrid ?? MODEL_MM_PER_GRID_DEFAULT;
-  const raw = aabbToGridSize(baked.fullAabb, mm);
-  const scale = uniformFitScale(raw.width, raw.depth, raw.height);
-  const gridPerWorld = scale / mm;
+  const fitGrid = opts.fitGrid !== false;
+  const gridPerWorld = gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
   const fullSx = Math.max(1e-9, baked.fullAabb.max[0] - baked.fullAabb.min[0]);
   const fullSz = Math.max(1e-9, baked.fullAabb.max[2] - baked.fullAabb.min[2]);
   const fullSy = Math.max(0, baked.fullAabb.max[1] - baked.fullAabb.min[1]);
@@ -159,6 +167,14 @@ export async function importModelAsTerrain(
   // Force modeled footprint layout (bar + wings), never a spaced 一字排.
   if (terrains.length > 1 && bakeGroupId) {
     assembleBakeGroupAt(terrains, position);
+  }
+  const yaw = Number(opts.yawDeg);
+  if (Number.isFinite(yaw) && yaw !== 0) {
+    if (terrains.length > 1 && bakeGroupId) {
+      rotateBakeGroupBy(terrains, yaw);
+    } else {
+      terrains[0].rotate = (terrains[0].rotate || 0) + yaw;
+    }
   }
   footprintDebug('importModelAsTerrain done', {
     n: terrains.length,

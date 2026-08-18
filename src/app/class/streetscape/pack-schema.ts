@@ -1,0 +1,138 @@
+import { STREETSCAPE_ERRORS } from './errors';
+
+export type StreetscapeQualityV1 = {
+  bakeMaxEdgePx: number;
+  fitGrid: boolean;
+  featureSort: 'distanceToOrigin' | 'manifestOrder';
+  unknownKind: 'import' | 'skip';
+};
+
+export type StreetscapeFeatureV1 = {
+  id: string;
+  kind: string;
+  path: string;
+  positionMeters: { x: number; z: number };
+  yawDeg?: number;
+  sizeMeters?: { w: number; d: number; h: number };
+};
+
+export type StreetscapePackV1 = {
+  version: 1;
+  id: string;
+  title: string;
+  attribution: string;
+  metersPerUnit: number;
+  axis?: 'y-up' | 'z-up';
+  origin: { x: number; z: number };
+  extentMeters: { width: number; depth: number };
+  floor: { path: string };
+  features: StreetscapeFeatureV1[];
+  quality?: Partial<StreetscapeQualityV1>;
+};
+
+const QUALITY_SORT = new Set(['distanceToOrigin', 'manifestOrder']);
+const UNKNOWN_KIND = new Set(['import', 'skip']);
+
+export function parseStreetscapePackV1(raw: unknown): StreetscapePackV1 {
+  if (!raw || typeof raw !== 'object') throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  const o = raw as Record<string, unknown>;
+  if (o.version !== 1) throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  const id = asNonEmptyString(o.id);
+  const title = asNonEmptyString(o.title);
+  const attribution = typeof o.attribution === 'string' ? o.attribution : '';
+  const metersPerUnit = asPositiveNumber(o.metersPerUnit);
+  const origin = asXZ(o.origin);
+  const extent = asExtent(o.extentMeters);
+  const floor = asFloor(o.floor);
+  if (!id || !title || metersPerUnit == null || !origin || !extent || !floor) {
+    throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  }
+  if (!Array.isArray(o.features) || o.features.length < 1) {
+    throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  }
+  const features = o.features.map(parseFeature);
+  const axis = o.axis === 'z-up' ? 'z-up' : 'y-up';
+  const quality = parseQualityPartial(o.quality);
+  return {
+    version: 1,
+    id,
+    title,
+    attribution,
+    metersPerUnit,
+    axis,
+    origin,
+    extentMeters: extent,
+    floor,
+    features,
+    ...(quality ? { quality } : {}),
+  };
+}
+
+function parseFeature(raw: unknown): StreetscapeFeatureV1 {
+  if (!raw || typeof raw !== 'object') throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  const o = raw as Record<string, unknown>;
+  const id = asNonEmptyString(o.id);
+  const path = asNonEmptyString(o.path);
+  const pos = asXZ(o.positionMeters);
+  if (!id || !path || !pos) throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
+  const kind = typeof o.kind === 'string' && o.kind.trim() ? o.kind.trim() : 'building';
+  const yawDeg = typeof o.yawDeg === 'number' && Number.isFinite(o.yawDeg) ? o.yawDeg : undefined;
+  const size = asSize(o.sizeMeters);
+  return { id, kind, path, positionMeters: pos, ...(yawDeg != null ? { yawDeg } : {}), ...(size ? { sizeMeters: size } : {}) };
+}
+
+function parseQualityPartial(raw: unknown): Partial<StreetscapeQualityV1> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: Partial<StreetscapeQualityV1> = {};
+  if (typeof o.bakeMaxEdgePx === 'number' && o.bakeMaxEdgePx > 0) out.bakeMaxEdgePx = o.bakeMaxEdgePx;
+  if (typeof o.fitGrid === 'boolean') out.fitGrid = o.fitGrid;
+  if (typeof o.featureSort === 'string' && QUALITY_SORT.has(o.featureSort)) {
+    out.featureSort = o.featureSort as StreetscapeQualityV1['featureSort'];
+  }
+  if (typeof o.unknownKind === 'string' && UNKNOWN_KIND.has(o.unknownKind)) {
+    out.unknownKind = o.unknownKind as StreetscapeQualityV1['unknownKind'];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function asNonEmptyString(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+function asPositiveNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+function asXZ(v: unknown): { x: number; z: number } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.x !== 'number' || !Number.isFinite(o.x)) return null;
+  if (typeof o.z !== 'number' || !Number.isFinite(o.z)) return null;
+  return { x: o.x, z: o.z };
+}
+
+function asExtent(v: unknown): { width: number; depth: number } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const width = asPositiveNumber(o.width);
+  const depth = asPositiveNumber(o.depth);
+  if (width == null || depth == null) return null;
+  return { width, depth };
+}
+
+function asFloor(v: unknown): { path: string } | null {
+  if (!v || typeof v !== 'object') return null;
+  const path = asNonEmptyString((v as Record<string, unknown>).path);
+  return path ? { path } : null;
+}
+
+function asSize(v: unknown): { w: number; d: number; h: number } | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const w = asPositiveNumber(o.w);
+  const d = asPositiveNumber(o.d);
+  const h = asPositiveNumber(o.h);
+  if (w == null || d == null || h == null) return undefined;
+  return { w, d, h };
+}

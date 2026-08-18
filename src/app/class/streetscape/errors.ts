@@ -1,0 +1,31 @@
+/** Streetscape error codes (align MODEL_* style). */
+
+export const STREETSCAPE_ERRORS = {
+  INVALID_PACK: 'STREETSCAPE_INVALID_PACK',
+  NO_MANIFEST: 'STREETSCAPE_NO_MANIFEST',
+  NO_FLOOR: 'STREETSCAPE_NO_FLOOR',
+  NO_FEATURE: 'STREETSCAPE_NO_FEATURE',
+  OVER_CAPS: 'STREETSCAPE_OVER_CAPS',
+  CANCELLED: 'STREETSCAPE_CANCELLED',
+  NOT_A_PACK: 'STREETSCAPE_NOT_A_PACK',
+  FETCH_FAILED: 'STREETSCAPE_FETCH_FAILED',
+  UNKNOWN_SOURCE: 'STREETSCAPE_UNKNOWN_SOURCE',
+  NO_QUERY: 'STREETSCAPE_NO_QUERY',
+} as const;
+
+export function streetscapeErrorI18nKey(err: unknown): string {
+  const code = err instanceof Error ? err.message : String(err || '');
+  switch (code) {
+    case STREETSCAPE_ERRORS.INVALID_PACK: return 'streetscape.error.invalidPack';
+    case STREETSCAPE_ERRORS.NO_MANIFEST: return 'streetscape.error.noManifest';
+    case STREETSCAPE_ERRORS.NO_FLOOR: return 'streetscape.error.noFloor';
+    case STREETSCAPE_ERRORS.NO_FEATURE: return 'streetscape.error.noFeature';
+    case STREETSCAPE_ERRORS.OVER_CAPS: return 'streetscape.error.overCaps';
+    case STREETSCAPE_ERRORS.CANCELLED: return 'streetscape.error.cancelled';
+    case STREETSCAPE_ERRORS.NOT_A_PACK: return 'streetscape.error.notAPack';
+    case STREETSCAPE_ERRORS.FETCH_FAILED: return 'streetscape.error.fetchFailed';
+    case STREETSCAPE_ERRORS.UNKNOWN_SOURCE: return 'streetscape.error.unknownSource';
+    case STREETSCAPE_ERRORS.NO_QUERY: return 'streetscape.error.noQuery';
+    default: return 'streetscape.error.generic';
+  }
+}

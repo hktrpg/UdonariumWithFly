@@ -1,4 +1,4 @@
-import { MODEL_BAKE_SIZE_MAX, MODEL_MAX_FILE_BYTES, fitModelGridSize, uniformFitScale, MODEL_GRID_EDGE_MAX, MODEL_GRID_EDGE_MIN } from './mesh-ir';
+import { MODEL_BAKE_SIZE_MAX, MODEL_MAX_FILE_BYTES, fitModelGridSize, uniformFitScale, gridPerWorldForImport, MODEL_GRID_EDGE_MAX, MODEL_GRID_EDGE_MIN } from './mesh-ir';
 import { MODEL_ZIP_MAX_BYTES } from './model-package-files';
 import { canvasSizeForFace, faceOrthoSize } from './ortho-face-views';
 import { createDevModelLayoutCursor, placeDevModelAndAdvance } from './dev-3dmodel-layout';
@@ -59,6 +59,31 @@ describe('placeDevModelAndAdvance', () => {
     expect(a).toEqual({ x: 10, y: 10 });
     const b = placeDevModelAndAdvance(cursor, 400, 80, 500, 20, 10);
     expect(b).toEqual({ x: 10, y: 130 });
+  });
+});
+
+describe('gridPerWorldForImport', () => {
+  const aabb = { min: [0, 0, 0] as [number, number, number], max: [10000, 2000, 4000] as [number, number, number] };
+
+  it('skips 2–40 fit when fitGrid is false so two buildings keep world spacing', () => {
+    const mm = 1000;
+    const a = gridPerWorldForImport(aabb, mm, false);
+    const b = gridPerWorldForImport({
+      min: [20000, 0, 0],
+      max: [30000, 2000, 4000],
+    }, mm, false);
+    expect(a).toBeCloseTo(1 / mm, 8);
+    expect(b).toBeCloseTo(1 / mm, 8);
+    const widthA = (10000) * a;
+    const gap = (20000 - 0) * a;
+    expect(widthA).toBeCloseTo(10, 5);
+    expect(gap).toBeCloseTo(20, 5);
+  });
+
+  it('still applies fit when fitGrid is true', () => {
+    const fitted = gridPerWorldForImport(aabb, 1000, true);
+    const unfitted = gridPerWorldForImport(aabb, 1000, false);
+    expect(fitted).not.toBeCloseTo(unfitted, 5);
   });
 });
 

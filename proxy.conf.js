@@ -105,6 +105,16 @@ module.exports = {
     pathRewrite: { '^/dev-3dmodel': '' },
     logLevel: 'info',
   },
+  '/streetscape-open3dhk': {
+    target: 'https://3d.map.gov.hk',
+    secure: true,
+    changeOrigin: true,
+    pathRewrite: { '^/streetscape-open3dhk': '/mapviewer/app/download-api' },
+    logLevel: 'info',
+    onProxyReq(proxyReq) {
+      proxyReq.setHeader('Accept', 'application/zip, application/json');
+    },
+  },
   '/v1': {
     target: 'http://127.0.0.1:8787',
     secure: false,

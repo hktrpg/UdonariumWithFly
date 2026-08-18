@@ -211,6 +211,25 @@ export class SceneNavComponent implements OnInit, OnDestroy {
     await ScenePresetList.instance.createFromCurrentAsync(title);
   }
 
+  openStreetscapeSettings(event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.isGM) return;
+    GameTableSettingComponent.pendingStreetscape = true;
+    PanelService.closePanelsByTourId('menu.table');
+    let option = {
+      width: 620,
+      height: 520,
+      left: 100,
+      title: this.i18n.t('table.title'),
+      tourPanelId: 'menu.table',
+      mobileReplace: true,
+      mobileSheet: 'half' as const,
+    };
+    option = this.mobileLayout.adaptPanelOption(option);
+    this.panelService.open(GameTableSettingComponent, option);
+  }
+
   openMapSettings(table: GameTable, event: Event) {
     event.preventDefault();
     event.stopPropagation();

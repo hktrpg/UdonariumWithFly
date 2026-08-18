@@ -1,7 +1,8 @@
 # Open3Dhk → 2.5D 街景（研究筆記）
 
 Date gathered: 2026-08-18 · Revised: 2026-08-18（架構 review 收斂 + 實作計畫）.  
-Scope: **研究／設計 only**（本輪不實作 runtime）.  
+Implemented: 2026-08-18（P0 notes + P1–P5 runtime）.  
+P0 spike: [open3dhk-spike-notes.md](./open3dhk-spike-notes.md).  
 產品遠景：GM 選街道 → 載入周邊 → 2.5D 街景.  
 硬約束：只用 `GameTable` + `Terrain` bake；嚴格 CSS 2.5D；不引入常駐城市引擎.
 
@@ -188,8 +189,10 @@ type StreetscapeFeatureV1 = {
 ```text
 tableCellsX = min(caps.maxTableCells, derivedFromExtent)
 metersPerGrid = extentMeters.width / tableCellsX
-mmPerGrid = metersPerGrid * 1000 / metersPerUnit
+mmPerGrid = metersPerGrid / metersPerUnit
 ```
+
+(`importModelAsTerrain` treats mesh units as mm; `metersPerUnit` is metres per mesh unit.)
 
 Builtin 範例（只活在 Caps／Quality 表）：`maxFeatures=8`、`bakeMaxEdgePx=512`、`fitGrid=false`.
 

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "streets": [
+    {
+      "id": "sample-nathan",
+      "title": "彌敦道（樣品街段）",
+      "street": "彌敦道",
+      "sheet": "11-SE-2C",
+      "packUrl": "assets/streetscape/sample-nathan/manifest.json",
+      "attribution": "Lands Department / Open3Dhk — sample pack (not official sheet data)"
+    }
+  ]
+}

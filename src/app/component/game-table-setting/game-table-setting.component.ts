@@ -28,6 +28,10 @@ import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { WeatherSeService } from 'service/weather-se.service';
+import { StreetscapeCatalogEntry, fetchStreetscapeCatalog } from '@udonarium/streetscape/catalog-source';
+import { streetscapeErrorI18nKey } from '@udonarium/streetscape/errors';
+import { generateStreetscape, registerBuiltinStreetscapeSources, StreetscapeProgress } from '@udonarium/streetscape/orchestrator';
+import { StreetscapeQuery } from '@udonarium/streetscape/source';
 
 @Component({
     selector: 'game-table-setting',
@@ -38,11 +42,20 @@ import { WeatherSeService } from 'service/weather-se.service';
 export class GameTableSettingComponent implements OnInit, OnDestroy {
   /** Open settings focused on this table without switching the canvas view. */
   static pendingEditTableId: string = null;
+  /** Open with the streetscape importer expanded. */
+  static pendingStreetscape = false;
 
   minSize: number = 1;
   maxSize: number = 100;
 
   isShowHideImages = false;
+
+  streetscapeBusy = false;
+  streetscapeStatus = '';
+  streetscapeCatalog: StreetscapeCatalogEntry[] = [];
+  streetscapeCatalogId = '';
+  streetscapeStreet = '';
+  streetscapeAttribution = '';
 
   get tableBackgroundImage(): ImageFile {
     return this.imageService.getEmptyOr(this.selectedTable ? this.selectedTable.imageIdentifier : null);
@@ -202,6 +215,8 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     Promise.resolve().then(() => this.refreshPanelTitle());
+    registerBuiltinStreetscapeSources();
+    void this.loadStreetscapeCatalog();
     const pending = GameTableSettingComponent.pendingEditTableId;
     GameTableSettingComponent.pendingEditTableId = null;
     if (pending) {
@@ -268,6 +283,83 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   getGameTables(): GameTable[] {
     return ObjectStore.instance.getObjects(GameTable);
+  }
+
+  async loadStreetscapeCatalog() {
+    try {
+      const catalog = await fetchStreetscapeCatalog();
+      this.streetscapeCatalog = catalog.streets;
+      this.changeDetector.markForCheck();
+    } catch {
+      this.streetscapeCatalog = [];
+    }
+  }
+
+  async onStreetscapePack(ev: Event) {
+    if (this.GuestMode() || this.streetscapeBusy) return;
+    const input = ev.target as HTMLInputElement;
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = '';
+    if (!files.length) return;
+    await this.runStreetscape({ type: 'file', files });
+  }
+
+  async createStreetscapeFromCatalog() {
+    if (this.GuestMode() || this.streetscapeBusy || !this.streetscapeCatalogId) return;
+    await this.runStreetscape({ type: 'catalog', id: this.streetscapeCatalogId });
+  }
+
+  async createStreetscapeFromStreet() {
+    if (this.GuestMode() || this.streetscapeBusy) return;
+    const q = this.streetscapeStreet.trim();
+    if (!q) return;
+    const looksLikeSheet = /^\d{1,2}-[A-Z]{2}-\d+[A-Z]?$/i.test(q);
+    await this.runStreetscape({
+      type: 'open3dhk',
+      ...(looksLikeSheet ? { sheet: q } : { street: q }),
+    });
+  }
+
+  private async runStreetscape(query: StreetscapeQuery) {
+    this.streetscapeBusy = true;
+    this.streetscapeStatus = this.i18n.t('streetscape.busy');
+    this.streetscapeAttribution = '';
+    this.changeDetector.markForCheck();
+    try {
+      const result = await generateStreetscape({
+        query,
+        onProgress: (p: StreetscapeProgress) => {
+          if (p.phase === 'estimate' && p.message) {
+            this.streetscapeStatus = this.i18n.t('streetscape.estimate', { mb: p.message.replace(' MiB', '') });
+          } else if (p.phase === 'feature') {
+            this.streetscapeStatus = this.i18n.t('streetscape.progressFeature', {
+              current: p.current,
+              total: p.total,
+            });
+          } else {
+            this.streetscapeStatus = this.i18n.t('streetscape.busy');
+          }
+          this.changeDetector.markForCheck();
+        },
+      });
+      this.selectGameTable(result.table.identifier);
+      this.streetscapeAttribution = result.attribution;
+      const warn = result.warnings.filter(Boolean).slice(0, 4).join('; ');
+      this.streetscapeStatus = warn
+        ? this.i18n.t('streetscape.warnings', { detail: warn })
+        : this.i18n.t('streetscape.done');
+    } catch (err) {
+      this.streetscapeStatus = '';
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('streetscape.errorTitle'),
+        text: this.i18n.t(streetscapeErrorI18nKey(err)),
+        type: ConfirmationType.OK,
+        materialIcon: 'error',
+      });
+    } finally {
+      this.streetscapeBusy = false;
+      this.changeDetector.markForCheck();
+    }
   }
 
   createGameTable() {
