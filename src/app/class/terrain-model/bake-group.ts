@@ -402,7 +402,8 @@ export function uniformScaleFromCornerDrag(
     ref = fallbackStart;
     startDist = Math.hypot(ref.x - anchor.x, ref.y - anchor.y);
   }
-  if (startDist < 1e-6) return 1;
+  // No usable ref (near-anchor start without geom fallback, or fallback also ≈anchor).
+  if (startDist < minStartDist) return 1;
   const curDist = Math.hypot(cur.x - anchor.x, cur.y - anchor.y);
   return Math.max(0.05, curDist / startDist);
 }

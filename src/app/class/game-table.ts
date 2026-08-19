@@ -62,6 +62,10 @@ export class GameTable extends ObjectNode {
   @SyncVar() showInNavigation: boolean = true;
   /** Non-GM players may View this table (Foundry-style scene access). */
   @SyncVar() playerCanView: boolean = true;
+  /** Pack source line (shown in settings). */
+  @SyncVar() mapAttribution: string = '';
+  /** Map-face credit kind; `landsd-open3dhk` shows LandsD logo + copyright. */
+  @SyncVar() mapCredit: string = '';
 
   gridHeight: number = 0;
   gridClipRect: {top: number, right: number, bottom: number, left: number} = null;

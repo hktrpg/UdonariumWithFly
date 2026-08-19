@@ -2,7 +2,10 @@ import { GameTable } from '@udonarium/game-table';
 import { Terrain } from '@udonarium/terrain';
 
 import { resolveStreetscapeCaps } from './caps';
-import { generateStreetscapeFromLoad } from './orchestrator';
+import {
+  generateStreetscapeFromLoad,
+  streetscapeTerrainNameMatches,
+} from './orchestrator';
 import { StreetscapePackV1 } from './pack-schema';
 import { StreetscapePackLoad } from './source';
 
@@ -21,6 +24,16 @@ const pack: StreetscapePackV1 = {
     { id: 'bad', kind: 'building', path: 'missing.stl', positionMeters: { x: 40, z: 0 } },
   ],
 };
+
+describe('streetscapeTerrainNameMatches', () => {
+  it('matches exact ids and Open3Dhk GLTF0↔GLTF product letters', () => {
+    expect(streetscapeTerrainNameMatches('b1', 'b1')).toBe(true);
+    expect(streetscapeTerrainNameMatches('B352541799701063C0', 'b352541799701063a0')).toBe(true);
+    expect(streetscapeTerrainNameMatches('b391661694001063c1', 'b391661694001063a1')).toBe(true);
+    expect(streetscapeTerrainNameMatches('b352541799701063c0', 'b352541799701063a1')).toBe(false);
+    expect(streetscapeTerrainNameMatches('b1', 'b2')).toBe(false);
+  });
+});
 
 describe('generateStreetscapeFromLoad', () => {
   it('places two buildings with world spacing and skips a failed feature', async () => {
@@ -48,6 +61,8 @@ describe('generateStreetscapeFromLoad', () => {
 
     expect(result.table.name).toBe('Sample street');
     expect(result.attribution).toContain('Open3Dhk');
+    expect(result.table.mapCredit).toBe('landsd-open3dhk');
+    expect(result.table.mapAttribution).toContain('Open3Dhk');
     expect(placed.map(p => p.name)).toEqual(['a', 'b']);
     const grid = result.table.gridSize || 50;
     expect((placed[1].x - placed[0].x) / grid).toBeCloseTo(20, 5);

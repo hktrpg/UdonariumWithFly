@@ -26,7 +26,8 @@ describe('parseStreetscapePackV1', () => {
     expect(() => parseStreetscapePackV1({ ...valid, floor: {} })).toThrowError(STREETSCAPE_ERRORS.INVALID_PACK);
   });
 
-  it('rejects empty features', () => {
-    expect(() => parseStreetscapePackV1({ ...valid, features: [] })).toThrowError(STREETSCAPE_ERRORS.INVALID_PACK);
+  it('accepts empty features for map-only packs', () => {
+    const pack = parseStreetscapePackV1({ ...valid, features: [] });
+    expect(pack.features.length).toBe(0);
   });
 });

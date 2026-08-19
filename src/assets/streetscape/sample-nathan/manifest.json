@@ -2,7 +2,7 @@
   "version": 1,
   "id": "sample-nathan",
   "title": "彌敦道（樣品街段）",
-  "attribution": "Lands Department / Open3Dhk — sample pack (not official sheet data)",
+  "attribution": "Synthetic demo geometry (not official LandsD / Open3Dhk sheet data)",
   "metersPerUnit": 1,
   "axis": "y-up",
   "origin": { "x": 0, "z": 0 },
@@ -12,14 +12,14 @@
     {
       "id": "b1",
       "kind": "building",
-      "path": "b1.stl",
+      "path": "b1.obj",
       "positionMeters": { "x": 10, "z": 8 },
       "sizeMeters": { "w": 12, "d": 10, "h": 24 }
     },
     {
       "id": "b2",
       "kind": "building",
-      "path": "b2.stl",
+      "path": "b2.obj",
       "positionMeters": { "x": 36, "z": 8 },
       "sizeMeters": { "w": 12, "d": 10, "h": 20 }
     }

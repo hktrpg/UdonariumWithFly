@@ -15,13 +15,12 @@ export function estimateSyncMiB(featureCount: number, quality: StreetscapeQualit
   return (Math.max(0, featureCount) * estimateFeatureSyncBytes(quality, caps)) / MEGA;
 }
 
+/** Honor requested count (no hard feature / sync-byte cap). */
 export function maxFeaturesForSyncBudget(
   wanted: number,
-  quality: StreetscapeQualityV1,
-  caps: StreetscapeCapsV1,
+  _quality: StreetscapeQualityV1,
+  _caps: StreetscapeCapsV1,
 ): number {
-  const per = estimateFeatureSyncBytes(quality, caps);
-  const budget = Math.max(0, caps.maxEstimatedSyncMiB) * MEGA;
-  const byBytes = per > 0 ? Math.floor(budget / per) : wanted;
-  return Math.max(0, Math.min(wanted, caps.maxFeatures, byBytes));
+  if (!Number.isFinite(wanted) || wanted <= 0) return 0;
+  return Math.floor(wanted);
 }

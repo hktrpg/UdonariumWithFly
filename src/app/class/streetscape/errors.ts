@@ -11,6 +11,7 @@ export const STREETSCAPE_ERRORS = {
   FETCH_FAILED: 'STREETSCAPE_FETCH_FAILED',
   UNKNOWN_SOURCE: 'STREETSCAPE_UNKNOWN_SOURCE',
   NO_QUERY: 'STREETSCAPE_NO_QUERY',
+  NO_STREET_MATCH: 'STREETSCAPE_NO_STREET_MATCH',
 } as const;
 
 export function isStreetscapeAbort(err: unknown): boolean {
@@ -34,6 +35,7 @@ export function streetscapeErrorI18nKey(err: unknown): string {
     case STREETSCAPE_ERRORS.FETCH_FAILED: return 'streetscape.error.fetchFailed';
     case STREETSCAPE_ERRORS.UNKNOWN_SOURCE: return 'streetscape.error.unknownSource';
     case STREETSCAPE_ERRORS.NO_QUERY: return 'streetscape.error.noQuery';
+    case STREETSCAPE_ERRORS.NO_STREET_MATCH: return 'streetscape.error.noStreetMatch';
     default: return 'streetscape.error.generic';
   }
 }

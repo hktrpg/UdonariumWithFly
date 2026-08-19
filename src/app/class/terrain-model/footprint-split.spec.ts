@@ -55,6 +55,28 @@ describe('splitFootprintFromPositions', () => {
     expect(boxes.length).toBe(1);
   });
 
+  it('keeps a hollow building shell as one box (not wall strips)', () => {
+    // Open3Dhk-style: only outer walls + roof rim — XZ raster is a thin ring.
+    const walls = concat(
+      concat(
+        boxPositions(0, 10, 0, 8, 0, 0.4),
+        boxPositions(0, 10, 0, 8, 9.6, 10),
+      ),
+      concat(
+        boxPositions(0, 0.4, 0, 8, 0, 10),
+        boxPositions(9.6, 10, 0, 8, 0, 10),
+      ),
+    );
+    const roof = boxPositions(0, 10, 7.5, 8, 0, 10);
+    const aabb: MeshAabb = { min: [0, 0, 0], max: [10, 8, 10] };
+    const boxes = splitFootprintFromPositions(concat(walls, roof), aabb, { maxBoxes: 3 });
+    expect(boxes.length).toBe(1);
+    const dx = boxes[0].max[0] - boxes[0].min[0];
+    const dz = boxes[0].max[2] - boxes[0].min[2];
+    expect(dx).toBeGreaterThan(8);
+    expect(dz).toBeGreaterThan(8);
+  });
+
   it('does not emit dust boxes from a speckled L', () => {
     // Classic L plus a few tiny islands that used to become leftover pads.
     const stem = boxPositions(0, 4, 0, 5, 0, 10);

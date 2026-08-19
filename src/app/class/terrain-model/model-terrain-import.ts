@@ -58,6 +58,11 @@ export type ImportModelAsTerrainOptions = {
   parentTable?: GameTable;
   /** Yaw in degrees applied after place (single box or bake group). */
   yawDeg?: number;
+  /**
+   * Multiply / replace glTF material color before photo-bake.
+   * Used for Open3Dhk GLTF0 (official vertex colors are flat gray).
+   */
+  colorTint?: { r: number; g: number; b: number };
 };
 
 export type BakeBoxPreviewContext = {
@@ -99,7 +104,7 @@ export async function importModelAsTerrain(
     }
   }
 
-  const baked = await bakeModelBoxes(files, opts.bakeSize);
+  const baked = await bakeModelBoxes(files, opts.bakeSize, opts.colorTint);
   const mm = opts.mmPerGrid ?? MODEL_MM_PER_GRID_DEFAULT;
   const fitGrid = opts.fitGrid !== false;
   const gridPerWorld = gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
@@ -329,9 +334,10 @@ function isExt(file: File, re: RegExp): boolean {
 async function bakeModelBoxes(
   files: File[],
   bakeSize?: number,
+  colorTint?: { r: number; g: number; b: number },
 ): Promise<{ boxes: BakedBox[]; fullAabb: MeshAabb; warnings: string[] }> {
   if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i) || isExt(f, /\.fbx$/i))) {
-    const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE);
+    const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE, { colorTint });
     return {
       boxes: photo.boxes?.length ? photo.boxes : [{ blobs: photo.blobs, aabb: photo.aabb }],
       fullAabb: photo.fullAabb || photo.aabb,

@@ -20,18 +20,16 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { StreetscapeImportComponent } from 'component/streetscape-import/streetscape-import.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ImageService } from 'service/image.service';
 import { I18nService } from 'service/i18n.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { WeatherSeService } from 'service/weather-se.service';
-import { StreetscapeCatalogEntry, fetchStreetscapeCatalog } from '@udonarium/streetscape/catalog-source';
-import { streetscapeErrorI18nKey } from '@udonarium/streetscape/errors';
-import { generateStreetscape, registerBuiltinStreetscapeSources, StreetscapeProgress } from '@udonarium/streetscape/orchestrator';
-import { StreetscapeQuery } from '@udonarium/streetscape/source';
 
 @Component({
     selector: 'game-table-setting',
@@ -42,20 +40,11 @@ import { StreetscapeQuery } from '@udonarium/streetscape/source';
 export class GameTableSettingComponent implements OnInit, OnDestroy {
   /** Open settings focused on this table without switching the canvas view. */
   static pendingEditTableId: string = null;
-  /** Open with the streetscape importer expanded. */
-  static pendingStreetscape = false;
 
   minSize: number = 1;
   maxSize: number = 100;
 
   isShowHideImages = false;
-
-  streetscapeBusy = false;
-  streetscapeStatus = '';
-  streetscapeCatalog: StreetscapeCatalogEntry[] = [];
-  streetscapeCatalogId = '';
-  streetscapeStreet = '';
-  streetscapeAttribution = '';
 
   get tableBackgroundImage(): ImageFile {
     return this.imageService.getEmptyOr(this.selectedTable ? this.selectedTable.imageIdentifier : null);
@@ -206,6 +195,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private chatMessageService: ChatMessageService,
     private i18n: I18nService,
     private weatherSe: WeatherSeService,
+    private mobileLayout: MobileLayoutService,
   ) { }
 
   GuestMode() {
@@ -215,9 +205,6 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     Promise.resolve().then(() => this.refreshPanelTitle());
-    registerBuiltinStreetscapeSources();
-    GameTableSettingComponent.pendingStreetscape = false;
-    void this.loadStreetscapeCatalog();
     const pending = GameTableSettingComponent.pendingEditTableId;
     GameTableSettingComponent.pendingEditTableId = null;
     if (pending) {
@@ -244,6 +231,22 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   private refreshPanelTitle() {
     this.modalService.title = this.panelService.title = this.i18n.t('table.title');
+  }
+
+  openStreetscapeImport() {
+    if (!this.canActivate) return;
+    PanelService.closePanelsByTourId('panel.streetscape-import');
+    let option = {
+      width: 360,
+      height: 520,
+      left: 100,
+      title: this.i18n.t('streetscape.title'),
+      tourPanelId: 'panel.streetscape-import',
+      mobileReplace: true,
+      mobileSheet: 'half' as const,
+    };
+    option = this.mobileLayout.adaptPanelOption(option);
+    this.panelService.open(StreetscapeImportComponent, option);
   }
 
   selectGameTable(identifier: string) {
@@ -284,83 +287,6 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   getGameTables(): GameTable[] {
     return ObjectStore.instance.getObjects(GameTable);
-  }
-
-  async loadStreetscapeCatalog() {
-    try {
-      const catalog = await fetchStreetscapeCatalog();
-      this.streetscapeCatalog = catalog.streets;
-      this.changeDetector.markForCheck();
-    } catch {
-      this.streetscapeCatalog = [];
-    }
-  }
-
-  async onStreetscapePack(ev: Event) {
-    if (!this.canActivate || this.streetscapeBusy) return;
-    const input = ev.target as HTMLInputElement;
-    const files = input.files ? Array.from(input.files) : [];
-    input.value = '';
-    if (!files.length) return;
-    await this.runStreetscape({ type: 'file', files });
-  }
-
-  async createStreetscapeFromCatalog() {
-    if (!this.canActivate || this.streetscapeBusy || !this.streetscapeCatalogId) return;
-    await this.runStreetscape({ type: 'catalog', id: this.streetscapeCatalogId });
-  }
-
-  async createStreetscapeFromStreet() {
-    if (!this.canActivate || this.streetscapeBusy) return;
-    const q = this.streetscapeStreet.trim();
-    if (!q) return;
-    const looksLikeSheet = /^\d{1,2}-[A-Z]{2}-\d+[A-Z]?$/i.test(q);
-    await this.runStreetscape({
-      type: 'open3dhk',
-      ...(looksLikeSheet ? { sheet: q } : { street: q }),
-    });
-  }
-
-  private async runStreetscape(query: StreetscapeQuery) {
-    this.streetscapeBusy = true;
-    this.streetscapeStatus = this.i18n.t('streetscape.busy');
-    this.streetscapeAttribution = '';
-    this.changeDetector.markForCheck();
-    try {
-      const result = await generateStreetscape({
-        query,
-        onProgress: (p: StreetscapeProgress) => {
-          if (p.phase === 'estimate' && p.mb != null) {
-            this.streetscapeStatus = this.i18n.t('streetscape.estimate', { mb: p.mb.toFixed(1) });
-          } else if (p.phase === 'feature') {
-            this.streetscapeStatus = this.i18n.t('streetscape.progressFeature', {
-              current: p.current,
-              total: p.total,
-            });
-          } else {
-            this.streetscapeStatus = this.i18n.t('streetscape.busy');
-          }
-          this.changeDetector.markForCheck();
-        },
-      });
-      this.selectGameTable(result.table.identifier);
-      this.streetscapeAttribution = result.attribution;
-      const warn = result.warnings.filter(Boolean).slice(0, 4).join('; ');
-      this.streetscapeStatus = warn
-        ? this.i18n.t('streetscape.warnings', { detail: warn })
-        : this.i18n.t('streetscape.done');
-    } catch (err) {
-      this.streetscapeStatus = '';
-      await this.modalService.open(ConfirmationComponent, {
-        title: this.i18n.t('streetscape.errorTitle'),
-        text: this.i18n.t(streetscapeErrorI18nKey(err)),
-        type: ConfirmationType.OK,
-        materialIcon: 'error',
-      });
-    } finally {
-      this.streetscapeBusy = false;
-      this.changeDetector.markForCheck();
-    }
   }
 
   createGameTable() {

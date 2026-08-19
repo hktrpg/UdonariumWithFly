@@ -13,6 +13,8 @@
     "watch": "node scripts/write-git-version.mjs && ng build --watch --configuration development",
     "test": "ng test",
     "test:ci": "node scripts/write-git-version.mjs && ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
+    "streetscape:streets": "python scripts/streetscape/build-hk-street-sheets.py",
+    "streetscape:streets:overrides": "python scripts/streetscape/build-hk-street-sheets.py --overrides-only",
     "e2e:smoke": "node scripts/write-git-version.mjs && playwright test",
     "postinstall": "patch-package && node scripts/write-git-version.mjs"
   },

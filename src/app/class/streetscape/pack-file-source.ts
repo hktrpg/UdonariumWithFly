@@ -36,6 +36,7 @@ export const packFileSource: StreetscapeSource = {
 export function createPackLoad(pack: StreetscapePackV1, files: File[]): StreetscapePackLoad {
   return {
     pack,
+    files: files.slice(),
     async openFeature(id: string, signal?: AbortSignal): Promise<File[]> {
       throwIfAborted(signal);
       const feature = pack.features.find(f => f.id === id);

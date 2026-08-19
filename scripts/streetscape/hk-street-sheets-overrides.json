@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "zh": "石崗上村",
+      "en": "Shek Kong Sheung Tsuen",
+      "sheet": "6-NE-13D",
+      "kind": "place"
+    },
+    {
+      "zh": "尖沙咀",
+      "en": "Tsim Sha Tsui",
+      "sheet": "11-SW-4B",
+      "kind": "place"
+    },
+    {
+      "zh": "彌敦道",
+      "en": "Nathan Road",
+      "sheet": "11-SW-4B",
+      "kind": "street"
+    }
+  ]
+}

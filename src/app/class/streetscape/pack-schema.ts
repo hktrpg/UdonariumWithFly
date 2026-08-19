@@ -47,9 +47,10 @@ export function parseStreetscapePackV1(raw: unknown): StreetscapePackV1 {
   if (!id || !title || metersPerUnit == null || !origin || !extent || !floor) {
     throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
   }
-  if (!Array.isArray(o.features) || o.features.length < 1) {
+  if (!Array.isArray(o.features)) {
     throw new Error(STREETSCAPE_ERRORS.INVALID_PACK);
   }
+  // Empty features allowed for map-only (floor) packs; facades can be appended later.
   const features = o.features.map(parseFeature);
   const axis = o.axis === 'z-up' ? 'z-up' : 'y-up';
   const quality = parseQualityPartial(o.quality);

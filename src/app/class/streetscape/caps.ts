@@ -14,7 +14,8 @@ export type StreetscapeCapsV1 = {
 };
 
 export const BUILTIN_STREETSCAPE_CAPS: StreetscapeCapsV1 = {
-  maxFeatures: 8,
+  /** Soft host default only — UI / query may request more; not a hard clamp. */
+  maxFeatures: Number.MAX_SAFE_INTEGER,
   maxEstimatedSyncMiB: 48,
   maxTableCells: GAME_TABLE_SIZE_MAX,
   maxImageBytes: IMAGE_STORED_MAX_BYTES,

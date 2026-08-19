@@ -1,9 +1,14 @@
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 
 const MODEL_DIR = path.resolve(__dirname, 'out-tsc', '3dmodel');
 const LISTEN_PORT = 47821;
+/** Local Range-capable relay → LandsD Open3Dhk ZIP CDN (avoids broken webpack HTTPS proxy). */
+const OPEN3DHK_RELAY_PORT = 47822;
+const OPEN3DHK_UPSTREAM_HOST = 'download.map.gov.hk';
+const OPEN3DHK_UPSTREAM_PREFIX = '/api/3d-zip';
 
 function isSafeBasename(name) {
   return !!name && !name.includes('..') && !name.includes('/') && !name.includes('\\');
@@ -95,7 +100,107 @@ function startDev3dmodelServer() {
   g.__udonariumDev3dmodelServer = server;
 }
 
+/**
+ * Same-origin Open3Dhk ZIP relay with HTTP Range.
+ * webpack-dev-server's HTTPS proxy to download.map.gov.hk was returning a ~7 KiB
+ * mapviewer HTML page instead of the multi‑GB sheet ZIP; Node https works fine.
+ */
+function isOpen3dhkZipPath(pathname) {
+  // /GLTF/11-SW-4B.zip or /GLTF0/11-SW-4B.zip
+  return /^\/(GLTF|GLTF0)\/[^/]+\.zip$/i.test(pathname);
+}
+
+function handleOpen3dhkRelay(req, res) {
+  const url = new URL(req.url || '/', 'http://127.0.0.1');
+  const pathname = decodeURIComponent(url.pathname);
+  if (!isOpen3dhkZipPath(pathname)) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('bad open3dhk path');
+    return;
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { Allow: 'GET, HEAD' });
+    res.end('method not allowed');
+    return;
+  }
+
+  const upstreamPath = `${OPEN3DHK_UPSTREAM_PREFIX}${pathname}`;
+  const headers = {
+    Host: OPEN3DHK_UPSTREAM_HOST,
+    Accept: 'application/zip, application/octet-stream, */*',
+    'User-Agent': 'UdonariumWithFly-open3dhk-relay',
+  };
+  if (req.headers.range) headers.Range = req.headers.range;
+
+  console.log('[open3dhk-relay]', req.method, pathname, {
+    range: req.headers.range || null,
+    upstream: upstreamPath,
+  });
+
+  const upstream = https.request(
+    {
+      hostname: OPEN3DHK_UPSTREAM_HOST,
+      path: upstreamPath,
+      method: req.method,
+      headers,
+    },
+    (up) => {
+      console.log('[open3dhk-relay] ←', {
+        status: up.statusCode,
+        contentType: up.headers['content-type'] || null,
+        contentLength: up.headers['content-length'] || null,
+        contentRange: up.headers['content-range'] || null,
+        acceptRanges: up.headers['accept-ranges'] || null,
+      });
+      const outHeaders = {
+        'Content-Type': up.headers['content-type'] || 'application/zip',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Expose-Headers':
+          'Accept-Ranges, Content-Range, Content-Length, Content-Type',
+      };
+      if (up.headers['content-length']) outHeaders['Content-Length'] = up.headers['content-length'];
+      if (up.headers['content-range']) outHeaders['Content-Range'] = up.headers['content-range'];
+      if (up.headers['accept-ranges']) outHeaders['Accept-Ranges'] = up.headers['accept-ranges'];
+      else outHeaders['Accept-Ranges'] = 'bytes';
+      res.writeHead(up.statusCode || 502, outHeaders);
+      if (req.method === 'HEAD') {
+        up.resume();
+        res.end();
+        return;
+      }
+      up.pipe(res);
+    },
+  );
+  upstream.on('error', (err) => {
+    console.error('[open3dhk-relay]', err);
+    if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('upstream error');
+  });
+  upstream.end();
+}
+
+function startOpen3dhkRelayServer() {
+  const g = globalThis;
+  if (g.__udonariumOpen3dhkRelayServer) return;
+  const server = http.createServer(handleOpen3dhkRelay);
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[open3dhk-relay] port ${OPEN3DHK_RELAY_PORT} in use; reusing existing server`);
+      return;
+    }
+    console.error('[open3dhk-relay]', err);
+  });
+  server.listen(OPEN3DHK_RELAY_PORT, '127.0.0.1', () => {
+    console.log(
+      `[open3dhk-relay] http://127.0.0.1:${OPEN3DHK_RELAY_PORT} → https://${OPEN3DHK_UPSTREAM_HOST}${OPEN3DHK_UPSTREAM_PREFIX}`,
+    );
+  });
+  g.__udonariumOpen3dhkRelayServer = server;
+}
+
 startDev3dmodelServer();
+startOpen3dhkRelayServer();
 
 module.exports = {
   '/dev-3dmodel': {
@@ -106,14 +211,11 @@ module.exports = {
     logLevel: 'info',
   },
   '/streetscape-open3dhk': {
-    target: 'https://3d.map.gov.hk',
-    secure: true,
+    target: `http://127.0.0.1:${OPEN3DHK_RELAY_PORT}`,
+    secure: false,
     changeOrigin: true,
-    pathRewrite: { '^/streetscape-open3dhk': '/mapviewer/app/download-api' },
+    pathRewrite: { '^/streetscape-open3dhk': '' },
     logLevel: 'info',
-    onProxyReq(proxyReq) {
-      proxyReq.setHeader('Accept', 'application/zip, application/json');
-    },
   },
   '/v1': {
     target: 'http://127.0.0.1:8787',
