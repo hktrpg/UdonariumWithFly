@@ -59,6 +59,28 @@ describe('RoomConnectHelper settle predicates', () => {
     expect(RoomConnectHelper.isJoinTabletopData('table-selecter')).toBeFalse();
   });
 
+  it('extends join-data wait while meshed instead of aborting', () => {
+    expect(RoomConnectHelper.shouldExtendJoinDataWait(0)).toBeFalse();
+    expect(RoomConnectHelper.shouldExtendJoinDataWait(1)).toBeTrue();
+  });
+
+  it('resetIfAlone is a no-op (join probe must not kick)', () => {
+    const leave = spyOn(RoomConnectHelper, 'resetToLobby');
+    RoomConnectHelper.resetIfAlone();
+    expect(leave).not.toHaveBeenCalled();
+  });
+
+  it('filterLobbyRooms hides suppressed rooms', () => {
+    RoomConnectHelper.clearLobbyRoomSuppression();
+    RoomConnectHelper.suppressLobbyRoom('Ab1', 'TestRoom');
+    const filtered = RoomConnectHelper.filterLobbyRooms([
+      { id: 'Ab1', name: 'TestRoom' },
+      { id: 'Cd2', name: 'Other' },
+    ]);
+    expect(filtered).toEqual([{ id: 'Cd2', name: 'Other' }]);
+    RoomConnectHelper.clearLobbyRoomSuppression();
+  });
+
   it('maps join fail reasons to lobby i18n key prefixes', () => {
     expect(RoomConnectHelper.joinFailMessageKey('all_targets_failed')).toBe('lobby.staleRoom');
     expect(RoomConnectHelper.joinFailMessageKey('no_tabletop_data')).toBe('lobby.joinDataTimeout');
@@ -162,6 +184,7 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
 describe('RoomConnectHelper.openAndConnect', () => {
   let openPeers: IPeerContext[];
   let resetSpy: jasmine.Spy;
+  let abandonSpy: jasmine.Spy;
   const prevStableMs = RoomConnectHelper.JOIN_STABLE_MS;
   const prevDataMs = RoomConnectHelper.JOIN_DATA_MS;
   const prevQuiesceMs = RoomConnectHelper.JOIN_QUIESCE_MS;
@@ -170,22 +193,27 @@ describe('RoomConnectHelper.openAndConnect', () => {
     RoomConnectHelper.JOIN_STABLE_MS = 0;
     RoomConnectHelper.JOIN_DATA_MS = 0;
     RoomConnectHelper.JOIN_QUIESCE_MS = 0;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 0;
     RoomConnectHelper.lastJoinFailReason = '';
+    RoomConnectHelper.clearLobbyRoomSuppression();
     openPeers = [];
     spyOn(Network, 'open');
     spyOn(Network, 'connect').and.returnValue(true);
     spyOnProperty(Network, 'peers', 'get').and.callFake(() => openPeers);
-    spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self' } as IPeerContext);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self', isRoom: true } as IPeerContext);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     spyOn(Room, 'clearLocalTabletopForJoin');
     resetSpy = spyOn(RoomConnectHelper, 'resetToLobby');
+    abandonSpy = spyOn(RoomConnectHelper, 'abandonFailedJoinProbe').and.callThrough();
   });
   afterEach(() => {
     RoomConnectHelper.JOIN_STABLE_MS = prevStableMs;
     RoomConnectHelper.JOIN_DATA_MS = prevDataMs;
     RoomConnectHelper.JOIN_QUIESCE_MS = prevQuiesceMs;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 0;
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.lastJoinFailReason = '';
+    RoomConnectHelper.clearLobbyRoomSuppression();
   });
 
   it('resolves true on first CONNECT_PEER without waiting for remaining targets', async () => {
@@ -218,8 +246,27 @@ describe('RoomConnectHelper.openAndConnect', () => {
     expect(Room.clearLocalTabletopForJoin).toHaveBeenCalledTimes(1);
   });
 
-  it('fails quickly when a live peer never sends a game-table', async () => {
+  it('extends data wait while meshed, then succeeds when game-table arrives late', async () => {
     RoomConnectHelper.JOIN_DATA_MS = 40;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 5000;
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('live')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    openPeers = [peer('live')];
+    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
+    hostCatalog('live');
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(Room.clearLocalTabletopForJoin).not.toHaveBeenCalled();
+
+    hostTabletop('live');
+    await expectAsync(result).toBeResolvedTo(true);
+    expect(resetSpy).not.toHaveBeenCalled();
+  });
+
+  it('on overall timeout while meshed stays in room (never kicks self)', async () => {
+    RoomConnectHelper.JOIN_DATA_MS = 40;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 120;
     const result = RoomConnectHelper.openAndConnect(room, '', [peer('live')]);
 
     EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
@@ -227,30 +274,50 @@ describe('RoomConnectHelper.openAndConnect', () => {
     EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
     hostCatalog('live');
 
-    await expectAsync(result).toBeResolvedTo(false);
-    expect(resetSpy).toHaveBeenCalled();
-    expect(RoomConnectHelper.lastJoinFailReason).toBe('no_tabletop_data');
-    expect(Room.clearLocalTabletopForJoin).not.toHaveBeenCalled();
+    await expectAsync(result).toBeResolvedTo(true);
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(Room.clearLocalTabletopForJoin).toHaveBeenCalled();
   });
 
-  it('resets the data deadline when a later peer connects after a ghost', async () => {
-    RoomConnectHelper.JOIN_DATA_MS = 80;
-    const result = RoomConnectHelper.openAndConnect(room, '', [peer('ghost'), peer('live')]);
+  it('aborts missing tabletop only after becoming alone', async () => {
+    RoomConnectHelper.JOIN_DATA_MS = 40;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 5000;
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('live')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    openPeers = [peer('live')];
+    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
+    await new Promise<void>(resolve => setTimeout(resolve, 60));
+    expect(resetSpy).not.toHaveBeenCalled();
+
+    openPeers = [];
+    EventSystem.trigger('DISCONNECT_PEER', { peerId: 'live' });
+    await expectAsync(result).toBeResolvedTo(false);
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(abandonSpy).toHaveBeenCalled();
+    expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeTrue();
+    expect(RoomConnectHelper.lastJoinFailReason).toBe('all_targets_failed');
+  });
+
+  it('fails no_tabletop_data when alone after soft slices', async () => {
+    RoomConnectHelper.JOIN_DATA_MS = 40;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 5000;
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('ghost')]);
 
     EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
     openPeers = [peer('ghost')];
     EventSystem.trigger('CONNECT_PEER', { peerId: 'ghost' });
-    await new Promise<void>(resolve => setTimeout(resolve, 50));
-    openPeers = [peer('live')];
-    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
-    await new Promise<void>(resolve => setTimeout(resolve, 50));
-    hostTabletop('live');
-
-    await expectAsync(result).toBeResolvedTo(true);
+    await new Promise<void>(resolve => setTimeout(resolve, 20));
+    openPeers = [];
+    EventSystem.trigger('DISCONNECT_PEER', { peerId: 'ghost' });
+    await expectAsync(result).toBeResolvedTo(false);
     expect(resetSpy).not.toHaveBeenCalled();
+    expect(abandonSpy).toHaveBeenCalled();
+    expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeTrue();
+    expect(['no_tabletop_data', 'all_targets_failed']).toContain(RoomConnectHelper.lastJoinFailReason);
   });
 
-  it('resolves false and resets when all targets fail while alone', async () => {
+  it('resolves false and suppresses room when all targets fail while alone', async () => {
     (Network.connect as jasmine.Spy).and.returnValue(false);
     const targets = [peer('a'), peer('b')];
     const result = RoomConnectHelper.openAndConnect(room, '', targets);
@@ -258,8 +325,10 @@ describe('RoomConnectHelper.openAndConnect', () => {
     EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
 
     await expectAsync(result).toBeResolvedTo(false);
-    expect(resetSpy).toHaveBeenCalled();
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(abandonSpy).toHaveBeenCalled();
     expect(RoomConnectHelper.lastJoinFailReason).toBe('all_targets_failed');
+    expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeTrue();
     expect(Room.clearLocalTabletopForJoin).not.toHaveBeenCalled();
   });
 
@@ -281,7 +350,7 @@ describe('RoomConnectHelper.openAndConnect', () => {
     expect(resetSpy).not.toHaveBeenCalled();
   });
 
-  it('fails join and resets when the only peer is a ghost that drops', async () => {
+  it('fails join and suppresses room when the only peer is a ghost that drops', async () => {
     RoomConnectHelper.JOIN_STABLE_MS = 50;
     const targets = [peer('ghost')];
     const result = RoomConnectHelper.openAndConnect(room, '', targets);
@@ -293,7 +362,9 @@ describe('RoomConnectHelper.openAndConnect', () => {
     EventSystem.trigger('DISCONNECT_PEER', { peerId: 'ghost' });
 
     await expectAsync(result).toBeResolvedTo(false);
-    expect(resetSpy).toHaveBeenCalled();
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(abandonSpy).toHaveBeenCalled();
+    expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeTrue();
     expect(Room.clearLocalTabletopForJoin).not.toHaveBeenCalled();
   });
 });

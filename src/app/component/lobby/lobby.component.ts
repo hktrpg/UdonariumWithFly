@@ -147,7 +147,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     }
     if (this.destroyed) return;
     this.ngZone.run(() => {
-      this.rooms = rooms;
+      this.rooms = RoomConnectHelper.filterLobbyRooms(rooms);
       this.help = this.i18n.t('lobby.helpEmpty');
       this.isReloading = false;
       this.scheduleAutoRefresh();

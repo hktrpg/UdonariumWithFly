@@ -28,16 +28,57 @@ export class RoomConnectHelper {
   private static readonly REMESH_PEER_WAIT_MS = 5000;
   /** Ghost SkyWay members often CONNECT then drop; require they stay up this long. */
   static JOIN_STABLE_MS = 1500;
-  /** After CONNECT, fail the probe if no game-table data arrives (ghost / empty room). */
+  /**
+   * Soft join-data slice: after each CONNECT / extend, wait this long for game-table.
+   * While still meshed (open peers), missing data extends another slice instead of aborting.
+   * Hard ceiling remains CONNECT_TIMEOUT_MS.
+   */
   static JOIN_DATA_MS = 8000;
   /** After the first game-table, wait for child UPDATEs to queue before switching maps. */
   static JOIN_QUIESCE_MS = 400;
+  /** Overall join probe ceiling (tests may shorten). */
+  static CONNECT_TIMEOUT_MS_FOR_TEST = 0; // 0 = use CONNECT_TIMEOUT_MS
   /** Probe join in progress: keep lobby/tabletop until a live peer + tabletop is confirmed. */
   static joinInProgress = false;
   /** Last failed join probe reason for lobby / invite messaging. */
   static lastJoinFailReason = '';
+  /** Lobby rooms to hide after a failed join probe (ghost / unreachable). */
+  private static readonly suppressedLobbyRooms = new Set<string>();
   /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
   private static reopenInFlight = false;
+
+  private static lobbyRoomKey(roomId: string, roomName: string): string {
+    return `${roomId}\n${roomName}`;
+  }
+
+  /** Hide a room from the lobby list (does not disconnect anyone). */
+  static suppressLobbyRoom(roomId: string, roomName: string) {
+    if (!roomId || !roomName) return;
+    RoomConnectHelper.suppressedLobbyRooms.add(RoomConnectHelper.lobbyRoomKey(roomId, roomName));
+  }
+
+  static isLobbyRoomSuppressed(roomId: string, roomName: string): boolean {
+    return RoomConnectHelper.suppressedLobbyRooms.has(RoomConnectHelper.lobbyRoomKey(roomId, roomName));
+  }
+
+  static clearLobbyRoomSuppression(roomId?: string, roomName?: string) {
+    if (roomId && roomName) {
+      RoomConnectHelper.suppressedLobbyRooms.delete(RoomConnectHelper.lobbyRoomKey(roomId, roomName));
+      return;
+    }
+    RoomConnectHelper.suppressedLobbyRooms.clear();
+  }
+
+  static filterLobbyRooms<T extends { id: string; name: string }>(rooms: T[]): T[] {
+    if (RoomConnectHelper.suppressedLobbyRooms.size < 1) return rooms;
+    return rooms.filter(r => !RoomConnectHelper.isLobbyRoomSuppressed(r.id, r.name));
+  }
+
+  private static connectTimeoutMs(): number {
+    return RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST > 0
+      ? RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST
+      : RoomConnectHelper.CONNECT_TIMEOUT_MS;
+  }
 
   /** True when join UI / Promise may succeed early (at least one live peer). */
   static shouldEarlySucceed(openPeerCount: number): boolean {
@@ -47,6 +88,14 @@ export class RoomConnectHelper {
   /** True when all targets were tried and none remain connected. */
   static shouldFailJoin(triedCount: number, targetCount: number, openPeerCount: number): boolean {
     return targetCount > 0 && triedCount >= targetCount && openPeerCount < 1;
+  }
+
+  /**
+   * While meshed, do not abort the join probe for missing game-table yet —
+   * the joiner is already a room client; tearing down would drop them aggressively.
+   */
+  static shouldExtendJoinDataWait(openPeerCount: number): boolean {
+    return openPeerCount >= 1;
   }
 
   static isRecoverableNetworkError(errorType: string): boolean {
@@ -220,9 +269,15 @@ export class RoomConnectHelper {
       const timeoutId = setTimeout(() => {
         if (settled) return;
         console.warn('RoomConnectHelper connect timeout');
+        // Pre-probe behavior: first live peer means we stay in the room. Never kick a meshed client.
+        if (Network.peers.length >= 1) {
+          Room.clearLocalTabletopForJoin();
+          finish(true);
+          return;
+        }
         failReason = 'connect_timeout';
         finish(false);
-      }, RoomConnectHelper.CONNECT_TIMEOUT_MS);
+      }, RoomConnectHelper.connectTimeoutMs());
 
       const finish = (ok: boolean) => {
         if (settled) return;
@@ -245,7 +300,13 @@ export class RoomConnectHelper {
         if (!ok) RoomConnectHelper.lastJoinFailReason = failReason || 'unknown';
         else RoomConnectHelper.lastJoinFailReason = '';
         RoomConnectHelper.endJoinProbe(ok);
-        if (!ok) RoomConnectHelper.resetToLobby();
+        if (!ok) {
+          // Hide unreachable rooms in the lobby. Never eject a meshed client.
+          RoomConnectHelper.suppressLobbyRoom(room.id, room.name);
+          if (Network.peers.length < 1) RoomConnectHelper.abandonFailedJoinProbe();
+        } else {
+          RoomConnectHelper.clearLobbyRoomSuppression(room.id, room.name);
+        }
         resolve(ok);
       };
 
@@ -275,7 +336,12 @@ export class RoomConnectHelper {
         }, RoomConnectHelper.JOIN_STABLE_MS);
       };
 
-      /** Restart the full JOIN_DATA window on every CONNECT (ghost-first races). */
+      /**
+   * Soft data deadline: restart slice on CONNECT; while still meshed, missing
+   * game-table extends another slice. Alone → fail probe only (hide room in lobby;
+   * never kick / resetToLobby).
+   * Hard ceiling is connectTimeoutMs() (meshed → stay / succeed; alone → fail+hide).
+   */
       const scheduleDataDeadline = () => {
         if (settled) return;
         if (RoomConnectHelper.JOIN_DATA_MS <= 0) return;
@@ -288,6 +354,11 @@ export class RoomConnectHelper {
           if (settled) return;
           if (sawTabletopData) {
             confirmIfStable();
+            return;
+          }
+          if (RoomConnectHelper.shouldExtendJoinDataWait(Network.peers.length)) {
+            netDebug('join data wait extended — still meshed, not aborting');
+            scheduleDataDeadline();
             return;
           }
           console.warn('RoomConnectHelper no tabletop data');
@@ -360,8 +431,15 @@ export class RoomConnectHelper {
             })
             .on('NETWORK_ERROR', () => {
               if (settled) return;
+              // Pre-probe: meshed NETWORK_ERROR still counts as joined.
               if (RoomConnectHelper.shouldEarlySucceed(Network.peers.length)) {
+                if (sawTabletopData) {
+                  Room.clearLocalTabletopForJoin();
+                  finish(true);
+                  return;
+                }
                 scheduleConfirm();
+                scheduleDataDeadline();
                 return;
               }
               failReason = 'network_error_mesh';
@@ -412,7 +490,23 @@ export class RoomConnectHelper {
     await RoomConnectHelper.remeshRoomPeers(roomId, roomName, '');
   }
 
-  /** Leave a failed probe room and return to the lobby peer. */
+  /**
+   * Leave a failed join's room peer when we never meshed (cancel probe only).
+   * Does not run when data peers exist — those clients stay in the room.
+   */
+  static abandonFailedJoinProbe() {
+    if (Network.peers.length > 0) return;
+    if (!Network.peer?.isRoom) return;
+    Network.open();
+    if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+  }
+
+  /** @deprecated no-op — join probe must not kick meshed clients. */
+  static resetIfAlone() {
+    // no-op
+  }
+
+  /** Explicit disconnect / menu logout — not used by join probe failure. */
   static resetToLobby() {
     GuestSession.isGuest = false;
     RoomAuth.clearAttained();
