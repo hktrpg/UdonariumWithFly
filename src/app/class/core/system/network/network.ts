@@ -200,6 +200,11 @@ export class Network {
     return this.connection ? this.connection.listAllRooms(force) : Promise.resolve([]);
   }
 
+  /** SkyWay room channel member names — prefer over lobby list when remeshing. */
+  listRoomMemberPeerIds(): string[] {
+    return this.connection ? this.connection.listRoomMemberPeerIds() : [];
+  }
+
   GuestMode(): boolean {
     return GuestSession.GuestMode();
   }
@@ -225,17 +230,12 @@ export class Network {
   }
 
   private async dynamicImport(mode: string = ''): Promise<ConnectionClass> {
-    switch (mode) {
-      case 'skyway2023':
-        return (await import(
-          /* webpackChunkName: "lib/backend/skyway2023/skyway-connection" */
-          './skyway2023/skyway-connection')
-        ).SkyWayConnection;
-      default:
-        return (await import(
-          /* webpackChunkName: "lib/backend/skyway/skyway-connection" */
-          './skyway/skyway-connection')
-        ).SkyWayConnection;
+    if (mode && mode !== 'skyway2023') {
+      console.warn(`Unknown backend mode "${mode}"; using skyway2023`);
     }
+    return (await import(
+      /* webpackChunkName: "lib/backend/skyway2023/skyway-connection" */
+      './skyway2023/skyway-connection')
+    ).SkyWayConnection;
   }
 }

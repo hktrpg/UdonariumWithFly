@@ -1,12 +1,14 @@
 import { EventSystem, Network } from '@udonarium/core/system';
-import { IPeerContext } from '@udonarium/core/system/network/peer-context';
+import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { netDebug } from '@udonarium/core/system/network/net-debug';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
+import { TableSelecter } from '@udonarium/table-selecter';
 import {
   isRecoverableNetworkError,
   RoomReopenResult,
@@ -120,6 +122,14 @@ export class RoomConnectHelper {
     return shouldAttemptRoomReopen(errorType);
   }
 
+  /**
+   * App NETWORK_ERROR may reopen only when no join probe / reopen is already running.
+   * Prevents abandonFailedJoinProbe ↔ reopenLastRoomOrLobby racing Network.open.
+   */
+  static shouldAttemptReopenNow(): boolean {
+    return !RoomConnectHelper.joinInProgress && !RoomConnectHelper.reopenInFlight;
+  }
+
   /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
   static clearRoomSessionMemory() {
     RoomConnectHelper.everHadRoomSession = false;
@@ -143,15 +153,26 @@ export class RoomConnectHelper {
 
   /**
    * Poll lobby listings and mesh-connect to peers in the same room.
+   * Prefer local SkyWay room members when available (fewer lobby Find storms).
    * One-sided connect is enough: the remote gets onSubscribed and opens the reverse stream.
-   * Does not resolve until an open peer appears, the room is alone, or peer-wait times out.
+   * Does not resolve until an open peer appears, attempts are exhausted while alone, or peer-wait times out.
    */
   static async remeshRoomPeers(roomId: string, roomName: string, connectPassword: string = ''): Promise<void> {
     let attemptedConnect = false;
     for (let i = 0; i < RoomConnectHelper.REMESH_ATTEMPTS; i++) {
       if (Network.peers.length > 0) return;
 
-      const rooms = await Network.listAllRooms();
+      // Channel members first — connect() already requires targets in room.members.
+      const memberIds = Network.listRoomMemberPeerIds();
+      if (memberIds.length > 0) {
+        for (const peerId of memberIds) {
+          if (peerId === Network.peerId) continue;
+          if (Network.connect(PeerContext.parse(peerId))) attemptedConnect = true;
+        }
+        if (Network.peers.length > 0) return;
+      }
+
+      const rooms = await Network.listAllRooms(true);
       const room = rooms.find(r => r.id === roomId && r.name === roomName);
       if (!room) {
         await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));
@@ -159,7 +180,11 @@ export class RoomConnectHelper {
       }
 
       const others = room.filterByPassword(connectPassword).filter(p => p.peerId !== Network.peerId);
-      if (others.length < 1) return; // alone in room listing
+      if (others.length < 1) {
+        // Lobby TTL / cache lag: keep retrying until attempts exhausted.
+        await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));
+        continue;
+      }
 
       for (const peer of others) {
         if (Network.connect(peer)) attemptedConnect = true;
@@ -215,8 +240,29 @@ export class RoomConnectHelper {
     RoomConnectHelper.joinInProgress = false;
     ObjectSynchronizer.instance.disableJoinFetch();
     ObjectSynchronizer.instance.releasePeerSync(ok);
-    if (ok) FolderBackupService.instance?.markContentTrusted();
-    else FolderBackupService.instance?.abortJoinQuarantine();
+    if (ok) {
+      FolderBackupService.instance?.markContentTrusted();
+      // ZIP load calls restoreAfterRoomLoad (ROOM_PIECES remount + suppress bounce).
+      // Mesh join used to skip that — 2nd tab tokens can stick invisible / without
+      // images until map switch or another peer's CONNECT_PEER. Mirror ZIP settle.
+      queueMicrotask(() => RoomConnectHelper.settleTabletopAfterMeshJoin());
+    } else {
+      FolderBackupService.instance?.abortJoinQuarantine();
+    }
+  }
+
+  /** Remount + re-request images after a successful mesh join probe. */
+  static settleTabletopAfterMeshJoin() {
+    try {
+      TableSelecter.instance.restoreAfterRoomLoad();
+    } catch (e) {
+      console.warn('RoomConnectHelper join settle (restore) failed', e);
+    }
+    try {
+      ImageStorage.instance.synchronize();
+    } catch (e) {
+      console.warn('RoomConnectHelper join settle (images) failed', e);
+    }
   }
 
   /**
@@ -227,6 +273,7 @@ export class RoomConnectHelper {
    * Shows busy overlay until OPEN_NETWORK (+ remesh) / NETWORK_ERROR / timeout.
    */
   static reopenLastRoomOrLobby(): RoomReopenResult {
+    if (RoomConnectHelper.joinInProgress) return 'busy';
     if (RoomConnectHelper.reopenInFlight) return 'busy';
 
     const session = Network.getLastRoomSession();
@@ -279,7 +326,7 @@ export class RoomConnectHelper {
     } else {
       Network.open();
     }
-    if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+    // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent) — open() is async.
     return 'started';
   }
 
@@ -289,7 +336,7 @@ export class RoomConnectHelper {
     return new Promise(resolve => {
       const userId = Network.peer.userId;
       Network.open(userId, room.id, room.name, password);
-      if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+      // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent) — open() is async.
 
       const listenerKey = { roomJoin: true };
       const tried = new Set<string>();
@@ -517,7 +564,6 @@ export class RoomConnectHelper {
           resolve();
         });
       Network.open(userId, roomId, roomName, mesh);
-      PeerCursor.myCursor.peerId = Network.peerId;
     });
 
     RoomAuth.applyIdentity(role, roomId);
@@ -532,7 +578,7 @@ export class RoomConnectHelper {
     if (Network.peers.length > 0) return;
     if (!Network.peer?.isRoom) return;
     Network.open();
-    if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+    // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent).
   }
 
   /** @deprecated no-op — join probe must not kick meshed clients. */
@@ -552,6 +598,6 @@ export class RoomConnectHelper {
       if (!wasGM) EventSystem.trigger('CHANGE_GM_MODE', null);
     }
     Network.open();
-    if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
+    // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent).
   }
 }

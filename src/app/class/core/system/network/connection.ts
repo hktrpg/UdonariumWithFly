@@ -31,4 +31,6 @@ export interface Connection {
   send(data: any, sendTo?: string)
   listAllPeers(force?: boolean): Promise<string[]>
   listAllRooms(force?: boolean): Promise<IRoomInfo[]>
+  /** PeerIds currently in the SkyWay room channel (empty if not in a room). */
+  listRoomMemberPeerIds(): string[]
 }

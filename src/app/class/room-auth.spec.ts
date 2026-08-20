@@ -49,4 +49,78 @@ describe('RoomAuth V3 mesh lock', () => {
     expect(a.roomName).toBe(b.roomName);
     expect(a.meshPassword).toBe(b.meshPassword);
   });
+
+  it('isMeshLocked agrees with PeerContext mesh packing for sealed V3 rooms', () => {
+    const { roomName, meshPassword } = RoomAuth.encode(display, roomId, passwords);
+    expect(RoomAuth.isMeshLocked(roomName)).toBeTrue();
+    const peer = PeerContext.create('testUserId01', roomId, roomName, meshPassword);
+    expect(peer.meshPassword).toBe(meshPassword);
+    expect(peer.digestPassword.length).toBe(0);
+  });
+});
+
+/**
+ * Repro: lobby opens RoomJoin with a RoomInfo snapshot; host rekeys passwords
+ * while the modal is open; joiner types the *new* password.
+ * RoomJoin/lobby still verify + resolveMesh against the stale room.name.
+ */
+describe('RoomAuth join after host rekey (stale roomName snapshot)', () => {
+  const roomId = 'Ab1';
+  const display = '改密測試房';
+
+  it('new password fails verify against pre-rekey roomName (wrong-password UI)', () => {
+    const before = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-old',
+      guest: { mode: 'disabled' },
+    });
+    const after = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-new',
+      guest: { mode: 'disabled' },
+    });
+    expect(before.roomName).not.toBe(after.roomName);
+
+    // What RoomJoinComponent.submit does today: verify(staleRoom.name, typedNewPw)
+    expect(RoomAuth.verify(roomId, before.roomName, 'user', 'user-new')).toBeFalse();
+    expect(RoomAuth.verify(roomId, after.roomName, 'user', 'user-new')).toBeTrue();
+  });
+
+  it('new password + stale roomName yields wrong mesh key (connect fails even if verify bypassed)', () => {
+    const before = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-old',
+      guest: { mode: 'disabled' },
+    });
+    const after = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-new',
+      guest: { mode: 'disabled' },
+    });
+    expect(RoomAuth.isMeshLocked(before.roomName)).toBeTrue();
+    expect(RoomAuth.isMeshLocked(after.roomName)).toBeTrue();
+
+    const staleMesh = RoomAuth.resolveMeshPassword(roomId, before.roomName, 'user', 'user-new');
+    const freshMesh = RoomAuth.resolveMeshPassword(roomId, after.roomName, 'user', 'user-new');
+    expect(freshMesh).toBe(after.meshPassword);
+    expect(staleMesh).not.toBe(freshMesh);
+  });
+
+  it('old password still verifies on stale snapshot but cannot reach post-rekey mesh', () => {
+    const before = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-old',
+      guest: { mode: 'disabled' },
+    });
+    const after = RoomAuth.encode(display, roomId, {
+      gm: 'gm-old',
+      user: 'user-new',
+      guest: { mode: 'disabled' },
+    });
+
+    expect(RoomAuth.verify(roomId, before.roomName, 'user', 'user-old')).toBeTrue();
+    const meshFromStale = RoomAuth.resolveMeshPassword(roomId, before.roomName, 'user', 'user-old');
+    expect(meshFromStale).toBe(before.meshPassword);
+    expect(meshFromStale).not.toBe(after.meshPassword);
+  });
 });

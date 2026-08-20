@@ -52,7 +52,6 @@
               "lodash",
               "msgpack-lite",
               "pako",
-              "skyway-js",
               "vkbeautify"
             ],
             "main": "src/main.ts"

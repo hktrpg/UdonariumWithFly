@@ -109,7 +109,7 @@ export class RoomInviteService {
     let room: IRoomInfo = null;
 
     for (let i = 0; i < retries; i++) {
-      const rooms = await Network.listAllRooms();
+      const rooms = await Network.listAllRooms(true);
       room = rooms.find(r => r.id === payload.id && r.name === payload.n) || null;
       if (room && room.peers.length > 0) break;
       room = null;

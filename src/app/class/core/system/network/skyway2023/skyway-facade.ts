@@ -96,8 +96,9 @@ export class SkyWayFacade {
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
     if (authToken.length < 1) {
       let message = translate('skyway.backendUnavailable', { url: backend.url });
-      if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
-      return;
+      const err = new Error(message);
+      err.name = 'server-error';
+      throw err;
     }
 
     let context = await SkyWayContext.Create(authToken);

@@ -202,7 +202,7 @@ export class SkyWayConnection implements Connection {
     this.listAllPeersCache = peers;
     // Positive hits: rate-limit. Empty: short TTL so lobby/invite retries can re-fetch
     // (concurrent callers used to get a still-empty cache while the first fetch was in flight).
-    const ttlMs = peers.length > 0 ? 10000 : 500;
+    const ttlMs = peers.length > 0 ? 2500 : 500;
     this.listAllPeersCacheUntil = performance.now() + ttlMs;
     return peers;
   }
@@ -210,6 +210,12 @@ export class SkyWayConnection implements Connection {
   async listAllRooms(force = false): Promise<IRoomInfo[]> {
     let allPeerIds = await this.listAllPeers(force);
     return RoomInfo.listFrom(allPeerIds);
+  }
+
+  listRoomMemberPeerIds(): string[] {
+    const members = this.skyWay?.room?.members;
+    if (!members?.length) return [];
+    return members.map(m => m.name).filter((name): name is string => !!name);
   }
 
   private async openSkyWay(peer: IPeerContext) {

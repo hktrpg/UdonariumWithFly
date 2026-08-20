@@ -2,6 +2,7 @@ import { CryptoUtil } from './core/system/util/crypto-util';
 import { EventSystem, Network } from './core/system';
 import { GuestSession } from './guest-session';
 import { PeerCursor } from './peer-cursor';
+import { roomNameHasMeshLock } from './room-mesh-lock';
 import { translate } from 'i18n';
 
 /** Join / create identity. */
@@ -142,16 +143,9 @@ export class RoomAuth {
     const gm = RoomAuth.readGate(blob, i, markerInfo.digestLen); i = gm.next;
     const user = RoomAuth.readGate(blob, i, markerInfo.digestLen); i = user.next;
     const guest = RoomAuth.readGate(blob, i, markerInfo.digestLen); i = guest.next;
-    const passwordGates = [gm.gate, user.gate, guest.gate].filter(g => g.mode === 'password').length;
-    let sealStart = i;
-    if (blob.charAt(sealStart) === 'M') sealStart++; // legacy V3 with marker
-    const leftover = blob.length - sealStart;
-    const isMeshLocked = markerInfo.marker === RoomAuth.AUTH_MARKER_V3
-      && passwordGates > 0
-      && leftover === passwordGates * RoomAuth.SEAL_HEX_LEN;
     return {
       isRoleAuth: true,
-      isMeshLocked,
+      isMeshLocked: roomNameHasMeshLock(roomName),
       gm: gm.gate,
       user: user.gate,
       guest: guest.gate,
@@ -160,7 +154,7 @@ export class RoomAuth {
 
   /** True when room advertises a sealed mesh (network lock). */
   static isMeshLocked(roomName: string): boolean {
-    return RoomAuth.parse(roomName).isMeshLocked;
+    return roomNameHasMeshLock(roomName);
   }
 
   /**

@@ -139,6 +139,23 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('no-session');
     expect(open).not.toHaveBeenCalled();
   });
+
+  it('returns busy while join probe is in progress', () => {
+    RoomConnectHelper.joinInProgress = true;
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOn(Network, 'getLastRoomSession').and.returnValue({
+      userId: 'u1',
+      roomId: 'Ab1',
+      roomName: 'TestRoom',
+      meshPassword: '',
+    });
+    const open = spyOn(Network, 'open');
+
+    expect(RoomConnectHelper.shouldAttemptReopenNow()).toBeFalse();
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('busy');
+    expect(open).not.toHaveBeenCalled();
+    RoomConnectHelper.joinInProgress = false;
+  });
 });
 
 describe('RoomConnectHelper.remeshRoomPeers', () => {
@@ -150,6 +167,7 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
   beforeEach(() => {
     openPeers = [];
     spyOn(Network, 'connect').and.returnValue(true);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue([]);
     spyOnProperty(Network, 'peers', 'get').and.callFake(() => openPeers);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
   });
@@ -159,8 +177,10 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
     (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = prevPeerWait;
   });
 
-  it('returns immediately when the room listing is alone', async () => {
-    spyOn(Network, 'listAllRooms').and.resolveTo([{
+  it('retries when the room listing is temporarily alone', async () => {
+    (RoomConnectHelper as any).REMESH_ATTEMPTS = 3;
+    (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
+    const list = spyOn(Network, 'listAllRooms').and.resolveTo([{
       id: 'Ab1',
       name: 'TestRoom',
       hasPassword: false,
@@ -169,7 +189,26 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
     }]);
 
     await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
+    expect(list).toHaveBeenCalledWith(true);
+    expect(list).toHaveBeenCalledTimes(3);
     expect(Network.connect).not.toHaveBeenCalled();
+  });
+
+  it('connects channel members before falling back to lobby list', async () => {
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'other']);
+    (Network.connect as jasmine.Spy).and.callFake(() => {
+      openPeers = [peer('other')];
+      return true;
+    });
+    const list = spyOn(Network, 'listAllRooms');
+    (RoomConnectHelper as any).REMESH_ATTEMPTS = 1;
+    (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
+    (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = 0;
+
+    await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
+
+    expect(Network.connect).toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('waits for CONNECT_PEER after connect attempts before resolving', async () => {
@@ -227,6 +266,32 @@ describe('RoomConnectHelper.openAndConnect', () => {
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.lastJoinFailReason = '';
     RoomConnectHelper.clearLobbyRoomSuppression();
+  });
+
+  it('settles tabletop remount after a successful mesh join', async () => {
+    const settle = spyOn(RoomConnectHelper, 'settleTabletopAfterMeshJoin').and.stub();
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('live')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    openPeers = [peer('live')];
+    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
+    hostTabletop('live');
+
+    await expectAsync(result).toBeResolvedTo(true);
+    await new Promise<void>(resolve => queueMicrotask(resolve));
+    expect(settle).toHaveBeenCalled();
+  });
+
+  it('does not settle tabletop when join probe fails', async () => {
+    const settle = spyOn(RoomConnectHelper, 'settleTabletopAfterMeshJoin').and.stub();
+    (Network.connect as jasmine.Spy).and.returnValue(false);
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('ghost')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+
+    await expectAsync(result).toBeResolvedTo(false);
+    await new Promise<void>(resolve => queueMicrotask(resolve));
+    expect(settle).not.toHaveBeenCalled();
   });
 
   it('resolves true on first CONNECT_PEER without waiting for remaining targets', async () => {

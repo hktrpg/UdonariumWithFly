@@ -590,11 +590,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.isLoggedin = false;
 
           // Prefer room reopen (incl. token refresh) over kicking to lobby / stuck offline.
-          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) {
+          // Join probe owns NETWORK_ERROR while active (abandon vs reopen race).
+          if (RoomConnectHelper.joinInProgress) return;
+
+          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)
+            && RoomConnectHelper.shouldAttemptReopenNow()) {
             const result = RoomConnectHelper.reopenLastRoomOrLobby();
-            if (result === 'started' || result === 'busy') return;
-            // Had a room this page but credentials were lost — keep local tabletop; do not open lobby.
-            if (result === 'no-session') {
+            if (result === 'started') return;
+            if (result === 'busy') {
+              console.warn('RoomConnectHelper reopen busy; showing error UI if config-related');
+              if (!configErrorTypes.includes(errorType)) return;
+            } else if (result === 'no-session') {
               await this.modalService.open(TextViewComponent, {
                 title: this.i18n.t('net.errorTitle'),
                 text: this.i18n.t('net.reconnectSessionLost'),
