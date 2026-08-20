@@ -1,6 +1,7 @@
 import {
   isRecoverableNetworkError,
   RECOVERABLE_NETWORK_ERROR_TYPES,
+  shouldAttemptRoomReopen,
 } from './room-reconnect.util';
 import { Network } from './core/system';
 
@@ -13,11 +14,19 @@ describe('room-reconnect.util', () => {
     expect(isRecoverableNetworkError('unavailable-id')).toBeTrue();
   });
 
-  it('does not auto-reconnect auth / backend failures', () => {
+  it('does not treat auth / backend failures as simple recoverable', () => {
     expect(isRecoverableNetworkError('server-error')).toBeFalse();
     expect(isRecoverableNetworkError('authentication')).toBeFalse();
     expect(isRecoverableNetworkError('token-expired')).toBeFalse();
     expect(isRecoverableNetworkError('peer-unavailable')).toBeFalse();
+  });
+
+  it('still attempts room reopen for token / auth / server errors', () => {
+    expect(shouldAttemptRoomReopen('internal')).toBeTrue();
+    expect(shouldAttemptRoomReopen('token-expired')).toBeTrue();
+    expect(shouldAttemptRoomReopen('authentication')).toBeTrue();
+    expect(shouldAttemptRoomReopen('server-error')).toBeTrue();
+    expect(shouldAttemptRoomReopen('peer-unavailable')).toBeFalse();
   });
 
   it('RECOVERABLE_NETWORK_ERROR_TYPES includes internal', () => {

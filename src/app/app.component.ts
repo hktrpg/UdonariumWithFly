@@ -536,12 +536,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             roomName: Network.peer.roomName,
             meshPassword: Network.peer.channelPassword || RoomAuth.getSessionMeshPassword() || '',
           });
+          RoomConnectHelper.markRoomSessionRemembered();
           // Create / resume: dismiss lobby. Probe join keeps it until a live peer is confirmed.
           if (!RoomConnectHelper.joinInProgress) {
             this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
           }
         } else {
-          Network.clearLastRoomSession();
+          // Do not clear lastRoomSession during auto-reopen / join probe races —
+          // a transient lobby peer would otherwise erase the room credentials mid-game.
+          if (!RoomConnectHelper.isReopenInFlight && !RoomConnectHelper.joinInProgress) {
+            Network.clearLastRoomSession();
+          }
           if (!this.inviteHandled) {
             this.inviteHandled = true;
             this.ngZone.run(async () => {
@@ -584,18 +589,26 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           if (quietErrorTypes.includes(errorType)) return;
           this.isLoggedin = false;
 
+          // Prefer room reopen (incl. token refresh) over kicking to lobby / stuck offline.
+          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) {
+            const result = RoomConnectHelper.reopenLastRoomOrLobby();
+            if (result === 'started' || result === 'busy') return;
+            // Had a room this page but credentials were lost — keep local tabletop; do not open lobby.
+            if (result === 'no-session') {
+              await this.modalService.open(TextViewComponent, {
+                title: this.i18n.t('net.errorTitle'),
+                text: this.i18n.t('net.reconnectSessionLost'),
+              });
+              return;
+            }
+          }
+
           if (configErrorTypes.includes(errorType)) {
             await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
             await this.modalService.open(TextViewComponent, {
               title: this.i18n.t('net.errorTitle'),
               text: this.i18n.t('net.backendHelp')
             });
-            return;
-          }
-
-          // Transient drops (cable / SkyWay internal): auto-reopen without blocking modals.
-          if (RoomConnectHelper.isRecoverableNetworkError(errorType)) {
-            RoomConnectHelper.reopenLastRoomOrLobby();
             return;
           }
 

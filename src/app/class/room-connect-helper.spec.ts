@@ -92,9 +92,11 @@ describe('RoomConnectHelper settle predicates', () => {
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   afterEach(() => {
     (RoomConnectHelper as any).reopenInFlight = false;
+    RoomConnectHelper.everHadRoomSession = false;
   });
 
   it('remeshes after OPEN_NETWORK when a room session exists', async () => {
+    RoomConnectHelper.everHadRoomSession = true;
     spyOn(Network, 'getLastRoomSession').and.returnValue({
       userId: 'u1',
       roomId: 'Ab1',
@@ -106,25 +108,36 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     const remesh = spyOn(RoomConnectHelper, 'remeshRoomPeers').and.resolveTo();
 
-    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBeTrue();
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('started');
     EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
     await new Promise<void>(resolve => setTimeout(resolve, 20));
 
     expect(remesh).toHaveBeenCalledWith('Ab1', 'TestRoom', '');
   });
 
-  it('does not remesh when reopening as a plain lobby peer', async () => {
+  it('reopens lobby peer only when this page never had a room', async () => {
+    RoomConnectHelper.everHadRoomSession = false;
     spyOn(Network, 'getLastRoomSession').and.returnValue(null);
     spyOn(Network, 'open');
     spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self' } as IPeerContext);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     const remesh = spyOn(RoomConnectHelper, 'remeshRoomPeers').and.resolveTo();
 
-    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBeTrue();
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('started');
     EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
     await new Promise<void>(resolve => setTimeout(resolve, 20));
 
+    expect(Network.open).toHaveBeenCalled();
     expect(remesh).not.toHaveBeenCalled();
+  });
+
+  it('skips lobby reopen when room session is missing after mid-game', () => {
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOn(Network, 'getLastRoomSession').and.returnValue(null);
+    const open = spyOn(Network, 'open');
+
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('no-session');
+    expect(open).not.toHaveBeenCalled();
   });
 });
 

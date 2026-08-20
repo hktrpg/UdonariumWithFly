@@ -651,6 +651,7 @@ export const ja_ui: I18nDictionary = {
   'net.reconnectRoomHint': '部屋の接続が切れました。ロビーには表示されません。このウィンドウを閉じると同じ部屋への再接続を試みます。',
   'net.reconnecting': '再接続中…',
   'net.reconnectingRoom': '部屋の接続が切れました。自動で同じ部屋を開き直しています…',
+  'net.reconnectSessionLost': '部屋の接続が切れ、部屋の資格情報も失われたため、ロビーへ自動復帰しませんでした（プレイ中の強制退出を避けるため）。卓のデータは残っています。「部屋を読込」か招待リンクで再試行してください。',
   'net.connectedRoom': '{{name}} に接続しました',
   'net.connectedPeer': '他の参加者と接続しました',
   'net.whisper': '(囁き)',

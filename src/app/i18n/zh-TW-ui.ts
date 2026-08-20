@@ -662,6 +662,7 @@ export const zhTW_ui: I18nDictionary = {
   'net.reconnectRoomHint': '房間連線已斷，大廳目前看不到此房。關閉此視窗後將嘗試用同一房間重新連線。',
   'net.reconnecting': '正在重新連線…',
   'net.reconnectingRoom': '房間連線中斷，正在自動重開房間…',
+  'net.reconnectSessionLost': '房間連線中斷，且無法還原房間憑證，因此沒有自動開回大廳（避免中途被踢出）。本機桌面仍保留。請用「讀取房間」或邀請連結重試。',
   'net.connectedRoom': '已連線到 {{name}}',
   'net.connectedPeer': '已與其他人連線',
   'net.whisper': '(密語)',

@@ -7,7 +7,11 @@ import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
-import { isRecoverableNetworkError } from '@udonarium/room-reconnect.util';
+import {
+  isRecoverableNetworkError,
+  RoomReopenResult,
+  shouldAttemptRoomReopen,
+} from '@udonarium/room-reconnect.util';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 
@@ -46,6 +50,16 @@ export class RoomConnectHelper {
   private static readonly suppressedLobbyRooms = new Set<string>();
   /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
   private static reopenInFlight = false;
+
+  static get isReopenInFlight(): boolean {
+    return RoomConnectHelper.reopenInFlight;
+  }
+
+  /**
+   * Sticky for this page load: once we have been a room peer, never fall back to a
+   * silent lobby Network.open() after NETWORK_ERROR (that feels like a mid-game kick).
+   */
+  static everHadRoomSession = false;
 
   private static lobbyRoomKey(roomId: string, roomName: string): string {
     return `${roomId}\n${roomName}`;
@@ -100,6 +114,20 @@ export class RoomConnectHelper {
 
   static isRecoverableNetworkError(errorType: string): boolean {
     return isRecoverableNetworkError(errorType);
+  }
+
+  static shouldAttemptRoomReopen(errorType: string): boolean {
+    return shouldAttemptRoomReopen(errorType);
+  }
+
+  /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
+  static clearRoomSessionMemory() {
+    RoomConnectHelper.everHadRoomSession = false;
+    Network.clearLastRoomSession();
+  }
+
+  static markRoomSessionRemembered() {
+    RoomConnectHelper.everHadRoomSession = true;
   }
 
   /** Host tabletop payload (not PeerCursor / selecter) — safe to switch maps. */
@@ -192,17 +220,23 @@ export class RoomConnectHelper {
   }
 
   /**
-   * After SkyWay fatal close: reopen the last room (so lobby lists us again),
-   * or fall back to a plain lobby peer when no room session was stored.
+   * After SkyWay fatal close: reopen the last room (+ remesh).
+   * Lobby peer reopen only when this page never had a room session.
+   * If we had a room but session is missing, returns 'no-session' and does nothing
+   * (avoids mid-game eject to lobby).
    * Shows busy overlay until OPEN_NETWORK (+ remesh) / NETWORK_ERROR / timeout.
-   * @returns false if a reopen is already in progress.
    */
-  static reopenLastRoomOrLobby(): boolean {
-    if (RoomConnectHelper.reopenInFlight) return false;
-    RoomConnectHelper.reopenInFlight = true;
+  static reopenLastRoomOrLobby(): RoomReopenResult {
+    if (RoomConnectHelper.reopenInFlight) return 'busy';
 
     const session = Network.getLastRoomSession();
     const willReopenRoom = !!(session?.roomId && session.roomName);
+    if (!willReopenRoom && RoomConnectHelper.everHadRoomSession) {
+      console.warn('RoomConnectHelper reopen skipped: room session missing after mid-game drop');
+      return 'no-session';
+    }
+
+    RoomConnectHelper.reopenInFlight = true;
     const busyKey = willReopenRoom ? 'net.reconnectingRoom' : 'net.reconnecting';
     ConnectionBusyService.instance?.show(busyKey);
 
@@ -246,7 +280,7 @@ export class RoomConnectHelper {
       Network.open();
     }
     if (PeerCursor.myCursor) PeerCursor.myCursor.peerId = Network.peerId;
-    return true;
+    return 'started';
   }
 
   static openAndConnect(room: IRoomInfo, password: string, targetPeers: IPeerContext[]): Promise<boolean> {
@@ -510,6 +544,7 @@ export class RoomConnectHelper {
   static resetToLobby() {
     GuestSession.isGuest = false;
     RoomAuth.clearAttained();
+    RoomConnectHelper.clearRoomSessionMemory();
     if (PeerCursor.myCursor) {
       PeerCursor.isGMHold = false;
       const wasGM = PeerCursor.myCursor.isGMMode;

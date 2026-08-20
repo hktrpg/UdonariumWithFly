@@ -18,6 +18,24 @@ export const RECOVERABLE_NETWORK_ERROR_TYPES = [
   'default',
 ] as const;
 
+/**
+ * Also try room reopen for these: a fresh Network.open() refreshes SkyWay token /
+ * context. If reopen fails, the UI still shows the backend help modal.
+ */
+export const ROOM_REOPEN_NETWORK_ERROR_TYPES = [
+  ...RECOVERABLE_NETWORK_ERROR_TYPES,
+  'token-expired',
+  'authentication',
+  'server-error',
+] as const;
+
+export type RoomReopenResult = 'started' | 'busy' | 'no-session';
+
 export function isRecoverableNetworkError(errorType: string): boolean {
   return (RECOVERABLE_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType);
+}
+
+/** True when we should try reopenLastRoom (including token / transient backend errors). */
+export function shouldAttemptRoomReopen(errorType: string): boolean {
+  return (ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType);
 }
