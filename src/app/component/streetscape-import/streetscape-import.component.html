@@ -28,6 +28,9 @@
     [(ngModel)]="streetscapeMaxFeatures"
     [disabled]="streetscapeBusy"
   >
+  <p class="streetscape-status streetscape-warn" *ngIf="streetscapeMaxFeaturesWarn">
+    {{ 'streetscape.maxFeaturesWarn' | i18n }}
+  </p>
 
   <div class="streetscape-street-wrap">
     <input

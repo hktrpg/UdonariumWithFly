@@ -9,7 +9,13 @@ import {
   Open3dhkRangeEstimate,
   Open3dhkRangeMode,
 } from './open3dhk-range-fetch';
-import { Open3dhkZipFormat, packLoadFromOpen3dhkSheetFiles } from './open3dhk-sheet-pack';
+import {
+  Open3dhkZipFormat,
+  packLoadFromOpen3dhkSheetFiles,
+} from './open3dhk-sheet-pack';
+import {
+  open3dhkSheetZipFetchUrls,
+} from './open3dhk-url';
 import {
   loadStreetSheetIndex,
   looksLikeOpen3dhkSheetId,
@@ -23,12 +29,16 @@ import {
   throwIfAborted,
 } from './source';
 
-/**
- * Same-origin proxy (dev) → local Range relay → https://download.map.gov.hk/api/3d-zip
- * Prefer proxy for Range (avoids CORS header gaps; relay preserves Content-Range).
- */
-export const OPEN3DHK_PROXY_PATH = '/streetscape-open3dhk';
-export const OPEN3DHK_DIRECT_ZIP_BASE = 'https://download.map.gov.hk/api/3d-zip';
+export {
+  OPEN3DHK_DATA11_ZIP_BASE,
+  OPEN3DHK_DIRECT_ZIP_BASE,
+  OPEN3DHK_DOWNLOAD_ZIP_BASE,
+  OPEN3DHK_PROXY_PATH,
+  open3dhkSheetZipDirectUrl,
+  open3dhkSheetZipFetchUrls,
+  open3dhkSheetZipProxyUrl,
+  open3dhkSheetZipUrl,
+} from './open3dhk-url';
 
 /** Textured Individualised GLTF — large whole-sheet ZIP; prefer HTTP Range subset. */
 export const OPEN3DHK_FORMAT_TEXTURED: Open3dhkZipFormat = 'GLTF';
@@ -126,24 +136,6 @@ export function matchCatalogStreet(
   });
 }
 
-export function open3dhkSheetZipUrl(
-  sheet: string,
-  format: Open3dhkZipFormat = OPEN3DHK_LIVE_FORMAT,
-): string {
-  const id = sheet.trim();
-  if (!id) throw new Error(STREETSCAPE_ERRORS.NO_QUERY);
-  return `${OPEN3DHK_DIRECT_ZIP_BASE}/${format}/${encodeURIComponent(id)}.zip`;
-}
-
-export function open3dhkSheetZipProxyUrl(
-  sheet: string,
-  format: Open3dhkZipFormat = OPEN3DHK_LIVE_FORMAT,
-): string {
-  const id = sheet.trim();
-  if (!id) throw new Error(STREETSCAPE_ERRORS.NO_QUERY);
-  return `${OPEN3DHK_PROXY_PATH}/${format}/${encodeURIComponent(id)}.zip`;
-}
-
 export function normalizeOpen3dhkFormat(format?: string): Open3dhkZipFormat {
   return normalizeFormat(format);
 }
@@ -160,11 +152,7 @@ export async function estimateOpen3dhkSheetDownload(
 ): Promise<Open3dhkRangeEstimate> {
   const format = normalizeFormat(opts.format);
   const maxFeatures = clampOpen3dhkMaxFeatures(opts.maxFeatures);
-  // Proxy first — same-origin Range avoids CORS hangs at 0 MB.
-  const urls = [
-    open3dhkSheetZipProxyUrl(sheet, format),
-    open3dhkSheetZipUrl(sheet, format),
-  ];
+  const urls = open3dhkSheetZipFetchUrls(sheet, format);
   let lastErr: unknown;
   for (const url of urls) {
     try {
@@ -181,7 +169,7 @@ export async function estimateOpen3dhkSheetDownload(
       lastErr = err;
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+  throw resolveOpen3dhkFetchError(lastErr);
 }
 
 async function fetchOfficialSheetAsPack(
@@ -256,10 +244,7 @@ async function fetchSheetZipSubsetFiles(
   onProgress?: (p: StreetscapeSourceProgress) => void,
   buildingIds?: string[],
 ): Promise<File[]> {
-  const urls = [
-    open3dhkSheetZipProxyUrl(sheet, format),
-    open3dhkSheetZipUrl(sheet, format),
-  ];
+  const urls = open3dhkSheetZipFetchUrls(sheet, format);
   let lastErr: unknown;
   for (const url of urls) {
     try {
@@ -286,7 +271,7 @@ async function fetchSheetZipSubsetFiles(
       lastErr = err;
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+  throw resolveOpen3dhkFetchError(lastErr);
 }
 
 async function fetchSheetZipBlob(
@@ -295,16 +280,15 @@ async function fetchSheetZipBlob(
   signal?: AbortSignal,
   onProgress?: (p: StreetscapeSourceProgress) => void,
 ): Promise<Blob> {
-  const urls = [
-    open3dhkSheetZipProxyUrl(sheet, format),
-    open3dhkSheetZipUrl(sheet, format),
-  ];
+  const urls = open3dhkSheetZipFetchUrls(sheet, format);
   let lastErr: unknown;
   for (const url of urls) {
     try {
       const res = await fetch(url, { cache: 'no-store', signal, credentials: 'omit' });
       if (!res.ok) {
-        lastErr = new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+        lastErr = res.status >= 500
+          ? new Error(STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE)
+          : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
         continue;
       }
       const blob = await readResponseBlobWithProgress(res, signal, onProgress);
@@ -318,7 +302,13 @@ async function fetchSheetZipBlob(
       lastErr = err;
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+  throw resolveOpen3dhkFetchError(lastErr);
+}
+
+/** Prefer upstream-unavailable when every host returned 5xx. */
+function resolveOpen3dhkFetchError(lastErr: unknown): Error {
+  if (lastErr instanceof Error) return lastErr;
+  return new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
 }
 
 /** Stream a Response body so callers can show download %. Falls back to `blob()`. */

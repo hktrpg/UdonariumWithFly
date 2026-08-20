@@ -9,6 +9,8 @@ export const STREETSCAPE_ERRORS = {
   CANCELLED: 'STREETSCAPE_CANCELLED',
   NOT_A_PACK: 'STREETSCAPE_NOT_A_PACK',
   FETCH_FAILED: 'STREETSCAPE_FETCH_FAILED',
+  /** LandsD Open3Dhk CDN returned 5xx (often 502 Proxy Error). */
+  UPSTREAM_UNAVAILABLE: 'STREETSCAPE_UPSTREAM_UNAVAILABLE',
   UNKNOWN_SOURCE: 'STREETSCAPE_UNKNOWN_SOURCE',
   NO_QUERY: 'STREETSCAPE_NO_QUERY',
   NO_STREET_MATCH: 'STREETSCAPE_NO_STREET_MATCH',
@@ -19,6 +21,10 @@ export function isStreetscapeAbort(err: unknown): boolean {
   const name = (err as { name?: string }).name;
   const message = err instanceof Error ? err.message : '';
   return name === 'AbortError' || message === STREETSCAPE_ERRORS.CANCELLED;
+}
+
+export function isOpen3dhkUpstreamUnavailable(err: unknown): boolean {
+  return err instanceof Error && err.message === STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE;
 }
 
 export function streetscapeErrorI18nKey(err: unknown): string {
@@ -33,6 +39,7 @@ export function streetscapeErrorI18nKey(err: unknown): string {
     case STREETSCAPE_ERRORS.CANCELLED: return 'streetscape.error.cancelled';
     case STREETSCAPE_ERRORS.NOT_A_PACK: return 'streetscape.error.notAPack';
     case STREETSCAPE_ERRORS.FETCH_FAILED: return 'streetscape.error.fetchFailed';
+    case STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE: return 'streetscape.error.upstreamUnavailable';
     case STREETSCAPE_ERRORS.UNKNOWN_SOURCE: return 'streetscape.error.unknownSource';
     case STREETSCAPE_ERRORS.NO_QUERY: return 'streetscape.error.noQuery';
     case STREETSCAPE_ERRORS.NO_STREET_MATCH: return 'streetscape.error.noStreetMatch';

@@ -1,7 +1,7 @@
 import { Reader } from '@zip.js/zip.js';
 
 import { open3dhkDebug, open3dhkDebugHeartbeat, open3dhkDebugWarn, isOpen3dhkVerboseDebug } from './open3dhk-debug';
-import { STREETSCAPE_ERRORS } from './errors';
+import { STREETSCAPE_ERRORS, isOpen3dhkUpstreamUnavailable } from './errors';
 import { throwIfAborted } from './source';
 
 /**
@@ -46,12 +46,16 @@ export async function probeOpen3dhkZipByteLength(
       acceptRanges: res.headers.get('Accept-Ranges'),
       ms: Math.round(now() - t0),
     });
+    if (isOpen3dhkUpstreamErrorStatus(res.status)) {
+      throw new Error(STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE);
+    }
     const n = Number(cl);
     if (res.ok && isPlausibleOpen3dhkZipSize(n, ct)) return n;
     if (res.ok && Number.isFinite(n) && n > 0 && n < OPEN3DHK_MIN_ZIP_BYTES) {
       open3dhkDebugWarn('probe HEAD: size too small (likely HTML fallback)', { n, ct });
     }
   } catch (err) {
+    if (isOpen3dhkUpstreamUnavailable(err)) throw err;
     open3dhkDebugWarn('probe HEAD failed', err);
   }
 
@@ -76,11 +80,15 @@ export async function probeOpen3dhkZipByteLength(
       contentType: ct,
       ms: Math.round(now() - t0),
     });
+    if (isOpen3dhkUpstreamErrorStatus(res.status)) {
+      throw new Error(STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE);
+    }
     // Consume tiny body so the connection can close cleanly.
     await res.arrayBuffer().catch(() => undefined);
     const n = parseContentRangeTotal(cr);
     if (isPlausibleOpen3dhkZipSize(n, ct)) return n;
   } catch (err) {
+    if (isOpen3dhkUpstreamUnavailable(err)) throw err;
     open3dhkDebugWarn('probe Range 0-0 failed', err);
   }
 
@@ -105,10 +113,14 @@ export async function probeOpen3dhkZipByteLength(
       contentType: ct,
       ms: Math.round(now() - t0),
     });
+    if (isOpen3dhkUpstreamErrorStatus(res.status)) {
+      throw new Error(STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE);
+    }
     await res.arrayBuffer().catch(() => undefined);
     const n = parseContentRangeTotal(cr);
     if (isPlausibleOpen3dhkZipSize(n, ct)) return n;
   } catch (err) {
+    if (isOpen3dhkUpstreamUnavailable(err)) throw err;
     open3dhkDebugWarn('probe Range -22 failed', err);
   }
 
@@ -216,6 +228,9 @@ export class Open3dhkHttpRangeReader extends Reader<string> {
         });
       }
       if (res.status !== 206 && res.status !== 200) {
+        if (isOpen3dhkUpstreamErrorStatus(res.status)) {
+          throw new Error(STREETSCAPE_ERRORS.UPSTREAM_UNAVAILABLE);
+        }
         throw new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
       }
       const buf = new Uint8Array(await res.arrayBuffer());
@@ -255,4 +270,9 @@ function absoluteFetchUrl(url: string): string {
 
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+/** LandsD CDN 502/503/504 HTML error pages — fail fast instead of hanging on direct fetch. */
+export function isOpen3dhkUpstreamErrorStatus(status: number): boolean {
+  return status === 502 || status === 503 || status === 504;
 }

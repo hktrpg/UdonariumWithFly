@@ -50,8 +50,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   streetscapeStreet = '';
   streetscapeStreetSuggestions: StreetSheetSuggestion[] = [];
   streetscapeAttribution = '';
+  /** Soft UX threshold — above this, show a lag / memory warning (not a hard cap). */
+  static readonly MAX_FEATURES_WARN = 10;
   /** Buildings to keep (≥1). */
   streetscapeMaxFeatures = 4;
+
+  get streetscapeMaxFeaturesWarn(): boolean {
+    const n = Number(this.streetscapeMaxFeatures);
+    return Number.isFinite(n) && n > StreetscapeImportComponent.MAX_FEATURES_WARN;
+  }
   /** After gray create: pending textured facade download for the same building ids. */
   streetscapeDeferred: {
     tableId: string;

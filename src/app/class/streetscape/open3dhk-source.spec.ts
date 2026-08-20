@@ -1,9 +1,9 @@
 import {
   matchCatalogStreet,
-  open3dhkSheetZipUrl,
   normalizeOpen3dhkFormat,
   readResponseBlobWithProgress,
 } from './open3dhk-source';
+import { open3dhkSheetZipUrl } from './open3dhk-url';
 import { StreetscapeSourceProgress } from './source';
 
 describe('matchCatalogStreet', () => {
