@@ -18,6 +18,8 @@ export interface RoomInvitePayload {
 export type RoomInviteJoinResult =
   | 'ok'
   | 'notFound'
+  | 'joinDataTimeout'
+  | 'joinNetworkTimeout'
   | 'badPassword'
   | 'roleUnavailable'
   | 'alreadyInRoom'
@@ -131,7 +133,11 @@ export class RoomInviteService {
     this.setRolePassword(payload.r, payload.p || '');
     RoomAuth.rememberSession(payload.r, payload.p || '', skywayPassword);
     const ok = await RoomConnectHelper.openAndConnect(room, skywayPassword, targetPeers);
-    return ok ? 'ok' : 'notFound';
+    if (ok) return 'ok';
+    const key = RoomConnectHelper.joinFailMessageKey(RoomConnectHelper.lastJoinFailReason);
+    if (key === 'lobby.joinDataTimeout') return 'joinDataTimeout';
+    if (key === 'lobby.joinNetworkTimeout') return 'joinNetworkTimeout';
+    return 'notFound';
   }
 
   encodeToken(payload: RoomInvitePayload): string {

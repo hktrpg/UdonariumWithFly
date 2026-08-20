@@ -47,3 +47,4 @@ package-lock.json
 .angular/cache/
 /.agents
 skills-lock.json
+*.log
