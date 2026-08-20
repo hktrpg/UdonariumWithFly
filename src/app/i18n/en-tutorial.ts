@@ -102,6 +102,8 @@ Drag images or music into the browser to import.`,
 　　　　Status icons = stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
 　　　　Image effects = right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
 　　　　Base rings = right-click “Ring”
+<Terrain・3D> Drop STL／OBJ／glTF／FBX or ZIP = bake six-face textured terrain; L-shapes can Shift-multi-select into a bake group
+　　　　Slope degrees, per-face textures, neon signs; settings can lock aspect ratio
 <Map masks> Alt+double-click = configured actions (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX
 　　　　Token FX can auto-apply while standing (restore on leave); manual apply is not undone by leaving
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
@@ -206,6 +208,17 @@ Upgraded to 1.13.2`,
 ・Removed redundant Create copy (use Ctrl+C/V; characters still have Advanced copy for temp Token / numbering)
 ・Paste as temporary Token and Ctrl+Shift+V only when clipboard has a character/Token (no longer shown for dice etc.)
 ・Object panels use Import / Export (ZIP); characters also Download as JSON (CCFOLIA; copies to system clipboard)`,
+  'changelog.2026terrain': `2026/08/17 Terrain・3D models
+・Drop STL／OBJ／glTF／FBX (or a ZIP with models) = bake into six-face textured terrain
+・L-shapes etc. become bake groups: Shift multi-select to form/clear; move・scale・export as a group
+・Terrain slopes, per-face textures, neon sign glow; corner scale and aspect lock
+・Small-token name tags stay on one line; ZIP load restores image tags and spoiler-hide`,
+  'changelog.2026net': `2026/08/20–21 Connection・invites
+・Keep the local tabletop until a live peer + map data arrives
+・Hide unreachable ghost rooms from the list (do not kick players already in a room back to lobby)
+・Auto remesh after disconnect; token／backend errors prefer reopening the room — no silent mid-game lobby drop
+・Invite links: freeze UI for valid or corrupt tokens; damaged links show “invalid or damaged”
+・Second-tab joins less often show blank TOKEN／images (settle + delayed remount)`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

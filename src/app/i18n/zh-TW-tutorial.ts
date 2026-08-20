@@ -102,6 +102,8 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　狀態圖示＝常駐名牌（含死亡等）；死亡與戰鬥追蹤器「倒下」雙向同步
 　　　　圖片效果＝右鍵可設灰階／復古／Matrix 數位雨／剪影／翻轉／高對比等
 　　　　底盤套圈＝右鍵「套圈」選擇
+＜地形・3D＞拖 STL／OBJ／glTF／FBX 或 ZIP＝焙成六面貼圖地形；L 形可 Shift 多選成組
+　　　　斜面角度、六面分貼、霓虹招牌；設定可鎖長寬比
 ＜地圖遮罩＞Alt＋雙擊＝觸發設定中的動作（可複選）：聊天／骰子、音樂、Cut-in、筆記出示、切地圖、套用場面、外觀 A/B、Token 效果
 　　　　Token 效果可勾「站上自動套用」（離開還原）；手動套用不被離開還原
 ＜場景工具＞僅 GM（選單）；選取／燈光／牆壁／矩形／橢圓／多邊形／手繪／文字
@@ -206,6 +208,17 @@ Patreon：https://www.patreon.com/HKTRPG
 ・移除與複製貼上重複的「建立副本」；請用 Ctrl＋C／V，角色另有進階複製（暫存 Token／編號等）
 ・「貼上為暫存 Token」與 Ctrl＋Shift＋V：僅剪貼簿含角色／Token 時出現（骰子等不再誤顯示）
 ・物件設定統一「匯入」「匯出」（ZIP）；角色另有「下載為 JSON」（CCFOLIA；並寫入系統剪貼簿）`,
+  'changelog.2026terrain': `2026/08/17 地形・3D 模型
+・拖曳 STL／OBJ／glTF／FBX（或含模型的 ZIP）落桌＝焙成六面貼圖地形
+・L 形等可拆成 bake group：Shift 多選後成組／解除；可整組移動・縮放・匯出
+・地形斜面角度、六面分開貼圖、霓虹招牌發光；單塊角落縮放與長寬比鎖定
+・小型 Token 名稱標籤單行顯示；讀 ZIP 還原圖片標籤與劇透隱藏`,
+  'changelog.2026net': `2026/08/20–21 連線・邀請
+・進房前保留本機桌面，確認有 live peer＋地圖資料才接上
+・達不到的幽靈房從列表隱藏（不再把已入房玩家踢回大廳）
+・斷線後自動 remesh；token／backend 錯誤優先重開房間，不在局中靜默掉回大廳
+・邀請連結：有效／損壞皆先凍結畫面；損壞連結顯示「無效或已損壞」
+・第二分頁入房後 TOKEN／圖片較不易空白（settle＋延遲 remount）`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教學：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
