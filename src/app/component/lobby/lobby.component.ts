@@ -139,8 +139,10 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (!silent || this.rooms.length < 1) {
       this.help = this.i18n.t('lobby.helpSearching');
     }
+    // Manual / empty: force Find. Silent auto-refresh with rooms: use cache TTL.
+    const force = !silent || this.rooms.length < 1;
     // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
-    let rooms = await Network.listAllRooms(true);
+    let rooms = await Network.listAllRooms(force);
     if (rooms.length < 1 && !silent) {
       await new Promise<void>(resolve => setTimeout(resolve, 600));
       rooms = await Network.listAllRooms(true);

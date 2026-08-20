@@ -68,6 +68,15 @@ export class RoomInviteService {
     return url.toString();
   }
 
+  /** True when URL has an invite query (even if the token is truncated / corrupt). */
+  hasInviteInLocation(): boolean {
+    try {
+      return new URLSearchParams(window.location.search).has('invite');
+    } catch {
+      return false;
+    }
+  }
+
   parseInviteFromLocation(): RoomInvitePayload | null {
     try {
       const params = new URLSearchParams(window.location.search);

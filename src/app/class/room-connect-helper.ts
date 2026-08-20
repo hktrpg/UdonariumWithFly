@@ -44,8 +44,16 @@ export class RoomConnectHelper {
   static JOIN_QUIESCE_MS = 400;
   /** Overall join probe ceiling (tests may shorten). */
   static CONNECT_TIMEOUT_MS_FOR_TEST = 0; // 0 = use CONNECT_TIMEOUT_MS
+  /** After failed join, App skips reopen until this timestamp (ms since epoch). */
+  private static readonly JOIN_OWNED_MS = 2000;
+  /** Delayed remount so late token/image UPDATEs are mounted with suppressEnterBounce. */
+  static JOIN_SETTLE_REMOUNT_MS = 200;
   /** Probe join in progress: keep lobby/tabletop until a live peer + tabletop is confirmed. */
   static joinInProgress = false;
+  /** Bumped on each beginJoinProbe — ownership window for NETWORK_ERROR after finish. */
+  static joinErrorEpoch = 0;
+  /** performance.now()-style wall clock: Date.now() until which join owns NETWORK_ERROR. */
+  private static joinOwnedUntil = 0;
   /** Last failed join probe reason for lobby / invite messaging. */
   static lastJoinFailReason = '';
   /** Lobby rooms to hide after a failed join probe (ghost / unreachable). */
@@ -55,6 +63,12 @@ export class RoomConnectHelper {
 
   static get isReopenInFlight(): boolean {
     return RoomConnectHelper.reopenInFlight;
+  }
+
+  /** True while join probe runs, or briefly after fail so App cannot reopen-race abandon. */
+  static get isJoinOwningNetworkError(): boolean {
+    return RoomConnectHelper.joinInProgress
+      || Date.now() < RoomConnectHelper.joinOwnedUntil;
   }
 
   /**
@@ -127,7 +141,8 @@ export class RoomConnectHelper {
    * Prevents abandonFailedJoinProbe ↔ reopenLastRoomOrLobby racing Network.open.
    */
   static shouldAttemptReopenNow(): boolean {
-    return !RoomConnectHelper.joinInProgress && !RoomConnectHelper.reopenInFlight;
+    return !RoomConnectHelper.isJoinOwningNetworkError
+      && !RoomConnectHelper.reopenInFlight;
   }
 
   /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
@@ -163,13 +178,16 @@ export class RoomConnectHelper {
       if (Network.peers.length > 0) return;
 
       // Channel members first — connect() already requires targets in room.members.
+      // When others are visible in-channel, skip lobby Find this round (retry next loop).
       const memberIds = Network.listRoomMemberPeerIds();
-      if (memberIds.length > 0) {
-        for (const peerId of memberIds) {
-          if (peerId === Network.peerId) continue;
+      const otherMembers = memberIds.filter(id => id && id !== Network.peerId);
+      if (otherMembers.length > 0) {
+        for (const peerId of otherMembers) {
           if (Network.connect(PeerContext.parse(peerId))) attemptedConnect = true;
         }
         if (Network.peers.length > 0) return;
+        await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));
+        continue;
       }
 
       const rooms = await Network.listAllRooms(true);
@@ -230,6 +248,8 @@ export class RoomConnectHelper {
 
   private static beginJoinProbe() {
     RoomConnectHelper.joinInProgress = true;
+    RoomConnectHelper.joinErrorEpoch++;
+    RoomConnectHelper.joinOwnedUntil = 0;
     RoomConnectHelper.lastJoinFailReason = '';
     FolderBackupService.instance?.beginJoinQuarantine();
     ObjectSynchronizer.instance.enableJoinFetch();
@@ -241,12 +261,15 @@ export class RoomConnectHelper {
     ObjectSynchronizer.instance.disableJoinFetch();
     ObjectSynchronizer.instance.releasePeerSync(ok);
     if (ok) {
+      RoomConnectHelper.joinOwnedUntil = 0;
       FolderBackupService.instance?.markContentTrusted();
       // ZIP load calls restoreAfterRoomLoad (ROOM_PIECES remount + suppress bounce).
       // Mesh join used to skip that — 2nd tab tokens can stick invisible / without
       // images until map switch or another peer's CONNECT_PEER. Mirror ZIP settle.
       queueMicrotask(() => RoomConnectHelper.settleTabletopAfterMeshJoin());
     } else {
+      // Hold reopen off while abandonFailedJoinProbe opens lobby (and a short tail).
+      RoomConnectHelper.joinOwnedUntil = Date.now() + RoomConnectHelper.JOIN_OWNED_MS;
       FolderBackupService.instance?.abortJoinQuarantine();
     }
   }
@@ -263,6 +286,19 @@ export class RoomConnectHelper {
     } catch (e) {
       console.warn('RoomConnectHelper join settle (images) failed', e);
     }
+    const delayMs = RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS;
+    if (delayMs > 0) {
+      const tableId = TableSelecter.instance.viewedTableIdentifier
+        || TableSelecter.instance.viewTableIdentifier
+        || '';
+      setTimeout(() => {
+        try {
+          EventSystem.trigger('ROOM_PIECES_REPLACED', { tableId });
+        } catch (e) {
+          console.warn('RoomConnectHelper join settle (delayed remount) failed', e);
+        }
+      }, delayMs);
+    }
   }
 
   /**
@@ -273,7 +309,7 @@ export class RoomConnectHelper {
    * Shows busy overlay until OPEN_NETWORK (+ remesh) / NETWORK_ERROR / timeout.
    */
   static reopenLastRoomOrLobby(): RoomReopenResult {
-    if (RoomConnectHelper.joinInProgress) return 'busy';
+    if (RoomConnectHelper.isJoinOwningNetworkError) return 'busy';
     if (RoomConnectHelper.reopenInFlight) return 'busy';
 
     const session = Network.getLastRoomSession();

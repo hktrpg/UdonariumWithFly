@@ -84,7 +84,7 @@ import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { RoomAuth } from '@udonarium/room-auth';
-import { RoomInviteService } from 'service/room-invite.service';
+import { RoomInviteService, RoomInviteJoinResult } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
@@ -259,7 +259,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private maskTokenFx: MaskTokenFxService,
     private weatherSe: WeatherSeService,
     _audioImportName: AudioImportNameService,
-    _connectionBusy: ConnectionBusyService,
+    private connectionBusy: ConnectionBusyService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -590,8 +590,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.isLoggedin = false;
 
           // Prefer room reopen (incl. token refresh) over kicking to lobby / stuck offline.
-          // Join probe owns NETWORK_ERROR while active (abandon vs reopen race).
-          if (RoomConnectHelper.joinInProgress) return;
+          // Join probe owns NETWORK_ERROR while active and briefly after fail (abandon race).
+          if (RoomConnectHelper.isJoinOwningNetworkError) return;
 
           if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)
             && RoomConnectHelper.shouldAttemptReopenNow()) {
@@ -851,17 +851,30 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async tryConsumeInvite() {
+    if (!this.roomInvite.hasInviteInLocation()) return;
+
     const payload = this.roomInvite.parseInviteFromLocation();
-    if (!payload) return;
     this.roomInvite.clearInviteFromLocation();
 
-    // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
-    for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+    // Freeze UI for every invite URL (valid or corrupt) — then success or error modal.
+    if (!this.connectionBusy.busy) this.connectionBusy.show('invite.joining');
+    let result: RoomInviteJoinResult = 'invalid';
+    try {
+      // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
+      for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      // Keep overlay visible briefly so corrupt links still feel like a join attempt.
+      if (!payload) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        result = 'invalid';
+      } else {
+        result = await this.roomInvite.joinFromInvite(payload);
+        if (result === 'ok') return;
+      }
+    } finally {
+      this.connectionBusy.hide();
     }
-
-    const result = await this.roomInvite.joinFromInvite(payload);
-    if (result === 'ok') return;
 
     const errorKey = `invite.error.${result}`;
     await this.modalService.open(ConfirmationComponent, {
@@ -874,6 +887,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     this.maskTokenFx.start();
+    // Invite deep-link: freeze UI immediately (before SkyWay open / lobby), including corrupt tokens.
+    if (this.roomInvite.hasInviteInLocation()) {
+      this.connectionBusy.show('invite.joining');
+    }
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
     this.syncChatUnreadBadge();
@@ -1096,7 +1113,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.guidedTour.isActive) return;
     if (!PanelService.defaultParentViewContainerRef) return;
     if (!Network.isOpen || Network.peer?.isRoom) return;
-    if (this.roomInvite.parseInviteFromLocation()) return;
+    if (this.roomInvite.hasInviteInLocation()) return;
+    // Invite join still running (URL already cleared) — do not flash lobby under overlay.
+    if (this.connectionBusy.busy) return;
     this.lobbyAutoOpened = true;
     // Normal UI panel (not modal): no overlay / focus trap; map stays usable.
     PanelService.closePanelsByTourId('menu.lobby');

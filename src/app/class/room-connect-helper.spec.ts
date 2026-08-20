@@ -2,6 +2,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { Room } from '@udonarium/room';
+import { TableSelecter } from '@udonarium/table-selecter';
 
 import { RoomConnectHelper } from './room-connect-helper';
 
@@ -92,6 +93,8 @@ describe('RoomConnectHelper settle predicates', () => {
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   afterEach(() => {
     (RoomConnectHelper as any).reopenInFlight = false;
+    (RoomConnectHelper as any).joinOwnedUntil = 0;
+    RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.everHadRoomSession = false;
   });
 
@@ -154,7 +157,24 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     expect(RoomConnectHelper.shouldAttemptReopenNow()).toBeFalse();
     expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('busy');
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it('returns busy during joinOwnedUntil after a failed probe', () => {
     RoomConnectHelper.joinInProgress = false;
+    (RoomConnectHelper as any).joinOwnedUntil = Date.now() + 5000;
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOn(Network, 'getLastRoomSession').and.returnValue({
+      userId: 'u1',
+      roomId: 'Ab1',
+      roomName: 'TestRoom',
+      meshPassword: '',
+    });
+    const open = spyOn(Network, 'open');
+
+    expect(RoomConnectHelper.isJoinOwningNetworkError).toBeTrue();
+    expect(RoomConnectHelper.shouldAttemptReopenNow()).toBeFalse();
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('busy');
+    expect(open).not.toHaveBeenCalled();
   });
 });
 
@@ -192,6 +212,20 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
     expect(list).toHaveBeenCalledWith(true);
     expect(list).toHaveBeenCalledTimes(3);
     expect(Network.connect).not.toHaveBeenCalled();
+  });
+
+  it('skips lobby list this round when channel members are present', async () => {
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'other']);
+    (Network.connect as jasmine.Spy).and.returnValue(false);
+    const list = spyOn(Network, 'listAllRooms').and.resolveTo([]);
+    (RoomConnectHelper as any).REMESH_ATTEMPTS = 1;
+    (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
+    (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = 0;
+
+    await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
+
+    expect(Network.connect).toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('connects channel members before falling back to lobby list', async () => {
@@ -282,6 +316,34 @@ describe('RoomConnectHelper.openAndConnect', () => {
     expect(settle).toHaveBeenCalled();
   });
 
+  it('schedules delayed ROOM_PIECES_REPLACED after settle', async () => {
+    const prevRemount = RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS;
+    RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS = 30;
+    spyOn(TableSelecter.instance, 'restoreAfterRoomLoad').and.stub();
+    const trigger = spyOn(EventSystem, 'trigger').and.callThrough();
+
+    RoomConnectHelper.settleTabletopAfterMeshJoin();
+    const piecesCalls = () =>
+      trigger.calls.allArgs().filter(args => String(args[0]) === 'ROOM_PIECES_REPLACED');
+    expect(piecesCalls().length).toBe(0);
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+    expect(piecesCalls().length).toBeGreaterThan(0);
+
+    RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS = prevRemount;
+  });
+
+  it('sets joinOwnedUntil when join probe fails so reopen stays busy', async () => {
+    (Network.connect as jasmine.Spy).and.returnValue(false);
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('ghost')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+
+    await expectAsync(result).toBeResolvedTo(false);
+    expect(RoomConnectHelper.isJoinOwningNetworkError).toBeTrue();
+    expect(RoomConnectHelper.shouldAttemptReopenNow()).toBeFalse();
+    (RoomConnectHelper as any).joinOwnedUntil = 0;
+  });
+
   it('does not settle tabletop when join probe fails', async () => {
     const settle = spyOn(RoomConnectHelper, 'settleTabletopAfterMeshJoin').and.stub();
     (Network.connect as jasmine.Spy).and.returnValue(false);
@@ -292,6 +354,7 @@ describe('RoomConnectHelper.openAndConnect', () => {
     await expectAsync(result).toBeResolvedTo(false);
     await new Promise<void>(resolve => queueMicrotask(resolve));
     expect(settle).not.toHaveBeenCalled();
+    (RoomConnectHelper as any).joinOwnedUntil = 0;
   });
 
   it('resolves true on first CONNECT_PEER without waiting for remaining targets', async () => {
