@@ -250,17 +250,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.destroyed) return;
-    this.help = this.i18n.t('lobby.helpStaleRoom');
+    const failKey = RoomConnectHelper.joinFailMessageKey(RoomConnectHelper.lastJoinFailReason);
+    this.help = this.i18n.t(`${failKey}.help`);
     const popup = this.modalService.open(ConfirmationComponent, {
-      title: this.i18n.t('lobby.staleRoom.title'),
-      text: this.i18n.t('lobby.staleRoom.text'),
-      help: this.i18n.t('lobby.helpStaleRoom'),
+      title: this.i18n.t(`${failKey}.title`),
+      text: this.i18n.t(`${failKey}.text`),
+      help: this.i18n.t(`${failKey}.help`),
       type: ConfirmationType.OK,
       materialIcon: 'link_off',
     });
     void this.reload(true);
     await popup;
-    if (!this.destroyed) this.help = this.i18n.t('lobby.helpStaleRoom');
+    if (!this.destroyed) this.help = this.i18n.t(`${failKey}.help`);
   }
 
   async showRoomSetting() {

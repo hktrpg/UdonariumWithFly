@@ -17,8 +17,8 @@ import { installSkyWayQuietLogger } from './skyway-log';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
-  /** Ghost lobby listings expire faster; too low causes false disconnects on slow links. */
-  private static readonly MEMBER_KEEPALIVE_SEC = 10;
+  /** Lobby/room membership TTL. Prefer fewer false fatals over slightly stickier ghosts; leave/close drops membership promptly. */
+  private static readonly MEMBER_KEEPALIVE_SEC = 30;
   url = '';
   context: SkyWayContext;
   private lobby: Channel;

@@ -22,6 +22,10 @@ import { FolderBackupService } from 'service/folder-backup.service';
  */
 export class RoomConnectHelper {
   private static readonly CONNECT_TIMEOUT_MS = 45000;
+  private static readonly REMESH_ATTEMPTS = 12;
+  private static readonly REMESH_DELAY_MS = 250;
+  /** After connect attempts, wait this long for at least one open peer (handshake). */
+  private static readonly REMESH_PEER_WAIT_MS = 5000;
   /** Ghost SkyWay members often CONNECT then drop; require they stay up this long. */
   static JOIN_STABLE_MS = 1500;
   /** After CONNECT, fail the probe if no game-table data arrives (ghost / empty room). */
@@ -30,6 +34,8 @@ export class RoomConnectHelper {
   static JOIN_QUIESCE_MS = 400;
   /** Probe join in progress: keep lobby/tabletop until a live peer + tabletop is confirmed. */
   static joinInProgress = false;
+  /** Last failed join probe reason for lobby / invite messaging. */
+  static lastJoinFailReason = '';
   /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
   private static reopenInFlight = false;
 
@@ -52,8 +58,77 @@ export class RoomConnectHelper {
     return aliasName === 'game-table';
   }
 
+  /** PeerId password digest filter: role/mesh rooms use empty digests. */
+  static connectPasswordForRoom(roomName: string, meshPassword: string): string {
+    if (RoomAuth.isRoleAuthRoom(roomName) || RoomAuth.isMeshLocked(roomName)) return '';
+    return meshPassword || '';
+  }
+
+  /**
+   * Poll lobby listings and mesh-connect to peers in the same room.
+   * One-sided connect is enough: the remote gets onSubscribed and opens the reverse stream.
+   * Does not resolve until an open peer appears, the room is alone, or peer-wait times out.
+   */
+  static async remeshRoomPeers(roomId: string, roomName: string, connectPassword: string = ''): Promise<void> {
+    let attemptedConnect = false;
+    for (let i = 0; i < RoomConnectHelper.REMESH_ATTEMPTS; i++) {
+      if (Network.peers.length > 0) return;
+
+      const rooms = await Network.listAllRooms();
+      const room = rooms.find(r => r.id === roomId && r.name === roomName);
+      if (!room) {
+        await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));
+        continue;
+      }
+
+      const others = room.filterByPassword(connectPassword).filter(p => p.peerId !== Network.peerId);
+      if (others.length < 1) return; // alone in room listing
+
+      for (const peer of others) {
+        if (Network.connect(peer)) attemptedConnect = true;
+      }
+      if (Network.peers.length > 0) return;
+
+      await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));
+    }
+
+    if (attemptedConnect && Network.peers.length < 1) {
+      await RoomConnectHelper.waitForOpenPeer(RoomConnectHelper.REMESH_PEER_WAIT_MS);
+    }
+  }
+
+  /** Resolve when Network.peers has an open peer, or when timeoutMs elapses. */
+  static waitForOpenPeer(timeoutMs: number): Promise<void> {
+    if (timeoutMs <= 0 || Network.peers.length > 0) return Promise.resolve();
+    return new Promise(resolve => {
+      const key = { remeshPeerWait: true };
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        EventSystem.unregister(key);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      EventSystem.register(key).on('CONNECT_PEER', () => {
+        if (Network.peers.length > 0) done();
+      });
+    });
+  }
+
+  /** Map join fail reason to lobby i18n key prefix (title/text/help under that prefix). */
+  static joinFailMessageKey(reason: string): string {
+    if (reason === 'no_tabletop_data') return 'lobby.joinDataTimeout';
+    if (reason === 'connect_timeout' || reason === 'network_error_mesh' || reason === 'network_error_open') {
+      return 'lobby.joinNetworkTimeout';
+    }
+    return 'lobby.staleRoom';
+  }
+
   private static beginJoinProbe() {
     RoomConnectHelper.joinInProgress = true;
+    RoomConnectHelper.lastJoinFailReason = '';
     FolderBackupService.instance?.beginJoinQuarantine();
     ObjectSynchronizer.instance.enableJoinFetch();
     ObjectSynchronizer.instance.holdPeerSync();
@@ -70,7 +145,7 @@ export class RoomConnectHelper {
   /**
    * After SkyWay fatal close: reopen the last room (so lobby lists us again),
    * or fall back to a plain lobby peer when no room session was stored.
-   * Shows busy overlay until OPEN_NETWORK / NETWORK_ERROR / timeout.
+   * Shows busy overlay until OPEN_NETWORK (+ remesh) / NETWORK_ERROR / timeout.
    * @returns false if a reopen is already in progress.
    */
   static reopenLastRoomOrLobby(): boolean {
@@ -99,7 +174,20 @@ export class RoomConnectHelper {
     }, 30000);
 
     EventSystem.register(key)
-      .on('OPEN_NETWORK', () => finish())
+      .on('OPEN_NETWORK', () => {
+        void (async () => {
+          if (willReopenRoom && session) {
+            const connectPassword = RoomConnectHelper.connectPasswordForRoom(
+              session.roomName, session.meshPassword || '');
+            try {
+              await RoomConnectHelper.remeshRoomPeers(session.roomId, session.roomName, connectPassword);
+            } catch (e) {
+              console.warn('RoomConnectHelper remesh after reopen failed', e);
+            }
+          }
+          finish();
+        })();
+      })
       .on('NETWORK_ERROR', () => finish());
 
     if (willReopenRoom) {
@@ -124,6 +212,7 @@ export class RoomConnectHelper {
       const tried = new Set<string>();
       let settled = false;
       let sawTabletopData = false;
+      let failReason = '';
       let stableElapsed = RoomConnectHelper.JOIN_STABLE_MS <= 0;
       let stableTimer: ReturnType<typeof setTimeout> | null = null;
       let dataTimer: ReturnType<typeof setTimeout> | null = null;
@@ -131,6 +220,7 @@ export class RoomConnectHelper {
       const timeoutId = setTimeout(() => {
         if (settled) return;
         console.warn('RoomConnectHelper connect timeout');
+        failReason = 'connect_timeout';
         finish(false);
       }, RoomConnectHelper.CONNECT_TIMEOUT_MS);
 
@@ -152,6 +242,8 @@ export class RoomConnectHelper {
         clearTimeout(timeoutId);
         EventSystem.unregister(listenerKey);
         ConnectionBusyService.instance?.hide();
+        if (!ok) RoomConnectHelper.lastJoinFailReason = failReason || 'unknown';
+        else RoomConnectHelper.lastJoinFailReason = '';
         RoomConnectHelper.endJoinProbe(ok);
         if (!ok) RoomConnectHelper.resetToLobby();
         resolve(ok);
@@ -183,10 +275,14 @@ export class RoomConnectHelper {
         }, RoomConnectHelper.JOIN_STABLE_MS);
       };
 
+      /** Restart the full JOIN_DATA window on every CONNECT (ghost-first races). */
       const scheduleDataDeadline = () => {
         if (settled) return;
         if (RoomConnectHelper.JOIN_DATA_MS <= 0) return;
-        if (dataTimer != null) return;
+        if (dataTimer != null) {
+          clearTimeout(dataTimer);
+          dataTimer = null;
+        }
         dataTimer = setTimeout(() => {
           dataTimer = null;
           if (settled) return;
@@ -195,6 +291,7 @@ export class RoomConnectHelper {
             return;
           }
           console.warn('RoomConnectHelper no tabletop data');
+          failReason = 'no_tabletop_data';
           finish(false);
         }, RoomConnectHelper.JOIN_DATA_MS);
       };
@@ -233,6 +330,7 @@ export class RoomConnectHelper {
           if (RoomConnectHelper.JOIN_STABLE_MS > 0) stableElapsed = false;
         }
         if (RoomConnectHelper.shouldFailJoin(tried.size, targetPeers.length, Network.peers.length)) {
+          failReason = 'all_targets_failed';
           finish(false);
         }
       };
@@ -266,11 +364,13 @@ export class RoomConnectHelper {
                 scheduleConfirm();
                 return;
               }
+              failReason = 'network_error_mesh';
               finish(false);
             });
         })
         .on('NETWORK_ERROR', () => {
           if (settled) return;
+          failReason = 'network_error_open';
           finish(false);
         });
     });
@@ -309,18 +409,7 @@ export class RoomConnectHelper {
     });
 
     RoomAuth.applyIdentity(role, roomId);
-
-    for (let i = 0; i < 12; i++) {
-      const rooms = await Network.listAllRooms();
-      const room = rooms.find(r => r.id === roomId && r.name === roomName);
-      if (room) {
-        for (const peer of room.filterByPassword('')) {
-          if (peer.peerId !== Network.peerId) Network.connect(peer);
-        }
-        if (room.peers.length <= 1 || Network.peers.length > 0) break;
-      }
-      await new Promise(r => setTimeout(r, 250));
-    }
+    await RoomConnectHelper.remeshRoomPeers(roomId, roomName, '');
   }
 
   /** Leave a failed probe room and return to the lobby peer. */
