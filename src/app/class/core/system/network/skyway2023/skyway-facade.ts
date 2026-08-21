@@ -53,13 +53,31 @@ export class SkyWayFacade {
       // only power listAllRooms — do not block OPEN_NETWORK on them.
       this.peer.isOpen = true;
       if (this.onOpen) this.onOpen(this.peer);
-      void this.joinLobby().catch(err => {
-        console.error('skyWay joinLobby failed (room mesh still open)', err);
-      });
+      void this.ensureLobbyJoined();
     } catch (err) {
       console.error(err);
       const fatal = this.formatFatalError(err);
       if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
+    }
+  }
+
+  /**
+   * Lobby membership drives listAllRooms. Retry once; if still failing, fatal so the
+   * host is not left “online” but invisible in the lobby.
+   */
+  private async ensureLobbyJoined() {
+    if (this.isDestroyed || !this.peer.isRoom) return;
+    try {
+      await this.joinLobby();
+    } catch (err) {
+      console.error('skyWay joinLobby failed, retrying', err);
+      try {
+        await this.joinLobby();
+      } catch (retryErr) {
+        console.error('skyWay joinLobby retry failed', retryErr);
+        const fatal = this.formatFatalError(retryErr);
+        if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, retryErr);
+      }
     }
   }
 

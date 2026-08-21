@@ -212,6 +212,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => this.syncPeerHealthPoll());
       })
+      .on('NETWORK_ERROR', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('CONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('DISCONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))
