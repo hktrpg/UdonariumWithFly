@@ -216,6 +216,9 @@ Patreon：https://www.patreon.com/HKTRPG
   'changelog.2026net': `2026/08/20–21 接続・招待
 ・入室確定までローカル卓を保持（live peer＋マップデータ後に切替）
 ・到達不能な幽霊部屋は一覧から隠す（入室済みをロビーに蹴らない）
+・ネットワークタイムアウト／接続エラーでは部屋を隠さない（ロビーから再試行可）；入室時は SkyWay メンバーも mesh
+・入室タイムアウトは OPEN_NETWORK から起算；connect 軟失敗は remesh 再試行（初回入室の失敗を軽減）
+・部屋 open 後に lobby Find を待たない；起動時に SkyWay／backend を予熱し Your ID を早く表示
 ・切断後は自動 remesh；token／backend エラーは部屋の再開を優先（対局中に黙ってロビーへ落とさない）
 ・招待リンク：有効／破損とも先に画面凍結；破損は「無効または破損」を表示
 ・2 つ目のタブ入室後、TOKEN／画像が空白になりにくい（settle＋遅延 remount）`,

@@ -178,7 +178,7 @@ export const ja_ui: I18nDictionary = {
   'lobby.joinDataTimeout.help': '接続はできましたが卓データがタイムアウトしました。誰も退出させていません。一覧を更新して再試行してください。',
   'lobby.joinNetworkTimeout.title': '入室できません',
   'lobby.joinNetworkTimeout.text': '入室中に接続がタイムアウトしたか、ネットワークが切断されました。誰も退出させていません。接続を確認して再試行してください。',
-  'lobby.joinNetworkTimeout.help': '入室に失敗しました。誰も退出させていません。しばらくしてから再試行してください。',
+  'lobby.joinNetworkTimeout.help': '入室に失敗しました。誰も退出させていません。部屋はロビー一覧に残ります。しばらくしてから再試行してください。',
 
   'roomJoin.selectRole': '役割を選択',
   'roomJoin.switchRole': '役割を切替',

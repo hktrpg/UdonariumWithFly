@@ -216,6 +216,9 @@ Patreon：https://www.patreon.com/HKTRPG
   'changelog.2026net': `2026/08/20–21 连线・邀请
 ・进房前保留本机桌面，确认有 live peer＋地图数据才接上
 ・达不到的幽灵房从列表隐藏（不再把已入房玩家踢回大厅）
+・网络超时／连线错误不隐藏房间（可从大厅重试）；入房时一并 mesh 当前 SkyWay 成员
+・入房超时从 OPEN_NETWORK 起算；connect 软失败可 remesh 重试（减轻第一次连不上）
+・房间 open 后不阻塞 lobby Find；开站预热 SkyWay／backend，Your ID 较快出现
 ・断线后自动 remesh；token／backend 错误优先重开房间，不在局中静默掉回大厅
 ・邀请链接：有效／损坏皆先冻结画面；损坏链接显示「无效或已损坏」
 ・第二分页入房后 TOKEN／图片较不易空白（settle＋延迟 remount）`,

@@ -17,6 +17,8 @@ export class Network {
     return Network._instance;
   }
   get isOpen(): boolean { return this.connection ? this.connection.peer.isOpen : false; }
+  /** True between open() and OPEN_NETWORK / NETWORK_ERROR — peer menu shows Connecting. */
+  get isOpening(): boolean { return this.opening && !this.isOpen; }
 
   get peerId(): string { return this.connection ? this.connection.peerId : unknownPeer.peerId; }
   get peerIds(): string[] { return this.connection ? this.connection.peerIds.concat() : []; }
@@ -40,6 +42,8 @@ export class Network {
   private connectionGen = 0;
   /** Survives fatal close() which wipes peer to ??? — used for room reopen. */
   private lastRoomSession: LastRoomSession | null = null;
+  /** Set by open(); cleared on OPEN_NETWORK / NETWORK_ERROR (via connection callbacks). */
+  private opening = false;
 
   private queue: Set<QueueItem> = new Set();
   private sendInterval: number = null;
@@ -70,26 +74,42 @@ export class Network {
 
   configure(config: any) {
     this.config = config;
+    // Warm SkyWay chunk + backend TLS before the first open() so Your ID appears sooner.
+    void this.dynamicImport(config?.backend?.mode);
+    const url = config?.backend?.url;
+    if (typeof url === 'string' && url.length > 0) {
+      try {
+        void fetch(new URL('/v1/status', url).href).catch(() => { /* warmup */ });
+      } catch {
+        // Invalid URL in config — open() will surface the real error.
+      }
+    }
   }
 
   open(userId?: string)
   open(userId: string, roomId: string, roomName: string, password: string)
   open(...args: any[]) {
     const seq = ++this.openSeq;
+    this.opening = true;
     void this.openSerialized(seq, ...args);
   }
 
   private async openSerialized(seq: number, ...args: any[]) {
-    await this.closing;
-    if (seq !== this.openSeq) return;
+    try {
+      await this.closing;
+      if (seq !== this.openSeq) return;
 
-    // Reopen is normal (lobby → room, room switch, backup load).
-    if (this.connection || this.connectionClassPromise) {
-      await this.closeAsync();
+      // Reopen is normal (lobby → room, room switch, backup load).
+      if (this.connection || this.connectionClassPromise) {
+        await this.closeAsync();
+      }
+      if (seq !== this.openSeq) return;
+
+      await this.openAsync(seq, ...args);
+    } catch (e) {
+      if (seq === this.openSeq) this.opening = false;
+      throw e;
     }
-    if (seq !== this.openSeq) return;
-
-    await this.openAsync(seq, ...args);
   }
 
   private async openAsync(seq: number, ...args: any[]) {
@@ -215,13 +235,19 @@ export class Network {
     connection.configure(this.config);
 
     const live = () => gen === this.connectionGen;
-    connection.callback.onOpen = (peer) => { if (live() && this.callback.onOpen) this.callback.onOpen(peer); }
+    connection.callback.onOpen = (peer) => {
+      if (!live()) return;
+      this.opening = false;
+      if (this.callback.onOpen) this.callback.onOpen(peer);
+    };
     connection.callback.onClose = (peer) => { if (live() && this.callback.onClose) this.callback.onClose(peer); }
     connection.callback.onConnect = (peer) => { if (live() && this.callback.onConnect) this.callback.onConnect(peer); }
     connection.callback.onDisconnect = (peer) => { if (live() && this.callback.onDisconnect) this.callback.onDisconnect(peer); }
     connection.callback.onData = (peer, data: any[]) => { if (live() && this.callback.onData) this.callback.onData(peer, data); }
     connection.callback.onError = (peer, errorType, errorMessage, errorObject) => {
-      if (live() && this.callback.onError) this.callback.onError(peer, errorType, errorMessage, errorObject);
+      if (!live()) return;
+      this.opening = false;
+      if (this.callback.onError) this.callback.onError(peer, errorType, errorMessage, errorObject);
     };
 
     if (0 < this.queue.size && this.sendInterval === null) this.sendInterval = setZeroTimeout(this.sendCallback);

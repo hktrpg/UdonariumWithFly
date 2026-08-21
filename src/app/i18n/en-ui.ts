@@ -178,7 +178,7 @@ export const en_ui: I18nDictionary = {
   'lobby.joinDataTimeout.help': 'Connected but room data timed out. Nobody was kicked. Refresh and try again.',
   'lobby.joinNetworkTimeout.title': 'Could not join room',
   'lobby.joinNetworkTimeout.text': 'Join timed out or the network dropped. Nobody was kicked. Check your connection and retry.',
-  'lobby.joinNetworkTimeout.help': 'Room join failed. Nobody was kicked. Retry later.',
+  'lobby.joinNetworkTimeout.help': 'Room join failed. Nobody was kicked. The room stays in your lobby list — retry later.',
 
   'roomJoin.selectRole': 'Choose role',
   'roomJoin.switchRole': 'Switch role',

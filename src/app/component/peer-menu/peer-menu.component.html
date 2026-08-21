@@ -43,7 +43,9 @@
         </button>
         <span [@fadeInOut]="isCopied" class="copied" [style.color]="myPeerColor">{{ isCopied ? ('peer.copied' | i18n) : '' }}</span>
       </ng-container>
-      <ng-template #offlineBlock><b>{{ 'peer.offline' | i18n }}</b></ng-template>
+      <ng-template #offlineBlock>
+        <b>{{ (networkService.isOpening ? 'peer.connecting' : 'peer.offline') | i18n }}</b>
+      </ng-template>
     </div>
 
     <ng-container *ngIf="networkService.peer.isRoom">
