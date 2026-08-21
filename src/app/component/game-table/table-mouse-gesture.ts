@@ -1,4 +1,5 @@
 import { InputHandler } from 'directive/input-handler';
+import { NoteHandoutComponent } from 'component/note-handout/note-handout.component';
 
 type Callback = (srcEvent: TouchEvent | MouseEvent | PointerEvent) => void;
 type OnTransformCallback = (transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: TableMouseGestureEvent, srcEvent: TouchEvent | MouseEvent | PointerEvent | KeyboardEvent) => void;
@@ -38,6 +39,11 @@ export class TableMouseGesture {
   get isDragging(): boolean { return this.input.isDragging; }
 
   private callbackOnWheel = (e) => this.onWheel(e);
+  /** Capture: always block browser Ctrl/Meta+wheel page-zoom (map uses it to pan). */
+  private callbackOnWheelCapture = (e: WheelEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.cancelable) e.preventDefault();
+  };
   private callbackOnKeydown = (e) => this.onKeydown(e);
   private callbackOnKeyup = (e) => this.onKeyup(e);
   private callbackOnBlur = () => { this.altHeld = false; };
@@ -77,6 +83,7 @@ export class TableMouseGesture {
   }
 
   onInputStart(ev: any) {
+    if (NoteHandoutComponent.previewConsumesPointer) return;
     this.currentPositionX = this.input.pointer.x;
     this.currentPositionY = this.input.pointer.y;
     this.buttonCode = ev.button;
@@ -88,6 +95,7 @@ export class TableMouseGesture {
   }
 
   onInputMove(ev: any) {
+    if (NoteHandoutComponent.previewConsumesPointer) return;
     let x = this.input.pointer.x;
     let y = this.input.pointer.y;
     let deltaX = x - this.currentPositionX;
@@ -121,6 +129,11 @@ export class TableMouseGesture {
   }
 
   onWheel(ev: WheelEvent) {
+    // Ctrl-preview handout owns the wheel (zoom content) — do not pan/zoom the map.
+    if (NoteHandoutComponent.previewConsumesWheel) {
+      if (ev.cancelable) ev.preventDefault();
+      return;
+    }
     // Ctrl+Shift+wheel = object rotate (handled in TabletopKeyboardService).
     if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) return;
     // Alt+wheel with selection = object rotate (same service, capture phase).
@@ -319,6 +332,8 @@ export class TableMouseGesture {
 
   private addEventListeners() {
     this.targetElement.addEventListener('wheel', this.callbackOnWheel, { passive: false });
+    // Capture on window so Ctrl+wheel during note preview (and elsewhere) cannot zoom the browser.
+    window.addEventListener('wheel', this.callbackOnWheelCapture, { capture: true, passive: false });
     document.body.addEventListener('keydown', this.callbackOnKeydown, false);
     document.body.addEventListener('keyup', this.callbackOnKeyup, false);
     window.addEventListener('blur', this.callbackOnBlur);
@@ -326,6 +341,7 @@ export class TableMouseGesture {
 
   private removeEventListeners() {
     this.targetElement.removeEventListener('wheel', this.callbackOnWheel);
+    window.removeEventListener('wheel', this.callbackOnWheelCapture, true);
     document.body.removeEventListener('keydown', this.callbackOnKeydown, false);
     document.body.removeEventListener('keyup', this.callbackOnKeyup, false);
     window.removeEventListener('blur', this.callbackOnBlur);

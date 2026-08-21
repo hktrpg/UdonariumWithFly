@@ -25,6 +25,12 @@
   pointer-events: auto;
 }
 
+.note-face-body:has(> .pdf-wrap) > .pdf-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .note-video {
   width: 100%;
   max-height: 100%;
@@ -48,10 +54,17 @@
 }
 
 .pdf-canvas {
-  max-width: 100%;
+  width: 100%;
   height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  object-fit: contain;
   display: block;
   pointer-events: none;
+  /* Prefer smooth downsample of the high-res PDF bitmap. */
+  image-rendering: auto;
 }
 
 .pdf-nav {
@@ -59,6 +72,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  flex: 0 0 auto;
   width: 100%;
   padding: 4px 0 6px;
   background: rgba(0, 0, 0, 0.45);
@@ -206,6 +220,13 @@
   position: absolute;
   inset: 0;
   min-height: 100%;
+}
+
+/* PDF: keep page + nav inside the paper box so the billboard bottom stays on the table. */
+.note-face-body:has(> .pdf-wrap) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /*

@@ -109,7 +109,7 @@
               class="resize-grab of-right-bottom is-pointer-events-auto"
               data-no-dblclick
               (dblclick)="$event.stopPropagation(); $event.preventDefault()"
-              [attr.title]="'note.resizeHint' | i18n">
+              [attr.title]="resizeHintKey | i18n">
               <i class="material-icons">open_in_full</i>
             </div>
           </div>

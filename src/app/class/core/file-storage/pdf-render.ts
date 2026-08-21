@@ -89,7 +89,8 @@ export async function renderPdfPage(
   if (canvasRenderSerial.get(canvas) !== serial) return null;
 
   const unscaled = pdfPage.getViewport({ scale: 1 });
-  const scale = Math.min(2, maxWidthPx / Math.max(1, unscaled.width));
+  // Allow sharp tabletop / retina renders (old cap of 2 made small notes unreadable).
+  const scale = Math.min(4, maxWidthPx / Math.max(1, unscaled.width));
   const viewport = pdfPage.getViewport({ scale });
   const context = canvas.getContext('2d');
   if (!context) return { pageCount, page };

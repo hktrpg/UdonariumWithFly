@@ -192,6 +192,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private needsPdfRender = false;
   private lastPdfKey = '';
   private pdfRenderSeq = 0;
+  /** Once per pdf id: grow paper height to the rendered page (+ title/nav) so the billboard bottom matches. */
+  private pdfHeightFittedKey = '';
   private selfPreviewOpen = false;
   private isHovering = false;
   /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
@@ -295,9 +297,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     this.ngZone.runOutsideAngular(() => {
       this.resizeInput = new InputHandler(el);
       this.resizeInput.onStart = (ev) => this.onResizeStart(ev);
-      this.resizeInput.onMove = () => this.onResizeMove();
+      this.resizeInput.onMove = (ev) => this.onResizeMove(ev);
       this.resizeInput.onEnd = () => this.onResizeEnd();
     });
+  }
+
+  /** PDF / image / video keep page aspect; text notes stay free-form. */
+  get keepsResizeAspect(): boolean {
+    return this.isPdfContent || this.isImageContent || this.isVideoContent;
+  }
+
+  get resizeHintKey(): string {
+    return this.keepsResizeAspect ? 'note.resizeHintAspect' : 'note.resizeHint';
   }
 
   private onResizeStart(ev: MouseEvent | TouchEvent) {
@@ -312,7 +323,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     this.resizeStartH = this.height;
   }
 
-  private onResizeMove() {
+  private onResizeMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) return;
     const cur = this.coordinateService.calcTabletopLocalCoordinate();
     const dx = cur.x - this.resizeStartTable.x;
@@ -325,10 +336,28 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const localDy = this.isUpright ? -(dx * sin + dy * cos) : (dx * sin + dy * cos);
     let w = MathUtil.clampMin(this.resizeStartW + localDx / this.gridSize);
     let h = MathUtil.clampMin(this.resizeStartH + localDy / this.gridSize);
+    const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
+    const lockAspect = this.keepsResizeAspect && !freeAspect;
+    if (lockAspect) {
+      const aspect = this.resizeStartW / Math.max(0.01, this.resizeStartH);
+      if (Math.abs(localDx) >= Math.abs(localDy)) {
+        h = MathUtil.clampMin(w / aspect);
+      } else {
+        w = MathUtil.clampMin(h * aspect);
+      }
+    }
     w = Math.min(40, Math.max(1, Math.round(w * 2) / 2));
     h = Math.min(40, Math.max(1, Math.round(h * 2) / 2));
+    if (lockAspect) {
+      // Re-apply after 0.5-grid snap so aspect does not drift.
+      const aspect = this.resizeStartW / Math.max(0.01, this.resizeStartH);
+      if (Math.abs(localDx) >= Math.abs(localDy)) {
+        h = Math.min(40, Math.max(1, Math.round((w / aspect) * 2) / 2));
+      } else {
+        w = Math.min(40, Math.max(1, Math.round((h * aspect) * 2) / 2));
+      }
+    }
     this.ngZone.run(() => {
-      // Free width/height — no aspect lock for A4 / sticky.
       this.textNote.width = w;
       this.textNote.height = h;
       this.changeDetector.markForCheck();
@@ -811,7 +840,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
 
   private queuePdfRender() {
     if (!this.isPdfContent) return;
-    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}`;
+    // ":hi" = sharp tabletop render tier (forces one re-render after quality bump).
+    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}:hi`;
     if (key !== this.lastPdfKey) this.needsPdfRender = true;
   }
 
@@ -823,16 +853,59 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const wantPage = this.textNote.pdfPage;
     const id = this.textNote.pdfIdentifier;
     try {
-      const maxW = Math.max(120, this.width * this.gridSize);
+      // Display width on the table is small (e.g. 4×50=200); render much sharper so text stays
+      // readable in 3D view — CSS then scales the bitmap down into the paper box.
+      const displayW = Math.max(120, this.width * this.gridSize);
+      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+      const maxW = Math.min(1600, Math.round(displayW * Math.max(3, dpr * 2.5)));
       const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
       // Ignore stale / superseded renders (rapid page flips).
       if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
-      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}`;
+      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}:hi`;
       if (this.textNote.pdfPageCount !== result.pageCount) this.textNote.pdfPageCount = result.pageCount;
       if (this.textNote.pdfPage !== result.page) this.textNote.pdfPage = result.page;
+      this.fitPaperToPdfCanvas(canvas);
       this.changeDetector.markForCheck();
     } catch (err) {
       if (seq === this.pdfRenderSeq) console.warn('text-note PDF render failed', err);
+    }
+  }
+
+  /**
+   * One-time paper fit for PDF notes:
+   * - Grow width to a mid-zoom readable size (old imports were ~4 grids / unreadable far away).
+   * - Grow height to the page aspect so the canvas does not sink past the table origin.
+   */
+  private fitPaperToPdfCanvas(canvas: HTMLCanvasElement) {
+    const id = this.textNote?.pdfIdentifier || '';
+    if (!id || this.pdfHeightFittedKey === id) return;
+    if (!canvas.width || !canvas.height) return;
+    this.pdfHeightFittedKey = id;
+    if (this.textNote.isSizeLocked) return;
+
+    /** ~500px — readable without camera glued to the note; user can still shrink after. */
+    const minReadableWidth = 10;
+    let sizeChanged = false;
+    // Old PDF imports used ~4×5; bump those once so mid-zoom text is usable.
+    // Notes the user already sized (≥5) are left alone.
+    if (this.width <= 4.5) {
+      this.textNote.width = minReadableWidth;
+      sizeChanged = true;
+    }
+
+    const titlePx = (this.isShowTitle && (this.title || '').length) ? 28 : 0;
+    const navPx = 36;
+    const pagePx = (canvas.height / Math.max(1, canvas.width)) * (this.width * this.gridSize);
+    const need = Math.max(1, Math.round(((pagePx + titlePx + navPx) / this.gridSize) * 2) / 2);
+    if (need > this.height + 0.05) {
+      this.textNote.height = need;
+      sizeChanged = true;
+    }
+
+    // Re-render at the new display width so sharpness matches the larger paper.
+    if (sizeChanged) {
+      this.lastPdfKey = '';
+      this.needsPdfRender = true;
     }
   }
 }
