@@ -1,4 +1,4 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { EventSystem } from '@udonarium/core/system';
 import { I18nService } from './i18n.service';
@@ -8,10 +8,18 @@ import { I18nService } from './i18n.service';
  * New build is used on the next manual reload / restart (no forced reload).
  */
 @Injectable({ providedIn: 'root' })
-export class AppUpdateService {
-  /** True after a new SW version is downloaded and activated for the next load. */
+export class AppUpdateService implements OnDestroy {
+  /** True when a newer build is available (activated, or install failed — still prompt reload). */
   isUpdateReady = false;
+  /** True when ngsw could not install (often index.html hash mismatch after deploy). */
+  installFailed = false;
+
   private started = false;
+  private checkTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly CHECK_INTERVAL_MS = 30 * 60 * 1000;
+  private onVisibility = () => {
+    if (document.visibilityState === 'visible') void this.checkNow();
+  };
 
   constructor(
     private swUpdate: SwUpdate,
@@ -54,21 +62,53 @@ export class AppUpdateService {
               notification.close();
               notification = null;
             }
-            this.ngZone.run(() => {
-              this.isUpdateReady = true;
-              EventSystem.trigger('APP_UPDATE_READY', null);
-              console.log('New app version activated; will apply on next reload / restart.');
-            });
+            this.markReady(false);
+            console.log('New app version activated; will apply on next reload / restart.');
+          }).catch(err => {
+            console.warn('Service worker activateUpdate failed', err);
+            this.markReady(true);
           });
           break;
         case 'VERSION_INSTALLATION_FAILED':
-          console.log(`Failed to install app version '${event.version.hash}': ${event.error}`);
+          console.warn(`Failed to install app version '${event.version.hash}': ${event.error}`);
+          if (notification) {
+            notification.close();
+            notification = null;
+          }
+          // Still show the red icon — user can hard-reload; hash mismatch is common after deploy.
+          this.markReady(true);
           break;
       }
     });
 
-    void this.swUpdate.checkForUpdate().catch(err => {
+    void this.checkNow();
+    this.ngZone.runOutsideAngular(() => {
+      this.checkTimer = setInterval(() => void this.checkNow(), this.CHECK_INTERVAL_MS);
+    });
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
+
+  ngOnDestroy() {
+    if (this.checkTimer != null) {
+      clearInterval(this.checkTimer);
+      this.checkTimer = null;
+    }
+    document.removeEventListener('visibilitychange', this.onVisibility);
+  }
+
+  private checkNow(): Promise<boolean> {
+    if (!this.swUpdate.isEnabled) return Promise.resolve(false);
+    return this.swUpdate.checkForUpdate().catch(err => {
       console.warn('Service worker update check failed', err);
+      return false;
+    });
+  }
+
+  private markReady(failed: boolean) {
+    this.ngZone.run(() => {
+      this.installFailed = failed;
+      this.isUpdateReady = true;
+      EventSystem.trigger('APP_UPDATE_READY', null);
     });
   }
 }

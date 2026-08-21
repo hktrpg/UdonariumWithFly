@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -156,6 +156,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(
     private ngZone: NgZone,
+    private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
@@ -171,6 +172,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     return Network.GuestMode();
   }
 
+  trackPeerById(_: number, peer: IPeerContext): string {
+    return peer?.peerId || '';
+  }
+
   onLocaleChange(locale: AppLocale) {
     this.i18n.setLocale(locale);
     this.refreshPanelTitle();
@@ -180,14 +185,15 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     e?.preventDefault();
     e?.stopPropagation();
     if (!this.appUpdate.isUpdateReady) return;
+    const failed = this.appUpdate.installFailed;
     const result = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('update.title'),
-      text: this.i18n.t('update.text'),
+      text: this.i18n.t(failed ? 'update.failedText' : 'update.text'),
       // update.help contains HTML; Confirmation uses helpHtml + safe pipe.
-      helpHtml: this.i18n.t('update.help'),
+      helpHtml: this.i18n.t(failed ? 'update.failedHelp' : 'update.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'system_update',
-      okLabel: this.i18n.t('update.restart'),
+      okLabel: this.i18n.t(failed ? 'update.hardReload' : 'update.restart'),
     });
     if (result === false || result == null) return;
     if (this.folderBackup.isReady) {
@@ -216,7 +222,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('CONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('DISCONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))
-      .on('APP_UPDATE_READY', () => this.ngZone.run(() => this.syncPeerHealthPoll()));
+      .on('APP_UPDATE_READY', () => this.ngZone.run(() => this.changeDetector.detectChanges()));
     this.syncPeerHealthPoll();
   }
 

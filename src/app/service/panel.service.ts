@@ -862,6 +862,7 @@ export class PanelService {
     const minH = opts?.minHeight ?? 200;
     const maxH = opts?.maxHeight ?? (window.innerHeight - 16);
     const save = opts?.save !== false;
+    const prevScrollTop = scrollEl.scrollTop;
 
     const probe = Math.min(window.innerHeight - 8, 1600);
     panelEl.style.height = `${probe}px`;
@@ -874,7 +875,10 @@ export class PanelService {
       host.offsetHeight,
       Math.ceil(host.getBoundingClientRect().height),
     );
-    if (!(contentH > 40)) return 0;
+    if (!(contentH > 40)) {
+      scrollEl.scrollTop = prevScrollTop;
+      return 0;
+    }
 
     let next = Math.max(minH, Math.min(maxH, Math.ceil(contentH + 25 + padY + 6)));
     this.height = next;
@@ -885,6 +889,8 @@ export class PanelService {
       this.height = next;
       panelEl.style.height = `${next}px`;
     }
+
+    scrollEl.scrollTop = prevScrollTop;
 
     if (save) {
       const key = this.geometryKey || this.tourPanelId;

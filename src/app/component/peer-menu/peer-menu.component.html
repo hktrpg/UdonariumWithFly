@@ -202,7 +202,7 @@
       <i class="material-icons health health-red">sentiment_very_dissatisfied</i>
       <span class="health"> {{ 'peer.healthBad' | i18n }}）</span>
     </p>
-    <div class="peer-info" *ngFor="let peer of networkService.peers">
+    <div class="peer-info" *ngFor="let peer of networkService.peers; trackBy: trackPeerById">
       <span *ngIf="!peer.isOpen">{{ 'peer.connecting' | i18n }}</span>
       <span class="peer-row">
         <span [ngClass]="{'is-gm-mode': findPeerIsGMMode(peer.peerId)}">
@@ -238,7 +238,7 @@
       (click)="confirmApplyUpdate($event)"
       (keydown.enter)="confirmApplyUpdate($event)"
       (keydown.space)="confirmApplyUpdate($event)"
-      [attr.title]="'update.readyHint' | i18n"
-      [attr.aria-label]="'update.readyHint' | i18n">system_update</i>
+      [attr.title]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n"
+      [attr.aria-label]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n">system_update</i>
   </div>
 </div>
