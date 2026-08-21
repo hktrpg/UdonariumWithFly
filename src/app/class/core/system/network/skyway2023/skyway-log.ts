@@ -4,16 +4,29 @@ import { netDebug } from '../net-debug';
 let installed = false;
 
 /** Expected peer churn / missing lobby Find — SDK dumps noisy payloads; keep console quiet. */
-function isBenignSkyWayNoise(msg: unknown[]): boolean {
+export function isBenignSkyWayNoise(msg: unknown[]): boolean {
   try {
     const text = msg.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join(' ');
-    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel/i.test(text);
+    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel|signalingClient|publicationNotExist/i.test(text);
   } catch {
     return false;
   }
 }
 
-function shortSkyWaySummary(msg: unknown[]): string {
+/**
+ * Real recovery signals that should stay visible as a single warn line
+ * (not console.error with a stack-looking SDK dump).
+ */
+export function isDowngradedSkyWayWarn(msg: unknown[]): boolean {
+  try {
+    const text = msg.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join(' ');
+    return /restartIce limit exceeded/i.test(text);
+  } catch {
+    return false;
+  }
+}
+
+export function shortSkyWaySummary(msg: unknown[]): string {
   for (const m of msg) {
     if (!m || typeof m !== 'object') continue;
     const any = m as { info?: { name?: string; detail?: string }; name?: string; message?: string };
@@ -30,7 +43,7 @@ function shortSkyWaySummary(msg: unknown[]): string {
 
 /**
  * Soften @skyway-sdk console noise: expected subscribe timeouts / missing channels
- * become netDebug-only; other errors print a one-line summary
+ * become netDebug-only; ICE restart limit is a one-line warn; other errors stay one-line
  * (full payload only with UDONARIUM_NET_DEBUG=1).
  */
 export function installSkyWayQuietLogger() {
@@ -46,6 +59,11 @@ export function installSkyWayQuietLogger() {
   proto._log = function (this: unknown, level: string, ...msg: unknown[]) {
     if ((level === 'error' || level === 'warn') && isBenignSkyWayNoise(msg)) {
       netDebug(`[skyWay] ${shortSkyWaySummary(msg)} (ignored)`);
+      return;
+    }
+    if ((level === 'error' || level === 'warn') && isDowngradedSkyWayWarn(msg)) {
+      console.warn(`[skyWay] ${shortSkyWaySummary(msg)}`);
+      netDebug('[skyWay] detail', ...msg);
       return;
     }
     if (level === 'error') {

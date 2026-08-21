@@ -175,19 +175,11 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   private async initializeSubscription() {
     //
     let member = this.member;
-    let publication = member.publications.find(publication => publication.contentType === 'data' && publication.metadata === 'udonarium-data-stream');
+    let publication = this.findDataStreamPublication(member);
 
     //
     if (!publication) {
-      this.onStreamPublished?.removeListener();
-      this.onStreamPublished = this.skyWay.room.onStreamPublished.add(event => {
-        let isMatch = event.publication.contentType === 'data' && event.publication.metadata === 'udonarium-data-stream' && event.publication.publisher.name === this.peer.peerId;
-        if (!isMatch) return;
-
-        netDebug(`onStreamPublished: ${event.publication.publisher.name} <${event.publication.metadata}>`);
-        this.onStreamPublished?.removeListener();
-        this.initializeSubscription();
-      });
+      this.waitForDataStreamPublication();
       return;
     }
 
@@ -195,6 +187,14 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     this.refresh();
     netDebug(`initializeSubscription ready ${member.name}`);
     try {
+      // Re-check: publication can vanish between find and subscribe (peer rejoin / remesh race).
+      publication = this.findDataStreamPublication(this.member);
+      if (!publication) {
+        netDebug(`[skyWay] ${member.name}: publication gone before subscribe; waiting`);
+        this.waitForDataStreamPublication();
+        return;
+      }
+
       let { subscription, stream } = await this.skyWay.roomPerson.subscribe<RemoteDataStream>(publication.id);
 
       //
@@ -210,9 +210,14 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       this.refresh();
     } catch (e) {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
-      // Peer left mid-subscribe is common with stale peer lists; keep it quiet.
-      if (/already left|onStreamAdded|timeout/i.test(msg)) {
+      // Peer left / publication raced away mid-subscribe — wait for republish when possible.
+      if (/already left|onStreamAdded|timeout|publicationNotExist/i.test(msg)) {
         netDebug(`[skyWay] ${member.name}: subscribe skipped (${e instanceof Error ? e.message : 'timeout'})`);
+        if (!this.isCanceled && this.member) {
+          this.subscription = null;
+          this.waitForDataStreamPublication();
+          return;
+        }
       } else if (e instanceof Error) {
         console.warn(`[skyWay] subscribe failed ${member.name}: ${e.name}: ${e.message}`);
       } else {
@@ -223,6 +228,28 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       this.state = 'disconnected';
       this.emit('close');
     }
+  }
+
+  private findDataStreamPublication(member: RemoteMember | undefined) {
+    return member?.publications.find(
+      publication => publication.contentType === 'data' && publication.metadata === 'udonarium-data-stream',
+    );
+  }
+
+  /** Stay half-open until the remote publishes udonarium-data-stream (or we disconnect). */
+  private waitForDataStreamPublication() {
+    this.onStreamPublished?.removeListener();
+    if (!this.skyWay.room || this.isCanceled) return;
+    this.onStreamPublished = this.skyWay.room.onStreamPublished.add(event => {
+      let isMatch = event.publication.contentType === 'data'
+        && event.publication.metadata === 'udonarium-data-stream'
+        && event.publication.publisher.name === this.peer.peerId;
+      if (!isMatch) return;
+
+      netDebug(`onStreamPublished: ${event.publication.publisher.name} <${event.publication.metadata}>`);
+      this.onStreamPublished?.removeListener();
+      this.initializeSubscription();
+    });
   }
 
   private onStateChanged(state: TransportConnectionState) {
