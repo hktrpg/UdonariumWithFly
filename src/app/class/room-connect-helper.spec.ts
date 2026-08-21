@@ -194,22 +194,34 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
 });
 
 describe('RoomConnectHelper.remeshRoomPeers', () => {
-  let openPeers: IPeerContext[];
+  let streamPeers: IPeerContext[];
+  let openPeerIds: string[];
   const prevAttempts = (RoomConnectHelper as any).REMESH_ATTEMPTS;
   const prevDelay = (RoomConnectHelper as any).REMESH_DELAY_MS;
   const prevPeerWait = (RoomConnectHelper as any).REMESH_PEER_WAIT_MS;
 
   beforeEach(() => {
-    openPeers = [];
+    streamPeers = [];
+    openPeerIds = [];
     spyOn(Network, 'connect').and.returnValue(true);
+    spyOn(Network, 'disconnect').and.callFake((p: IPeerContext) => {
+      streamPeers = streamPeers.filter(x => x.peerId !== p.peerId);
+      openPeerIds = openPeerIds.filter(id => id !== p.peerId);
+      return true;
+    });
     spyOn(Network, 'listRoomMemberPeerIds').and.returnValue([]);
-    spyOnProperty(Network, 'peers', 'get').and.callFake(() => openPeers);
+    spyOnProperty(Network, 'peers', 'get').and.callFake(() => streamPeers);
+    spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => openPeerIds.slice());
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    RoomConnectHelper.stopMeshKeepalive();
+    (RoomConnectHelper as any).connectingSince = new Map();
   });
   afterEach(() => {
     (RoomConnectHelper as any).REMESH_ATTEMPTS = prevAttempts;
     (RoomConnectHelper as any).REMESH_DELAY_MS = prevDelay;
     (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = prevPeerWait;
+    RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 0;
+    RoomConnectHelper.stopMeshKeepalive();
   });
 
   it('retries when the room listing is temporarily alone', async () => {
@@ -246,13 +258,29 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
   it('connects channel members before falling back to lobby list', async () => {
     (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'other']);
     (Network.connect as jasmine.Spy).and.callFake(() => {
-      openPeers = [peer('other')];
+      streamPeers = [peer('other')];
+      openPeerIds = ['other'];
       return true;
     });
     const list = spyOn(Network, 'listAllRooms');
     (RoomConnectHelper as any).REMESH_ATTEMPTS = 1;
     (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
     (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = 0;
+
+    await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
+
+    expect(Network.connect).toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it('does not treat half-open streams as remesh success', async () => {
+    streamPeers = [{ peerId: 'stuck', isOpen: false } as IPeerContext];
+    openPeerIds = [];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'other']);
+    (RoomConnectHelper as any).REMESH_ATTEMPTS = 1;
+    (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
+    (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = 0;
+    const list = spyOn(Network, 'listAllRooms');
 
     await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
 
@@ -276,9 +304,85 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
     const done = RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
     await new Promise<void>(resolve => setTimeout(resolve, 20));
     expect(Network.connect).toHaveBeenCalled();
-    openPeers = [other];
+    streamPeers = [other];
+    openPeerIds = ['other'];
     EventSystem.trigger('CONNECT_PEER', { peerId: 'other' });
     await done;
+  });
+});
+
+describe('RoomConnectHelper.healMeshGaps', () => {
+  let streamPeers: IPeerContext[];
+  let openPeerIds: string[];
+
+  beforeEach(() => {
+    streamPeers = [];
+    openPeerIds = [];
+    spyOn(Network, 'connect').and.callFake((p: IPeerContext) => {
+      streamPeers = [...streamPeers, { peerId: p.peerId, isOpen: false } as IPeerContext];
+      return true;
+    });
+    spyOn(Network, 'disconnect').and.callFake((p: IPeerContext) => {
+      streamPeers = streamPeers.filter(x => x.peerId !== p.peerId);
+      openPeerIds = openPeerIds.filter(id => id !== p.peerId);
+      return true;
+    });
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self', 'a', 'b']);
+    spyOnProperty(Network, 'peers', 'get').and.callFake(() => streamPeers);
+    spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => openPeerIds.slice());
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({
+      peerId: 'self', isRoom: true, userId: 'u1',
+    } as IPeerContext);
+    RoomConnectHelper.stopMeshKeepalive();
+    (RoomConnectHelper as any).connectingSince = new Map();
+    RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 0;
+  });
+
+  afterEach(() => {
+    RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 0;
+    RoomConnectHelper.stopMeshKeepalive();
+  });
+
+  it('connects room members that lack an open DataChannel', async () => {
+    openPeerIds = ['a'];
+    streamPeers = [{ peerId: 'a', isOpen: true } as IPeerContext];
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(Network.connect).toHaveBeenCalled();
+    const connectedIds = (Network.connect as jasmine.Spy).calls.allArgs().map(args => args[0].peerId);
+    expect(connectedIds).toEqual(['b']);
+  });
+
+  it('prunes stuck connecting peers then reconnects them', async () => {
+    RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 50;
+    streamPeers = [{ peerId: 'b', isOpen: false } as IPeerContext];
+    openPeerIds = [];
+    (RoomConnectHelper as any).connectingSince = new Map([['b', Date.now() - 1000]]);
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(Network.disconnect).toHaveBeenCalled();
+    expect(Network.connect).toHaveBeenCalled();
+  });
+
+  it('keeps remeshing after a half-open handshake instead of aborting', async () => {
+    streamPeers = [{ peerId: 'other', isOpen: false } as IPeerContext];
+    openPeerIds = [];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'other']);
+    (RoomConnectHelper as any).REMESH_ATTEMPTS = 2;
+    (RoomConnectHelper as any).REMESH_DELAY_MS = 0;
+    (RoomConnectHelper as any).REMESH_PEER_WAIT_MS = 0;
+    RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 1;
+    (RoomConnectHelper as any).connectingSince = new Map([['other', Date.now() - 1000]]);
+    const list = spyOn(Network, 'listAllRooms');
+
+    await RoomConnectHelper.remeshRoomPeers('Ab1', 'TestRoom', '');
+
+    expect(Network.disconnect).toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 });
 
@@ -302,6 +406,7 @@ describe('RoomConnectHelper.openAndConnect', () => {
     spyOn(Network, 'connect').and.returnValue(true);
     spyOn(Network, 'listRoomMemberPeerIds').and.returnValue([]);
     spyOnProperty(Network, 'peers', 'get').and.callFake(() => openPeers);
+    spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => openPeers.map(p => p.peerId));
     spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self', isRoom: true } as IPeerContext);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     spyOn(Room, 'clearLocalTabletopForJoin');

@@ -52,7 +52,9 @@ export class SkyWayConnection implements Connection {
 
   private readonly trustedPeerIds: Set<PeerId> = new Set();
   private readonly relayingPeerIds: Map<string, string[]> = new Map();
-  private readonly maybeUnavailablePeerIds: Set<string> = new Set();
+  /** peerId → marked-unavailable-at (ms). Gossip skips until open, disconnect, or TTL. */
+  private readonly maybeUnavailablePeerIds: Map<string, number> = new Map();
+  private static readonly MAYBE_UNAVAILABLE_TTL_MS = 30000;
 
   configure(config: any) {
     this.skyWay.url = resolveBackendUrl(config?.backend?.url ?? '');
@@ -70,11 +72,13 @@ export class SkyWayConnection implements Connection {
       peer = PeerContext.create(args[0], args[1], args[2], args[3]);
     }
     this.trustedPeerIds.clear();
+    this.maybeUnavailablePeerIds.clear();
     this.openSkyWay(peer);
   }
 
   close(): Promise<void> {
     this.disconnectAll();
+    this.maybeUnavailablePeerIds.clear();
     this.listAllPeersInFlight = null;
     this.listAllPeersCache = [];
     this.listAllPeersCacheUntil = 0;
@@ -269,7 +273,7 @@ export class SkyWayConnection implements Connection {
     netDebug(`openStream ${stream.peer.peerId}`);
 
     this.trustedPeerIds.delete(stream.peer.peerId);
-    this.maybeUnavailablePeerIds.add(stream.peer.peerId);
+    this.maybeUnavailablePeerIds.set(stream.peer.peerId, Date.now());
 
     stream.on('data', data => {
       this.onData(stream, data);
@@ -297,6 +301,8 @@ export class SkyWayConnection implements Connection {
     stream.disconnect();
     let closed = this.streams.remove(stream);
 
+    // Allow gossip / remesh to retry this peer after a drop or failed handshake.
+    this.maybeUnavailablePeerIds.delete(stream.peer.peerId);
     this.relayingPeerIds.delete(stream.peer.peerId);
     this.relayingPeerIds.forEach(peerIds => {
       let index = peerIds.indexOf(stream.peer.peerId);
@@ -361,12 +367,23 @@ export class SkyWayConnection implements Connection {
     if (unknownUserIds.length) {
       for (let userId of unknownUserIds) {
         let peer = this.makeFriendPeer(userId);
-        if (!this.maybeUnavailablePeerIds.has(peer.peerId) && this.connect(peer)) {
+        if (!this.isMaybeUnavailable(peer.peerId) && this.connect(peer)) {
           netDebug('auto connect to unknown Peer <' + peer.peerId + '>');
         }
       }
     }
     if (needsNotifyUserList) this.notifyUserList();
+  }
+
+  /** True while a recent failed/pending connect should suppress gossip auto-retry. */
+  private isMaybeUnavailable(peerId: string): boolean {
+    const since = this.maybeUnavailablePeerIds.get(peerId);
+    if (since == null) return false;
+    if (Date.now() - since >= SkyWayConnection.MAYBE_UNAVAILABLE_TTL_MS) {
+      this.maybeUnavailablePeerIds.delete(peerId);
+      return false;
+    }
+    return true;
   }
 
   private notifyUserList() {

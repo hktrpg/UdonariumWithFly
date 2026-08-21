@@ -547,11 +547,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             meshPassword: Network.peer.channelPassword || RoomAuth.getSessionMeshPassword() || '',
           });
           RoomConnectHelper.markRoomSessionRemembered();
+          RoomConnectHelper.startMeshKeepalive();
           // Create / resume: dismiss lobby. Probe join keeps it until a live peer is confirmed.
           if (!RoomConnectHelper.joinInProgress) {
             this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
           }
         } else {
+          RoomConnectHelper.stopMeshKeepalive();
           // Do not clear lastRoomSession during auto-reopen / join probe races —
           // a transient lobby peer would otherwise erase the room credentials mid-game.
           if (!RoomConnectHelper.isReopenInFlight && !RoomConnectHelper.joinInProgress) {
@@ -648,6 +650,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         // Do not clear isLoggedin here. Any peer DataConnection close used to reset it,
         // which re-logged "connected to room" on the next reconnect (spam in chat).
         // Reset happens on OPEN_NETWORK / NETWORK_ERROR instead.
+        if (Network.peer?.isRoom) void RoomConnectHelper.tickMeshKeepalive();
       })
       .on('MESSAGE_NORTIFICATION', event => {
         //console.log(event)

@@ -1,6 +1,9 @@
 import {
   isRecoverableNetworkError,
+  isStuckConnecting,
+  meshGapPeerIds,
   RECOVERABLE_NETWORK_ERROR_TYPES,
+  refreshConnectingSince,
   shouldAttemptRoomReopen,
 } from './room-reconnect.util';
 import { Network } from './core/system';
@@ -31,6 +34,32 @@ describe('room-reconnect.util', () => {
 
   it('RECOVERABLE_NETWORK_ERROR_TYPES includes internal', () => {
     expect(RECOVERABLE_NETWORK_ERROR_TYPES).toContain('internal');
+  });
+
+  it('meshGapPeerIds lists room members without an open DataChannel', () => {
+    expect(meshGapPeerIds('self', ['self', 'a', 'b'], ['a'])).toEqual(['b']);
+    expect(meshGapPeerIds('self', ['self', 'a'], ['a'])).toEqual([]);
+    expect(meshGapPeerIds('self', ['', 'a'], [])).toEqual(['a']);
+  });
+
+  it('isStuckConnecting respects the budget', () => {
+    expect(isStuckConnecting(undefined, 1000, 500)).toBeFalse();
+    expect(isStuckConnecting(100, 500, 500)).toBeFalse();
+    expect(isStuckConnecting(100, 600, 500)).toBeTrue();
+    expect(isStuckConnecting(100, 9999, 0)).toBeFalse();
+  });
+
+  it('refreshConnectingSince keeps first-seen time and drops open peers', () => {
+    const prev = new Map([['a', 10], ['gone', 5]]);
+    const next = refreshConnectingSince(prev, [
+      { peerId: 'a', isOpen: false },
+      { peerId: 'b', isOpen: false },
+      { peerId: 'c', isOpen: true },
+    ], 99);
+    expect(next.get('a')).toBe(10);
+    expect(next.get('b')).toBe(99);
+    expect(next.has('c')).toBeFalse();
+    expect(next.has('gone')).toBeFalse();
   });
 });
 

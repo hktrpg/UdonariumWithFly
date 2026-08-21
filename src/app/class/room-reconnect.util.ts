@@ -39,3 +39,39 @@ export function isRecoverableNetworkError(errorType: string): boolean {
 export function shouldAttemptRoomReopen(errorType: string): boolean {
   return (ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType);
 }
+
+/** Room channel members that do not yet have an open DataChannel. */
+export function meshGapPeerIds(
+  selfId: string,
+  memberIds: readonly string[],
+  openPeerIds: readonly string[],
+): string[] {
+  const open = new Set(openPeerIds);
+  return memberIds.filter(id => !!id && id !== selfId && !open.has(id));
+}
+
+/** True when a half-open connect attempt has exceeded the stuck budget. */
+export function isStuckConnecting(
+  connectingSinceMs: number | undefined,
+  nowMs: number,
+  stuckMs: number,
+): boolean {
+  return connectingSinceMs != null && stuckMs > 0 && (nowMs - connectingSinceMs) >= stuckMs;
+}
+
+/**
+ * Track when each non-open peer first appeared.
+ * Drop entries for peers that left or opened.
+ */
+export function refreshConnectingSince(
+  prev: ReadonlyMap<string, number>,
+  peers: ReadonlyArray<{ peerId: string; isOpen: boolean }>,
+  nowMs: number,
+): Map<string, number> {
+  const next = new Map<string, number>();
+  for (const p of peers) {
+    if (!p.peerId || p.isOpen) continue;
+    next.set(p.peerId, prev.get(p.peerId) ?? nowMs);
+  }
+  return next;
+}
