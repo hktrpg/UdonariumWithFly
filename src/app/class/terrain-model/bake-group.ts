@@ -402,7 +402,8 @@ export function uniformScaleFromCornerDrag(
     ref = fallbackStart;
     startDist = Math.hypot(ref.x - anchor.x, ref.y - anchor.y);
   }
-  // No usable reference (near anchor, and no / bad fallback): freeze scale.
+  // Without a usable reference (no/near-anchor fallback), keep scale at 1
+  // instead of dividing by a tiny startDist and exploding.
   if (startDist < minStartDist) return 1;
   const curDist = Math.hypot(cur.x - anchor.x, cur.y - anchor.y);
   return Math.max(0.05, curDist / startDist);
