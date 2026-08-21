@@ -216,6 +216,7 @@ Upgraded to 1.13.2`,
   'changelog.2026net': `2026/08/20–21 Connection・invites
 ・Keep the local tabletop until a live peer + map data arrives
 ・Hide unreachable ghost rooms from the list (do not kick players already in a room back to lobby)
+・Network timeout／connect errors do not hide the room (retry from lobby); join also meshes current SkyWay members
 ・Auto remesh after disconnect; token／backend errors prefer reopening the room — no silent mid-game lobby drop
 ・Invite links: freeze UI for valid or corrupt tokens; damaged links show “invalid or damaged”
 ・Second-tab joins less often show blank TOKEN／images (settle + delayed remount)`,

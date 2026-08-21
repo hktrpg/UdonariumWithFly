@@ -179,7 +179,7 @@ export const zhTW_ui: I18nDictionary = {
   'lobby.joinDataTimeout.help': '連線成功但房間資料逾時。沒有人被踢出。請重試或請房內玩家確認連線。',
   'lobby.joinNetworkTimeout.title': '無法進入房間',
   'lobby.joinNetworkTimeout.text': '加入房間時連線逾時或網路中斷。沒有人被踢出。請確認網路後再試。',
-  'lobby.joinNetworkTimeout.help': '入室連線失敗。沒有人被踢出。請稍後重試。',
+  'lobby.joinNetworkTimeout.help': '入室連線失敗。沒有人被踢出。房間仍留在大廳列表，請稍後重試。',
 
   'roomJoin.selectRole': '選擇身份',
   'roomJoin.switchRole': '轉換身份',

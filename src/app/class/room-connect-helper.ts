@@ -33,6 +33,8 @@ export class RoomConnectHelper {
   private static readonly REMESH_DELAY_MS = 250;
   /** After connect attempts, wait this long for at least one open peer (handshake). */
   private static readonly REMESH_PEER_WAIT_MS = 5000;
+  /** While a join probe is alone, retry SkyWay room-member mesh this often. */
+  private static readonly JOIN_REMESH_MS = 2000;
   /** Ghost SkyWay members often CONNECT then drop; require they stay up this long. */
   static JOIN_STABLE_MS = 1500;
   /**
@@ -245,6 +247,30 @@ export class RoomConnectHelper {
     return 'lobby.staleRoom';
   }
 
+  /**
+   * Hide from lobby only when peers were reachable as ghosts / empty —
+   * not on transient network timeout or open errors (user should retry the same room).
+   */
+  static shouldSuppressLobbyRoom(reason: string): boolean {
+    return reason === 'all_targets_failed' || reason === 'no_tabletop_data';
+  }
+
+  /**
+   * Lobby snapshot peers plus current SkyWay room members.
+   * Lobby TTL can list ghosts while live members are already in-channel (or vice versa).
+   */
+  static gatherJoinTargets(seed: IPeerContext[]): IPeerContext[] {
+    const byId = new Map<string, IPeerContext>();
+    for (const p of seed || []) {
+      if (p?.peerId) byId.set(p.peerId, p);
+    }
+    for (const id of Network.listRoomMemberPeerIds()) {
+      if (!id || id === Network.peerId) continue;
+      if (!byId.has(id)) byId.set(id, PeerContext.parse(id));
+    }
+    return Array.from(byId.values());
+  }
+
   private static beginJoinProbe() {
     RoomConnectHelper.joinInProgress = true;
     RoomConnectHelper.joinErrorEpoch++;
@@ -374,6 +400,9 @@ export class RoomConnectHelper {
       let stableTimer: ReturnType<typeof setTimeout> | null = null;
       let dataTimer: ReturnType<typeof setTimeout> | null = null;
       let quiesceTimer: ReturnType<typeof setTimeout> | null = null;
+      let remeshTimer: ReturnType<typeof setInterval> | null = null;
+      /** Lobby seed plus SkyWay room members discovered during the probe. */
+      let joinTargets = targetPeers.slice();
       const timeoutId = setTimeout(() => {
         if (settled) return;
         console.warn('RoomConnectHelper connect timeout');
@@ -402,6 +431,10 @@ export class RoomConnectHelper {
           clearTimeout(quiesceTimer);
           quiesceTimer = null;
         }
+        if (remeshTimer != null) {
+          clearInterval(remeshTimer);
+          remeshTimer = null;
+        }
         clearTimeout(timeoutId);
         EventSystem.unregister(listenerKey);
         ConnectionBusyService.instance?.hide();
@@ -409,8 +442,10 @@ export class RoomConnectHelper {
         else RoomConnectHelper.lastJoinFailReason = '';
         RoomConnectHelper.endJoinProbe(ok);
         if (!ok) {
-          // Hide unreachable rooms in the lobby. Never eject a meshed client.
-          RoomConnectHelper.suppressLobbyRoom(room.id, room.name);
+          // Ghost / empty rooms: hide from lobby. Transient network fails: keep listed for retry.
+          if (RoomConnectHelper.shouldSuppressLobbyRoom(RoomConnectHelper.lastJoinFailReason)) {
+            RoomConnectHelper.suppressLobbyRoom(room.id, room.name);
+          }
           if (Network.peers.length < 1) RoomConnectHelper.abandonFailedJoinProbe();
         } else {
           RoomConnectHelper.clearLobbyRoomSuppression(room.id, room.name);
@@ -445,11 +480,11 @@ export class RoomConnectHelper {
       };
 
       /**
-   * Soft data deadline: restart slice on CONNECT; while still meshed, missing
-   * game-table extends another slice. Alone → fail probe only (hide room in lobby;
-   * never kick / resetToLobby).
-   * Hard ceiling is connectTimeoutMs() (meshed → stay / succeed; alone → fail+hide).
-   */
+       * Soft data deadline: restart slice on CONNECT; while still meshed, missing
+       * game-table extends another slice. Alone → fail probe only (ghost rooms may
+       * hide; network timeouts keep the room listed). Never kick / resetToLobby.
+       * Hard ceiling is connectTimeoutMs() (meshed → stay / succeed; alone → fail).
+       */
       const scheduleDataDeadline = () => {
         if (settled) return;
         if (RoomConnectHelper.JOIN_DATA_MS <= 0) return;
@@ -488,11 +523,21 @@ export class RoomConnectHelper {
         }, RoomConnectHelper.JOIN_QUIESCE_MS);
       };
 
+      /** Connect any not-yet-tried join targets; expand from current SkyWay members. */
+      const meshJoinTargets = () => {
+        if (settled) return;
+        joinTargets = RoomConnectHelper.gatherJoinTargets(joinTargets);
+        for (const peer of joinTargets) {
+          if (tried.has(peer.peerId)) continue;
+          if (!Network.connect(peer)) onDisconnect(peer.peerId);
+        }
+      };
+
       const onConnect = (peerId: string) => {
         if (settled) return;
         netDebug('連線成功！', peerId);
         tried.add(peerId);
-        netDebug(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
+        netDebug(`連線進度 ${tried.size}/${joinTargets.length}（成功 ${Network.peers.length}）`);
         scheduleConfirm();
         scheduleDataDeadline();
       };
@@ -502,13 +547,15 @@ export class RoomConnectHelper {
         if (settled) return;
         console.warn('放棄連線（對方離線或訂閱逾時）', peerId);
         tried.add(peerId);
-        netDebug(`連線進度 ${tried.size}/${targetPeers.length}（成功 ${Network.peers.length}）`);
+        netDebug(`連線進度 ${tried.size}/${joinTargets.length}（成功 ${Network.peers.length}）`);
         if (Network.peers.length < 1 && stableTimer != null) {
           clearTimeout(stableTimer);
           stableTimer = null;
           if (RoomConnectHelper.JOIN_STABLE_MS > 0) stableElapsed = false;
         }
-        if (RoomConnectHelper.shouldFailJoin(tried.size, targetPeers.length, Network.peers.length)) {
+        // Refresh members before deciding all targets failed — a live peer may have joined.
+        joinTargets = RoomConnectHelper.gatherJoinTargets(joinTargets);
+        if (RoomConnectHelper.shouldFailJoin(tried.size, joinTargets.length, Network.peers.length)) {
           failReason = 'all_targets_failed';
           finish(false);
         }
@@ -518,15 +565,19 @@ export class RoomConnectHelper {
         .on('OPEN_NETWORK', event => {
           netDebug('RoomConnectHelper OPEN_PEER', event.data.peerId);
           EventSystem.unregister(listenerKey);
-          if (targetPeers.length < 1) {
+          joinTargets = RoomConnectHelper.gatherJoinTargets(targetPeers);
+          if (joinTargets.length < 1) {
             finish(true);
             return;
           }
           // Probe first: keep local tabletop until a live peer sends a game-table.
-          for (const peer of targetPeers) {
-            if (!Network.connect(peer)) onDisconnect(peer.peerId);
-          }
+          meshJoinTargets();
           if (settled) return;
+          // Lobby list can lag SkyWay membership; keep remeshing while alone.
+          remeshTimer = setInterval(() => {
+            if (settled || Network.peers.length > 0) return;
+            meshJoinTargets();
+          }, RoomConnectHelper.JOIN_REMESH_MS);
           EventSystem.register(listenerKey)
             .on('CONNECT_PEER', event => onConnect(event.data.peerId))
             .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId))

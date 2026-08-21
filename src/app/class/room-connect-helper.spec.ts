@@ -88,6 +88,21 @@ describe('RoomConnectHelper settle predicates', () => {
     expect(RoomConnectHelper.joinFailMessageKey('connect_timeout')).toBe('lobby.joinNetworkTimeout');
     expect(RoomConnectHelper.joinFailMessageKey('network_error_open')).toBe('lobby.joinNetworkTimeout');
   });
+
+  it('suppresses lobby rooms only for stale/empty fails, not network timeouts', () => {
+    expect(RoomConnectHelper.shouldSuppressLobbyRoom('all_targets_failed')).toBeTrue();
+    expect(RoomConnectHelper.shouldSuppressLobbyRoom('no_tabletop_data')).toBeTrue();
+    expect(RoomConnectHelper.shouldSuppressLobbyRoom('connect_timeout')).toBeFalse();
+    expect(RoomConnectHelper.shouldSuppressLobbyRoom('network_error_open')).toBeFalse();
+    expect(RoomConnectHelper.shouldSuppressLobbyRoom('network_error_mesh')).toBeFalse();
+  });
+
+  it('gatherJoinTargets merges lobby seed with SkyWay room members', () => {
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self', 'room-live']);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    const merged = RoomConnectHelper.gatherJoinTargets([peer('lobby-a')]);
+    expect(merged.map(p => p.peerId).sort()).toEqual(['lobby-a', 'room-live']);
+  });
 });
 
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
@@ -285,6 +300,7 @@ describe('RoomConnectHelper.openAndConnect', () => {
     openPeers = [];
     spyOn(Network, 'open');
     spyOn(Network, 'connect').and.returnValue(true);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue([]);
     spyOnProperty(Network, 'peers', 'get').and.callFake(() => openPeers);
     spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self', isRoom: true } as IPeerContext);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
@@ -503,5 +519,34 @@ describe('RoomConnectHelper.openAndConnect', () => {
     expect(abandonSpy).toHaveBeenCalled();
     expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeTrue();
     expect(Room.clearLocalTabletopForJoin).not.toHaveBeenCalled();
+  });
+
+  it('does not hide the lobby room on connect_timeout (retryable network fail)', async () => {
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 80;
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('slow')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    // Connect started but never CONNECT_PEER / DISCONNECT_PEER — overall timeout.
+    await expectAsync(result).toBeResolvedTo(false);
+    expect(RoomConnectHelper.lastJoinFailReason).toBe('connect_timeout');
+    expect(RoomConnectHelper.isLobbyRoomSuppressed('Ab1', 'TestRoom')).toBeFalse();
+    expect(abandonSpy).toHaveBeenCalled();
+    expect(resetSpy).not.toHaveBeenCalled();
+  });
+
+  it('meshes SkyWay room members even when lobby seed peers are ghosts', async () => {
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'live']);
+    (Network.connect as jasmine.Spy).and.callFake((p: IPeerContext) => p.peerId === 'live');
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('ghost')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    openPeers = [peer('live')];
+    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
+    hostTabletop('live');
+
+    await expectAsync(result).toBeResolvedTo(true);
+    expect(Network.connect).toHaveBeenCalled();
+    const connectedIds = (Network.connect as jasmine.Spy).calls.allArgs().map(a => a[0].peerId);
+    expect(connectedIds).toContain('live');
   });
 });

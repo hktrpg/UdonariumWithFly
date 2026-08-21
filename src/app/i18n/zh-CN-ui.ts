@@ -178,7 +178,7 @@ export const zhCN_ui: I18nDictionary = {
   'lobby.joinDataTimeout.help': '连线成功但房间数据超时。没有人被踢出。请重试或请房内玩家确认连线。',
   'lobby.joinNetworkTimeout.title': '无法进入房间',
   'lobby.joinNetworkTimeout.text': '加入房间时连线超时或网络中断。没有人被踢出。请确认网络后再试。',
-  'lobby.joinNetworkTimeout.help': '入室连线失败。没有人被踢出。请稍后再试。',
+  'lobby.joinNetworkTimeout.help': '入室连线失败。没有人被踢出。房间仍留在大厅列表，请稍后再试。',
 
   'roomJoin.selectRole': '选择身份',
   'roomJoin.switchRole': '转换身份',
