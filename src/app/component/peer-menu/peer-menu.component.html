@@ -136,24 +136,15 @@
         [disabled]="folderBackup.status === 'writing'">
         <i class="material-icons">save</i>{{ 'menu.folderBackup.saveRoom' | i18n }}
       </button>
-      <div class="save-folder-wrap" *ngIf="folderBackup.canLoadFromFolder">
-        <button type="button" class="btn btn-sm" (click)="loadFolderBackup()"
-          [disabled]="!canLoadRoom"
-          [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">
-          <i class="material-icons">folder_open</i>
-          {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
-        </button>
-        <div class="save-folder-flyout" role="menu">
-          <button type="button" role="menuitem" (click)="changeFolderBackup()">
-            <i class="material-icons" aria-hidden="true">create_new_folder</i>
-            {{ 'menu.folderBackup.changeFolder' | i18n }}
-          </button>
-          <button type="button" role="menuitem" (click)="unbindFolderBackup()">
-            <i class="material-icons" aria-hidden="true">link_off</i>
-            {{ 'menu.folderBackup.disconnectFolder' | i18n }}
-          </button>
-        </div>
-      </div>
+      <button type="button" class="btn btn-sm" *ngIf="folderBackup.canLoadFromFolder"
+        (click)="loadFolderBackup()"
+        [disabled]="!canLoadRoom"
+        [title]="canLoadRoom
+          ? ('menu.folderBackup.autoStoreHint' | i18n)
+          : ('peer.loadData.gmOnly' | i18n)">
+        <i class="material-icons">folder_open</i>
+        {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
+      </button>
       <span class="folder-status" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
         {{ folderBackup.status === 'writing'
           ? ('menu.folderBackup.status.writing' | i18n)

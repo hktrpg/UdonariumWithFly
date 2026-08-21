@@ -1647,6 +1647,34 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  /**
+   * Personal settings: change / disconnect folder (was hover-flyout on Load Room).
+   * Two-level menu under 個人設定.
+   */
+  private makeFolderBackupSettingsMenu(): ContextMenuAction {
+    const unsupported = this.folderBackup.status === 'unsupported';
+    const unbound = this.folderBackup.status === 'unbound';
+    return {
+      name: this.i18n.t('menu.folderBackup'),
+      materialIcon: 'folder',
+      disabled: unsupported || this.GuestMode(),
+      subActions: [
+        {
+          name: this.i18n.t('menu.folderBackup.changeFolder'),
+          materialIcon: 'create_new_folder',
+          disabled: unsupported || this.GuestMode(),
+          action: () => { void this.folderBackup.bindFolder(); },
+        },
+        {
+          name: this.i18n.t('menu.folderBackup.disconnectFolder'),
+          materialIcon: 'link_off',
+          disabled: unsupported || unbound || this.GuestMode(),
+          action: () => { void this.folderBackup.unbindFolder(); },
+        },
+      ],
+    };
+  }
+
   private makeWeatherToolboxMenu() {
     const markType = (type: WeatherType) => {
       const cur = TableSelecter.instance.viewTable?.weatherType || 'none';
@@ -1926,6 +1954,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
         off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
+      this.makeFolderBackupSettingsMenu(),
       ...(this.mobileLayout.isMobile ? [] : [
         contextMenuToggleCheck({
           get: () => PanelService.singleNonChatWindow,

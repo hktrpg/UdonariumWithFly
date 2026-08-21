@@ -19,6 +19,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
+import { rbCornerResizeSize, rotateTableDeltaToLocal } from '@udonarium/tabletop-corner-resize';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -31,7 +32,7 @@ import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.com
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
-import { MovableOption } from 'directive/movable.directive';
+import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { PAPER_STYLES, pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
@@ -55,6 +56,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   @ViewChild('textArea') textAreaElementRef: ElementRef<HTMLTextAreaElement>;
   @ViewChild('pdfCanvas') pdfCanvasRef: ElementRef<HTMLCanvasElement>;
   @ViewChild('resizeGrab') resizeGrabRef: ElementRef<HTMLElement>;
+  @ViewChild(MovableDirective) private movableDir: MovableDirective;
 
   @Input() textNote: TextNote = null;
   @Input() is3D: boolean = false;
@@ -313,50 +315,47 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
 
   private onResizeStart(ev: MouseEvent | TouchEvent) {
     ev?.stopPropagation?.();
+    if (ev?.cancelable) ev.preventDefault();
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) {
       this.resizeInput?.cancel();
       return;
     }
-    const table = this.coordinateService.calcTabletopLocalCoordinate();
-    this.resizeStartTable = { x: table.x, y: table.y };
+    // Same as terrain: stop parent movable so corner drag scales instead of moving.
+    this.input?.cancel();
+    this.movableDir?.cancel();
+    // Always map via tabletop origin — targetElement under the grab is 3D-transformed
+    // and flips deltas once the pointer leaves the handle (looks like "both ways shrink").
+    this.resizeStartTable = this.tablePointer();
     this.resizeStartW = this.width;
     this.resizeStartH = this.height;
   }
 
+  private tablePointer(): { x: number; y: number } {
+    const p = this.pointerDeviceService.pointers[0] || { x: 0, y: 0 };
+    const table = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: p.x, y: p.y, z: 0 },
+      this.coordinateService.tabletopOriginElement
+    );
+    return { x: table.x, y: table.y };
+  }
+
   private onResizeMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) return;
-    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const cur = this.tablePointer();
     const dx = cur.x - this.resizeStartTable.x;
     const dy = cur.y - this.resizeStartTable.y;
-    const rad = (-(this.rotate || 0) * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const localDx = dx * cos - dy * sin;
-    // Flat notes tip so paper height grows with table +Y; flip if upright billboard.
-    const localDy = this.isUpright ? -(dx * sin + dy * cos) : (dx * sin + dy * cos);
-    let w = MathUtil.clampMin(this.resizeStartW + localDx / this.gridSize);
-    let h = MathUtil.clampMin(this.resizeStartH + localDy / this.gridSize);
+    const { localDx, localDy } = rotateTableDeltaToLocal(dx, dy, this.rotate || 0);
     const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
-    const lockAspect = this.keepsResizeAspect && !freeAspect;
-    if (lockAspect) {
-      const aspect = this.resizeStartW / Math.max(0.01, this.resizeStartH);
-      if (Math.abs(localDx) >= Math.abs(localDy)) {
-        h = MathUtil.clampMin(w / aspect);
-      } else {
-        w = MathUtil.clampMin(h * aspect);
-      }
-    }
-    w = Math.min(40, Math.max(1, Math.round(w * 2) / 2));
-    h = Math.min(40, Math.max(1, Math.round(h * 2) / 2));
-    if (lockAspect) {
-      // Re-apply after 0.5-grid snap so aspect does not drift.
-      const aspect = this.resizeStartW / Math.max(0.01, this.resizeStartH);
-      if (Math.abs(localDx) >= Math.abs(localDy)) {
-        h = Math.min(40, Math.max(1, Math.round((w / aspect) * 2) / 2));
-      } else {
-        w = Math.min(40, Math.max(1, Math.round((h * aspect) * 2) / 2));
-      }
-    }
+    const { width: w, height: h } = rbCornerResizeSize({
+      startW: this.resizeStartW,
+      startH: this.resizeStartH,
+      localDxPx: localDx,
+      // Match terrain table +Y → depth/height; do not invert for upright (that made
+      // horizontal drags pick a shrinking height axis under aspect lock).
+      localDyPx: localDy,
+      gridSize: this.gridSize,
+      lockAspect: this.keepsResizeAspect && !freeAspect,
+    });
     this.ngZone.run(() => {
       this.textNote.width = w;
       this.textNote.height = h;

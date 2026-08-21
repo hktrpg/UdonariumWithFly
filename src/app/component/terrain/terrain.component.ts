@@ -410,8 +410,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     this.input?.cancel();
     this.movableDir?.cancel();
     this.scaleCorner = corner;
-    const table = this.coordinateService.calcTabletopLocalCoordinate();
-    this.scaleStartTable = { x: table.x, y: table.y };
+    this.scaleStartTable = this.tablePointer();
     const parts = bakeGroupPartsOf(this.terrain);
     this.scaleStartBounds = bakeGroupBoundsPx(parts);
     this.scaleStartSnapshots = parts.map(t => ({
@@ -424,10 +423,19 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     }));
   }
 
+  private tablePointer(): { x: number; y: number } {
+    const p = this.pointerDeviceService.pointers[0] || { x: 0, y: 0 };
+    const table = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: p.x, y: p.y, z: 0 },
+      this.coordinateService.tabletopOriginElement
+    );
+    return { x: table.x, y: table.y };
+  }
+
   private onScaleMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || !this.scaleStartSnapshots.length) return;
     const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
-    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const cur = this.tablePointer();
     const dx = cur.x - this.scaleStartTable.x;
     const dy = cur.y - this.scaleStartTable.y;
     const b = this.scaleStartBounds;
