@@ -70,6 +70,16 @@ export class Network {
 
   configure(config: any) {
     this.config = config;
+    // Warm SkyWay chunk + backend TLS before the first open() so Your ID appears sooner.
+    void this.dynamicImport(config?.backend?.mode);
+    const url = config?.backend?.url;
+    if (typeof url === 'string' && url.length > 0) {
+      try {
+        void fetch(new URL('/v1/status', url).href).catch(() => { /* warmup */ });
+      } catch {
+        // Invalid URL in config — open() will surface the real error.
+      }
+    }
   }
 
   open(userId?: string)

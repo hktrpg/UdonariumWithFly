@@ -403,18 +403,8 @@ export class RoomConnectHelper {
       let remeshTimer: ReturnType<typeof setInterval> | null = null;
       /** Lobby seed plus SkyWay room members discovered during the probe. */
       let joinTargets = targetPeers.slice();
-      const timeoutId = setTimeout(() => {
-        if (settled) return;
-        console.warn('RoomConnectHelper connect timeout');
-        // Pre-probe behavior: first live peer means we stay in the room. Never kick a meshed client.
-        if (Network.peers.length >= 1) {
-          Room.clearLocalTabletopForJoin();
-          finish(true);
-          return;
-        }
-        failReason = 'connect_timeout';
-        finish(false);
-      }, RoomConnectHelper.connectTimeoutMs());
+      /** Mesh budget starts at OPEN_NETWORK — room open must not burn the join ceiling. */
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
       const finish = (ok: boolean) => {
         if (settled) return;
@@ -435,7 +425,10 @@ export class RoomConnectHelper {
           clearInterval(remeshTimer);
           remeshTimer = null;
         }
-        clearTimeout(timeoutId);
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         EventSystem.unregister(listenerKey);
         ConnectionBusyService.instance?.hide();
         if (!ok) RoomConnectHelper.lastJoinFailReason = failReason || 'unknown';
@@ -451,6 +444,23 @@ export class RoomConnectHelper {
           RoomConnectHelper.clearLobbyRoomSuppression(room.id, room.name);
         }
         resolve(ok);
+      };
+
+      const startConnectTimeout = () => {
+        if (timeoutId != null || settled) return;
+        timeoutId = setTimeout(() => {
+          timeoutId = null;
+          if (settled) return;
+          console.warn('RoomConnectHelper connect timeout');
+          // Pre-probe behavior: first live peer means we stay in the room. Never kick a meshed client.
+          if (Network.peers.length >= 1) {
+            Room.clearLocalTabletopForJoin();
+            finish(true);
+            return;
+          }
+          failReason = 'connect_timeout';
+          finish(false);
+        }, RoomConnectHelper.connectTimeoutMs());
       };
 
       const confirmIfStable = () => {
@@ -529,7 +539,9 @@ export class RoomConnectHelper {
         joinTargets = RoomConnectHelper.gatherJoinTargets(joinTargets);
         for (const peer of joinTargets) {
           if (tried.has(peer.peerId)) continue;
-          if (!Network.connect(peer)) onDisconnect(peer.peerId);
+          // Soft fail: peer not in room.members yet / not ready — retry on remesh.
+          // Do not mark tried or abort the probe (first-join race with SkyWay membership).
+          if (!Network.connect(peer)) continue;
         }
       };
 
@@ -565,6 +577,7 @@ export class RoomConnectHelper {
         .on('OPEN_NETWORK', event => {
           netDebug('RoomConnectHelper OPEN_PEER', event.data.peerId);
           EventSystem.unregister(listenerKey);
+          startConnectTimeout();
           joinTargets = RoomConnectHelper.gatherJoinTargets(targetPeers);
           if (joinTargets.length < 1) {
             finish(true);

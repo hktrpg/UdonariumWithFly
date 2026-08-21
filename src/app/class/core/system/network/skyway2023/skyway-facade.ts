@@ -49,11 +49,13 @@ export class SkyWayFacade {
 
       await this.createContext();
       await this.joinRoom();
-      await this.joinLobby();
-
+      // Room channel (+ data stream) is enough for mesh / Your ID. Lobby Find storms
+      // only power listAllRooms — do not block OPEN_NETWORK on them.
       this.peer.isOpen = true;
-
       if (this.onOpen) this.onOpen(this.peer);
+      void this.joinLobby().catch(err => {
+        console.error('skyWay joinLobby failed (room mesh still open)', err);
+      });
     } catch (err) {
       console.error(err);
       const fatal = this.formatFatalError(err);
