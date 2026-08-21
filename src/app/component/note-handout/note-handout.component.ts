@@ -246,7 +246,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     try {
       const result = await renderPdfPage(canvas, pdf.url, wantPage, id, 1100);
       // Ignore stale renders so an older page cannot overwrite the current one.
-      if (seq !== this.pdfRenderSeq || this.pdfIdentifier !== id) return;
+      if (!result || seq !== this.pdfRenderSeq || this.pdfIdentifier !== id) return;
       this.pdfPageCount = result.pageCount;
       // Keep clamped page; if we asked past the end, stay on last (result.page === pageCount).
       this.pdfPage = result.page;

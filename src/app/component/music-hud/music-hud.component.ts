@@ -182,12 +182,28 @@ export class MusicHudComponent implements OnInit, OnDestroy {
       this.openAudioPicker(index, event);
       return;
     }
-    if (track.isPlaying) {
-      jb.stopTrack(index);
-    } else {
-      const loop = AudioLibrary.instance.effectivePlayLoop(track.audioIdentifier);
-      jb.playTrack(index, track.audioIdentifier, loop);
-    }
+    jb.toggleTrackPlayback(index);
+  }
+
+  /** Playing or paused — keep scrubber / highlight while paused. */
+  isTrackActive(index: number): boolean {
+    return !!this.jukebox?.tracks[index]?.isPlaying;
+  }
+
+  isPaused(index: number): boolean {
+    const t = this.jukebox?.tracks[index];
+    return !!(t?.isPlaying && t?.isPaused);
+  }
+
+  playButtonIcon(index: number): string {
+    return this.isPlaying(index) ? 'pause' : 'play_arrow';
+  }
+
+  playButtonTitle(index: number): string {
+    if (!this.hasAudio(index)) return this.i18n.t('musicHud.pickAudio');
+    if (this.isPlaying(index)) return this.i18n.t('jukebox.pause');
+    if (this.isPaused(index)) return this.i18n.t('jukebox.resume');
+    return this.i18n.t('jukebox.play');
   }
 
   onNameClick(index: number, event: MouseEvent) {

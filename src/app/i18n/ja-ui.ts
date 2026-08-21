@@ -573,7 +573,7 @@ export const ja_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM時透過', 'mask.optAffectsLight': 'ライトと相互作用', 'mask.optShowAltitude': '高度を表示', 'mask.optScratchPreview': 'GM時スクラッチプレビュー',
 
-  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルやオンラインリンクがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 20MB', 'jukebox.auditionVolume': '試聴', 'jukebox.playbackVolume': '端末音量', 'jukebox.musicMasterVolume': 'マスター', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': 'システムSE', 'jukebox.soundboardVolume': 'サウンドボード', 'jukebox.volumeSaved': '端末に保存', 'jukebox.sfxTest': 'システムSEテスト', 'jukebox.soundboardTest': 'ボードテスト',
+  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルやオンラインリンクがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 20MB', 'jukebox.reject.title': '取り込みできません', 'jukebox.reject.tooLarge': '「{{name}}」は {{max}}MB を超えるためスキップ', 'jukebox.reject.notAudio': '「{{name}}」は音楽ファイルではないためスキップ', 'jukebox.auditionVolume': '試聴', 'jukebox.playbackVolume': '端末音量', 'jukebox.musicMasterVolume': 'マスター', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': 'システムSE', 'jukebox.soundboardVolume': 'サウンドボード', 'jukebox.volumeSaved': '端末に保存', 'jukebox.sfxTest': 'システムSEテスト', 'jukebox.soundboardTest': 'ボードテスト',
   'jukebox.tracks': '再生トラック',
   'jukebox.library': 'ライブラリ',
   'jukebox.showHelp': '説明',

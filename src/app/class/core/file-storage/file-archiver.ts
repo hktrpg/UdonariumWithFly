@@ -15,6 +15,7 @@ import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 
 type MetaData = { percent: number, currentFile: string };
@@ -32,12 +33,17 @@ export class FileArchiver {
   /** Chrome often rejects move(); remember and skip after first NotAllowedError. */
   private static moveUnsupported = false;
 
+  /** Public audio import cap (jukebox drop / FileArchiver). */
+  static readonly MAX_AUDIO_BYTES = 20 * MEGA_BYTE;
+
   /** Source accept cap; stored size is enforced by normalizeImageBlob (≤2MB). */
   private maxImageSize = IMAGE_SOURCE_MAX_BYTES;
-  private maxAudioeSize = 20 * MEGA_BYTE;
+  private maxAudioeSize = FileArchiver.MAX_AUDIO_BYTES;
   private maxPdfSize = 20 * MEGA_BYTE;
   private maxVideoSize = 50 * MEGA_BYTE;
   private loadDepth = 0;
+  /** Oversized audio rejected during the current outermost load batch. */
+  private pendingAudioRejects: { name: string; reason: 'tooLarge' }[] = [];
 
   private callbackOnDragEnter;
   private callbackOnDragOver;
@@ -98,7 +104,10 @@ export class FileArchiver {
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
     this.loadDepth++;
-    if (this.loadDepth === 1) this.loadHadZip = false;
+    if (this.loadDepth === 1) {
+      this.loadHadZip = false;
+      this.pendingAudioRejects = [];
+    }
     const nameService = AudioImportNameService.instance;
     nameService?.beginBatch();
     try {
@@ -109,23 +118,37 @@ export class FileArchiver {
         await this.handleVideo(file);
         await this.handleAudioUrlManifest(file);
         await this.handleText(file);
-        if (await this.handleZip(file)) this.loadHadZip = true;
+        if (await this.handleZip(file)) {
+          this.loadHadZip = true;
+          // Before XML restore remount finishes: keep gate until ARCHIVE sync ends.
+          TabletopLoadSettle.markExpectArchive();
+        }
         EventSystem.trigger('FILE_LOADED', { file: file });
       }
     } finally {
       nameService?.endBatch();
       this.loadDepth--;
-      // Only after a ZIP batch: audio/image drops must not remount table tokens.
-      if (this.loadDepth === 0 && this.loadHadZip) {
-        poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
-          fileCount: loadFiles.length,
-          names: loadFiles.map(f => f.name).slice(0, 20),
-        });
-        folderBackupDebug('FileArchiver ARCHIVE_LOAD_COMPLETE', {
-          fileCount: loadFiles.length,
-          names: loadFiles.map(f => f.name).slice(0, 30),
-        });
-        EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
+      if (this.loadDepth === 0) {
+        if (this.pendingAudioRejects.length) {
+          EventSystem.trigger('AUDIO_IMPORT_REJECTED', {
+            rejects: this.pendingAudioRejects.slice(),
+            maxBytes: this.maxAudioeSize,
+          });
+          this.pendingAudioRejects = [];
+        }
+        // Only after a ZIP batch: audio/image drops must not remount table tokens.
+        if (this.loadHadZip) {
+          TabletopLoadSettle.markExpectArchive();
+          poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
+            fileCount: loadFiles.length,
+            names: loadFiles.map(f => f.name).slice(0, 20),
+          });
+          folderBackupDebug('FileArchiver ARCHIVE_LOAD_COMPLETE', {
+            fileCount: loadFiles.length,
+            names: loadFiles.map(f => f.name).slice(0, 30),
+          });
+          EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
+        }
       }
     }
   }
@@ -179,6 +202,7 @@ export class FileArchiver {
     if (!FileArchiver.isAudioFile(file)) return;
     if (this.maxAudioeSize < file.size) {
       console.warn(`File size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      this.pendingAudioRejects.push({ name: file.name, reason: 'tooLarge' });
       return;
     }
     // Room ZIP / folder media are "<sha256>.ext". Display names + folders live in

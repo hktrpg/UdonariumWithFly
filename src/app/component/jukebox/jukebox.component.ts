@@ -6,6 +6,11 @@ import { probeAudioDurationSec } from '@udonarium/core/file-storage/audio-durati
 import { AudioPlayer, VolumeType } from '@udonarium/core/file-storage/audio-player';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import {
+  formatJukeboxImportRejectLines,
+  JukeboxImportReject,
+  partitionJukeboxImportFiles,
+} from '@udonarium/core/file-storage/jukebox-import-files';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
@@ -21,6 +26,8 @@ import { I18nService } from 'service/i18n.service';
 import { WeatherSeService } from 'service/weather-se.service';
 
 import * as localForage from 'localforage';
+
+const JUKEBOX_REJECT_TOAST_MS = 5000;
 
 @Component({
     selector: 'app-jukebox',
@@ -56,6 +63,10 @@ export class JukeboxComponent implements OnInit, OnDestroy {
   dropFileFolderId: string | null = null;
   /** Soundboard section (non-pad) is an OS-file / library drop target. */
   dropSoundboardSurface = false;
+
+  /** Non-focusing import-reject notice (auto-clears). */
+  rejectToastLines: string[] = [];
+  private rejectToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Library multi-select (Ctrl = toggle, Shift = range). */
   selectedAudioIds = new Set<string>();
@@ -730,6 +741,10 @@ export class JukeboxComponent implements OnInit, OnDestroy {
       clearInterval(this.progressTimer);
       this.progressTimer = null;
     }
+    if (this.rejectToastTimer != null) {
+      clearTimeout(this.rejectToastTimer);
+      this.rejectToastTimer = null;
+    }
     const host = this.hostRef?.nativeElement;
     if (host) {
       host.removeEventListener('dragover', this.onHostDragOverCapture, true);
@@ -824,6 +839,31 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     return !!audio && !!this.jukebox?.isAnyTrackPlayingAudio(audio);
   }
 
+  /** True when this audio is actively playing (not paused) on any track. */
+  isActivelyPlayingOnTrack(audio: AudioFile): boolean {
+    if (!audio || !this.jukebox) return false;
+    return this.tracks.some(
+      t => t.isPlaying && !t.isPaused && t.audioIdentifier === audio.identifier,
+    );
+  }
+
+  isPausedOnTrack(audio: AudioFile): boolean {
+    if (!audio || !this.jukebox) return false;
+    return this.tracks.some(
+      t => t.isPlaying && t.isPaused && t.audioIdentifier === audio.identifier,
+    );
+  }
+
+  libraryPlayIcon(audio: AudioFile): string {
+    return this.isActivelyPlayingOnTrack(audio) ? 'pause' : 'play_arrow';
+  }
+
+  libraryPlayTitle(audio: AudioFile): string {
+    if (this.isActivelyPlayingOnTrack(audio)) return this.i18n.t('jukebox.pause');
+    if (this.isPausedOnTrack(audio)) return this.i18n.t('jukebox.resume');
+    return this.i18n.t('jukebox.play');
+  }
+
   isPlayLoop(audio: AudioFile, folderId?: string): boolean {
     if (!audio) return true;
     return this.library.effectivePlayLoop(audio.identifier, folderId);
@@ -870,15 +910,19 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.library.setPlayLoop(audio.identifier, !this.isPlayLoop(audio, folderId), folderId || '');
   }
 
-  /** Put this audio on its effective track and play (or stop if already playing). */
+  /** Put this audio on its effective track and play (or pause / resume if already on a track). */
   toggleLibraryPlay(audio: AudioFile, folderId: string, event?: Event) {
     event?.stopPropagation();
     event?.preventDefault();
     if (this.GuestMode() || !audio || !this.jukebox) return;
-    if (this.isPlayingOnTrack(audio)) {
-      this.stopBGM(audio);
-      return;
+    const tracks = this.tracks;
+    let matched = false;
+    for (let i = 0; i < tracks.length; i++) {
+      if (!tracks[i].isPlaying || tracks[i].audioIdentifier !== audio.identifier) continue;
+      matched = true;
+      this.jukebox.toggleTrackPlayback(i);
     }
+    if (matched) return;
     const track = this.trackTypeOf(audio, folderId);
     const loop = this.isPlayLoop(audio, folderId);
     this.jukebox.playTrack(track, audio.identifier, loop);
@@ -907,8 +951,11 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   toggleTrackSlot(index: number, audio: AudioFile) {
     if (this.GuestMode() || !this.jukebox) return;
-    if (this.tracks[index]?.isPlaying) this.stopTrack(index);
-    else if (audio) this.assignAndPlay(audio, index);
+    if (this.tracks[index]?.isPlaying) {
+      this.jukebox.toggleTrackPlayback(index);
+    } else if (audio) {
+      this.assignAndPlay(audio, index);
+    }
   }
 
   stopBGM(audio: AudioFile) {
@@ -949,7 +996,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.ngZone.run(() => { });
   }
 
-  /** Play / stop folder queue using folder shuffle preference. */
+  /** Play / pause / resume folder queue using folder shuffle preference. */
   playFolderQueue(folderId: string, event?: Event) {
     event?.stopPropagation();
     event?.preventDefault();
@@ -957,7 +1004,7 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const fid = folderId || '';
     const track = this.folderTrackType(fid);
     if (this.isFolderPlaying(fid)) {
-      this.jukebox.stopTrack(track);
+      this.jukebox.toggleTrackPlayback(track);
       this.ngZone.run(() => { });
       return;
     }
@@ -982,6 +1029,22 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     const inFolder = new Set(this.audiosIn(folderId || '').map(a => a.identifier));
     if (t.audioIdentifier && inFolder.has(t.audioIdentifier)) return true;
     return Array.isArray(t.queue) && t.queue.length > 0 && t.queue.every(id => inFolder.has(id));
+  }
+
+  isFolderActivelyPlaying(folderId: string): boolean {
+    if (!this.isFolderPlaying(folderId)) return false;
+    const t = this.tracks[this.folderTrackType(folderId)];
+    return !!(t && !t.isPaused);
+  }
+
+  folderPlayIcon(folderId: string): string {
+    return this.isFolderActivelyPlaying(folderId) ? 'pause' : 'play_arrow';
+  }
+
+  folderPlayTitle(folderId: string): string {
+    if (this.isFolderActivelyPlaying(folderId)) return this.i18n.t('jukebox.pause');
+    if (this.isFolderPlaying(folderId)) return this.i18n.t('jukebox.resume');
+    return this.i18n.t('jukebox.folderPlayQueue');
   }
 
   folderShuffle(folderId: string): boolean {
@@ -1021,14 +1084,36 @@ export class JukeboxComponent implements OnInit, OnDestroy {
 
   async importFilesToFolder(folderId: string, files: FileList | File[]) {
     if (this.GuestMode() || !files?.length) return;
+    const maxBytes = FileArchiver.MAX_AUDIO_BYTES;
+    const { accepted, rejected } = partitionJukeboxImportFiles(Array.from(files), maxBytes);
+    if (rejected.length) this.showImportRejectToast(rejected);
+    if (!accepted.length) return;
     const fid = folderId || '';
     this.library.importFolderId = fid;
     this.expandedFolders[fid] = true;
     try {
-      await FileArchiver.instance.load(Array.from(files));
+      await FileArchiver.instance.load(accepted);
     } finally {
       this.library.importFolderId = null;
     }
+  }
+
+  /** Non-modal, no-focus toast beside the library; auto-hides after 5s. */
+  private showImportRejectToast(rejects: JukeboxImportReject[]) {
+    if (!rejects.length) return;
+    const maxMb = Math.round(FileArchiver.MAX_AUDIO_BYTES / (1024 * 1024));
+    this.rejectToastLines = formatJukeboxImportRejectLines(
+      rejects,
+      (key, params) => this.i18n.t(key, params),
+      maxMb,
+    );
+    if (this.rejectToastTimer != null) clearTimeout(this.rejectToastTimer);
+    this.rejectToastTimer = setTimeout(() => {
+      this.ngZone.run(() => {
+        this.rejectToastLines = [];
+        this.rejectToastTimer = null;
+      });
+    }, JUKEBOX_REJECT_TOAST_MS);
   }
 
   // —— Library selection ——————————————————————————————————————————

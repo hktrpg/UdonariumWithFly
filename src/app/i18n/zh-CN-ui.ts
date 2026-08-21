@@ -573,7 +573,7 @@ export const zhCN_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM 时透明', 'mask.optAffectsLight': '与灯光互动', 'mask.optShowAltitude': '显示高度', 'mask.optScratchPreview': 'GM 刮除预览',
 
-  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件或在线链接会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 20MB', 'jukebox.auditionVolume': '试听', 'jukebox.playbackVolume': '本机音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系统 SE', 'jukebox.soundboardVolume': '音效垫板', 'jukebox.volumeSaved': '存本机', 'jukebox.sfxTest': '系统 SE 测试', 'jukebox.soundboardTest': '垫板测试',
+  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件或在线链接会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 20MB', 'jukebox.reject.title': '无法导入', 'jukebox.reject.tooLarge': '「{{name}}」超过 {{max}}MB 上限，已跳过', 'jukebox.reject.notAudio': '「{{name}}」不是音乐文件，已跳过', 'jukebox.auditionVolume': '试听', 'jukebox.playbackVolume': '本机音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系统 SE', 'jukebox.soundboardVolume': '音效垫板', 'jukebox.volumeSaved': '存本机', 'jukebox.sfxTest': '系统 SE 测试', 'jukebox.soundboardTest': '垫板测试',
   'jukebox.tracks': '播放音轨',
   'jukebox.library': '曲库',
   'jukebox.showHelp': '说明',

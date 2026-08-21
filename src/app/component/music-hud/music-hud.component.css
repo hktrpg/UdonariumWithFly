@@ -131,6 +131,15 @@
   border-left-color: #7cbc68;
 }
 
+.slot-row.is-paused {
+  background: rgba(200, 160, 80, 0.18);
+  border-left-color: #c9a050;
+}
+
+.slot-play.is-paused {
+  color: #c9a050;
+}
+
 .slot-row.is-drop-target {
   outline: 2px solid #e8b86d;
   outline-offset: -2px;

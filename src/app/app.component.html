@@ -136,6 +136,11 @@
 <scene-nav></scene-nav>
 <pause-overlay></pause-overlay>
 <connection-busy-overlay></connection-busy-overlay>
+<div class="ephemeral-notice" *ngIf="audioRejectToastLines.length"
+  role="status" aria-live="polite" aria-atomic="true">
+  <div class="ephemeral-notice-title">{{ 'jukebox.reject.title' | i18n }}</div>
+  <div class="ephemeral-notice-line" *ngFor="let line of audioRejectToastLines">{{ line }}</div>
+</div>
 <character-resource-hud></character-resource-hud>
 <music-hud></music-hud>
 <network-indicator class="networkIndicator"></network-indicator>

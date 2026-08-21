@@ -18,6 +18,7 @@ import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -190,6 +191,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private dragStarted = false;
   private needsPdfRender = false;
   private lastPdfKey = '';
+  private pdfRenderSeq = 0;
   private selfPreviewOpen = false;
   private isHovering = false;
   /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
@@ -728,6 +730,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.textNote);
   }
@@ -816,15 +819,20 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const canvas = this.pdfCanvasRef?.nativeElement;
     const pdf = PdfStorage.instance.get(this.textNote.pdfIdentifier);
     if (!canvas || !pdf?.url) return;
+    const seq = ++this.pdfRenderSeq;
+    const wantPage = this.textNote.pdfPage;
+    const id = this.textNote.pdfIdentifier;
     try {
       const maxW = Math.max(120, this.width * this.gridSize);
-      const result = await renderPdfPage(canvas, pdf.url, this.textNote.pdfPage, this.textNote.pdfIdentifier, maxW);
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
+      // Ignore stale / superseded renders (rapid page flips).
+      if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
       this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}`;
       if (this.textNote.pdfPageCount !== result.pageCount) this.textNote.pdfPageCount = result.pageCount;
       if (this.textNote.pdfPage !== result.page) this.textNote.pdfPage = result.page;
       this.changeDetector.markForCheck();
     } catch (err) {
-      console.warn('text-note PDF render failed', err);
+      if (seq === this.pdfRenderSeq) console.warn('text-note PDF render failed', err);
     }
   }
 }

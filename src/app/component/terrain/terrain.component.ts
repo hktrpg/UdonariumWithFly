@@ -17,6 +17,7 @@ import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR, TERRAIN_SIZE_MIN } from '@udonarium/terrain';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -811,6 +812,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.terrain);
   }

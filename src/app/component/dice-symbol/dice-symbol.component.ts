@@ -19,6 +19,8 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { DiceSettingsComponent } from 'component/dice-settings/dice-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -116,6 +118,7 @@ import { TabletopActionService } from 'service/tabletop-action.service';
     standalone: false
 })
 export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy {
+  get skipEnterBounce(): boolean { return TabletopLoadSettle.skipEnterAnimation; }
   @Input() diceSymbol: DiceSymbol = null;
   @Input() is3D: boolean = false;
 
@@ -312,6 +315,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   onDoubleClick(e?: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e?.stopPropagation();
     this.showDetail(this.diceSymbol);
   }

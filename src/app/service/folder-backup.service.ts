@@ -10,6 +10,7 @@ import { Room } from '@udonarium/room';
 import { RoleAuthInput, RoomAuth } from '@udonarium/room-auth';
 import { captureMapPreviewDataUrl } from '@udonarium/scene-preset-preview';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -585,11 +586,33 @@ export class FolderBackupService implements OnDestroy {
     busy?.show('folderBackup.loadingRoom');
     try {
       await this.loadRoomBackup(selection);
-      // Keep overlay up while hydrate / Movable / *ngFor remount settle.
-      await new Promise<void>(resolve => setTimeout(resolve, 700));
+      await this.waitForTabletopLoadSettle();
     } finally {
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
+  }
+
+  /**
+   * Align busy overlay with TabletopLoadSettle (not a fixed 700ms).
+   * Connection reopen ownership is unrelated — this only waits for bounce/remount gate.
+   */
+  private waitForTabletopLoadSettle(timeoutMs = 2500): Promise<void> {
+    if (!TabletopLoadSettle.busy) {
+      return new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return new Promise(resolve => {
+      const key = { folderBackupSettleWait: true };
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        EventSystem.unregister(key);
+        resolve();
+      };
+      EventSystem.register(key).on('TABLETOP_LOAD_SETTLE_DONE', () => finish());
+      setTimeout(finish, timeoutMs);
+    });
   }
 
   async deleteRoomBackup(backup: RoomBackupInfo): Promise<boolean> {
@@ -790,16 +813,8 @@ export class FolderBackupService implements OnDestroy {
       this.logTokenVisibility('before-load');
       await this.loadRoomBackup(selected);
       this.logTokenVisibility('after-load-0ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 300));
-      this.logTokenVisibility('after-load-300ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 400));
-      this.logTokenVisibility('after-load-700ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-      this.logTokenVisibility('after-load-1200ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 800));
-      this.logTokenVisibility('after-load-2000ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 1500));
-      this.logTokenVisibility('after-load-3500ms');
+      await this.waitForTabletopLoadSettle();
+      this.logTokenVisibility('after-settle');
       folderBackupDebug('resumeOrLoad done', {
         roomId: Network.peer?.roomId || '',
         roomName: RoomAuth.displayRoomName(Network.peer?.roomName || ''),
@@ -810,6 +825,7 @@ export class FolderBackupService implements OnDestroy {
       console.warn('FolderBackup resume/load failed', e);
       folderBackupDebug('resumeOrLoad error', { error: String((e as Error)?.message || e) });
       this.lastError = String((e as Error)?.message || e);
+      TabletopLoadSettle.forceRelease();
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.folderBackup.loadFailed.title'),
         text: this.i18n.t('menu.folderBackup.loadFailed.text'),
@@ -823,6 +839,7 @@ export class FolderBackupService implements OnDestroy {
       const trust = loadOk || (!openedNewRoom && !!Network.peer?.isRoom);
       this.settlePeerSyncAfterLoad(loadOk, trust);
       if (!trust && openedNewRoom && Network.peer?.isRoom) Network.open();
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
   }
@@ -843,20 +860,15 @@ export class FolderBackupService implements OnDestroy {
       this.logTokenVisibility('before-load');
       await this.loadRoomBackup(selected);
       this.logTokenVisibility('after-load-0ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 700));
-      this.logTokenVisibility('after-load-700ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-      this.logTokenVisibility('after-load-1200ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 800));
-      this.logTokenVisibility('after-load-2000ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 1500));
-      this.logTokenVisibility('after-load-3500ms');
+      await this.waitForTabletopLoadSettle();
+      this.logTokenVisibility('after-settle');
       this.closeLobbyWindows();
       loadOk = true;
     } catch (e) {
       console.warn('FolderBackup load failed', e);
       folderBackupDebug('load error', { error: String((e as Error)?.message || e) });
       this.lastError = String((e as Error)?.message || e);
+      TabletopLoadSettle.forceRelease();
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.folderBackup.loadFailed.title'),
         text: this.i18n.t('menu.folderBackup.loadFailed.text'),
@@ -870,6 +882,7 @@ export class FolderBackupService implements OnDestroy {
         loadOk,
         !!(loadOk && Network.peer?.isRoom && !Network.GuestMode()),
       );
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
   }

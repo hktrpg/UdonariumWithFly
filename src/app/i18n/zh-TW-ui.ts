@@ -584,7 +584,7 @@ export const zhTW_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM 時透過', 'mask.optAffectsLight': '與燈光互動', 'mask.optShowAltitude': '顯示高度', 'mask.optScratchPreview': 'GM 刮除預覽',
 
-  'jukebox.title': '音樂播放器', 'jukebox.audition': '試聽', 'jukebox.auditionPlaying': '【試聽中】', 'jukebox.empty': '上傳的音樂檔案或線上連結會顯示在這裡。', 'jukebox.dropMusic': '將音樂拖放到這裡', 'jukebox.orClick': '或點擊這裡選擇', 'jukebox.maxFileSize': '每個檔案最大 20MB', 'jukebox.auditionVolume': '試聽', 'jukebox.playbackVolume': '本機音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系統 SE', 'jukebox.soundboardVolume': '音效墊板', 'jukebox.volumeSaved': '存本機', 'jukebox.sfxTest': '系統 SE 測試', 'jukebox.soundboardTest': '墊板測試',
+  'jukebox.title': '音樂播放器', 'jukebox.audition': '試聽', 'jukebox.auditionPlaying': '【試聽中】', 'jukebox.empty': '上傳的音樂檔案或線上連結會顯示在這裡。', 'jukebox.dropMusic': '將音樂拖放到這裡', 'jukebox.orClick': '或點擊這裡選擇', 'jukebox.maxFileSize': '每個檔案最大 20MB', 'jukebox.reject.title': '無法匯入', 'jukebox.reject.tooLarge': '「{{name}}」超過 {{max}}MB 上限，已略過', 'jukebox.reject.notAudio': '「{{name}}」不是音樂檔，已略過', 'jukebox.auditionVolume': '試聽', 'jukebox.playbackVolume': '本機音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系統 SE', 'jukebox.soundboardVolume': '音效墊板', 'jukebox.volumeSaved': '存本機', 'jukebox.sfxTest': '系統 SE 測試', 'jukebox.soundboardTest': '墊板測試',
   'jukebox.tracks': '播放音軌',
   'jukebox.library': '曲庫',
   'jukebox.showHelp': '說明',

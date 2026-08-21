@@ -302,6 +302,11 @@
         <i class="material-icons">{{ showHelp ? 'expand_less' : 'info_outline' }}</i>
       </button>
     </header>
+    <div class="jb-reject-toast" *ngIf="rejectToastLines.length"
+      role="status" aria-live="polite" aria-atomic="true">
+      <div class="jb-reject-toast-title">{{ 'jukebox.reject.title' | i18n }}</div>
+      <div class="jb-reject-toast-line" *ngFor="let line of rejectToastLines">{{ line }}</div>
+    </div>
     <div class="jb-help" *ngIf="showHelp">
       <p [innerHTML]="'jukebox.hintAudition' | i18n"></p>
       <p [innerHTML]="'jukebox.hintBgm' | i18n"></p>
@@ -365,11 +370,11 @@
             <button
               type="button"
               class="jb-icon-act"
-              [class.is-on]="isFolderPlaying('')"
+              [class.is-on]="isFolderActivelyPlaying('')"
               (click)="playFolderQueue('', $event)"
-              [title]="isFolderPlaying('') ? ('jukebox.stopAll' | i18n) : ('jukebox.folderPlayQueue' | i18n)"
+              [title]="folderPlayTitle('')"
             >
-              <i class="material-icons" aria-hidden="true">{{ isFolderPlaying('') ? 'stop' : 'play_arrow' }}</i>
+              <i class="material-icons" aria-hidden="true">{{ folderPlayIcon('') }}</i>
             </button>
           </div>
         </div>
@@ -433,11 +438,11 @@
             <button
               type="button"
               class="jb-icon-act"
-              [class.is-on]="isFolderPlaying(folder.id)"
+              [class.is-on]="isFolderActivelyPlaying(folder.id)"
               (click)="playFolderQueue(folder.id, $event)"
-              [title]="isFolderPlaying(folder.id) ? ('jukebox.stopAll' | i18n) : ('jukebox.folderPlayQueue' | i18n)"
+              [title]="folderPlayTitle(folder.id)"
             >
-              <i class="material-icons" aria-hidden="true">{{ isFolderPlaying(folder.id) ? 'stop' : 'play_arrow' }}</i>
+              <i class="material-icons" aria-hidden="true">{{ folderPlayIcon(folder.id) }}</i>
             </button>
           </div>
         </div>
@@ -522,12 +527,12 @@
       <button
         type="button"
         class="jb-icon-act"
-        [class.is-on]="isPlayingOnTrack(audio)"
+        [class.is-on]="isActivelyPlayingOnTrack(audio)"
         (click)="toggleLibraryPlay(audio, folderId, $event)"
         [disabled]="!audio.isReady"
-        [title]="isPlayingOnTrack(audio) ? ('jukebox.stopAll' | i18n) : ('jukebox.play' | i18n)"
+        [title]="libraryPlayTitle(audio)"
       >
-        <i class="material-icons" aria-hidden="true">{{ isPlayingOnTrack(audio) ? 'stop' : 'play_arrow' }}</i>
+        <i class="material-icons" aria-hidden="true">{{ libraryPlayIcon(audio) }}</i>
       </button>
     </span>
   </div>

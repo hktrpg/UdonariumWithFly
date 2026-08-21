@@ -28,6 +28,8 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
@@ -109,10 +111,8 @@ import { nameTagShouldWrap, NAME_TAG_WRAP_WIDTH_PX } from './name-tag-width';
 })
 export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestroy {
   /**
-   * Room ZIP remounts tokens while FoW/camera may still hide hosts. bounceInOut starts at
-   * scale(0); if aborted mid-flight (esp. former display:none), tokens stay invisible even
-   * after data is fine — and dual-map placements never remount on scene switch. Suppress
-   * enter bounce during archive settle so tokens appear at scale(1).
+   * @deprecated Prefer TabletopLoadSettle.skipEnterAnimation for load/join.
+   * Kept for brief map-switch suppress via TabletopLoadSettle.suppressBriefly.
    */
   static suppressEnterBounce = false;
   /** Coalesce out-of-zone AFTER_VIEW_TABLE_CHANGE into one NgZone kick (avoid N×tick). */
@@ -145,7 +145,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }) || this.gameCharacter;
   }
 
-  get skipEnterBounce(): boolean { return GameCharacterComponent.suppressEnterBounce; }
+  get skipEnterBounce(): boolean {
+    return TabletopLoadSettle.skipEnterAnimation || GameCharacterComponent.suppressEnterBounce;
+  }
 
   get name(): string {
     if (this.characterToken?.displayNameOverride) return this.characterToken.displayNameOverride;
@@ -1626,6 +1628,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.gameCharacter);
   }
