@@ -48,3 +48,4 @@ package-lock.json
 /.agents
 skills-lock.json
 *.log
+/.cursor
