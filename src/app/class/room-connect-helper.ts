@@ -9,6 +9,7 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import {
   isRecoverableNetworkError,
   RoomReopenResult,
@@ -46,8 +47,6 @@ export class RoomConnectHelper {
   static CONNECT_TIMEOUT_MS_FOR_TEST = 0; // 0 = use CONNECT_TIMEOUT_MS
   /** After failed join, App skips reopen until this timestamp (ms since epoch). */
   private static readonly JOIN_OWNED_MS = 2000;
-  /** Delayed remount so late token/image UPDATEs are mounted with suppressEnterBounce. */
-  static JOIN_SETTLE_REMOUNT_MS = 200;
   /** Probe join in progress: keep lobby/tabletop until a live peer + tabletop is confirmed. */
   static joinInProgress = false;
   /** Bumped on each beginJoinProbe — ownership window for NETWORK_ERROR after finish. */
@@ -276,28 +275,20 @@ export class RoomConnectHelper {
 
   /** Remount + re-request images after a successful mesh join probe. */
   static settleTabletopAfterMeshJoin() {
+    // Mesh path: one ROOM_PIECES via restore — no delayed second remount (dual-flash).
+    // Does not interact with reopen / joinOwnedUntil (connection ownership stays separate).
+    TabletopLoadSettle.begin();
     try {
       TableSelecter.instance.restoreAfterRoomLoad();
     } catch (e) {
       console.warn('RoomConnectHelper join settle (restore) failed', e);
+      TabletopLoadSettle.forceRelease();
+      return;
     }
     try {
       ImageStorage.instance.synchronize();
     } catch (e) {
       console.warn('RoomConnectHelper join settle (images) failed', e);
-    }
-    const delayMs = RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS;
-    if (delayMs > 0) {
-      const tableId = TableSelecter.instance.viewedTableIdentifier
-        || TableSelecter.instance.viewTableIdentifier
-        || '';
-      setTimeout(() => {
-        try {
-          EventSystem.trigger('ROOM_PIECES_REPLACED', { tableId });
-        } catch (e) {
-          console.warn('RoomConnectHelper join settle (delayed remount) failed', e);
-        }
-      }, delayMs);
     }
   }
 

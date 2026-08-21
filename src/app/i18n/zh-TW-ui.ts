@@ -529,7 +529,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.boardSettings': '桌面設定', 'note.fieldWidth': '寬', 'note.fieldHeight': '高',
   'note.changeFront': '正面圖', 'note.changeBack': '背面圖', 'note.attachPdf': '附加 PDF', 'note.clearPdf': '清除 PDF', 'note.pdfAttached': '已附加 PDF',
   'note.scope': '範圍', 'note.scopeScene': '目前地圖', 'note.scopeRoom': '全房間地圖',
-  'note.lock': '鎖定位置', 'note.sizeLock': '鎖定大小', 'note.resizeHint': '拖曳以調整大小', 'note.visible': '顯示', 'note.hidden': '隱藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
+  'note.lock': '鎖定位置', 'note.sizeLock': '鎖定大小', 'note.resizeHint': '拖曳以調整大小', 'note.resizeHintAspect': '拖曳等比縮放；Shift＋拖曳可自由比例', 'note.visible': '顯示', 'note.hidden': '隱藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
   'note.flipTip': '勾選＝顯示背面（有背面圖）或正面鏡像翻轉（無背面圖）。',
   'note.clickAction': '點擊動作', 'note.actionNone': '無', 'note.actionChat': '送出聊天／骰子', 'note.actionTable': '切換地圖', 'note.actionPreset': '套用場面',
   'note.clickChatText': '聊天／骰子文字', 'note.clickGameType': '系統類型', 'note.clickTable': '目標地圖', 'note.clickPreset': '場面',
@@ -545,7 +545,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.fieldTitleBg': '標題欄底色',
   'note.showTitle': '顯示標題', 'note.whiteOut': '白底遮罩', 'note.upright': '直立', 'note.upright2dLocked': '2D 地圖筆記固定平放',
   'note.pickImage': '選擇圖片', 'note.pdfPage': '頁碼', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加影片。',
-  'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.ctrlHoverHint': '提示：滑鼠移到桌面筆記上後再按 Ctrl 可預覽。',
+  'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.previewResetView': '重設縮放／平移', 'note.ctrlHoverHint': '提示：滑鼠移到桌面筆記上後再按 Ctrl 可預覽。滾輪縮放；拖曳平移；雙擊重設。',
   'note.settingsEmpty': '請選擇要編輯的筆記。',
   'note.selfOnly': '僅自己可見', 'note.showEveryone': '顯示給所有人', 'note.importFile': '匯入檔案', 'note.dropHint': '拖曳文字／圖片／影片／PDF 到此處即可匯入。',
   'mask.clickAction': '點擊動作', 'mask.clickSettings': '點擊動作設定',
@@ -584,7 +584,7 @@ export const zhTW_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM 時透過', 'mask.optAffectsLight': '與燈光互動', 'mask.optShowAltitude': '顯示高度', 'mask.optScratchPreview': 'GM 刮除預覽',
 
-  'jukebox.title': '音樂播放器', 'jukebox.audition': '試聽', 'jukebox.auditionPlaying': '【試聽中】', 'jukebox.empty': '上傳的音樂檔案或線上連結會顯示在這裡。', 'jukebox.dropMusic': '將音樂拖放到這裡', 'jukebox.orClick': '或點擊這裡選擇', 'jukebox.maxFileSize': '每個檔案最大 20MB', 'jukebox.auditionVolume': '試聽', 'jukebox.playbackVolume': '本機音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系統 SE', 'jukebox.soundboardVolume': '音效墊板', 'jukebox.volumeSaved': '存本機', 'jukebox.sfxTest': '系統 SE 測試', 'jukebox.soundboardTest': '墊板測試',
+  'jukebox.title': '音樂播放器', 'jukebox.audition': '試聽', 'jukebox.auditionPlaying': '【試聽中】', 'jukebox.empty': '上傳的音樂檔案或線上連結會顯示在這裡。', 'jukebox.dropMusic': '將音樂拖放到這裡', 'jukebox.orClick': '或點擊這裡選擇', 'jukebox.maxFileSize': '每個檔案最大 20MB', 'jukebox.reject.title': '無法匯入', 'jukebox.reject.tooLarge': '「{{name}}」超過 {{max}}MB 上限，已略過', 'jukebox.reject.notAudio': '「{{name}}」不是音樂檔，已略過', 'jukebox.auditionVolume': '試聽', 'jukebox.playbackVolume': '本機音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系統 SE', 'jukebox.soundboardVolume': '音效墊板', 'jukebox.volumeSaved': '存本機', 'jukebox.sfxTest': '系統 SE 測試', 'jukebox.soundboardTest': '墊板測試',
   'jukebox.tracks': '播放音軌',
   'jukebox.library': '曲庫',
   'jukebox.showHelp': '說明',

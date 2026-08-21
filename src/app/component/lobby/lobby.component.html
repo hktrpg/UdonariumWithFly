@@ -10,7 +10,11 @@
       </button>
       <button type="button" class="btn" *ngIf="canShowLoadRoom" (click)="loadFolderBackup()"
         [disabled]="isFolderLoadDisabled"
-        [title]="isFolderLoadDisabled ? ('peer.loadData.gmOnly' | i18n) : (folderBackupActionLabelKey | i18n)">
+        [title]="isFolderLoadDisabled
+          ? ('peer.loadData.gmOnly' | i18n)
+          : (folderBackup.isReady
+            ? ('menu.folderBackup.autoStoreHint' | i18n)
+            : (folderBackupActionLabelKey | i18n))">
         <i class="material-icons">{{ folderBackup.isReady ? 'folder_open' : 'create_new_folder' }}</i>{{ folderBackupActionLabelKey | i18n }}<ng-container *ngIf="isFolderLoadDisabled">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
       </button>
     </div>

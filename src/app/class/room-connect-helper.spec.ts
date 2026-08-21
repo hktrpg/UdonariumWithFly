@@ -316,20 +316,16 @@ describe('RoomConnectHelper.openAndConnect', () => {
     expect(settle).toHaveBeenCalled();
   });
 
-  it('schedules delayed ROOM_PIECES_REPLACED after settle', async () => {
-    const prevRemount = RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS;
-    RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS = 30;
-    spyOn(TableSelecter.instance, 'restoreAfterRoomLoad').and.stub();
+  it('restores tabletop once on mesh settle without delayed ROOM_PIECES', () => {
+    const restore = spyOn(TableSelecter.instance, 'restoreAfterRoomLoad').and.stub();
     const trigger = spyOn(EventSystem, 'trigger').and.callThrough();
 
     RoomConnectHelper.settleTabletopAfterMeshJoin();
-    const piecesCalls = () =>
-      trigger.calls.allArgs().filter(args => String(args[0]) === 'ROOM_PIECES_REPLACED');
-    expect(piecesCalls().length).toBe(0);
-    await new Promise<void>(resolve => setTimeout(resolve, 50));
-    expect(piecesCalls().length).toBeGreaterThan(0);
 
-    RoomConnectHelper.JOIN_SETTLE_REMOUNT_MS = prevRemount;
+    expect(restore).toHaveBeenCalled();
+    const piecesCalls = trigger.calls.allArgs().filter(args => String(args[0]) === 'ROOM_PIECES_REPLACED');
+    // Delayed second remount removed; restore owns the single ROOM_PIECES when not stubbed.
+    expect(piecesCalls.length).toBe(0);
   });
 
   it('sets joinOwnedUntil when join probe fails so reopen stays busy', async () => {

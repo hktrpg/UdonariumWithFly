@@ -518,7 +518,7 @@ export const ja_ui: I18nDictionary = {
   'note.boardSettings': '卓上設定', 'note.fieldWidth': '幅', 'note.fieldHeight': '高さ',
   'note.changeFront': '表面画像', 'note.changeBack': '裏面画像', 'note.attachPdf': 'PDFを添付', 'note.clearPdf': 'PDFを解除', 'note.pdfAttached': 'PDF添付済み',
   'note.scope': '範囲', 'note.scopeScene': 'このマップ', 'note.scopeRoom': '全マップ',
-  'note.lock': '位置ロック', 'note.sizeLock': 'サイズロック', 'note.resizeHint': 'ドラッグでサイズ変更', 'note.visible': '表示', 'note.hidden': '非表示', 'note.flipped': '裏返し', 'note.frontFace': '表面',
+  'note.lock': '位置ロック', 'note.sizeLock': 'サイズロック', 'note.resizeHint': 'ドラッグでサイズ変更', 'note.resizeHintAspect': 'ドラッグで等比拡大縮小；Shift＋ドラッグで自由比率', 'note.visible': '表示', 'note.hidden': '非表示', 'note.flipped': '裏返し', 'note.frontFace': '表面',
   'note.flipTip': 'オン＝裏面画像（あれば）／なければ表面を左右反転。',
   'note.clickAction': 'クリック動作', 'note.actionNone': 'なし', 'note.actionChat': 'チャット／ダイス送信', 'note.actionTable': 'マップ切替', 'note.actionPreset': 'シーン適用',
   'note.clickChatText': 'チャット／ダイス文', 'note.clickGameType': 'ゲームタイプ', 'note.clickTable': '対象マップ', 'note.clickPreset': 'シーン',
@@ -534,7 +534,7 @@ export const ja_ui: I18nDictionary = {
   'note.fieldTitleBg': 'タイトル欄の背景色',
   'note.showTitle': 'タイトル表示', 'note.whiteOut': '白塗り', 'note.upright': '直立', 'note.upright2dLocked': '2Dマップでは平置き固定',
   'note.pickImage': '画像を選択', 'note.pdfPage': 'ページ', 'note.pdfEmpty': 'PDFは未添付です。', 'note.videoEmpty': '動画は未添付です。',
-  'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.ctrlHoverHint': 'ヒント：卓上メモにホバーしてから Ctrl を押すとプレビュー。',
+  'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.previewResetView': 'ズーム／パンをリセット', 'note.ctrlHoverHint': 'ヒント：卓上メモにホバーしてから Ctrl でプレビュー。ホイールで拡大、ドラッグで移動、ダブルクリックでリセット。',
   'note.settingsEmpty': '編集するメモを選択してください。',
   'note.selfOnly': '自分のみ表示', 'note.showEveryone': '全員に表示', 'note.importFile': 'ファイル読込', 'note.dropHint': 'テキスト／画像／動画／PDF をここにドロップして取り込み。',
   'mask.clickAction': 'クリック動作', 'mask.clickSettings': 'クリック動作設定',
@@ -573,7 +573,7 @@ export const ja_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM時透過', 'mask.optAffectsLight': 'ライトと相互作用', 'mask.optShowAltitude': '高度を表示', 'mask.optScratchPreview': 'GM時スクラッチプレビュー',
 
-  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルやオンラインリンクがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 20MB', 'jukebox.auditionVolume': '試聴', 'jukebox.playbackVolume': '端末音量', 'jukebox.musicMasterVolume': 'マスター', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': 'システムSE', 'jukebox.soundboardVolume': 'サウンドボード', 'jukebox.volumeSaved': '端末に保存', 'jukebox.sfxTest': 'システムSEテスト', 'jukebox.soundboardTest': 'ボードテスト',
+  'jukebox.title': '音楽プレイヤー', 'jukebox.audition': '試聴', 'jukebox.auditionPlaying': '【試聴中】', 'jukebox.empty': 'アップロードした音楽ファイルやオンラインリンクがここに表示されます。', 'jukebox.dropMusic': '音楽をここにドロップ', 'jukebox.orClick': 'またはクリックして選択', 'jukebox.maxFileSize': '各ファイル最大 20MB', 'jukebox.reject.title': '取り込みできません', 'jukebox.reject.tooLarge': '「{{name}}」は {{max}}MB を超えるためスキップ', 'jukebox.reject.notAudio': '「{{name}}」は音楽ファイルではないためスキップ', 'jukebox.auditionVolume': '試聴', 'jukebox.playbackVolume': '端末音量', 'jukebox.musicMasterVolume': 'マスター', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': 'システムSE', 'jukebox.soundboardVolume': 'サウンドボード', 'jukebox.volumeSaved': '端末に保存', 'jukebox.sfxTest': 'システムSEテスト', 'jukebox.soundboardTest': 'ボードテスト',
   'jukebox.tracks': '再生トラック',
   'jukebox.library': 'ライブラリ',
   'jukebox.showHelp': '説明',

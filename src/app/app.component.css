@@ -361,3 +361,30 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   font-size: 22px !important;
 }
 
+/* Non-modal import reject toast — no focus, auto-dismiss (app.component). */
+.ephemeral-notice {
+  position: fixed;
+  z-index: 2500000;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid #c9a882;
+  background: rgba(58, 47, 36, 0.94);
+  color: #fff8ee;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.ephemeral-notice-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ephemeral-notice-line + .ephemeral-notice-line {
+  margin-top: 2px;
+}
+

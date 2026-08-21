@@ -11,6 +11,7 @@ import { folderBackupDebug, summarizeCharPlacements } from '../service/folder-ba
 import { CharacterToken } from './character-token';
 import { GameCharacter } from './game-character';
 import { reconcileLayerStack } from './tabletop-object-util';
+import { TabletopLoadSettle } from './tabletop-load-settle';
 
 /**
  * Foundry-style scene selection:
@@ -63,6 +64,9 @@ export class TableSelecter extends GameObject implements InnerXml {
     this.viewedTableIdentifier = '';
     this.viewTableIdentifier = '';
     this.isPaused = false;
+    // Start bounce gate early so XML→restore remounts do not run enter animations.
+    // Does not touch Network / join reopen ownership.
+    TabletopLoadSettle.begin();
   }
 
   /**
@@ -138,10 +142,14 @@ export class TableSelecter extends GameObject implements InnerXml {
       try { reconcileLayerStack(); }
       catch (e) { console.warn('[TableSelecter] reconcileLayerStack failed', e); }
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId: targetId });
-      // Clear cameras / remount *before* SELECT so shared table ids (e.g. gameTable)
-      // do not briefly restore the previous room's saved camera.
+      // Single identity remount owner: ROOM_PIECES_REPLACED (GameTable).
+      // SELECT uses _fromRoomLoad so map-switch characterViewEpoch is not double-fired.
       EventSystem.trigger('ROOM_PIECES_REPLACED', { tableId: targetId });
-      EventSystem.trigger('SELECT_GAME_TABLE', { identifier: targetId, _fromSelecter: true });
+      EventSystem.trigger('SELECT_GAME_TABLE', {
+        identifier: targetId,
+        _fromSelecter: true,
+        _fromRoomLoad: true,
+      });
       this.syncMyViewedPresence();
       this.schedulePoseVisualSyncAfterLoad(targetId);
     } catch (e) {
@@ -178,11 +186,7 @@ export class TableSelecter extends GameObject implements InnerXml {
       EventSystem.trigger('AFTER_VIEW_TABLE_CHANGE', { tableId });
     };
     queueMicrotask(() => sync('microtask'));
-    setTimeout(() => sync('0ms'), 0);
-    setTimeout(() => sync('50ms'), 50);
     setTimeout(() => sync('200ms'), 200);
-    setTimeout(() => sync('500ms'), 500);
-    setTimeout(() => sync('1000ms'), 1000);
   }
 
   // GameObject Lifecycle

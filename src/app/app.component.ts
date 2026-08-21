@@ -5,6 +5,7 @@ import { AudioPlayer, VolumeType } from '@udonarium/core/file-storage/audio-play
 import { AudioSharingSystem } from '@udonarium/core/file-storage/audio-sharing-system';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import { formatJukeboxImportRejectLines, JukeboxImportReject } from '@udonarium/core/file-storage/jukebox-import-files';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { PdfSharingSystem } from '@udonarium/core/file-storage/pdf-sharing-system';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
@@ -204,6 +205,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
    */
   showChatUnreadBadge = false;
   chatUnreadBadgeLabel = '0';
+
+  /** Non-focusing toast for body-level audio import rejects (5s). */
+  audioRejectToastLines: string[] = [];
+  private audioRejectToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   private syncChatUnreadBadge() {
     const n = ChatTabList.instance.unreadLength;
@@ -436,6 +441,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       .on('LOCALE_CHANGED', () => {
         // Tab labels use ChatTabList.localizedName() (local display only — do not SyncVar-write).
         this.ngZone.run(() => this.lazyNgZoneUpdate(false));
+      })
+      .on('AUDIO_IMPORT_REJECTED', event => {
+        const rejects = (event.data?.rejects || []) as JukeboxImportReject[];
+        if (!rejects.length) return;
+        this.ngZone.run(() => this.showAudioRejectToast(rejects));
       })
       .on<AppConfig>('LOAD_CONFIG', event => {
         if (event.data.dice && event.data.dice.url) {
@@ -945,6 +955,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
+    if (this.audioRejectToastTimer != null) {
+      clearTimeout(this.audioRejectToastTimer);
+      this.audioRejectToastTimer = null;
+    }
     window.removeEventListener('keydown', this.onWindowKeydown, true);
     this.mobileSub?.unsubscribe();
   }
@@ -1237,6 +1251,23 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     let files = input.files;
     if (files.length) FileArchiver.instance.load(files);
     input.value = '';
+  }
+
+  /** Body / menu file drops: non-modal notice when audio is over the size cap. */
+  private showAudioRejectToast(rejects: JukeboxImportReject[]) {
+    const maxMb = Math.round(FileArchiver.MAX_AUDIO_BYTES / (1024 * 1024));
+    this.audioRejectToastLines = formatJukeboxImportRejectLines(
+      rejects,
+      (key, params) => this.i18n.t(key, params),
+      maxMb,
+    );
+    if (this.audioRejectToastTimer != null) clearTimeout(this.audioRejectToastTimer);
+    this.audioRejectToastTimer = setTimeout(() => {
+      this.ngZone.run(() => {
+        this.audioRejectToastLines = [];
+        this.audioRejectToastTimer = null;
+      });
+    }, 5000);
   }
 
   private lazyNgZoneUpdate(isImmediate: boolean) {
@@ -1616,6 +1647,34 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  /**
+   * Personal settings: change / disconnect folder (was hover-flyout on Load Room).
+   * Two-level menu under 個人設定.
+   */
+  private makeFolderBackupSettingsMenu(): ContextMenuAction {
+    const unsupported = this.folderBackup.status === 'unsupported';
+    const unbound = this.folderBackup.status === 'unbound';
+    return {
+      name: this.i18n.t('menu.folderBackup'),
+      materialIcon: 'folder',
+      disabled: unsupported || this.GuestMode(),
+      subActions: [
+        {
+          name: this.i18n.t('menu.folderBackup.changeFolder'),
+          materialIcon: 'create_new_folder',
+          disabled: unsupported || this.GuestMode(),
+          action: () => { void this.folderBackup.bindFolder(); },
+        },
+        {
+          name: this.i18n.t('menu.folderBackup.disconnectFolder'),
+          materialIcon: 'link_off',
+          disabled: unsupported || unbound || this.GuestMode(),
+          action: () => { void this.folderBackup.unbindFolder(); },
+        },
+      ],
+    };
+  }
+
   private makeWeatherToolboxMenu() {
     const markType = (type: WeatherType) => {
       const cur = TableSelecter.instance.viewTable?.weatherType || 'none';
@@ -1895,6 +1954,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
         off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
+      this.makeFolderBackupSettingsMenu(),
       ...(this.mobileLayout.isMobile ? [] : [
         contextMenuToggleCheck({
           get: () => PanelService.singleNonChatWindow,

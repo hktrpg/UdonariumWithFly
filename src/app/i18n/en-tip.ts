@@ -26,7 +26,7 @@ export const en_tip: I18nDictionary = {
   'tip.menu.notes.title': 'Notes',
   'tip.menu.notes.body': 'Shared notes: text, image, video, PDF. Hover a note then press Ctrl to preview; flip, hide, click actions, show to players.',
   'tip.menu.settings.title': 'Settings',
-  'tip.menu.settings.body': 'Local options: grid, snap, sounds, auto-open chat, one menu window, rearrange panels, stands, language, tutorial.',
+  'tip.menu.settings.body': 'Local options: grid, snap, sounds, auto-open chat, one menu window, rearrange panels, stands, ZIP, folder backup (change / disconnect), language, tutorial.',
   'tip.menu.more.title': 'More',
   'tip.menu.more.body': 'Play: toolbox, notes, enter Edit. Edit: table/images/music/notes on the primary bar.',
   'tip.menu.mode.edit.title': 'Edit mode',

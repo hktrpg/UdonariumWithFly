@@ -18,6 +18,8 @@ import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
+import { rbCornerResizeSize, rotateTableDeltaToLocal } from '@udonarium/tabletop-corner-resize';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -30,7 +32,7 @@ import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.com
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
-import { MovableOption } from 'directive/movable.directive';
+import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { PAPER_STYLES, pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
@@ -54,6 +56,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   @ViewChild('textArea') textAreaElementRef: ElementRef<HTMLTextAreaElement>;
   @ViewChild('pdfCanvas') pdfCanvasRef: ElementRef<HTMLCanvasElement>;
   @ViewChild('resizeGrab') resizeGrabRef: ElementRef<HTMLElement>;
+  @ViewChild(MovableDirective) private movableDir: MovableDirective;
 
   @Input() textNote: TextNote = null;
   @Input() is3D: boolean = false;
@@ -190,6 +193,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private dragStarted = false;
   private needsPdfRender = false;
   private lastPdfKey = '';
+  private pdfRenderSeq = 0;
+  /** Once per pdf id: grow paper height to the rendered page (+ title/nav) so the billboard bottom matches. */
+  private pdfHeightFittedKey = '';
   private selfPreviewOpen = false;
   private isHovering = false;
   /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
@@ -293,40 +299,64 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     this.ngZone.runOutsideAngular(() => {
       this.resizeInput = new InputHandler(el);
       this.resizeInput.onStart = (ev) => this.onResizeStart(ev);
-      this.resizeInput.onMove = () => this.onResizeMove();
+      this.resizeInput.onMove = (ev) => this.onResizeMove(ev);
       this.resizeInput.onEnd = () => this.onResizeEnd();
     });
   }
 
+  /** PDF / image / video keep page aspect; text notes stay free-form. */
+  get keepsResizeAspect(): boolean {
+    return this.isPdfContent || this.isImageContent || this.isVideoContent;
+  }
+
+  get resizeHintKey(): string {
+    return this.keepsResizeAspect ? 'note.resizeHintAspect' : 'note.resizeHint';
+  }
+
   private onResizeStart(ev: MouseEvent | TouchEvent) {
     ev?.stopPropagation?.();
+    if (ev?.cancelable) ev.preventDefault();
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) {
       this.resizeInput?.cancel();
       return;
     }
-    const table = this.coordinateService.calcTabletopLocalCoordinate();
-    this.resizeStartTable = { x: table.x, y: table.y };
+    // Same as terrain: stop parent movable so corner drag scales instead of moving.
+    this.input?.cancel();
+    this.movableDir?.cancel();
+    // Always map via tabletop origin — targetElement under the grab is 3D-transformed
+    // and flips deltas once the pointer leaves the handle (looks like "both ways shrink").
+    this.resizeStartTable = this.tablePointer();
     this.resizeStartW = this.width;
     this.resizeStartH = this.height;
   }
 
-  private onResizeMove() {
+  private tablePointer(): { x: number; y: number } {
+    const p = this.pointerDeviceService.pointers[0] || { x: 0, y: 0 };
+    const table = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: p.x, y: p.y, z: 0 },
+      this.coordinateService.tabletopOriginElement
+    );
+    return { x: table.x, y: table.y };
+  }
+
+  private onResizeMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) return;
-    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const cur = this.tablePointer();
     const dx = cur.x - this.resizeStartTable.x;
     const dy = cur.y - this.resizeStartTable.y;
-    const rad = (-(this.rotate || 0) * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const localDx = dx * cos - dy * sin;
-    // Flat notes tip so paper height grows with table +Y; flip if upright billboard.
-    const localDy = this.isUpright ? -(dx * sin + dy * cos) : (dx * sin + dy * cos);
-    let w = MathUtil.clampMin(this.resizeStartW + localDx / this.gridSize);
-    let h = MathUtil.clampMin(this.resizeStartH + localDy / this.gridSize);
-    w = Math.min(40, Math.max(1, Math.round(w * 2) / 2));
-    h = Math.min(40, Math.max(1, Math.round(h * 2) / 2));
+    const { localDx, localDy } = rotateTableDeltaToLocal(dx, dy, this.rotate || 0);
+    const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
+    const { width: w, height: h } = rbCornerResizeSize({
+      startW: this.resizeStartW,
+      startH: this.resizeStartH,
+      localDxPx: localDx,
+      // Match terrain table +Y → depth/height; do not invert for upright (that made
+      // horizontal drags pick a shrinking height axis under aspect lock).
+      localDyPx: localDy,
+      gridSize: this.gridSize,
+      lockAspect: this.keepsResizeAspect && !freeAspect,
+    });
     this.ngZone.run(() => {
-      // Free width/height — no aspect lock for A4 / sticky.
       this.textNote.width = w;
       this.textNote.height = h;
       this.changeDetector.markForCheck();
@@ -728,6 +758,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.textNote);
   }
@@ -808,7 +839,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
 
   private queuePdfRender() {
     if (!this.isPdfContent) return;
-    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}`;
+    // ":hi" = sharp tabletop render tier (forces one re-render after quality bump).
+    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}:hi`;
     if (key !== this.lastPdfKey) this.needsPdfRender = true;
   }
 
@@ -816,15 +848,63 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const canvas = this.pdfCanvasRef?.nativeElement;
     const pdf = PdfStorage.instance.get(this.textNote.pdfIdentifier);
     if (!canvas || !pdf?.url) return;
+    const seq = ++this.pdfRenderSeq;
+    const wantPage = this.textNote.pdfPage;
+    const id = this.textNote.pdfIdentifier;
     try {
-      const maxW = Math.max(120, this.width * this.gridSize);
-      const result = await renderPdfPage(canvas, pdf.url, this.textNote.pdfPage, this.textNote.pdfIdentifier, maxW);
-      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}`;
+      // Display width on the table is small (e.g. 4×50=200); render much sharper so text stays
+      // readable in 3D view — CSS then scales the bitmap down into the paper box.
+      const displayW = Math.max(120, this.width * this.gridSize);
+      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+      const maxW = Math.min(1600, Math.round(displayW * Math.max(3, dpr * 2.5)));
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
+      // Ignore stale / superseded renders (rapid page flips).
+      if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
+      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}:hi`;
       if (this.textNote.pdfPageCount !== result.pageCount) this.textNote.pdfPageCount = result.pageCount;
       if (this.textNote.pdfPage !== result.page) this.textNote.pdfPage = result.page;
+      this.fitPaperToPdfCanvas(canvas);
       this.changeDetector.markForCheck();
     } catch (err) {
-      console.warn('text-note PDF render failed', err);
+      if (seq === this.pdfRenderSeq) console.warn('text-note PDF render failed', err);
+    }
+  }
+
+  /**
+   * One-time paper fit for PDF notes:
+   * - Grow width to a mid-zoom readable size (old imports were ~4 grids / unreadable far away).
+   * - Grow height to the page aspect so the canvas does not sink past the table origin.
+   */
+  private fitPaperToPdfCanvas(canvas: HTMLCanvasElement) {
+    const id = this.textNote?.pdfIdentifier || '';
+    if (!id || this.pdfHeightFittedKey === id) return;
+    if (!canvas.width || !canvas.height) return;
+    this.pdfHeightFittedKey = id;
+    if (this.textNote.isSizeLocked) return;
+
+    /** ~500px — readable without camera glued to the note; user can still shrink after. */
+    const minReadableWidth = 10;
+    let sizeChanged = false;
+    // Old PDF imports used ~4×5; bump those once so mid-zoom text is usable.
+    // Notes the user already sized (≥5) are left alone.
+    if (this.width <= 4.5) {
+      this.textNote.width = minReadableWidth;
+      sizeChanged = true;
+    }
+
+    const titlePx = (this.isShowTitle && (this.title || '').length) ? 28 : 0;
+    const navPx = 36;
+    const pagePx = (canvas.height / Math.max(1, canvas.width)) * (this.width * this.gridSize);
+    const need = Math.max(1, Math.round(((pagePx + titlePx + navPx) / this.gridSize) * 2) / 2);
+    if (need > this.height + 0.05) {
+      this.textNote.height = need;
+      sizeChanged = true;
+    }
+
+    // Re-render at the new display width so sharpness matches the larger paper.
+    if (sizeChanged) {
+      this.lastPdfKey = '';
+      this.needsPdfRender = true;
     }
   }
 }

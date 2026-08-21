@@ -518,7 +518,7 @@ export const en_ui: I18nDictionary = {
   'note.boardSettings': 'Board settings', 'note.fieldWidth': 'Width', 'note.fieldHeight': 'Height',
   'note.changeFront': 'Front image', 'note.changeBack': 'Back image', 'note.attachPdf': 'Attach PDF', 'note.clearPdf': 'Clear PDF', 'note.pdfAttached': 'PDF attached',
   'note.scope': 'Scope', 'note.scopeScene': 'This map', 'note.scopeRoom': 'All maps',
-  'note.lock': 'Lock position', 'note.sizeLock': 'Lock size', 'note.resizeHint': 'Drag to resize', 'note.visible': 'Visible', 'note.hidden': 'Hidden', 'note.flipped': 'Flipped', 'note.frontFace': 'Front face',
+  'note.lock': 'Lock position', 'note.sizeLock': 'Lock size', 'note.resizeHint': 'Drag to resize', 'note.resizeHintAspect': 'Drag to resize proportionally; Shift+drag for free aspect', 'note.visible': 'Visible', 'note.hidden': 'Hidden', 'note.flipped': 'Flipped', 'note.frontFace': 'Front face',
   'note.flipTip': 'Checked = show back image (if set) or mirror the front face.',
   'note.clickAction': 'On click', 'note.actionNone': 'None', 'note.actionChat': 'Send chat / dice', 'note.actionTable': 'Switch map', 'note.actionPreset': 'Apply scene',
   'note.clickChatText': 'Chat / dice text', 'note.clickGameType': 'Game type', 'note.clickTable': 'Target map', 'note.clickPreset': 'Scene',
@@ -534,7 +534,7 @@ export const en_ui: I18nDictionary = {
   'note.fieldTitleBg': 'Title bar color',
   'note.showTitle': 'Show title', 'note.whiteOut': 'White out', 'note.upright': 'Upright', 'note.upright2dLocked': 'Notes stay flat on 2D maps',
   'note.pickImage': 'Choose image', 'note.pdfPage': 'Page', 'note.pdfEmpty': 'No PDF attached yet.', 'note.videoEmpty': 'No video attached yet.',
-  'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.ctrlHoverHint': 'Tip: hover a table note, then press Ctrl to preview.',
+  'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.previewResetView': 'Reset zoom / pan', 'note.ctrlHoverHint': 'Tip: hover a table note, then press Ctrl to preview. Wheel zooms; drag to pan; double-click resets.',
   'note.settingsEmpty': 'Select a note to edit.',
   'note.selfOnly': 'Self only', 'note.showEveryone': 'Show to everyone', 'note.importFile': 'Import file', 'note.dropHint': 'Drop text / image / video / PDF here to import.',
   'mask.clickAction': 'On click', 'mask.clickSettings': 'Click action settings',
@@ -573,7 +573,7 @@ export const en_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'See-through as GM', 'mask.optAffectsLight': 'Affects lights', 'mask.optShowAltitude': 'Show altitude', 'mask.optScratchPreview': 'Scratch preview as GM',
 
-  'jukebox.title': 'Music player', 'jukebox.audition': 'Preview', 'jukebox.auditionPlaying': '【Previewing】', 'jukebox.empty': 'Uploaded files and online links appear here.', 'jukebox.dropMusic': 'Drop music here', 'jukebox.orClick': 'or click here to choose', 'jukebox.maxFileSize': 'Max. 20 MB per file', 'jukebox.auditionVolume': 'Preview', 'jukebox.playbackVolume': 'Local volume', 'jukebox.musicMasterVolume': 'Master', 'jukebox.noticeVolume': 'Notice', 'jukebox.sfxVolume': 'System SE', 'jukebox.soundboardVolume': 'Soundboard', 'jukebox.volumeSaved': 'Saved locally', 'jukebox.sfxTest': 'Test system SE', 'jukebox.soundboardTest': 'Test soundboard',
+  'jukebox.title': 'Music player', 'jukebox.audition': 'Preview', 'jukebox.auditionPlaying': '【Previewing】', 'jukebox.empty': 'Uploaded files and online links appear here.', 'jukebox.dropMusic': 'Drop music here', 'jukebox.orClick': 'or click here to choose', 'jukebox.maxFileSize': 'Max. 20 MB per file', 'jukebox.reject.title': 'Could not import', 'jukebox.reject.tooLarge': '“{{name}}” exceeds {{max}} MB — skipped', 'jukebox.reject.notAudio': '“{{name}}” is not an audio file — skipped', 'jukebox.auditionVolume': 'Preview', 'jukebox.playbackVolume': 'Local volume', 'jukebox.musicMasterVolume': 'Master', 'jukebox.noticeVolume': 'Notice', 'jukebox.sfxVolume': 'System SE', 'jukebox.soundboardVolume': 'Soundboard', 'jukebox.volumeSaved': 'Saved locally', 'jukebox.sfxTest': 'Test system SE', 'jukebox.soundboardTest': 'Test soundboard',
   'jukebox.tracks': 'Tracks',
   'jukebox.library': 'Library',
   'jukebox.showHelp': 'Help',

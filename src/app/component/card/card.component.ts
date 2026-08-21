@@ -21,6 +21,8 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { CardSettingsComponent } from 'component/card-settings/card-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -82,6 +84,7 @@ import { ChatMessageService } from 'service/chat-message.service';
     standalone: false
 })
 export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
+  get skipEnterBounce(): boolean { return TabletopLoadSettle.skipEnterAnimation; }
   @Input() card: Card = null;
   @Input() is3D: boolean = false;
   @ViewChild('cardImage', { static: false }) cardImageElement: ElementRef<HTMLImageElement>;
@@ -271,6 +274,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   onDoubleClick(e?: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e?.stopPropagation();
     this.showDetail(this.card);
   }

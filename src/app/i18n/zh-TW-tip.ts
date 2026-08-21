@@ -26,7 +26,7 @@ export const zhTW_tip: I18nDictionary = {
   'tip.menu.notes.title': '筆記',
   'tip.menu.notes.body': '筆記倉庫：文字（Markdown）／圖片／影片／PDF。滑鼠移到筆記上再按 Ctrl 可預覽；可翻面、隱藏、點擊動作、出示給玩家。',
   'tip.menu.settings.title': '設定',
-  'tip.menu.settings.body': '本機選項：格線、吸附、提示音、聊天自動開啟、選單單視窗、重排面板、Stand、語系、教學。',
+  'tip.menu.settings.body': '本機選項：格線、吸附、提示音、聊天自動開啟、選單單視窗、重排面板、Stand、ZIP、資料夾備份（更改／斷開）、語系、教學。',
   'tip.menu.more.title': '更多',
   'tip.menu.more.body': '遊玩：工具箱、筆記、進入編輯。編輯：地圖／圖庫／音樂／筆記在主列。',
   'tip.menu.mode.edit.title': '編輯模式',

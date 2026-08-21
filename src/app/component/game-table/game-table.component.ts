@@ -23,6 +23,7 @@ import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { notePinAnchorPx, pinAnchorPx, stringBeamStyle3d, stringPathD, tokenCenterAnchorPx, tokenVisualHeightPx } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { Stackable } from '@udonarium/tabletop-object-util';
@@ -630,10 +631,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   isLayerMask(piece: Stackable): piece is GameTableMask { return piece instanceof GameTableMask; }
 
   trackByLayerPiece = (_index: number, piece: Stackable) => {
-    if (piece instanceof CharacterToken || piece instanceof GameCharacter) {
-      return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
-    }
-    return piece.identifier;
+    // Include pieceRenderEpoch for ALL peers so cross-room syncId recycle remounts cards/notes/masks too.
+    return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
   };
 
   /** Foundry-style Alt hold outlines (screen AABB). */
@@ -870,6 +869,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('SELECT_GAME_TABLE', -10, event => {
         // After TabletopService refreshes object caches for the new viewed table.
         const id = event.data?.identifier || '';
+        const fromRoomLoad = !!event.data?._fromRoomLoad;
         const viewed = this.tableSelecter.viewedTableIdentifier || '';
         const cache = this.characters || [];
         const dualInCache = cache.filter(c => (c.placementTableIds || []).length > 1);
@@ -878,6 +878,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           viewed,
           fromSelecter: !!event.data?._fromSelecter,
           fromCatalog: !!event.data?._fromCatalog,
+          fromRoomLoad,
           charEpochBefore: this.characterViewEpoch,
           pieceEpoch: this.pieceRenderEpoch,
           cacheCount: cache.length,
@@ -886,87 +887,70 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           cacheNames: cache.map(c => c.name || '?'),
         });
         this.ngZone.run(() => queueMicrotask(() => {
-          // Remount dual-map survivors (same cache membership → same trackBy otherwise).
-          // Suppress bounce: remount while visibility:hidden aborts bounceInOut at scale(0).
-          GameCharacterComponent.suppressEnterBounce = true;
-          const epochBefore = this.characterViewEpoch;
-          this.characterViewEpoch++;
-          GameCharacterComponent.resetMountLogBudget(16);
-          const viewed = this.tableSelecter.viewedTableIdentifier || id;
-          const placeSnap = summarizeCharPlacements(
-            ObjectStore.instance.getObjects(GameCharacter),
-            '',
-            viewed,
-          );
-          folderBackupDebug('game-table map remount chars', {
-            id,
-            charEpoch: `${epochBefore}→${this.characterViewEpoch}`,
-            dualInCache: dualInCache.map(c =>
-              `${c.name}|${c.identifier.slice(0, 8)}|maps=${(c.placementTableIds || []).map(m => m.slice(0, 12)).join('+')}|` +
-              `live=${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}|load=${!!c.isLoaded}`
-            ),
-            placeSnap,
-            mountBudget: 16,
-          });
+          // Room-load identity remount is owned by ROOM_PIECES_REPLACED — do not
+          // also bump characterViewEpoch (dual-path flash). User map-switch still remounts once.
+          if (!fromRoomLoad) {
+            TabletopLoadSettle.suppressBriefly(120);
+            GameCharacterComponent.resetMountLogBudget(16);
+            const epochBefore = this.characterViewEpoch;
+            this.characterViewEpoch++;
+            folderBackupDebug('game-table map remount chars', {
+              id,
+              charEpoch: `${epochBefore}→${this.characterViewEpoch}`,
+              dualInCache: dualInCache.map(c =>
+                `${c.name}|${c.identifier.slice(0, 8)}|maps=${(c.placementTableIds || []).map(m => m.slice(0, 12)).join('+')}|` +
+                `live=${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}|load=${!!c.isLoaded}`
+              ),
+              placeSnap: summarizeCharPlacements(
+                ObjectStore.instance.getObjects(GameCharacter),
+                '',
+                this.tableSelecter.viewedTableIdentifier || id,
+              ),
+              mountBudget: 16,
+            });
+          }
           this.applyViewedTable();
           MovableDirective.syncAllPosesFromObjects();
           this.changeDetector.detectChanges();
           queueMicrotask(() => {
             MovableDirective.syncAllPosesFromObjects();
             this.changeDetector.detectChanges();
-            GameCharacterComponent.suppressEnterBounce = false;
           });
-          // Immediate DOM count (before bounce finishes).
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +0ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 0);
-          // Map-switch is the control that often "fixes" invisible tokens — capture DOM after it.
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +150ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 150);
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +600ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 600);
         }));
       })
       .on('ARCHIVE_LOAD_COMPLETE', () => {
-        // ZIP load replaces tables but keeps this component's in-memory cameras.
-        // Stale pan/tilt (or a singular CSS matrix during hydrate) makes tokens look
-        // "wrong" until the user switches maps — which re-runs applyViewedTable.
-        folderBackupDebug('game-table ARCHIVE_LOAD_COMPLETE → refreshAfterRoomArchiveLoad');
-        this.ngZone.run(() => this.refreshAfterRoomArchiveLoad());
+        // ZIP path: identity remount already done in ROOM_PIECES during XML restore.
+        // Sync-only here — never pieceRenderEpoch++ (avoids dual remount vs restore).
+        folderBackupDebug('game-table ARCHIVE_LOAD_COMPLETE → archiveSyncAfterLoad');
+        this.ngZone.run(() => this.archiveSyncAfterLoad());
       })
       .on('ROOM_PIECES_REPLACED', () => {
-        // fly_data.xml finished before images; remount so recycled syncId views are not kept.
+        // Sole identity remount owner for ZIP restore + mesh settle.
         this.ngZone.run(() => {
           folderBackupDebug('game-table ROOM_PIECES_REPLACED', {
             epochBefore: this.pieceRenderEpoch,
             cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
             viewId: this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier || '',
           });
-          GameCharacterComponent.suppressEnterBounce = true;
+          TabletopLoadSettle.begin();
           GameCharacterComponent.resetMountLogBudget(20);
           this.pieceRenderEpoch++;
-          // Room A→B reuses table syncIds; drop A's camera before applyViewedTable.
           this.tableViewById.clear();
           this.cameraTableId = '';
           this._last2DMode = null;
           this.visionRevealedIds = new Set();
           this.changeDetector.detectChanges();
           MovableDirective.syncAllPosesFromObjects();
-          // Defer FoW/camera refresh until after *ngFor remounts piece components.
           queueMicrotask(() => {
             this.applyViewedTable();
-            this.logTokenVisibilityDiag('game-table ROOM_PIECES microtask');
-          });
-          setTimeout(() => {
-            this.applyViewedTable();
+            for (const c of this.characters || []) {
+              if (c && !c.isLoaded) c.isLoaded = true;
+            }
             MovableDirective.syncAllPosesFromObjects();
-            this.logTokenVisibilityDiag('game-table ROOM_PIECES +200ms');
-          }, 200);
+            this.changeDetector.detectChanges();
+            this.logTokenVisibilityDiag('game-table ROOM_PIECES microtask');
+            TabletopLoadSettle.noteIdentityRemountDone(220);
+          });
         });
       })
       .on('UPDATE_GAME_OBJECT', event => {
@@ -1149,7 +1133,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // During folder-backup settle, ignore any leftover per-table camera from the prior room
     // (table ids like "gameTable" are often reused across rooms).
-    const saved = GameCharacterComponent.suppressEnterBounce
+    const saved = TabletopLoadSettle.busy
       ? undefined
       : this.tableViewById.get(table.identifier);
     if (saved) {
@@ -2120,7 +2104,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       charCache: (this.characters || []).length,
       epoch: this.pieceRenderEpoch,
       charEpoch: this.characterViewEpoch,
-      suppressBounce: GameCharacterComponent.suppressEnterBounce,
+      suppressBounce: TabletopLoadSettle.skipEnterAnimation,
+      settleBusy: TabletopLoadSettle.busy,
       dualCache: (this.characters || [])
         .filter(c => (c.placementTableIds || []).length > 1)
         .map(c => c.name || c.identifier.slice(0, 8)),
@@ -2143,85 +2128,40 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * After room ZIP finishes: remount piece views, reset cameras, re-apply grid,
-   * then sync Movable once layout has settled.
-   *
-   * Enter bounce is suppressed until settle — display/FoW races previously aborted
-   * bounceInOut at scale(0); dual-map tokens never remounted on scene switch.
+   * After room ZIP assets finish: pose/hydrate sync only.
+   * Identity remount already happened via ROOM_PIECES_REPLACED during XML restore —
+   * bumping pieceRenderEpoch again here caused the multi-flash dual path.
    */
-  private refreshAfterRoomArchiveLoad() {
-    folderBackupDebug('game-table refreshAfterRoomArchiveLoad');
-    GameCharacterComponent.suppressEnterBounce = true;
-    GameCharacterComponent.resetMountLogBudget(24);
-    this.pieceRenderEpoch++;
-    this.tableViewById.clear();
-    this.cameraTableId = '';
-    this._last2DMode = null;
-    // Force FoW reveal set to rebuild on next refreshFx.
-    this.visionRevealedIds = new Set();
+  private archiveSyncAfterLoad() {
+    folderBackupDebug('game-table archiveSyncAfterLoad');
+    TabletopLoadSettle.markExpectArchive();
 
-    const countMovables = () => {
-      let n = 0;
-      for (const set of MovableDirective.layerMap.values()) n += set.size;
-      return n;
-    };
-
-    const refresh = (label: string, remount = false) => {
-      if (remount) this.pieceRenderEpoch++;
+    const sync = (label: string) => {
       this.applyViewedTable();
       MovableDirective.syncAllPosesFromObjects();
       for (const c of this.characters || []) {
         if (c && !c.isLoaded) c.isLoaded = true;
       }
       this.changeDetector.detectChanges();
-      this.logTokenVisibilityDiag(`game-table refresh (${label})`, {
-        remount,
+      this.logTokenVisibilityDiag(`game-table archive sync (${label})`, {
         epoch: this.pieceRenderEpoch,
-        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+        settleBusy: TabletopLoadSettle.busy,
       });
     };
 
-    // Force *ngFor to see the new trackBy epoch immediately.
-    this.changeDetector.detectChanges();
-
-    queueMicrotask(() => refresh('microtask'));
+    queueMicrotask(() => sync('microtask'));
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => refresh('raf2'));
-    });
-    setTimeout(() => refresh('100ms'), 100);
-    setTimeout(() => {
-      // Remount after Movable usually exists — same effect as a real map switch.
-      refresh('350ms+epoch', true);
-      const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier;
-      if (viewId) {
-        EventSystem.trigger('VIEW_GAME_TABLE', { identifier: viewId });
-        MovableDirective.syncAllPosesFromObjects();
-        this.changeDetector.detectChanges();
-        folderBackupDebug('game-table VIEW_GAME_TABLE bounce', { viewId, movableCount: countMovables() });
-      }
-    }, 350);
-    setTimeout(() => refresh('700ms', true), 700);
-    setTimeout(() => {
-      refresh('1200ms', true);
-      // Remount while bounce is still suppressed — same as map switch, without
-      // replaying enter animation on brand-new hosts (which can leave tokens invisible).
-      this.pieceRenderEpoch++;
-      MovableDirective.syncAllPosesFromObjects();
-      this.changeDetector.detectChanges();
-      queueMicrotask(() => {
-        MovableDirective.syncAllPosesFromObjects();
-        this.changeDetector.detectChanges();
-        GameCharacterComponent.suppressEnterBounce = false;
-        this.logTokenVisibilityDiag('game-table archive settle done', {
-          movableCount: countMovables(),
-          suppressBounce: false,
-          epoch: this.pieceRenderEpoch,
-        });
+      requestAnimationFrame(() => {
+        sync('raf2');
+        const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier;
+        if (viewId) {
+          EventSystem.trigger('VIEW_GAME_TABLE', { identifier: viewId });
+          MovableDirective.syncAllPosesFromObjects();
+          this.changeDetector.detectChanges();
+        }
+        TabletopLoadSettle.afterArchiveSettle(220);
       });
-    }, 1200);
-    // Extra late probe — images / FoW may still settle after busy overlay hides.
-    setTimeout(() => this.logTokenVisibilityDiag('game-table +2s probe'), 2000);
-    setTimeout(() => this.logTokenVisibilityDiag('game-table +3.5s probe'), 3500);
+    });
   }
 
   /** Full per-token visibility diagnosis (data + DOM). Filter console: FolderBackup */
@@ -2267,7 +2207,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         isGM: this.isGMMode,
         epoch: this.pieceRenderEpoch,
         charEpoch: this.characterViewEpoch,
-        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+        suppressBounce: TabletopLoadSettle.skipEnterAnimation,
+      settleBusy: TabletopLoadSettle.busy,
         cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
         camRot: `${this.viewRotateX|0},${this.viewRotateY|0},${this.viewRotateZ|0}`,
         cacheCount: cacheChars.length,

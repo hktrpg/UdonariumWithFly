@@ -2,6 +2,7 @@ import { ObjectStore } from './core/synchronize-object/object-store';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
 import { TableSelecter } from './table-selecter';
+import { TabletopLoadSettle } from './tabletop-load-settle';
 import {
   makeCharacter,
   makeTable,
@@ -13,7 +14,10 @@ import {
 
 describe('TableSelecter view / reload', () => {
   beforeEach(() => resetTabletopStore());
-  afterEach(() => resetTabletopStore());
+  afterEach(() => {
+    resetTabletopStore();
+    TabletopLoadSettle.forceRelease();
+  });
 
   it('prepareForRoomReload clears active and viewed ids', () => {
     makeTable('t1');

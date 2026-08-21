@@ -376,16 +376,6 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     void this.folderBackup.ensureBound();
   }
 
-  changeFolderBackup() {
-    if (this.GuestMode()) return;
-    void this.folderBackup.bindFolder();
-  }
-
-  unbindFolderBackup() {
-    if (this.GuestMode()) return;
-    void this.folderBackup.unbindFolder();
-  }
-
   async saveFolderBackup() {
     if (this.GuestMode() || !this.networkService.peer?.isRoom) return;
     if (!(await this.folderBackup.ensureBound())) return;

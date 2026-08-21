@@ -518,7 +518,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.boardSettings': '桌面设置', 'note.fieldWidth': '宽', 'note.fieldHeight': '高',
   'note.changeFront': '正面图', 'note.changeBack': '背面图', 'note.attachPdf': '附加 PDF', 'note.clearPdf': '清除 PDF', 'note.pdfAttached': '已附加 PDF',
   'note.scope': '范围', 'note.scopeScene': '当前地图', 'note.scopeRoom': '全房间地图',
-  'note.lock': '锁定位置', 'note.sizeLock': '锁定大小', 'note.resizeHint': '拖曳以调整大小', 'note.visible': '显示', 'note.hidden': '隐藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
+  'note.lock': '锁定位置', 'note.sizeLock': '锁定大小', 'note.resizeHint': '拖曳以调整大小', 'note.resizeHintAspect': '拖曳等比缩放；Shift＋拖曳可自由比例', 'note.visible': '显示', 'note.hidden': '隐藏', 'note.flipped': '翻面', 'note.frontFace': '正面',
   'note.flipTip': '勾选＝显示背面（有背面图）或正面镜像翻转（无背面图）。',
   'note.clickAction': '点击动作', 'note.actionNone': '无', 'note.actionChat': '发送聊天／骰子', 'note.actionTable': '切换地图', 'note.actionPreset': '应用场面',
   'note.clickChatText': '聊天／骰子文字', 'note.clickGameType': '系统类型', 'note.clickTable': '目标地图', 'note.clickPreset': '场面',
@@ -534,7 +534,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.fieldTitleBg': '标题栏底色',
   'note.showTitle': '显示标题', 'note.whiteOut': '白底遮罩', 'note.upright': '直立', 'note.upright2dLocked': '2D 地图笔记固定平放',
   'note.pickImage': '选择图片', 'note.pdfPage': '页码', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加视频。',
-  'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.ctrlHoverHint': '提示：鼠标移到桌面笔记上后再按 Ctrl 可预览。',
+  'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.previewResetView': '重置缩放／平移', 'note.ctrlHoverHint': '提示：鼠标移到桌面笔记上后再按 Ctrl 可预览。滚轮缩放；拖动平移；双击重置。',
   'note.settingsEmpty': '请选择要编辑的笔记。',
   'note.selfOnly': '仅自己可见', 'note.showEveryone': '显示给所有人', 'note.importFile': '导入文件', 'note.dropHint': '拖入文字／图片／视频／PDF 即可导入。',
   'mask.clickAction': '点击动作', 'mask.clickSettings': '点击动作设置',
@@ -573,7 +573,7 @@ export const zhCN_ui: I18nDictionary = {
 
   'mask.optGmSeeThrough': 'GM 时透明', 'mask.optAffectsLight': '与灯光互动', 'mask.optShowAltitude': '显示高度', 'mask.optScratchPreview': 'GM 刮除预览',
 
-  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件或在线链接会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 20MB', 'jukebox.auditionVolume': '试听', 'jukebox.playbackVolume': '本机音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系统 SE', 'jukebox.soundboardVolume': '音效垫板', 'jukebox.volumeSaved': '存本机', 'jukebox.sfxTest': '系统 SE 测试', 'jukebox.soundboardTest': '垫板测试',
+  'jukebox.title': '音乐播放器', 'jukebox.audition': '试听', 'jukebox.auditionPlaying': '【试听中】', 'jukebox.empty': '上传的音乐文件或在线链接会显示在这里。', 'jukebox.dropMusic': '将音乐拖放到这里', 'jukebox.orClick': '或点击这里选择', 'jukebox.maxFileSize': '每个文件最大 20MB', 'jukebox.reject.title': '无法导入', 'jukebox.reject.tooLarge': '「{{name}}」超过 {{max}}MB 上限，已跳过', 'jukebox.reject.notAudio': '「{{name}}」不是音乐文件，已跳过', 'jukebox.auditionVolume': '试听', 'jukebox.playbackVolume': '本机音量', 'jukebox.musicMasterVolume': '主音量', 'jukebox.noticeVolume': '通知', 'jukebox.sfxVolume': '系统 SE', 'jukebox.soundboardVolume': '音效垫板', 'jukebox.volumeSaved': '存本机', 'jukebox.sfxTest': '系统 SE 测试', 'jukebox.soundboardTest': '垫板测试',
   'jukebox.tracks': '播放音轨',
   'jukebox.library': '曲库',
   'jukebox.showHelp': '说明',

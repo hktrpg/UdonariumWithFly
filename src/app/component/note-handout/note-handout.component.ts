@@ -75,6 +75,14 @@ export function buildNoteHandoutPayload(note: TextNote, nameFallback: string): N
   standalone: false
 })
 export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked {
+  /**
+   * True while any Ctrl-preview handout is open — table wheel must not pan/zoom;
+   * the handout capture listener zooms the preview content instead.
+   */
+  static previewConsumesWheel = false;
+  /** True while the user is dragging the preview (block map gesture steal). */
+  static previewConsumesPointer = false;
+
   @ViewChild('pdfCanvas') pdfCanvas: ElementRef<HTMLCanvasElement>;
 
   title = '';
@@ -86,10 +94,21 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   videoIdentifier = '';
   videoUrl = '';
   isPreview = false;
+  /** CSS scale for Ctrl-preview content (wheel). Reset on open/close. */
+  previewZoom = 1;
+  previewPanX = 0;
+  previewPanY = 0;
+  isPreviewDragging = false;
   private needsPdfRender = false;
   private previewNoteId = '';
   private pdfRenderSeq = 0;
+  private dragLastX = 0;
+  private dragLastY = 0;
   private readonly onWindowKeyDown = (e: KeyboardEvent) => this.handlePageKey(e);
+  private readonly onWindowWheel = (e: WheelEvent) => this.handlePreviewWheel(e);
+
+  private static readonly PREVIEW_ZOOM_MIN = 0.5;
+  private static readonly PREVIEW_ZOOM_MAX = 4;
 
   get isOpen(): boolean {
     return !!(this.imageUrl || this.pdfIdentifier || this.resolvedVideoUrl || this.text);
@@ -98,6 +117,12 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   get isVideo(): boolean { return !!this.resolvedVideoUrl; }
   get isText(): boolean { return !this.isPdf && !this.isVideo && !this.imageUrl && !!this.text; }
   get textHtml(): string { return this.isText ? noteMarkdownToHtml(this.text) : ''; }
+  get previewTransform(): string {
+    return `translate(${this.previewPanX}px, ${this.previewPanY}px) scale(${this.previewZoom})`;
+  }
+  get previewZoomPercent(): number {
+    return Math.round(this.previewZoom * 100);
+  }
   get resolvedVideoUrl(): string {
     if (this.videoIdentifier) {
       const file = VideoStorage.instance.get(this.videoIdentifier);
@@ -126,8 +151,10 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
         this.videoUrl = data.videoUrl || '';
         this.isPreview = !!data.preview;
         this.previewNoteId = data.noteIdentifier || '';
+        this.resetPreviewView();
         this.pdfRenderSeq++;
         this.needsPdfRender = !!this.pdfIdentifier;
+        this.syncPreviewWheelFlag();
         this.changeDetector.markForCheck();
       })
       .on('HIDE_NOTE_HANDOUT', event => {
@@ -153,6 +180,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     // Capture phase so A/D work even while Ctrl is held (Ctrl+A is otherwise stolen by the browser).
     this.ngZone.runOutsideAngular(() => {
       window.addEventListener('keydown', this.onWindowKeyDown, true);
+      window.addEventListener('wheel', this.onWindowWheel, { capture: true, passive: false });
     });
   }
 
@@ -164,8 +192,102 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   ngOnDestroy() {
+    NoteHandoutComponent.previewConsumesWheel = false;
+    NoteHandoutComponent.previewConsumesPointer = false;
     window.removeEventListener('keydown', this.onWindowKeyDown, true);
+    window.removeEventListener('wheel', this.onWindowWheel, true);
     EventSystem.unregister(this);
+  }
+
+  private syncPreviewWheelFlag() {
+    NoteHandoutComponent.previewConsumesWheel = !!(this.isPreview && this.isOpen);
+    if (!NoteHandoutComponent.previewConsumesWheel) {
+      NoteHandoutComponent.previewConsumesPointer = false;
+      this.isPreviewDragging = false;
+    }
+  }
+
+  /** Ctrl-preview: wheel zooms content (image / PDF / video / text) — not map pan / browser zoom. */
+  private handlePreviewWheel(e: WheelEvent) {
+    if (!NoteHandoutComponent.previewConsumesWheel) return;
+    if (!this.isPreview || !this.isOpen) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (raw === 0) return;
+    const factor = raw > 0 ? (1 / 1.12) : 1.12;
+    const next = Math.min(
+      NoteHandoutComponent.PREVIEW_ZOOM_MAX,
+      Math.max(NoteHandoutComponent.PREVIEW_ZOOM_MIN, this.previewZoom * factor),
+    );
+    if (Math.abs(next - this.previewZoom) < 0.001) return;
+    this.ngZone.run(() => {
+      this.previewZoom = next;
+      this.changeDetector.markForCheck();
+    });
+  }
+
+  onPreviewPointerDown(e: PointerEvent) {
+    if (!this.isPreview || !this.isOpen || e.button !== 0) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('video, button, a, input, textarea, .handout-actions')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.isPreviewDragging = true;
+    this.dragLastX = e.clientX;
+    this.dragLastY = e.clientY;
+    NoteHandoutComponent.previewConsumesPointer = true;
+    try {
+      (e.currentTarget as HTMLElement)?.setPointerCapture?.(e.pointerId);
+    } catch { /* ignore */ }
+    this.changeDetector.markForCheck();
+  }
+
+  onPreviewPointerMove(e: PointerEvent) {
+    if (!this.isPreviewDragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const dx = e.clientX - this.dragLastX;
+    const dy = e.clientY - this.dragLastY;
+    if (dx === 0 && dy === 0) return;
+    this.dragLastX = e.clientX;
+    this.dragLastY = e.clientY;
+    this.previewPanX += dx;
+    this.previewPanY += dy;
+    this.changeDetector.markForCheck();
+  }
+
+  onPreviewPointerUp(e: PointerEvent) {
+    if (!this.isPreviewDragging) return;
+    e.stopPropagation();
+    this.isPreviewDragging = false;
+    NoteHandoutComponent.previewConsumesPointer = false;
+    try {
+      (e.currentTarget as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+    } catch { /* ignore */ }
+    this.changeDetector.markForCheck();
+  }
+
+  onPreviewDblClick(e: Event) {
+    if (!this.isPreview) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.resetPreviewView(e);
+  }
+
+  onPreviewMediaClick(e: Event) {
+    e.stopPropagation();
+    if (this.isPreview) return;
+    this.close();
+  }
+
+  resetPreviewView(e?: Event) {
+    e?.stopPropagation();
+    e?.preventDefault();
+    this.previewZoom = 1;
+    this.previewPanX = 0;
+    this.previewPanY = 0;
+    this.changeDetector.markForCheck();
   }
 
   private handlePageKey(e: KeyboardEvent) {
@@ -205,6 +327,8 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     this.pdfPageCount = 0;
     this.isPreview = false;
     this.previewNoteId = '';
+    this.resetPreviewView();
+    this.syncPreviewWheelFlag();
     this.changeDetector.markForCheck();
   }
 
@@ -246,7 +370,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     try {
       const result = await renderPdfPage(canvas, pdf.url, wantPage, id, 1100);
       // Ignore stale renders so an older page cannot overwrite the current one.
-      if (seq !== this.pdfRenderSeq || this.pdfIdentifier !== id) return;
+      if (!result || seq !== this.pdfRenderSeq || this.pdfIdentifier !== id) return;
       this.pdfPageCount = result.pageCount;
       // Keep clamped page; if we asked past the end, stay on last (result.page === pageCount).
       this.pdfPage = result.page;

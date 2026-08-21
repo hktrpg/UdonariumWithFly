@@ -62,7 +62,11 @@
               <ng-container *ngIf="!showBackFace" [ngSwitch]="contentKind">
                 <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
                   <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
-                  <div class="pdf-nav is-3d" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                  <div class="pdf-nav is-3d" data-no-dblclick
+                    (pointerdown)="$event.stopPropagation()"
+                    (mousedown)="$event.stopPropagation()"
+                    (click)="$event.stopPropagation()"
+                    (dblclick)="$event.stopPropagation(); $event.preventDefault()">
                     <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
                     <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
                     <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
@@ -70,11 +74,13 @@
                   </div>
                 </div>
 
-                <div *ngSwitchCase="'video'" class="video-wrap is-3d"
-                  (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+                <div *ngSwitchCase="'video'" class="video-wrap is-3d" data-no-dblclick
+                  (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()"
+                  (dblclick)="$event.stopPropagation(); $event.preventDefault()">
                   <video *ngIf="videoSrc" class="note-video is-3d" [src]="videoSrc | safe: 'resourceUrl'"
                     controls playsinline preload="metadata"
-                    (click)="$event.stopPropagation()"></video>
+                    (click)="$event.stopPropagation()"
+                    (dblclick)="$event.stopPropagation(); $event.preventDefault()"></video>
                   <div *ngIf="!videoSrc" class="media-loading is-3d">…</div>
                 </div>
 
@@ -101,7 +107,9 @@
             <div *ngIf="!isLocked && !GuestMode() && !textNote.isSizeLocked"
               #resizeGrab
               class="resize-grab of-right-bottom is-pointer-events-auto"
-              [attr.title]="'note.resizeHint' | i18n">
+              data-no-dblclick
+              (dblclick)="$event.stopPropagation(); $event.preventDefault()"
+              [attr.title]="resizeHintKey | i18n">
               <i class="material-icons">open_in_full</i>
             </div>
           </div>

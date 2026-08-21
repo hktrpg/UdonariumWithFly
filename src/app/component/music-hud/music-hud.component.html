@@ -12,14 +12,15 @@
         class="slot-play"
         *ngFor="let i of slotIndexes"
         [class.is-on]="isPlaying(i)"
+        [class.is-paused]="isPaused(i)"
         [class.is-empty]="!hasAudio(i)"
         (pointerdown)="$event.stopPropagation()"
         (click)="togglePlay(i, $event)"
         (contextmenu)="onSlotContextMenu(i, $event)"
         [disabled]="!canControl"
-        [attr.title]="trackName(i) + ' · ' + displayName(i)"
+        [attr.title]="trackName(i) + ' · ' + displayName(i) + ' · ' + playButtonTitle(i)"
       >
-        <i class="material-icons">{{ isPlaying(i) ? 'stop' : 'play_arrow' }}</i>
+        <i class="material-icons">{{ playButtonIcon(i) }}</i>
       </button>
     </div>
 
@@ -42,6 +43,7 @@
       class="slot-row"
       *ngFor="let i of slotIndexes"
       [class.is-playing]="isPlaying(i)"
+      [class.is-paused]="isPaused(i)"
       [class.is-drop-target]="dropSlotIndex === i"
       (dragover)="onSlotDragOver($event, i)"
       (dragleave)="onSlotDragLeave($event, i)"
@@ -62,16 +64,17 @@
         type="button"
         class="slot-play"
         [class.is-on]="isPlaying(i)"
+        [class.is-paused]="isPaused(i)"
         [class.is-empty]="!hasAudio(i)"
         (click)="togglePlay(i, $event)"
         (contextmenu)="onSlotContextMenu(i, $event)"
         [disabled]="!canControl"
-        [attr.title]="!hasAudio(i) ? ('musicHud.pickAudio' | i18n) : (isPlaying(i) ? ('jukebox.stopAll' | i18n) : ('jukebox.play' | i18n))"
+        [attr.title]="playButtonTitle(i)"
       >
-        <i class="material-icons">{{ isPlaying(i) ? 'stop' : 'play_arrow' }}</i>
+        <i class="material-icons">{{ playButtonIcon(i) }}</i>
       </button>
       <input
-        *ngIf="isPlaying(i)"
+        *ngIf="isTrackActive(i)"
         class="slot-scrub"
         type="range"
         min="0"

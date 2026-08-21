@@ -20,6 +20,8 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { CardStackListComponent } from 'component/card-stack-list/card-stack-list.component';
 import { CardStackSettingsComponent } from 'component/card-stack-settings/card-stack-settings.component';
@@ -82,6 +84,7 @@ import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
     standalone: false
 })
 export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
+  get skipEnterBounce(): boolean { return TabletopLoadSettle.skipEnterAnimation; }
   @Input() cardStack: CardStack = null;
   @Input() is3D: boolean = false;
 
@@ -277,6 +280,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   onDoubleClick(e?: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e?.stopPropagation();
     this.showDetail(this.cardStack);
   }
