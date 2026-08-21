@@ -3,11 +3,16 @@ import { netDebug } from '../net-debug';
 
 let installed = false;
 
+/** Flatten SDK log args for regex filters. */
+export function skyWayMsgText(msg: unknown[]): string {
+  return msg.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join(' ');
+}
+
 /** Expected peer churn / missing lobby Find — SDK dumps noisy payloads; keep console quiet. */
 export function isBenignSkyWayNoise(msg: unknown[]): boolean {
   try {
-    const text = msg.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join(' ');
-    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel|signalingClient|publicationNotExist/i.test(text);
+    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel|signalingClient|publicationNotExist/i
+      .test(skyWayMsgText(msg));
   } catch {
     return false;
   }
@@ -19,8 +24,7 @@ export function isBenignSkyWayNoise(msg: unknown[]): boolean {
  */
 export function isDowngradedSkyWayWarn(msg: unknown[]): boolean {
   try {
-    const text = msg.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join(' ');
-    return /restartIce limit exceeded/i.test(text);
+    return /restartIce limit exceeded/i.test(skyWayMsgText(msg));
   } catch {
     return false;
   }

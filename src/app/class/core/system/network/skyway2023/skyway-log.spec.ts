@@ -2,6 +2,7 @@ import {
   isBenignSkyWayNoise,
   isDowngradedSkyWayWarn,
   shortSkyWaySummary,
+  skyWayMsgText,
 } from './skyway-log';
 
 describe('skyway-log quiet filters', () => {
@@ -24,5 +25,10 @@ describe('skyway-log quiet filters', () => {
     expect(shortSkyWaySummary([{
       info: { name: 'internal', detail: 'signalingClient' },
     }])).toBe('internal: signalingClient');
+  });
+
+  it('skyWayMsgText joins string and object args', () => {
+    expect(skyWayMsgText(['a', { b: 1 }])).toContain('a');
+    expect(skyWayMsgText(['a', { b: 1 }])).toContain('"b":1');
   });
 });

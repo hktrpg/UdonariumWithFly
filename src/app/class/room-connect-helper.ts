@@ -257,14 +257,9 @@ export class RoomConnectHelper {
     const selfId = Network.peerId;
     const members = Network.listRoomMemberPeerIds();
     const gaps = meshGapPeerIds(selfId, members, Network.peerIds);
-    const attempting = new Set(Network.peers.map(p => p.peerId));
-
-    const toConnect: string[] = [];
-    for (const peerId of gaps) {
-      if (attempting.has(peerId)) continue;
-      toConnect.push(peerId);
-      Network.connect(PeerContext.parse(peerId));
-    }
+    const toConnect = RoomConnectHelper.connectMissingPeers(
+      gaps.map(id => PeerContext.parse(id)),
+    );
     if (toConnect.length > 0) {
       const now = Date.now();
       if (now - RoomConnectHelper.lastGapWarnAt >= RoomConnectHelper.GAP_WARN_COOLDOWN_MS) {
@@ -289,16 +284,16 @@ export class RoomConnectHelper {
 
   /**
    * Connect room/lobby peers that are not open and not already handshaking.
-   * @returns true if any Network.connect() returned true
+   * @returns peerIds for which Network.connect() returned true
    */
-  private static connectMissingPeers(targets: IPeerContext[]): boolean {
+  private static connectMissingPeers(targets: IPeerContext[]): string[] {
     const attempting = new Set(Network.peers.map(p => p.peerId));
-    let attempted = false;
+    const connected: string[] = [];
     for (const peer of targets) {
       if (!peer?.peerId || Network.peerIds.includes(peer.peerId) || attempting.has(peer.peerId)) continue;
-      if (Network.connect(peer)) attempted = true;
+      if (Network.connect(peer)) connected.push(peer.peerId);
     }
-    return attempted;
+    return connected;
   }
 
   /**
@@ -347,7 +342,7 @@ export class RoomConnectHelper {
       if (otherMembers.length > 0) {
         if (RoomConnectHelper.connectMissingPeers(
           otherMembers.map(id => PeerContext.parse(id)),
-        )) {
+        ).length > 0) {
           attemptedConnect = true;
         }
         if (RoomConnectHelper.openPeerCount() > 0) return;
@@ -373,7 +368,7 @@ export class RoomConnectHelper {
         continue;
       }
 
-      if (RoomConnectHelper.connectMissingPeers(others)) attemptedConnect = true;
+      if (RoomConnectHelper.connectMissingPeers(others).length > 0) attemptedConnect = true;
       if (RoomConnectHelper.openPeerCount() > 0) return;
       if (Network.peers.length > 0) {
         if (await RoomConnectHelper.waitHandshakeOrPrune() === 'open') return;
