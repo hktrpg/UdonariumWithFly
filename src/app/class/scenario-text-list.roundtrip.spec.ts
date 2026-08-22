@@ -1,7 +1,7 @@
 import { ObjectSerializer } from './core/synchronize-object/object-serializer';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { ScenarioText } from './scenario-text';
-import { ScenarioTextList } from './scenario-text-list';
+import { SAMPLE_SCENARIO_TEXT_ID, ScenarioTextList } from './scenario-text-list';
 
 function resetScenarioTextList() {
   const list = ScenarioTextList.instance;
@@ -13,6 +13,14 @@ function resetScenarioTextList() {
 describe('ScenarioTextList ZIP / backup load', () => {
   beforeEach(() => resetScenarioTextList());
   afterEach(() => resetScenarioTextList());
+
+  it('ensureSample adds at most one default scenario with a stable id', () => {
+    ScenarioTextList.instance.ensureSample('靈探事件：山中老村', 'body');
+    ScenarioTextList.instance.ensureSample('靈探事件：山中老村', 'body again');
+    expect(ScenarioTextList.instance.items.length).toBe(1);
+    expect(ScenarioTextList.instance.items[0].identifier).toBe(SAMPLE_SCENARIO_TEXT_ID);
+    expect(ScenarioTextList.instance.items[0].title).toBe('靈探事件：山中老村');
+  });
 
   it('replaces items on reload instead of accumulating duplicates', () => {
     const a = ScenarioText.create('Opening');

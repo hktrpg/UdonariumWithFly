@@ -5,6 +5,8 @@ import { ObjectStore } from './core/synchronize-object/object-store';
 import { ScenarioText } from './scenario-text';
 import { translate } from 'i18n';
 
+export const SAMPLE_SCENARIO_TEXT_ID = 'SampleScenarioText';
+
 @SyncObject('scenario-text-list')
 export class ScenarioTextList extends ObjectNode implements InnerXml {
   private static _instance: ScenarioTextList;
@@ -17,6 +19,19 @@ export class ScenarioTextList extends ObjectNode implements InnerXml {
   }
 
   get items(): ScenarioText[] { return this.children as ScenarioText[]; }
+
+  /** Seed the default sample once; stable id avoids duplicates across reloads and peers. */
+  ensureSample(title: string, body: string): void {
+    if (this.items.some(c => c.identifier === SAMPLE_SCENARIO_TEXT_ID)) return;
+    let item = ObjectStore.instance.get(SAMPLE_SCENARIO_TEXT_ID) as ScenarioText;
+    if (!(item instanceof ScenarioText)) {
+      item = new ScenarioText(SAMPLE_SCENARIO_TEXT_ID);
+      item.title = title;
+      item.body = body;
+      item.initialize();
+    }
+    this.addItem(item);
+  }
 
   addItem(item: ScenarioText): ScenarioText
   addItem(title?: string): ScenarioText

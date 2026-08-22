@@ -5,15 +5,17 @@ import { Network } from '../system';
 
 describe('FileReceiveScheduler', () => {
   beforeEach(() => {
+    FileReceiveScheduler.resetForTests();
     spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['p1']);
   });
-  it('schedules smallest transfers first across resource kinds', () => {
+  it('schedules images before other kinds, then smallest bytes within tier', () => {
     const order: string[] = [];
     FileReceiveScheduler.enqueueReceiveRequest('video', 'p1', 'big', 5_000_000, () => order.push('big'));
     FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', 'small', 100_000, () => order.push('small'));
     FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'mid', 1_000_000, () => order.push('mid'));
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'thumb', 4_000, () => order.push('thumb'));
     FileReceiveScheduler.schedule();
-    expect(order).toEqual(['small', 'mid', 'big']);
+    expect(order).toEqual(['thumb', 'small', 'mid', 'big']);
   });
 
   it('estimateNextReceiveBytes prefers thumbBytes for incomplete images', () => {

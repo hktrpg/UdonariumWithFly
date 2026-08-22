@@ -313,8 +313,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     CutInList.instance.initialize();
     ScenePresetList.instance.initialize();
     ScenarioTextList.instance.initialize();
-    const sampleScenario = ScenarioTextList.instance.addItem(this.i18n.t('sample.scenarioText'));
-    sampleScenario.body = this.i18n.t('sample.scenarioTextBody');
+    ScenarioTextList.instance.ensureSample(
+      this.i18n.t('sample.scenarioText'),
+      this.i18n.t('sample.scenarioTextBody'),
+    );
     AuraNameConfig.instance;
     CombatTracker.instance;
     SceneToolPermission.instance;

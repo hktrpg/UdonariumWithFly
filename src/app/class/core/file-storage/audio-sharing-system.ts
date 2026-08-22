@@ -73,7 +73,7 @@ export class AudioSharingSystem {
           if (audio && item.state < audio.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
 
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length && !this.existsSendTask(event.data.receiver)) {
+        if (this.isLimitSendTask() === false && 0 < randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', randomRequest, item => item.state);
           const item = sorted[0];
           const audio: AudioFile = AudioStorage.instance.get(item.identifier);
@@ -229,13 +229,13 @@ export class AudioSharingSystem {
     }
   }
 
-  private async queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
+  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', request, item => {
       const audio = AudioStorage.instance.get(item.identifier);
       return audio?.state ?? AudioState.NULL;
     });
-    await FolderMediaHydrator.instance.hydrateMissing('audio', sorted.map(item => item.identifier));
+    FolderMediaHydrator.instance.beginHydrateMissing('audio', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const audio = AudioStorage.instance.get(item.identifier);
       const localState = audio?.state ?? AudioState.NULL;

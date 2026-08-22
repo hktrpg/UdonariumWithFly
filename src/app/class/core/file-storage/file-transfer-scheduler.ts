@@ -1,4 +1,5 @@
 import { AudioState } from './audio-file';
+import { clearPlayingMusicCache, compareFileSyncPriority, collectPlayingMusicIdentifiers, primePlayingMusicCache } from './file-sync-priority';
 import { ImageState } from './image-file';
 import { PdfState } from './pdf-file';
 import { VideoState } from './video-file';
@@ -26,7 +27,8 @@ interface PendingReceiveRequest {
 const DEFAULT_UNKNOWN_BYTES = 999_999_999;
 const DEFAULT_THUMB_BYTES = 4_096;
 /** Wait before re-requesting after a canceled/failed receive (avoids cancel loops). */
-const RECEIVE_RETRY_BACKOFF_MS = 20_000;
+const RECEIVE_RETRY_BACKOFF_MS = 5_000;
+const OUTBOUND_PENDING_TIMEOUT_MS = 30_000;
 
 export class FileReceiveScheduler {
   private static readonly MAX_CONCURRENT_RECEIVES = 4;
@@ -38,6 +40,7 @@ export class FileReceiveScheduler {
   private static peerRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private static receiveRetryAfter = new Map<string, number>();
   private static networkHooksRegistered = false;
+  private static playingMusicPriorityKey = '';
 
   static ensureNetworkHooks(): void {
     if (FileReceiveScheduler.networkHooksRegistered) return;
@@ -46,6 +49,15 @@ export class FileReceiveScheduler {
       .on('CONNECT_PEER', () => {
         FileReceiveScheduler.clearPeerRetryTimers();
         FileReceiveScheduler.schedule();
+      })
+      .on('UPDATE_GAME_OBJECT', event => {
+        if (event.data?.identifier !== 'Jukebox') return;
+        const key = [...collectPlayingMusicIdentifiers()].sort().join('\0');
+        if (key === FileReceiveScheduler.playingMusicPriorityKey) return;
+        FileReceiveScheduler.playingMusicPriorityKey = key;
+        if (FileReceiveScheduler.pending.length > 0) {
+          FileReceiveScheduler.scheduleDeferred();
+        }
       });
   }
 
@@ -142,7 +154,7 @@ export class FileReceiveScheduler {
     FileReceiveScheduler.scheduleDeferred();
   }
 
-  /** Queue a download request; smallest pending transfers run first across all resource kinds. */
+  /** Queue a download request; images first, then playing music, then smallest bytes. */
   static enqueueReceiveRequest(
     kind: FileResourceKind,
     peerId: string,
@@ -160,7 +172,7 @@ export class FileReceiveScheduler {
     FileReceiveScheduler.scheduleDeferred();
   }
 
-  /** Coalesce enqueue bursts (e.g. image + audio + pdf sync) into one size-ordered dispatch. */
+  /** Coalesce enqueue bursts (e.g. image + audio + pdf sync) into one priority-ordered dispatch. */
   static scheduleDeferred(): void {
     if (FileReceiveScheduler.scheduleTimer != null) return;
     FileReceiveScheduler.scheduleTimer = setZeroTimeout(() => {
@@ -170,7 +182,15 @@ export class FileReceiveScheduler {
   }
 
   static schedule(): void {
-    FileReceiveScheduler.pending.sort((a, b) => a.bytes - b.bytes);
+    primePlayingMusicCache();
+    try {
+      FileReceiveScheduler.pending.sort((a, b) => compareFileSyncPriority(
+        a.kind, a.identifier, a.bytes,
+        b.kind, b.identifier, b.bytes,
+      ));
+    } finally {
+      clearPlayingMusicCache();
+    }
     while (!FileReceiveScheduler.isReceiveBudgetFull() && FileReceiveScheduler.pending.length > 0) {
       const nextIndex = FileReceiveScheduler.pending.findIndex(
         (p, index) => !FileReceiveScheduler.outboundPending.has(FileReceiveScheduler.receiveKey(p.kind, p.identifier))
@@ -189,8 +209,26 @@ export class FileReceiveScheduler {
       const next = FileReceiveScheduler.pending.splice(nextIndex, 1)[0];
       const key = FileReceiveScheduler.receiveKey(next.kind, next.identifier);
       FileReceiveScheduler.outboundPending.add(key);
-      setTimeout(() => FileReceiveScheduler.outboundPending.delete(key), 60_000);
+      setTimeout(() => {
+        if (FileReceiveScheduler.outboundPending.delete(key)) {
+          FileReceiveScheduler.schedule();
+        }
+      }, OUTBOUND_PENDING_TIMEOUT_MS);
       next.execute();
+    }
+  }
+
+  /** @internal Test helper — clears queued transfers between specs. */
+  static resetForTests(): void {
+    FileReceiveScheduler.activeReceives.clear();
+    FileReceiveScheduler.outboundPending.clear();
+    FileReceiveScheduler.pending = [];
+    FileReceiveScheduler.receiveRetryAfter.clear();
+    FileReceiveScheduler.playingMusicPriorityKey = '';
+    FileReceiveScheduler.clearPeerRetryTimers();
+    if (FileReceiveScheduler.scheduleTimer != null) {
+      clearTimeout(FileReceiveScheduler.scheduleTimer);
+      FileReceiveScheduler.scheduleTimer = null;
     }
   }
 
@@ -199,11 +237,16 @@ export class FileReceiveScheduler {
     items: T[],
     localStateFor: (item: T) => number
   ): T[] {
-    return items.slice().sort((a, b) => {
-      const bytesA = estimateNextReceiveBytes(kind, localStateFor(a), a);
-      const bytesB = estimateNextReceiveBytes(kind, localStateFor(b), b);
-      return bytesA - bytesB;
-    });
+    primePlayingMusicCache();
+    try {
+      return items.slice().sort((a, b) => {
+        const bytesA = estimateNextReceiveBytes(kind, localStateFor(a), a);
+        const bytesB = estimateNextReceiveBytes(kind, localStateFor(b), b);
+        return compareFileSyncPriority(kind, a.identifier, bytesA, kind, b.identifier, bytesB);
+      });
+    } finally {
+      clearPlayingMusicCache();
+    }
   }
 }
 

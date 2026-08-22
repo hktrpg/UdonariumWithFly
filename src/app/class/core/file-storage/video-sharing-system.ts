@@ -59,7 +59,7 @@ export class VideoSharingSystem {
           const video = VideoStorage.instance.get(item.identifier);
           if (video && item.state < video.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
-        if (!this.isLimitSendTask() && randomRequest.length && !this.existsSendTask(event.data.receiver)) {
+        if (!this.isLimitSendTask() && randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', randomRequest, item => item.state);
           const item = sorted[0];
           const video = VideoStorage.instance.get(item.identifier);
@@ -180,13 +180,13 @@ export class VideoSharingSystem {
     }
   }
 
-  private async queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {
+  private queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', request, item => {
       const video = VideoStorage.instance.get(item.identifier);
       return video?.state ?? VideoState.NULL;
     });
-    await FolderMediaHydrator.instance.hydrateMissing('video', sorted.map(item => item.identifier));
+    FolderMediaHydrator.instance.beginHydrateMissing('video', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const video = VideoStorage.instance.get(item.identifier);
       const localState = video?.state ?? VideoState.NULL;

@@ -1,7 +1,7 @@
 import { AudioState } from '@udonarium/core/file-storage/audio-file';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
-import { FileResourceKind } from '@udonarium/core/file-storage/file-transfer-scheduler';
+import { FileReceiveScheduler, FileResourceKind } from '@udonarium/core/file-storage/file-transfer-scheduler';
 import { ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
@@ -153,5 +153,12 @@ export class FolderMediaHydrator {
     };
     const workers = Math.min(MAX_CONCURRENT_HYDRATE, unique.length);
     await Promise.all(Array.from({ length: workers }, () => worker()));
+  }
+
+  /** Hydrate from folder backup without blocking peer download enqueue. */
+  beginHydrateMissing(kind: FileResourceKind, identifiers: string[]): void {
+    void this.hydrateMissing(kind, identifiers).finally(() => {
+      FileReceiveScheduler.scheduleDeferred();
+    });
   }
 }

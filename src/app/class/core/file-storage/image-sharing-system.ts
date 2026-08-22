@@ -243,13 +243,13 @@ export class ImageSharingSystem {
     netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
-  private async queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
+  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('image', request, item => {
       const image = ImageStorage.instance.get(item.identifier);
       return image?.state ?? ImageState.NULL;
     });
-    await FolderMediaHydrator.instance.hydrateMissing('image', sorted.map(item => item.identifier));
+    FolderMediaHydrator.instance.beginHydrateMissing('image', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const image = ImageStorage.instance.get(item.identifier);
       const localState = image?.state ?? ImageState.NULL;

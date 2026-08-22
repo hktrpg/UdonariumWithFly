@@ -59,7 +59,7 @@ export class PdfSharingSystem {
           const pdf = PdfStorage.instance.get(item.identifier);
           if (pdf && item.state < pdf.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
-        if (!this.isLimitSendTask() && randomRequest.length && !this.existsSendTask(event.data.receiver)) {
+        if (!this.isLimitSendTask() && randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', randomRequest, item => item.state);
           const item = sorted[0];
           const pdf = PdfStorage.instance.get(item.identifier);
@@ -187,13 +187,13 @@ export class PdfSharingSystem {
     }
   }
 
-  private async queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {
+  private queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', request, item => {
       const pdf = PdfStorage.instance.get(item.identifier);
       return pdf?.state ?? PdfState.NULL;
     });
-    await FolderMediaHydrator.instance.hydrateMissing('pdf', sorted.map(item => item.identifier));
+    FolderMediaHydrator.instance.beginHydrateMissing('pdf', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const pdf = PdfStorage.instance.get(item.identifier);
       const localState = pdf?.state ?? PdfState.NULL;
