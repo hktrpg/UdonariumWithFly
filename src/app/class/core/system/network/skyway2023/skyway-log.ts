@@ -27,6 +27,14 @@ export function isRetriableSubscribeError(msg: string): boolean {
   return /already left|onStreamAdded|timeout|publicationNotExist|alreadySubscribedPublication|localPersonNotJoinedChannel|internalError|internal-error/i.test(msg);
 }
 
+/** SkyWay join rejected because a stale member with the same name is still in the channel. */
+export function isAlreadySameNameMemberExist(err: unknown): boolean {
+  const name = String((err as { name?: string })?.name || '');
+  const msg = String((err as { message?: string })?.message || '');
+  return /alreadySameNameMemberExist/i.test(name)
+    || /同じNameのMemberが存在/.test(msg);
+}
+
 export function isDowngradedSkyWayWarn(msg: unknown[]): boolean {
   try {
     return /restartIce limit exceeded/i.test(skyWayMsgText(msg));

@@ -109,6 +109,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   beforeEach(() => {
     RoomConnectHelper.clearReopenRetry();
     (RoomConnectHelper as any).reopenInFlight = false;
+    (RoomConnectHelper as any).rekeyInFlight = false;
     (RoomConnectHelper as any).meshHealInFlight = false;
     (RoomConnectHelper as any).meshHealDebounceTimer = null;
     RoomConnectHelper.joinInProgress = false;
@@ -116,6 +117,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
 
   afterEach(() => {
     (RoomConnectHelper as any).reopenInFlight = false;
+    (RoomConnectHelper as any).rekeyInFlight = false;
     (RoomConnectHelper as any).meshHealInFlight = false;
     (RoomConnectHelper as any).meshHealDebounceTimer = null;
     (RoomConnectHelper as any).joinOwnedUntil = 0;

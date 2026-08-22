@@ -1,4 +1,5 @@
 import {
+  isAlreadySameNameMemberExist,
   isBenignSkyWayNoise,
   isDowngradedSkyWayWarn,
   isRetriableSubscribeError,
@@ -22,6 +23,12 @@ describe('skyway-log quiet filters', () => {
     expect(isRetriableSubscribeError('publicationNotExist: gone')).toBeTrue();
     expect(isRetriableSubscribeError('internalError:')).toBeTrue();
     expect(isRetriableSubscribeError('fatal: auth')).toBeFalse();
+  });
+
+  it('isAlreadySameNameMemberExist detects duplicate channel member join', () => {
+    expect(isAlreadySameNameMemberExist({ name: 'alreadySameNameMemberExist', message: 'dup' })).toBeTrue();
+    expect(isAlreadySameNameMemberExist({ message: 'Channelにすでに同じNameのMemberが存在します' })).toBeTrue();
+    expect(isAlreadySameNameMemberExist({ name: 'token-expired' })).toBeFalse();
   });
 
   it('downgrades restartIce limit exceeded to warn-class noise', () => {

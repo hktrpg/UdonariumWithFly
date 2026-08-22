@@ -69,6 +69,8 @@ export class RoomConnectHelper {
   private static readonly suppressedLobbyRooms = new Set<string>();
   /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
   private static reopenInFlight = false;
+  /** GM auth re-key — suppress auto-reopen while Network.open churns. */
+  private static rekeyInFlight = false;
   /** Quiet mid-session remesh while in a room (bad-network peer flaps). */
   private static readonly MESH_KEEPALIVE_MS = 5000;
   /** Half-open DataChannel older than this is disconnected so remesh can retry. */
@@ -190,7 +192,8 @@ export class RoomConnectHelper {
    */
   static shouldAttemptReopenNow(): boolean {
     return !RoomConnectHelper.isJoinOwningNetworkError
-      && !RoomConnectHelper.reopenInFlight;
+      && !RoomConnectHelper.reopenInFlight
+      && !RoomConnectHelper.rekeyInFlight;
   }
 
   /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
@@ -252,6 +255,7 @@ export class RoomConnectHelper {
   static async tickMeshKeepalive(): Promise<void> {
     if (RoomConnectHelper.meshHealInFlight) return;
     if (RoomConnectHelper.joinInProgress || RoomConnectHelper.reopenInFlight) return;
+    if (RoomConnectHelper.rekeyInFlight) return;
 
     if (!Network.isOpen) {
       if (RoomConnectHelper.everHadRoomSession && Network.getLastRoomSession()?.roomId) {
@@ -618,6 +622,7 @@ export class RoomConnectHelper {
   static reopenLastRoomOrLobby(): RoomReopenResult {
     if (RoomConnectHelper.isJoinOwningNetworkError) return 'busy';
     if (RoomConnectHelper.reopenInFlight) return 'busy';
+    if (RoomConnectHelper.rekeyInFlight) return 'busy';
 
     const session = Network.getLastRoomSession();
     const willReopenRoom = !!(session?.roomId && session.roomName);
@@ -932,33 +937,39 @@ export class RoomConnectHelper {
    * @param meshPassword SkyWay password for the new roomName ('' if unlocked).
    */
   static async rekeyRoom(roomId: string, roomName: string, meshPassword: string = ''): Promise<void> {
-    const userId = Network.peer.userId;
-    const wasGuest = GuestSession.isGuest;
-    const wasGM = !!PeerCursor.myCursor?.isGMMode;
-    let role: RoomRole = 'user';
-    if (wasGM) role = 'gm';
-    else if (wasGuest) role = 'guest';
+    RoomConnectHelper.clearReopenRetry();
+    RoomConnectHelper.rekeyInFlight = true;
+    try {
+      const userId = Network.peer.userId;
+      const wasGuest = GuestSession.isGuest;
+      const wasGM = !!PeerCursor.myCursor?.isGMMode;
+      let role: RoomRole = 'user';
+      if (wasGM) role = 'gm';
+      else if (wasGuest) role = 'guest';
 
-    // Prefer explicit mesh; otherwise unseal with the role password we joined with.
-    let mesh = meshPassword;
-    if (mesh === '' && RoomAuth.isMeshLocked(roomName)) {
-      const rolePw = RoomAuth.getSessionRolePassword(role);
-      mesh = RoomAuth.resolveMeshPassword(roomId, roomName, role, rolePw);
+      // Prefer explicit mesh; otherwise unseal with the role password we joined with.
+      let mesh = meshPassword;
+      if (mesh === '' && RoomAuth.isMeshLocked(roomName)) {
+        const rolePw = RoomAuth.getSessionRolePassword(role);
+        mesh = RoomAuth.resolveMeshPassword(roomId, roomName, role, rolePw);
+      }
+      RoomAuth.rememberSession(role, RoomAuth.getSessionRolePassword(role), mesh);
+
+      await new Promise<void>(resolve => {
+        const key = { rekey: true };
+        EventSystem.register(key)
+          .on('OPEN_NETWORK', () => {
+            EventSystem.unregister(key);
+            resolve();
+          });
+        Network.open(userId, roomId, roomName, mesh);
+      });
+
+      RoomAuth.applyIdentity(role, roomId);
+      await RoomConnectHelper.remeshRoomPeers(roomId, roomName, '');
+    } finally {
+      RoomConnectHelper.rekeyInFlight = false;
     }
-    RoomAuth.rememberSession(role, RoomAuth.getSessionRolePassword(role), mesh);
-
-    await new Promise<void>(resolve => {
-      const key = { rekey: true };
-      EventSystem.register(key)
-        .on('OPEN_NETWORK', () => {
-          EventSystem.unregister(key);
-          resolve();
-        });
-      Network.open(userId, roomId, roomName, mesh);
-    });
-
-    RoomAuth.applyIdentity(role, roomId);
-    await RoomConnectHelper.remeshRoomPeers(roomId, roomName, '');
   }
 
   /**

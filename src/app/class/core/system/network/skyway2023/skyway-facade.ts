@@ -13,7 +13,7 @@ import {
 import { CryptoUtil } from '../../util/crypto-util';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
-import { installSkyWayQuietLogger } from './skyway-log';
+import { installSkyWayQuietLogger, isAlreadySameNameMemberExist } from './skyway-log';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
@@ -255,35 +255,48 @@ export class SkyWayFacade {
   }
 
   private async joinRoomPerson() {
-    await this.leaveRoomPerson();
-    if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.leaveRoomPerson();
+      if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
 
-    let roomPerson = await this.room.join({
-      name: this.peer.peerId,
-      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
-    });
+      try {
+        const roomPerson = await this.room.join({
+          name: this.peer.peerId,
+          keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
+        });
 
-    roomPerson.onFatalError.add(err => {
-      console.warn('roomPerson onFatalError; attempting room restore', err);
-      if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
-        void this.restoreRoomMembership().catch(() => {
-          if (!this.isOpen) return;
-          this.close();
-          if (this.onClose) this.onClose(this.peer);
+        roomPerson.onFatalError.add(err => {
+          console.warn('roomPerson onFatalError; attempting room restore', err);
+          if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+            void this.restoreRoomMembership().catch(() => {
+              if (!this.isOpen) return;
+              this.close();
+              if (this.onClose) this.onClose(this.peer);
+              const fatal = this.formatFatalError(err);
+              if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
+            });
+            return;
+          }
+          if (this.isOpen) {
+            this.close();
+            if (this.onClose) this.onClose(this.peer);
+          }
           const fatal = this.formatFatalError(err);
           if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
         });
-        return;
-      }
-      if (this.isOpen) {
-        this.close();
-        if (this.onClose) this.onClose(this.peer);
-      }
-      const fatal = this.formatFatalError(err);
-      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
-    });
 
-    this.roomPerson = roomPerson;
+        this.roomPerson = roomPerson;
+        return;
+      } catch (err) {
+        if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
+        const delayMs = 400 * (attempt + 1);
+        console.warn(`skyWay joinRoomPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        await this.leaveRoomChannel();
+        await this.joinRoomChannel();
+      }
+    }
   }
 
   /** Rejoin room member + republish data stream after transient channel errors. */

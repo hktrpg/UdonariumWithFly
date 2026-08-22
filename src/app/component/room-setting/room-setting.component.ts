@@ -243,12 +243,23 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     const roles = this.buildRoleAuthInputs();
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
+    const currentMesh = Network.peer.meshPassword || Network.peer.channelPassword || '';
+    const authUnchanged = encodedName === Network.peer.roomName && meshPassword === currentMesh;
+
     this.roomInvite.setRolePasswords({
       gm: this.gmPassword,
       user: this.allowUser ? this.userPassword : '',
       guest: this.allowGuest ? this.guestPassword : '',
     });
     RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
+
+    if (authUnchanged) {
+      RoomAuth.applyIdentity('gm', roomId);
+      RoomAuth.noteAttained('gm', roomId);
+      this.modalService.resolve(true);
+      this.isSaving = false;
+      return;
+    }
 
     try {
       if (Network.peers.length > 0) {
