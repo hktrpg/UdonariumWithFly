@@ -142,8 +142,17 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   selectNote(note: TextNote) {
+    if (this.selectedIdentifier === note.identifier) {
+      this.selectedIdentifier = '';
+      if (this.expandedId === note.identifier) {
+        this.expandedId = '';
+      }
+      this.changeDetector.markForCheck();
+      return;
+    }
     this.selectedIdentifier = note.identifier;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: note.identifier, className: note.aliasName });
+    this.changeDetector.markForCheck();
   }
 
   toggleExpand(note: TextNote) {
