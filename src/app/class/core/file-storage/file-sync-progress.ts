@@ -1,7 +1,6 @@
 import { AudioState } from './audio-file';
 import { AudioStorage } from './audio-storage';
 import {
-  estimateNextReceiveBytes,
   FileReceiveScheduler,
   FileResourceKind,
   TransferCatalogMeta,
@@ -14,15 +13,17 @@ import { VideoState } from './video-file';
 import { VideoStorage } from './video-storage';
 
 export interface FileSyncProgressSnapshot {
-  /** True only while file bytes are actively loading (hide when idle). */
+  /** True while room file sync is in progress (or briefly at 100% before hide). */
   active: boolean;
-  /** 0–100 loaded (starts at 0). */
+  /** 0–100 loaded (monotonic within a session). */
   percentLoaded: number;
   segmentCount: number;
   filledSegments: number;
 }
 
 const BAR_SEGMENTS = 20;
+/** Keep the bar at 100% briefly so the user sees completion before hide. */
+const SESSION_COMPLETE_HOLD_MS = 800;
 
 interface ChunkProgress {
   loaded: number;
@@ -31,9 +32,19 @@ interface ChunkProgress {
 
 export class FileSyncProgress {
   private static readonly transfers = new Map<string, ChunkProgress>();
+  private static prevIncompleteKeys = new Set<string>();
+  private static completedFileCount = 0;
+  private static displayPercent = 0;
+  private static sessionStarted = false;
+  private static sessionEndAt: number | null = null;
 
   static reset(): void {
     FileSyncProgress.transfers.clear();
+    FileSyncProgress.prevIncompleteKeys.clear();
+    FileSyncProgress.completedFileCount = 0;
+    FileSyncProgress.displayPercent = 0;
+    FileSyncProgress.sessionStarted = false;
+    FileSyncProgress.sessionEndAt = null;
   }
 
   static noteChunkProgress(identifier: string, loaded: number, total: number): void {
@@ -54,78 +65,104 @@ export class FileSyncProgress {
       filledSegments: 0,
     };
 
-    if (!FileSyncProgress.isActivelyLoading()) {
+    FileSyncProgress.updateSession();
+
+    if (FileSyncProgress.sessionEndAt != null) {
+      if (performance.now() - FileSyncProgress.sessionEndAt < SESSION_COMPLETE_HOLD_MS) {
+        return FileSyncProgress.buildSnapshot(100, segmentCount);
+      }
+      FileSyncProgress.resetSessionState();
       return idle;
     }
 
-    const work = FileSyncProgress.measureActiveFileWork();
-    if (work.totalBytes < 1) {
-      const ratio = FileSyncProgress.chunkOnlyRatio();
-      if (ratio == null) return idle;
-      const percentLoaded = Math.round(ratio * 100);
-      const filledSegments = Math.round(ratio * segmentCount);
-      return {
-        active: true,
-        percentLoaded,
-        segmentCount,
-        filledSegments: Math.max(0, Math.min(segmentCount, filledSegments)),
-      };
+    if (!FileSyncProgress.sessionStarted) {
+      return idle;
     }
 
-    const ratio = Math.max(0, Math.min(1, (work.totalBytes - work.remainingBytes) / work.totalBytes));
-    const percentLoaded = Math.round(ratio * 100);
-    const filledSegments = Math.round(ratio * segmentCount);
+    const percentLoaded = Math.round(FileSyncProgress.displayPercent * 100);
+    return FileSyncProgress.buildSnapshot(percentLoaded, segmentCount);
+  }
 
+  private static buildSnapshot(percentLoaded: number, segmentCount: number): FileSyncProgressSnapshot {
+    const clamped = Math.max(0, Math.min(100, percentLoaded));
+    const ratio = clamped / 100;
+    const filledSegments = Math.round(ratio * segmentCount);
     return {
       active: true,
-      percentLoaded,
+      percentLoaded: clamped,
       segmentCount,
       filledSegments: Math.max(0, Math.min(segmentCount, filledSegments)),
     };
   }
 
-  /** True when file bytes are moving (not merely queued). */
-  private static isActivelyLoading(): boolean {
-    if (FileSyncProgress.transfers.size > 0) return true;
-    if (FileReceiveScheduler.activeReceiveCount() > 0) return true;
-    return false;
+  private static resetSessionState(): void {
+    FileSyncProgress.prevIncompleteKeys.clear();
+    FileSyncProgress.completedFileCount = 0;
+    FileSyncProgress.displayPercent = 0;
+    FileSyncProgress.sessionStarted = false;
+    FileSyncProgress.sessionEndAt = null;
   }
 
-  private static chunkOnlyRatio(): number | null {
-    if (FileSyncProgress.transfers.size < 1) return null;
-    let sum = 0;
-    for (const chunk of FileSyncProgress.transfers.values()) {
-      sum += (chunk.loaded + 1) / chunk.total;
-    }
-    return sum / FileSyncProgress.transfers.size;
-  }
+  private static updateSession(): void {
+    const incompleteKeys = FileSyncProgress.collectIncompleteKeys();
 
-  private static isSyncing(kind: FileResourceKind, identifier: string): boolean {
-    if (FileSyncProgress.transfers.has(identifier)) return true;
-    return FileReceiveScheduler.isTransferActive(kind, identifier);
-  }
-
-  private static measureActiveFileWork(): { totalBytes: number; remainingBytes: number } {
-    let totalBytes = 0;
-    let remainingBytes = 0;
-
-    const add = (kind: FileResourceKind, localState: number, meta: TransferCatalogMeta) => {
-      if (!FileSyncProgress.isSyncing(kind, meta.identifier)) return;
-      const estimate = estimateNextReceiveBytes(kind, localState, meta);
-      if (estimate <= 0) return;
-      totalBytes += estimate;
-      const chunk = FileSyncProgress.transfers.get(meta.identifier);
-      if (chunk && chunk.total > 0) {
-        const doneRatio = Math.max(0, Math.min(1, (chunk.loaded + 1) / chunk.total));
-        remainingBytes += estimate * (1 - doneRatio);
-      } else {
-        remainingBytes += estimate;
+    for (const key of FileSyncProgress.prevIncompleteKeys) {
+      if (!incompleteKeys.has(key)) {
+        FileSyncProgress.completedFileCount++;
       }
+    }
+    FileSyncProgress.prevIncompleteKeys = incompleteKeys;
+
+    if (incompleteKeys.size > 0) {
+      FileSyncProgress.sessionStarted = true;
+      FileSyncProgress.sessionEndAt = null;
+      FileSyncProgress.displayPercent = Math.max(
+        FileSyncProgress.displayPercent,
+        FileSyncProgress.measureSessionRatio(incompleteKeys),
+      );
+      return;
+    }
+
+    if (FileSyncProgress.sessionStarted && FileSyncProgress.sessionEndAt == null) {
+      FileSyncProgress.sessionEndAt = performance.now();
+      FileSyncProgress.displayPercent = 1;
+    }
+  }
+
+  private static measureSessionRatio(incompleteKeys: Set<string>): number {
+    const incompleteCount = incompleteKeys.size;
+    const total = FileSyncProgress.completedFileCount + incompleteCount;
+    if (total < 1) return 0;
+
+    let inFlight = 0;
+    for (const key of incompleteKeys) {
+      const sep = key.indexOf(':');
+      const kind = key.slice(0, sep) as FileResourceKind;
+      const identifier = key.slice(sep + 1);
+      const chunk = FileSyncProgress.transfers.get(identifier);
+      if (chunk && chunk.total > 0) {
+        inFlight += (chunk.loaded + 1) / chunk.total;
+        continue;
+      }
+      if (FileReceiveScheduler.isTransferActive(kind, identifier)) {
+        inFlight += 0.02;
+      }
+    }
+    inFlight = Math.min(inFlight, incompleteCount);
+
+    return Math.max(0, Math.min(1, (FileSyncProgress.completedFileCount + inFlight) / total));
+  }
+
+  private static collectIncompleteKeys(): Set<string> {
+    const keys = new Set<string>();
+
+    const add = (kind: FileResourceKind, completeState: number, localState: number, meta: TransferCatalogMeta) => {
+      if (localState >= completeState) return;
+      keys.add(`${kind}:${meta.identifier}`);
     };
 
     for (const image of ImageStorage.instance.images) {
-      if (image.state >= ImageState.COMPLETE) continue;
-      add('image', image.state, {
+      add('image', ImageState.COMPLETE, image.state, {
         identifier: image.identifier,
         state: image.state,
         byteSize: image.blob?.size,
@@ -133,30 +170,27 @@ export class FileSyncProgress {
       });
     }
     for (const audio of AudioStorage.instance.audios) {
-      if (audio.state >= AudioState.COMPLETE) continue;
-      add('audio', audio.state, {
+      add('audio', AudioState.COMPLETE, audio.state, {
         identifier: audio.identifier,
         state: audio.state,
         byteSize: audio.blob?.size,
       });
     }
     for (const pdf of PdfStorage.instance.pdfs) {
-      if (pdf.state >= PdfState.COMPLETE) continue;
-      add('pdf', pdf.state, {
+      add('pdf', PdfState.COMPLETE, pdf.state, {
         identifier: pdf.identifier,
         state: pdf.state,
         byteSize: pdf.blob?.size,
       });
     }
     for (const video of VideoStorage.instance.videos) {
-      if (video.state >= VideoState.COMPLETE) continue;
-      add('video', video.state, {
+      add('video', VideoState.COMPLETE, video.state, {
         identifier: video.identifier,
         state: video.state,
         byteSize: video.blob?.size,
       });
     }
 
-    return { totalBytes, remainingBytes };
+    return keys;
   }
 }

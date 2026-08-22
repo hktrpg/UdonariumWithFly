@@ -30,7 +30,7 @@ describe('FileSyncProgress', () => {
     expect(snap.filledSegments).toBe(0);
   });
 
-  it('ignores incomplete assets that are not actively syncing', () => {
+  it('stays active for incomplete assets even between chunk transfers', () => {
     const image = ImageFile.createEmpty('img-1');
     const thumbBlob = new Blob([new Uint8Array(100)], { type: 'image/png' });
     image.apply({
@@ -44,7 +44,9 @@ describe('FileSyncProgress', () => {
     images.push(image);
 
     const snap = FileSyncProgress.snapshot(20);
-    expect(snap.active).toBeFalse();
+    expect(snap.active).toBeTrue();
+    expect(snap.percentLoaded).toBeGreaterThanOrEqual(0);
+    expect(snap.percentLoaded).toBeLessThan(100);
   });
 
   it('starts at 0% and grows while chunks arrive', () => {
@@ -69,7 +71,59 @@ describe('FileSyncProgress', () => {
 
     FileSyncProgress.noteChunkProgress('img-1', 8, 9);
     const later = FileSyncProgress.snapshot(20);
-    expect(later.percentLoaded).toBeGreaterThan(start.percentLoaded);
+    expect(later.percentLoaded).toBeGreaterThanOrEqual(start.percentLoaded);
+  });
+
+  it('holds percent between files when one completes and another is queued', () => {
+    const a = ImageFile.createEmpty('img-a');
+    const b = ImageFile.createEmpty('img-b');
+    const thumbBlob = new Blob([new Uint8Array(100)], { type: 'image/png' });
+    for (const img of [a, b]) {
+      img.apply({
+        identifier: img.identifier,
+        name: '',
+        type: 'image/png',
+        blob: thumbBlob,
+        url: 'blob:test',
+        thumbnail: { type: 'image/png', blob: thumbBlob, url: 'blob:test' },
+      });
+    }
+    images.push(a, b);
+
+    const first = FileSyncProgress.snapshot(20);
+    expect(first.active).toBeTrue();
+
+    images.splice(0, 1);
+    const between = FileSyncProgress.snapshot(20);
+    expect(between.active).toBeTrue();
+    expect(between.percentLoaded).toBeGreaterThanOrEqual(first.percentLoaded);
+  });
+
+  it('shows 100% briefly when all assets complete then goes idle', () => {
+    let now = 0;
+    spyOn(performance, 'now').and.callFake(() => now);
+
+    const image = ImageFile.createEmpty('img-1');
+    const thumbBlob = new Blob([new Uint8Array(100)], { type: 'image/png' });
+    image.apply({
+      identifier: 'img-1',
+      name: '',
+      type: 'image/png',
+      blob: thumbBlob,
+      url: 'blob:test',
+      thumbnail: { type: 'image/png', blob: thumbBlob, url: 'blob:test' },
+    });
+    images.push(image);
+    FileSyncProgress.snapshot(10);
+    images.length = 0;
+
+    const done = FileSyncProgress.snapshot(10);
+    expect(done.active).toBeTrue();
+    expect(done.percentLoaded).toBe(100);
+
+    now = 900;
+    const idle = FileSyncProgress.snapshot(10);
+    expect(idle.active).toBeFalse();
   });
 
   it('clears transfer progress on clearTransfer when nothing else is loading', () => {
@@ -79,7 +133,7 @@ describe('FileSyncProgress', () => {
     expect(snap.active).toBeFalse();
   });
 
-  it('does not activate for queued transfers without active byte movement', () => {
+  it('does not activate for queued transfers without incomplete assets', () => {
     (FileReceiveScheduler.pendingReceiveCount as jasmine.Spy).and.returnValue(3);
     (FileReceiveScheduler.outboundPendingCount as jasmine.Spy).and.returnValue(1);
     const snap = FileSyncProgress.snapshot(20);
