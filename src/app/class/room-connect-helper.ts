@@ -31,7 +31,7 @@ import { FolderBackupService } from 'service/folder-backup.service';
  * Resolves false only when every target failed / timed out and no peer is connected.
  */
 export class RoomConnectHelper {
-  private static readonly CONNECT_TIMEOUT_MS = 45000;
+  private static readonly CONNECT_TIMEOUT_MS = 60000;
   private static readonly REMESH_ATTEMPTS = 12;
   private static readonly REMESH_DELAY_MS = 250;
   /** After connect attempts, wait this long for at least one open peer (handshake). */
@@ -67,7 +67,7 @@ export class RoomConnectHelper {
   /** Quiet mid-session remesh while in a room (bad-network peer flaps). */
   private static readonly MESH_KEEPALIVE_MS = 5000;
   /** Half-open DataChannel older than this is disconnected so remesh can retry. */
-  private static readonly STUCK_CONNECTING_MS = 20000;
+  private static readonly STUCK_CONNECTING_MS = 45000;
   /** Tests may shorten stuck budget (0 = use STUCK_CONNECTING_MS). */
   static STUCK_CONNECTING_MS_FOR_TEST = 0;
   private static meshKeepaliveTimer: ReturnType<typeof setInterval> | null = null;
@@ -673,6 +673,7 @@ export class RoomConnectHelper {
       let dataTimer: ReturnType<typeof setTimeout> | null = null;
       let quiesceTimer: ReturnType<typeof setTimeout> | null = null;
       let remeshTimer: ReturnType<typeof setInterval> | null = null;
+      let roomOpenRetries = 0;
       /** Lobby seed plus SkyWay room members discovered during the probe. */
       let joinTargets = targetPeers.slice();
       /** Mesh budget starts at OPEN_NETWORK — room open must not burn the join ceiling. */
@@ -707,7 +708,6 @@ export class RoomConnectHelper {
         else RoomConnectHelper.lastJoinFailReason = '';
         RoomConnectHelper.endJoinProbe(ok);
         if (!ok) {
-          // Ghost / empty rooms: hide from lobby. Transient network fails: keep listed for retry.
           if (RoomConnectHelper.shouldSuppressLobbyRoom(RoomConnectHelper.lastJoinFailReason)) {
             RoomConnectHelper.suppressLobbyRoom(room.id, room.name);
           }
@@ -860,7 +860,7 @@ export class RoomConnectHelper {
           if (settled) return;
           // Lobby list can lag SkyWay membership; keep remeshing while alone.
           remeshTimer = setInterval(() => {
-            if (settled || RoomConnectHelper.openPeerCount() > 0) return;
+            if (settled) return;
             meshJoinTargets();
           }, RoomConnectHelper.JOIN_REMESH_MS);
           EventSystem.register(listenerKey)
@@ -892,6 +892,12 @@ export class RoomConnectHelper {
         })
         .on('NETWORK_ERROR', () => {
           if (settled) return;
+          if (roomOpenRetries < 1) {
+            roomOpenRetries++;
+            console.warn('RoomConnectHelper room open failed, retrying once');
+            Network.open(userId, room.id, room.name, password);
+            return;
+          }
           failReason = 'network_error_open';
           finish(false);
         });

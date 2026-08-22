@@ -70,6 +70,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   private onStreamPublished: { removeListener: () => void };
   private onConnectionStateChanged: { removeListener: () => void };
   private subscribeInFlight = false;
+  private subscribeRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   private onopen = () => {
     netDebug(`peer ${this.peer.peerId} dataChannel is open`);
@@ -115,6 +116,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   disconnect() {
     netDebug(`disconnect ${this.peer.peerId}, isPublication: ${this.isPublication}`);
     this.isCanceled = true;
+    this.clearSubscribeRetry();
     this.onStreamPublished?.removeListener();
     this.releaseSubscription();
     if (this.isOpend) {
@@ -240,7 +242,11 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
             return;
           }
           this.subscription = null;
-          this.waitForDataStreamPublication();
+          if (/publicationNotExist|onStreamAdded/i.test(msg)) {
+            this.waitForDataStreamPublication();
+          } else {
+            this.scheduleSubscriptionRetry();
+          }
           return;
         }
       } else if (e instanceof Error) {
@@ -281,6 +287,23 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       // SDK may already have torn this down.
     }
     this.subscription = null;
+  }
+
+  private clearSubscribeRetry() {
+    if (this.subscribeRetryTimer != null) {
+      clearTimeout(this.subscribeRetryTimer);
+      this.subscribeRetryTimer = null;
+    }
+  }
+
+  /** Publication still exists — retry subscribe after transient SDK / ICE errors. */
+  private scheduleSubscriptionRetry(delayMs = 2500) {
+    if (this.isCanceled || this.isPublication) return;
+    this.clearSubscribeRetry();
+    this.subscribeRetryTimer = setTimeout(() => {
+      this.subscribeRetryTimer = null;
+      if (!this.isCanceled) void this.initializeSubscription();
+    }, delayMs);
   }
 
   private findDataStreamPublication(member: RemoteMember | undefined) {

@@ -20,6 +20,7 @@ describe('skyway-log quiet filters', () => {
     expect(isRetriableSubscribeError('alreadySubscribedPublication: dup')).toBeTrue();
     expect(isRetriableSubscribeError('localPersonNotJoinedChannel: left')).toBeTrue();
     expect(isRetriableSubscribeError('publicationNotExist: gone')).toBeTrue();
+    expect(isRetriableSubscribeError('internalError:')).toBeTrue();
     expect(isRetriableSubscribeError('fatal: auth')).toBeFalse();
   });
 
