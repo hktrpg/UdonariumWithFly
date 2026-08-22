@@ -134,6 +134,14 @@
 
 **還原語意**：從資料夾「恢復房間」會沿用備份的 `roomId`（與名稱／開關／可解密時的密碼），之後自動備份覆寫同一檔。若在已連線的不同 roomId 房間載入，則會以目前房間 ID 另存（fork）。載入進已連線房間會覆寫桌面並同步給其他參加者。
 
+## 近期更新（2026/08/22 起）
+
+- **連線／mesh**：弱網減少重連風暴、入房失敗可重試、致命斷線自動重開房、PWA 更新提示改進。
+- **檔案同步**：FILES 進度穩定顯示；圖片 → 正在播 BGM → 按大小；資料夾 `media/` hydrate 不阻塞 peer 下載。
+- **筆記倉庫**：五分頁對齊角色倉庫、拖放、再點收合；紅繩拖曳即時更新；預設劇本不再重複。
+
+詳見 [`docs/changelog-2026-08-late.md`](docs/changelog-2026-08-late.md) 或站內聊天「更新日誌」。
+
 ## 本機開發
 
 需要 Node.js、npm，以及自架的 [udonarium-backend](https://github.com/TK11235/udonarium-backend)（SkyWay Auth Token）。  

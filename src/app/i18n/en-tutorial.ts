@@ -222,6 +222,19 @@ Upgraded to 1.13.2`,
 ・Auto remesh after disconnect; token／backend errors prefer reopening the room — no silent mid-game lobby drop
 ・Invite links: freeze UI for valid or corrupt tokens; damaged links show “invalid or damaged”
 ・Second-tab joins less often show blank TOKEN／images (settle + delayed remount)`,
+  'changelog.2026mesh2': `2026/08/22–23 Connection・mesh・PWA
+・Fewer mesh reconnect storms on weak LTE; mid-session drops keep remeshing
+・Lobby join failures keep the room online for retry; Connecting／Offline states are clearer
+・Fatal disconnects schedule auto reopen; quieter SkyWay signaling; republish after publication races
+・Room password rekey no longer duplicates SkyWay members; relay／subscribe survive weak networks better
+・PWA: ngsw hashes aligned with HKTRPG build; update icon even when SW install fails; peer menu no longer scroll-jumps`,
+  'changelog.2026filesnote': `2026/08/22–23 File sync・note inventory
+・Connection panel **FILES** progress stays 0→100% until assets are complete (no idle flicker)
+・Transfer scheduler: concurrent kinds; **images first**, then **currently playing BGM**, then by size within tier
+・With folder backup bound, **media/** hydrate runs in parallel with peer downloads; timed-out slots auto-release
+・Note inventory matches character warehouse: five tabs (table／shared／personal／other maps／graveyard), drag to map／tabs
+・Click selected note again to collapse; delete goes to graveyard; PDF etc. draggable to tabs
+・Clue links (red strings) update live while dragging linked objects; default scenario text no longer duplicates`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

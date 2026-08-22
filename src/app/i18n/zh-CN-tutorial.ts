@@ -222,6 +222,19 @@ Patreon：https://www.patreon.com/HKTRPG
 ・断线后自动 remesh；token／backend 错误优先重开房间，不在局中静默掉回大厅
 ・邀请链接：有效／损坏皆先冻结画面；损坏链接显示「无效或已损坏」
 ・第二分页入房后 TOKEN／图片较不易空白（settle＋延迟 remount）`,
+  'changelog.2026mesh2': `2026/08/22–23 连线・mesh・PWA
+・弱网／LTE 上减少 mesh 重连风暴；局中断线会持续 remesh 重试
+・大厅入房失败时保持房间在线，可重试；Connecting／Offline 状态较准确
+・致命断线后排程自动重开房；SkyWay 信号杂讯降噪、publication 竞态后重新发布
+・房间密码重设不会重复 SkyWay 成员；relay／subscribe 在弱网较易存活
+・PWA：ngsw 哈希与 HKTRPG 构建对齐；SW 安装失败也显示更新图标；连线面板滚动不再跳位`,
+  'changelog.2026filesnote': `2026/08/22–23 文件同步・笔记仓库
+・连线面板 **FILES** 进度：入房至文件齐全前保持 0→100%，不再 idle 闪烁
+・文件传输调度：多类型并行；**图片优先**，其次**正在播放的 BGM**，同层再按大小
+・绑定文件夹备份时，入房先从 **media/** hydrate，不阻塞 peer 下载；超时 slot 自动释放
+・笔记仓库对齐角色仓库：五分页（桌面／共用／个人／其他地图／坟场）、拖放到地图／分页
+・再点已选笔记可收合；删除进坟场；PDF 等可拖到分页
+・红绳（线索链接）拖曳连线物件时即时更新；默认剧本文本不再重复载入`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教学：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

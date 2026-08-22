@@ -222,6 +222,19 @@ Patreon：https://www.patreon.com/HKTRPG
 ・切断後は自動 remesh；token／backend エラーは部屋の再開を優先（対局中に黙ってロビーへ落とさない）
 ・招待リンク：有効／破損とも先に画面凍結；破損は「無効または破損」を表示
 ・2 つ目のタブ入室後、TOKEN／画像が空白になりにくい（settle＋遅延 remount）`,
+  'changelog.2026mesh2': `2026/08/22–23 接続・mesh・PWA
+・弱い LTE でも mesh 再接続の嵐を抑制；セッション中の切断は remesh を継続
+・ロビー入室失敗でも部屋はオンラインのまま再試行可；Connecting／Offline 表示を改善
+・致命的切断後は自動で部屋再開を予約；SkyWay シグナリング雑音を低減；publication 競合後に再 publish
+・部屋パスワード再設定で SkyWay メンバーが重複しない；relay／subscribe が弱い回線でも生存しやすく
+・PWA：ngsw ハッシュを HKTRPG ビルドに整合；SW インストール失敗時も更新アイコン；接続パネルのスクロール飛びを修正`,
+  'changelog.2026filesnote': `2026/08/22–23 ファイル同期・メモ倉庫
+・接続パネル **FILES** 進捗：入室からファイル完了まで 0→100% を維持（idle ちらつきなし）
+・転送スケジューラ：種別並行；**画像優先**、次に**再生中 BGM**、同層内はサイズ順
+・フォルダバックアップ時は **media/** から hydrate を peer ダウンロードと並行；タイムアウト slot は自動解放
+・メモ倉庫をキャラ倉庫に合わせ：5 タブ（卓上／共有／個人／他マップ／ごみ箱）、マップ／タブへ D&D
+・選択中メモを再クリックで折りたたみ；削除はごみ箱へ；PDF 等をタブへドラッグ可
+・赤糸（手がかりリンク）は連結オブジェクトのドラッグ中もリアルタイム更新；既定シナリオ文の重複読込を防止`,
   'changelog.links': `サイト：https://z01.hktrpg.com
 ガイド：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com
