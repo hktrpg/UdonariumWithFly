@@ -106,8 +106,18 @@ describe('RoomConnectHelper settle predicates', () => {
 });
 
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
+  beforeEach(() => {
+    RoomConnectHelper.clearReopenRetry();
+    (RoomConnectHelper as any).reopenInFlight = false;
+    (RoomConnectHelper as any).meshHealInFlight = false;
+    (RoomConnectHelper as any).meshHealDebounceTimer = null;
+    RoomConnectHelper.joinInProgress = false;
+  });
+
   afterEach(() => {
     (RoomConnectHelper as any).reopenInFlight = false;
+    (RoomConnectHelper as any).meshHealInFlight = false;
+    (RoomConnectHelper as any).meshHealDebounceTimer = null;
     (RoomConnectHelper as any).joinOwnedUntil = 0;
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.everHadRoomSession = false;
@@ -196,6 +206,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   it('schedules backoff reopen retry after failed reopen', () => {
     jasmine.clock().install();
     try {
+      RoomConnectHelper.clearReopenRetry();
+      (RoomConnectHelper as any).reopenInFlight = false;
       RoomConnectHelper.everHadRoomSession = true;
       spyOn(Network, 'getLastRoomSession').and.returnValue({
         userId: 'u1',
@@ -382,11 +394,16 @@ describe('RoomConnectHelper.healMeshGaps', () => {
   afterEach(() => {
     RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 0;
     RoomConnectHelper.stopMeshKeepalive();
+    (RoomConnectHelper as any).meshHealInFlight = false;
   });
 
   it('connects room members that lack an open DataChannel', async () => {
     openPeerIds = ['a'];
-    streamPeers = [{ peerId: 'a', isOpen: true } as IPeerContext];
+    streamPeers = [{
+      peerId: 'a',
+      isOpen: true,
+      session: { ping: 50, health: 1, speed: 1, grade: 0, description: '' },
+    } as IPeerContext];
 
     await RoomConnectHelper.healMeshGaps();
 
@@ -403,8 +420,22 @@ describe('RoomConnectHelper.healMeshGaps', () => {
 
     await RoomConnectHelper.healMeshGaps();
 
-    expect(Network.disconnect).toHaveBeenCalled();
     expect(Network.connect).toHaveBeenCalled();
+    expect(Network.disconnect).toHaveBeenCalled();
+  });
+
+  it('skips extra gap connects in survival mesh when hub is already open', async () => {
+    openPeerIds = ['a'];
+    streamPeers = [{
+      peerId: 'a',
+      isOpen: true,
+      session: { ping: 3000, health: 1, speed: 1, grade: 0, description: '' },
+    } as IPeerContext];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'a', 'b', 'c']);
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(Network.connect).not.toHaveBeenCalled();
   });
 
   it('keeps remeshing after a half-open handshake instead of aborting', async () => {

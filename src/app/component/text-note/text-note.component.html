@@ -63,13 +63,17 @@
                 <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
                   <canvas #pdfCanvas class="pdf-canvas is-3d"></canvas>
                   <div class="pdf-nav is-3d" data-no-dblclick
-                    (pointerdown)="$event.stopPropagation()"
-                    (mousedown)="$event.stopPropagation()"
                     (click)="$event.stopPropagation()"
                     (dblclick)="$event.stopPropagation(); $event.preventDefault()">
-                    <button type="button" class="pdf-btn" (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
+                    <button type="button" class="pdf-btn"
+                      (pointerdown)="$event.stopPropagation()"
+                      (mousedown)="$event.stopPropagation()"
+                      (click)="prevPdfPage($event)" [disabled]="textNote.pdfPageCount <= 1">‹</button>
                     <span class="pdf-page">{{ textNote.pdfPage }}{{ textNote.pdfPageCount ? ' / ' + textNote.pdfPageCount : '' }}</span>
-                    <button type="button" class="pdf-btn" (click)="nextPdfPage($event)"
+                    <button type="button" class="pdf-btn"
+                      (pointerdown)="$event.stopPropagation()"
+                      (mousedown)="$event.stopPropagation()"
+                      (click)="nextPdfPage($event)"
                       [disabled]="textNote.pdfPageCount <= 1">›</button>
                   </div>
                 </div>

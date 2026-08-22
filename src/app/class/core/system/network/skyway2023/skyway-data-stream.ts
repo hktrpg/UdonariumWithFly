@@ -8,6 +8,7 @@ import { PeerSessionGrade } from '../peer-session-state';
 import { CandidateType, WebRTCStats } from '../webrtc/webrtc-stats';
 import { WebRTCConnection, WebRTCStatsMonitor } from '../webrtc/webrtc-stats-monitor';
 import { netDebug } from '../net-debug';
+import { navigatorEffectiveType, poorNetworkCloseDebounceMs } from '@udonarium/room-reconnect.util';
 import { isRetriableSubscribeError } from './skyway-log';
 import { SkyWayFacade } from './skyway-facade';
 
@@ -71,6 +72,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   private onConnectionStateChanged: { removeListener: () => void };
   private subscribeInFlight = false;
   private subscribeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private closeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   private onopen = () => {
     netDebug(`peer ${this.peer.peerId} dataChannel is open`);
@@ -116,6 +118,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   disconnect() {
     netDebug(`disconnect ${this.peer.peerId}, isPublication: ${this.isPublication}`);
     this.isCanceled = true;
+    this.clearCloseDebounce();
     this.clearSubscribeRetry();
     this.onStreamPublished?.removeListener();
     this.releaseSubscription();
@@ -134,6 +137,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
 
   private dispose() {
     netDebug(`dispose ${this.peer.peerId}, isPublication: ${this.isPublication}`);
+    this.clearCloseDebounce();
     this.peer.isOpen = false;
     this.stopMonitoring();
     this.removeAllListeners();
@@ -296,14 +300,48 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     }
   }
 
+  private clearCloseDebounce() {
+    if (this.closeDebounceTimer != null) {
+      clearTimeout(this.closeDebounceTimer);
+      this.closeDebounceTimer = null;
+    }
+  }
+
+  private isTransportRecovering(): boolean {
+    return this.state === 'reconnecting' || this.state === 'connecting';
+  }
+
+  /** ICE may recover after a brief DataChannel close on poor mobile links. */
+  private scheduleCloseEmit() {
+    this.clearCloseDebounce();
+    const delayMs = poorNetworkCloseDebounceMs(navigatorEffectiveType());
+    this.closeDebounceTimer = setTimeout(() => {
+      this.closeDebounceTimer = null;
+      if (this.isCanceled) return;
+      this.refresh();
+      if (this.peer.isOpen) return;
+      this.subscription = null;
+      this.state = 'disconnected';
+      this.peer.isOpen = false;
+      this.emit('close');
+    }, delayMs);
+  }
+
+  private subscriptionRetryDelayMs(): number {
+    const effectiveType = navigatorEffectiveType();
+    if (effectiveType === 'slow-2g' || effectiveType === '2g') return 5000;
+    if (effectiveType === '3g') return 3500;
+    return 2500;
+  }
+
   /** Publication still exists — retry subscribe after transient SDK / ICE errors. */
-  private scheduleSubscriptionRetry(delayMs = 2500) {
+  private scheduleSubscriptionRetry(delayMs?: number) {
     if (this.isCanceled || this.isPublication) return;
     this.clearSubscribeRetry();
     this.subscribeRetryTimer = setTimeout(() => {
       this.subscribeRetryTimer = null;
       if (!this.isCanceled) void this.initializeSubscription();
-    }, delayMs);
+    }, delayMs ?? this.subscriptionRetryDelayMs());
   }
 
   private findDataStreamPublication(member: RemoteMember | undefined) {
@@ -334,10 +372,11 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       case 'new': break;
       case 'connecting': break;
       case 'connected':
-        if (this.state == 'reconnecting') this.peer.isOpen = false;
+        this.clearCloseDebounce();
         break;
       case 'reconnecting': break;
       case 'disconnected':
+        this.clearCloseDebounce();
         this.subscription = null;
         this.emit('close');
         return;
@@ -397,11 +436,17 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
 
     // open or close
     if (isOpen !== this.peer.isOpen) {
-      this.peer.isOpen = isOpen;
       if (isOpen) {
+        this.clearCloseDebounce();
+        this.peer.isOpen = true;
         this.isOpend = true;
         this.state = 'connected';
         this.emit('open');
+      } else if (this.isTransportRecovering() || this.state === 'connected') {
+        // Soft-down: keep isOpen until debounce expires so heal does not tear the mesh.
+        this.stopMonitoring();
+        this.scheduleCloseEmit();
+        return;
       } else {
         this.subscription = null;
         this.state = 'disconnected';

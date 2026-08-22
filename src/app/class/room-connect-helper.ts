@@ -14,9 +14,14 @@ import {
   isRecoverableNetworkError,
   isStuckConnecting,
   meshGapPeerIds,
+  meshStuckBudgetMs,
+  navigatorEffectiveType,
   refreshConnectingSince,
   RoomReopenResult,
   shouldAttemptRoomReopen,
+  buildSurvivalMeshContext,
+  shouldBootstrapSurvivalMesh,
+  shouldLimitDirectMesh,
 } from '@udonarium/room-reconnect.util';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { FolderBackupService } from 'service/folder-backup.service';
@@ -102,9 +107,10 @@ export class RoomConnectHelper {
   }
 
   private static stuckConnectingMs(): number {
-    return RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST > 0
-      ? RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST
-      : RoomConnectHelper.STUCK_CONNECTING_MS;
+    if (RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST > 0) {
+      return RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST;
+    }
+    return meshStuckBudgetMs(RoomConnectHelper.STUCK_CONNECTING_MS, navigatorEffectiveType());
   }
 
   /** True while join probe runs, or briefly after fail so App cannot reopen-race abandon. */
@@ -308,8 +314,9 @@ export class RoomConnectHelper {
     const selfId = Network.peerId;
     const members = Network.listRoomMemberPeerIds();
     const gaps = meshGapPeerIds(selfId, members, Network.peerIds);
+    const gapsToFill = RoomConnectHelper.filterMeshConnectTargets(gaps);
     const toConnect = RoomConnectHelper.connectMissingPeers(
-      gaps.map(id => PeerContext.parse(id)),
+      gapsToFill.map(id => PeerContext.parse(id)),
     );
     if (toConnect.length > 0) {
       const now = Date.now();
@@ -335,6 +342,14 @@ export class RoomConnectHelper {
         }
       }
     }
+  }
+
+  static filterMeshConnectTargets(peerIds: string[]): string[] {
+    const members = Network.listRoomMemberPeerIds();
+    const ctx = buildSurvivalMeshContext(Network.peerIds, members, Network.peers);
+    if (shouldLimitDirectMesh(ctx)) return [];
+    if (shouldBootstrapSurvivalMesh(ctx)) return peerIds.slice(0, 1);
+    return peerIds;
   }
 
   /**
@@ -404,8 +419,9 @@ export class RoomConnectHelper {
       const memberIds = Network.listRoomMemberPeerIds();
       const otherMembers = memberIds.filter(id => id && id !== Network.peerId);
       if (otherMembers.length > 0) {
+        const remeshTargets = RoomConnectHelper.filterMeshConnectTargets(otherMembers);
         if (RoomConnectHelper.connectMissingPeers(
-          otherMembers.map(id => PeerContext.parse(id)),
+          remeshTargets.map(id => PeerContext.parse(id)),
         ).length > 0) {
           attemptedConnect = true;
         }
@@ -432,7 +448,13 @@ export class RoomConnectHelper {
         continue;
       }
 
-      if (RoomConnectHelper.connectMissingPeers(others).length > 0) attemptedConnect = true;
+      const lobbyTargets = RoomConnectHelper.filterMeshConnectTargets(
+        others.map(p => p.peerId),
+      );
+      const lobbyPeers = lobbyTargets
+        .map(id => others.find(p => p.peerId === id))
+        .filter((p): p is IPeerContext => !!p);
+      if (RoomConnectHelper.connectMissingPeers(lobbyPeers).length > 0) attemptedConnect = true;
       if (RoomConnectHelper.openPeerCount() > 0) return;
       if (Network.peers.length > 0) {
         if (await RoomConnectHelper.waitHandshakeOrPrune() === 'open') return;

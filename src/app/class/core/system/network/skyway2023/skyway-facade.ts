@@ -17,8 +17,8 @@ import { installSkyWayQuietLogger } from './skyway-log';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
-  /** Lobby/room membership TTL. Prefer fewer false fatals over slightly stickier ghosts; leave/close drops membership promptly. */
-  private static readonly MEMBER_KEEPALIVE_SEC = 30;
+  /** Lobby/room membership keepalive — shorter interval helps on high-latency mobile links. */
+  private static readonly MEMBER_KEEPALIVE_SEC = 15;
   url = '';
   context: SkyWayContext;
   private lobby: Channel;
@@ -33,6 +33,7 @@ export class SkyWayFacade {
   private isDestroyed = false;
   private lobbyJoinTimer: ReturnType<typeof setTimeout> | null = null;
   private lobbyJoinBackoffMs = 5000;
+  private roomRestoreInFlight = false;
 
   onOpen: (peer: IPeerContext) => void;
   onClose: (peer: IPeerContext) => void;
@@ -263,7 +264,17 @@ export class SkyWayFacade {
     });
 
     roomPerson.onFatalError.add(err => {
-      console.error('roomPerson onFatalError', err);
+      console.warn('roomPerson onFatalError; attempting room restore', err);
+      if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+        void this.restoreRoomMembership().catch(() => {
+          if (!this.isOpen) return;
+          this.close();
+          if (this.onClose) this.onClose(this.peer);
+          const fatal = this.formatFatalError(err);
+          if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
+        });
+        return;
+      }
       if (this.isOpen) {
         this.close();
         if (this.onClose) this.onClose(this.peer);
@@ -273,6 +284,24 @@ export class SkyWayFacade {
     });
 
     this.roomPerson = roomPerson;
+  }
+
+  /** Rejoin room member + republish data stream after transient channel errors. */
+  private async restoreRoomMembership() {
+    if (this.isDestroyed || !this.peer.isRoom) return;
+    if (this.roomRestoreInFlight) {
+      setTimeout(() => void this.restoreRoomMembership(), 3000);
+      return;
+    }
+    this.roomRestoreInFlight = true;
+    try {
+      await this.closeRoomDataStream();
+      await this.joinRoomPerson();
+      await this.createRoomDataStream();
+      if (this.onRoomRestore) this.onRoomRestore(this.peer);
+    } finally {
+      this.roomRestoreInFlight = false;
+    }
   }
 
   private async createRoomDataStream() {

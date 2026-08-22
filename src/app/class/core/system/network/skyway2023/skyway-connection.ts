@@ -9,6 +9,7 @@ import { netDebug } from '../net-debug';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
+import { relayTargetPeerIds, shouldBootstrapSurvivalMesh, shouldLimitDirectMesh, buildSurvivalMeshContext, applyRelayFanOut } from '@udonarium/room-reconnect.util';
 import { translate } from 'i18n';
 
 type PeerId = string;
@@ -297,6 +298,7 @@ export class SkyWayConnection implements Connection {
       this.trustedPeerIds.add(stream.peer.peerId);
       this.maybeUnavailablePeerIds.delete(stream.peer.peerId);
       this.notifyUserList();
+      this.refreshRelayTargets(stream.peer.peerId);
       if (this.callback.onConnect) this.callback.onConnect(stream.peer);
     });
     stream.on('close', () => {
@@ -324,6 +326,7 @@ export class SkyWayConnection implements Connection {
       if (0 <= index) peerIds.splice(index, 1);
     });
     this.notifyUserList();
+    this.refreshAllRelayTargets();
     if (closed && this.callback.onDisconnect) this.callback.onDisconnect(closed.peer);
   }
 
@@ -345,22 +348,44 @@ export class SkyWayConnection implements Connection {
   }
 
   private onRelay(stream: SkyWayDataStream, container: DataContainer) {
-    container.ttl--;
-
-    let relayingPeerIds: string[] = this.relayingPeerIds.get(stream.peer.peerId);
-    if (relayingPeerIds == null) return;
-
-    if (container.users && 0 < container.users.length) {
-      container.users = this.userIds;
+    const relayPeers: { peerId: string; isOpen: boolean; send: (c: DataContainer) => void }[] = [];
+    for (const conn of this.streams) {
+      relayPeers.push({
+        peerId: conn.peer.peerId,
+        isOpen: conn.open,
+        send: c => {
+          netDebug('<' + conn.peer.peerId + '> need to forward...');
+          conn.send(c);
+        },
+      });
     }
+    applyRelayFanOut(
+      stream.peer.peerId,
+      this.peerIds,
+      this.relayingPeerIds.get(stream.peer.peerId),
+      relayPeers,
+      container.users && container.users.length > 0 ? this.userIds : undefined,
+      container,
+    );
+  }
 
-    for (let peerId of relayingPeerIds) {
-      let conn = this.streams.find(peerId);
-      if (conn && conn.open) {
-        netDebug('<' + peerId + '> need to forward...');
-        conn.send(container);
-      }
+  private refreshRelayTargets(sourcePeerId: string) {
+    this.relayingPeerIds.set(sourcePeerId, relayTargetPeerIds(sourcePeerId, this.peerIds));
+  }
+
+  private refreshAllRelayTargets() {
+    for (const peerId of this.peerIds) {
+      this.refreshRelayTargets(peerId);
     }
+  }
+
+  private shouldLimitDirectMeshLocal(): boolean {
+    const ctx = buildSurvivalMeshContext(
+      this.peerIds,
+      this.listRoomMemberPeerIds(),
+      this.peers,
+    );
+    return shouldLimitDirectMesh(ctx) || shouldBootstrapSurvivalMesh(ctx);
   }
 
   private onUpdateUserIds(stream: SkyWayDataStream, userIds: string[]) {
@@ -375,11 +400,10 @@ export class SkyWayConnection implements Connection {
     });
 
     let diff = ArrayUtil.diff(this.userIds, userIds);
-    let relayingUserIds = diff.diff1;
     let unknownUserIds = diff.diff2;
-    this.relayingPeerIds.set(stream.peer.peerId, relayingUserIds.map(userId => this.makeFriendPeer(userId).peerId));
+    this.refreshRelayTargets(stream.peer.peerId);
 
-    if (unknownUserIds.length) {
+    if (unknownUserIds.length && !this.shouldLimitDirectMeshLocal()) {
       for (let userId of unknownUserIds) {
         let peer = this.makeFriendPeer(userId);
         if (!this.isMaybeUnavailable(peer.peerId) && this.connect(peer)) {
