@@ -234,14 +234,16 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     this.syncPeerHealthPoll();
   }
 
-  /** Peer health/ping stats need a 1s CD tick only while peers are present. */
+  /** Peer health/ping stats need a 1s CD tick while peers are present or reconnect is pending. */
   private syncPeerHealthPoll() {
-    const need = (this.networkService.peers?.length || 0) > 0;
+    const need = (this.networkService.peers?.length || 0) > 0
+      || this.isYourIdReconnecting
+      || (!this.networkService.isOpen && !!Network.getLastRoomSession()?.roomId);
     if (need) {
       if (this.interval) return;
       this.ngZone.runOutsideAngular(() => {
         this.interval = setInterval(() => {
-          this.ngZone.run(() => { });
+          this.ngZone.run(() => this.changeDetector.detectChanges());
         }, 1000);
       });
     } else if (this.interval) {

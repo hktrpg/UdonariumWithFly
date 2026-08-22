@@ -111,6 +111,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     (RoomConnectHelper as any).joinOwnedUntil = 0;
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.everHadRoomSession = false;
+    RoomConnectHelper.clearReopenRetry();
   });
 
   it('remeshes after OPEN_NETWORK when a room session exists', async () => {
@@ -190,6 +191,43 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     expect(RoomConnectHelper.shouldAttemptReopenNow()).toBeFalse();
     expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('busy');
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it('schedules backoff reopen retry after failed reopen', () => {
+    jasmine.clock().install();
+    try {
+      RoomConnectHelper.everHadRoomSession = true;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      const open = spyOn(Network, 'open');
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({ userId: 'u1', peerId: 'self' } as IPeerContext);
+      spyOn(RoomConnectHelper, 'remeshRoomPeers').and.resolveTo();
+
+      expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('started');
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(RoomConnectHelper.isReopenInFlight).toBeTrue();
+
+      EventSystem.trigger('NETWORK_ERROR', {
+        peerId: 'self',
+        errorType: 'server-error',
+        errorMessage: 'unreachable',
+        errorObject: null,
+      });
+
+      expect(RoomConnectHelper.isReopenInFlight).toBeFalse();
+      expect(RoomConnectHelper.isReopenRetryPending()).toBeTrue();
+
+      jasmine.clock().tick(3000);
+      expect(open).toHaveBeenCalledTimes(2);
+    } finally {
+      jasmine.clock().uninstall();
+      RoomConnectHelper.clearReopenRetry();
+      (RoomConnectHelper as any).reopenInFlight = false;
+    }
   });
 });
 

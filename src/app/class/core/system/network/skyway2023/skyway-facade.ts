@@ -144,7 +144,7 @@ export class SkyWayFacade {
       let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
       if (authToken.length < 1) {
         let message = translate('skyway.backendUnavailableShort', { url: backend.url });
-        if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
+        console.warn(`skyWay token refresh failed: ${message}`);
         return;
       }
       context.updateAuthToken(authToken);

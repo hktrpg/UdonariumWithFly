@@ -221,6 +221,7 @@ export class RoomConnectHelper {
       RoomConnectHelper.meshHealDebounceTimer = null;
     }
     RoomConnectHelper.connectingSince.clear();
+    RoomConnectHelper.clearReopenRetry();
   }
 
   /**
@@ -563,7 +564,7 @@ export class RoomConnectHelper {
   static scheduleReopenRetry(errorType: string = 'disconnected') {
     if (!shouldAttemptRoomReopen(errorType)) return;
     if (!Network.getLastRoomSession()?.roomId && RoomConnectHelper.everHadRoomSession) return;
-    if (RoomConnectHelper.reopenInFlight || RoomConnectHelper.isJoinOwningNetworkError) return;
+    if (RoomConnectHelper.isJoinOwningNetworkError) return;
     if (RoomConnectHelper.reopenRetryTimer != null) return;
 
     const delayMs = Math.min(
@@ -615,8 +616,7 @@ export class RoomConnectHelper {
       clearTimeout(timer);
       EventSystem.unregister(key);
       ConnectionBusyService.instance?.hide();
-      // Allow a later genuine drop to reconnect again.
-      setTimeout(() => { RoomConnectHelper.reopenInFlight = false; }, 2000);
+      RoomConnectHelper.reopenInFlight = false;
     };
     const timer = setTimeout(() => {
       console.warn('RoomConnectHelper reopenLastRoomOrLobby timeout');
