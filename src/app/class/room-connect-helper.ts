@@ -75,12 +75,25 @@ export class RoomConnectHelper {
   private static meshHealInFlight = false;
   private static meshHealDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly MESH_HEAL_DEBOUNCE_MS = 400;
+  private static reopenRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private static reopenRetryAttempt = 0;
+  private static readonly REOPEN_RETRY_BASE_MS = 3000;
+  private static readonly REOPEN_RETRY_MAX_MS = 60000;
   /** Throttle mid-session gap reconnect warns (avoid 5s spam while ICE is stuck). */
   private static lastGapWarnAt = 0;
   private static readonly GAP_WARN_COOLDOWN_MS = 60000;
 
   static get isReopenInFlight(): boolean {
     return RoomConnectHelper.reopenInFlight;
+  }
+
+  static isReopenRetryPending(): boolean {
+    return RoomConnectHelper.reopenRetryTimer != null;
+  }
+
+  /** True when UI should show Connecting instead of Offline for the local peer id. */
+  static isNetworkReconnecting(): boolean {
+    return RoomConnectHelper.reopenInFlight || RoomConnectHelper.isReopenRetryPending();
   }
 
   /** Open DataChannels only (excludes stuck “connecting” streams). */
@@ -179,6 +192,7 @@ export class RoomConnectHelper {
     RoomConnectHelper.everHadRoomSession = false;
     Network.clearLastRoomSession();
     RoomConnectHelper.stopMeshKeepalive();
+    RoomConnectHelper.clearReopenRetry();
   }
 
   static markRoomSessionRemembered() {
@@ -231,7 +245,14 @@ export class RoomConnectHelper {
   static async tickMeshKeepalive(): Promise<void> {
     if (RoomConnectHelper.meshHealInFlight) return;
     if (RoomConnectHelper.joinInProgress || RoomConnectHelper.reopenInFlight) return;
-    if (!Network.isOpen || !Network.peer?.isRoom) return;
+
+    if (!Network.isOpen) {
+      if (RoomConnectHelper.everHadRoomSession && Network.getLastRoomSession()?.roomId) {
+        RoomConnectHelper.scheduleReopenRetry('disconnected');
+      }
+      return;
+    }
+    if (!Network.peer?.isRoom) return;
 
     RoomConnectHelper.meshHealInFlight = true;
     try {
@@ -277,9 +298,7 @@ export class RoomConnectHelper {
    */
   static async healMeshGaps(): Promise<void> {
     if (!Network.isRoomChannelReady()) {
-      if (RoomConnectHelper.shouldAttemptReopenNow()) {
-        RoomConnectHelper.reopenLastRoomOrLobby();
-      }
+      RoomConnectHelper.scheduleReopenRetry('disconnected');
       return;
     }
 
@@ -530,6 +549,42 @@ export class RoomConnectHelper {
     }
   }
 
+  static clearReopenRetry() {
+    if (RoomConnectHelper.reopenRetryTimer != null) {
+      clearTimeout(RoomConnectHelper.reopenRetryTimer);
+      RoomConnectHelper.reopenRetryTimer = null;
+    }
+    RoomConnectHelper.reopenRetryAttempt = 0;
+  }
+
+  /**
+   * After a failed reopen or channel drop, retry with backoff instead of staying offline.
+   */
+  static scheduleReopenRetry(errorType: string = 'disconnected') {
+    if (!shouldAttemptRoomReopen(errorType)) return;
+    if (!Network.getLastRoomSession()?.roomId && RoomConnectHelper.everHadRoomSession) return;
+    if (RoomConnectHelper.reopenInFlight || RoomConnectHelper.isJoinOwningNetworkError) return;
+    if (RoomConnectHelper.reopenRetryTimer != null) return;
+
+    const delayMs = Math.min(
+      RoomConnectHelper.REOPEN_RETRY_BASE_MS * (2 ** RoomConnectHelper.reopenRetryAttempt),
+      RoomConnectHelper.REOPEN_RETRY_MAX_MS,
+    );
+    RoomConnectHelper.reopenRetryAttempt++;
+
+    RoomConnectHelper.reopenRetryTimer = setTimeout(() => {
+      RoomConnectHelper.reopenRetryTimer = null;
+      if (!RoomConnectHelper.shouldAttemptReopenNow()) {
+        RoomConnectHelper.scheduleReopenRetry(errorType);
+        return;
+      }
+      const result = RoomConnectHelper.reopenLastRoomOrLobby();
+      if (result !== 'started') {
+        RoomConnectHelper.scheduleReopenRetry(errorType);
+      }
+    }, delayMs);
+  }
+
   /**
    * After SkyWay fatal close: reopen the last room (+ remesh).
    * Lobby peer reopen only when this page never had a room session.
@@ -566,11 +621,13 @@ export class RoomConnectHelper {
     const timer = setTimeout(() => {
       console.warn('RoomConnectHelper reopenLastRoomOrLobby timeout');
       finish();
+      RoomConnectHelper.scheduleReopenRetry('disconnected');
     }, 30000);
 
     EventSystem.register(key)
       .on('OPEN_NETWORK', () => {
         void (async () => {
+          RoomConnectHelper.clearReopenRetry();
           if (willReopenRoom && session) {
             const connectPassword = RoomConnectHelper.connectPasswordForRoom(
               session.roomName, session.meshPassword || '');
@@ -583,7 +640,10 @@ export class RoomConnectHelper {
           finish();
         })();
       })
-      .on('NETWORK_ERROR', () => finish());
+      .on('NETWORK_ERROR', event => {
+        finish();
+        RoomConnectHelper.scheduleReopenRetry(event.data?.errorType || 'disconnected');
+      });
 
     if (willReopenRoom) {
       const userId = session!.userId || Network.peer.userId;

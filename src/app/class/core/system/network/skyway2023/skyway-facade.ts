@@ -31,6 +31,8 @@ export class SkyWayFacade {
   peer: PeerContext = PeerContext.parse('???');
   get isOpen(): boolean { return this.peer.isOpen };
   private isDestroyed = false;
+  private lobbyJoinTimer: ReturnType<typeof setTimeout> | null = null;
+  private lobbyJoinBackoffMs = 5000;
 
   onOpen: (peer: IPeerContext) => void;
   onClose: (peer: IPeerContext) => void;
@@ -62,27 +64,42 @@ export class SkyWayFacade {
   }
 
   /**
-   * Lobby membership drives listAllRooms. Retry once; if still failing, fatal so the
-   * host is not left “online” but invisible in the lobby.
+   * Lobby membership drives listAllRooms only — room mesh does not depend on it.
+   * Failures are retried in the background; never tear down an open room session.
    */
   private async ensureLobbyJoined() {
     if (this.isDestroyed || !this.peer.isRoom) return;
     try {
       await this.joinLobby();
+      this.lobbyJoinBackoffMs = 5000;
     } catch (err) {
-      console.error('skyWay joinLobby failed, retrying', err);
-      try {
-        await this.joinLobby();
-      } catch (retryErr) {
-        console.error('skyWay joinLobby retry failed', retryErr);
-        const fatal = this.formatFatalError(retryErr);
-        if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, retryErr);
-      }
+      console.warn('skyWay joinLobby failed; room mesh continues, will retry lobby', err);
+      this.scheduleLobbyJoinRetry();
     }
+  }
+
+  private scheduleLobbyJoinRetry() {
+    if (this.isDestroyed || !this.peer.isOpen || !this.peer.isRoom) return;
+    if (this.lobbyJoinTimer != null) clearTimeout(this.lobbyJoinTimer);
+    const delayMs = this.lobbyJoinBackoffMs;
+    this.lobbyJoinTimer = setTimeout(() => {
+      this.lobbyJoinTimer = null;
+      void this.ensureLobbyJoined();
+    }, delayMs);
+    this.lobbyJoinBackoffMs = Math.min(this.lobbyJoinBackoffMs * 2, 60000);
+  }
+
+  private clearLobbyJoinRetry() {
+    if (this.lobbyJoinTimer != null) {
+      clearTimeout(this.lobbyJoinTimer);
+      this.lobbyJoinTimer = null;
+    }
+    this.lobbyJoinBackoffMs = 5000;
   }
 
   async close() {
     try {
+      this.clearLobbyJoinRetry();
       this.peer = PeerContext.parse('???');
       this.isDestroyed = true;
 
@@ -202,19 +219,11 @@ export class SkyWayFacade {
       keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
     });
 
-    lobbyPerson.onFatalError.add(async err => {
-      console.error('lobbyPerson onFatalError', err);
-      // Lobby membership is what listAllPeers uses — try rejoin without tearing down the room.
+    lobbyPerson.onFatalError.add(err => {
+      console.warn('lobbyPerson onFatalError; retrying lobby in background', err);
       if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
-        try {
-          await this.joinLobby();
-          return;
-        } catch (rejoinErr) {
-          console.error('lobbyPerson rejoin failed', rejoinErr);
-        }
+        this.scheduleLobbyJoinRetry();
       }
-      const fatal = this.formatFatalError(err);
-      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.lobbyPerson = lobbyPerson;

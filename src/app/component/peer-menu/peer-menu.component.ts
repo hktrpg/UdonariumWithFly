@@ -8,6 +8,7 @@ import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth } from '@udonarium/room-auth';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
@@ -53,6 +54,10 @@ import * as localForage from 'localforage';
 export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   targetUserId: string = '';
   networkService = Network
+
+  get isYourIdReconnecting(): boolean {
+    return this.networkService.isOpening || RoomConnectHelper.isNetworkReconnecting();
+  }
   gameRoomService = ObjectStore.instance;
 
   isCopied = false;
@@ -218,7 +223,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => this.syncPeerHealthPoll());
       })
-      .on('NETWORK_ERROR', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
+      .on('NETWORK_ERROR', () => this.ngZone.run(() => {
+        this.changeDetector.detectChanges();
+        this.syncPeerHealthPoll();
+      }))
       .on('CONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('DISCONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))

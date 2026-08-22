@@ -26,6 +26,8 @@ describe('room-reconnect.util', () => {
 
   it('still attempts room reopen for token / auth / server errors', () => {
     expect(shouldAttemptRoomReopen('internal')).toBeTrue();
+    expect(shouldAttemptRoomReopen('internal-error')).toBeTrue();
+    expect(shouldAttemptRoomReopen('event-as-promise-timeout')).toBeTrue();
     expect(shouldAttemptRoomReopen('token-expired')).toBeTrue();
     expect(shouldAttemptRoomReopen('authentication')).toBeTrue();
     expect(shouldAttemptRoomReopen('server-error')).toBeTrue();

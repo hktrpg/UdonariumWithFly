@@ -37,7 +37,11 @@ export function isRecoverableNetworkError(errorType: string): boolean {
 
 /** True when we should try reopenLastRoom (including token / transient backend errors). */
 export function shouldAttemptRoomReopen(errorType: string): boolean {
-  return (ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType);
+  if ((ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType)) return true;
+  // SDK kebab-cases internalError → internal-error, Event asPromise timeout, etc.
+  if (/^internal(-|$)/.test(errorType)) return true;
+  if (/timeout|as-promise/i.test(errorType)) return true;
+  return false;
 }
 
 /** Room channel members that do not yet have an open DataChannel. */
