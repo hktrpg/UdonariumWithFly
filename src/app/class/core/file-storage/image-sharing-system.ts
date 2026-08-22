@@ -7,6 +7,7 @@ import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { MimeType } from './mime-type';
+import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class ImageSharingSystem {
   private static _instance: ImageSharingSystem
@@ -68,7 +69,7 @@ export class ImageSharingSystem {
         if (request.length < 1) {
           return;
         }
-        this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
       })
       .on('REQUEST_FILE_RESOURE', async event => {
         if (event.isSendFromSelf) return;
@@ -242,15 +243,17 @@ export class ImageSharingSystem {
     netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
-  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
+  private async queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('image', request, item => {
       const image = ImageStorage.instance.get(item.identifier);
       return image?.state ?? ImageState.NULL;
     });
+    await FolderMediaHydrator.instance.hydrateMissing('image', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const image = ImageStorage.instance.get(item.identifier);
       const localState = image?.state ?? ImageState.NULL;
+      if (localState >= ImageState.COMPLETE) continue;
       const meta = metaById.get(item.identifier) ?? item;
       const bytes = estimateNextReceiveBytes('image', localState, meta);
       FileReceiveScheduler.enqueueReceiveRequest('image', peerId, item.identifier, bytes, () => {
@@ -292,7 +295,7 @@ export class ImageSharingSystem {
           request.push({ identifier: item.identifier, state: image.state });
         }
       }
-      if (request.length) this.queueMissingDownloads(request, peerId, catalog);
+      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
   }
 

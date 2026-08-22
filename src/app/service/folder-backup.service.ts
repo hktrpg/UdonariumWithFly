@@ -22,6 +22,7 @@ import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import { FolderBackupCrypto, FolderBackupSecretsBlob } from './folder-backup-crypto';
 import { folderBackupDebug } from './folder-backup-debug';
+import { FolderMediaHydrator } from './folder-media-hydrator';
 import { shouldPersistLeaveFlush } from './folder-backup-persist';
 import {
   FOLDER_BACKUP_FORMAT_VERSION,
@@ -359,6 +360,7 @@ export class FolderBackupService implements OnDestroy {
       await localForage.setItem(FolderBackupService.STORAGE_KEY, handle);
       this.lastError = '';
       this.setStatus('ready');
+      FolderMediaHydrator.invalidateIndex();
       void this.onNetworkOpen();
       return true;
     } catch (e) {
@@ -380,6 +382,7 @@ export class FolderBackupService implements OnDestroy {
       }
       this.lastError = '';
       this.setStatus('ready');
+      FolderMediaHydrator.invalidateIndex();
       void this.onNetworkOpen();
       return true;
     } catch (e) {
@@ -406,6 +409,7 @@ export class FolderBackupService implements OnDestroy {
       console.warn(e);
     }
     this.setStatus(this.isSupported ? 'unbound' : 'unsupported');
+    FolderMediaHydrator.invalidateIndex();
   }
 
   markDirty() {
@@ -1085,8 +1089,23 @@ export class FolderBackupService implements OnDestroy {
       this.contentTrusted = true;
       this.listening = !Network.GuestMode();
       if (!this.listening) this.clearTimers();
+      if (this.isReady && !this.joinQuarantine) {
+        FolderMediaHydrator.instance.warmIndex();
+      }
     }
     await this.runPendingLoadAfterOpen();
+  }
+
+  /** Shared media/ directory when folder backup is readable. */
+  async getMediaDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+    if (!this.isReady || !this.dirHandle || Network.GuestMode()) return null;
+    const perm = await this.queryPermission(this.dirHandle);
+    if (perm !== 'granted') return null;
+    try {
+      return await this.dirHandle.getDirectoryHandle(MEDIA_DIR);
+    } catch {
+      return null;
+    }
   }
 
   private async handleLeaveRoom() {
@@ -1245,6 +1264,7 @@ export class FolderBackupService implements OnDestroy {
         this.lastError = '';
         this.activeRoomId = snapshot.roomId;
         this.setStatus('ready');
+        FolderMediaHydrator.invalidateIndex();
       } catch (e) {
         console.warn('FolderBackup write failed', e);
         this.lastError = String((e as Error)?.message || e);

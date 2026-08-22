@@ -180,6 +180,14 @@ export class FileArchiver {
     }
   }
 
+  /** Import one media blob from folder backup media/ (reuses ZIP restore handlers). */
+  async importMediaFile(file: File): Promise<void> {
+    await this.handleImage(file);
+    await this.handleAudio(file);
+    await this.handlePdf(file);
+    await this.handleVideo(file);
+  }
+
   private async handleImage(file: File) {
     if (file.type.indexOf('image/') < 0) return;
     if (this.maxImageSize < file.size) {

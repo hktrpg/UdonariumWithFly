@@ -5,6 +5,7 @@ import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-
 import { FileReaderUtil } from './file-reader-util';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 import { PdfCatalogItem, PdfStorage } from './pdf-storage';
+import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class PdfSharingSystem {
   private static _instance: PdfSharingSystem;
@@ -48,7 +49,7 @@ export class PdfSharingSystem {
           PdfStorage.instance.synchronize(event.sendFrom);
         }
         if (request.length < 1) return;
-        this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
       })
       .on('REQUEST_PDF_RESOURE', event => {
         if (event.isSendFromSelf) return;
@@ -182,19 +183,21 @@ export class PdfSharingSystem {
           request.push({ identifier: item.identifier, state: pdf.state });
         }
       }
-      if (request.length) this.queueMissingDownloads(request, peerId, catalog);
+      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
   }
 
-  private queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {
+  private async queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', request, item => {
       const pdf = PdfStorage.instance.get(item.identifier);
       return pdf?.state ?? PdfState.NULL;
     });
+    await FolderMediaHydrator.instance.hydrateMissing('pdf', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const pdf = PdfStorage.instance.get(item.identifier);
       const localState = pdf?.state ?? PdfState.NULL;
+      if (localState >= PdfState.COMPLETE) continue;
       const meta = metaById.get(item.identifier) ?? item;
       const bytes = estimateNextReceiveBytes('pdf', localState, meta);
       FileReceiveScheduler.enqueueReceiveRequest('pdf', peerId, item.identifier, bytes, () => {

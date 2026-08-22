@@ -1,6 +1,7 @@
 import {
   STATE_FILE_NAMES,
   computeStateFingerprint,
+  isContentHashIdentifier,
   isMediaFileName,
   mediaHashFromName,
   sha256Hex,
@@ -27,6 +28,14 @@ describe('folder-backup-layout', () => {
   it('mediaHashFromName strips extension', () => {
     const hash = 'b'.repeat(64);
     expect(mediaHashFromName(`${hash}.jpg`)).toBe(hash);
+  });
+
+  it('isContentHashIdentifier accepts 64-char hex only', () => {
+    const hash = 'c'.repeat(64);
+    expect(isContentHashIdentifier(hash)).toBeTrue();
+    expect(isContentHashIdentifier(hash.toUpperCase())).toBeTrue();
+    expect(isContentHashIdentifier('https://example.com/x.png')).toBeFalse();
+    expect(isContentHashIdentifier(hash.slice(0, 63))).toBeFalse();
   });
 
   it('sha256Hex is stable for the same payload (fingerprint skip input)', async () => {

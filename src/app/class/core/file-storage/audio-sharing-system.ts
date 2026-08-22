@@ -5,6 +5,7 @@ import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
+import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class AudioSharingSystem {
   private static _instance: AudioSharingSystem
@@ -59,7 +60,7 @@ export class AudioSharingSystem {
         if (request.length < 1) {
           return;
         }
-        this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
       })
       .on('REQUEST_AUDIO_RESOURE', event => {
         if (event.isSendFromSelf) return;
@@ -224,19 +225,21 @@ export class AudioSharingSystem {
           request.push({ identifier: item.identifier, state: audio.state });
         }
       }
-      if (request.length) this.queueMissingDownloads(request, peerId, catalog);
+      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
   }
 
-  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
+  private async queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', request, item => {
       const audio = AudioStorage.instance.get(item.identifier);
       return audio?.state ?? AudioState.NULL;
     });
+    await FolderMediaHydrator.instance.hydrateMissing('audio', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const audio = AudioStorage.instance.get(item.identifier);
       const localState = audio?.state ?? AudioState.NULL;
+      if (localState >= AudioState.COMPLETE) continue;
       const meta = metaById.get(item.identifier) ?? item;
       const bytes = estimateNextReceiveBytes('audio', localState, meta);
       FileReceiveScheduler.enqueueReceiveRequest('audio', peerId, item.identifier, bytes, () => {

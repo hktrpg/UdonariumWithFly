@@ -5,6 +5,7 @@ import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-
 import { FileReaderUtil } from './file-reader-util';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 import { VideoCatalogItem, VideoStorage } from './video-storage';
+import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class VideoSharingSystem {
   private static _instance: VideoSharingSystem;
@@ -48,7 +49,7 @@ export class VideoSharingSystem {
           VideoStorage.instance.synchronize(event.sendFrom);
         }
         if (request.length < 1) return;
-        this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
       })
       .on('REQUEST_VIDEO_RESOURE', event => {
         if (event.isSendFromSelf) return;
@@ -175,19 +176,21 @@ export class VideoSharingSystem {
           request.push({ identifier: item.identifier, state: video.state });
         }
       }
-      if (request.length) this.queueMissingDownloads(request, peerId, catalog);
+      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
   }
 
-  private queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {
+  private async queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {
     const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
     const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', request, item => {
       const video = VideoStorage.instance.get(item.identifier);
       return video?.state ?? VideoState.NULL;
     });
+    await FolderMediaHydrator.instance.hydrateMissing('video', sorted.map(item => item.identifier));
     for (const item of sorted) {
       const video = VideoStorage.instance.get(item.identifier);
       const localState = video?.state ?? VideoState.NULL;
+      if (localState >= VideoState.COMPLETE) continue;
       const meta = metaById.get(item.identifier) ?? item;
       const bytes = estimateNextReceiveBytes('video', localState, meta);
       FileReceiveScheduler.enqueueReceiveRequest('video', peerId, item.identifier, bytes, () => {

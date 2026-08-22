@@ -91,6 +91,11 @@ export function mediaHashFromName(name: string): string {
   return i > 0 ? name.slice(0, i).toLowerCase() : name.toLowerCase();
 }
 
+/** Catalog / media identifiers: 64-char content SHA-256 hex. */
+export function isContentHashIdentifier(identifier: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(identifier || '');
+}
+
 export async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
   const buf = typeof data === 'string' ? new TextEncoder().encode(data) : data;
   const digest = await crypto.subtle.digest('SHA-256', buf);
