@@ -669,8 +669,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if ((obj instanceof GameCharacter || obj instanceof CharacterToken) && !is2D) {
       const foot = (obj.size || 1) * gridSize;
       const pose = obj.getPoseForView();
+      const live = MovableDirective.livePoseFor(obj.identifier);
+      const px = live?.x ?? pose.x;
+      const py = live?.y ?? pose.y;
+      const pz = live?.posZ ?? pose.posZ;
       return tokenCenterAnchorPx(
-        { ...obj, location: { x: pose.x, y: pose.y }, posZ: pose.posZ, rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0 },
+        { ...obj, location: { x: px, y: py }, posZ: pz, rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0 },
         foot,
         tokenVisualHeightPx(obj, gridSize),
         gridSize,
@@ -699,6 +703,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Pin math must use the viewed-map pose, not possibly-stale location SyncVar. */
   private pinHostFromView(obj: GameCharacter | CharacterToken | TextNote) {
     const pose = obj.getPoseForView();
+    const live = MovableDirective.livePoseFor(obj.identifier);
+    const x = live?.x ?? pose.x;
+    const y = live?.y ?? pose.y;
+    const posZ = live?.posZ ?? pose.posZ;
     const tokenFrame = (obj instanceof GameCharacter || obj instanceof CharacterToken)
       ? (obj.tokenFrame || 'none')
       : 'none';
@@ -709,9 +717,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       pushPinLeft: obj.pushPinLeft,
       pushPinTop: obj.pushPinTop,
       tokenFrame,
-      location: { x: pose.x, y: pose.y },
+      location: { x, y },
       rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0,
-      posZ: pose.posZ,
+      posZ,
     };
   }
 
@@ -962,6 +970,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         this.sync2DModeCamera();
         this.refreshFx();
         this.ensureFxTimer();
+      })
+      .on('TABLETOP_DRAG_MOVE', () => {
+        if (this.clueLinks.length) this.scheduleClueYarnRefresh();
       })
       .on('TABLE_PING', event => {
         this.ngZone.run(() => this.spawnPing(event.data));

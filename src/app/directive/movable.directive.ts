@@ -316,6 +316,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.posZ = nextZ;
 
     this.synchronizer.updateMove(delta);
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onInputEnd(e: MouseEvent | TouchEvent) {
@@ -430,6 +433,25 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     for (const set of MovableDirective.layerMap.values()) {
       for (const movable of set) apply(movable);
     }
+  }
+
+  /** Live tabletop pose while dragging (before placements flush on pointer up). */
+  static livePoseFor(objectId: string): { x: number; y: number; posZ: number } | null {
+    if (!objectId) return null;
+    for (const set of MovableDirective.layerMap.values()) {
+      for (const movable of set) {
+        const obj = movable.tabletopObject;
+        if (!obj || obj.identifier !== objectId) continue;
+        if (movable.input?.isGrabbing || movable.input?.isDragging) {
+          return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
+        }
+        const pose = obj.getPoseForView();
+        if (pose.x !== movable.posX || pose.y !== movable.posY || pose.posZ !== movable.posZ) {
+          return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
+        }
+      }
+    }
+    return null;
   }
 
   private setUpdateBatching() {
