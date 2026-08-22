@@ -553,7 +553,7 @@ export const zhTW_ui: I18nDictionary = {
   'note.pickImage': '選擇圖片', 'note.pdfPage': '頁碼', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加影片。',
   'note.previewSelf': '預覽（自己）', 'note.previewBadge': '預覽', 'note.previewResetView': '重設縮放／平移', 'note.ctrlHoverHint': '提示：滑鼠移到桌面筆記上後再按 Ctrl 可預覽。滾輪縮放；拖曳平移；雙擊重設。',
   'note.settingsEmpty': '請選擇要編輯的筆記。',
-  'note.selfOnly': '僅自己可見', 'note.showEveryone': '顯示給所有人', 'note.importFile': '匯入檔案', 'note.dropHint': '拖曳文字／圖片／影片／PDF 到此處即可匯入。',
+  'note.selfOnly': '僅自己可見', 'note.showEveryone': '顯示給所有人', 'note.importFile': '匯入檔案', 'note.dropHint': '拖曳文字／圖片／影片／PDF 到此處即可匯入。', 'note.dragHint': '筆記卡片可拖至桌面或分頁。',
   'mask.clickAction': '點擊動作', 'mask.clickSettings': '點擊動作設定',
   'mask.clickHint': '可複選多種動作，Alt＋雙擊會同時觸發已勾選且有填寫目標者（不會開設定）。選「無」關閉全部。「站立效果／點擊效果」共用圖片效果設定。',
   'mask.fieldName': '名稱', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': '文字',

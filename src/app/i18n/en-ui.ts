@@ -542,7 +542,7 @@ export const en_ui: I18nDictionary = {
   'note.pickImage': 'Choose image', 'note.pdfPage': 'Page', 'note.pdfEmpty': 'No PDF attached yet.', 'note.videoEmpty': 'No video attached yet.',
   'note.previewSelf': 'Preview (self)', 'note.previewBadge': 'Preview', 'note.previewResetView': 'Reset zoom / pan', 'note.ctrlHoverHint': 'Tip: hover a table note, then press Ctrl to preview. Wheel zooms; drag to pan; double-click resets.',
   'note.settingsEmpty': 'Select a note to edit.',
-  'note.selfOnly': 'Self only', 'note.showEveryone': 'Show to everyone', 'note.importFile': 'Import file', 'note.dropHint': 'Drop text / image / video / PDF here to import.',
+  'note.selfOnly': 'Self only', 'note.showEveryone': 'Show to everyone', 'note.importFile': 'Import file', 'note.dropHint': 'Drop text / image / video / PDF here to import.', 'note.dragHint': 'Drag note cards onto the table or tabs.',
   'mask.clickAction': 'On click', 'mask.clickSettings': 'Click action settings',
   'mask.clickHint': 'Multi-select actions; Alt+double-click runs all selected actions that have a target (does not open settings). Choose None to disable. Standing FX and Click FX share the same image-effect settings.',
   'mask.fieldName': 'Name', 'mask.fieldOpacity': 'Opacity', 'mask.fieldAltitude': 'Altitude', 'mask.fieldText': 'Text',

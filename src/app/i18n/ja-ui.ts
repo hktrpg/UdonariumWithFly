@@ -542,7 +542,7 @@ export const ja_ui: I18nDictionary = {
   'note.pickImage': '画像を選択', 'note.pdfPage': 'ページ', 'note.pdfEmpty': 'PDFは未添付です。', 'note.videoEmpty': '動画は未添付です。',
   'note.previewSelf': 'プレビュー（自分）', 'note.previewBadge': 'プレビュー', 'note.previewResetView': 'ズーム／パンをリセット', 'note.ctrlHoverHint': 'ヒント：卓上メモにホバーしてから Ctrl でプレビュー。ホイールで拡大、ドラッグで移動、ダブルクリックでリセット。',
   'note.settingsEmpty': '編集するメモを選択してください。',
-  'note.selfOnly': '自分のみ表示', 'note.showEveryone': '全員に表示', 'note.importFile': 'ファイル読込', 'note.dropHint': 'テキスト／画像／動画／PDF をここにドロップして取り込み。',
+  'note.selfOnly': '自分のみ表示', 'note.showEveryone': '全員に表示', 'note.importFile': 'ファイル読込', 'note.dropHint': 'テキスト／画像／動画／PDF をここにドロップして取り込み。', 'note.dragHint': 'メモカードは卓上またはタブへドラッグできます。',
   'mask.clickAction': 'クリック動作', 'mask.clickSettings': 'クリック動作設定',
   'mask.clickHint': '動作は複数選択可。Alt＋ダブルクリックで、選択済みかつ対象が入力されたものを同時に実行（設定は開きません）。「なし」で全解除。「立ち効果／クリック効果」は同じ画像エフェクト設定を共有します。',
   'mask.fieldName': '名前', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': 'テキスト',

@@ -542,7 +542,7 @@ export const zhCN_ui: I18nDictionary = {
   'note.pickImage': '选择图片', 'note.pdfPage': '页码', 'note.pdfEmpty': '尚未附加 PDF。', 'note.videoEmpty': '尚未附加视频。',
   'note.previewSelf': '预览（自己）', 'note.previewBadge': '预览', 'note.previewResetView': '重置缩放／平移', 'note.ctrlHoverHint': '提示：鼠标移到桌面笔记上后再按 Ctrl 可预览。滚轮缩放；拖动平移；双击重置。',
   'note.settingsEmpty': '请选择要编辑的笔记。',
-  'note.selfOnly': '仅自己可见', 'note.showEveryone': '显示给所有人', 'note.importFile': '导入文件', 'note.dropHint': '拖入文字／图片／视频／PDF 即可导入。',
+  'note.selfOnly': '仅自己可见', 'note.showEveryone': '显示给所有人', 'note.importFile': '导入文件', 'note.dropHint': '拖入文字／图片／视频／PDF 即可导入。', 'note.dragHint': '笔记卡片可拖到桌面或分页。',
   'mask.clickAction': '点击动作', 'mask.clickSettings': '点击动作设置',
   'mask.clickHint': '可多选多种动作，Alt＋双击会同时触发已勾选且已填写目标者（不会打开设置）。选「无」关闭全部。「站立效果／点击效果」共用图片效果设定。',
   'mask.fieldName': '名称', 'mask.fieldOpacity': '不透明度', 'mask.fieldAltitude': '高度', 'mask.fieldText': '文字',

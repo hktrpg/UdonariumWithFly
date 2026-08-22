@@ -67,9 +67,44 @@
   color: #fffaf2;
 }
 
+.inv-tab.is-drop-target span {
+  background: #4a7c59;
+  border-color: #3d6849;
+  color: #fff;
+  outline: 2px dashed #cfe8d5;
+  outline-offset: 1px;
+}
+
+.tab-card {
+  padding: 8px 10px;
+}
+
 .note-card {
   cursor: pointer;
   transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+
+.note-card.is-other-table {
+  opacity: 0.88;
+  border-style: dashed;
+}
+
+.note-card.is-draggable {
+  cursor: grab;
+}
+
+.note-card.is-draggable:active {
+  cursor: grabbing;
+}
+
+.note-card.is-draggable input,
+.note-card.is-draggable button,
+.note-card.is-draggable select,
+.note-card.is-draggable textarea,
+.note-card.is-draggable a,
+.note-card.is-draggable label,
+.note-card.is-draggable note-settings {
+  cursor: auto;
 }
 
 .note-card.is-selected {

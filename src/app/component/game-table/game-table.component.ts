@@ -2624,6 +2624,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       return;
     }
+    if (this.readInventoryNoteDragIds(e).length) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      return;
+    }
     if (this.tabletopFileDrop.hasFileDrag(e) && !GuestSession.isGuest && !Network.GuestMode()) {
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -2635,6 +2640,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const ids = this.readInventoryCharacterDragIds(e);
     if (ids.length) {
       this.onInventoryCharacterDrop(e, ids);
+      return;
+    }
+    const noteIds = this.readInventoryNoteDragIds(e);
+    if (noteIds.length) {
+      this.onInventoryNoteDrop(e, noteIds);
       return;
     }
     // Prefer files[] on drop — some browsers clear types/items while files remain.
@@ -2707,6 +2717,48 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  private onInventoryNoteDrop(e: DragEvent, ids: string[]) {
+    if (!ids.length || ids[0] === '__pending__') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (GuestSession.isGuest || Network.GuestMode()) return;
+
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: e.clientX, y: e.clientY, z: 0 },
+      this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
+    );
+    const grid = this.currentTable?.gridSize || 50;
+    let placed = 0;
+    let firstPlaced: TextNote | null = null;
+
+    for (let i = 0; i < ids.length; i++) {
+      const note = ObjectStore.instance.get(ids[i]);
+      if (!(note instanceof TextNote)) continue;
+      if (!note.canSeeSelfOnly && !this.isGMMode) continue;
+
+      const col = i % 5;
+      const row = Math.floor(i / 5);
+      const x = pos.x - (note.width * grid) / 2 + col * grid;
+      const y = pos.y - (note.height * grid) / 2 + row * grid;
+
+      note.addToTable(undefined, { x, y, posZ: note.posZ });
+      if (!firstPlaced) firstPlaced = note;
+      placed++;
+    }
+
+    if (placed > 0) {
+      if (firstPlaced) {
+        EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+          identifier: firstPlaced.identifier,
+          className: firstPlaced.aliasName,
+          highlighting: true,
+        });
+      }
+      SoundEffect.play(PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+    }
+  }
+
   private readInventoryTempCopy(e: DragEvent): boolean {
     if (!e.dataTransfer) return false;
     if (e.dataTransfer.getData(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return true;
@@ -2729,6 +2781,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const plain = e.dataTransfer.getData('text/plain') || '';
     const m = /^udonarium-character:(.+)$/.exec(plain);
     return m ? this.parseInventoryDragPayload(m[1]) : [];
+  }
+
+  private readInventoryNoteDragIds(e: DragEvent): string[] {
+    if (!e.dataTransfer) return [];
+    const typed = e.dataTransfer.getData(TextNote.INVENTORY_DRAG_MIME);
+    if (typed) return [typed];
+    if (e.type === 'dragover') {
+      const types = Array.from(e.dataTransfer.types || []);
+      if (types.includes(TextNote.INVENTORY_DRAG_MIME)) return ['__pending__'];
+      return [];
+    }
+    const plain = e.dataTransfer.getData('text/plain') || '';
+    const m = /^udonarium-note:(.+)$/.exec(plain);
+    return m?.[1] ? [m[1]] : [];
   }
 
   private parseInventoryDragPayload(payload: string): string[] {
