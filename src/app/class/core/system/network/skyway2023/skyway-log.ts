@@ -11,7 +11,7 @@ export function skyWayMsgText(msg: unknown[]): string {
 /** Expected peer churn / missing lobby Find — SDK dumps noisy payloads; keep console quiet. */
 export function isBenignSkyWayNoise(msg: unknown[]): boolean {
   try {
-    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel|signalingClient|publicationNotExist/i
+    return /onStreamAdded|already left|"name"\s*:\s*"timeout"|timeout:\s*onStreamAdded|channelNotFound|\[failed\]\s*findChannel|signalingClient|publicationNotExist|alreadySubscribedPublication|localPersonNotJoinedChannel/i
       .test(skyWayMsgText(msg));
   } catch {
     return false;
@@ -22,6 +22,11 @@ export function isBenignSkyWayNoise(msg: unknown[]): boolean {
  * Real recovery signals that should stay visible as a single warn line
  * (not console.error with a stack-looking SDK dump).
  */
+/** Subscribe races / channel not ready — retry without tearing down the stream. */
+export function isRetriableSubscribeError(msg: string): boolean {
+  return /already left|onStreamAdded|timeout|publicationNotExist|alreadySubscribedPublication|localPersonNotJoinedChannel/i.test(msg);
+}
+
 export function isDowngradedSkyWayWarn(msg: unknown[]): boolean {
   try {
     return /restartIce limit exceeded/i.test(skyWayMsgText(msg));

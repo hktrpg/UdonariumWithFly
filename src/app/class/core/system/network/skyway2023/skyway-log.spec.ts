@@ -1,6 +1,7 @@
 import {
   isBenignSkyWayNoise,
   isDowngradedSkyWayWarn,
+  isRetriableSubscribeError,
   shortSkyWaySummary,
   skyWayMsgText,
 } from './skyway-log';
@@ -10,7 +11,16 @@ describe('skyway-log quiet filters', () => {
     expect(isBenignSkyWayNoise(['internal: signalingClient'])).toBeTrue();
     expect(isBenignSkyWayNoise([{ info: { name: 'internal', detail: 'signalingClient' } }])).toBeTrue();
     expect(isBenignSkyWayNoise(['publicationNotExist: channelに該当するPublicationが存在しません'])).toBeTrue();
+    expect(isBenignSkyWayNoise(['alreadySubscribedPublication: すでにSubscribeした'])).toBeTrue();
+    expect(isBenignSkyWayNoise(['localPersonNotJoinedChannel: not in channel'])).toBeTrue();
     expect(isBenignSkyWayNoise(['already left'])).toBeTrue();
+  });
+
+  it('isRetriableSubscribeError covers subscribe races', () => {
+    expect(isRetriableSubscribeError('alreadySubscribedPublication: dup')).toBeTrue();
+    expect(isRetriableSubscribeError('localPersonNotJoinedChannel: left')).toBeTrue();
+    expect(isRetriableSubscribeError('publicationNotExist: gone')).toBeTrue();
+    expect(isRetriableSubscribeError('fatal: auth')).toBeFalse();
   });
 
   it('downgrades restartIce limit exceeded to warn-class noise', () => {

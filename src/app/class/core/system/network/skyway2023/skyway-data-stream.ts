@@ -8,6 +8,7 @@ import { PeerSessionGrade } from '../peer-session-state';
 import { CandidateType, WebRTCStats } from '../webrtc/webrtc-stats';
 import { WebRTCConnection, WebRTCStatsMonitor } from '../webrtc/webrtc-stats-monitor';
 import { netDebug } from '../net-debug';
+import { isRetriableSubscribeError } from './skyway-log';
 import { SkyWayFacade } from './skyway-facade';
 
 interface Ping {
@@ -68,6 +69,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   private onStreamAdded: { removeListener: () => void };
   private onStreamPublished: { removeListener: () => void };
   private onConnectionStateChanged: { removeListener: () => void };
+  private subscribeInFlight = false;
 
   private onopen = () => {
     netDebug(`peer ${this.peer.peerId} dataChannel is open`);
@@ -113,6 +115,8 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   disconnect() {
     netDebug(`disconnect ${this.peer.peerId}, isPublication: ${this.isPublication}`);
     this.isCanceled = true;
+    this.onStreamPublished?.removeListener();
+    this.releaseSubscription();
     if (this.isOpend) {
       this.dispose();
     } else {
@@ -139,7 +143,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     this.onStreamPublished = null;
     this.onConnectionStateChanged = null;
 
-    this.subscription = null
+    this.releaseSubscription();
 
     this.dataChannel?.removeEventListener('open', this.onopen);
     this.dataChannel?.removeEventListener('message', this.onmessage);
@@ -173,21 +177,34 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
   }
 
   private async initializeSubscription() {
-    //
-    let member = this.member;
-    let publication = this.findDataStreamPublication(member);
+    if (this.subscribeInFlight || this.isCanceled) return;
 
-    //
+    let member = this.member;
+    if (!member) {
+      netDebug(`[skyWay] ${this.peer.peerId}: member missing; waiting for publication`);
+      this.waitForDataStreamPublication();
+      return;
+    }
+
+    if (!this.skyWay.roomPerson) {
+      netDebug(`[skyWay] ${member.name}: roomPerson not joined`);
+      return;
+    }
+
+    let publication = this.findDataStreamPublication(member);
     if (!publication) {
       this.waitForDataStreamPublication();
       return;
     }
 
-    //
-    this.refresh();
-    netDebug(`initializeSubscription ready ${member.name}`);
+    const existing = this.findLocalDataSubscription(publication.id);
+    if (existing) {
+      this.bindSubscription(existing, member.name);
+      return;
+    }
+
+    this.subscribeInFlight = true;
     try {
-      // Re-check: publication can vanish between find and subscribe (peer rejoin / remesh race).
       publication = this.findDataStreamPublication(this.member);
       if (!publication) {
         netDebug(`[skyWay] ${member.name}: publication gone before subscribe; waiting`);
@@ -195,25 +212,33 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
         return;
       }
 
-      let { subscription, stream } = await this.skyWay.roomPerson.subscribe<RemoteDataStream>(publication.id);
+      const racedExisting = this.findLocalDataSubscription(publication.id);
+      if (racedExisting) {
+        this.bindSubscription(racedExisting, member.name);
+        return;
+      }
 
-      //
-      this.onConnectionStateChanged?.removeListener();
-      this.onConnectionStateChanged = subscription.onConnectionStateChanged.add(state => {
-        this.onStateChanged(state);
-      });
-
-      //
+      const { subscription } = await this.skyWay.roomPerson.subscribe<RemoteDataStream>(publication.id);
       netDebug(`initializeSubscription done ${member.name} ${publication.id}`);
-      this.subscription = subscription;
-
-      this.refresh();
+      this.bindSubscription(subscription, member.name);
     } catch (e) {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
-      // Peer left / publication raced away mid-subscribe — wait for republish when possible.
-      if (/already left|onStreamAdded|timeout|publicationNotExist/i.test(msg)) {
+      if (/alreadySubscribedPublication/i.test(msg)) {
+        const retryPublication = this.findDataStreamPublication(this.member);
+        const racedExisting = retryPublication && this.findLocalDataSubscription(retryPublication.id);
+        if (racedExisting && !this.isCanceled) {
+          netDebug(`[skyWay] ${member.name}: reusing existing subscription`);
+          this.bindSubscription(racedExisting, member.name);
+          return;
+        }
+      }
+      if (isRetriableSubscribeError(msg)) {
         netDebug(`[skyWay] ${member.name}: subscribe skipped (${e instanceof Error ? e.message : 'timeout'})`);
         if (!this.isCanceled && this.member) {
+          if (/localPersonNotJoinedChannel/i.test(msg)) {
+            this.subscription = null;
+            return;
+          }
           this.subscription = null;
           this.waitForDataStreamPublication();
           return;
@@ -227,7 +252,35 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
       this.subscription = null;
       this.state = 'disconnected';
       this.emit('close');
+    } finally {
+      this.subscribeInFlight = false;
     }
+  }
+
+  private findLocalDataSubscription(publicationId: string): Subscription<RemoteDataStream> | undefined {
+    return this.skyWay.roomPerson?.subscriptions?.find(
+      sub => sub.publication?.id === publicationId,
+    ) as Subscription<RemoteDataStream> | undefined;
+  }
+
+  private bindSubscription(subscription: Subscription<RemoteDataStream>, memberName: string) {
+    this.onConnectionStateChanged?.removeListener();
+    this.onConnectionStateChanged = subscription.onConnectionStateChanged.add(state => {
+      this.onStateChanged(state);
+    });
+    this.subscription = subscription;
+    netDebug(`initializeSubscription ready ${memberName}`);
+    this.refresh();
+  }
+
+  private releaseSubscription() {
+    if (this.isPublication || !this.subscription) return;
+    try {
+      this.subscription.cancel();
+    } catch {
+      // SDK may already have torn this down.
+    }
+    this.subscription = null;
   }
 
   private findDataStreamPublication(member: RemoteMember | undefined) {

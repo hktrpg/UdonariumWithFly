@@ -332,6 +332,7 @@ describe('RoomConnectHelper.healMeshGaps', () => {
     spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => openPeerIds.slice());
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
     spyOnProperty(Network, 'peer', 'get').and.returnValue({
       peerId: 'self', isRoom: true, userId: 'u1',
     } as IPeerContext);

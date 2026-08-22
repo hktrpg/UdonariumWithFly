@@ -117,6 +117,16 @@ export class SkyWayConnection implements Connection {
       return false;
     }
 
+    if (this.streams.find(peerId)) {
+      netDebug('connect() is Fail. <' + peerId + '> handshake already in flight.');
+      return false;
+    }
+
+    if (!this.isRoomChannelReady()) {
+      netDebug('connect() is Fail. roomPerson is not in channel.');
+      return false;
+    }
+
     if (!this.peer.verifyPeer(peerId)) {
       netDebug('connect() is Fail. <' + peerId + '> is invalid.');
       return false;
@@ -220,6 +230,11 @@ export class SkyWayConnection implements Connection {
     const members = this.skyWay?.room?.members;
     if (!members?.length) return [];
     return members.map(m => m.name).filter((name): name is string => !!name);
+  }
+
+  isRoomChannelReady(): boolean {
+    const roomPerson = this.skyWay?.roomPerson as { state?: string } | null | undefined;
+    return !!(this.skyWay?.room && roomPerson && roomPerson.state !== 'left');
   }
 
   private async openSkyWay(peer: IPeerContext) {

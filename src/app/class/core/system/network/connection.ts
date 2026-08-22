@@ -33,4 +33,6 @@ export interface Connection {
   listAllRooms(force?: boolean): Promise<IRoomInfo[]>
   /** PeerIds currently in the SkyWay room channel (empty if not in a room). */
   listRoomMemberPeerIds(): string[]
+  /** True when local member has joined the room channel and mesh connect is safe. */
+  isRoomChannelReady(): boolean
 }

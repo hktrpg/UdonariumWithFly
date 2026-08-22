@@ -73,6 +73,8 @@ export class RoomConnectHelper {
   private static meshKeepaliveTimer: ReturnType<typeof setInterval> | null = null;
   private static connectingSince = new Map<string, number>();
   private static meshHealInFlight = false;
+  private static meshHealDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly MESH_HEAL_DEBOUNCE_MS = 400;
   /** Throttle mid-session gap reconnect warns (avoid 5s spam while ICE is stuck). */
   private static lastGapWarnAt = 0;
   private static readonly GAP_WARN_COOLDOWN_MS = 60000;
@@ -200,7 +202,29 @@ export class RoomConnectHelper {
       clearInterval(RoomConnectHelper.meshKeepaliveTimer);
       RoomConnectHelper.meshKeepaliveTimer = null;
     }
+    if (RoomConnectHelper.meshHealDebounceTimer != null) {
+      clearTimeout(RoomConnectHelper.meshHealDebounceTimer);
+      RoomConnectHelper.meshHealDebounceTimer = null;
+    }
     RoomConnectHelper.connectingSince.clear();
+  }
+
+  /**
+   * Schedule mesh heal — debounced on peer disconnect to avoid reconnect storms
+   * while subscribe / disconnect races settle.
+   */
+  static scheduleMeshHeal(fromDisconnect = false) {
+    if (fromDisconnect) {
+      if (RoomConnectHelper.meshHealDebounceTimer != null) {
+        clearTimeout(RoomConnectHelper.meshHealDebounceTimer);
+      }
+      RoomConnectHelper.meshHealDebounceTimer = setTimeout(() => {
+        RoomConnectHelper.meshHealDebounceTimer = null;
+        void RoomConnectHelper.tickMeshKeepalive();
+      }, RoomConnectHelper.MESH_HEAL_DEBOUNCE_MS);
+      return;
+    }
+    void RoomConnectHelper.tickMeshKeepalive();
   }
 
   /** One heal pass — also used on DISCONNECT_PEER for faster recovery than the interval. */
@@ -252,6 +276,13 @@ export class RoomConnectHelper {
    * Falls back to lobby remesh only when alone and channel membership is empty.
    */
   static async healMeshGaps(): Promise<void> {
+    if (!Network.isRoomChannelReady()) {
+      if (RoomConnectHelper.shouldAttemptReopenNow()) {
+        RoomConnectHelper.reopenLastRoomOrLobby();
+      }
+      return;
+    }
+
     RoomConnectHelper.pruneStuckConnectingPeers();
 
     const selfId = Network.peerId;
@@ -277,7 +308,11 @@ export class RoomConnectHelper {
       if (session?.roomId && session.roomName) {
         const connectPassword = RoomConnectHelper.connectPasswordForRoom(
           session.roomName, session.meshPassword || '');
-        await RoomConnectHelper.remeshRoomPeers(session.roomId, session.roomName, connectPassword);
+        try {
+          await RoomConnectHelper.remeshRoomPeers(session.roomId, session.roomName, connectPassword);
+        } catch (e) {
+          netDebug('[mesh] remesh during heal failed', e);
+        }
       }
     }
   }
@@ -294,6 +329,15 @@ export class RoomConnectHelper {
       if (Network.connect(peer)) connected.push(peer.peerId);
     }
     return connected;
+  }
+
+  private static async listAllRoomsSafe(force: boolean): Promise<IRoomInfo[]> {
+    try {
+      return await Network.listAllRooms(force);
+    } catch (e) {
+      netDebug('[mesh] listAllRooms failed', e);
+      return [];
+    }
   }
 
   /**
@@ -354,7 +398,7 @@ export class RoomConnectHelper {
         continue;
       }
 
-      const rooms = await Network.listAllRooms(true);
+      const rooms = await RoomConnectHelper.listAllRoomsSafe(true);
       const room = rooms.find(r => r.id === roomId && r.name === roomName);
       if (!room) {
         await new Promise(r => setTimeout(r, RoomConnectHelper.REMESH_DELAY_MS));

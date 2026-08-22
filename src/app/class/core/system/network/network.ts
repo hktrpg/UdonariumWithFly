@@ -225,6 +225,10 @@ export class Network {
     return this.connection ? this.connection.listRoomMemberPeerIds() : [];
   }
 
+  isRoomChannelReady(): boolean {
+    return this.connection ? this.connection.isRoomChannelReady() : false;
+  }
+
   GuestMode(): boolean {
     return GuestSession.GuestMode();
   }

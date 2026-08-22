@@ -650,7 +650,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         // Do not clear isLoggedin here. Any peer DataConnection close used to reset it,
         // which re-logged "connected to room" on the next reconnect (spam in chat).
         // Reset happens on OPEN_NETWORK / NETWORK_ERROR instead.
-        if (Network.peer?.isRoom) void RoomConnectHelper.tickMeshKeepalive();
+        if (Network.peer?.isRoom) RoomConnectHelper.scheduleMeshHeal(true);
       })
       .on('MESSAGE_NORTIFICATION', event => {
         //console.log(event)
