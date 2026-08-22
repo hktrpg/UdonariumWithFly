@@ -84,12 +84,10 @@ export class FileSyncProgress {
     };
   }
 
-  /** True when a file transfer is in flight or queued for an open peer. */
+  /** True when file bytes are moving (not merely queued). */
   private static isActivelyLoading(): boolean {
     if (FileSyncProgress.transfers.size > 0) return true;
     if (FileReceiveScheduler.activeReceiveCount() > 0) return true;
-    if (FileReceiveScheduler.outboundPendingCount() > 0) return true;
-    if (FileReceiveScheduler.pendingReceiveCount() > 0) return true;
     return false;
   }
 
@@ -104,8 +102,7 @@ export class FileSyncProgress {
 
   private static isSyncing(kind: FileResourceKind, identifier: string): boolean {
     if (FileSyncProgress.transfers.has(identifier)) return true;
-    return FileReceiveScheduler.isTransferActive(kind, identifier)
-      || FileReceiveScheduler.isTransferPending(kind, identifier);
+    return FileReceiveScheduler.isTransferActive(kind, identifier);
   }
 
   private static measureActiveFileWork(): { totalBytes: number; remainingBytes: number } {

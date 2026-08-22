@@ -245,10 +245,21 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         }
       },
       ContextMenuSeparator,
-      {
-        name: this.i18n.t('note.delete'),
+      location === 'graveyard' ? {
+        name: this.i18n.t('char.deleteForever'),
         action: () => {
           gameObject.destroy();
+          SoundEffect.play(PresetSound.sweep);
+          this.refresh();
+        }
+      } : {
+        name: this.i18n.t('char.deleteToGraveyard'),
+        action: () => {
+          if (gameObject.location?.name === 'table') {
+            gameObject.leaveCurrentTable('graveyard');
+          } else {
+            gameObject.setLocation('graveyard');
+          }
           SoundEffect.play(PresetSound.sweep);
           this.refresh();
         }

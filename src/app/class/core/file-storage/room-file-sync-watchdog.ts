@@ -108,6 +108,12 @@ export class RoomFileSyncWatchdog {
       return;
     }
 
+    const incomplete = this.hasIncompleteAssets();
+    if (!incomplete) {
+      this.scheduleTick(TICK_IDLE_MS);
+      return;
+    }
+
     for (const peerId of Network.peerIds) {
       ImageStorage.instance.synchronize(peerId);
       AudioStorage.instance.synchronize(peerId);
@@ -120,11 +126,8 @@ export class RoomFileSyncWatchdog {
     PdfSharingSystem.instance.ensureRoomDownloads(this.remotePdfCatalogs);
     VideoSharingSystem.instance.ensureRoomDownloads(this.remoteVideoCatalogs);
 
-    const incomplete = this.hasIncompleteAssets();
-    if (incomplete) {
-      netDebug('room file sync watchdog: incomplete assets, will retry');
-    }
-    this.scheduleTick(incomplete ? TICK_WHILE_INCOMPLETE_MS : TICK_IDLE_MS);
+    netDebug('room file sync watchdog: incomplete assets, will retry');
+    this.scheduleTick(TICK_WHILE_INCOMPLETE_MS);
   }
 
   private hasIncompleteAssets(): boolean {

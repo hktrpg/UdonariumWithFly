@@ -1193,6 +1193,33 @@ export class TabletopKeyboardService {
         continue;
       }
 
+      if (object instanceof TextNote) {
+        if (object.location.name === 'graveyard') {
+          entries.push({
+            kind: 'destroy',
+            xml: object.toXml(),
+            parentId: (object as ObjectNode).parentId || TableSelecter.instance.viewTable?.identifier || '',
+            liveId: object.identifier,
+          });
+          object.destroy();
+        } else {
+          entries.push({
+            kind: 'graveyard',
+            id: object.identifier,
+            fromLocation: object.location.name,
+            fromTableIdentifier: object.tableIdentifier || TabletopObject.resolveViewTableIdentifier() || '',
+          });
+          if (object.location.name === 'table') {
+            object.leaveCurrentTable('graveyard');
+          } else {
+            object.setLocation('graveyard');
+          }
+        }
+        this.selectionService.remove(object);
+        deleted = true;
+        continue;
+      }
+
       entries.push({
         kind: 'destroy',
         xml: object.toXml(),

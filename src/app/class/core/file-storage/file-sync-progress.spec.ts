@@ -78,4 +78,12 @@ describe('FileSyncProgress', () => {
     const snap = FileSyncProgress.snapshot(10);
     expect(snap.active).toBeFalse();
   });
+
+  it('does not activate for queued transfers without active byte movement', () => {
+    (FileReceiveScheduler.pendingReceiveCount as jasmine.Spy).and.returnValue(3);
+    (FileReceiveScheduler.outboundPendingCount as jasmine.Spy).and.returnValue(1);
+    const snap = FileSyncProgress.snapshot(20);
+    expect(snap.active).toBeFalse();
+    expect(snap.percentLoaded).toBe(0);
+  });
 });

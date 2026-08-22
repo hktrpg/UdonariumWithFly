@@ -245,8 +245,10 @@ export class UndoService {
       undo: () => {
         for (const e of state) {
           if (e.kind === 'graveyard') {
-            const obj = ObjectStore.instance.get<GameCharacter>(e.id);
-            if (obj) obj.setLocation(e.fromLocation, e.fromTableIdentifier);
+            const obj = ObjectStore.instance.get(e.id);
+            if (obj instanceof TabletopObject) {
+              obj.setLocation(e.fromLocation, e.fromTableIdentifier);
+            }
           } else {
             const restored = restoreFromXml(e.xml, e.parentId);
             if (restored) e.liveId = restored.identifier;
@@ -256,9 +258,11 @@ export class UndoService {
       redo: () => {
         for (const e of state) {
           if (e.kind === 'graveyard') {
-            const obj = ObjectStore.instance.get<GameCharacter>(e.id);
-            if (obj) {
-              EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: obj.identifier });
+            const obj = ObjectStore.instance.get(e.id);
+            if (obj instanceof TabletopObject) {
+              if (obj instanceof GameCharacter) {
+                EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: obj.identifier });
+              }
               if (obj.location.name === 'table') obj.leaveCurrentTable('graveyard');
               else obj.setLocation('graveyard');
             }
