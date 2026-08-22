@@ -5,11 +5,12 @@ import { setZeroTimeout } from '../../util/zero-timeout';
 import { Connection, ConnectionCallback } from '../connection';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { IRoomInfo, RoomInfo } from '../room-info';
-import { netDebug } from '../net-debug';
+import { netDebug, meshWarn, meshWarnThrottled } from '../net-debug';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
-import { relayTargetPeerIds, shouldBootstrapSurvivalMesh, shouldLimitDirectMesh, buildSurvivalMeshContext, applyRelayFanOut } from '@udonarium/room-reconnect.util';
+import { relayTargetPeerIds, shouldBootstrapSurvivalMesh, shouldLimitDirectMesh, buildSurvivalMeshContext, applyRelayFanOut, isRekeyFullMeshBoost } from '@udonarium/room-reconnect.util';
+import { isHighPriorityOutbound } from '../outbound-priority';
 import { translate } from 'i18n';
 
 type PeerId = string;
@@ -19,6 +20,8 @@ interface DataContainer {
   users?: string[];
   ttl: number;
   isCompressed?: boolean;
+  /** Propagates to DataChannel priority queue (token moves beat file chunks). */
+  priority?: boolean;
 }
 
 export class SkyWayConnection implements Connection {
@@ -56,6 +59,8 @@ export class SkyWayConnection implements Connection {
   /** peerId → marked-unavailable-at (ms). Gossip skips until open, disconnect, or TTL. */
   private readonly maybeUnavailablePeerIds: Map<string, number> = new Map();
   private static readonly MAYBE_UNAVAILABLE_TTL_MS = 30000;
+  private static readonly DEFERRED_SEND_MAX = 256;
+  private readonly deferredSends: { data: any; sendTo?: string; priority?: boolean }[] = [];
 
   configure(config: any) {
     this.skyWay.url = resolveBackendUrl(config?.backend?.url ?? '');
@@ -78,6 +83,7 @@ export class SkyWayConnection implements Connection {
   }
 
   close(): Promise<void> {
+    this.deferredSends.length = 0;
     this.disconnectAll();
     this.maybeUnavailablePeerIds.clear();
     this.listAllPeersInFlight = null;
@@ -97,6 +103,10 @@ export class SkyWayConnection implements Connection {
 
     if (!this.shouldConnect(peer.peerId)) return false;
 
+    meshWarn('connect attempt', peer.peerId.slice(0, 16), {
+      open: this.peerIds.length,
+      handshaking: this.peers.length,
+    });
     netDebug(`connect() ${peer.peerId}`);
     this.connectStream(SkyWayDataStream.createSubscription(this.skyWay, peer));
     return true;
@@ -155,11 +165,88 @@ export class SkyWayConnection implements Connection {
     }
   }
 
-  send(data: any, sendTo?: string) {
-    if (this.peers.length < 1) return;
+  send(data: any, sendTo?: string): boolean {
+    if (sendTo) {
+      const stream = this.streams.find(sendTo);
+      if (!stream) {
+        const inRoom = this.listRoomMemberPeerIds().includes(sendTo);
+        if (inRoom) {
+          this.deferSend(data, sendTo);
+          netDebug('send deferred (unicast peer not in mesh yet)', sendTo.slice(0, 16), {
+            pending: this.deferredSends.length,
+          });
+          return true;
+        }
+        meshWarnThrottled(`drop-unicast-${sendTo.slice(0, 12)}`,
+          'send dropped (unicast peer not in mesh)', sendTo.slice(0, 16));
+        return false;
+      }
+      if (!stream.open) {
+        this.deferSend(data, sendTo);
+        netDebug('send deferred (unicast peer not open)', sendTo.slice(0, 16), {
+          pending: this.deferredSends.length,
+        });
+        return true;
+      }
+      if (!this.streamSendReady(stream)) {
+        this.deferSend(data, sendTo);
+        meshWarnThrottled(`defer-stale-${sendTo.slice(0, 12)}`, 'send deferred (stale DataChannel)', sendTo.slice(0, 16));
+        return true;
+      }
+    } else if (this.peerIds.length < 1) {
+      if (!this.hasOtherRoomMembers()) {
+        return true;
+      }
+      this.deferSend(data, sendTo);
+      meshWarnThrottled('defer-no-open', 'outbound queued until DataChannel opens', {
+        open: this.peerIds.length,
+        handshaking: this.peers.filter(p => !p.isOpen).length,
+        pending: this.deferredSends.length,
+      });
+      return true;
+    }
+
+    this.enqueueSend(data, sendTo);
+    return true;
+  }
+
+  flushDeferredSends(): void {
+    if (this.deferredSends.length < 1) return;
+    const pending = this.deferredSends.splice(0);
+    pending.sort((a, b) => {
+      const ap = isHighPriorityOutbound(a.data) ? 0 : 1;
+      const bp = isHighPriorityOutbound(b.data) ? 0 : 1;
+      return ap - bp;
+    });
+    netDebug('flush deferred sends', { count: pending.length, open: this.peerIds.length });
+    for (const item of pending) {
+      const accepted = this.send(item.data, item.sendTo);
+      if (!accepted) continue;
+    }
+    if (this.deferredSends.length > 0 && this.peerIds.length > 0) {
+      queueMicrotask(() => this.flushDeferredSends());
+    }
+  }
+
+  private deferSend(data: any, sendTo?: string) {
+    const item = { data, sendTo, priority: isHighPriorityOutbound(data) };
+    if (this.deferredSends.length >= SkyWayConnection.DEFERRED_SEND_MAX) {
+      const dropIdx = this.deferredSends.findIndex(e => !isHighPriorityOutbound(e.data));
+      if (dropIdx >= 0) {
+        this.deferredSends.splice(dropIdx, 1);
+      } else {
+        this.deferredSends.shift();
+      }
+    }
+    this.deferredSends.push(item);
+  }
+
+  private enqueueSend(data: any, sendTo?: string) {
+    const memberCount = this.listRoomMemberPeerIds().length;
     let container: DataContainer = {
       data: MessagePack.encode(data),
-      ttl: 1
+      ttl: memberCount > 0 && memberCount <= 4 ? 2 : 1,
+      priority: isHighPriorityOutbound(data),
     }
 
     let byteLength = container.data.byteLength;
@@ -187,13 +274,21 @@ export class SkyWayConnection implements Connection {
   private sendUnicast(container: DataContainer, sendTo: string) {
     container.ttl = 0;
     let stream = this.streams.find(sendTo);
-    if (stream && stream.open) stream.send(container);
+    if (stream && this.streamSendReady(stream)) stream.send(container);
   }
 
   private sendBroadcast(container: DataContainer) {
     for (let stream of this.streams) {
-      if (stream.open) stream.send(container);
+      if (this.streamSendReady(stream)) stream.send(container);
     }
+  }
+
+  /** Open but silent for 45s+ — treat as not writable until ICE recycle completes. */
+  private streamSendReady(stream: SkyWayDataStream): boolean {
+    if (!stream.open) return false;
+    const health = stream.peer.session?.health ?? 1;
+    const ping = stream.peer.session?.ping ?? 0;
+    return health >= 0.12 || ping <= 45000;
   }
 
   async listAllPeers(force = false): Promise<string[]> {
@@ -230,7 +325,21 @@ export class SkyWayConnection implements Connection {
   listRoomMemberPeerIds(): string[] {
     const members = this.skyWay?.room?.members;
     if (!members?.length) return [];
-    return members.map(m => m.name).filter((name): name is string => !!name);
+    return members
+      .filter(m => {
+        if (!m.name) return false;
+        const state = (m as { state?: string }).state;
+        return state !== 'left';
+      })
+      .map(m => m.name as string);
+  }
+
+  /** True when no other SkyWay room members besides this client. */
+  private hasOtherRoomMembers(): boolean {
+    for (const id of this.listRoomMemberPeerIds()) {
+      if (id && id !== this.peerId) return true;
+    }
+    return false;
   }
 
   isRoomChannelReady(): boolean {
@@ -280,6 +389,11 @@ export class SkyWayConnection implements Connection {
       }
     }
 
+    this.skyWay.onMemberLeft = (peerId) => {
+      if (!peerId || peerId === this.peerId) return;
+      this.disconnect(PeerContext.parse(peerId));
+    }
+
     await this.skyWay.open(peer);
     return;
   }
@@ -297,9 +411,14 @@ export class SkyWayConnection implements Connection {
     stream.on('open', () => {
       this.trustedPeerIds.add(stream.peer.peerId);
       this.maybeUnavailablePeerIds.delete(stream.peer.peerId);
+      meshWarn('DataChannel open', stream.peer.peerId.slice(0, 16), {
+        openPeers: this.peerIds.length + 1,
+        survivalLimit: this.shouldLimitDirectMeshLocal(),
+      });
       this.notifyUserList();
       this.refreshRelayTargets(stream.peer.peerId);
       if (this.callback.onConnect) this.callback.onConnect(stream.peer);
+      this.flushDeferredSends();
     });
     stream.on('close', () => {
       this.disconnectStream(stream);
@@ -315,19 +434,31 @@ export class SkyWayConnection implements Connection {
   }
 
   private disconnectStream(stream: SkyWayDataStream) {
+    const droppedPeerId = stream.peer.peerId;
+    const closed = this.streams.remove(stream);
+    if (!closed) return;
     stream.disconnect();
-    let closed = this.streams.remove(stream);
 
     // Allow gossip / remesh to retry this peer after a drop or failed handshake.
-    this.maybeUnavailablePeerIds.delete(stream.peer.peerId);
-    this.relayingPeerIds.delete(stream.peer.peerId);
+    this.maybeUnavailablePeerIds.delete(droppedPeerId);
+    this.relayingPeerIds.delete(droppedPeerId);
+    this.deferredSends.splice(0, this.deferredSends.length,
+      ...this.deferredSends.filter(item => item.sendTo !== droppedPeerId));
     this.relayingPeerIds.forEach(peerIds => {
-      let index = peerIds.indexOf(stream.peer.peerId);
+      let index = peerIds.indexOf(droppedPeerId);
       if (0 <= index) peerIds.splice(index, 1);
     });
+    if (!this.hasOtherRoomMembers()) {
+      this.deferredSends.length = 0;
+    }
     this.notifyUserList();
     this.refreshAllRelayTargets();
-    if (closed && this.callback.onDisconnect) this.callback.onDisconnect(closed.peer);
+    if (closed) {
+      meshWarn('DataChannel closed', stream.peer.peerId.slice(0, 16), {
+        openPeers: this.peerIds.length,
+      });
+      if (this.callback.onDisconnect) this.callback.onDisconnect(closed.peer);
+    }
   }
 
   private onData(stream: SkyWayDataStream, container: DataContainer) {
@@ -380,6 +511,7 @@ export class SkyWayConnection implements Connection {
   }
 
   private shouldLimitDirectMeshLocal(): boolean {
+    if (isRekeyFullMeshBoost()) return false;
     const ctx = buildSurvivalMeshContext(
       this.peerIds,
       this.listRoomMemberPeerIds(),
@@ -410,6 +542,12 @@ export class SkyWayConnection implements Connection {
           netDebug('auto connect to unknown Peer <' + peer.peerId + '>');
         }
       }
+    } else if (unknownUserIds.length) {
+      meshWarn('gossip connect skipped (survival mesh)', {
+        unknown: unknownUserIds.length,
+        open: this.peerIds.length,
+        members: this.listRoomMemberPeerIds().length,
+      });
     }
     if (needsNotifyUserList) this.notifyUserList();
   }

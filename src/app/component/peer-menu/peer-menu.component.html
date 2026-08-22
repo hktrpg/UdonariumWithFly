@@ -185,12 +185,23 @@
     <ng-container *ngIf="networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">
       <p class="hint">{{ 'peer.helpNoPrivateInRoom' | i18n }}</p>
     </ng-container>
+    <p class="hint" *ngIf="networkService.peer.isRoom && networkService.peers.length < 1 && isYourIdReconnecting">
+      {{ 'room.rekeyPeerListHint' | i18n }}
+    </p>
   </section>
 
   <section class="card card-dense" *ngIf="networkService.peers.length">
     <header class="card-head">
       <h3>{{ 'peer.connectionStatusTitle' | i18n }}</h3>
+      <button type="button" class="btn btn-sm" *ngIf="isAbleClipboardCopy()"
+        (click)="copyMeshDiag()" [disabled]="isMeshDiagCopied"
+        [title]="'peer.copyMeshDiag.title' | i18n">
+        <i class="material-icons">bug_report</i>{{ 'peer.copyMeshDiag' | i18n }}
+      </button>
     </header>
+    <p class="hint" *ngIf="isMeshDiagCopied" [@fadeInOut]="isMeshDiagCopied" [style.color]="myPeerColor">
+      {{ 'peer.copyMeshDiag.copied' | i18n }}
+    </p>
     <p class="hint health-legend">
       <span class="health">（{{ 'peer.healthGood' | i18n }} </span>
       <i class="material-icons health health-blue">sentiment_very_satisfied</i>

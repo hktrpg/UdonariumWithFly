@@ -40,6 +40,7 @@ export class SkyWayFacade {
   onFatalError: (peer: IPeerContext, errorType: string, errorMessage: string, errorObject: any) => void;
   onSubscribed: (peer: IPeerContext, subscription: Subscription) => void;
   onRoomRestore: (peer: IPeerContext) => void;
+  onMemberLeft: (peerId: string) => void;
 
   async open(peer: IPeerContext) {
     if (this.isOpen) await this.close();
@@ -212,22 +213,35 @@ export class SkyWayFacade {
   }
 
   private async joinLobbyPerson() {
-    await this.leaveLobbyPerson();
-    if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.leaveLobbyPerson();
+      if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
 
-    let lobbyPerson = await this.lobby.join({
-      name: this.peer.peerId,
-      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
-    });
+      try {
+        const lobbyPerson = await this.lobby.join({
+          name: this.peer.peerId,
+          keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
+        });
 
-    lobbyPerson.onFatalError.add(err => {
-      console.warn('lobbyPerson onFatalError; retrying lobby in background', err);
-      if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
-        this.scheduleLobbyJoinRetry();
+        lobbyPerson.onFatalError.add(err => {
+          console.warn('lobbyPerson onFatalError; retrying lobby in background', err);
+          if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+            this.scheduleLobbyJoinRetry();
+          }
+        });
+
+        this.lobbyPerson = lobbyPerson;
+        return;
+      } catch (err) {
+        if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
+        const delayMs = 400 * (attempt + 1);
+        console.warn(`skyWay joinLobbyPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        await this.leaveLobbyChannel();
+        await this.joinLobbyChannel();
       }
-    });
-
-    this.lobbyPerson = lobbyPerson;
+    }
   }
 
   private async joinRoom() {
@@ -249,6 +263,13 @@ export class SkyWayFacade {
     room.onClosed.add(async () => {
       await this.joinRoom();
       if (this.onRoomRestore) this.onRoomRestore(this.peer);
+    });
+
+    room.onMemberLeft.add(event => {
+      const peerId = event.member?.name;
+      if (peerId && peerId !== this.peer.peerId && this.onMemberLeft) {
+        this.onMemberLeft(peerId);
+      }
     });
 
     this.room = room;

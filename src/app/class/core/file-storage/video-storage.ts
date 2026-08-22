@@ -1,8 +1,13 @@
 import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
+import { catalogByteSize } from './file-transfer-scheduler';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 
-export type VideoCatalogItem = { readonly identifier: string, readonly state: number };
+export type VideoCatalogItem = {
+  readonly identifier: string;
+  readonly state: number;
+  readonly byteSize?: number;
+};
 
 export class VideoStorage {
   private static _instance: VideoStorage;
@@ -80,15 +85,20 @@ export class VideoStorage {
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    const delay = Math.max(ms, 1500);
+    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
+    this.lazyTimer.reset(delay);
   }
 
   getCatalog(): VideoCatalogItem[] {
     const catalog: VideoCatalogItem[] = [];
     for (const video of this.videos) {
       if (VideoState.COMPLETE <= video.state) {
-        catalog.push({ identifier: video.identifier, state: video.state });
+        catalog.push({
+          identifier: video.identifier,
+          state: video.state,
+          byteSize: catalogByteSize(video.blob),
+        });
       }
     }
     return catalog;

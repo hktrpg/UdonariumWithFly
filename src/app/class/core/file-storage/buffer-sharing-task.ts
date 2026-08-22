@@ -1,5 +1,6 @@
 import { EventSystem } from '../system';
-import { netDebug } from '../system/network/net-debug';
+import { FileSyncProgress } from './file-sync-progress';
+import { meshWarnThrottled, netDebug } from '../system/network/net-debug';
 import { MessagePack } from '../system/util/message-pack';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { clearZeroTimeout, setZeroTimeout } from '../system/util/zero-timeout';
@@ -27,6 +28,9 @@ export class BufferSharingTask<T> {
 
   private startTime = 0;
   private isCanceled = false;
+  private completedSuccessfully = false;
+
+  get didCompleteSuccessfully(): boolean { return this.completedSuccessfully; }
 
   private onstart: () => void;
   onprogress: (task: BufferSharingTask<T>, loaded: number, total: number) => void;
@@ -65,12 +69,14 @@ export class BufferSharingTask<T> {
   }
 
   private progress(loaded: number, total: number) {
+    FileSyncProgress.noteChunkProgress(this.identifier, loaded, total);
     if (this.onprogress) this.onprogress(this, loaded, total);
   }
 
   private finish() {
     if (this.isCanceled) return;
     this.isCanceled = true;
+    this.completedSuccessfully = true;
     if (this.onfinish) this.onfinish(this, this.data);
     this.dispose();
   }
@@ -86,10 +92,18 @@ export class BufferSharingTask<T> {
   cancel() {
     if (this.isCanceled) return;
     if (this.sendTo != null) EventSystem.call('CANCEL_TASK_' + this.identifier, null, this.sendTo);
-    this._cancel();
+    this._cancelLocal();
   }
 
-  private _cancel() {
+  /** Remote peer asked to stop — do not echo CANCEL_TASK or treat as a finished send. */
+  private _cancelFromPeer() {
+    if (this.isCanceled) return;
+    this.isCanceled = true;
+    if (this.oncancel) this.oncancel(this);
+    this.dispose();
+  }
+
+  private _cancelLocal() {
     if (this.isCanceled) return;
     this.isCanceled = true;
     if (this.oncancel) this.oncancel(this);
@@ -97,7 +111,12 @@ export class BufferSharingTask<T> {
     this.dispose();
   }
 
+  private _cancel() {
+    this._cancelLocal();
+  }
+
   private dispose() {
+    FileSyncProgress.clearTransfer(this.identifier);
     EventSystem.unregister(this);
     if (this.sendChankTimer) clearZeroTimeout(this.sendChankTimer);
     if (this.timeoutTimer) this.timeoutTimer.clear();
@@ -128,8 +147,13 @@ export class BufferSharingTask<T> {
         this._cancel();
       })
       .on('CANCEL_TASK_' + this.identifier, event => {
-        console.warn('send canceled', this, event.sendFrom);
-        this._cancel();
+        meshWarnThrottled(
+          `buffer-send-cancel-${this.identifier}-${event.sendFrom}`,
+          'send canceled BufferSharingTask',
+          this.identifier,
+          event.sendFrom?.slice(0, 16),
+        );
+        this._cancelFromPeer();
       });
     this.sentChankIndex = this.completedChankIndex = 0;
     this.startTime = performance.now();
@@ -141,6 +165,7 @@ export class BufferSharingTask<T> {
     let data = { index: index, length: this.chanks.length, chank: chank };
     EventSystem.call('FILE_SEND_CHANK_' + this.identifier, data, this.sendTo);
     this.sentChankIndex = index;
+    this.progress(index, this.chanks.length);
     this.sendChankTimer = null;
     if (this.chanks.length <= index + 1) {
       netDebug('buffer send complete', this.identifier);
@@ -181,7 +206,12 @@ export class BufferSharingTask<T> {
         this._cancel();
       })
       .on('CANCEL_TASK_' + this.identifier, event => {
-        console.warn('receive canceled', this, event.sendFrom);
+        meshWarnThrottled(
+          `buffer-receive-cancel-${this.identifier}-${event.sendFrom}`,
+          'receive canceled BufferSharingTask',
+          this.identifier,
+          event.sendFrom?.slice(0, 16),
+        );
         this._cancel();
       });
   }

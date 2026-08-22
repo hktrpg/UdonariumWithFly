@@ -148,21 +148,36 @@ function isHighLatencyMesh(bestOpenPing?: number): boolean {
   return bestOpenPing != null && bestOpenPing > 2000;
 }
 
+/** TRPG tables — keep full mesh; relay-only breaks bidirectional sync on 3–4 clients. */
+const SMALL_ROOM_FULL_MESH = 4;
+
+let rekeyFullMeshUntil = 0;
+
+/** After room auth re-key, keep full mesh for a short window (all clients). */
+export function markRekeyFullMeshBoost(durationMs = 120000): void {
+  rekeyFullMeshUntil = Date.now() + durationMs;
+}
+
+export function isRekeyFullMeshBoost(): boolean {
+  return Date.now() < rekeyFullMeshUntil;
+}
+
 /**
  * True when this client should keep at most one direct mesh link and rely on hub relay.
  * Uses measured RTT on an open peer — avoids false positives from effectiveType alone.
  */
 export function shouldLimitDirectMesh(input: SurvivalMeshInput): boolean {
   const { openCount, roomMemberCount, bestOpenPing } = input;
-  if (roomMemberCount <= 1 || openCount === 0) return false;
+  if (roomMemberCount <= SMALL_ROOM_FULL_MESH || openCount === 0) return false;
   if (openCount >= roomMemberCount - 1) return false;
+  if (openCount > 1) return false;
   return isHighLatencyMesh(bestOpenPing);
 }
 
 /** When no open peer yet, connect only one hub on slow links instead of full mesh. */
 export function shouldBootstrapSurvivalMesh(input: SurvivalMeshInput): boolean {
   const { openCount, roomMemberCount, bestOpenPing } = input;
-  if (roomMemberCount <= 1 || openCount !== 0) return false;
+  if (roomMemberCount <= SMALL_ROOM_FULL_MESH || openCount !== 0) return false;
   return isSlowEffectiveType() || isHighLatencyMesh(bestOpenPing);
 }
 
@@ -174,6 +189,8 @@ export function isRecoverableNetworkError(errorType: string): boolean {
 
 /** True when we should try reopenLastRoom (including token / transient backend errors). */
 export function shouldAttemptRoomReopen(errorType: string): boolean {
+  // joinRoomPerson retries this — reopen would churn Network.open and worsen the race.
+  if (/already-?same-?name-?member-?exist/i.test(errorType)) return false;
   if ((ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType)) return true;
   // SDK kebab-cases internalError → internal-error, Event asPromise timeout, etc.
   if (/^internal(-|$)/.test(errorType)) return true;

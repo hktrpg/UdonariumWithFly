@@ -28,7 +28,10 @@ export interface Connection {
   connect(peer: IPeerContext): boolean
   disconnect(peer: IPeerContext): boolean
   disconnectAll()
-  send(data: any, sendTo?: string)
+  /** @returns false when the payload is discarded (unknown unicast target). */
+  send(data: any, sendTo?: string): boolean
+  /** Retry deferred payloads after a DataChannel opens. */
+  flushDeferredSends(): void
   listAllPeers(force?: boolean): Promise<string[]>
   listAllRooms(force?: boolean): Promise<IRoomInfo[]>
   /** PeerIds currently in the SkyWay room channel (empty if not in a room). */

@@ -113,16 +113,18 @@ export class ObjectStore {
       for (let key in context) {
         queue[key] = context[key];
       }
-      return;
+    } else {
+      this.queueMap.set(context.identifier, context);
     }
-    EventSystem.call('UPDATE_GAME_OBJECT', context);
-    this.queueMap.set(context.identifier, context);
     if (this.updateInterval === null) {
       this.updateInterval = setZeroTimeout(this.updateCallback);
     }
   }
 
   private updateQueue() {
+    for (const context of this.queueMap.values()) {
+      EventSystem.call('UPDATE_GAME_OBJECT', context);
+    }
     this.queueMap.clear();
     this.updateInterval = null;
   }

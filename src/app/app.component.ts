@@ -11,6 +11,7 @@ import { PdfSharingSystem } from '@udonarium/core/file-storage/pdf-sharing-syste
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoSharingSystem } from '@udonarium/core/file-storage/video-sharing-system';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
+import { RoomFileSyncWatchdog } from '@udonarium/core/file-storage/room-file-sync-watchdog';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory';
@@ -281,6 +282,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       PdfStorage.instance;
       VideoSharingSystem.instance.initialize();
       VideoStorage.instance;
+      RoomFileSyncWatchdog.instance.initialize();
       ObjectFactory.instance;
       ObjectSerializer.instance;
       ObjectStore.instance;
@@ -571,15 +573,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       })
       .on('ROOM_REKEY', event => {
-        // GM changed room auth; reopen into the new encoded roomName.
+        // GM applies via room-setting save — ignore network copy (avoids double Network.open).
         if (event.isSendFromSelf) return;
+        if (PeerCursor.myCursor?.isGMMode) return;
         const roomId = event.data?.roomId;
         const roomName = event.data?.roomName;
         if (!roomId || !roomName) return;
         if (!Network.peer?.isRoom || Network.peer.roomId !== roomId) return;
         if (Network.peer.roomName === roomName) return;
+        const meshPassword = String(event.data?.meshPassword || '');
         this.ngZone.run(() => {
-          RoomConnectHelper.rekeyRoom(roomId, roomName).catch(e => console.warn('ROOM_REKEY failed', e));
+          RoomConnectHelper.rekeyRoom(roomId, roomName, meshPassword)
+            .catch(e => console.warn('ROOM_REKEY failed', e));
         });
       })
       .on('KICK_PEER', event => {

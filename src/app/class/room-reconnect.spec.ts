@@ -39,6 +39,8 @@ describe('room-reconnect.util', () => {
     expect(shouldAttemptRoomReopen('authentication')).toBeTrue();
     expect(shouldAttemptRoomReopen('server-error')).toBeTrue();
     expect(shouldAttemptRoomReopen('peer-unavailable')).toBeFalse();
+    expect(shouldAttemptRoomReopen('already-same-name-member-exist')).toBeFalse();
+    expect(shouldAttemptRoomReopen('alreadySameNameMemberExist')).toBeFalse();
   });
 
   it('RECOVERABLE_NETWORK_ERROR_TYPES includes internal', () => {
@@ -169,25 +171,29 @@ describe('room-reconnect.util', () => {
   });
 
   it('shouldLimitDirectMesh limits partial mesh on high ping only', () => {
-    expect(shouldLimitDirectMesh({ openCount: 1, roomMemberCount: 4, bestOpenPing: 3000 })).toBeTrue();
+    expect(shouldLimitDirectMesh({ openCount: 1, roomMemberCount: 4, bestOpenPing: 3000 })).toBeFalse();
+    expect(shouldLimitDirectMesh({ openCount: 1, roomMemberCount: 5, bestOpenPing: 3000 })).toBeTrue();
     expect(shouldLimitDirectMesh({ openCount: 3, roomMemberCount: 4, bestOpenPing: 3000 })).toBeFalse();
+    expect(shouldLimitDirectMesh({ openCount: 3, roomMemberCount: 5, bestOpenPing: 3000 })).toBeFalse();
     expect(shouldLimitDirectMesh({ openCount: 0, roomMemberCount: 4, bestOpenPing: 3000 })).toBeFalse();
     expect(shouldLimitDirectMesh({ openCount: 1, roomMemberCount: 4, bestOpenPing: 100 })).toBeFalse();
   });
 
   it('shouldBootstrapSurvivalMesh caps first connect on slow link', () => {
+    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 4 })).toBeFalse();
+    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5 })).toBeFalse();
     const prev = Object.getOwnPropertyDescriptor(navigator, 'connection');
     Object.defineProperty(navigator, 'connection', {
       configurable: true,
       get: () => ({ effectiveType: '3g' }),
     });
     try {
-      expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 4 })).toBeTrue();
-      expect(shouldBootstrapSurvivalMesh({ openCount: 1, roomMemberCount: 4 })).toBeFalse();
+      expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5 })).toBeTrue();
+      expect(shouldBootstrapSurvivalMesh({ openCount: 1, roomMemberCount: 5 })).toBeFalse();
     } finally {
       if (prev) Object.defineProperty(navigator, 'connection', prev);
     }
-    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 4, bestOpenPing: 2500 })).toBeTrue();
+    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5, bestOpenPing: 2500 })).toBeTrue();
   });
 });
 

@@ -1,8 +1,13 @@
 import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
+import { catalogByteSize } from './file-transfer-scheduler';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 
-export type PdfCatalogItem = { readonly identifier: string, readonly state: number };
+export type PdfCatalogItem = {
+  readonly identifier: string;
+  readonly state: number;
+  readonly byteSize?: number;
+};
 
 export class PdfStorage {
   private static _instance: PdfStorage;
@@ -80,15 +85,20 @@ export class PdfStorage {
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    const delay = Math.max(ms, 1500);
+    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
+    this.lazyTimer.reset(delay);
   }
 
   getCatalog(): PdfCatalogItem[] {
     const catalog: PdfCatalogItem[] = [];
     for (const pdf of this.pdfs) {
       if (PdfState.COMPLETE <= pdf.state) {
-        catalog.push({ identifier: pdf.identifier, state: pdf.state });
+        catalog.push({
+          identifier: pdf.identifier,
+          state: pdf.state,
+          byteSize: catalogByteSize(pdf.blob),
+        });
       }
     }
     return catalog;

@@ -194,6 +194,8 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     if (!suppressBusy) this.connectionBusy.show('peer.creatingRoom');
     const afterCreate = this.modalService.option?.afterCreate;
     this.createRoomKey = { createRoom: true };
+    RoomConnectHelper.clearReopenRetry();
+    RoomConnectHelper.createRoomInFlight = true;
     this.createRoomTimer = setTimeout(() => this.abortCreateRoom(), 30000);
     EventSystem.register(this.createRoomKey)
       .on('OPEN_NETWORK', () => {
@@ -224,6 +226,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
       EventSystem.unregister(this.createRoomKey);
       this.createRoomKey = null;
     }
+    RoomConnectHelper.createRoomInFlight = false;
   }
 
   /** Drop pending create wait and clear busy overlay (timeout / error / destroy). */
@@ -262,9 +265,16 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     }
 
     try {
-      if (Network.peers.length > 0) {
-        EventSystem.call('ROOM_REKEY', { roomId, roomName: encodedName });
-        await new Promise(r => setTimeout(r, 150));
+      this.connectionBusy.show('room.savingPasswords');
+      if (Network.peerIds.length > 0) {
+        for (const peerId of Network.peerIds) {
+          EventSystem.call(
+            'ROOM_REKEY',
+            { roomId, roomName: encodedName, meshPassword },
+            peerId,
+          );
+        }
+        await new Promise(r => setTimeout(r, 500));
       }
       await RoomConnectHelper.rekeyRoom(roomId, encodedName, meshPassword);
       RoomAuth.applyIdentity('gm', roomId);
@@ -273,6 +283,8 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     } catch (e) {
       console.warn('saveRoomPasswords failed', e);
       this.help = this.i18n.t('room.editError');
+    } finally {
+      this.connectionBusy.hide();
       this.isSaving = false;
     }
   }

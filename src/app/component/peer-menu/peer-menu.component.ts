@@ -2,6 +2,7 @@ import { AfterViewInit, ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit 
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { copyMeshDiagToClipboard } from '@udonarium/core/system/network/net-debug';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
@@ -56,7 +57,9 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   networkService = Network
 
   get isYourIdReconnecting(): boolean {
-    return this.networkService.isOpening || RoomConnectHelper.isNetworkReconnecting();
+    return this.networkService.isOpening
+      || RoomConnectHelper.isNetworkReconnecting()
+      || RoomConnectHelper.isRekeyInFlight;
   }
   gameRoomService = ObjectStore.instance;
 
@@ -65,6 +68,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   isPasswordCopied = false;
   isPasswordOpen = false;
   isRoomInfoCopied = false;
+  isMeshDiagCopied = false;
   inviteCopiedRole: RoomRole = null;
   isDownloadingZip = false;
   downloadZipPercent = 0;
@@ -75,6 +79,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private _timeOutId2: NodeJS.Timeout;
   private _timeOutId3: NodeJS.Timeout;
   private _timeOutId4: NodeJS.Timeout;
+  private _timeOutIdMeshDiag: NodeJS.Timeout;
   private _timeOutIdInvite: NodeJS.Timeout;
 
   private interval: NodeJS.Timeout = null;
@@ -493,6 +498,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isCopied = false;
       }, 1000);
     }
+  }
+
+  async copyMeshDiag() {
+    if (!this.isAbleClipboardCopy()) return;
+    const ok = await copyMeshDiagToClipboard();
+    if (!ok) return;
+    this.isMeshDiagCopied = true;
+    clearTimeout(this._timeOutIdMeshDiag);
+    this._timeOutIdMeshDiag = setTimeout(() => {
+      this.isMeshDiagCopied = false;
+    }, 2000);
   }
 
   copyRoomName() {

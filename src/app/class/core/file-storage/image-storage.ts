@@ -1,8 +1,14 @@
 import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
+import { catalogByteSize } from './file-transfer-scheduler';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 
-export type CatalogItem = { readonly identifier: string, readonly state: number };
+export type CatalogItem = {
+  readonly identifier: string;
+  readonly state: number;
+  readonly byteSize?: number;
+  readonly thumbBytes?: number;
+};
 
 export class ImageStorage {
   private static _instance: ImageStorage
@@ -102,15 +108,21 @@ export class ImageStorage {
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    const delay = Math.max(ms, 1500);
+    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
+    this.lazyTimer.reset(delay);
   }
 
   getCatalog(): CatalogItem[] {
     let catalog: CatalogItem[] = [];
     for (let image of this.images) {
       if (ImageState.COMPLETE <= image.state) {
-        catalog.push({ identifier: image.identifier, state: image.state });
+        catalog.push({
+          identifier: image.identifier,
+          state: image.state,
+          thumbBytes: catalogByteSize(image.thumbnail?.blob),
+          byteSize: catalogByteSize(image.blob, catalogByteSize(image.thumbnail?.blob)),
+        });
       }
     }
     return catalog;

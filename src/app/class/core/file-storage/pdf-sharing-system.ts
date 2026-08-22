@@ -1,5 +1,7 @@
 import { EventSystem, Network } from '../system';
+import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
+import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { FileReaderUtil } from './file-reader-util';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 import { PdfCatalogItem, PdfStorage } from './pdf-storage';
@@ -23,7 +25,8 @@ export class PdfSharingSystem {
     EventSystem.register(this)
       .on('CONNECT_PEER', -1, event => {
         if (!event.isSendFromSelf) return;
-        PdfStorage.instance.synchronize();
+        PdfStorage.instance.synchronize(event.data.peerId);
+        PdfStorage.instance.lazySynchronize(1000, event.data.peerId);
       })
       .on('SYNCHRONIZE_PDF_LIST', event => {
         if (event.isSendFromSelf) return;
@@ -35,16 +38,17 @@ export class PdfSharingSystem {
             pdf = PdfFile.createEmpty(item.identifier);
             PdfStorage.instance.add(pdf);
           }
-          if (pdf.state < PdfState.COMPLETE && !this.receiveTaskMap.has(item.identifier)) {
+          if (pdf.state < PdfState.COMPLETE
+          && !this.receiveTaskMap.has(item.identifier)
+          && FileReceiveScheduler.canEnqueueReceive('pdf', item.identifier)) {
             request.push({ identifier: item.identifier, state: pdf.state });
           }
         }
         if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < PdfStorage.instance.getCatalog().length) {
           PdfStorage.instance.synchronize(event.sendFrom);
         }
-        if (request.length < 1 || this.isLimitReceiveTask()) return;
-        const index = Math.floor(Math.random() * request.length);
-        this.request([request[index]], event.sendFrom);
+        if (request.length < 1) return;
+        this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
       })
       .on('REQUEST_PDF_RESOURE', event => {
         if (event.isSendFromSelf) return;
@@ -55,12 +59,13 @@ export class PdfSharingSystem {
           if (pdf && item.state < pdf.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
         if (!this.isLimitSendTask() && randomRequest.length && !this.existsSendTask(event.data.receiver)) {
-          const index = Math.floor(Math.random() * randomRequest.length);
-          const item = randomRequest[index];
+          const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', randomRequest, item => item.state);
+          const item = sorted[0];
           const pdf = PdfStorage.instance.get(item.identifier);
           this.startSendTask(pdf, event.data.receiver);
         } else {
-          const candidatePeers: string[] = event.data.candidatePeers;
+          const candidatePeers: string[] = event.data.candidatePeers
+            .filter((id: string) => Network.peerIds.includes(id));
           const index = candidatePeers.indexOf(Network.peerId);
           if (-1 < index) candidatePeers.splice(index, 1);
           for (const peerId of candidatePeers) {
@@ -79,7 +84,10 @@ export class PdfSharingSystem {
       .on('START_PDF_TRANSMISSION', event => {
         const identifier: string = event.data.fileIdentifier;
         const pdf = PdfStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier) || (pdf && PdfState.COMPLETE <= pdf.state)) {
+        if (this.receiveTaskMap.has(identifier)) {
+          return;
+        }
+        if (pdf && PdfState.COMPLETE <= pdf.state) {
           EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
         } else {
           this.startReceiveTask(identifier);
@@ -88,8 +96,11 @@ export class PdfSharingSystem {
   }
 
   private async startSendTask(pdf: PdfFile, sendTo: string) {
+    const taskKey = this.sendTaskKey(sendTo, pdf.identifier);
+    if (this.sendTaskMap.has(taskKey)) return;
+
     const task = BufferSharingTask.createSendTask<PdfFileContext>(pdf.identifier, sendTo);
-    this.sendTaskMap.set(pdf.identifier, task);
+    this.sendTaskMap.set(taskKey, task);
     EventSystem.call('START_PDF_TRANSMISSION', { fileIdentifier: pdf.identifier }, sendTo);
     const context: PdfFileContext = {
       identifier: pdf.identifier,
@@ -105,13 +116,14 @@ export class PdfSharingSystem {
       context.type = pdf.blob.type || 'application/pdf';
     }
     task.onfinish = () => {
-      this.stopSendTask(task.identifier);
+      this.stopSendTask(taskKey);
       PdfStorage.instance.synchronize();
     };
     task.start(context);
   }
 
   private startReceiveTask(identifier: string) {
+    FileReceiveScheduler.markReceiveStart('pdf', identifier);
     const pdf = PdfStorage.instance.get(identifier);
     const task = BufferSharingTask.createReceiveTask<PdfFileContext>(identifier);
     this.receiveTaskMap.set(identifier, task);
@@ -121,31 +133,99 @@ export class PdfSharingSystem {
       pdf.apply(context);
     };
     task.onfinish = (task, data) => {
+      const ok = task.didCompleteSuccessfully;
+      FileReceiveScheduler.noteReceiveEnded('pdf', task.identifier, ok);
       this.stopReceiveTask(task.identifier);
       if (data) EventSystem.trigger('UPDATE_PDF_RESOURE', [data]);
-      PdfStorage.instance.synchronize();
+      PdfStorage.instance.lazySynchronize(ok ? 800 : 20_000);
     };
     task.start();
   }
 
-  private stopSendTask(identifier: string) {
-    const task = this.sendTaskMap.get(identifier);
+  private stopSendTask(sendKey: string) {
+    const task = this.sendTaskMap.get(sendKey);
     if (task) task.cancel();
-    this.sendTaskMap.delete(identifier);
+    this.sendTaskMap.delete(sendKey);
+  }
+
+  private sendTaskKey(sendTo: string, identifier: string): string {
+    return `${sendTo}:${identifier}`;
+  }
+
+  private existsSendTask(peerId: string): boolean {
+    for (const task of this.sendTaskMap.values()) {
+      if (task && task.sendTo === peerId) return true;
+    }
+    return false;
   }
 
   private stopReceiveTask(identifier: string) {
     const task = this.receiveTaskMap.get(identifier);
     if (task) task.cancel();
     this.receiveTaskMap.delete(identifier);
+    FileReceiveScheduler.markReceiveEnd('pdf', identifier);
+  }
+
+  ensureRoomDownloads(catalogsByPeer: Map<string, PdfCatalogItem[]>) {
+    for (const [peerId, catalog] of catalogsByPeer) {
+      if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
+      const request: PdfCatalogItem[] = [];
+      for (const item of catalog) {
+        let pdf = PdfStorage.instance.get(item.identifier);
+        if (pdf === null) {
+          pdf = PdfFile.createEmpty(item.identifier);
+          PdfStorage.instance.add(pdf);
+        }
+        if (pdf.state < PdfState.COMPLETE
+          && !this.receiveTaskMap.has(item.identifier)
+          && FileReceiveScheduler.canEnqueueReceive('pdf', item.identifier)) {
+          request.push({ identifier: item.identifier, state: pdf.state });
+        }
+      }
+      if (request.length) this.queueMissingDownloads(request, peerId, catalog);
+    }
+  }
+
+  private queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {
+    const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
+    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', request, item => {
+      const pdf = PdfStorage.instance.get(item.identifier);
+      return pdf?.state ?? PdfState.NULL;
+    });
+    for (const item of sorted) {
+      const pdf = PdfStorage.instance.get(item.identifier);
+      const localState = pdf?.state ?? PdfState.NULL;
+      const meta = metaById.get(item.identifier) ?? item;
+      const bytes = estimateNextReceiveBytes('pdf', localState, meta);
+      FileReceiveScheduler.enqueueReceiveRequest('pdf', peerId, item.identifier, bytes, () => {
+        this.request([{ identifier: item.identifier, state: localState }], peerId);
+      });
+    }
   }
 
   private request(request: PdfCatalogItem[], peerId: string) {
+    const identifier = request[0]?.identifier;
+    if (!Network.peerIds.includes(peerId)) {
+      if (identifier) FileReceiveScheduler.abortOutboundRequest('pdf', identifier);
+      meshWarnThrottled(`pdf-skip-${peerId.slice(0, 12)}`,
+        'pdf request skipped (peer not open)', peerId.slice(0, 16));
+      PdfStorage.instance.lazySynchronize(1500, peerId);
+      return;
+    }
     EventSystem.call('REQUEST_PDF_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: Network.peerIds
+      candidatePeers: this.meshCandidatePeerIds()
     }, peerId);
+  }
+
+  private meshCandidatePeerIds(): string[] {
+    const ids = new Set<string>();
+    for (const id of Network.listRoomMemberPeerIds()) {
+      if (id && id !== Network.peerId) ids.add(id);
+    }
+    for (const id of Network.peerIds) ids.add(id);
+    return Array.from(ids);
   }
 
   private hasActiveTask(): boolean {
@@ -157,13 +237,6 @@ export class PdfSharingSystem {
   }
 
   private isLimitReceiveTask(): boolean {
-    return this.maxReceiveTask <= this.receiveTaskMap.size;
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (const task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
+    return FileReceiveScheduler.isReceiveBudgetFull();
   }
 }

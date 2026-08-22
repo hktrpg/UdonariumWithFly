@@ -10,6 +10,7 @@ import {
   Output
 } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { GridType } from '@udonarium/game-table';
 import { isHexGrid, snapToHexCell } from '@udonarium/hex-grid';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -150,14 +151,12 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.tabletopObject?.identifier}`, event => {
-        if ((event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) || !this.shouldTransition(this.tabletopObject)) return;
+        if (event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) return;
+        // Keep local drag pose; commit once on pointer up (avoid snap-back when peers move the same token).
+        if (!event.isSendFromSelf && this.input.isGrabbing) return;
+        if (!this.shouldTransition(this.tabletopObject)) return;
         this.batchService.add(() => {
-          if (this.input.isGrabbing) {
-            UndoService.instance?.discardTransformGesture();
-            this.cancel();
-          } else {
-            this.setAnimatedTransition(true);
-          }
+          this.setAnimatedTransition(true);
           this.state = SelectionState.NONE;
           this.stopTransition();
           this.setPosition(this.tabletopObject);
@@ -342,6 +341,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     this.synchronizer.finishMove(delta);
 
+    this.flushDragPosesToTable();
+
     this.cancel();
     this.onend.emit(e as PointerEvent);
   }
@@ -432,6 +433,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private setUpdateBatching() {
+    this.updateTransformCss();
+    // Network sync only on pointer up — dragging used to version-bump every frame and flood the mesh.
+    if (this.input.isGrabbing) return;
     if (!this.isUpdateBatching && this.tabletopObject) {
       this.isUpdateBatching = true;
       // Pin the map id at queue time — resolveViewTableIdentifier() at flush can be a different map.
@@ -453,7 +457,18 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
         this.isUpdateBatching = false;
       }, this);
     }
-    this.updateTransformCss();
+  }
+
+  /** Commit drag poses to SyncVars once (primary + multi-select / magnetic group). */
+  private flushDragPosesToTable() {
+    const movables = new Set<MovableDirective>(this.synchronizer.selectedMovables);
+    movables.add(this);
+    for (const movable of movables) {
+      if (movable.tabletopObject?.identifier) {
+        ObjectSynchronizer.instance.markPoseGraceReleased(movable.tabletopObject.identifier);
+      }
+      movable.flushPoseToTable();
+    }
   }
 
   /** Write directive pose into tablePlacements for the given (or current) view. */

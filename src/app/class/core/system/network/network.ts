@@ -4,6 +4,7 @@ import { Connection, ConnectionCallback } from './connection';
 import { IPeerContext, PeerContext } from './peer-context';
 import { IRoomInfo } from './room-info';
 import { LastRoomSession } from '@udonarium/room-reconnect.util';
+import { outboundEventPriority } from './outbound-priority';
 
 type QueueItem = { data: any, sendTo: string };
 type ConnectionClass = new (...args: any[]) => Connection;
@@ -162,7 +163,6 @@ export class Network {
     if (!this.connection) return;
     if (this.connection.disconnect(peer)) {
       console.log('<disconnectPeer()> Peer:' + peer.peerId);
-      this.disconnect(peer);
     }
   }
 
@@ -178,8 +178,11 @@ export class Network {
     let unicast: { [sendTo: string]: any[] } = {};
     let echocast: any[] = [];
 
-    let loopCount = this.queue.size < 128 ? this.queue.size : 128;
-    for (let item of this.queue) {
+    const pending = Array.from(this.queue);
+    pending.sort((a, b) => outboundEventPriority(a.data) - outboundEventPriority(b.data));
+
+    let loopCount = pending.length < 128 ? pending.length : 128;
+    for (let item of pending) {
       if (loopCount <= 0) break;
       loopCount--;
       this.queue.delete(item);
@@ -193,10 +196,18 @@ export class Network {
       }
     }
 
-    // 盡量合併後再送出
+    // Deliver — keep queue items when send rejects (stale unicast target).
     if (this.connection) {
-      if (broadcast.length) this.connection.send(broadcast);
-      for (let sendTo in unicast) this.connection.send(unicast[sendTo], sendTo);
+      if (broadcast.length) {
+        if (!this.connection.send(broadcast)) {
+          for (const data of broadcast) this.queue.add({ data, sendTo: undefined });
+        }
+      }
+      for (let sendTo in unicast) {
+        if (!this.connection.send(unicast[sendTo], sendTo)) {
+          // Stale / unreachable unicast — drop (do not re-queue; prevents log storms).
+        }
+      }
     }
 
     // 傳送給自己
@@ -245,7 +256,14 @@ export class Network {
       if (this.callback.onOpen) this.callback.onOpen(peer);
     };
     connection.callback.onClose = (peer) => { if (live() && this.callback.onClose) this.callback.onClose(peer); }
-    connection.callback.onConnect = (peer) => { if (live() && this.callback.onConnect) this.callback.onConnect(peer); }
+    connection.callback.onConnect = (peer) => {
+      if (!live()) return;
+      if (this.callback.onConnect) this.callback.onConnect(peer);
+      this.connection?.flushDeferredSends();
+      if (0 < this.queue.size && this.sendInterval === null) {
+        this.sendInterval = setZeroTimeout(this.sendCallback);
+      }
+    }
     connection.callback.onDisconnect = (peer) => { if (live() && this.callback.onDisconnect) this.callback.onDisconnect(peer); }
     connection.callback.onData = (peer, data: any[]) => { if (live() && this.callback.onData) this.callback.onData(peer, data); }
     connection.callback.onError = (peer, errorType, errorMessage, errorObject) => {

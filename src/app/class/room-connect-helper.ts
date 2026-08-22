@@ -1,7 +1,7 @@
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
-import { netDebug } from '@udonarium/core/system/network/net-debug';
+import { netDebug, meshWarn } from '@udonarium/core/system/network/net-debug';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { GuestSession } from '@udonarium/guest-session';
@@ -22,6 +22,8 @@ import {
   buildSurvivalMeshContext,
   shouldBootstrapSurvivalMesh,
   shouldLimitDirectMesh,
+  isRekeyFullMeshBoost,
+  markRekeyFullMeshBoost,
 } from '@udonarium/room-reconnect.util';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { FolderBackupService } from 'service/folder-backup.service';
@@ -71,6 +73,12 @@ export class RoomConnectHelper {
   private static reopenInFlight = false;
   /** GM auth re-key — suppress auto-reopen while Network.open churns. */
   private static rekeyInFlight = false;
+  /** After re-key, prefer full mesh (skip survival cap) until boost window ends. */
+  private static readonly REKEY_FULL_MESH_MS = 120000;
+  /** Room create modal — suppress auto-reopen while Network.open churns. */
+  static createRoomInFlight = false;
+  /** Folder backup GM resume — suppress auto-reopen while Network.open churns. */
+  private static backupRoomOpenInFlight = false;
   /** Quiet mid-session remesh while in a room (bad-network peer flaps). */
   private static readonly MESH_KEEPALIVE_MS = 5000;
   /** Half-open DataChannel older than this is disconnected so remesh can retry. */
@@ -92,6 +100,10 @@ export class RoomConnectHelper {
 
   static get isReopenInFlight(): boolean {
     return RoomConnectHelper.reopenInFlight;
+  }
+
+  static get isRekeyInFlight(): boolean {
+    return RoomConnectHelper.rekeyInFlight;
   }
 
   static isReopenRetryPending(): boolean {
@@ -193,7 +205,19 @@ export class RoomConnectHelper {
   static shouldAttemptReopenNow(): boolean {
     return !RoomConnectHelper.isJoinOwningNetworkError
       && !RoomConnectHelper.reopenInFlight
-      && !RoomConnectHelper.rekeyInFlight;
+      && !RoomConnectHelper.rekeyInFlight
+      && !RoomConnectHelper.createRoomInFlight
+      && !RoomConnectHelper.backupRoomOpenInFlight;
+  }
+
+  /** True when already in the target room session with SkyWay channel membership. */
+  static isMatchingRoomSession(roomId: string, roomName: string, meshPassword: string = ''): boolean {
+    if (!Network.isOpen || !Network.peer?.isRoom) return false;
+    const mesh = Network.peer.meshPassword || Network.peer.channelPassword || '';
+    return Network.peer.roomId === roomId
+      && Network.peer.roomName === roomName
+      && mesh === (meshPassword || '')
+      && Network.isRoomChannelReady();
   }
 
   /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
@@ -256,6 +280,7 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.meshHealInFlight) return;
     if (RoomConnectHelper.joinInProgress || RoomConnectHelper.reopenInFlight) return;
     if (RoomConnectHelper.rekeyInFlight) return;
+    if (RoomConnectHelper.createRoomInFlight || RoomConnectHelper.backupRoomOpenInFlight) return;
 
     if (!Network.isOpen) {
       if (RoomConnectHelper.everHadRoomSession && Network.getLastRoomSession()?.roomId) {
@@ -276,11 +301,27 @@ export class RoomConnectHelper {
   }
 
   /**
+   * Drop half-open streams for peers no longer in the SkyWay room (left / ghost lobby).
+   */
+  static disconnectPeersNotInRoom(): string[] {
+    const members = new Set(Network.listRoomMemberPeerIds());
+    const dropped: string[] = [];
+    for (const p of Network.peers) {
+      if (!p.peerId || members.has(p.peerId)) continue;
+      RoomConnectHelper.connectingSince.delete(p.peerId);
+      Network.disconnect(PeerContext.parse(p.peerId));
+      dropped.push(p.peerId);
+    }
+    return dropped;
+  }
+
+  /**
    * Disconnect peers stuck in connecting longer than the budget so connect() can retry.
    * @returns peerIds that were pruned
    */
   static pruneStuckConnectingPeers(nowMs: number = Date.now()): string[] {
     const stuckMs = RoomConnectHelper.stuckConnectingMs();
+    const members = new Set(Network.listRoomMemberPeerIds());
     RoomConnectHelper.connectingSince = refreshConnectingSince(
       RoomConnectHelper.connectingSince,
       Network.peers.map(p => ({ peerId: p.peerId, isOpen: !!p.isOpen })),
@@ -289,15 +330,21 @@ export class RoomConnectHelper {
 
     const pruned: string[] = [];
     for (const [peerId, since] of [...RoomConnectHelper.connectingSince]) {
+      if (!members.has(peerId)) {
+        Network.disconnect(PeerContext.parse(peerId));
+        pruned.push(peerId);
+        RoomConnectHelper.connectingSince.delete(peerId);
+        continue;
+      }
       if (!isStuckConnecting(since, nowMs, stuckMs)) continue;
       Network.disconnect(PeerContext.parse(peerId));
       pruned.push(peerId);
       RoomConnectHelper.connectingSince.delete(peerId);
     }
     if (pruned.length > 0) {
-      console.warn(
-        `[mesh] pruned ${pruned.length} stuck connecting peer(s) after ${stuckMs}ms`,
-        pruned.map(id => id.slice(0, 12)),
+      meshWarn(
+        `pruned ${pruned.length} stuck connecting peer(s) after ${stuckMs}ms`,
+        pruned.map(id => id.slice(0, 16)),
       );
     }
     return pruned;
@@ -305,20 +352,28 @@ export class RoomConnectHelper {
 
   /**
    * Mid-session mesh repair: prune stuck handshakes, connect room members without an open channel.
-   * Falls back to lobby remesh only when alone and channel membership is empty.
+   * When alone in the SkyWay room, only clean orphan streams — no lobby remesh (avoids ICE storms).
    */
   static async healMeshGaps(): Promise<void> {
     if (!Network.isRoomChannelReady()) {
-      RoomConnectHelper.scheduleReopenRetry('disconnected');
+      // Reconnect is event-driven (NETWORK_ERROR / SkyWay close). Avoid keepalive → reopen
+      // while Network.isOpen — that shows the fullscreen busy overlay and feels like a freeze.
+      if (!Network.isOpen) {
+        RoomConnectHelper.scheduleReopenRetry('disconnected');
+      }
       return;
     }
 
+    RoomConnectHelper.disconnectPeersNotInRoom();
     RoomConnectHelper.pruneStuckConnectingPeers();
 
     const selfId = Network.peerId;
     const members = Network.listRoomMemberPeerIds();
+    const otherMembers = members.filter(id => id && id !== selfId);
+    if (otherMembers.length < 1) return;
+
     const gaps = meshGapPeerIds(selfId, members, Network.peerIds);
-    const gapsToFill = RoomConnectHelper.filterMeshConnectTargets(gaps);
+    const gapsToFill = RoomConnectHelper.filterMeshConnectTargets(gaps, 0);
     const toConnect = RoomConnectHelper.connectMissingPeers(
       gapsToFill.map(id => PeerContext.parse(id)),
     );
@@ -326,33 +381,41 @@ export class RoomConnectHelper {
       const now = Date.now();
       if (now - RoomConnectHelper.lastGapWarnAt >= RoomConnectHelper.GAP_WARN_COOLDOWN_MS) {
         RoomConnectHelper.lastGapWarnAt = now;
-        console.warn(
-          `[mesh] reconnecting ${toConnect.length} room member(s) without open DataChannel`,
-          toConnect.map(id => id.slice(0, 12)),
+        meshWarn(
+          `heal: connecting ${toConnect.length} gap(s), open=${Network.peerIds.length} members=${members.length}`,
+          toConnect.map(id => id.slice(0, 16)),
         );
-      }
-    }
-
-    const otherMembers = members.filter(id => id && id !== selfId);
-    if (otherMembers.length < 1 && RoomConnectHelper.openPeerCount() < 1) {
-      const session = Network.getLastRoomSession();
-      if (session?.roomId && session.roomName) {
-        const connectPassword = RoomConnectHelper.connectPasswordForRoom(
-          session.roomName, session.meshPassword || '');
-        try {
-          await RoomConnectHelper.remeshRoomPeers(session.roomId, session.roomName, connectPassword);
-        } catch (e) {
-          netDebug('[mesh] remesh during heal failed', e);
-        }
       }
     }
   }
 
-  static filterMeshConnectTargets(peerIds: string[]): string[] {
+  static filterMeshConnectTargets(peerIds: string[], round = 0): string[] {
+    if (isRekeyFullMeshBoost()) return peerIds;
     const members = Network.listRoomMemberPeerIds();
     const ctx = buildSurvivalMeshContext(Network.peerIds, members, Network.peers);
-    if (shouldLimitDirectMesh(ctx)) return [];
-    if (shouldBootstrapSurvivalMesh(ctx)) return peerIds.slice(0, 1);
+    if (shouldLimitDirectMesh(ctx)) {
+      // Never leave the client with zero open peers when room members are reachable.
+      if (ctx.openCount === 0 && peerIds.length > 0) {
+        return peerIds.length <= 1 ? peerIds : [peerIds[round % peerIds.length]];
+      }
+      meshWarn('survival: skip gap connect (limit direct mesh)', {
+        openCount: ctx.openCount,
+        roomMemberCount: ctx.roomMemberCount,
+        bestOpenPing: ctx.bestOpenPing,
+      });
+      return [];
+    }
+    if (shouldBootstrapSurvivalMesh(ctx)) {
+      if (peerIds.length <= 1) return peerIds;
+      const idx = round % peerIds.length;
+      const pick = peerIds[idx];
+      meshWarn('survival: bootstrap hub pick', {
+        round,
+        pick: pick.slice(0, 16),
+        candidates: peerIds.length,
+      });
+      return [pick];
+    }
     return peerIds;
   }
 
@@ -412,9 +475,17 @@ export class RoomConnectHelper {
    * Does not resolve until an open peer appears, attempts are exhausted while alone, or peer-wait times out.
    * Uses open peerIds (not half-open streams) so stuck “connecting” does not abort remesh.
    */
-  static async remeshRoomPeers(roomId: string, roomName: string, connectPassword: string = ''): Promise<void> {
+  /** Mid-session remesh after auth re-key — shorter than cold reopen. */
+  private static readonly REKEY_REMESH_ATTEMPTS = 4;
+
+  static async remeshRoomPeers(
+    roomId: string,
+    roomName: string,
+    connectPassword: string = '',
+    maxAttempts = RoomConnectHelper.REMESH_ATTEMPTS,
+  ): Promise<void> {
     let attemptedConnect = false;
-    for (let i = 0; i < RoomConnectHelper.REMESH_ATTEMPTS; i++) {
+    for (let i = 0; i < maxAttempts; i++) {
       RoomConnectHelper.pruneStuckConnectingPeers();
       if (RoomConnectHelper.openPeerCount() > 0) return;
 
@@ -423,11 +494,13 @@ export class RoomConnectHelper {
       const memberIds = Network.listRoomMemberPeerIds();
       const otherMembers = memberIds.filter(id => id && id !== Network.peerId);
       if (otherMembers.length > 0) {
-        const remeshTargets = RoomConnectHelper.filterMeshConnectTargets(otherMembers);
-        if (RoomConnectHelper.connectMissingPeers(
+        const remeshTargets = RoomConnectHelper.filterMeshConnectTargets(otherMembers, i);
+        const connected = RoomConnectHelper.connectMissingPeers(
           remeshTargets.map(id => PeerContext.parse(id)),
-        ).length > 0) {
+        );
+        if (connected.length > 0) {
           attemptedConnect = true;
+          meshWarn(`remesh round ${i + 1}: connect attempt`, connected.map(id => id.slice(0, 16)));
         }
         if (RoomConnectHelper.openPeerCount() > 0) return;
         if (Network.peers.length > 0) {
@@ -454,6 +527,7 @@ export class RoomConnectHelper {
 
       const lobbyTargets = RoomConnectHelper.filterMeshConnectTargets(
         others.map(p => p.peerId),
+        i,
       );
       const lobbyPeers = lobbyTargets
         .map(id => others.find(p => p.peerId === id))
@@ -623,6 +697,7 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.isJoinOwningNetworkError) return 'busy';
     if (RoomConnectHelper.reopenInFlight) return 'busy';
     if (RoomConnectHelper.rekeyInFlight) return 'busy';
+    if (RoomConnectHelper.createRoomInFlight || RoomConnectHelper.backupRoomOpenInFlight) return 'busy';
 
     const session = Network.getLastRoomSession();
     const willReopenRoom = !!(session?.roomId && session.roomName);
@@ -672,7 +747,22 @@ export class RoomConnectHelper {
         RoomConnectHelper.scheduleReopenRetry(event.data?.errorType || 'disconnected');
       });
 
-    if (willReopenRoom) {
+    const skipRoomOpen = willReopenRoom && session
+      && RoomConnectHelper.isMatchingRoomSession(session.roomId, session.roomName, session.meshPassword || '');
+
+    if (skipRoomOpen) {
+      void (async () => {
+        RoomConnectHelper.clearReopenRetry();
+        const connectPassword = RoomConnectHelper.connectPasswordForRoom(
+          session!.roomName, session!.meshPassword || '');
+        try {
+          await RoomConnectHelper.remeshRoomPeers(session!.roomId, session!.roomName, connectPassword);
+        } catch (e) {
+          console.warn('RoomConnectHelper remesh without reopen failed', e);
+        }
+        finish();
+      })();
+    } else if (willReopenRoom) {
       const userId = session!.userId || Network.peer.userId;
       Network.open(userId, session!.roomId, session!.roomName, session!.meshPassword || '');
     } else {
@@ -687,8 +777,6 @@ export class RoomConnectHelper {
     RoomConnectHelper.beginJoinProbe();
     return new Promise(resolve => {
       const userId = Network.peer.userId;
-      Network.open(userId, room.id, room.name, password);
-      // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent) — open() is async.
 
       const listenerKey = { roomJoin: true };
       const tried = new Set<string>();
@@ -846,6 +934,9 @@ export class RoomConnectHelper {
 
       const onConnect = (peerId: string) => {
         if (settled) return;
+        meshWarn('join probe: peer connected', peerId.slice(0, 16), {
+          open: RoomConnectHelper.openPeerCount(),
+        });
         netDebug('連線成功！', peerId);
         tried.add(peerId);
         netDebug(`連線進度 ${tried.size}/${joinTargets.length}（成功 ${RoomConnectHelper.openPeerCount()}）`);
@@ -856,6 +947,9 @@ export class RoomConnectHelper {
       const onDisconnect = (peerId: string) => {
         // Stale lobby/room peers often leave before subscribe finishes — not a join failure by itself.
         if (settled) return;
+        meshWarn('join probe: peer disconnected', peerId.slice(0, 16), {
+          open: RoomConnectHelper.openPeerCount(),
+        });
         console.warn('放棄連線（對方離線或訂閱逾時）', peerId);
         tried.add(peerId);
         netDebug(`連線進度 ${tried.size}/${joinTargets.length}（成功 ${RoomConnectHelper.openPeerCount()}）`);
@@ -872,54 +966,57 @@ export class RoomConnectHelper {
         }
       };
 
-      EventSystem.register(listenerKey)
-        .on('OPEN_NETWORK', event => {
-          netDebug('RoomConnectHelper OPEN_PEER', event.data.peerId);
-          EventSystem.unregister(listenerKey);
-          startConnectTimeout();
-          joinTargets = RoomConnectHelper.gatherJoinTargets(targetPeers);
-          if (joinTargets.length < 1) {
-            finish(true);
-            return;
-          }
-          // Probe first: keep local tabletop until a live peer sends a game-table.
-          meshJoinTargets();
+      const onRoomOpenReady = (peerId?: string) => {
+        if (settled) return;
+        netDebug('RoomConnectHelper OPEN_PEER', peerId ?? Network.peerId);
+        EventSystem.unregister(listenerKey);
+        startConnectTimeout();
+        joinTargets = RoomConnectHelper.gatherJoinTargets(targetPeers);
+        if (joinTargets.length < 1) {
+          finish(true);
+          return;
+        }
+        // Probe first: keep local tabletop until a live peer sends a game-table.
+        meshJoinTargets();
+        if (settled) return;
+        // Lobby list can lag SkyWay membership; keep remeshing while alone.
+        remeshTimer = setInterval(() => {
           if (settled) return;
-          // Lobby list can lag SkyWay membership; keep remeshing while alone.
-          remeshTimer = setInterval(() => {
+          meshJoinTargets();
+        }, RoomConnectHelper.JOIN_REMESH_MS);
+        EventSystem.register(listenerKey)
+          .on('CONNECT_PEER', event => onConnect(event.data.peerId))
+          .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId))
+          .on('UPDATE_GAME_OBJECT', event => {
+            if (settled || event.isSendFromSelf) return;
+            const aliasName = event.data?.aliasName || '';
+            if (aliasName === 'PeerCursor') return;
+            if (RoomConnectHelper.isJoinTabletopData(aliasName)) sawTabletopData = true;
+            if (sawTabletopData) scheduleQuiesceConfirm();
+          })
+          .on('NETWORK_ERROR', () => {
             if (settled) return;
-            meshJoinTargets();
-          }, RoomConnectHelper.JOIN_REMESH_MS);
-          EventSystem.register(listenerKey)
-            .on('CONNECT_PEER', event => onConnect(event.data.peerId))
-            .on('DISCONNECT_PEER', event => onDisconnect(event.data.peerId))
-            .on('UPDATE_GAME_OBJECT', event => {
-              if (settled || event.isSendFromSelf) return;
-              const aliasName = event.data?.aliasName || '';
-              if (aliasName === 'PeerCursor') return;
-              if (RoomConnectHelper.isJoinTabletopData(aliasName)) sawTabletopData = true;
-              if (sawTabletopData) scheduleQuiesceConfirm();
-            })
-            .on('NETWORK_ERROR', () => {
-              if (settled) return;
-              // Pre-probe: meshed NETWORK_ERROR still counts as joined.
-              if (RoomConnectHelper.shouldEarlySucceed(RoomConnectHelper.openPeerCount())) {
-                if (sawTabletopData) {
-                  Room.clearLocalTabletopForJoin();
-                  finish(true);
-                  return;
-                }
-                scheduleConfirm();
-                scheduleDataDeadline();
+            // Pre-probe: meshed NETWORK_ERROR still counts as joined.
+            if (RoomConnectHelper.shouldEarlySucceed(RoomConnectHelper.openPeerCount())) {
+              if (sawTabletopData) {
+                Room.clearLocalTabletopForJoin();
+                finish(true);
                 return;
               }
-              failReason = 'network_error_mesh';
-              finish(false);
-            });
-        })
+              scheduleConfirm();
+              scheduleDataDeadline();
+              return;
+            }
+            failReason = 'network_error_mesh';
+            finish(false);
+          });
+      };
+
+      EventSystem.register(listenerKey)
+        .on('OPEN_NETWORK', event => onRoomOpenReady(event.data.peerId))
         .on('NETWORK_ERROR', () => {
           if (settled) return;
-          if (roomOpenRetries < 1) {
+          if (roomOpenRetries < 1 && !RoomConnectHelper.isMatchingRoomSession(room.id, room.name, password)) {
             roomOpenRetries++;
             console.warn('RoomConnectHelper room open failed, retrying once');
             Network.open(userId, room.id, room.name, password);
@@ -928,7 +1025,22 @@ export class RoomConnectHelper {
           failReason = 'network_error_open';
           finish(false);
         });
+
+      if (RoomConnectHelper.isMatchingRoomSession(room.id, room.name, password)) {
+        queueMicrotask(() => onRoomOpenReady());
+      } else {
+        Network.open(userId, room.id, room.name, password);
+      }
     });
+  }
+
+  static beginBackupRoomOpen() {
+    RoomConnectHelper.clearReopenRetry();
+    RoomConnectHelper.backupRoomOpenInFlight = true;
+  }
+
+  static endBackupRoomOpen() {
+    RoomConnectHelper.backupRoomOpenInFlight = false;
   }
 
   /**
@@ -939,6 +1051,10 @@ export class RoomConnectHelper {
   static async rekeyRoom(roomId: string, roomName: string, meshPassword: string = ''): Promise<void> {
     RoomConnectHelper.clearReopenRetry();
     RoomConnectHelper.rekeyInFlight = true;
+    markRekeyFullMeshBoost(RoomConnectHelper.REKEY_FULL_MESH_MS);
+    const busy = ConnectionBusyService.instance;
+    const ownedBusy = !busy?.busy;
+    if (ownedBusy) busy?.show('room.rekeyingRoom');
     try {
       const userId = Network.peer.userId;
       const wasGuest = GuestSession.isGuest;
@@ -955,20 +1071,47 @@ export class RoomConnectHelper {
       }
       RoomAuth.rememberSession(role, RoomAuth.getSessionRolePassword(role), mesh);
 
-      await new Promise<void>(resolve => {
+      meshWarn('rekey: Network.open', { roomId, meshLocked: RoomAuth.isMeshLocked(roomName) });
+
+      await new Promise<void>((resolve, reject) => {
         const key = { rekey: true };
+        const timer = setTimeout(() => {
+          EventSystem.unregister(key);
+          reject(new Error('rekey open timeout'));
+        }, 30000);
         EventSystem.register(key)
           .on('OPEN_NETWORK', () => {
+            clearTimeout(timer);
             EventSystem.unregister(key);
             resolve();
+          })
+          .on('NETWORK_ERROR', event => {
+            clearTimeout(timer);
+            EventSystem.unregister(key);
+            reject(new Error(event.data?.errorType || 'rekey network error'));
           });
         Network.open(userId, roomId, roomName, mesh);
       });
 
       RoomAuth.applyIdentity(role, roomId);
-      await RoomConnectHelper.remeshRoomPeers(roomId, roomName, '');
+      const connectPw = RoomConnectHelper.connectPasswordForRoom(roomName, mesh);
+      await RoomConnectHelper.remeshRoomPeers(
+        roomId,
+        roomName,
+        connectPw,
+        RoomConnectHelper.REKEY_REMESH_ATTEMPTS,
+      );
+      await RoomConnectHelper.healMeshGaps();
+      meshWarn('rekey: finished', { openPeers: RoomConnectHelper.openPeerCount() });
     } finally {
       RoomConnectHelper.rekeyInFlight = false;
+      if (ownedBusy) busy?.hide();
+      try {
+        ImageStorage.instance.synchronize();
+      } catch (e) {
+        console.warn('RoomConnectHelper rekey image sync failed', e);
+      }
+      RoomConnectHelper.scheduleMeshHeal();
     }
   }
 

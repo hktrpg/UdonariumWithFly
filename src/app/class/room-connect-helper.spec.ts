@@ -110,6 +110,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     RoomConnectHelper.clearReopenRetry();
     (RoomConnectHelper as any).reopenInFlight = false;
     (RoomConnectHelper as any).rekeyInFlight = false;
+    (RoomConnectHelper as any).backupRoomOpenInFlight = false;
+    RoomConnectHelper.createRoomInFlight = false;
     (RoomConnectHelper as any).meshHealInFlight = false;
     (RoomConnectHelper as any).meshHealDebounceTimer = null;
     RoomConnectHelper.joinInProgress = false;
@@ -118,7 +120,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   afterEach(() => {
     (RoomConnectHelper as any).reopenInFlight = false;
     (RoomConnectHelper as any).rekeyInFlight = false;
-    (RoomConnectHelper as any).meshHealInFlight = false;
+    (RoomConnectHelper as any).backupRoomOpenInFlight = false;
+    RoomConnectHelper.createRoomInFlight = false;
     (RoomConnectHelper as any).meshHealDebounceTimer = null;
     (RoomConnectHelper as any).joinOwnedUntil = 0;
     RoomConnectHelper.joinInProgress = false;
@@ -144,6 +147,37 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 20));
 
     expect(remesh).toHaveBeenCalledWith('Ab1', 'TestRoom', '');
+  });
+
+  it('skips Network.open when already in the same room session', async () => {
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOn(Network, 'getLastRoomSession').and.returnValue({
+      userId: 'u1',
+      roomId: 'Ab1',
+      roomName: 'TestRoom',
+      meshPassword: '',
+    });
+    const open = spyOn(Network, 'open');
+    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({
+      userId: 'u1',
+      peerId: 'self',
+      isRoom: true,
+      roomId: 'Ab1',
+      roomName: 'TestRoom',
+      meshPassword: '',
+      channelPassword: '',
+    } as IPeerContext);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    const remesh = spyOn(RoomConnectHelper, 'remeshRoomPeers').and.resolveTo();
+
+    expect(RoomConnectHelper.reopenLastRoomOrLobby()).toBe('started');
+    await new Promise<void>(resolve => setTimeout(resolve, 20));
+
+    expect(open).not.toHaveBeenCalled();
+    expect(remesh).toHaveBeenCalledWith('Ab1', 'TestRoom', '');
+    expect(RoomConnectHelper.isReopenInFlight).toBeFalse();
   });
 
   it('reopens lobby peer only when this page never had a room', async () => {
@@ -366,8 +400,10 @@ describe('RoomConnectHelper.remeshRoomPeers', () => {
 describe('RoomConnectHelper.healMeshGaps', () => {
   let streamPeers: IPeerContext[];
   let openPeerIds: string[];
+  let networkIsOpen = true;
 
   beforeEach(() => {
+    networkIsOpen = true;
     streamPeers = [];
     openPeerIds = [];
     spyOn(Network, 'connect').and.callFake((p: IPeerContext) => {
@@ -383,7 +419,7 @@ describe('RoomConnectHelper.healMeshGaps', () => {
     spyOnProperty(Network, 'peers', 'get').and.callFake(() => streamPeers);
     spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => openPeerIds.slice());
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
-    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOnProperty(Network, 'isOpen', 'get').and.callFake(() => networkIsOpen);
     spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
     spyOnProperty(Network, 'peer', 'get').and.returnValue({
       peerId: 'self', isRoom: true, userId: 'u1',
@@ -396,6 +432,7 @@ describe('RoomConnectHelper.healMeshGaps', () => {
   afterEach(() => {
     RoomConnectHelper.STUCK_CONNECTING_MS_FOR_TEST = 0;
     RoomConnectHelper.stopMeshKeepalive();
+    RoomConnectHelper.clearReopenRetry();
     (RoomConnectHelper as any).meshHealInFlight = false;
   });
 
@@ -426,7 +463,21 @@ describe('RoomConnectHelper.healMeshGaps', () => {
     expect(Network.disconnect).toHaveBeenCalled();
   });
 
-  it('skips extra gap connects in survival mesh when hub is already open', async () => {
+  it('skips extra gap connects in survival mesh when hub is already open (5+ members)', async () => {
+    openPeerIds = ['a'];
+    streamPeers = [{
+      peerId: 'a',
+      isOpen: true,
+      session: { ping: 3000, health: 1, speed: 1, grade: 0, description: '' },
+    } as IPeerContext];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'a', 'b', 'c', 'd']);
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(Network.connect).not.toHaveBeenCalled();
+  });
+
+  it('fills mesh gaps for small rooms even when ping is high', async () => {
     openPeerIds = ['a'];
     streamPeers = [{
       peerId: 'a',
@@ -437,7 +488,53 @@ describe('RoomConnectHelper.healMeshGaps', () => {
 
     await RoomConnectHelper.healMeshGaps();
 
+    expect(Network.connect).toHaveBeenCalled();
+  });
+
+  it('when alone in room, cleans orphan streams and skips gap connect / lobby remesh', async () => {
+    streamPeers = [{ peerId: 'ghost', isOpen: false } as IPeerContext];
+    openPeerIds = [];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self']);
+    const remesh = spyOn(RoomConnectHelper, 'remeshRoomPeers').and.resolveTo();
+
+    await RoomConnectHelper.healMeshGaps();
+
     expect(Network.connect).not.toHaveBeenCalled();
+    expect(Network.disconnect).toHaveBeenCalled();
+    expect(remesh).not.toHaveBeenCalled();
+  });
+
+  it('when channel not ready but Network still open, does not schedule reopen from heal', async () => {
+    (Network.isRoomChannelReady as jasmine.Spy).and.returnValue(false);
+    const reopen = spyOn(RoomConnectHelper, 'scheduleReopenRetry');
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(reopen).not.toHaveBeenCalled();
+    expect(Network.connect).not.toHaveBeenCalled();
+  });
+
+  it('when channel not ready and Network closed, schedules reopen from heal', async () => {
+    (Network.isRoomChannelReady as jasmine.Spy).and.returnValue(false);
+    networkIsOpen = false;
+    const reopen = spyOn(RoomConnectHelper, 'scheduleReopenRetry');
+
+    await RoomConnectHelper.healMeshGaps();
+
+    expect(reopen).toHaveBeenCalledWith('disconnected');
+  });
+
+  it('disconnectPeersNotInRoom drops streams not in SkyWay members', () => {
+    streamPeers = [
+      { peerId: 'live', isOpen: true } as IPeerContext,
+      { peerId: 'ghost', isOpen: false } as IPeerContext,
+    ];
+    (Network.listRoomMemberPeerIds as jasmine.Spy).and.returnValue(['self', 'live']);
+
+    const dropped = RoomConnectHelper.disconnectPeersNotInRoom();
+
+    expect(dropped).toEqual(['ghost']);
+    expect(Network.disconnect).toHaveBeenCalled();
   });
 
   it('keeps remeshing after a half-open handshake instead of aborting', async () => {

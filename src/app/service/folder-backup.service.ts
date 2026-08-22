@@ -8,6 +8,7 @@ import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoleAuthInput, RoomAuth } from '@udonarium/room-auth';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { captureMapPreviewDataUrl } from '@udonarium/scene-preset-preview';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
@@ -917,12 +918,14 @@ export class FolderBackupService implements OnDestroy {
       const key = { folderResume: true };
       const timer = setTimeout(() => {
         EventSystem.unregister(key);
+        RoomConnectHelper.endBackupRoomOpen();
         reject(new Error('Room open timeout'));
       }, 30000);
       EventSystem.register(key)
         .on('OPEN_NETWORK', () => {
           clearTimeout(timer);
           EventSystem.unregister(key);
+          RoomConnectHelper.endBackupRoomOpen();
           // Drop lobby samples before any catalog can go out (holdPeerSync is already on).
           Room.clearLocalTabletopForJoin();
           PeerCursor.myCursor.peerId = Network.peerId;
@@ -942,8 +945,10 @@ export class FolderBackupService implements OnDestroy {
         .on('NETWORK_ERROR', () => {
           clearTimeout(timer);
           EventSystem.unregister(key);
+          RoomConnectHelper.endBackupRoomOpen();
           reject(new Error('Room open network error'));
         });
+      RoomConnectHelper.beginBackupRoomOpen();
       Network.open(userId, roomId, encodedName, meshPassword);
     });
   }

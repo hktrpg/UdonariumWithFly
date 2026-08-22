@@ -1,8 +1,13 @@
 import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
+import { catalogByteSize } from './file-transfer-scheduler';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 
-export type CatalogItem = { readonly identifier: string, readonly state: number };
+export type CatalogItem = {
+  readonly identifier: string;
+  readonly state: number;
+  readonly byteSize?: number;
+};
 
 export class AudioStorage {
   private static _instance: AudioStorage
@@ -101,15 +106,20 @@ export class AudioStorage {
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    const delay = Math.max(ms, 1500);
+    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
+    this.lazyTimer.reset(delay);
   }
 
   getCatalog(): CatalogItem[] {
     let catalog: CatalogItem[] = [];
     for (let audio of AudioStorage.instance.audios) {
       if (AudioState.COMPLETE <= audio.state) {
-        catalog.push({ identifier: audio.identifier, state: audio.state });
+        catalog.push({
+          identifier: audio.identifier,
+          state: audio.state,
+          byteSize: catalogByteSize(audio.blob),
+        });
       }
     }
     return catalog;
