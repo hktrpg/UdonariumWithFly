@@ -1,6 +1,7 @@
 import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
+import { skyWayRecoveryGate } from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
 import { Room } from '@udonarium/room';
 import { TableSelecter } from '@udonarium/table-selecter';
 
@@ -127,6 +128,27 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.everHadRoomSession = false;
     RoomConnectHelper.clearReopenRetry();
+    skyWayRecoveryGate.resetForTests();
+  });
+
+  it('isNetworkReconnecting is false when alone in room with no peers', () => {
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({ isRoom: true, peerId: 'self' } as IPeerContext);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
+    expect(RoomConnectHelper.isNetworkReconnecting()).toBeFalse();
+  });
+
+  it('isNetworkReconnecting is true when others are in room but no open DataChannels', () => {
+    RoomConnectHelper.everHadRoomSession = true;
+    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({ isRoom: true, peerId: 'self' } as IPeerContext);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self', 'other']);
+    expect(RoomConnectHelper.isNetworkReconnecting()).toBeTrue();
   });
 
   it('remeshes after OPEN_NETWORK when a room session exists', async () => {
@@ -242,6 +264,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   it('schedules backoff reopen retry after failed reopen', () => {
     jasmine.clock().install();
     try {
+      skyWayRecoveryGate.resetForTests();
       RoomConnectHelper.clearReopenRetry();
       (RoomConnectHelper as any).reopenInFlight = false;
       RoomConnectHelper.everHadRoomSession = true;
@@ -269,12 +292,14 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       expect(RoomConnectHelper.isReopenInFlight).toBeFalse();
       expect(RoomConnectHelper.isReopenRetryPending()).toBeTrue();
 
-      jasmine.clock().tick(3000);
+      // server-error outage base delay is 8s (not the old 3s disconnected base).
+      jasmine.clock().tick(8000);
       expect(open).toHaveBeenCalledTimes(2);
     } finally {
       jasmine.clock().uninstall();
       RoomConnectHelper.clearReopenRetry();
       (RoomConnectHelper as any).reopenInFlight = false;
+      skyWayRecoveryGate.resetForTests();
     }
   });
 });

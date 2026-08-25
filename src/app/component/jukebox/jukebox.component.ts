@@ -978,11 +978,19 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.jukebox?.stopAll();
   }
 
-  createFolder() {
+  async createFolder() {
     if (this.GuestMode()) return;
-    const name = window.prompt(this.i18n.t('jukebox.folderNamePrompt'), this.i18n.t('jukebox.folderDefaultName'));
-    if (name == null) return;
-    const folder = this.library.createFolder(name);
+    const name = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.folderNamePrompt'),
+      hasInput: true,
+      inputValue: this.i18n.t('jukebox.folderDefaultName'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'create_new_folder',
+    });
+    if (name == null || name === false) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    const folder = this.library.createFolder(trimmed);
     this.expandedFolders[folder.id] = true;
   }
 
@@ -1059,15 +1067,29 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     input.value = '';
   }
 
-  promptFolderLink(folderId: string, event?: Event) {
+  async promptFolderLink(folderId: string, event?: Event) {
     event?.stopPropagation();
     if (this.GuestMode()) return;
-    const url = (window.prompt(this.i18n.t('jukebox.linkUrlPlaceholder'), '') || '').trim();
+    const raw = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.linkUrlPlaceholder'),
+      hasInput: true,
+      inputValue: '',
+      inputPlaceholder: this.i18n.t('jukebox.linkUrlPlaceholder'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'link',
+    });
+    if (raw == null || raw === false) return;
+    const url = String(raw).trim();
     if (!url) return;
     this.linkError = '';
     if (!StringUtil.validUrl(url)) {
       this.linkError = this.i18n.t('jukebox.linkInvalid');
-      window.alert(this.linkError);
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('jukebox.linkInvalid'),
+        text: this.linkError,
+        type: ConfirmationType.OK,
+        materialIcon: 'error_outline',
+      });
       return;
     }
     const name = this.displayNameFromUrl(url);
@@ -1727,26 +1749,52 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.contextMenuService.open(position, menu, folder.name);
   }
 
-  private renameAudio(audio: AudioFile) {
+  private async renameAudio(audio: AudioFile) {
     const current = this.displayName(audio);
-    const name = window.prompt(this.i18n.t('jukebox.renamePrompt'), current);
-    if (name == null || !name.trim()) return;
-    this.library.renameAudio(audio.identifier, name.trim());
+    const name = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.renamePrompt'),
+      hasInput: true,
+      inputValue: current,
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'edit',
+    });
+    if (name == null || name === false) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    this.library.renameAudio(audio.identifier, trimmed);
   }
 
-  private renameFolder(folder: AudioLibraryFolder) {
-    const name = window.prompt(this.i18n.t('jukebox.folderNamePrompt'), folder.name);
-    if (name == null) return;
-    this.library.renameFolder(folder.id, name);
+  private async renameFolder(folder: AudioLibraryFolder) {
+    const name = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.folderNamePrompt'),
+      hasInput: true,
+      inputValue: folder.name,
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'edit',
+    });
+    if (name == null || name === false) return;
+    this.library.renameFolder(folder.id, String(name).trim() || folder.name);
   }
 
-  private deleteFolder(folder: AudioLibraryFolder) {
-    if (!window.confirm(this.i18n.t('jukebox.deleteFolderConfirm', { name: folder.name }))) return;
+  private async deleteFolder(folder: AudioLibraryFolder) {
+    const ok = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.deleteFolder'),
+      text: this.i18n.t('jukebox.deleteFolderConfirm', { name: folder.name }),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'delete',
+    });
+    if (ok !== true) return;
     this.library.deleteFolder(folder.id);
   }
 
-  private removeAudio(audio: AudioFile, folderId: string = '') {
-    if (!window.confirm(this.i18n.t('jukebox.removeConfirm', { name: this.displayName(audio) }))) return;
+  private async removeAudio(audio: AudioFile, folderId: string = '') {
+    const ok = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.removeFromLibrary'),
+      text: this.i18n.t('jukebox.removeConfirm', { name: this.displayName(audio) }),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'delete',
+    });
+    if (ok !== true) return;
     this.removeAudioImmediate(audio, folderId || '');
     this.selectedAudioIds.delete(audio.identifier);
     this.selectedAudioIds = new Set(this.selectedAudioIds);
@@ -1759,10 +1807,16 @@ export class JukeboxComponent implements OnInit, OnDestroy {
     this.expandedFolders[folderId || ''] = true;
   }
 
-  private removeSelectedAudios(folderId: string = '') {
+  private async removeSelectedAudios(folderId: string = '') {
     const ids = this.orderedSelectedIds();
     if (ids.length < 1) return;
-    if (!window.confirm(this.i18n.t('jukebox.removeSelectedConfirm', { count: ids.length }))) return;
+    const ok = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('jukebox.removeFromLibrary'),
+      text: this.i18n.t('jukebox.removeSelectedConfirm', { count: ids.length }),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'delete',
+    });
+    if (ok !== true) return;
     const fid = folderId || this.selectionAnchorFolderId || '';
     for (const id of ids) {
       const audio = AudioStorage.instance.get(id);

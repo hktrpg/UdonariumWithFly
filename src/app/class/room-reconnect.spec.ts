@@ -38,6 +38,9 @@ describe('room-reconnect.util', () => {
     expect(shouldAttemptRoomReopen('token-expired')).toBeTrue();
     expect(shouldAttemptRoomReopen('authentication')).toBeTrue();
     expect(shouldAttemptRoomReopen('server-error')).toBeTrue();
+    expect(shouldAttemptRoomReopen('rtc-api-fatal-error')).toBeTrue();
+    expect(shouldAttemptRoomReopen('rtcApiFatalError')).toBeTrue();
+    expect(shouldAttemptRoomReopen('token-api')).toBeTrue();
     expect(shouldAttemptRoomReopen('peer-unavailable')).toBeFalse();
     expect(shouldAttemptRoomReopen('already-same-name-member-exist')).toBeFalse();
     expect(shouldAttemptRoomReopen('alreadySameNameMemberExist')).toBeFalse();
