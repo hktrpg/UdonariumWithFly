@@ -391,6 +391,34 @@
   gap: 4px;
 }
 
+.mesh-diag-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mesh-diag-icon .material-icons {
+  font-size: 16px;
+  margin: 0;
+}
+
+.mesh-diag-icon:hover:not(:disabled) {
+  color: #334155;
+}
+
+.mesh-diag-icon:disabled {
+  color: #94a3b8;
+  cursor: default;
+}
+
 .app-update-icon {
   flex: 0 0 auto;
   font-size: 16px;
