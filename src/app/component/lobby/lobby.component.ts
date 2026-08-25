@@ -135,25 +135,31 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.scheduleAutoRefresh();
       return;
     }
-    this.isReloading = true;
-    if (!silent || this.rooms.length < 1) {
-      this.help = this.i18n.t('lobby.helpSearching');
+    this.ngZone.run(() => { this.isReloading = true; });
+    try {
+      // Manual / empty: force Find. Silent auto-refresh with rooms: use cache TTL.
+      const force = !silent || this.rooms.length < 1;
+      // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
+      let rooms = await Network.listAllRooms(force);
+      if (rooms.length < 1 && !silent) {
+        await new Promise<void>(resolve => setTimeout(resolve, 600));
+        rooms = await Network.listAllRooms(true);
+      }
+      if (this.destroyed) return;
+      this.ngZone.run(() => {
+        this.rooms = RoomConnectHelper.filterLobbyRooms(rooms);
+        if (this.rooms.length < 1) {
+          this.help = this.i18n.t('lobby.helpEmpty');
+        }
+        this.scheduleAutoRefresh();
+      });
+    } catch (err) {
+      console.warn('Lobby room list failed', err);
+    } finally {
+      if (!this.destroyed) {
+        this.ngZone.run(() => { this.isReloading = false; });
+      }
     }
-    // Manual / empty: force Find. Silent auto-refresh with rooms: use cache TTL.
-    const force = !silent || this.rooms.length < 1;
-    // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
-    let rooms = await Network.listAllRooms(force);
-    if (rooms.length < 1 && !silent) {
-      await new Promise<void>(resolve => setTimeout(resolve, 600));
-      rooms = await Network.listAllRooms(true);
-    }
-    if (this.destroyed) return;
-    this.ngZone.run(() => {
-      this.rooms = RoomConnectHelper.filterLobbyRooms(rooms);
-      this.help = this.i18n.t('lobby.helpEmpty');
-      this.isReloading = false;
-      this.scheduleAutoRefresh();
-    });
   }
 
   private scheduleAutoRefresh() {
@@ -290,9 +296,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   private refreshHelp() {
-    if (this.isReloading) {
-      this.help = this.i18n.t('lobby.helpSearching');
-    } else if (this.rooms.length < 1) {
+    if (this.rooms.length < 1) {
       this.help = this.i18n.t('lobby.helpEmpty');
     } else {
       this.help = this.i18n.t('lobby.helpInitial');

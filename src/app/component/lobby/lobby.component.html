@@ -2,8 +2,8 @@
   <section class="card">
     <header class="card-head"><h3>{{ 'lobby.title' | i18n }}</h3></header>
     <div class="actions">
-      <button type="button" class="btn" (click)="reload()" [disabled]="isReloading">
-        <i class="material-icons">refresh</i>{{ 'lobby.refresh' | i18n }}
+      <button type="button" class="btn" (click)="reload()" [disabled]="isReloading" [attr.aria-busy]="isReloading">
+        <i class="material-icons" [class.is-spinning]="isReloading">refresh</i>{{ 'lobby.refresh' | i18n }}
       </button>
       <button type="button" class="btn btn-primary" (click)="showRoomSetting()" [disabled]="connectionBusy.busy">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
@@ -12,14 +12,12 @@
         [disabled]="isFolderLoadDisabled"
         [title]="isFolderLoadDisabled
           ? ('peer.loadData.gmOnly' | i18n)
-          : (folderBackup.isReady
-            ? ('menu.folderBackup.autoStoreHint' | i18n)
-            : (folderBackupActionLabelKey | i18n))">
+          : (folderBackupActionLabelKey | i18n)">
         <i class="material-icons">{{ folderBackup.isReady ? 'folder_open' : 'create_new_folder' }}</i>{{ folderBackupActionLabelKey | i18n }}<ng-container *ngIf="isFolderLoadDisabled">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
       </button>
     </div>
 
-    <div class="room-table-wrap" *ngIf="rooms.length">
+    <div class="room-table-wrap">
       <table class="room-list">
         <tr>
           <th class="is-0-width is-small-font">{{ 'lobby.colId' | i18n }}</th>
@@ -50,6 +48,6 @@
         </ng-container>
       </table>
     </div>
-    <p class="empty-hint" *ngIf="rooms.length < 1">{{help}}</p>
+    <p class="empty-hint" *ngIf="rooms.length < 1">{{ help }}</p>
   </section>
 </div>

@@ -69,3 +69,12 @@
   vertical-align: middle;
   color: #5c4630;
 }
+
+.actions .material-icons.is-spinning {
+  display: inline-block;
+  animation: lobby-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes lobby-refresh-spin {
+  to { transform: rotate(360deg); }
+}

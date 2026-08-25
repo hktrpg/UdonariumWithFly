@@ -209,7 +209,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.folderBackup.isReady) {
       await this.folderBackup.flush({ timeoutMs: 60000 });
     }
-    document.location.reload();
+    await this.appUpdate.applyPendingUpdate();
   }
 
   private refreshPanelTitle() {

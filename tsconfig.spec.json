@@ -15,6 +15,7 @@
     "src/testing/**/*.ts",
     "src/app/class/**/*.spec.ts",
     "src/app/service/default-room/**/*.spec.ts",
+    "src/app/service/app-update.service.spec.ts",
     "src/app/service/folder-backup-layout.spec.ts",
     "src/app/service/folder-backup-persist.spec.ts",
     "src/app/service/folder-media-hydrator.spec.ts",

@@ -141,9 +141,7 @@
       <button type="button" class="btn btn-sm" *ngIf="folderBackup.canLoadFromFolder"
         (click)="loadFolderBackup()"
         [disabled]="!canLoadRoom"
-        [title]="canLoadRoom
-          ? ('menu.folderBackup.autoStoreHint' | i18n)
-          : ('peer.loadData.gmOnly' | i18n)">
+        [title]="canLoadRoom ? null : ('peer.loadData.gmOnly' | i18n)">
         <i class="material-icons">folder_open</i>
         {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
       </button>
@@ -158,9 +156,6 @@
           : ('menu.folderBackup.status.needAuth' | i18n) }}
         <ng-container *ngIf="folderBackup.lastError"> — {{ folderBackup.lastError }}</ng-container>
       </span>
-      <p class="hint folder-auto-hint" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
-        {{ 'menu.folderBackup.autoStoreHint' | i18n }}
-      </p>
     </div>
     <div class="connect-actions actions">
       <ng-container *ngIf="!networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">

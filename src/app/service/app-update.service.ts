@@ -5,12 +5,15 @@ import { EventSystem } from '@udonarium/core/system';
 /**
  * Tracks PWA updates: activate quietly when ready; UI shows an Angular modal
  * (no browser Notification / alert). New build applies on reload after user confirms.
+ *
+ * index.html is excluded from ngsw integrity (Cloudflare may rewrite HTML). Install
+ * failures are uncommon; on failure we still clear SW caches before reload.
  */
 @Injectable({ providedIn: 'root' })
 export class AppUpdateService implements OnDestroy {
   /** True when a newer build is available (activated, or install failed — still prompt reload). */
   isUpdateReady = false;
-  /** True when ngsw could not install (often index.html hash mismatch after deploy). */
+  /** True when ngsw could not install (e.g. hashed asset mismatch). */
   installFailed = false;
 
   private started = false;
@@ -48,7 +51,6 @@ export class AppUpdateService implements OnDestroy {
           break;
         case 'VERSION_INSTALLATION_FAILED':
           console.warn(`Failed to install app version '${event.version.hash}': ${event.error}`);
-          // Still show the update modal — user can hard-reload; hash mismatch is common after deploy.
           this.markReady(true);
           break;
       }
@@ -79,6 +81,35 @@ export class AppUpdateService implements OnDestroy {
     return true;
   }
 
+  /**
+   * Apply pending update. On install failure, unregister SW and drop ngsw caches
+   * so the next load is not stuck on a broken waiting worker.
+   */
+  async applyPendingUpdate(): Promise<void> {
+    if (this.installFailed) {
+      await this.clearBrokenServiceWorker();
+    }
+    document.location.reload();
+  }
+
+  /** Unregister SWs and delete ngsw Cache Storage entries (best-effort). */
+  async clearBrokenServiceWorker(): Promise<void> {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(reg => reg.unregister()));
+      }
+      if (typeof caches !== 'undefined') {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter(k => k.includes('ngsw')).map(k => caches.delete(k)),
+        );
+      }
+    } catch (err) {
+      console.warn('Failed to clear service worker before reload', err);
+    }
+  }
+
   private checkNow(): Promise<boolean> {
     if (!this.swUpdate.isEnabled) return Promise.resolve(false);
     return this.swUpdate.checkForUpdate().catch(err => {
@@ -90,7 +121,8 @@ export class AppUpdateService implements OnDestroy {
   private markReady(failed: boolean) {
     this.ngZone.run(() => {
       const firstReady = !this.isUpdateReady;
-      this.installFailed = this.installFailed || failed;
+      // Success must clear a prior fail so applyPendingUpdate does not wipe a good SW.
+      this.installFailed = failed;
       this.isUpdateReady = true;
       // Only arm auto-popup once per ready cycle.
       if (firstReady) {

@@ -10,7 +10,7 @@
     "pretest": "node scripts/write-git-version.mjs",
     "start": "ng serve --ssl --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.js",
     "build": "ng build",
-    "build:hktrpg-main": "node scripts/write-git-version.mjs && ng build --configuration production --base-href /hktrpg-main/ && node scripts/fix-ngsw-hashes.mjs dist/udonarium /hktrpg-main/",
+    "build:hktrpg-main": "node scripts/write-git-version.mjs && ng build --configuration production --base-href /hktrpg-main/ && node scripts/fix-ngsw-hashes.mjs dist/udonarium /hktrpg-main/ && node scripts/verify-ngsw-hashes.mjs dist/udonarium",
     "watch": "node scripts/write-git-version.mjs && ng build --watch --configuration development",
     "test": "ng test",
     "test:ci": "node scripts/write-git-version.mjs && ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",

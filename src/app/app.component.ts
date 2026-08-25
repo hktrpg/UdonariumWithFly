@@ -1021,7 +1021,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.folderBackup.isReady) {
         await this.folderBackup.flush({ timeoutMs: 60000 });
       }
-      document.location.reload();
+      await this.appUpdate.applyPendingUpdate();
     } finally {
       this.isUpdatePromptOpen = false;
     }
