@@ -16,6 +16,7 @@ describe('fileSyncPriority', () => {
   afterEach(() => {
     clearPlayingMusicCache();
     ObjectStore.instance.get('Jukebox')?.destroy();
+    ObjectStore.instance.clearDeleted('Jukebox');
     ImageStorage.instance.delete('img-thumb');
     ImageStorage.instance.delete('img-full');
   });
@@ -45,6 +46,7 @@ describe('fileSyncPriority', () => {
   });
 
   it('keeps playing BGM after thumbnails and before full images / pdf', () => {
+    ObjectStore.instance.clearDeleted('Jukebox');
     const jukebox = new Jukebox('Jukebox');
     jukebox.initialize();
     jukebox.tracks = [{

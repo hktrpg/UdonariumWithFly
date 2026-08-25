@@ -2,7 +2,9 @@ import { AudioState } from './audio-file';
 import { FileSyncPriorityTier } from './file-sync-priority';
 import { FileReceiveScheduler, estimateNextReceiveBytes } from './file-transfer-scheduler';
 import { ImageState } from './image-file';
-import { Network } from '../system';
+import { EventSystem, Network } from '../system';
+import { Jukebox } from '@udonarium/Jukebox';
+import { ObjectStore } from '../synchronize-object/object-store';
 
 describe('FileReceiveScheduler', () => {
   let peerIds: string[];
@@ -11,6 +13,11 @@ describe('FileReceiveScheduler', () => {
     FileReceiveScheduler.resetForTests();
     peerIds = ['p1'];
     spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => peerIds);
+  });
+
+  afterEach(() => {
+    ObjectStore.instance.get('Jukebox')?.destroy();
+    ObjectStore.instance.clearDeleted('Jukebox');
   });
 
   it('finishes thumbnail phase before dispatching audio/pdf by size', () => {
@@ -75,5 +82,67 @@ describe('FileReceiveScheduler', () => {
     FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'p1doc', 1_000_000, () => {});
     FileReceiveScheduler.schedule();
     expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(1);
+  });
+
+  it('promotes playing BGM after markForChanged-style Jukebox identifier event', () => {
+    const log = spyOn(console, 'log');
+    peerIds = []; // keep queue pending so tiers stay visible
+    FileReceiveScheduler.ensureNetworkHooks();
+    spyOn(FileReceiveScheduler as any, 'scheduleDeferred').and.callFake(() => {
+      FileReceiveScheduler.schedule();
+    });
+
+    FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', 'bgm-playing', 8_000_000, () => {});
+    FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'rules', 1_000_000, () => {});
+    FileReceiveScheduler.schedule();
+
+    let rows = log.calls.mostRecent().args[1] as Array<{ tier: string; id: string }>;
+    expect(rows.find(r => r.id === 'bgm-playing')?.tier).toBe('DEFAULT');
+
+    ObjectStore.instance.clearDeleted('Jukebox');
+    const jukebox = new Jukebox('Jukebox');
+    jukebox.initialize();
+    jukebox.tracks = [{
+      audioIdentifier: 'bgm-playing',
+      isPlaying: true,
+      isPaused: false,
+      currentTime: 0,
+      isLoop: true,
+      roomGain: 1,
+      label: '',
+      queue: [],
+      queueMode: 'single',
+      fadeSec: 2.5,
+      overlapSec: 6,
+    }, ...Array.from({ length: 4 }, () => ({
+      audioIdentifier: '',
+      isPlaying: false,
+      isPaused: false,
+      currentTime: 0,
+      isLoop: true,
+      roomGain: 1,
+      label: '',
+      queue: [],
+      queueMode: 'single' as const,
+      fadeSec: 2.5,
+      overlapSec: 6,
+    }))];
+    expect(jukebox.tracks[0].isPlaying).toBe(true);
+
+    // Simulate join: files queued before jukebox apply; forget any earlier priority snapshot.
+    (FileReceiveScheduler as any).playingMusicPriorityKey = '';
+    log.calls.reset();
+    // Same event markForChanged fires after inbound apply / releasePeerSync.
+    EventSystem.trigger('UPDATE_GAME_OBJECT/identifier/Jukebox', {
+      aliasName: 'jukebox',
+      identifier: 'Jukebox',
+    });
+
+    const orderLogs = log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order'));
+    expect(orderLogs.length).toBeGreaterThan(0);
+    rows = orderLogs[orderLogs.length - 1].args[1] as Array<{ tier: string; id: string; order: number }>;
+    expect(rows.find(r => r.id === 'bgm-playing')?.tier).toBe('PLAYING_AUDIO');
+    expect(rows[0].id).toBe('bgm-playing');
+    expect(rows[1].id).toBe('rules');
   });
 });

@@ -11,7 +11,7 @@ import { ImageState } from './image-file';
 import { PdfState } from './pdf-file';
 import { VideoState } from './video-file';
 import { EventSystem, Network } from '../system';
-import { setZeroTimeout } from '../system/util/zero-timeout';
+import { clearZeroTimeout, setZeroTimeout } from '../system/util/zero-timeout';
 
 export type FileResourceKind = 'image' | 'audio' | 'pdf' | 'video';
 
@@ -57,15 +57,28 @@ export class FileReceiveScheduler {
         FileReceiveScheduler.clearPeerRetryTimers();
         FileReceiveScheduler.schedule();
       })
+      // Inbound apply uses markForChanged → identifier/aliasName events (not plain UPDATE_GAME_OBJECT).
+      .on('UPDATE_GAME_OBJECT/identifier/Jukebox', () => {
+        FileReceiveScheduler.onPlayingMusicMaybeChanged();
+      })
+      .on('UPDATE_GAME_OBJECT/aliasName/jukebox', () => {
+        FileReceiveScheduler.onPlayingMusicMaybeChanged();
+      })
       .on('UPDATE_GAME_OBJECT', event => {
         if (event.data?.identifier !== 'Jukebox') return;
-        const key = [...collectPlayingMusicIdentifiers()].sort().join('\0');
-        if (key === FileReceiveScheduler.playingMusicPriorityKey) return;
-        FileReceiveScheduler.playingMusicPriorityKey = key;
-        if (FileReceiveScheduler.pending.length > 0) {
-          FileReceiveScheduler.scheduleDeferred();
-        }
+        FileReceiveScheduler.onPlayingMusicMaybeChanged();
       });
+  }
+
+  /** Re-sort pending downloads when room jukebox playing ids change. */
+  private static onPlayingMusicMaybeChanged(): void {
+    const key = [...collectPlayingMusicIdentifiers()].sort().join('\0');
+    if (key === FileReceiveScheduler.playingMusicPriorityKey) return;
+    FileReceiveScheduler.playingMusicPriorityKey = key;
+    if (FileReceiveScheduler.pending.length < 1) return;
+    // Refresh diagnostic log so PLAYING_AUDIO appears after late jukebox sync.
+    FileReceiveScheduler.loggedReceiveKeys.clear();
+    FileReceiveScheduler.scheduleDeferred();
   }
 
   private static clearPeerRetryTimers() {
@@ -314,6 +327,8 @@ export class FileReceiveScheduler {
 
   /** @internal Test helper — clears queued transfers between specs. */
   static resetForTests(): void {
+    EventSystem.unregister(FileReceiveScheduler);
+    FileReceiveScheduler.networkHooksRegistered = false;
     FileReceiveScheduler.activeReceives.clear();
     FileReceiveScheduler.outboundPending.clear();
     FileReceiveScheduler.pending = [];
@@ -322,7 +337,7 @@ export class FileReceiveScheduler {
     FileReceiveScheduler.loggedReceiveKeys.clear();
     FileReceiveScheduler.clearPeerRetryTimers();
     if (FileReceiveScheduler.scheduleTimer != null) {
-      clearTimeout(FileReceiveScheduler.scheduleTimer);
+      clearZeroTimeout(FileReceiveScheduler.scheduleTimer);
       FileReceiveScheduler.scheduleTimer = null;
     }
   }
