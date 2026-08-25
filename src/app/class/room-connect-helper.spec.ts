@@ -108,8 +108,7 @@ describe('RoomConnectHelper settle predicates', () => {
 
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   beforeEach(() => {
-    RoomConnectHelper.clearReopenRetry();
-    (RoomConnectHelper as any).reopenInFlight = false;
+    RoomConnectHelper.abortReopenInFlight();
     (RoomConnectHelper as any).rekeyInFlight = false;
     (RoomConnectHelper as any).backupRoomOpenInFlight = false;
     RoomConnectHelper.createRoomInFlight = false;
@@ -119,7 +118,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   });
 
   afterEach(() => {
-    (RoomConnectHelper as any).reopenInFlight = false;
+    RoomConnectHelper.abortReopenInFlight();
     (RoomConnectHelper as any).rekeyInFlight = false;
     (RoomConnectHelper as any).backupRoomOpenInFlight = false;
     RoomConnectHelper.createRoomInFlight = false;
@@ -127,7 +126,6 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     (RoomConnectHelper as any).joinOwnedUntil = 0;
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.everHadRoomSession = false;
-    RoomConnectHelper.clearReopenRetry();
     skyWayRecoveryGate.resetForTests();
   });
 

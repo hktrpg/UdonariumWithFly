@@ -119,7 +119,9 @@ describe('ObjectSynchronizer peer-sync hold', () => {
   });
 
   it('requests catalog objects while held during join fetch', async () => {
+    // getTargetPeerId filters peers by Network.peerIds ∩ open peers.
     spyOnProperty(Network, 'peers', 'get').and.returnValue([{ peerId: 'peer-a', isOpen: true } as any]);
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['peer-a']);
     const requested: string[] = [];
     spyOn(EventSystem, 'call').and.callFake(((name: string, data?: unknown) => {
       if (name === 'REQUEST_GAME_OBJECT') requested.push(String(data));

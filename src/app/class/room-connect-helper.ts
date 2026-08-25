@@ -76,6 +76,9 @@ export class RoomConnectHelper {
   private static readonly suppressedLobbyRooms = new Set<string>();
   /** Prevent NETWORK_ERROR → reopen → NETWORK_ERROR loops. */
   private static reopenInFlight = false;
+  /** EventSystem key for the in-flight reopen; kept so tests/abort can unregister reliably. */
+  private static reopenListenerKey: object | null = null;
+  private static reopenFinish: (() => void) | null = null;
   /** GM auth re-key — suppress auto-reopen while Network.open churns. */
   private static rekeyInFlight = false;
   /** After re-key, prefer full mesh (skip survival cap) until boost window ends. */
@@ -688,6 +691,23 @@ export class RoomConnectHelper {
   }
 
   /**
+   * Abort an in-flight reopen (EventSystem listeners + busy overlay).
+   * Used by tests between cases; also clears a leaked listener before a new reopen.
+   */
+  static abortReopenInFlight() {
+    RoomConnectHelper.clearReopenRetry();
+    if (RoomConnectHelper.reopenFinish) {
+      RoomConnectHelper.reopenFinish();
+      return;
+    }
+    if (RoomConnectHelper.reopenListenerKey) {
+      EventSystem.unregister(RoomConnectHelper.reopenListenerKey);
+      RoomConnectHelper.reopenListenerKey = null;
+    }
+    RoomConnectHelper.reopenInFlight = false;
+  }
+
+  /**
    * After a failed reopen or channel drop, retry with backoff instead of staying offline.
    * Outage kinds (rtc-api / server-error / token-api) use longer ceilings to avoid stampede.
    * @param errorType Error that caused the retry.
@@ -761,21 +781,34 @@ export class RoomConnectHelper {
       }
     }
 
+    // Drop a leaked prior reopen listener (e.g. test afterEach forced reopenInFlight=false).
+    if (RoomConnectHelper.reopenFinish || RoomConnectHelper.reopenListenerKey) {
+      RoomConnectHelper.abortReopenInFlight();
+    }
+
     RoomConnectHelper.reopenInFlight = true;
     const busyKey = willReopenRoom ? 'net.reconnectingRoom' : 'net.reconnecting';
     ConnectionBusyService.instance?.show(busyKey);
     console.warn(`reopen: started willReopenRoom=${willReopenRoom}`);
 
     const key = { autoReconnect: true };
+    RoomConnectHelper.reopenListenerKey = key;
     let settled = false;
     const finish = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       EventSystem.unregister(key);
+      if (RoomConnectHelper.reopenListenerKey === key) {
+        RoomConnectHelper.reopenListenerKey = null;
+      }
+      if (RoomConnectHelper.reopenFinish === finish) {
+        RoomConnectHelper.reopenFinish = null;
+      }
       ConnectionBusyService.instance?.hide();
       RoomConnectHelper.reopenInFlight = false;
     };
+    RoomConnectHelper.reopenFinish = finish;
     const reopenErrorType = errorType
       || (skyWayRecoveryGate.lastOutageKind !== 'disconnected' ? skyWayRecoveryGate.lastOutageKind : 'disconnected');
     const timer = setTimeout(() => {
