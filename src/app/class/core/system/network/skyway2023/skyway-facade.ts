@@ -14,6 +14,10 @@ import { CryptoUtil } from '../../util/crypto-util';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
 import { installSkyWayQuietLogger, isAlreadySameNameMemberExist } from './skyway-log';
+import {
+  nextRefreshDelayMs,
+  skyWayRecoveryGate,
+} from './skyway-recovery-policy';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
@@ -34,6 +38,9 @@ export class SkyWayFacade {
   private lobbyJoinTimer: ReturnType<typeof setTimeout> | null = null;
   private lobbyJoinBackoffMs = 5000;
   private roomRestoreInFlight = false;
+  private tokenRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private tokenRefreshAttempt = 0;
+  private tokenRefreshGeneration = 0;
 
   onOpen: (peer: IPeerContext) => void;
   onClose: (peer: IPeerContext) => void;
@@ -102,6 +109,7 @@ export class SkyWayFacade {
   async close() {
     try {
       this.clearLobbyJoinRetry();
+      this.clearTokenRefresh();
       this.peer = PeerContext.parse('???');
       this.isDestroyed = true;
 
@@ -134,6 +142,7 @@ export class SkyWayFacade {
 
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
     if (authToken.length < 1) {
+      skyWayRecoveryGate.noteFailure('token-api');
       let message = translate('skyway.backendUnavailable', { url: backend.url });
       const err = new Error(message);
       err.name = 'server-error';
@@ -143,23 +152,14 @@ export class SkyWayFacade {
     let context = await SkyWayContext.Create(authToken);
     context.onTokenUpdateReminder.add(async () => {
       console.log(`skyWay onTokenUpdateReminder ${new Date().toISOString()}`);
-      let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
-      if (authToken.length < 1) {
-        let message = translate('skyway.backendUnavailableShort', { url: backend.url });
-        console.warn(`skyWay token refresh failed: ${message}`);
-        return;
-      }
-      context.updateAuthToken(authToken);
+      this.clearTokenRefreshTimersOnly();
+      this.tokenRefreshAttempt = 0;
+      await this.refreshAuthToken(context, backend, channelName, true);
     });
 
     context.onTokenExpired.add(() => {
       console.error('skyWay onTokenExpired');
-      if (this.isOpen) {
-        this.close();
-        if (this.onClose) this.onClose(this.peer);
-      }
-      let message = translate('skyway.tokenExpired');
-      if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
+      void this.handleTokenExpired(context, backend, channelName);
     });
 
     context.onFatalError.add(err => {
@@ -169,10 +169,100 @@ export class SkyWayFacade {
         if (this.onClose) this.onClose(this.peer);
       }
       const fatal = this.formatFatalError(err);
+      if (/rtc-?api/i.test(fatal.type)) {
+        skyWayRecoveryGate.noteFailure('rtc-api');
+      }
       if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.context = context;
+  }
+
+  private clearTokenRefresh() {
+    this.clearTokenRefreshTimersOnly();
+    this.tokenRefreshGeneration++;
+    this.tokenRefreshAttempt = 0;
+  }
+
+  /** Clear pending retry without bumping generation (mid-session reminder restart). */
+  private clearTokenRefreshTimersOnly() {
+    if (this.tokenRefreshTimer != null) {
+      clearTimeout(this.tokenRefreshTimer);
+      this.tokenRefreshTimer = null;
+    }
+  }
+
+  private async refreshAuthToken(
+    context: SkyWayContext,
+    backend: SkyWayBackend,
+    channelName: string,
+    scheduleRetry: boolean,
+  ): Promise<boolean> {
+    if (this.isDestroyed || !context || context.disposed) return false;
+    const gen = this.tokenRefreshGeneration;
+    const authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
+    if (gen !== this.tokenRefreshGeneration || this.isDestroyed) return false;
+    if (authToken.length < 1) {
+      skyWayRecoveryGate.noteFailure('token-api');
+      const message = translate('skyway.backendUnavailableShort', { url: backend.url });
+      console.warn(`token-refresh: attempt ${this.tokenRefreshAttempt} failed: ${message}`);
+      if (scheduleRetry && !this.isDestroyed) {
+        this.clearTokenRefreshTimersOnly();
+        const delay = nextRefreshDelayMs(this.tokenRefreshAttempt);
+        this.tokenRefreshAttempt++;
+        console.warn(`token-refresh: retry in ${delay}ms`);
+        this.tokenRefreshTimer = setTimeout(() => {
+          this.tokenRefreshTimer = null;
+          void this.refreshAuthToken(context, backend, channelName, true);
+        }, delay);
+      }
+      return false;
+    }
+    try {
+      context.updateAuthToken(authToken);
+      this.tokenRefreshAttempt = 0;
+      this.clearTokenRefreshTimersOnly();
+      skyWayRecoveryGate.noteSuccess();
+      console.log('token-refresh: success');
+      return true;
+    } catch (e) {
+      console.warn('token-refresh: updateAuthToken failed', e);
+      if (scheduleRetry && !this.isDestroyed) {
+        this.clearTokenRefreshTimersOnly();
+        const delay = nextRefreshDelayMs(this.tokenRefreshAttempt);
+        this.tokenRefreshAttempt++;
+        this.tokenRefreshTimer = setTimeout(() => {
+          this.tokenRefreshTimer = null;
+          void this.refreshAuthToken(context, backend, channelName, true);
+        }, delay);
+      }
+      return false;
+    }
+  }
+
+  private async handleTokenExpired(
+    context: SkyWayContext,
+    backend: SkyWayBackend,
+    channelName: string,
+  ) {
+    this.clearTokenRefresh();
+    // Best-effort final refresh with a short timeout — do not hang close().
+    const final = Promise.race([
+      this.refreshAuthToken(context, backend, channelName, false),
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 2500)),
+    ]);
+    const ok = await final;
+    if (ok && !this.isDestroyed) {
+      console.log('token-refresh: recovered after expiry reminder race');
+      return;
+    }
+    if (this.isOpen) {
+      this.close();
+      if (this.onClose) this.onClose(this.peer);
+    }
+    const message = translate('skyway.tokenExpired');
+    skyWayRecoveryGate.noteFailure('token-expired');
+    if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
   }
 
   private async joinLobby() {

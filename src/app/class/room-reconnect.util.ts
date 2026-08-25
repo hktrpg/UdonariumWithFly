@@ -195,6 +195,9 @@ export function shouldAttemptRoomReopen(errorType: string): boolean {
   // SDK kebab-cases internalError → internal-error, Event asPromise timeout, etc.
   if (/^internal(-|$)/.test(errorType)) return true;
   if (/timeout|as-promise/i.test(errorType)) return true;
+  // SkyWay rtcApiFatalError after _reconnectLimit (situation 1 outage).
+  if (/rtc-?api/i.test(errorType)) return true;
+  if (errorType === 'token-api') return true;
   return false;
 }
 

@@ -85,6 +85,10 @@ import { RoomSettingComponent } from 'component/room-setting/room-setting.compon
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
+import {
+  shouldSuppressConfigErrorModal,
+  skyWayRecoveryGate,
+} from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
 import { RoomAuth } from '@udonarium/room-auth';
 import { RoomInviteService, RoomInviteJoinResult } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
@@ -149,6 +153,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private inviteHandled = false;
   private lobbyAutoOpened = false;
   private isRefreshPromptOpen = false;
+  private isUpdatePromptOpen = false;
   private mobileSub: Subscription = null;
 
   /** Bottom / rail items — Play vs Edit is a filter, not duplicated markup. */
@@ -612,23 +617,43 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           // Join probe owns NETWORK_ERROR while active and briefly after fail (abandon race).
           if (RoomConnectHelper.isJoinOwningNetworkError) return;
 
-          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)
-            && RoomConnectHelper.shouldAttemptReopenNow()) {
-            const result = RoomConnectHelper.reopenLastRoomOrLobby();
-            if (result === 'started') return;
-            if (result === 'busy') {
-              console.warn('RoomConnectHelper reopen busy; showing error UI if config-related');
+          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) {
+            if (!RoomConnectHelper.shouldAttemptReopenNow()) {
+              // Recovery already owned (reopen / jitter / join) — no modal spam.
+              if (shouldSuppressConfigErrorModal(errorType, {
+                reopenResult: 'busy',
+                retryPending: RoomConnectHelper.isReopenRetryPending(),
+                coolingDown: skyWayRecoveryGate.isCoolingDown(),
+              }) || RoomConnectHelper.isNetworkReconnecting()) {
+                return;
+              }
               if (!configErrorTypes.includes(errorType)) return;
-            } else if (result === 'no-session') {
-              await this.modalService.open(TextViewComponent, {
-                title: this.i18n.t('net.errorTitle'),
-                text: this.i18n.t('net.reconnectSessionLost'),
-              });
-              return;
+            } else {
+              const result = RoomConnectHelper.reopenLastRoomOrLobby(errorType);
+              if (result === 'started') return;
+              if (result === 'busy') {
+                console.warn('RoomConnectHelper reopen busy; showing error UI if config-related');
+                if (shouldSuppressConfigErrorModal(errorType, {
+                  reopenResult: 'busy',
+                  retryPending: RoomConnectHelper.isReopenRetryPending(),
+                  coolingDown: skyWayRecoveryGate.isCoolingDown(),
+                })) return;
+                if (!configErrorTypes.includes(errorType)) return;
+              } else if (result === 'no-session') {
+                await this.modalService.open(TextViewComponent, {
+                  title: this.i18n.t('net.errorTitle'),
+                  text: this.i18n.t('net.reconnectSessionLost'),
+                });
+                return;
+              }
             }
           }
 
           if (configErrorTypes.includes(errorType)) {
+            if (shouldSuppressConfigErrorModal(errorType, {
+              retryPending: RoomConnectHelper.isReopenRetryPending(),
+              coolingDown: skyWayRecoveryGate.isCoolingDown(),
+            })) return;
             await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
             await this.modalService.open(TextViewComponent, {
               title: this.i18n.t('net.errorTitle'),
@@ -703,6 +728,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('MESSAGE_ADDED', () => {
         this.lazyNgZoneUpdate(true);
+      })
+      .on('APP_UPDATE_READY', () => {
+        this.ngZone.run(() => { void this.promptAppUpdateIfPending(); });
       })
       .on('CHAT_PANEL_CHANGED', () => {
         this.lazyNgZoneUpdate(true);
@@ -958,8 +986,33 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       tourWasActive = active;
     });
     
-    // PWA: download in background, activate for next reload; peer-menu shows an icon (no auto-reload).
+    // PWA: download in background; Angular modal prompts reload when ready (no browser Notification).
     this.appUpdate.start();
+  }
+
+  /** Auto popup when a new SW build is ready (one-shot via takeUpdatePrompt). */
+  private async promptAppUpdateIfPending() {
+    if (this.isUpdatePromptOpen) return;
+    if (!this.appUpdate.takeUpdatePrompt()) return;
+    this.isUpdatePromptOpen = true;
+    try {
+      const failed = this.appUpdate.installFailed;
+      const result = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('update.title'),
+        text: this.i18n.t(failed ? 'update.failedText' : 'update.text'),
+        helpHtml: this.i18n.t(failed ? 'update.failedHelp' : 'update.help'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'system_update',
+        okLabel: this.i18n.t(failed ? 'update.hardReload' : 'update.restart'),
+      });
+      if (result === false || result == null) return;
+      if (this.folderBackup.isReady) {
+        await this.folderBackup.flush({ timeoutMs: 60000 });
+      }
+      document.location.reload();
+    } finally {
+      this.isUpdatePromptOpen = false;
+    }
   }
 
   ngOnDestroy() {
