@@ -1,4 +1,5 @@
-<div class="settings-ui dense peer-menu" appFitPanel [fitMinHeight]="320" [fitMaxHeight]="560">
+<!-- fitMaxHeight 0 = viewport cap (not a short 560px ceiling that clips the peer list). -->
+<div class="settings-ui dense peer-menu" appFitPanel [fitMinHeight]="320" [fitMaxHeight]="0">
   <section class="card card-dense">
     <div class="lang-row">
       <label class="lang-label">{{ 'peer.language' | i18n }}</label>

@@ -821,9 +821,9 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
               if (loggingTexts.length) this.chatMessageService.sendOperationLog(loggingTexts.join("\n"));
               if (isDiceRoll) {
                 if (Math.random() < 0.5) {
-                  SoundEffect.play(PresetSound.diceRoll1);
+                  SoundEffect.playRoom(PresetSound.diceRoll1);
                 } else {
-                  SoundEffect.play(PresetSound.diceRoll2);
+                  SoundEffect.playRoom(PresetSound.diceRoll2);
                 }
               }
             //})();

@@ -112,6 +112,8 @@ interface MobileNavItemDef {
   /** When true, hide unless canShowMenu(tourId). */
   gated?: boolean;
   chatBadge?: boolean;
+  /** Show system_update badge when a PWA build is ready. */
+  updateBadge?: boolean;
 }
 
 @Component({
@@ -158,7 +160,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Bottom / rail items — Play vs Edit is a filter, not duplicated markup. */
   private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = [
-    { tourId: 'menu.connection', icon: 'people', labelKey: 'menu.connection', tipKey: 'tip.menu.connection', mode: 'play', action: 'open', component: 'PeerMenuComponent' },
+    { tourId: 'menu.connection', icon: 'people', labelKey: 'menu.connection', tipKey: 'tip.menu.connection', mode: 'play', action: 'open', component: 'PeerMenuComponent', updateBadge: true },
     { tourId: 'menu.chat', icon: 'speaker_notes', labelKey: 'menu.chat', tipKey: 'tip.menu.chat', mode: 'play', action: 'open', component: 'ChatWindowComponent', chatBadge: true },
     { tourId: 'menu.combat', icon: 'sports_mma', labelKey: 'menu.combat', tipKey: 'tip.menu.combat', mode: 'play', action: 'open', component: 'CombatTrackerComponent' },
     { tourId: 'menu.inventory', icon: 'folder_shared', labelKey: 'menu.inventory', tipKey: 'tip.menu.inventory', mode: 'play', action: 'open', component: 'GameObjectInventoryComponent', gated: true },
@@ -211,16 +213,22 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
    */
   showChatUnreadBadge = false;
   chatUnreadBadgeLabel = '0';
-
-  /** Non-focusing toast for body-level audio import rejects (5s). */
-  audioRejectToastLines: string[] = [];
-  private audioRejectToastTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Cached so APP_UPDATE_READY can refresh the menu badge without NG0100. */
+  showAppUpdateBadge = false;
 
   private syncChatUnreadBadge() {
     const n = ChatTabList.instance.unreadLength;
     this.showChatUnreadBadge = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
     this.chatUnreadBadgeLabel = n > 99 ? '99+' : String(n);
   }
+
+  private syncAppUpdateBadge() {
+    this.showAppUpdateBadge = this.appUpdate.isUpdateReady;
+  }
+
+  /** Non-focusing toast for body-level audio import rejects (5s). */
+  audioRejectToastLines: string[] = [];
+  private audioRejectToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
@@ -250,7 +258,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   constructor(
-    private appUpdate: AppUpdateService,
+    public appUpdate: AppUpdateService,
     private modalService: ModalService,
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
@@ -730,7 +738,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         this.lazyNgZoneUpdate(true);
       })
       .on('APP_UPDATE_READY', () => {
-        this.ngZone.run(() => { void this.promptAppUpdateIfPending(); });
+        this.ngZone.run(() => {
+          this.syncAppUpdateBadge();
+          void this.promptAppUpdateIfPending();
+        });
       })
       .on('CHAT_PANEL_CHANGED', () => {
         this.lazyNgZoneUpdate(true);
@@ -988,6 +999,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     
     // PWA: download in background; Angular modal prompts reload when ready (no browser Notification).
     this.appUpdate.start();
+    this.syncAppUpdateBadge();
   }
 
   /** Auto popup when a new SW build is ready (one-shot via takeUpdatePrompt). */

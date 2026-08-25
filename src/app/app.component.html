@@ -26,9 +26,11 @@
       [appTeachingTip]="item.tipKey"
       (click)="onMobileNavClick(item, $event)">
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none">
-        <div [class.menu-chat-icon]="item.chatBadge">
+        <div [class.menu-chat-icon]="item.chatBadge || item.updateBadge">
           <i class="material-icons" [class.icon-size]="!isTabletLandscape">{{ item.icon }}</i>
           <span *ngIf="item.chatBadge && showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span>
+          <i *ngIf="item.updateBadge && showAppUpdateBadge" class="material-icons menu-update-badge"
+            aria-hidden="true">system_update</i>
         </div>
         <div>{{ item.labelKey | i18n }}</div>
       </a>
@@ -41,7 +43,12 @@
   <ul>
     <li data-tour-id="menu.connection" [appTeachingTip]="'tip.menu.connection'" (click)="openOrToggle('PeerMenuComponent')">
       <a routerLink="/" routerLinkActive="active">
-        <div><i class="material-icons icon-size">people</i></div>
+        <div class="menu-chat-icon">
+          <i class="material-icons icon-size">people</i>
+          <i *ngIf="showAppUpdateBadge" class="material-icons menu-update-badge"
+            [attr.title]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n"
+            aria-hidden="true">system_update</i>
+        </div>
         <div>{{ 'menu.connection' | i18n }}</div>
       </a>
     </li>

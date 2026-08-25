@@ -91,6 +91,18 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   transform: none;
 }
 
+.menu-update-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 1;
+  pointer-events: none;
+  font-size: 16px !important;
+  line-height: 1;
+  color: #c45c26;
+  text-shadow: 0 0 2px #fff, 0 0 3px #fff;
+}
+
 .mobile-bottom-nav .menu-chat-badge,
 .mobile-side-rail .menu-chat-badge {
   min-width: 14px;
