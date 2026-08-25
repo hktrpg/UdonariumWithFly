@@ -61,7 +61,7 @@ export class AudioStorage {
   }
 
   private _add(audio: AudioFile): AudioFile {
-    if (AudioState.COMPLETE <= audio.state) this.lazySynchronize(100);
+    if (audio.state === AudioState.COMPLETE) this.lazySynchronize(100);
     if (this.update(audio)) return this.hash[audio.identifier];
     this.hash[audio.identifier] = audio;
     return audio;
@@ -114,7 +114,7 @@ export class AudioStorage {
   getCatalog(): CatalogItem[] {
     let catalog: CatalogItem[] = [];
     for (let audio of AudioStorage.instance.audios) {
-      if (AudioState.COMPLETE <= audio.state) {
+      if (audio.state === AudioState.COMPLETE) {
         catalog.push({
           identifier: audio.identifier,
           state: audio.state,

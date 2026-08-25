@@ -2,20 +2,49 @@ import { Jukebox } from '@udonarium/Jukebox';
 
 import { ObjectStore } from '../synchronize-object/object-store';
 
-import { FileSyncPriorityTier, compareFileSyncPriority, fileSyncPriorityTier } from './file-sync-priority';
+import {
+  FileSyncPriorityTier,
+  clearPlayingMusicCache,
+  compareFileSyncPriority,
+  fileSyncPriorityTier,
+  primePlayingMusicCache,
+} from './file-sync-priority';
+import { ImageFile, ImageState } from './image-file';
+import { ImageStorage } from './image-storage';
 
 describe('fileSyncPriority', () => {
-  it('ranks images above playing audio and other files', () => {
-    expect(fileSyncPriorityTier('image', 'img-a')).toBe(FileSyncPriorityTier.IMAGE);
-    expect(fileSyncPriorityTier('audio', 'bgm-a')).toBe(FileSyncPriorityTier.DEFAULT);
-    expect(compareFileSyncPriority('image', 'img-a', 500_000, 'audio', 'bgm-a', 1_000)).toBeLessThan(0);
-    expect(compareFileSyncPriority('audio', 'bgm-a', 1_000, 'video', 'clip', 5_000_000)).toBeLessThan(0);
+  afterEach(() => {
+    clearPlayingMusicCache();
+    ObjectStore.instance.get('Jukebox')?.destroy();
+    ImageStorage.instance.delete('img-thumb');
+    ImageStorage.instance.delete('img-full');
   });
 
-  it('treats jukebox playing tracks as priority audio', () => {
-    const existing = ObjectStore.instance.get('Jukebox');
-    existing?.destroy();
+  it('ranks thumbnails → playing BGM → full images → audio/pdf by size', () => {
+    const thumb = ImageFile.createEmpty('img-thumb');
+    ImageStorage.instance.add(thumb);
 
+    const full = ImageFile.createEmpty('img-full');
+    const thumbBlob = new Blob([new Uint8Array(4)], { type: 'image/png' });
+    (full as any).context.thumbnail = { blob: thumbBlob, type: 'image/png', url: '' };
+    (full as any).context.blob = null;
+    ImageStorage.instance.add(full);
+
+    expect(thumb.state).toBe(ImageState.NULL);
+    expect(full.state).toBe(ImageState.THUMBNAIL);
+
+    expect(fileSyncPriorityTier('image', 'img-thumb')).toBe(FileSyncPriorityTier.IMAGE_THUMB);
+    expect(fileSyncPriorityTier('image', 'img-full')).toBe(FileSyncPriorityTier.IMAGE_FULL);
+    expect(fileSyncPriorityTier('pdf', 'rules')).toBe(FileSyncPriorityTier.DEFAULT);
+    expect(fileSyncPriorityTier('audio', 'idle')).toBe(FileSyncPriorityTier.DEFAULT);
+
+    expect(compareFileSyncPriority('image', 'img-thumb', 4_000, 'image', 'img-full', 500_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('image', 'img-full', 500_000, 'audio', 'idle', 1_000)).toBeLessThan(0);
+    // Same DEFAULT tier: smaller pdf before larger idle audio.
+    expect(compareFileSyncPriority('pdf', 'rules', 1_000, 'audio', 'idle', 8_000_000)).toBeLessThan(0);
+  });
+
+  it('keeps playing BGM after thumbnails and before full images / pdf', () => {
     const jukebox = new Jukebox('Jukebox');
     jukebox.initialize();
     jukebox.tracks = [{
@@ -43,12 +72,20 @@ describe('fileSyncPriority', () => {
       fadeSec: 2.5,
       overlapSec: 6,
     }))];
+    primePlayingMusicCache();
+
+    const full = ImageFile.createEmpty('img-full');
+    const thumbBlob = new Blob([new Uint8Array(4)], { type: 'image/png' });
+    (full as any).context.thumbnail = { blob: thumbBlob, type: 'image/png', url: '' };
+    (full as any).context.blob = null;
+    ImageStorage.instance.add(full);
 
     expect(fileSyncPriorityTier('audio', 'bgm-playing')).toBe(FileSyncPriorityTier.PLAYING_AUDIO);
     expect(fileSyncPriorityTier('audio', 'bgm-next')).toBe(FileSyncPriorityTier.PLAYING_AUDIO);
-    expect(fileSyncPriorityTier('audio', 'bgm-idle')).toBe(FileSyncPriorityTier.DEFAULT);
-    expect(compareFileSyncPriority('image', 'thumb', 8_000, 'audio', 'bgm-playing', 4_000_000)).toBeLessThan(0);
-    expect(compareFileSyncPriority('audio', 'bgm-playing', 4_000_000, 'video', 'clip', 1_000)).toBeLessThan(0);
+
+    expect(compareFileSyncPriority('image', 'missing-thumb', 4_000, 'audio', 'bgm-playing', 8_000_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('audio', 'bgm-playing', 8_000_000, 'image', 'img-full', 500_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('audio', 'bgm-playing', 8_000_000, 'pdf', 'rules', 1_000)).toBeLessThan(0);
 
     jukebox.destroy();
   });

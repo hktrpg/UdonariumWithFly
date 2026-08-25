@@ -3,6 +3,7 @@ import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { FileReaderUtil } from './file-reader-util';
+import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 import { VideoCatalogItem, VideoStorage } from './video-storage';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
@@ -34,6 +35,7 @@ export class VideoSharingSystem {
         const otherCatalog: VideoCatalogItem[] = event.data;
         const request: VideoCatalogItem[] = [];
         for (const item of otherCatalog) {
+          if (this.hydrateUrlBackedIfNeeded(item)) continue;
           let video = VideoStorage.instance.get(item.identifier);
           if (video === null) {
             video = VideoFile.createEmpty(item.identifier);
@@ -165,6 +167,7 @@ export class VideoSharingSystem {
       if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
       const request: VideoCatalogItem[] = [];
       for (const item of catalog) {
+        if (this.hydrateUrlBackedIfNeeded(item)) continue;
         let video = VideoStorage.instance.get(item.identifier);
         if (video === null) {
           video = VideoFile.createEmpty(item.identifier);
@@ -178,6 +181,18 @@ export class VideoSharingSystem {
       }
       if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
+  }
+
+  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
+  private hydrateUrlBackedIfNeeded(item: VideoCatalogItem): boolean {
+    if (item.state !== VideoState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
+      return false;
+    }
+    const existing = VideoStorage.instance.get(item.identifier);
+    if (!existing || existing.state < VideoState.URL) {
+      VideoStorage.instance.add(VideoFile.create(item.identifier));
+    }
+    return true;
   }
 
   private queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {

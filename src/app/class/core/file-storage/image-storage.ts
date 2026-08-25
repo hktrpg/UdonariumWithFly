@@ -63,7 +63,8 @@ export class ImageStorage {
   }
 
   private _add(image: ImageFile): ImageFile {
-    if (ImageState.COMPLETE <= image.state) this.lazySynchronize(100);
+    // URL assets (./assets/...) are not P2P-synced; only blob-complete entries.
+    if (image.state === ImageState.COMPLETE) this.lazySynchronize(100);
     if (this.update(image)) return this.imageHash[image.identifier];
     this.imageHash[image.identifier] = image;
     return image;
@@ -116,7 +117,8 @@ export class ImageStorage {
   getCatalog(): CatalogItem[] {
     let catalog: CatalogItem[] = [];
     for (let image of this.images) {
-      if (ImageState.COMPLETE <= image.state) {
+      // Exclude ImageState.URL (1000): COMPLETE <= URL would advertise path/HTTP assets for P2P.
+      if (image.state === ImageState.COMPLETE) {
         catalog.push({
           identifier: image.identifier,
           state: image.state,

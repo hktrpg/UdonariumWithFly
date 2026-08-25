@@ -2,17 +2,32 @@ import { Jukebox } from '@udonarium/Jukebox';
 
 import { ObjectStore } from '../synchronize-object/object-store';
 
+import { ImageState } from './image-file';
+import { ImageStorage } from './image-storage';
+
 type FileResourceKind = 'image' | 'audio' | 'pdf' | 'video';
 
-/** Lower tier runs first. Within a tier, sort by estimated bytes ascending. */
+/**
+ * Lower tier runs first. Within a tier, sort by estimated bytes ascending.
+ *
+ * Join order: thumbnails → playing BGM → full images → (audio + pdf + video by size).
+ */
 export enum FileSyncPriorityTier {
-  IMAGE = 0,
+  IMAGE_THUMB = 0,
   PLAYING_AUDIO = 1,
-  DEFAULT = 2,
+  IMAGE_FULL = 2,
+  /** Idle audio, pdf, video — same tier, size order. */
+  DEFAULT = 3,
 }
 
 export function fileSyncPriorityTier(kind: FileResourceKind, identifier: string): FileSyncPriorityTier {
-  if (kind === 'image') return FileSyncPriorityTier.IMAGE;
+  if (kind === 'image') {
+    const image = ImageStorage.instance.get(identifier);
+    const state = image?.state ?? ImageState.NULL;
+    // Still need thumbnail blob before full image.
+    if (state < ImageState.THUMBNAIL) return FileSyncPriorityTier.IMAGE_THUMB;
+    return FileSyncPriorityTier.IMAGE_FULL;
+  }
   if (kind === 'audio' && isPlayingMusicIdentifier(identifier)) {
     return FileSyncPriorityTier.PLAYING_AUDIO;
   }

@@ -50,7 +50,7 @@ export class VideoStorage {
   }
 
   private _add(video: VideoFile): VideoFile {
-    if (VideoState.COMPLETE <= video.state) this.lazySynchronize(100);
+    if (video.state === VideoState.COMPLETE) this.lazySynchronize(100);
     if (this.update(video)) return this.hash[video.identifier];
     this.hash[video.identifier] = video;
     return video;
@@ -93,7 +93,7 @@ export class VideoStorage {
   getCatalog(): VideoCatalogItem[] {
     const catalog: VideoCatalogItem[] = [];
     for (const video of this.videos) {
-      if (VideoState.COMPLETE <= video.state) {
+      if (video.state === VideoState.COMPLETE) {
         catalog.push({
           identifier: video.identifier,
           state: video.state,

@@ -50,7 +50,7 @@ export class PdfStorage {
   }
 
   private _add(pdf: PdfFile): PdfFile {
-    if (PdfState.COMPLETE <= pdf.state) this.lazySynchronize(100);
+    if (pdf.state === PdfState.COMPLETE) this.lazySynchronize(100);
     if (this.update(pdf)) return this.hash[pdf.identifier];
     this.hash[pdf.identifier] = pdf;
     return pdf;
@@ -93,7 +93,7 @@ export class PdfStorage {
   getCatalog(): PdfCatalogItem[] {
     const catalog: PdfCatalogItem[] = [];
     for (const pdf of this.pdfs) {
-      if (PdfState.COMPLETE <= pdf.state) {
+      if (pdf.state === PdfState.COMPLETE) {
         catalog.push({
           identifier: pdf.identifier,
           state: pdf.state,

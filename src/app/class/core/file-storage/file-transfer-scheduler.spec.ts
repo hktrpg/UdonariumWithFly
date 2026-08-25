@@ -1,20 +1,28 @@
 import { AudioState } from './audio-file';
+import { FileSyncPriorityTier } from './file-sync-priority';
 import { FileReceiveScheduler, estimateNextReceiveBytes } from './file-transfer-scheduler';
 import { ImageState } from './image-file';
 import { Network } from '../system';
 
 describe('FileReceiveScheduler', () => {
+  let peerIds: string[];
+
   beforeEach(() => {
     FileReceiveScheduler.resetForTests();
-    spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['p1']);
+    peerIds = ['p1'];
+    spyOnProperty(Network, 'peerIds', 'get').and.callFake(() => peerIds);
   });
-  it('schedules images before other kinds, then smallest bytes within tier', () => {
+
+  it('finishes thumbnail phase before dispatching audio/pdf by size', () => {
     const order: string[] = [];
     FileReceiveScheduler.enqueueReceiveRequest('video', 'p1', 'big', 5_000_000, () => order.push('big'));
     FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', 'small', 100_000, () => order.push('small'));
     FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'mid', 1_000_000, () => order.push('mid'));
     FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'thumb', 4_000, () => order.push('thumb'));
     FileReceiveScheduler.schedule();
+    expect(order).toEqual(['thumb']);
+    FileReceiveScheduler.markReceiveStart('image', 'thumb');
+    FileReceiveScheduler.markReceiveEnd('image', 'thumb');
     expect(order).toEqual(['thumb', 'small', 'mid', 'big']);
   });
 
@@ -46,5 +54,26 @@ describe('FileReceiveScheduler', () => {
       byteSize: 42_000,
     });
     expect(bytes).toBe(42_000);
+  });
+
+  it('logs receive order only when new files enter the queue', () => {
+    const log = spyOn(console, 'log');
+    peerIds = [];
+    FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', 'a1', 100_000, () => {});
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'i1', 4_000, () => {});
+    FileReceiveScheduler.schedule();
+    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(1);
+    const rows = log.calls.mostRecent().args[1] as Array<{ tier: string; id: string }>;
+    expect(rows[0].tier).toBe('IMAGE_THUMB');
+    expect(rows.map(r => r.id)).toEqual(['i1', 'a1']);
+    expect(FileSyncPriorityTier.IMAGE_THUMB).toBe(0);
+
+    log.calls.reset();
+    FileReceiveScheduler.schedule();
+    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(0);
+
+    FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'p1doc', 1_000_000, () => {});
+    FileReceiveScheduler.schedule();
+    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(1);
   });
 });

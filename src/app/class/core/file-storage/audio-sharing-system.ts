@@ -5,6 +5,7 @@ import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
+import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class AudioSharingSystem {
@@ -40,6 +41,7 @@ export class AudioSharingSystem {
 
         netDebug('SYNCHRONIZE_AUDIO_LIST active tasks ', this.sendTaskMap.size + this.receiveTaskMap.size);
         for (let item of otherCatalog) {
+          if (this.hydrateUrlBackedIfNeeded(item)) continue;
           let audio: AudioFile = AudioStorage.instance.get(item.identifier);
           if (audio === null) {
             audio = AudioFile.createEmpty(item.identifier);
@@ -214,6 +216,7 @@ export class AudioSharingSystem {
       if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
       const request: CatalogItem[] = [];
       for (const item of catalog) {
+        if (this.hydrateUrlBackedIfNeeded(item)) continue;
         let audio = AudioStorage.instance.get(item.identifier);
         if (audio === null) {
           audio = AudioFile.createEmpty(item.identifier);
@@ -227,6 +230,18 @@ export class AudioSharingSystem {
       }
       if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
+  }
+
+  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
+  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
+    if (item.state !== AudioState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
+      return false;
+    }
+    const existing = AudioStorage.instance.get(item.identifier);
+    if (!existing || existing.state < AudioState.URL) {
+      AudioStorage.instance.add(AudioFile.create(item.identifier));
+    }
+    return true;
   }
 
   private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {

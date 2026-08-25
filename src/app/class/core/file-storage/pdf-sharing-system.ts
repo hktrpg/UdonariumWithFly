@@ -3,6 +3,7 @@ import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { FileReaderUtil } from './file-reader-util';
+import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 import { PdfCatalogItem, PdfStorage } from './pdf-storage';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
@@ -34,6 +35,7 @@ export class PdfSharingSystem {
         const otherCatalog: PdfCatalogItem[] = event.data;
         const request: PdfCatalogItem[] = [];
         for (const item of otherCatalog) {
+          if (this.hydrateUrlBackedIfNeeded(item)) continue;
           let pdf = PdfStorage.instance.get(item.identifier);
           if (pdf === null) {
             pdf = PdfFile.createEmpty(item.identifier);
@@ -172,6 +174,7 @@ export class PdfSharingSystem {
       if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
       const request: PdfCatalogItem[] = [];
       for (const item of catalog) {
+        if (this.hydrateUrlBackedIfNeeded(item)) continue;
         let pdf = PdfStorage.instance.get(item.identifier);
         if (pdf === null) {
           pdf = PdfFile.createEmpty(item.identifier);
@@ -185,6 +188,18 @@ export class PdfSharingSystem {
       }
       if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
+  }
+
+  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
+  private hydrateUrlBackedIfNeeded(item: PdfCatalogItem): boolean {
+    if (item.state !== PdfState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
+      return false;
+    }
+    const existing = PdfStorage.instance.get(item.identifier);
+    if (!existing || existing.state < PdfState.URL) {
+      PdfStorage.instance.add(PdfFile.create(item.identifier));
+    }
+    return true;
   }
 
   private queueMissingDownloads(request: PdfCatalogItem[], peerId: string, catalogMeta: PdfCatalogItem[]) {

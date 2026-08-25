@@ -6,6 +6,7 @@ import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
@@ -49,6 +50,7 @@ export class ImageSharingSystem {
         let request: CatalogItem[] = [];
 
         for (let item of otherCatalog) {
+          if (this.hydrateUrlBackedIfNeeded(item)) continue;
           let image: ImageFile = ImageStorage.instance.get(item.identifier);
           if (image === null) {
             image = ImageFile.createEmpty(item.identifier);
@@ -284,6 +286,7 @@ export class ImageSharingSystem {
       if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
       const request: CatalogItem[] = [];
       for (const item of catalog) {
+        if (this.hydrateUrlBackedIfNeeded(item)) continue;
         let image = ImageStorage.instance.get(item.identifier);
         if (image === null) {
           image = ImageFile.createEmpty(item.identifier);
@@ -297,6 +300,18 @@ export class ImageSharingSystem {
       }
       if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
     }
+  }
+
+  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
+  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
+    if (item.state !== ImageState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
+      return false;
+    }
+    const existing = ImageStorage.instance.get(item.identifier);
+    if (!existing || existing.state < ImageState.URL) {
+      ImageStorage.instance.add(ImageFile.create(item.identifier));
+    }
+    return true;
   }
 
   private request(request: CatalogItem[], peerId: string) {
