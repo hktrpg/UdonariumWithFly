@@ -4,6 +4,7 @@ import { ObjectStore } from '../synchronize-object/object-store';
 
 import {
   FileSyncPriorityTier,
+  JUKEBOX_OBJECT_ID,
   clearPlayingMusicCache,
   compareFileSyncPriority,
   fileSyncPriorityTier,
@@ -13,10 +14,15 @@ import { ImageFile, ImageState } from './image-file';
 import { ImageStorage } from './image-storage';
 
 describe('fileSyncPriority', () => {
+  it('keeps Jukebox object id and sync alias aligned with markForChanged events', () => {
+    expect(JUKEBOX_OBJECT_ID).toBe('Jukebox');
+    expect(Jukebox.aliasName).toBe('jukebox');
+  });
+
   afterEach(() => {
     clearPlayingMusicCache();
-    ObjectStore.instance.get('Jukebox')?.destroy();
-    ObjectStore.instance.clearDeleted('Jukebox');
+    ObjectStore.instance.get(JUKEBOX_OBJECT_ID)?.destroy();
+    ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
     ImageStorage.instance.delete('img-thumb');
     ImageStorage.instance.delete('img-full');
   });
@@ -46,8 +52,8 @@ describe('fileSyncPriority', () => {
   });
 
   it('keeps playing BGM after thumbnails and before full images / pdf', () => {
-    ObjectStore.instance.clearDeleted('Jukebox');
-    const jukebox = new Jukebox('Jukebox');
+    ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
+    const jukebox = new Jukebox(JUKEBOX_OBJECT_ID);
     jukebox.initialize();
     jukebox.tracks = [{
       audioIdentifier: 'bgm-playing',

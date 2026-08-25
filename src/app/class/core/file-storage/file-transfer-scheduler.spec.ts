@@ -1,5 +1,5 @@
 import { AudioState } from './audio-file';
-import { FileSyncPriorityTier } from './file-sync-priority';
+import { FileSyncPriorityTier, JUKEBOX_OBJECT_ID } from './file-sync-priority';
 import { FileReceiveScheduler, estimateNextReceiveBytes } from './file-transfer-scheduler';
 import { ImageState } from './image-file';
 import { EventSystem, Network } from '../system';
@@ -16,8 +16,10 @@ describe('FileReceiveScheduler', () => {
   });
 
   afterEach(() => {
-    ObjectStore.instance.get('Jukebox')?.destroy();
-    ObjectStore.instance.clearDeleted('Jukebox');
+    // Unregister hooks before destroying Jukebox so teardown does not re-log.
+    FileReceiveScheduler.resetForTests();
+    ObjectStore.instance.get(JUKEBOX_OBJECT_ID)?.destroy();
+    ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
   });
 
   it('finishes thumbnail phase before dispatching audio/pdf by size', () => {
@@ -43,15 +45,16 @@ describe('FileReceiveScheduler', () => {
     expect(bytes).toBe(8_000);
   });
 
-  it('abortOutboundRequest frees a slot for a later retry', () => {
+  it('abortOutboundRequest re-queues so the file can retry', () => {
     const order: string[] = [];
     FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'doc', 1_000_000, () => order.push('first'));
     FileReceiveScheduler.schedule();
     expect(order).toEqual(['first']);
     FileReceiveScheduler.abortOutboundRequest('pdf', 'doc');
-    FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'doc', 1_000_000, () => order.push('retry'));
+    expect(FileReceiveScheduler.isTransferPending('pdf', 'doc')).toBe(true);
+    expect(FileReceiveScheduler.isTransferActive('pdf', 'doc')).toBe(false);
     FileReceiveScheduler.schedule();
-    expect(order).toEqual(['first', 'retry']);
+    expect(order).toEqual(['first', 'first']);
   });
 
   it('estimateNextReceiveBytes uses byteSize for audio', () => {
@@ -69,7 +72,7 @@ describe('FileReceiveScheduler', () => {
     FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', 'a1', 100_000, () => {});
     FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'i1', 4_000, () => {});
     FileReceiveScheduler.schedule();
-    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(1);
+    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order (queued')).length).toBe(1);
     const rows = log.calls.mostRecent().args[1] as Array<{ tier: string; id: string }>;
     expect(rows[0].tier).toBe('IMAGE_THUMB');
     expect(rows.map(r => r.id)).toEqual(['i1', 'a1']);
@@ -81,7 +84,7 @@ describe('FileReceiveScheduler', () => {
 
     FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'p1doc', 1_000_000, () => {});
     FileReceiveScheduler.schedule();
-    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order')).length).toBe(1);
+    expect(log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order (queued')).length).toBe(1);
   });
 
   it('promotes playing BGM after markForChanged-style Jukebox identifier event', () => {
@@ -99,8 +102,8 @@ describe('FileReceiveScheduler', () => {
     let rows = log.calls.mostRecent().args[1] as Array<{ tier: string; id: string }>;
     expect(rows.find(r => r.id === 'bgm-playing')?.tier).toBe('DEFAULT');
 
-    ObjectStore.instance.clearDeleted('Jukebox');
-    const jukebox = new Jukebox('Jukebox');
+    ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
+    const jukebox = new Jukebox(JUKEBOX_OBJECT_ID);
     jukebox.initialize();
     jukebox.tracks = [{
       audioIdentifier: 'bgm-playing',
@@ -133,16 +136,93 @@ describe('FileReceiveScheduler', () => {
     (FileReceiveScheduler as any).playingMusicPriorityKey = '';
     log.calls.reset();
     // Same event markForChanged fires after inbound apply / releasePeerSync.
-    EventSystem.trigger('UPDATE_GAME_OBJECT/identifier/Jukebox', {
-      aliasName: 'jukebox',
-      identifier: 'Jukebox',
+    EventSystem.trigger(`UPDATE_GAME_OBJECT/identifier/${JUKEBOX_OBJECT_ID}`, {
+      aliasName: Jukebox.aliasName,
+      identifier: JUKEBOX_OBJECT_ID,
     });
 
-    const orderLogs = log.calls.all().filter(c => String(c.args[0]).includes('[file-sync] receive order'));
-    expect(orderLogs.length).toBeGreaterThan(0);
-    rows = orderLogs[orderLogs.length - 1].args[1] as Array<{ tier: string; id: string; order: number }>;
+    const orderLogs = log.calls.all().filter(c =>
+      String(c.args[0]).includes('[file-sync] receive order (reprioritized')
+    );
+    expect(orderLogs.length).toBe(1);
+    rows = orderLogs[0].args[1] as Array<{ tier: string; id: string; order: number }>;
     expect(rows.find(r => r.id === 'bgm-playing')?.tier).toBe('PLAYING_AUDIO');
     expect(rows[0].id).toBe('bgm-playing');
     expect(rows[1].id).toBe('rules');
+  });
+
+  it('dispatches reachable higher tier while lower-tier peer is closed', () => {
+    const order: string[] = [];
+    peerIds = ['p-open']; // thumb's peer is offline
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p-closed', 'thumb', 4_000, () => order.push('thumb'));
+    FileReceiveScheduler.enqueueReceiveRequest('audio', 'p-open', 'bgm', 100_000, () => order.push('bgm'));
+    FileReceiveScheduler.schedule();
+    expect(order).toEqual(['bgm']);
+    expect(FileReceiveScheduler.isTransferPending('image', 'thumb')).toBe(true);
+
+    peerIds = ['p-open', 'p-closed'];
+    FileReceiveScheduler.markReceiveStart('audio', 'bgm');
+    FileReceiveScheduler.markReceiveEnd('audio', 'bgm');
+    expect(order).toEqual(['bgm', 'thumb']);
+  });
+
+  it('yield re-queues higher-tier outbound so files are not orphaned', () => {
+    peerIds = ['p1'];
+    const order: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', `a${i}`, 100_000 + i, () => order.push(`a${i}`));
+    }
+    FileReceiveScheduler.schedule();
+    expect(order.length).toBe(4);
+    expect(FileReceiveScheduler.outboundPendingCount()).toBe(4);
+
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'thumb', 4_000, () => order.push('thumb'));
+    FileReceiveScheduler.schedule();
+    expect(order).toContain('thumb');
+    // Yielded audios return to pending (still syncable).
+    expect(FileReceiveScheduler.isTransferPending('audio', 'a0')).toBe(true);
+    expect(FileReceiveScheduler.isTransferActive('audio', 'a0')).toBe(false);
+  });
+
+  it('eventually dispatches every queued file after yield and peer recovery', () => {
+    const dispatched = new Set<string>();
+    const track = (id: string) => () => { dispatched.add(id); };
+
+    peerIds = ['p1'];
+    for (let i = 0; i < 4; i++) {
+      FileReceiveScheduler.enqueueReceiveRequest('audio', 'p1', `a${i}`, 50_000 + i, track(`a${i}`));
+    }
+    FileReceiveScheduler.schedule();
+    expect(dispatched.size).toBe(4);
+
+    // Reachable thumb forces yield of DEFAULT outbound back into pending.
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'thumb', 4_000, track('thumb'));
+    FileReceiveScheduler.schedule();
+    expect(dispatched.has('thumb')).toBe(true);
+    expect(FileReceiveScheduler.isTransferPending('audio', 'a0')).toBe(true);
+
+    FileReceiveScheduler.markReceiveStart('image', 'thumb');
+    FileReceiveScheduler.markReceiveEnd('image', 'thumb');
+
+    // Drain re-queued audio until every id has been dispatched at least once.
+    for (let n = 0; n < 8; n++) {
+      FileReceiveScheduler.schedule();
+      for (const id of ['a0', 'a1', 'a2', 'a3']) {
+        const keyActive = FileReceiveScheduler.isTransferActive('audio', id);
+        // outbound counts as active via isTransferActive
+        if (keyActive) {
+          FileReceiveScheduler.markReceiveStart('audio', id);
+          FileReceiveScheduler.markReceiveEnd('audio', id);
+        }
+      }
+      if (['a0', 'a1', 'a2', 'a3', 'thumb'].every(id => dispatched.has(id))
+        && FileReceiveScheduler.pendingReceiveCount() === 0
+        && FileReceiveScheduler.outboundPendingCount() === 0
+        && FileReceiveScheduler.activeReceiveCount() === 0) {
+        break;
+      }
+    }
+    expect([...dispatched].sort()).toEqual(['a0', 'a1', 'a2', 'a3', 'thumb']);
+    expect(FileReceiveScheduler.pendingReceiveCount()).toBe(0);
   });
 });

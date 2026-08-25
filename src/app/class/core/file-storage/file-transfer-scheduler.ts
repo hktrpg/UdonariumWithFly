@@ -1,6 +1,7 @@
 import { AudioState } from './audio-file';
 import {
   FileSyncPriorityTier,
+  JUKEBOX_OBJECT_ID,
   clearPlayingMusicCache,
   compareFileSyncPriority,
   collectPlayingMusicIdentifiers,
@@ -10,6 +11,7 @@ import {
 import { ImageState } from './image-file';
 import { PdfState } from './pdf-file';
 import { VideoState } from './video-file';
+import { Jukebox } from '@udonarium/Jukebox';
 import { EventSystem, Network } from '../system';
 import { clearZeroTimeout, setZeroTimeout } from '../system/util/zero-timeout';
 
@@ -42,6 +44,8 @@ export class FileReceiveScheduler {
   private static activeReceives = new Set<string>();
   /** Slots reserved when a REQUEST is sent, before START_*_TRANSMISSION arrives. */
   private static outboundPending = new Set<string>();
+  /** Full request retained so yield / outbound timeout can re-queue instead of orphaning. */
+  private static outboundRequests = new Map<string, PendingReceiveRequest>();
   private static pending: PendingReceiveRequest[] = [];
   private static scheduleTimer: number | null = null;
   private static peerRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -58,14 +62,14 @@ export class FileReceiveScheduler {
         FileReceiveScheduler.schedule();
       })
       // Inbound apply uses markForChanged → identifier/aliasName events (not plain UPDATE_GAME_OBJECT).
-      .on('UPDATE_GAME_OBJECT/identifier/Jukebox', () => {
+      .on(`UPDATE_GAME_OBJECT/identifier/${JUKEBOX_OBJECT_ID}`, () => {
         FileReceiveScheduler.onPlayingMusicMaybeChanged();
       })
-      .on('UPDATE_GAME_OBJECT/aliasName/jukebox', () => {
+      .on(`UPDATE_GAME_OBJECT/aliasName/${Jukebox.aliasName}`, () => {
         FileReceiveScheduler.onPlayingMusicMaybeChanged();
       })
       .on('UPDATE_GAME_OBJECT', event => {
-        if (event.data?.identifier !== 'Jukebox') return;
+        if (event.data?.identifier !== JUKEBOX_OBJECT_ID) return;
         FileReceiveScheduler.onPlayingMusicMaybeChanged();
       });
   }
@@ -76,8 +80,9 @@ export class FileReceiveScheduler {
     if (key === FileReceiveScheduler.playingMusicPriorityKey) return;
     FileReceiveScheduler.playingMusicPriorityKey = key;
     if (FileReceiveScheduler.pending.length < 1) return;
-    // Refresh diagnostic log so PLAYING_AUDIO appears after late jukebox sync.
+    // Re-log under a distinct label so PLAYING_AUDIO is visible after late jukebox sync.
     FileReceiveScheduler.loggedReceiveKeys.clear();
+    FileReceiveScheduler.pendingReceiveOrderLogKind = 'reprioritized';
     FileReceiveScheduler.scheduleDeferred();
   }
 
@@ -158,19 +163,27 @@ export class FileReceiveScheduler {
   static markReceiveStart(kind: FileResourceKind, identifier: string): void {
     const key = FileReceiveScheduler.receiveKey(kind, identifier);
     FileReceiveScheduler.outboundPending.delete(key);
+    FileReceiveScheduler.outboundRequests.delete(key);
+    // Drop any yielded re-queue; transfer has started.
+    FileReceiveScheduler.pending = FileReceiveScheduler.pending.filter(
+      p => FileReceiveScheduler.receiveKey(p.kind, p.identifier) !== key,
+    );
     FileReceiveScheduler.activeReceives.add(key);
   }
 
   static markReceiveEnd(kind: FileResourceKind, identifier: string): void {
     const key = FileReceiveScheduler.receiveKey(kind, identifier);
     FileReceiveScheduler.outboundPending.delete(key);
+    FileReceiveScheduler.outboundRequests.delete(key);
     FileReceiveScheduler.activeReceives.delete(key);
     FileReceiveScheduler.schedule();
   }
 
   /** REQUEST never left the client (e.g. peer DataChannel not open yet). */
   static abortOutboundRequest(kind: FileResourceKind, identifier: string): void {
-    FileReceiveScheduler.outboundPending.delete(FileReceiveScheduler.receiveKey(kind, identifier));
+    FileReceiveScheduler.releaseOutboundToPending(
+      FileReceiveScheduler.receiveKey(kind, identifier),
+    );
     FileReceiveScheduler.scheduleDeferred();
   }
 
@@ -209,30 +222,28 @@ export class FileReceiveScheduler {
         b.kind, b.identifier, b.bytes,
       ));
       FileReceiveScheduler.yieldHigherTiersForPhase();
+      // Yield may have re-queued outbound items — keep priority order.
+      FileReceiveScheduler.pending.sort((a, b) => compareFileSyncPriority(
+        a.kind, a.identifier, a.bytes,
+        b.kind, b.identifier, b.bytes,
+      ));
       FileReceiveScheduler.logReceiveQueueOrderOnce();
       while (!FileReceiveScheduler.isReceiveBudgetFull() && FileReceiveScheduler.pending.length > 0) {
-        const phase = FileReceiveScheduler.lowestActivePhaseTier();
+        const phase = FileReceiveScheduler.lowestDispatchablePhaseTier();
+        if (phase == null) break;
         const nextIndex = FileReceiveScheduler.pending.findIndex(
           p => fileSyncPriorityTier(p.kind, p.identifier) === phase
             && !FileReceiveScheduler.outboundPending.has(FileReceiveScheduler.receiveKey(p.kind, p.identifier))
             && !FileReceiveScheduler.activeReceives.has(FileReceiveScheduler.receiveKey(p.kind, p.identifier))
             && FileReceiveScheduler.isPeerOpen(p.peerId)
         );
-        if (nextIndex < 0) {
-          const waitingPeer = FileReceiveScheduler.pending.find(
-            p => fileSyncPriorityTier(p.kind, p.identifier) === phase
-              && !FileReceiveScheduler.isPeerOpen(p.peerId)
-              && !FileReceiveScheduler.outboundPending.has(FileReceiveScheduler.receiveKey(p.kind, p.identifier))
-              && !FileReceiveScheduler.activeReceives.has(FileReceiveScheduler.receiveKey(p.kind, p.identifier))
-          );
-          if (waitingPeer) FileReceiveScheduler.schedulePeerRetry(waitingPeer.peerId);
-          break;
-        }
+        if (nextIndex < 0) break;
         const next = FileReceiveScheduler.pending.splice(nextIndex, 1)[0];
         const key = FileReceiveScheduler.receiveKey(next.kind, next.identifier);
         FileReceiveScheduler.outboundPending.add(key);
+        FileReceiveScheduler.outboundRequests.set(key, next);
         setTimeout(() => {
-          if (FileReceiveScheduler.outboundPending.delete(key)) {
+          if (FileReceiveScheduler.releaseOutboundToPending(key)) {
             FileReceiveScheduler.schedule();
           }
         }, OUTBOUND_PENDING_TIMEOUT_MS);
@@ -243,8 +254,12 @@ export class FileReceiveScheduler {
     }
   }
 
-  /** Lowest priority tier still waiting or in flight — higher tiers must wait. */
-  private static lowestActivePhaseTier(): FileSyncPriorityTier {
+  /**
+   * Lowest tier that can make progress now.
+   * Unreachable pending peers are skipped (retry scheduled) so they do not block
+   * reachable higher-tier files — those unreachable items stay queued for later.
+   */
+  private static lowestDispatchablePhaseTier(): FileSyncPriorityTier | null {
     let min = FileSyncPriorityTier.DEFAULT;
     let found = false;
     const consider = (tier: FileSyncPriorityTier) => {
@@ -252,7 +267,16 @@ export class FileReceiveScheduler {
       if (tier < min) min = tier;
     };
     for (const p of FileReceiveScheduler.pending) {
-      consider(fileSyncPriorityTier(p.kind, p.identifier));
+      const key = FileReceiveScheduler.receiveKey(p.kind, p.identifier);
+      if (FileReceiveScheduler.activeReceives.has(key) || FileReceiveScheduler.outboundPending.has(key)) {
+        consider(fileSyncPriorityTier(p.kind, p.identifier));
+        continue;
+      }
+      if (FileReceiveScheduler.isPeerOpen(p.peerId)) {
+        consider(fileSyncPriorityTier(p.kind, p.identifier));
+      } else {
+        FileReceiveScheduler.schedulePeerRetry(p.peerId);
+      }
     }
     for (const key of FileReceiveScheduler.activeReceives) {
       consider(FileReceiveScheduler.tierForReceiveKey(key));
@@ -260,7 +284,7 @@ export class FileReceiveScheduler {
     for (const key of FileReceiveScheduler.outboundPending) {
       consider(FileReceiveScheduler.tierForReceiveKey(key));
     }
-    return found ? min : FileSyncPriorityTier.DEFAULT;
+    return found ? min : null;
   }
 
   private static tierForReceiveKey(key: string): FileSyncPriorityTier {
@@ -273,31 +297,57 @@ export class FileReceiveScheduler {
 
   /**
    * If a lower-tier file is still pending (e.g. thumb / playing BGM just appeared),
-   * drop higher-tier outbound reservations so the lower tier can take slots.
+   * return higher-tier outbound reservations to the queue so lower tier can take slots
+   * and the yielded files are not orphaned.
    */
   private static yieldHigherTiersForPhase(): void {
     if (FileReceiveScheduler.pending.length < 1) return;
     let pendingMin = FileSyncPriorityTier.DEFAULT;
+    let hasReachableLower = false;
     for (const p of FileReceiveScheduler.pending) {
+      if (!FileReceiveScheduler.isPeerOpen(p.peerId)) continue;
+      hasReachableLower = true;
       const tier = fileSyncPriorityTier(p.kind, p.identifier);
       if (tier < pendingMin) pendingMin = tier;
     }
+    if (!hasReachableLower) return;
     for (const key of [...FileReceiveScheduler.outboundPending]) {
       if (FileReceiveScheduler.tierForReceiveKey(key) > pendingMin) {
-        FileReceiveScheduler.outboundPending.delete(key);
+        FileReceiveScheduler.releaseOutboundToPending(key);
       }
     }
   }
 
+  /** Move an outbound reservation back to pending (yield / timeout / abort). */
+  private static releaseOutboundToPending(key: string): boolean {
+    if (!FileReceiveScheduler.outboundPending.delete(key)) return false;
+    const req = FileReceiveScheduler.outboundRequests.get(key);
+    FileReceiveScheduler.outboundRequests.delete(key);
+    if (!req) return true;
+    if (FileReceiveScheduler.activeReceives.has(key)) return true;
+    const alreadyQueued = FileReceiveScheduler.pending.some(
+      p => FileReceiveScheduler.receiveKey(p.kind, p.identifier) === key,
+    );
+    if (!alreadyQueued) FileReceiveScheduler.pending.push(req);
+    return true;
+  }
+
   private static loggedReceiveKeys = new Set<string>();
+  /**
+   * Consumed by the next successful receive-order log, then reset to `queued`.
+   * Set to `reprioritized` only from jukebox playing-id changes.
+   */
+  private static pendingReceiveOrderLogKind: 'queued' | 'reprioritized' = 'queued';
 
   /**
-   * Log pending receive order only when new file(s) enter the queue.
+   * Log pending receive order only when new file(s) enter the queue,
+   * or when jukebox reprioritization forces a re-log.
    * Shrinking the queue (dispatch progress) must not re-log 73→72→71…
    */
   private static logReceiveQueueOrderOnce(): void {
     if (FileReceiveScheduler.pending.length < 1) {
       FileReceiveScheduler.loggedReceiveKeys.clear();
+      FileReceiveScheduler.pendingReceiveOrderLogKind = 'queued';
       return;
     }
     let hasNew = false;
@@ -308,7 +358,11 @@ export class FileReceiveScheduler {
         break;
       }
     }
-    if (!hasNew) return;
+    if (!hasNew) {
+      // Do not leave a sticky `reprioritized` label for a later unrelated enqueue log.
+      FileReceiveScheduler.pendingReceiveOrderLogKind = 'queued';
+      return;
+    }
     for (const p of FileReceiveScheduler.pending) {
       FileReceiveScheduler.loggedReceiveKeys.add(
         FileReceiveScheduler.receiveKey(p.kind, p.identifier),
@@ -322,7 +376,12 @@ export class FileReceiveScheduler {
       bytes: p.bytes,
       size: formatByteSize(p.bytes),
     }));
-    console.log(`[file-sync] receive order (${rows.length} file(s))`, rows);
+    const kind = FileReceiveScheduler.pendingReceiveOrderLogKind;
+    FileReceiveScheduler.pendingReceiveOrderLogKind = 'queued';
+    const label = kind === 'reprioritized'
+      ? `[file-sync] receive order (reprioritized, ${rows.length} file(s))`
+      : `[file-sync] receive order (queued, ${rows.length} file(s))`;
+    console.log(label, rows);
   }
 
   /** @internal Test helper — clears queued transfers between specs. */
@@ -331,10 +390,12 @@ export class FileReceiveScheduler {
     FileReceiveScheduler.networkHooksRegistered = false;
     FileReceiveScheduler.activeReceives.clear();
     FileReceiveScheduler.outboundPending.clear();
+    FileReceiveScheduler.outboundRequests.clear();
     FileReceiveScheduler.pending = [];
     FileReceiveScheduler.receiveRetryAfter.clear();
     FileReceiveScheduler.playingMusicPriorityKey = '';
     FileReceiveScheduler.loggedReceiveKeys.clear();
+    FileReceiveScheduler.pendingReceiveOrderLogKind = 'queued';
     FileReceiveScheduler.clearPeerRetryTimers();
     if (FileReceiveScheduler.scheduleTimer != null) {
       clearZeroTimeout(FileReceiveScheduler.scheduleTimer);

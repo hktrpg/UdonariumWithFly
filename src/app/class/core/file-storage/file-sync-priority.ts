@@ -7,6 +7,9 @@ import { ImageStorage } from './image-storage';
 
 type FileResourceKind = 'image' | 'audio' | 'pdf' | 'video';
 
+/** Stable ObjectStore id for the room jukebox singleton (`new Jukebox('Jukebox')`). */
+export const JUKEBOX_OBJECT_ID = 'Jukebox';
+
 /**
  * Lower tier runs first. Within a tier, sort by estimated bytes ascending.
  *
@@ -51,7 +54,7 @@ export function compareFileSyncPriority(
 /** Jukebox tracks that are actively playing (including paused transport). */
 export function collectPlayingMusicIdentifiers(): Set<string> {
   const ids = new Set<string>();
-  const jukebox = ObjectStore.instance.get<Jukebox>('Jukebox');
+  const jukebox = ObjectStore.instance.get<Jukebox>(JUKEBOX_OBJECT_ID);
   if (!jukebox) return ids;
   for (const track of jukebox.tracks) {
     if (!track.isPlaying || !track.audioIdentifier) continue;
