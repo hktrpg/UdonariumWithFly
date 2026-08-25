@@ -2,6 +2,7 @@ import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
+import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 export type PdfCatalogItem = {
   readonly identifier: string;
@@ -31,6 +32,14 @@ export class PdfStorage {
   async addAsync(arg: any, displayName?: string): Promise<PdfFile> {
     const pdf = await PdfFile.createAsync(arg, displayName);
     return this._add(pdf);
+  }
+
+  async addPackedAsync(file: File): Promise<PdfFile> {
+    const hash = mediaHashFromName(file.name);
+    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
+    const existing = this.get(hash);
+    if (existing && existing.state >= PdfState.COMPLETE) return existing;
+    return this._add(await PdfFile.createPackedAsync(file, hash));
   }
 
   add(url: string): PdfFile

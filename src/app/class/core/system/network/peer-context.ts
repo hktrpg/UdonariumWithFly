@@ -39,7 +39,15 @@ export class PeerContext implements IPeerContext {
   digestUserId: string = '';
   digestPassword: string = '';
   isOpen: boolean = false;
-  session: MutablePeerSessionState = { grade: PeerSessionGrade.UNSPECIFIED, ping: 0, health: 0, speed: 0, description: '' };
+  session: MutablePeerSessionState = {
+    grade: PeerSessionGrade.UNSPECIFIED,
+    ping: 0,
+    health: 0,
+    speed: 0,
+    bitrateInstantBps: 0,
+    bitrateBps: 0,
+    description: '',
+  };
 
   get isRoom(): boolean { return 0 < this.roomId.length; }
   get hasPassword(): boolean { return 0 < this.password.length + this.digestPassword.length; }

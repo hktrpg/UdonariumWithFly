@@ -43,12 +43,16 @@ import {
   SNAP_30D_MS,
   SNAP_DIRS,
   STATE_ZIP_FILE,
+  collectReferencedMediaHashes,
   dataUrlToJpegBlob,
+  isMediaFileName,
+  mediaHashFromName,
 } from './folder-backup-layout';
 import { RoomInviteService } from './room-invite.service';
 import { SaveDataService } from './save-data.service';
 import { ConnectionBusyService } from './connection-busy.service';
 import { PanelService } from './panel.service';
+import { BlobReader, BlobWriter, ZipReader } from '@zip.js/zip.js';
 
 export type FolderBackupStatus = 'unsupported' | 'unbound' | 'needAuth' | 'ready' | 'writing' | 'error';
 
@@ -269,6 +273,7 @@ export class FolderBackupService implements OnDestroy {
       this.listening = true;
       this.captureRoomSnapshot();
     }
+    FolderMediaHydrator.instance.beginHydrateRoomReferencedMedia();
   }
 
   private settlePeerSyncAfterLoad(loadOk: boolean, trust: boolean) {
@@ -570,6 +575,11 @@ export class FolderBackupService implements OnDestroy {
         new File([file], zipName, { type: 'application/zip' }),
       ]);
       folderBackupDebug('loadRoomBackup FileArchiver.load done (legacy)');
+      try {
+        await FolderMediaHydrator.instance.hydrateRoomReferencedMedia();
+      } catch (e) {
+        console.warn('FolderBackup post-load media hydrate failed (legacy)', e);
+      }
       return;
     }
 
@@ -583,6 +593,11 @@ export class FolderBackupService implements OnDestroy {
     });
     await FileArchiver.instance.load(files);
     folderBackupDebug('loadRoomBackup FileArchiver.load done (v2)');
+    try {
+      await FolderMediaHydrator.instance.hydrateRoomReferencedMedia();
+    } catch (e) {
+      console.warn('FolderBackup post-load media hydrate failed', e);
+    }
   }
 
   /** Blocks UI while reading media + state and letting piece views remount. */
@@ -1709,6 +1724,40 @@ export class FolderBackupService implements OnDestroy {
       throw new Error('Backup manifest missing media list');
     }
 
+    // Also pull media/ blobs referenced by state XML but dropped from a shrunk manifest.
+    try {
+      const stateZipFile = loadFiles.find(f => /\.zip$/i.test(f.name));
+      if (stateZipFile) {
+        const zipReader = new ZipReader(new BlobReader(stateZipFile));
+        const entries = await zipReader.getEntries();
+        const texts: string[] = [];
+        for (const entry of entries || []) {
+          if (!/\.(xml|json)$/i.test(entry.filename || '')) continue;
+          try {
+            const blob = await entry.getData(new BlobWriter());
+            texts.push(await blob.text());
+          } catch { /* skip entry */ }
+        }
+        await zipReader.close();
+        const needed = collectReferencedMediaHashes(...texts);
+        const indexed = new Map<string, string>();
+        try {
+          for await (const [name, handle] of mediaDir.entries()) {
+            if (handle.kind !== 'file' || !isMediaFileName(name)) continue;
+            const hash = mediaHashFromName(name);
+            if (!indexed.has(hash)) indexed.set(hash, name);
+          }
+        } catch { /* ignore */ }
+        for (const hash of needed) {
+          if ([...mediaNames].some(n => mediaHashFromName(n) === hash)) continue;
+          const name = indexed.get(hash);
+          if (name) mediaNames.add(name);
+        }
+      }
+    } catch (e) {
+      console.warn('FolderBackup: expand media from state refs failed', e);
+    }
+
     const missing: string[] = [];
     for (const name of mediaNames) {
       try {
@@ -1722,7 +1771,11 @@ export class FolderBackupService implements OnDestroy {
       }
     }
     if (missing.length) {
-      throw new Error(`Missing media files: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}`);
+      console.warn(
+        `FolderBackup: ${missing.length} media file(s) listed but missing on disk`,
+        missing.slice(0, 8),
+      );
+      // Do not hard-fail: room XML can still load; hydrator / peers may fill gaps.
     }
     return loadFiles;
   }

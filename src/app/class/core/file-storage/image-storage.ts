@@ -2,6 +2,7 @@ import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
 import { ImageContext, ImageFile, ImageState } from './image-file';
+import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 export type CatalogItem = {
   readonly identifier: string;
@@ -43,6 +44,16 @@ export class ImageStorage {
   async addAsync(arg: any): Promise<ImageFile> {
     let image: ImageFile = await ImageFile.createAsync(arg);
 
+    return this._add(image);
+  }
+
+  /** Restore `<sha256>.ext` from ZIP / folder media under the filename hash. */
+  async addPackedAsync(file: File): Promise<ImageFile> {
+    const hash = mediaHashFromName(file.name);
+    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
+    const existing = this.get(hash);
+    if (existing && existing.state >= ImageState.COMPLETE) return existing;
+    const image = await ImageFile.createPackedAsync(file, hash);
     return this._add(image);
   }
 

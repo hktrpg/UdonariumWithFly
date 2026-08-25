@@ -57,7 +57,9 @@ import {
   mediaHashFromName,
   computeStateFingerprint,
   sha256Hex,
+  unionManifestMedia,
 } from './folder-backup-layout';
+import { FolderMediaHydrator } from './folder-media-hydrator';
 import { remapImageIdentifiers as remapXmlImageIds, remapIdsInJson as remapJsonImageIds } from './save-xml-remap.util';
 import { reparentOrphanTableFx } from './tabletop-orphan-fx.util';
 
@@ -266,6 +268,12 @@ export class SaveDataService {
   async buildRoomFiles(includeAudio = true): Promise<File[]> {
     this.prepareRoomSnapshotForSave();
     try {
+      // Pull any XML-referenced blobs still on disk before packing ZIP / folder media.
+      try {
+        await FolderMediaHydrator.instance.hydrateRoomReferencedMedia();
+      } catch (e) {
+        console.warn('buildRoomFiles: folder media hydrate failed', e);
+      }
       return await this.buildRoomFilesCore(includeAudio);
     } finally {
       // Re-apply standing mask FX that were stripped so the live room looks unchanged.
@@ -477,12 +485,15 @@ export class SaveDataService {
     const latestDir = await archiver.ensureDirectory(roomDir, LATEST_DIR);
 
     let prevStateFp = '';
+    let previousMedia: { hash: string; name: string; kind?: string }[] = [];
     try {
       const prevManifestFile = await (await latestDir.getFileHandle(MANIFEST_FILE)).getFile();
       const prev = JSON.parse(await prevManifestFile.text()) as {
         stateFingerprint?: string;
+        media?: { hash: string; name: string; kind?: string }[];
       };
       prevStateFp = prev?.stateFingerprint || '';
+      previousMedia = Array.isArray(prev?.media) ? prev.media : [];
     } catch { /* first save */ }
 
     const stateFiles: File[] = [];
@@ -545,7 +556,8 @@ export class SaveDataService {
       files: fileFingerprints,
       stateFingerprint,
       stateZip: STATE_ZIP_FILE,
-      media: mediaEntries,
+      // Never drop previously written media — incomplete in-memory packs must not orphan disk blobs.
+      media: unionManifestMedia(previousMedia, mediaEntries),
     };
     await archiver.writeBlobToDirectory(
       latestDir,

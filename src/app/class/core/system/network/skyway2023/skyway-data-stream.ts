@@ -646,6 +646,8 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     this.peer.session.health = healthRate;
     this.peer.session.ping = ping;
     this.peer.session.speed = pingRate * healthRate;
+    this.peer.session.bitrateInstantBps = this.stats.instantBitrateBps;
+    this.peer.session.bitrateBps = this.stats.bitrateBps;
 
     switch (this.candidateType) {
       case CandidateType.HOST:

@@ -89,6 +89,27 @@ export class ImageFile {
     }
   }
 
+  /**
+   * Room ZIP / folder media restore: keep the filename content-hash as identifier
+   * and skip normalize so XML refs (cards, notes, tags) stay valid.
+   */
+  static async createPackedAsync(file: File, forcedIdentifier: string): Promise<ImageFile> {
+    const id = (forcedIdentifier || '').toLowerCase();
+    const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(file);
+    const imageFile = new ImageFile();
+    imageFile.context.identifier = id;
+    imageFile.context.name = id;
+    imageFile.context.type = file.type || 'image/png';
+    imageFile.context.blob = new Blob([arrayBuffer], { type: imageFile.context.type });
+    imageFile.context.url = window.URL.createObjectURL(imageFile.context.blob);
+    try {
+      imageFile.context.thumbnail = await ImageFile.createThumbnailAsync(imageFile.context);
+    } catch {
+      imageFile.context.thumbnail = { type: '', blob: null, url: '' };
+    }
+    return imageFile;
+  }
+
   private static async _createAsync(blob: Blob, name?: string): Promise<ImageFile> {
     // Normalize before hash so identifiers match stored/synced bytes.
     const { blob: stored } = await normalizeImageBlob(blob);

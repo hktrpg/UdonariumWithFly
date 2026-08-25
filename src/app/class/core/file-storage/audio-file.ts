@@ -72,6 +72,18 @@ export class AudioFile {
     }
   }
 
+  static async createPackedAsync(file: File, forcedIdentifier: string): Promise<AudioFile> {
+    const id = (forcedIdentifier || '').toLowerCase();
+    const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(file);
+    const audio = new AudioFile();
+    audio.context.identifier = id;
+    audio.context.name = id;
+    audio.context.blob = new Blob([arrayBuffer], { type: file.type || 'audio/mpeg' });
+    audio.context.type = audio.context.blob.type;
+    audio.context.url = window.URL.createObjectURL(audio.context.blob);
+    return audio;
+  }
+
   private static async _createAsync(blob: Blob, name?: string): Promise<AudioFile> {
     let arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(blob);
 

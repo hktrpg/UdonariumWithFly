@@ -2,6 +2,7 @@ import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
+import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 export type CatalogItem = {
   readonly identifier: string;
@@ -42,6 +43,14 @@ export class AudioStorage {
     let audio: AudioFile = await AudioFile.createAsync(arg, displayName);
 
     return this._add(audio);
+  }
+
+  async addPackedAsync(file: File): Promise<AudioFile> {
+    const hash = mediaHashFromName(file.name);
+    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
+    const existing = this.get(hash);
+    if (existing && existing.state >= AudioState.COMPLETE) return existing;
+    return this._add(await AudioFile.createPackedAsync(file, hash));
   }
 
   add(url: string): AudioFile

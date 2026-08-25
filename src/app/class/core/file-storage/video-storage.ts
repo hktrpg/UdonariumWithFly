@@ -2,6 +2,7 @@ import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
+import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 export type VideoCatalogItem = {
   readonly identifier: string;
@@ -31,6 +32,14 @@ export class VideoStorage {
   async addAsync(arg: any, displayName?: string): Promise<VideoFile> {
     const video = await VideoFile.createAsync(arg, displayName);
     return this._add(video);
+  }
+
+  async addPackedAsync(file: File): Promise<VideoFile> {
+    const hash = mediaHashFromName(file.name);
+    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
+    const existing = this.get(hash);
+    if (existing && existing.state >= VideoState.COMPLETE) return existing;
+    return this._add(await VideoFile.createPackedAsync(file, hash));
   }
 
   add(url: string): VideoFile

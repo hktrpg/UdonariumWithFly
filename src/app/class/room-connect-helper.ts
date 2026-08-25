@@ -105,6 +105,24 @@ export class RoomConnectHelper {
   /** Throttle mid-session gap reconnect warns (avoid 5s spam while ICE is stuck). */
   private static lastGapWarnAt = 0;
   private static readonly GAP_WARN_COOLDOWN_MS = 60000;
+  /**
+   * Sticky for this page load: once we had an open DataChannel in-room, soft-death
+   * recovery may full-reopen after a prolonged alone spell (sleep/wake zombies).
+   */
+  static hadOpenPeerThisSession = false;
+  /** Wall clock when open peers dropped to 0 while hadOpenPeerThisSession. */
+  private static softDeathSince = 0;
+  /** One soft-death reopen per alone spell; cleared when open peers return. */
+  private static softDeathAttempted = false;
+  private static readonly SOFT_DEATH_MS = 20000;
+  /** Tests may shorten soft-death wait (0 = use SOFT_DEATH_MS). */
+  static SOFT_DEATH_MS_FOR_TEST = 0;
+  /** document.visibilityState === 'hidden' started at (0 = never / unknown). */
+  private static documentHiddenAt = 0;
+  private static readonly WAKE_MIN_HIDDEN_MS = 5000;
+  /** Tests may shorten wake hide threshold (0 = use WAKE_MIN_HIDDEN_MS). */
+  static WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
+  private static wakeReopenTimer: ReturnType<typeof setTimeout> | null = null;
 
   static get isReopenInFlight(): boolean {
     return RoomConnectHelper.reopenInFlight;
@@ -122,6 +140,9 @@ export class RoomConnectHelper {
   static isNetworkReconnecting(): boolean {
     if (RoomConnectHelper.reopenInFlight || RoomConnectHelper.isReopenRetryPending()) return true;
     if (RoomConnectHelper.reopenJitterTimer != null) return true;
+    if (RoomConnectHelper.wakeReopenTimer != null) return true;
+    // Soft-death waiting to fire — not permanent hadOpenPeer&&open=0 (solo after peers left).
+    if (RoomConnectHelper.isSoftDeathArmed()) return true;
     // Soft mesh death: others still in SkyWay room but no open DataChannels.
     // Alone in the room (openPeers=0) is normal — do not show Connecting.
     if (Network.isOpen && Network.peer?.isRoom && RoomConnectHelper.everHadRoomSession
@@ -131,6 +152,26 @@ export class RoomConnectHelper {
       if (others.length > 0) return true;
     }
     return false;
+  }
+
+  /** Soft-death timer counting toward a full reopen (was meshed, now alone). */
+  static isSoftDeathArmed(): boolean {
+    return RoomConnectHelper.softDeathSince > 0
+      && RoomConnectHelper.hadOpenPeerThisSession
+      && !RoomConnectHelper.softDeathAttempted
+      && RoomConnectHelper.openPeerCount() === 0;
+  }
+
+  private static softDeathMs(): number {
+    return RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST > 0
+      ? RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST
+      : RoomConnectHelper.SOFT_DEATH_MS;
+  }
+
+  private static wakeMinHiddenMs(): number {
+    return RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST > 0
+      ? RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST
+      : RoomConnectHelper.WAKE_MIN_HIDDEN_MS;
   }
 
   /** Open DataChannels only (excludes stuck “connecting” streams). */
@@ -224,6 +265,7 @@ export class RoomConnectHelper {
     return !RoomConnectHelper.isJoinOwningNetworkError
       && !RoomConnectHelper.reopenInFlight
       && RoomConnectHelper.reopenJitterTimer == null
+      && RoomConnectHelper.wakeReopenTimer == null
       && !RoomConnectHelper.rekeyInFlight
       && !RoomConnectHelper.createRoomInFlight
       && !RoomConnectHelper.backupRoomOpenInFlight;
@@ -242,6 +284,9 @@ export class RoomConnectHelper {
   /** Call when intentionally leaving a room (menu disconnect / resetToLobby). */
   static clearRoomSessionMemory() {
     RoomConnectHelper.everHadRoomSession = false;
+    RoomConnectHelper.hadOpenPeerThisSession = false;
+    RoomConnectHelper.clearSoftDeathState();
+    RoomConnectHelper.clearWakeReopenTimer();
     Network.clearLastRoomSession();
     RoomConnectHelper.stopMeshKeepalive();
     RoomConnectHelper.clearReopenRetry();
@@ -249,6 +294,107 @@ export class RoomConnectHelper {
 
   static markRoomSessionRemembered() {
     RoomConnectHelper.everHadRoomSession = true;
+  }
+
+  private static clearSoftDeathState() {
+    RoomConnectHelper.softDeathSince = 0;
+    RoomConnectHelper.softDeathAttempted = false;
+  }
+
+  private static clearWakeReopenTimer() {
+    if (RoomConnectHelper.wakeReopenTimer != null) {
+      clearTimeout(RoomConnectHelper.wakeReopenTimer);
+      RoomConnectHelper.wakeReopenTimer = null;
+    }
+  }
+
+  /**
+   * Track open DataChannels for soft-death recovery.
+   * Call from mesh keepalive (and tests).
+   */
+  static noteOpenPeerPresence() {
+    if (RoomConnectHelper.openPeerCount() > 0) {
+      RoomConnectHelper.hadOpenPeerThisSession = true;
+      RoomConnectHelper.clearSoftDeathState();
+      return;
+    }
+    if (!RoomConnectHelper.hadOpenPeerThisSession) return;
+    if (!Network.peer?.isRoom) return;
+    if (RoomConnectHelper.softDeathAttempted) return;
+    if (RoomConnectHelper.softDeathSince < 1) {
+      RoomConnectHelper.softDeathSince = Date.now();
+    }
+  }
+
+  /**
+   * If was meshed and alone past soft-death threshold, full-reopen once per alone spell.
+   * @returns true when a reopen was scheduled/started
+   */
+  static maybeSoftDeathReopen(): boolean {
+    RoomConnectHelper.noteOpenPeerPresence();
+    if (!RoomConnectHelper.isSoftDeathArmed()) return false;
+    if (Date.now() - RoomConnectHelper.softDeathSince < RoomConnectHelper.softDeathMs()) return false;
+    if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
+
+    RoomConnectHelper.softDeathAttempted = true;
+    RoomConnectHelper.softDeathSince = 0;
+    console.warn('reopen: soft-death (was meshed, alone too long)');
+    const result = RoomConnectHelper.reopenLastRoomOrLobby('disconnected');
+    return result === 'started';
+  }
+
+  /** document.visibilitychange → hidden. */
+  static onDocumentHidden() {
+    RoomConnectHelper.documentHiddenAt = Date.now();
+  }
+
+  /**
+   * document.visibilitychange → visible, or pageshow (bfcache).
+   * Full-reopens when in-room with dead mesh after a meaningful hide (sleep).
+   */
+  static onDocumentVisible(opts?: { persisted?: boolean; skipJitter?: boolean }) {
+    const hiddenAt = RoomConnectHelper.documentHiddenAt;
+    RoomConnectHelper.documentHiddenAt = 0;
+    const hiddenMs = hiddenAt > 0 ? Date.now() - hiddenAt : 0;
+    const longEnough = opts?.persisted || hiddenMs >= RoomConnectHelper.wakeMinHiddenMs();
+    if (!longEnough) return;
+
+    RoomConnectHelper.maybeScheduleWakeReopen(opts?.skipJitter);
+  }
+
+  /**
+   * Schedule wake reopen with peerId jitter (disconnected path has no outage jitter).
+   * Only when this page previously had a live mesh peer — solo rooms normally have openPeers=0.
+   * @returns true when a reopen was scheduled or started
+   */
+  static maybeScheduleWakeReopen(skipJitter = false): boolean {
+    if (!RoomConnectHelper.everHadRoomSession) return false;
+    if (!RoomConnectHelper.hadOpenPeerThisSession) return false;
+    if (!Network.peer?.isRoom) return false;
+    if (RoomConnectHelper.openPeerCount() > 0) return false;
+    if (!Network.getLastRoomSession()?.roomId) return false;
+    if (RoomConnectHelper.wakeReopenTimer != null) return true;
+    if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
+
+    const start = () => {
+      RoomConnectHelper.wakeReopenTimer = null;
+      if (!RoomConnectHelper.everHadRoomSession || !RoomConnectHelper.hadOpenPeerThisSession) return;
+      if (!Network.peer?.isRoom) return;
+      if (RoomConnectHelper.openPeerCount() > 0) return;
+      if (!RoomConnectHelper.shouldAttemptReopenNow()) return;
+      console.warn('reopen: wake (was meshed, openPeers=0)');
+      RoomConnectHelper.reopenLastRoomOrLobby('disconnected');
+    };
+
+    if (skipJitter) {
+      start();
+      return true;
+    }
+    const session = Network.getLastRoomSession();
+    const jitter = reopenJitterMs(Network.peerId || session?.userId);
+    console.warn(`reopen: wake deferred-jitter ${jitter}ms`);
+    RoomConnectHelper.wakeReopenTimer = setTimeout(start, jitter);
+    return true;
   }
 
   /**
@@ -273,6 +419,8 @@ export class RoomConnectHelper {
       RoomConnectHelper.meshHealDebounceTimer = null;
     }
     RoomConnectHelper.connectingSince.clear();
+    RoomConnectHelper.clearSoftDeathState();
+    RoomConnectHelper.clearWakeReopenTimer();
     RoomConnectHelper.clearReopenRetry();
   }
 
@@ -316,6 +464,9 @@ export class RoomConnectHelper {
     if (!Network.peer?.isRoom) return;
 
     if (skyWayRecoveryGate.shouldThrottleOpenHeal(true)) return;
+
+    RoomConnectHelper.noteOpenPeerPresence();
+    if (RoomConnectHelper.maybeSoftDeathReopen()) return;
 
     RoomConnectHelper.meshHealInFlight = true;
     skyWayRecoveryGate.markHealAttempt();
@@ -696,6 +847,7 @@ export class RoomConnectHelper {
    */
   static abortReopenInFlight() {
     RoomConnectHelper.clearReopenRetry();
+    RoomConnectHelper.clearWakeReopenTimer();
     if (RoomConnectHelper.reopenFinish) {
       RoomConnectHelper.reopenFinish();
       return;
@@ -719,6 +871,7 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.isJoinOwningNetworkError) return;
     if (RoomConnectHelper.reopenRetryTimer != null) return;
     if (RoomConnectHelper.reopenJitterTimer != null) return;
+    if (RoomConnectHelper.wakeReopenTimer != null) return;
 
     const kind = classifyOutageKind(errorType);
     if (opts?.noteOutage !== false && kind !== 'disconnected') {
@@ -842,7 +995,8 @@ export class RoomConnectHelper {
       });
 
     const skipRoomOpen = willReopenRoom && session
-      && RoomConnectHelper.isMatchingRoomSession(session.roomId, session.roomName, session.meshPassword || '');
+      && RoomConnectHelper.isMatchingRoomSession(session.roomId, session.roomName, session.meshPassword || '')
+      && RoomConnectHelper.openPeerCount() >= 1;
 
     if (skipRoomOpen) {
       void (async () => {

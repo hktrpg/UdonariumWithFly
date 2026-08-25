@@ -14,6 +14,7 @@ import { MimeType } from './mime-type';
 import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
+import { isMediaFileName, mediaHashFromName } from 'service/folder-backup-layout';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { folderBackupDebug } from 'service/folder-backup-debug';
@@ -195,7 +196,11 @@ export class FileArchiver {
       return;
     }
     try {
-      await ImageStorage.instance.addAsync(file);
+      if (isMediaFileName(file.name)) {
+        await ImageStorage.instance.addPackedAsync(file);
+      } else {
+        await ImageStorage.instance.addAsync(file);
+      }
     } catch (e) {
       console.warn(`Image import failed (normalize/store). -> ${file.name}`, e);
     }
@@ -235,7 +240,9 @@ export class FileArchiver {
       const ab = await file.arrayBuffer();
       importFile = new File([ab], base.replace(/\.mpeg$/i, '.mp3'), { type: 'audio/mpeg' });
     }
-    const created = await AudioFile.createAsync(importFile, restorePacked ? undefined : displayName);
+    const created = restorePacked
+      ? await AudioFile.createPackedAsync(importFile, mediaHashFromName(importFile.name))
+      : await AudioFile.createAsync(importFile, displayName);
     const existed = !!AudioStorage.instance.get(created.identifier);
     const audio = AudioStorage.instance.add(created);
     if (!audio) return;
@@ -257,7 +264,11 @@ export class FileArchiver {
       console.warn(`PDF size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    await PdfStorage.instance.addAsync(file);
+    if (isMediaFileName(file.name)) {
+      await PdfStorage.instance.addPackedAsync(file);
+    } else {
+      await PdfStorage.instance.addAsync(file);
+    }
   }
 
   private async handleVideo(file: File) {
@@ -270,7 +281,11 @@ export class FileArchiver {
       console.warn(`Video size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    await VideoStorage.instance.addAsync(file);
+    if (isMediaFileName(file.name)) {
+      await VideoStorage.instance.addPackedAsync(file);
+    } else {
+      await VideoStorage.instance.addAsync(file);
+    }
   }
 
   private async handleText(file: File): Promise<void> {

@@ -13,6 +13,7 @@ import { PdfStorage } from './pdf-storage';
 import { VideoSharingSystem } from './video-sharing-system';
 import { VideoState } from './video-file';
 import { VideoStorage } from './video-storage';
+import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 const TICK_WHILE_INCOMPLETE_MS = 3_000;
 const TICK_IDLE_MS = 8_000;
@@ -103,6 +104,10 @@ export class RoomFileSyncWatchdog {
       this.scheduleTick(TICK_IDLE_MS);
       return;
     }
+
+    // Solo rooms still need media/ rehydrate when blobs were dropped from memory.
+    FolderMediaHydrator.instance.beginHydrateRoomReferencedMedia();
+
     if (Network.peerIds.length < 1) {
       this.scheduleTick(TICK_IDLE_MS);
       return;

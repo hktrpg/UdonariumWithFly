@@ -220,11 +220,13 @@
         </button>
       </span>
       <div class="session-info" [style.border-left-color]="findPeerColor(peer.peerId)">
-        <span>{{ 'peer.sessionStatus' | i18n }}
-          {{ 'peer.grade' | i18n }}:{{ stringFromSessionGrade(peer.session.grade) }} ({{ candidateLabel(peer.session.description) }})
-          {{ 'peer.health' | i18n }}:{{ (peer.session.health * 100).toFixed(0) }}%
-          {{ 'peer.speed' | i18n }}:{{ (peer.session.speed * 100).toFixed(0) }}%
-          {{ 'peer.ping' | i18n:{ n: peer.session.ping.toFixed(1) } }}</span>
+        <div class="session-metrics" *ngIf="peer.isOpen">
+          <span class="metric">{{ 'peer.ping' | i18n:{ n: formatPing(peer.session.ping) } }}</span>
+          <span class="metric">{{ 'peer.speed' | i18n:{ rate: formatBitrate(peer.session.bitrateInstantBps) } }}</span>
+          <span class="metric">{{ 'peer.maxSpeed' | i18n:{ rate: formatBitrate(peer.session.bitrateBps) } }}</span>
+          <span class="metric">{{ 'peer.path' | i18n:{ path: candidateLabel(peer.session.description) } }}</span>
+        </div>
+        <span class="metric metric-muted" *ngIf="!peer.isOpen">{{ 'peer.connecting' | i18n }}</span>
       </div>
     </div>
   </section>

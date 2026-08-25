@@ -683,6 +683,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
           }
         }
+        if (Network.peer?.isRoom) RoomConnectHelper.noteOpenPeerPresence();
         this.lazyNgZoneUpdate(event.isSendFromSelf);
       })
       .on('DISCONNECT_PEER', event => {
@@ -828,6 +829,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ngZone.run(() => this.promptRefreshDownload());
   };
 
+  /** Sleep/wake: full room reopen when mesh is dead after a long hide. */
+  private readonly onDocumentVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      RoomConnectHelper.onDocumentHidden();
+      return;
+    }
+    this.ngZone.run(() => RoomConnectHelper.onDocumentVisible());
+  };
+
+  private readonly onWindowPageShow = (event: PageTransitionEvent) => {
+    if (!event.persisted) return;
+    this.ngZone.run(() => RoomConnectHelper.onDocumentVisible({ persisted: true }));
+  };
+
   private promptRefreshDownload() {
     if (this.isRefreshPromptOpen || this.GuestMode() || !this.isRoom) return;
     this.isRefreshPromptOpen = true;
@@ -952,6 +967,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
+    document.addEventListener('visibilitychange', this.onDocumentVisibilityChange);
+    window.addEventListener('pageshow', this.onWindowPageShow);
     this.syncChatUnreadBadge();
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
@@ -1035,6 +1052,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       this.audioRejectToastTimer = null;
     }
     window.removeEventListener('keydown', this.onWindowKeydown, true);
+    document.removeEventListener('visibilitychange', this.onDocumentVisibilityChange);
+    window.removeEventListener('pageshow', this.onWindowPageShow);
     this.mobileSub?.unsubscribe();
   }
 

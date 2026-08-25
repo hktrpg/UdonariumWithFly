@@ -67,6 +67,19 @@ export class PdfFile {
     }
   }
 
+  /** Restore `<sha256>.pdf` under the filename hash (skip content re-hash). */
+  static async createPackedAsync(file: File, forcedIdentifier: string): Promise<PdfFile> {
+    const id = (forcedIdentifier || '').toLowerCase();
+    const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(file);
+    const pdf = new PdfFile();
+    pdf.context.identifier = id;
+    pdf.context.name = id;
+    pdf.context.blob = new Blob([arrayBuffer], { type: file.type || 'application/pdf' });
+    pdf.context.type = pdf.context.blob.type;
+    pdf.context.url = window.URL.createObjectURL(pdf.context.blob);
+    return pdf;
+  }
+
   private static async _createAsync(blob: Blob, name?: string): Promise<PdfFile> {
     const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(blob);
     const pdf = new PdfFile();

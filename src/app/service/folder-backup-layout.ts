@@ -123,6 +123,65 @@ export function shouldSkipStateZipWrite(
   return !!stateFingerprint && stateFingerprint === (previousStateFingerprint || '');
 }
 
+export type ManifestMediaEntry = { hash: string; name: string; kind?: string };
+
+/**
+ * Folder autosave must never drop media entries that were written earlier.
+ * Otherwise a brief incomplete ImageStorage/PdfStorage (peers joining, remesh)
+ * rewrites manifest.media to a subset, and the next load skips orphaned media/
+ * blobs even though the files still exist on disk.
+ */
+export function unionManifestMedia(
+  previous: ManifestMediaEntry[] | null | undefined,
+  next: ManifestMediaEntry[] | null | undefined,
+): ManifestMediaEntry[] {
+  const byHash = new Map<string, ManifestMediaEntry>();
+  const absorb = (list: ManifestMediaEntry[] | null | undefined) => {
+    if (!list?.length) return;
+    for (const entry of list) {
+      if (!entry?.hash || !entry?.name) continue;
+      if (!isMediaFileName(entry.name) && !isContentHashIdentifier(entry.hash)) continue;
+      const hash = entry.hash.toLowerCase();
+      const name = entry.name;
+      const prev = byHash.get(hash);
+      byHash.set(hash, {
+        hash,
+        name: isMediaFileName(name) ? name : (prev?.name || name),
+        kind: entry.kind || prev?.kind,
+      });
+    }
+  };
+  absorb(previous);
+  absorb(next);
+  return Array.from(byHash.values()).sort((a, b) => a.hash.localeCompare(b.hash));
+}
+
+/**
+ * Collect content-hash media ids referenced by room XML / tag attributes.
+ * Used to pull orphaned media/ files that fell out of manifest.media.
+ */
+export function collectReferencedMediaHashes(...texts: string[]): string[] {
+  const found = new Set<string>();
+  const attrRe = /(?:pdfIdentifier|videoIdentifier|imageIdentifier|toImageIdentifier|backgroundImageIdentifier2?|currentValue)\s*[=:]\s*["']?([a-f0-9]{64})/gi;
+  const attachedRe = /attachedImageIdentifiers\s*=\s*["']([^"']+)["']/gi;
+  const typeImageRe = /type\s*=\s*["']image["'][^>]*>\s*([a-f0-9]{64})\s*</gi;
+  for (const text of texts) {
+    if (!text) continue;
+    let m: RegExpExecArray | null;
+    attrRe.lastIndex = 0;
+    while ((m = attrRe.exec(text)) !== null) found.add(m[1].toLowerCase());
+    attachedRe.lastIndex = 0;
+    while ((m = attachedRe.exec(text)) !== null) {
+      for (const id of m[1].trim().split(/\s+/)) {
+        if (isContentHashIdentifier(id)) found.add(id.toLowerCase());
+      }
+    }
+    typeImageRe.lastIndex = 0;
+    while ((m = typeImageRe.exec(text)) !== null) found.add(m[1].toLowerCase());
+  }
+  return Array.from(found);
+}
+
 export function dataUrlToJpegBlob(dataUrl: string): Blob | null {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
   const comma = dataUrl.indexOf(',');

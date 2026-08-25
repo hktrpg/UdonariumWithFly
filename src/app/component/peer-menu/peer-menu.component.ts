@@ -4,7 +4,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { copyMeshDiagToClipboard } from '@udonarium/core/system/network/net-debug';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
-import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
+import { formatBitrate, formatPing } from '@udonarium/core/system/network/peer-session-format';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -430,8 +430,12 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  stringFromSessionGrade(grade: PeerSessionGrade): string {
-    return PeerSessionGrade[grade] ?? PeerSessionGrade[PeerSessionGrade.UNSPECIFIED];
+  formatBitrate(bps: number): string {
+    return formatBitrate(bps);
+  }
+
+  formatPing(ms: number): string {
+    return formatPing(ms);
   }
 
   candidateLabel(description: string): string {

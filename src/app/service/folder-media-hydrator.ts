@@ -9,7 +9,12 @@ import { PdfState } from '@udonarium/core/file-storage/pdf-file';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoState } from '@udonarium/core/file-storage/video-file';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
+import { ImageTag } from '@udonarium/image-tag';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { TextNote } from '@udonarium/text-note';
 import { Network } from '@udonarium/core/system';
+import { Card } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
 
 import { FolderBackupService } from './folder-backup.service';
 import { isContentHashIdentifier, isMediaFileName, mediaHashFromName } from './folder-backup-layout';
@@ -26,6 +31,7 @@ export class FolderMediaHydrator {
   private index: Map<string, string> | null = null;
   private indexPromise: Promise<Map<string, string>> | null = null;
   private readonly inFlight = new Map<string, Promise<boolean>>();
+  private roomHydratePromise: Promise<void> | null = null;
 
   private constructor() { }
 
@@ -160,5 +166,96 @@ export class FolderMediaHydrator {
     void this.hydrateMissing(kind, identifiers).finally(() => {
       FileReceiveScheduler.scheduleDeferred();
     });
+  }
+
+  /**
+   * Restore any room-referenced blobs that are incomplete in memory but still
+   * present under media/ (covers manifest shrink / peer-join races).
+   */
+  async hydrateRoomReferencedMedia(): Promise<void> {
+    if (!this.canHydrate()) return;
+    if (this.roomHydratePromise) return this.roomHydratePromise;
+    this.roomHydratePromise = this.hydrateRoomReferencedMediaInner().finally(() => {
+      this.roomHydratePromise = null;
+    });
+    return this.roomHydratePromise;
+  }
+
+  beginHydrateRoomReferencedMedia(): void {
+    void this.hydrateRoomReferencedMedia().finally(() => {
+      FileReceiveScheduler.scheduleDeferred();
+    });
+  }
+
+  private collectRoomReferenced(): { image: string[]; pdf: string[]; video: string[]; audio: string[] } {
+    const image = new Set<string>();
+    const pdf = new Set<string>();
+    const video = new Set<string>();
+    const audio = new Set<string>();
+
+    const addImage = (id: string) => {
+      if (isContentHashIdentifier(id) && !this.isComplete('image', id)) image.add(id.toLowerCase());
+    };
+    const addPdf = (id: string) => {
+      if (isContentHashIdentifier(id) && !this.isComplete('pdf', id)) pdf.add(id.toLowerCase());
+    };
+    const addVideo = (id: string) => {
+      if (isContentHashIdentifier(id) && !this.isComplete('video', id)) video.add(id.toLowerCase());
+    };
+    const addAudio = (id: string) => {
+      if (isContentHashIdentifier(id) && !this.isComplete('audio', id)) audio.add(id.toLowerCase());
+    };
+
+    const addImageIdsFromObject = (obj: { imageDataElement?: { children?: { value?: unknown }[] } }) => {
+      const children = obj?.imageDataElement?.children;
+      if (!children) return;
+      for (const el of children) {
+        addImage(String(el?.value ?? ''));
+      }
+    };
+
+    for (const tag of ObjectStore.instance.getObjects(ImageTag)) {
+      addImage(tag.imageIdentifier);
+    }
+    for (const note of ObjectStore.instance.getObjects(TextNote)) {
+      addPdf(note.pdfIdentifier);
+      addVideo(note.videoIdentifier);
+      addImageIdsFromObject(note);
+    }
+    for (const card of ObjectStore.instance.getObjects(Card)) {
+      addImageIdsFromObject(card);
+    }
+    for (const stack of ObjectStore.instance.getObjects(CardStack)) {
+      addImageIdsFromObject(stack);
+    }
+    for (const img of ImageStorage.instance.images) {
+      if (img?.identifier) addImage(img.identifier);
+    }
+    for (const p of PdfStorage.instance.pdfs) {
+      if (p?.identifier) addPdf(p.identifier);
+    }
+    for (const v of VideoStorage.instance.videos) {
+      if (v?.identifier) addVideo(v.identifier);
+    }
+    for (const a of AudioStorage.instance.audios) {
+      if (a?.identifier) addAudio(a.identifier);
+    }
+
+    return {
+      image: Array.from(image),
+      pdf: Array.from(pdf),
+      video: Array.from(video),
+      audio: Array.from(audio),
+    };
+  }
+
+  private async hydrateRoomReferencedMediaInner(): Promise<void> {
+    const refs = this.collectRoomReferenced();
+    await Promise.all([
+      this.hydrateMissing('image', refs.image),
+      this.hydrateMissing('pdf', refs.pdf),
+      this.hydrateMissing('video', refs.video),
+      this.hydrateMissing('audio', refs.audio),
+    ]);
   }
 }
