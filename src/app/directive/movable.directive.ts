@@ -198,6 +198,27 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     if (this.tabletopService.tableSelecter.viewTable) this.tabletopService.tableSelecter.viewTable.gridHeight = 0;
   }
 
+  /**
+   * Start dragging after an external hold gesture (card-stack 1s hold).
+   * Works for mouse and touch because InputHandler then listens on document move/end.
+   */
+  startDeferredDrag(pointer: { pageX: number; pageY: number; clientX: number; clientY: number }) {
+    if (Network.GuestMode() || this.isDisable) return;
+    this.input.cancel();
+    this.input.forceStart(pointer.pageX, pointer.pageY);
+    const synthetic = {
+      button: 0,
+      buttons: 1,
+      ctrlKey: false,
+      shiftKey: false,
+      pageX: pointer.pageX,
+      pageY: pointer.pageY,
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+    } as MouseEvent;
+    this.onInputStart(synthetic);
+  }
+
   dispose() {
     EventSystem.unregister(this);
     this.batchService.remove(this);
@@ -287,7 +308,16 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     pointer3d.x -= this.width / 2;
     pointer3d.y -= this.height / 2;
 
-    const nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    let nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    // Analytic terrain / card-stack tops (deck thickness is CSS-only, not in pick Z).
+    const blockedByPeer = this.hitStackHasNonRidePeer(hitStack) || this.isHitOnNonRidePeer(element);
+    if (!blockedByPeer) {
+      const rideZ = MovableSelectionSynchronizer.sampleRidePosZ(
+        pointer3d.x + this.width / 2,
+        pointer3d.y + this.height / 2,
+      );
+      if (rideZ != null) nextZ = Math.max(nextZ, rideZ);
+    }
     if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === nextZ) return;
 
     if (!this.input.isDragging) this.ondragstart.emit(e as PointerEvent);

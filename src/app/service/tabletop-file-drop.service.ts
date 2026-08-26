@@ -569,7 +569,8 @@ export class TabletopFileDropService {
   }
 
   private ensureDefaultCardBack(): string {
-    const backUrl = './assets/images/trump/z01.gif';
+    // Blank white back for drop-created cards/decks (not the trump patterned back).
+    const backUrl = './assets/images/trump/blank_card.png';
     let back = ImageStorage.instance.get(backUrl);
     if (!back) {
       back = ImageStorage.instance.add(backUrl);

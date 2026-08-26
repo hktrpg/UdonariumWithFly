@@ -32,6 +32,7 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
   private mobileSub: { unsubscribe: () => void } | null = null;
+  private charactersSignature = '';
 
   /** Forced off on mobile — use character sheet instead. */
   get visible(): boolean {
@@ -216,6 +217,10 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     if (this.lazyUpdateTimer !== null) return;
     this.lazyUpdateTimer = setTimeout(() => {
       this.lazyUpdateTimer = null;
+      if (!this.visible) return;
+      const signature = this.characters.map(ch => ch.identifier).join('\0');
+      if (signature === this.charactersSignature) return;
+      this.charactersSignature = signature;
       this.changeDetector.markForCheck();
     }, 80);
   }

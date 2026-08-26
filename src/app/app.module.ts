@@ -98,12 +98,16 @@ import { DiceSettingsComponent } from './component/dice-settings/dice-settings.c
 import { RangeSettingsComponent } from './component/range-settings/range-settings.component';
 import { CharacterSettingsComponent } from './component/character-settings/character-settings.component';
 import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
+import { HandRailComponent } from './component/hand-rail/hand-rail.component';
 import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
 import { PauseOverlayComponent } from './component/pause-overlay/pause-overlay.component';
 import { ConnectionBusyOverlayComponent } from './component/connection-busy-overlay/connection-busy-overlay.component';
 import { SceneNavComponent } from './component/scene-nav/scene-nav.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
+import { TableTimerComponent } from './component/table-timer/table-timer.component';
+import { TableTimerCompactHudComponent } from './component/table-timer-compact-hud/table-timer-compact-hud.component';
+import { TableTimerPanelComponent } from './component/table-timer-panel/table-timer-panel.component';
 import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
 import { GuidedTourComponent } from './component/guided-tour/guided-tour.component';
 
@@ -113,6 +117,7 @@ import '@udonarium/table-fx/table-light';
 import '@udonarium/table-fx/table-drawing';
 import '@udonarium/table-fx/aura-name-config';
 import '@udonarium/table-fx/combat-tracker';
+import '@udonarium/table-fx/table-timer';
 
 @NgModule({
   declarations: [
@@ -192,8 +197,12 @@ import '@udonarium/table-fx/combat-tracker';
     RangeSettingsComponent,
     CharacterSettingsComponent,
     CharacterResourceHudComponent,
+    HandRailComponent,
     MusicHudComponent,
     CombatTrackerComponent,
+    TableTimerComponent,
+    TableTimerCompactHudComponent,
+    TableTimerPanelComponent,
     CombatAnnounceComponent,
     PauseOverlayComponent,
     ConnectionBusyOverlayComponent,

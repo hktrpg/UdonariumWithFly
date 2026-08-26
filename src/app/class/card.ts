@@ -1,4 +1,5 @@
 import { ImageFile } from './core/file-storage/image-file';
+import { ObjectStore } from './core/synchronize-object/object-store';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { Network } from './core/system';
 import { DataElement } from './data-element';
@@ -18,6 +19,7 @@ export class Card extends TabletopObject {
   @SyncVar() owner: string = '';
   @SyncVar() zindex: number = 0;
   @SyncVar() isLocked: boolean = false;
+  @SyncVar() handOrder: number = 0;
 
   get isVisibleOnTable(): boolean {
     return super.isVisibleOnTable && (!this.parentIsAssigned || this.parentIsDestroyed);
@@ -64,9 +66,22 @@ export class Card extends TabletopObject {
   
   get hasOwner(): boolean { return !!(this.owner && this.owner.length); }
   get ownerIsOnline(): boolean { return this.hasOwner && (this.isHand || Network.peers.some(peer => peer.userId === this.owner && peer.isOpen)); }
-  get isHand(): boolean { return Network.peer.userId === this.owner; }
+  get isInHand(): boolean { return this.location.name === 'hand'; }
+  get isHand(): boolean { return this.isInHand && Network.peer.userId === this.owner; }
   get isFront(): boolean { return this.state === CardState.FRONT; }
   get isVisible(): boolean { return this.isHand || this.isFront; }
+
+  moveToHand(userId: string) {
+    if (!userId) return;
+    this.mutateAppearance(() => { this.state = CardState.BACK; });
+    this.owner = userId;
+    const peersHand = ObjectStore.instance.getObjects(Card)
+      .filter(c => c !== this && c.location.name === 'hand' && c.owner === userId);
+    this.handOrder = peersHand.length < 1
+      ? 0
+      : Math.max(...peersHand.map(c => c.handOrder)) + 1;
+    this.setLocation('hand');
+  }
 
   complement(): void {
     let element = this.getElement('fontsize', this.commonDataElement);

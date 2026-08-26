@@ -17,6 +17,20 @@
   object-fit: contain;
 }
 
+/* Hand rail: one face only, portrait card size, no #555 backside plate. */
+.image-box.is-single-face,
+.image-box.is-single-face .image {
+  width: 64px;
+  height: 88px;
+  background: transparent;
+}
+
+.image-box.is-single-face .image img {
+  width: 64px;
+  height: 88px;
+  object-fit: contain;
+}
+
 .text {
   transform-origin: left top;
 

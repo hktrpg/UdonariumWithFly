@@ -32,13 +32,16 @@ import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchr
 
 import { CoordinateService } from './coordinate.service';
 import { ContextMenuService } from './context-menu.service';
+import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import { PanelService } from './panel.service';
+import { PointerDeviceService, PointerCoordinate } from './pointer-device.service';
 import { SceneToolService } from './scene-tool.service';
 import { filesFromDataTransfer, TabletopFileDropService } from './tabletop-file-drop.service';
 import { SelectionState, TabletopSelectionService } from './tabletop-selection.service';
 import { TokenPathMoveService } from './token-path-move.service';
 import { DeleteEntry, UndoService } from './undo.service';
+import { findCardOrStackIdAtPoint } from 'component/card-stack/card-stack-gesture';
 
 const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
@@ -84,19 +87,45 @@ export class TabletopKeyboardService {
   constructor(
     private selectionService: TabletopSelectionService,
     private coordinateService: CoordinateService,
+    private pointerDevice: PointerDeviceService,
     private sceneTools: SceneToolService,
     private undoService: UndoService,
     private tokenPath: TokenPathMoveService,
     private contextMenu: ContextMenuService,
     private tabletopFileDrop: TabletopFileDropService,
+    private i18n: I18nService,
     private ngZone: NgZone,
   ) { }
 
   /**
-   * Keyboard listeners are registered outside NgZone (game-table init) so WASD
-   * does not thrash CD. Template-bound state (z-index, mask order, flip…) must
-   * re-enter the zone or the view never updates.
+   * Objects that receive tabletop shortcuts.
+   * Explicit selection wins; otherwise the card / card-stack under the pointer (hover).
    */
+  private shortcutTargets(): TabletopObject[] {
+    if (this.selectionService.size > 0) return this.selectionService.objects;
+    const hovered = this.resolveHoveredCardOrStack();
+    return hovered ? [hovered] : [];
+  }
+
+  /** F / R: only the card or stack under the pointer — never box-selection alone. */
+  private hoverCardOrStackTargets(): TabletopObject[] {
+    const hovered = this.resolveHoveredCardOrStack();
+    return hovered ? [hovered] : [];
+  }
+
+  /** Card or stack under the current pointer (page → client for hit-test). */
+  private resolveHoveredCardOrStack(): Card | CardStack | null {
+    const ptr = this.pointerDevice.pointers[0];
+    if (!ptr) return null;
+    const clientX = ptr.x - (window.scrollX || window.pageXOffset || 0);
+    const clientY = ptr.y - (window.scrollY || window.pageYOffset || 0);
+    const id = findCardOrStackIdAtPoint(clientX, clientY);
+    if (!id) return null;
+    const obj = ObjectStore.instance.get(id);
+    if (obj instanceof CardStack || obj instanceof Card) return obj;
+    return null;
+  }
+
   private runInAngular<T>(fn: () => T): T {
     return NgZone.isInAngularZone() ? fn() : this.ngZone.run(fn);
   }
@@ -276,20 +305,36 @@ export class TabletopKeyboardService {
     // Q/E: rotate selection (±45°; Shift = ±15°). Empty selection → view yaw in TableMouseGesture.
     if ((code === 'KeyQ' || code === 'KeyE') && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      const targets = this.shortcutTargets();
+      if (targets.length < 1) return;
       const step = e.shiftKey ? 15 : 45;
       const delta = code === 'KeyQ' ? -step : step;
-      if (RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta)) {
+      if (RotableSelectionSynchronizer.rotateBy(targets, delta)) {
         this.consume(e);
       }
       return;
     }
 
-    // R: reset facing + tilt (roll) to 0°.
+    // R: shuffle hovered stack, else reset facing on hovered card. Hover required (not box-select).
     if (code === 'KeyR' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
-      if (RotableSelectionSynchronizer.resetAngles(this.selectionService.objects)) {
+      const objects = this.hoverCardOrStackTargets();
+      if (objects.length < 1) return;
+      if (objects.every(o => o instanceof CardStack)) {
+        let shuffled = false;
+        for (const object of objects) {
+          if (!(object instanceof CardStack) || object.isLocked || object.isEmpty) continue;
+          object.shuffle();
+          EventSystem.call('SHUFFLE_CARD_STACK', { identifier: object.identifier });
+          shuffled = true;
+        }
+        if (shuffled) {
+          SoundEffect.play(PresetSound.cardShuffle);
+          this.consume(e);
+        }
+        return;
+      }
+      if (RotableSelectionSynchronizer.resetAngles(objects)) {
         this.consume(e);
       }
       return;
@@ -298,25 +343,26 @@ export class TabletopKeyboardService {
     // PageUp / PageDown: nudge altitude (±1; Shift = ±0.5).
     if ((code === 'PageUp' || code === 'PageDown') && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       const step = e.shiftKey ? 0.5 : 1;
       const delta = code === 'PageUp' ? step : -step;
       if (this.runInAngular(() => this.nudgeAltitude(delta))) this.consume(e);
       return;
     }
 
-    // F: flip cards / coin faces; roll multi-face dice.
+    // F: flip hovered card / stack cover. Hover required (not box-select).
     if (code === 'KeyF' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
-      if (this.runInAngular(() => this.flipSelection())) this.consume(e);
+      const hovered = this.hoverCardOrStackTargets();
+      if (hovered.length < 1) return;
+      if (this.runInAngular(() => this.flipObjects(hovered))) this.consume(e);
       return;
     }
 
     // H: GM hide / reveal selected characters.
     if (code === 'KeyH' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.runInAngular(() => this.toggleHideSelection())) this.consume(e);
       return;
     }
@@ -324,7 +370,7 @@ export class TabletopKeyboardService {
     // L: lock / unlock selected objects.
     if (code === 'KeyL' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.runInAngular(() => this.toggleLockSelection())) this.consume(e);
       return;
     }
@@ -332,7 +378,7 @@ export class TabletopKeyboardService {
     // T: congregate selected tokens to the current mouse / pointer position on the table.
     if (code === 'KeyT' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.congregateSelectionToPointer()) this.consume(e);
       return;
     }
@@ -353,12 +399,13 @@ export class TabletopKeyboardService {
       return;
     }
 
-    if (this.selectionService.size < 1) return;
+    const moveTargets = this.shortcutTargets();
+    if (moveTargets.length < 1) return;
 
     if (e.shiftKey) {
       const angle = this.facingAngleFromPressed();
       if (angle == null) return;
-      if (RotableSelectionSynchronizer.face(this.selectionService.objects, angle)) {
+      if (RotableSelectionSynchronizer.face(moveTargets, angle)) {
         this.consume(e);
       }
       return;
@@ -367,7 +414,7 @@ export class TabletopKeyboardService {
     const delta = this.moveDeltaFromPressed();
     if (!delta) return;
     const gridSize = TableSelecter.instance.viewTable?.gridSize ?? 50;
-    if (MovableSelectionSynchronizer.nudge(this.selectionService.objects, delta.dx * gridSize, delta.dy * gridSize)) {
+    if (MovableSelectionSynchronizer.nudge(moveTargets, delta.dx * gridSize, delta.dy * gridSize)) {
       // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
       if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
       this.consume(e);
@@ -403,7 +450,8 @@ export class TabletopKeyboardService {
     const isAltShift = alt && e.shiftKey && !e.ctrlKey && !e.metaKey;
     const stepDeg = isCtrlShift ? 45 : (isAltOnly || isAltShift) ? 3 : null;
     if (stepDeg == null) return;
-    if (this.selectionService.size < 1) return;
+    const wheelTargets = this.shortcutTargets();
+    if (wheelTargets.length < 1) return;
 
     // Prefer the dominant axis (Shift may still contribute deltaX while Ctrl is held).
     const scroll = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -425,9 +473,9 @@ export class TabletopKeyboardService {
     const delta = dir * stepDeg;
 
     if (isAltShift) {
-      RotableSelectionSynchronizer.rollBy(this.selectionService.objects, delta);
+      RotableSelectionSynchronizer.rollBy(wheelTargets, delta);
     } else {
-      RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta);
+      RotableSelectionSynchronizer.rotateBy(wheelTargets, delta);
     }
   }
 
@@ -582,13 +630,14 @@ export class TabletopKeyboardService {
   }
 
   private changeLayerOrder(toFront: boolean): boolean {
-    if (this.selectionService.size < 1) return false;
-    const before = this.snapshotZindexes(this.selectionService.objects);
-    const beforeOrder = this.snapshotChildOrders(this.selectionService.objects);
+    const targets = this.shortcutTargets();
+    if (targets.length < 1) return false;
+    const before = this.snapshotZindexes(targets);
+    const beforeOrder = this.snapshotChildOrders(targets);
     let changed = false;
     // Process back→front when bringing forward (and reverse when sending back) so
     // multi-select keeps relative order while moving as a group.
-    const objects = this.selectionService.objects.slice().sort((a, b) => {
+    const objects = targets.slice().sort((a, b) => {
       const za = 'zindex' in a ? (a as Stackable).zindex : 0;
       const zb = 'zindex' in b ? (b as Stackable).zindex : 0;
       return toFront ? za - zb : zb - za;
@@ -599,8 +648,8 @@ export class TabletopKeyboardService {
       if (did) changed = true;
     }
     if (changed) {
-      const after = this.snapshotZindexes(this.selectionService.objects);
-      const afterOrder = this.snapshotChildOrders(this.selectionService.objects);
+      const after = this.snapshotZindexes(targets);
+      const afterOrder = this.snapshotChildOrders(targets);
       this.undoService.recordLayerChange(before, after, beforeOrder, afterOrder, 'layer');
       // Stackable toTopmost/toBackmost already emit TABLETOP_LAYER_CHANGED via util.
       // Re-firing here doubles detectChanges and makes every token flash on [ ].
@@ -720,8 +769,8 @@ export class TabletopKeyboardService {
       this.clipboardSourceIds = objs.map(object => object.identifier);
       return this.clipboardXml.length > 0;
     }
-    if (this.selectionService.size < 1) return false;
-    const objs = this.selectionService.objects;
+    const objs = this.shortcutTargets();
+    if (objs.length < 1) return false;
     this.clipboardXml = objs.map(object => object.toXml());
     this.clipboardSourceIds = objs.map(object => object.identifier);
     return this.clipboardXml.length > 0;
@@ -767,12 +816,81 @@ export class TabletopKeyboardService {
     this.selectionService.add(object);
   }
 
-  private congregateSelectionToPointer(): boolean {
+  /**
+   * Hotkey T / context menu: if selection is only cards + stacks (≥2 pieces),
+   * merge into one deck at `position`; otherwise congregate to that point.
+   */
+  congregateOrMergeSelection(position?: PointerCoordinate): boolean {
+    return this.runInAngular(() => this.congregateOrMergeSelectionInner(position));
+  }
+
+  private congregateOrMergeSelectionInner(position?: PointerCoordinate): boolean {
     if (Network.GuestMode()) return false;
-    if (this.selectionService.size < 1) return false;
-    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
-    this.selectionService.congregate(pointer);
+    const targets = this.selectionService.size > 0
+      ? this.selectionService.objects
+      : this.shortcutTargets();
+    if (targets.length < 1) return false;
+    const pointer = position ?? this.coordinateService.calcTabletopLocalCoordinate();
+    if (this.tryMergeCardsAndStacks(targets, pointer)) return true;
+    MovableSelectionSynchronizer.congregate(pointer, targets);
     SoundEffect.play(PresetSound.piecePut);
+    return true;
+  }
+
+  private congregateSelectionToPointer(): boolean {
+    return this.congregateOrMergeSelectionInner();
+  }
+
+  /**
+   * Merge free cards + card stacks into one deck. Returns true when merged.
+   * Requires every target to be a Card or CardStack and at least two pieces.
+   */
+  private tryMergeCardsAndStacks(targets: TabletopObject[], position: PointerCoordinate): boolean {
+    if (targets.length < 2) return false;
+    const pieces: Array<Card | CardStack> = [];
+    for (const obj of targets) {
+      if (obj instanceof Card || obj instanceof CardStack) pieces.push(obj);
+      else return false;
+    }
+
+    const freeCards = pieces.filter((p): p is Card => p instanceof Card && !p.parent);
+    const stacks = pieces.filter((p): p is CardStack => p instanceof CardStack);
+    if (freeCards.length + stacks.length < 2) return false;
+
+    let totalCards = freeCards.length;
+    for (const s of stacks) totalCards += s.cards.length;
+    if (totalCards < 2) return false;
+
+    const deck = CardStack.create(this.i18n.t('card.deckDefault'));
+    deck.location.x = position.x - 25;
+    deck.location.y = position.y - 25;
+    deck.posZ = position.z;
+    deck.location.name = 'table';
+    const viewId = TabletopObject.resolveViewTableIdentifier() || '';
+    if (viewId) deck.tableIdentifier = viewId;
+    deck.setLocation('table');
+
+    const ordered = [...freeCards, ...stacks].sort((a, b) => {
+      const za = 'zindex' in a ? (a as Card | CardStack).zindex : 0;
+      const zb = 'zindex' in b ? (b as Card | CardStack).zindex : 0;
+      return za - zb;
+    });
+
+    for (const piece of ordered) {
+      if (piece instanceof Card) {
+        deck.putOnBottom(piece);
+        continue;
+      }
+      const drawn = piece.drawCardAll();
+      for (const card of drawn) deck.putOnBottom(card);
+      piece.setLocation('');
+      piece.destroy();
+    }
+
+    deck.raiseInTier();
+    this.selectionService.clear();
+    this.selectionService.add(deck);
+    SoundEffect.play(PresetSound.cardPut);
     return true;
   }
 
@@ -1152,9 +1270,9 @@ export class TabletopKeyboardService {
 
   private deleteSelection(): boolean {
     if (Network.GuestMode()) return false;
-    if (this.selectionService.size < 1) return false;
+    const targets = [...this.shortcutTargets()];
+    if (targets.length < 1) return false;
 
-    const targets = [...this.selectionService.objects];
     const entries: DeleteEntry[] = [];
     let deleted = false;
 
@@ -1257,7 +1375,7 @@ export class TabletopKeyboardService {
     if (delta === 0) return false;
     if (TableSelecter.instance?.viewTable?.is2DMode) return false;
     let changed = false;
-    for (const object of this.selectionService.objects) {
+    for (const object of this.shortcutTargets()) {
       if (this.isLocked(object)) continue;
       if (!object.isHaveAltitude) continue;
       const next = Math.min(ALTITUDE_MAX, Math.max(ALTITUDE_MIN, object.altitude + delta));
@@ -1271,11 +1389,15 @@ export class TabletopKeyboardService {
 
   /** Flip cards / coin faces; roll multi-face dice. */
   private flipSelection(): boolean {
+    return this.flipObjects(this.shortcutTargets());
+  }
+
+  private flipObjects(objects: TabletopObject[]): boolean {
     let flippedCard = false;
     let rolledCoin = false;
     let rolledDice = false;
 
-    for (const object of this.selectionService.objects) {
+    for (const object of objects) {
       if (this.isLocked(object)) continue;
 
       if (object instanceof Card) {
@@ -1286,9 +1408,9 @@ export class TabletopKeyboardService {
       }
 
       if (object instanceof CardStack) {
-        const top = object.topCard;
-        if (!top) continue;
-        if (top.isFront) object.faceDown();
+        const cover = object.coverCard;
+        if (!cover) continue;
+        if (cover.isFront) object.faceDown();
         else object.faceUp();
         flippedCard = true;
         continue;
@@ -1319,7 +1441,7 @@ export class TabletopKeyboardService {
   /** GM only: hide / reveal selected tokens (owner stealth on Token when present). */
   private toggleHideSelection(): boolean {
     if (!PeerCursor.myCursor?.isGMMode) return false;
-    const hosts = this.selectionService.objects.filter(
+    const hosts = this.shortcutTargets().filter(
       (o): o is GameCharacter | CharacterToken =>
         o instanceof GameCharacter || o instanceof CharacterToken
     );
@@ -1351,7 +1473,7 @@ export class TabletopKeyboardService {
   /** Toggle lock on selected objects that support isLocked / isLock. */
   private toggleLockSelection(): boolean {
     const lockable: TabletopObject[] = [];
-    for (const object of this.selectionService.objects) {
+    for (const object of this.shortcutTargets()) {
       if (object instanceof GameCharacter) continue; // soft player-owner lock only
       if ('isLocked' in object || 'isLock' in object) lockable.push(object);
     }

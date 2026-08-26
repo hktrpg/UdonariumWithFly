@@ -1,0 +1,46 @@
+<div
+  class="table-timer-root"
+  *ngIf="timer"
+  [attr.data-timer-id]="timer.identifier"
+  [class.is-compact]="isCompact"
+  [class.is-full]="isFull"
+  [class.is-running]="isRunning"
+  [class.is-finished]="isFinished"
+  [class.is-flashing]="isFlashing"
+  [style.left.%]="timer.posX"
+  [style.top.%]="timer.posY"
+>
+  <div class="table-timer-shell" (pointerdown)="startDrag($event)" (click)="onShellClick($event)">
+    <div class="table-timer-chrome">
+      <div class="table-timer-label" *ngIf="showLabel">{{ displayLabel }}</div>
+      <div class="table-timer-window-btns" (pointerdown)="$event.stopPropagation()">
+        <button type="button" class="win-btn" (click)="setViewMode('compact', $event)"
+          [class.is-active]="isCompact" [attr.title]="'timer.display.compact' | i18n">––</button>
+        <button type="button" class="win-btn" (click)="setViewMode('full', $event)"
+          [class.is-active]="isFull" [attr.title]="'timer.display.full' | i18n">□</button>
+        <button type="button" class="win-btn is-close" (click)="setViewMode('hidden', $event)"
+          [attr.title]="'timer.display.hidden' | i18n">×</button>
+      </div>
+    </div>
+    <div class="table-timer-face" *ngIf="isFull">
+      <svg class="table-timer-ring" viewBox="0 0 36 36" aria-hidden="true">
+        <circle class="ring-track" cx="18" cy="18" [attr.r]="ringRadius" fill="none" />
+        <circle class="ring-progress" cx="18" cy="18" [attr.r]="ringRadius" fill="none"
+          [attr.stroke-dasharray]="ringCircumference"
+          [attr.stroke-dashoffset]="ringDashOffset" />
+      </svg>
+      <div class="table-timer-time">{{ displayTime }}</div>
+    </div>
+    <div class="table-timer-time" *ngIf="!isFull">{{ displayTime }}</div>
+    <div class="table-timer-actions" *ngIf="!isGuest">
+      <button type="button" class="timer-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleRun($event)"
+        [attr.title]="isRunning ? ('timer.pause' | i18n) : ('timer.start' | i18n)">
+        <i class="material-icons">{{ isRunning ? 'pause' : 'play_arrow' }}</i>
+      </button>
+      <button type="button" class="timer-btn" (pointerdown)="$event.stopPropagation()" (click)="stopTimer($event)"
+        [attr.title]="'timer.stop' | i18n">
+        <i class="material-icons">stop</i>
+      </button>
+    </div>
+  </div>
+</div>

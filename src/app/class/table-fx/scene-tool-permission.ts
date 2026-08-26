@@ -13,6 +13,7 @@ const ALWAYS_OPEN_MENUS = new Set([
   'menu.connection',
   'menu.chat',
   'menu.combat',
+  'menu.timer',
   'menu.settings',
   'menu.disconnect',
   'menu.more',

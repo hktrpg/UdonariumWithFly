@@ -10,6 +10,11 @@ export interface CombatRoundAnnounceData {
   kind?: 'begin' | 'round';
 }
 
+export interface TimerAnnounceData {
+  message: string;
+  label?: string;
+}
+
 @Component({
   selector: 'combat-announce',
   templateUrl: './combat-announce.component.html',
@@ -37,7 +42,8 @@ export class CombatAnnounceComponent implements OnInit, OnDestroy {
   visible = false;
   round = 1;
   name = '';
-  kind: 'begin' | 'round' = 'round';
+  kind: 'begin' | 'round' | 'timer' = 'round';
+  timerMessage = '';
   private hideTimer: ReturnType<typeof setTimeout> = null;
   private animKey = 0;
 
@@ -48,6 +54,7 @@ export class CombatAnnounceComponent implements OnInit, OnDestroy {
   ) {}
 
   get label(): string {
+    if (this.kind === 'timer') return this.i18n.t('timer.announce');
     return this.i18n.t(this.kind === 'begin' ? 'combat.begin' : 'combat.nextRound');
   }
 
@@ -59,7 +66,10 @@ export class CombatAnnounceComponent implements OnInit, OnDestroy {
   ngOnInit() {
     EventSystem.register(this)
       .on<CombatRoundAnnounceData>('COMBAT_ROUND_ANNOUNCE', -1000, event => {
-        this.ngZone.run(() => this.show(event.data));
+        this.ngZone.run(() => this.showCombat(event.data));
+      })
+      .on<TimerAnnounceData>('TABLE_TIMER_ANNOUNCE', -1000, event => {
+        this.ngZone.run(() => this.showTimer(event.data));
       });
   }
 
@@ -68,16 +78,32 @@ export class CombatAnnounceComponent implements OnInit, OnDestroy {
     if (this.hideTimer) clearTimeout(this.hideTimer);
   }
 
-  private show(data: CombatRoundAnnounceData) {
+  private showCombat(data: CombatRoundAnnounceData) {
     if (!data || !(data.round > 0)) return;
     this.round = data.round;
     this.name = (data.name || '').trim();
+    this.timerMessage = '';
     this.kind = data.kind === 'begin' ? 'begin' : 'round';
+    this.present();
+    SoundEffect.playLocal(this.kind === 'begin' ? PresetSound.surprise : PresetSound.selectionStart);
+  }
+
+  private showTimer(data: TimerAnnounceData) {
+    const message = (data?.message || data?.label || '').trim();
+    if (!message) return;
+    this.timerMessage = message;
+    this.name = (data?.label || '').trim();
+    this.round = 0;
+    this.kind = 'timer';
+    this.present();
+    SoundEffect.playLocal(PresetSound.surprise);
+  }
+
+  private present() {
     this.animKey += 1;
     this.visible = false;
     this.changeDetector.detectChanges();
     this.visible = true;
-    SoundEffect.playLocal(this.kind === 'begin' ? PresetSound.surprise : PresetSound.selectionStart);
     if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = setTimeout(() => {
       this.visible = false;

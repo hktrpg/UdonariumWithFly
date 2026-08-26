@@ -1,0 +1,131 @@
+<div class="settings-ui dense table-timer-panel">
+  <section class="card">
+    <header class="card-head">
+      <h3>{{ 'timer.list' | i18n }}</h3>
+      <span class="actions-spacer">
+        <button type="button" class="btn btn-sm btn-primary" (click)="createTimer()" [disabled]="isGuest" [title]="'timer.create' | i18n">
+          <i class="material-icons">add</i>
+        </button>
+      </span>
+    </header>
+    <div class="timer-list" *ngIf="timers.length; else emptyTimers">
+      <div class="timer-item" *ngFor="let timer of timers" [class.is-expanded]="timer.identifier === selectedId">
+        <button
+          type="button"
+          class="timer-row"
+          [class.is-selected]="timer.identifier === selectedId"
+          (click)="toggleTimer(timer.identifier)"
+        >
+          <i class="material-icons timer-row-chevron">{{ timer.identifier === selectedId ? 'expand_less' : 'expand_more' }}</i>
+          <span class="timer-row-label">{{ timerDisplayLabel(timer) }}</span>
+          <span class="timer-row-mode">{{ countModeLabel(timer.countMode) }}</span>
+          <span class="timer-row-time">{{ remainingLabel(timer) }}</span>
+          <span class="timer-row-state">{{ stateLabel(timer) }}</span>
+        </button>
+
+        <div class="timer-edit" *ngIf="timer.identifier === selectedId && selected">
+          <div class="field-row">
+            <label>{{ 'timer.label' | i18n }}</label>
+            <input [(ngModel)]="draftLabel" [disabled]="isGuest || !canManageSelected" (blur)="applySelected()" [placeholder]="timerDisplayLabel(timer)">
+          </div>
+
+          <div class="field-row wrap">
+            <label>{{ 'timer.countMode' | i18n }}</label>
+            <select [(ngModel)]="draftCountMode" [disabled]="isGuest || !canManageSelected" (ngModelChange)="applySelected()">
+              <option *ngFor="let mode of countModes" [ngValue]="mode">{{ countModeLabel(mode) }}</option>
+            </select>
+          </div>
+
+          <div class="field-row wrap">
+            <label>{{ draftCountMode === 'countup' ? ('timer.targetDuration' | i18n) : ('timer.duration' | i18n) }}</label>
+            <div class="duration-presets" *ngIf="canManageSelected">
+              <button type="button" class="btn btn-sm"
+                *ngFor="let preset of durationPresets"
+                (click)="applyDurationPreset(preset.minutes, preset.seconds)">
+                {{ preset.minutes }}{{ 'timer.minutes' | i18n }}
+              </button>
+            </div>
+            <input type="number" min="0" class="duration-input" [(ngModel)]="draftMinutes" [disabled]="isGuest || !canManageSelected" (blur)="applySelected()">
+            <span>{{ 'timer.minutes' | i18n }}</span>
+            <input type="number" min="0" max="59" class="duration-input" [(ngModel)]="draftSeconds" [disabled]="isGuest || !canManageSelected" (blur)="applySelected()">
+            <span>{{ 'timer.seconds' | i18n }}</span>
+            <span class="hint inline-hint" *ngIf="draftCountMode === 'countup'">{{ 'timer.countupHint' | i18n }}</span>
+          </div>
+
+          <div class="timer-canvas-actions">
+            <button type="button" class="btn btn-canvas btn-canvas-personal"
+              (click)="showOnMyCanvas()">
+              {{ 'timer.showOnMyCanvas' | i18n }}
+            </button>
+            <button type="button" class="btn btn-canvas btn-canvas-room"
+              (click)="showOnRoomCanvas()" [disabled]="isGuest || !canManageSelected">
+              {{ 'timer.showOnRoomCanvas' | i18n }}
+            </button>
+          </div>
+
+          <div class="field-row">
+            <label>{{ 'timer.flashSeconds' | i18n }}</label>
+            <input type="number" min="0" class="duration-input" [(ngModel)]="draftFlashSeconds" [disabled]="isGuest || !canManageSelected" (blur)="applySelected()">
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn btn-sm btn-primary" (click)="startSelected()" [disabled]="isGuest">{{ 'timer.start' | i18n }}</button>
+            <button type="button" class="btn btn-sm" (click)="pauseSelected()" [disabled]="isGuest">{{ 'timer.pause' | i18n }}</button>
+            <button type="button" class="btn btn-sm" (click)="stopSelected()" [disabled]="isGuest">{{ 'timer.stop' | i18n }}</button>
+            <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelected()" [disabled]="!canManageSelected">{{ 'timer.delete' | i18n }}</button>
+          </div>
+
+          <div class="onzero-block">
+            <header class="onzero-head">
+              <h4>{{ 'timer.onZero' | i18n }}</h4>
+              <button type="button" class="btn btn-sm btn-primary" (click)="addOnZeroAction()" [disabled]="!canManageSelected">
+                <i class="material-icons">add</i>
+              </button>
+            </header>
+
+            <div class="onzero-list" *ngIf="onZeroDrafts.length; else noOnZero">
+              <div class="onzero-row" *ngFor="let action of onZeroDrafts; let i = index">
+                <select [(ngModel)]="action.type" [disabled]="!canManageSelected" (ngModelChange)="applySelected()">
+                  <option *ngFor="let type of actionTypes" [ngValue]="type">{{ actionTypeLabel(type) }}</option>
+                </select>
+
+                <ng-container [ngSwitch]="action.type">
+                  <select *ngSwitchCase="'sound'" [(ngModel)]="action.preset" [disabled]="!canManageSelected" (ngModelChange)="applySelected()">
+                    <option *ngFor="let preset of soundPresets" [ngValue]="preset">{{ preset }}</option>
+                  </select>
+                  <div *ngSwitchCase="'chat'" class="onzero-chat-fields">
+                    <textarea rows="2" [(ngModel)]="action.message" [disabled]="!canManageSelected" (blur)="applySelected()" [placeholder]="'timer.chatMessage' | i18n"></textarea>
+                    <input type="text" class="tag-input" [(ngModel)]="action.tag" [disabled]="!canManageSelected" (blur)="applySelected()"
+                      [placeholder]="'timer.chatTag' | i18n" [attr.title]="'timer.chatTagHint' | i18n">
+                  </div>
+                  <textarea *ngSwitchCase="'announce'" rows="2" [(ngModel)]="action.message" [disabled]="!canManageSelected" (blur)="applySelected()" [placeholder]="'timer.announceMessage' | i18n"></textarea>
+                  <select *ngSwitchCase="'cutin'" [(ngModel)]="action.cutInIdentifier" [disabled]="!canManageSelected" (ngModelChange)="applySelected()">
+                    <option value="">{{ 'timer.none' | i18n }}</option>
+                    <option *ngFor="let cutIn of cutIns" [ngValue]="cutIn.identifier">{{ cutIn.name }}</option>
+                  </select>
+                  <select *ngSwitchCase="'scenePreset'" [(ngModel)]="action.presetIdentifier" [disabled]="!canManageSelected" (ngModelChange)="applySelected()">
+                    <option value="">{{ 'timer.none' | i18n }}</option>
+                    <option *ngFor="let preset of scenePresets" [ngValue]="preset.identifier">{{ preset.title }}</option>
+                  </select>
+                  <select *ngSwitchCase="'weather'" [(ngModel)]="action.weatherType" [disabled]="!canManageSelected" (ngModelChange)="applySelected()">
+                    <option *ngFor="let weather of weatherTypes" [ngValue]="weather">{{ weatherLabel(weather) }}</option>
+                  </select>
+                </ng-container>
+
+                <button type="button" class="btn btn-sm btn-danger" (click)="removeOnZeroAction(i); applySelected()" [disabled]="!canManageSelected">
+                  <i class="material-icons">delete</i>
+                </button>
+              </div>
+            </div>
+            <ng-template #noOnZero>
+              <p class="hint">{{ 'timer.onZeroEmpty' | i18n }}</p>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ng-template #emptyTimers>
+      <p class="hint">{{ 'timer.empty' | i18n }}</p>
+    </ng-template>
+  </section>
+</div>

@@ -59,6 +59,8 @@ export class TabletopObject extends ObjectNode {
   /** Clone from「建立暫存副本」/ CTRL+drag; delete destroys (no graveyard). */
   @SyncVar() isTemporaryCopy: boolean = false;
 
+  get isInHand(): boolean { return this.location.name === 'hand'; }
+
   get isVisibleOnTable(): boolean {
     if (this.location.name !== 'table') return false;
     const viewId = TabletopObject.resolveViewTableIdentifier();
