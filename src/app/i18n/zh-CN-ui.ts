@@ -655,6 +655,7 @@ export const zhCN_ui: I18nDictionary = {
   'net.reconnectHint': '关闭此窗口后将尝试重新连接。',
   'net.reconnectRoomHint': '房间连接已断，大厅目前看不到此房。关闭此窗口后将尝试用同一房间重新连接。',
   'net.reconnecting': '正在重新连接…',
+  'net.meshReconnecting': '连线异常，正在重连…消息可能暂时无法送达其他人。',
   'net.reconnectingRoom': '房间连接中断，正在自动重开房间…',
   'net.reconnectSessionLost': '房间连接中断且无法还原房间凭证，因此未自动回到大厅（避免游戏中被踢出）。本机桌面仍保留。请用「读取房间」或邀请链接重试。',
   'net.connectedRoom': '已连接到 {{name}}',

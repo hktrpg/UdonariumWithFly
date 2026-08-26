@@ -241,3 +241,10 @@ FILES 進度條入房期間穩定顯示；圖片優先，跟住正在播嘅 BGM
 筆記倉庫五分頁同拖放；紅繩拖曳即時更新；預設劇本唔再重複載入
 
 ---
+
+Udonarium烏冬ユドナリウム開發日誌29
+長團約 1 小時後全員 mesh 靜默失活、訊息互不可見又冇提示
+所以 token 刷新後 remesh、open=0 且房內有人 30s 升級 full reopen、聊天窗重連 banner
+詳見 `docs/hktrpg-backend.md` 長 session 排查
+
+---

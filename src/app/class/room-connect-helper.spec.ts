@@ -128,8 +128,10 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     RoomConnectHelper.everHadRoomSession = false;
     RoomConnectHelper.hadOpenPeerThisSession = false;
     (RoomConnectHelper as any).clearSoftDeathState();
+    (RoomConnectHelper as any).clearMeshDeathState();
     (RoomConnectHelper as any).documentHiddenAt = 0;
     RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
+    RoomConnectHelper.MESH_DEATH_MS_FOR_TEST = 0;
     RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
     skyWayRecoveryGate.resetForTests();
   });
@@ -289,6 +291,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       } as IPeerContext);
       spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
       spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+      spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
 
       RoomConnectHelper.noteOpenPeerPresence();
       expect(RoomConnectHelper.isSoftDeathArmed()).toBeTrue();
@@ -317,10 +320,86 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     (RoomConnectHelper as any).softDeathSince = 0;
     spyOnProperty(Network, 'peer', 'get').and.returnValue({ isRoom: true, peerId: 'self' } as IPeerContext);
     spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
     RoomConnectHelper.noteOpenPeerPresence();
     expect(RoomConnectHelper.isSoftDeathArmed()).toBeFalse();
     expect(RoomConnectHelper.maybeSoftDeathReopen()).toBeFalse();
     RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
+  });
+
+  it('isMeshDeathArmed when open=0 with other room members', () => {
+    RoomConnectHelper.hadOpenPeerThisSession = true;
+    (RoomConnectHelper as any).meshDeathSince = Date.now();
+    (RoomConnectHelper as any).meshDeathAttempted = false;
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self', 'peer']);
+    expect(RoomConnectHelper.isMeshDeathArmed()).toBeTrue();
+    expect(RoomConnectHelper.isSoftDeathArmed()).toBeFalse();
+  });
+
+  it('mesh-death reopens once after threshold when others are in room', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    try {
+      RoomConnectHelper.MESH_DEATH_MS_FOR_TEST = 1000;
+      RoomConnectHelper.everHadRoomSession = true;
+      RoomConnectHelper.hadOpenPeerThisSession = true;
+      (RoomConnectHelper as any).meshDeathSince = 0;
+      (RoomConnectHelper as any).meshDeathAttempted = false;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      const open = spyOn(Network, 'open');
+      spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+      spyOn(Network, 'isRoomChannelReady').and.returnValue(false);
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({
+        userId: 'u1',
+        peerId: 'self',
+        isRoom: true,
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      } as IPeerContext);
+      spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+      spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+      spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self', 'peer']);
+
+      RoomConnectHelper.noteOpenPeerPresence();
+      expect(RoomConnectHelper.isMeshDeathArmed()).toBeTrue();
+      expect(RoomConnectHelper.maybeMeshDeathReopen()).toBeFalse();
+
+      jasmine.clock().tick(1000);
+      expect(RoomConnectHelper.maybeMeshDeathReopen()).toBeTrue();
+      expect(open).toHaveBeenCalled();
+      expect((RoomConnectHelper as any).meshDeathAttempted).toBeTrue();
+
+      RoomConnectHelper.abortReopenInFlight();
+      expect(RoomConnectHelper.maybeMeshDeathReopen()).toBeFalse();
+    } finally {
+      jasmine.clock().uninstall();
+      RoomConnectHelper.MESH_DEATH_MS_FOR_TEST = 0;
+      RoomConnectHelper.hadOpenPeerThisSession = false;
+      (RoomConnectHelper as any).clearMeshDeathState();
+      RoomConnectHelper.abortReopenInFlight();
+    }
+  });
+
+  it('mesh-death state clears when open peers return', () => {
+    RoomConnectHelper.hadOpenPeerThisSession = true;
+    (RoomConnectHelper as any).meshDeathSince = Date.now();
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['peer']);
+    RoomConnectHelper.noteOpenPeerPresence();
+    expect(RoomConnectHelper.isMeshDeathArmed()).toBeFalse();
+  });
+
+  it('scheduleMeshHeal is the token-refresh remesh entry point', () => {
+    const heal = spyOn(RoomConnectHelper, 'scheduleMeshHeal');
+    RoomConnectHelper.scheduleMeshHeal();
+    expect(heal).toHaveBeenCalled();
   });
 
   it('wake schedules reopen after long hide when previously meshed and openPeers=0', () => {

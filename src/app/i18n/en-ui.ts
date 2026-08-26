@@ -655,6 +655,7 @@ export const en_ui: I18nDictionary = {
   'net.reconnectHint': 'Closing this window will try to reconnect.',
   'net.reconnectRoomHint': 'Room connection dropped — the lobby cannot see this room. Closing this window will try to reopen the same room.',
   'net.reconnecting': 'Reconnecting…',
+  'net.meshReconnecting': 'Connection issue — reconnecting. Messages may not reach others until restored.',
   'net.reconnectingRoom': 'Room connection dropped — reopening the room…',
   'net.reconnectSessionLost': 'Room connection dropped and room credentials were lost, so the lobby was not opened automatically (to avoid a mid-game kick). Your local tabletop is unchanged. Retry with Load room or an invite link.',
   'net.connectedRoom': 'Connected to {{name}}',

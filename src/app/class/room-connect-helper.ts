@@ -117,6 +117,13 @@ export class RoomConnectHelper {
   private static readonly SOFT_DEATH_MS = 20000;
   /** Tests may shorten soft-death wait (0 = use SOFT_DEATH_MS). */
   static SOFT_DEATH_MS_FOR_TEST = 0;
+  /** Wall clock when open=0 with other room members — escalation to full reopen. */
+  private static meshDeathSince = 0;
+  /** One mesh-death full reopen per spell; cleared when open peers return. */
+  private static meshDeathAttempted = false;
+  private static readonly MESH_DEATH_MS = 30000;
+  /** Tests may shorten mesh-death wait (0 = use MESH_DEATH_MS). */
+  static MESH_DEATH_MS_FOR_TEST = 0;
   /** document.visibilityState === 'hidden' started at (0 = never / unknown). */
   private static documentHiddenAt = 0;
   private static readonly WAKE_MIN_HIDDEN_MS = 5000;
@@ -143,6 +150,8 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.wakeReopenTimer != null) return true;
     // Soft-death waiting to fire — not permanent hadOpenPeer&&open=0 (solo after peers left).
     if (RoomConnectHelper.isSoftDeathArmed()) return true;
+    // Mesh-death waiting to escalate — others in room but no open DataChannels.
+    if (RoomConnectHelper.isMeshDeathArmed()) return true;
     // Soft mesh death: others still in SkyWay room but no open DataChannels.
     // Alone in the room (openPeers=0) is normal — do not show Connecting.
     if (Network.isOpen && Network.peer?.isRoom && RoomConnectHelper.everHadRoomSession
@@ -159,13 +168,34 @@ export class RoomConnectHelper {
     return RoomConnectHelper.softDeathSince > 0
       && RoomConnectHelper.hadOpenPeerThisSession
       && !RoomConnectHelper.softDeathAttempted
-      && RoomConnectHelper.openPeerCount() === 0;
+      && RoomConnectHelper.openPeerCount() === 0
+      && RoomConnectHelper.otherRoomMemberCount() < 1;
+  }
+
+  /** Mesh-death timer counting toward full reopen (was meshed, open=0, others still in room). */
+  static isMeshDeathArmed(): boolean {
+    return RoomConnectHelper.meshDeathSince > 0
+      && RoomConnectHelper.hadOpenPeerThisSession
+      && !RoomConnectHelper.meshDeathAttempted
+      && RoomConnectHelper.openPeerCount() === 0
+      && RoomConnectHelper.otherRoomMemberCount() > 0;
+  }
+
+  private static otherRoomMemberCount(): number {
+    const selfId = Network.peerId;
+    return Network.listRoomMemberPeerIds().filter(id => id && id !== selfId).length;
   }
 
   private static softDeathMs(): number {
     return RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST > 0
       ? RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST
       : RoomConnectHelper.SOFT_DEATH_MS;
+  }
+
+  private static meshDeathMs(): number {
+    return RoomConnectHelper.MESH_DEATH_MS_FOR_TEST > 0
+      ? RoomConnectHelper.MESH_DEATH_MS_FOR_TEST
+      : RoomConnectHelper.MESH_DEATH_MS;
   }
 
   private static wakeMinHiddenMs(): number {
@@ -286,6 +316,7 @@ export class RoomConnectHelper {
     RoomConnectHelper.everHadRoomSession = false;
     RoomConnectHelper.hadOpenPeerThisSession = false;
     RoomConnectHelper.clearSoftDeathState();
+    RoomConnectHelper.clearMeshDeathState();
     RoomConnectHelper.clearWakeReopenTimer();
     Network.clearLastRoomSession();
     RoomConnectHelper.stopMeshKeepalive();
@@ -299,6 +330,11 @@ export class RoomConnectHelper {
   private static clearSoftDeathState() {
     RoomConnectHelper.softDeathSince = 0;
     RoomConnectHelper.softDeathAttempted = false;
+  }
+
+  private static clearMeshDeathState() {
+    RoomConnectHelper.meshDeathSince = 0;
+    RoomConnectHelper.meshDeathAttempted = false;
   }
 
   private static clearWakeReopenTimer() {
@@ -316,10 +352,22 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.openPeerCount() > 0) {
       RoomConnectHelper.hadOpenPeerThisSession = true;
       RoomConnectHelper.clearSoftDeathState();
+      RoomConnectHelper.clearMeshDeathState();
       return;
     }
     if (!RoomConnectHelper.hadOpenPeerThisSession) return;
     if (!Network.peer?.isRoom) return;
+
+    if (RoomConnectHelper.otherRoomMemberCount() > 0) {
+      RoomConnectHelper.clearSoftDeathState();
+      if (RoomConnectHelper.meshDeathAttempted) return;
+      if (RoomConnectHelper.meshDeathSince < 1) {
+        RoomConnectHelper.meshDeathSince = Date.now();
+      }
+      return;
+    }
+
+    RoomConnectHelper.clearMeshDeathState();
     if (RoomConnectHelper.softDeathAttempted) return;
     if (RoomConnectHelper.softDeathSince < 1) {
       RoomConnectHelper.softDeathSince = Date.now();
@@ -339,6 +387,23 @@ export class RoomConnectHelper {
     RoomConnectHelper.softDeathAttempted = true;
     RoomConnectHelper.softDeathSince = 0;
     console.warn('reopen: soft-death (was meshed, alone too long)');
+    const result = RoomConnectHelper.reopenLastRoomOrLobby('disconnected');
+    return result === 'started';
+  }
+
+  /**
+   * If was meshed and open=0 with others in room past mesh-death threshold, full-reopen once.
+   * @returns true when a reopen was scheduled/started
+   */
+  static maybeMeshDeathReopen(): boolean {
+    RoomConnectHelper.noteOpenPeerPresence();
+    if (!RoomConnectHelper.isMeshDeathArmed()) return false;
+    if (Date.now() - RoomConnectHelper.meshDeathSince < RoomConnectHelper.meshDeathMs()) return false;
+    if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
+
+    RoomConnectHelper.meshDeathAttempted = true;
+    RoomConnectHelper.meshDeathSince = 0;
+    console.warn('reopen: mesh-death (was meshed, open=0 with others in room)');
     const result = RoomConnectHelper.reopenLastRoomOrLobby('disconnected');
     return result === 'started';
   }
@@ -420,6 +485,7 @@ export class RoomConnectHelper {
     }
     RoomConnectHelper.connectingSince.clear();
     RoomConnectHelper.clearSoftDeathState();
+    RoomConnectHelper.clearMeshDeathState();
     RoomConnectHelper.clearWakeReopenTimer();
     RoomConnectHelper.clearReopenRetry();
   }
@@ -467,6 +533,7 @@ export class RoomConnectHelper {
 
     RoomConnectHelper.noteOpenPeerPresence();
     if (RoomConnectHelper.maybeSoftDeathReopen()) return;
+    if (RoomConnectHelper.maybeMeshDeathReopen()) return;
 
     RoomConnectHelper.meshHealInFlight = true;
     skyWayRecoveryGate.markHealAttempt();

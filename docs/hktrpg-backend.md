@@ -63,3 +63,27 @@ Open `https://localhost:4200/` (accept the self-signed cert) and hard-reload.
 ## Production (HKTRPG)
 
 Set `ACCESS_CONTROL_ALLOW_ORIGIN` to your real HTTPS site Origin (e.g. `https://z01.hktrpg.com`) and the same URL in the deployed `assets/config.yaml`.
+
+## Long session / mass disconnect troubleshooting
+
+Symptoms: after ~1 hour (or mid-session), everyone stops seeing each other's chat; no error modal; peer ID may still look online.
+
+### Client-side diagnostics
+
+1. In DevTools console: `localStorage.setItem('UDONARIUM_NET_DEBUG', 'compact')` then reproduce and copy console output.
+2. Connection panel → copy **mesh diag** (includes `open=`, `members=`, recent heal/reopen lines).
+3. Note room size, session duration, and whether all clients dropped at once.
+
+### Server-side checks (Cloudflare Worker)
+
+1. Worker logs for `POST /v1/skyway2023/token` — look for **504**, timeouts, or elevated error rate during the incident.
+2. Confirm `ACCESS_CONTROL_ALLOW_ORIGIN` matches the page Origin exactly (scheme + host).
+3. JWT TTL from [udonarium-backend](https://github.com/TK11235/udonarium-backend) defaults to **24 hours** (`iat + 86400`). Mass disconnect at ~1 hour is often **mesh/ICE**, not JWT expiry — use logs to distinguish `token-refresh` / `onTokenExpired` lines from `DataChannel stale` / `mesh-death` lines.
+
+### User report template
+
+- URL (e.g. `https://z01.hktrpg.com/...`)
+- Browser + OS
+- Players in room
+- Approx. time in room before failure
+- mesh diag + console log (with `UDONARIUM_NET_DEBUG=compact`)

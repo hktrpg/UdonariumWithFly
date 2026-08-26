@@ -48,6 +48,8 @@ export class SkyWayFacade {
   onSubscribed: (peer: IPeerContext, subscription: Subscription) => void;
   onRoomRestore: (peer: IPeerContext) => void;
   onMemberLeft: (peerId: string) => void;
+  /** Fired after a mid-session auth token refresh succeeds — remesh all room members. */
+  onTokenRefreshed: () => void;
 
   async open(peer: IPeerContext) {
     if (this.isOpen) await this.close();
@@ -224,6 +226,7 @@ export class SkyWayFacade {
       this.clearTokenRefreshTimersOnly();
       skyWayRecoveryGate.noteSuccess();
       console.log('token-refresh: success');
+      this.notifyTokenRefreshed();
       return true;
     } catch (e) {
       console.warn('token-refresh: updateAuthToken failed', e);
@@ -240,6 +243,10 @@ export class SkyWayFacade {
     }
   }
 
+  private notifyTokenRefreshed() {
+    if (this.onTokenRefreshed) this.onTokenRefreshed();
+  }
+
   private async handleTokenExpired(
     context: SkyWayContext,
     backend: SkyWayBackend,
@@ -254,6 +261,7 @@ export class SkyWayFacade {
     const ok = await final;
     if (ok && !this.isDestroyed) {
       console.log('token-refresh: recovered after expiry reminder race');
+      this.notifyTokenRefreshed();
       return;
     }
     if (this.isOpen) {

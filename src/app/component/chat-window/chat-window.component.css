@@ -15,6 +15,16 @@
   align-content: space-between;
 }
 
+.mesh-reconnect-banner {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  text-align: center;
+  color: #5a3e1b;
+  background-color: rgba(255, 220, 140, 0.92);
+  border-bottom: 1px solid rgba(120, 80, 20, 0.35);
+}
+
 .sticky-bottom {
   position: sticky;
   bottom : 0;

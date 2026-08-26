@@ -529,8 +529,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       const charAry = Array.from(text.replace(/[\|｜]([^\|｜\s]+?)《.+?》/g, '$1'));
       this.chatIntervalId = setInterval(() => {
         let c = charAry[count];
-        let isMulti = c.length > 1;
         if (c) {
+            const isMulti = c.length > 1;
             if (!isOpenRuby && carrentRuby && countLength >= carrentRuby.start) {
                 tmpText += '<ruby>';
                 isOpenRuby = true;

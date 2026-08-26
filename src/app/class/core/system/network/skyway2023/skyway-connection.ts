@@ -9,6 +9,7 @@ import { netDebug, meshWarn, meshWarnThrottled } from '../net-debug';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { relayTargetPeerIds, shouldBootstrapSurvivalMesh, shouldLimitDirectMesh, buildSurvivalMeshContext, applyRelayFanOut, isRekeyFullMeshBoost } from '@udonarium/room-reconnect.util';
 import { isHighPriorityOutbound } from '../outbound-priority';
 import { translate } from 'i18n';
@@ -387,7 +388,11 @@ export class SkyWayConnection implements Connection {
         this.disconnect(peer);
         this.connect(peer);
       }
-    }
+    };
+
+    this.skyWay.onTokenRefreshed = () => {
+      RoomConnectHelper.scheduleMeshHeal();
+    };
 
     this.skyWay.onMemberLeft = (peerId) => {
       if (!peerId || peerId === this.peerId) return;
