@@ -79,6 +79,7 @@ Symptoms: after ~1 hour (or mid-session), everyone stops seeing each other's cha
 1. Worker logs for `POST /v1/skyway2023/token` — look for **504**, timeouts, or elevated error rate during the incident.
 2. Confirm `ACCESS_CONTROL_ALLOW_ORIGIN` matches the page Origin exactly (scheme + host).
 3. JWT TTL from [udonarium-backend](https://github.com/TK11235/udonarium-backend) defaults to **24 hours** (`iat + 86400`). Mass disconnect at ~1 hour is often **mesh/ICE**, not JWT expiry — use logs to distinguish `token-refresh` / `onTokenExpired` lines from `DataChannel stale` / `mesh-death` lines.
+4. Since devlog 30, `DataChannel stale (no inbound); metrics only` is **warn-only** (no forced channel recycle). If you still see `recycling` in old builds, upgrade the client.
 
 ### User report template
 

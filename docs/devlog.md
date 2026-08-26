@@ -248,3 +248,9 @@ Udonarium烏冬ユドナリウム開發日誌29
 詳見 `docs/hktrpg-backend.md` 長 session 排查
 
 ---
+
+Udonarium烏冬ユドナリウム開發日誌30
+長團失聯對照上游：WithFly 只降 health、唔會 45s 強拆 DataChannel
+所以移除 HKTRPG 獨有 stale recycle，改 warn-only 監測；日誌 29 recovery 保留
+
+---
