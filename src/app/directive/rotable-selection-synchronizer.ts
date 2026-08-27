@@ -14,7 +14,7 @@ import { RotableDirective } from './rotable.directive';
 export class RotableSelectionSynchronizer {
   private static readonly rotablesMap: Map<TabletopObject, Set<RotableDirective>> = new Map();
 
-  private get selectedRotables(): Set<RotableDirective> {
+  get selectedRotables(): Set<RotableDirective> {
     let selected: Set<RotableDirective> = new Set();
     for (let object of this.selection.objects) {
       RotableSelectionSynchronizer.rotablesMap.get(object)?.forEach(r => selected.add(r));
