@@ -43,10 +43,16 @@ const REOPEN_MAX_MS: Record<OutageKind, number> = {
 /** Map NETWORK_ERROR / formatFatalError types onto an outage kind. */
 export function classifyOutageKind(errorType: string): OutageKind {
   const t = String(errorType || '').toLowerCase();
-  if (/rtc-?api/.test(t)) return 'rtc-api';
-  if (t === 'token-api' || t === 'token-fetch') return 'token-api';
-  if (t === 'server-error' || t === 'authentication') return 'server-error';
+  // Identity for OutageKind literals (keepalive / timeout retry paths pass these).
+  if (t === 'duplicate-member') return 'duplicate-member';
+  if (t === 'rtc-api') return 'rtc-api';
+  if (t === 'token-api') return 'token-api';
+  if (t === 'server-error') return 'server-error';
   if (t === 'token-expired') return 'token-expired';
+  if (t === 'disconnected') return 'disconnected';
+  if (/rtc-?api/.test(t)) return 'rtc-api';
+  if (t === 'token-fetch') return 'token-api';
+  if (t === 'authentication') return 'server-error';
   if (/already-?same-?name-?member-?exist/i.test(t)) return 'duplicate-member';
   return 'disconnected';
 }
@@ -66,11 +72,12 @@ export const DUPLICATE_MEMBER_JOIN_ATTEMPTS = 6;
 /**
  * OPEN_NETWORK wait during reopenLastRoomOrLobby.
  * Must cover joinRoomPerson duplicate-member delays (2+4+6+8+10=30s across 6 attempts)
- * plus join/remesh wall time. Mesh-death uses `disconnected` but join may still hit ghosts.
+ * plus leave/rejoin + remesh wall time. Mesh-death uses `disconnected` but join may
+ * still hit ghosts, so that path gets the same budget.
  */
 export function reopenOpenNetworkTimeoutMs(errorType?: string): number {
   const kind = errorType ? classifyOutageKind(errorType) : 'disconnected';
-  if (kind === 'duplicate-member') return 75000;
+  if (kind === 'duplicate-member' || kind === 'disconnected') return 75000;
   return 60000;
 }
 

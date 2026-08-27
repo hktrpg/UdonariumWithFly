@@ -568,6 +568,32 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     }
   });
 
+  it('scheduleReopenRetry accepts OutageKind duplicate-member from lastOutageKind', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    try {
+      RoomConnectHelper.everHadRoomSession = true;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      const reopen = spyOn(RoomConnectHelper, 'reopenLastRoomOrLobby').and.returnValue('started');
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({
+        userId: 'u1', peerId: 'self', isRoom: true,
+      } as IPeerContext);
+
+      RoomConnectHelper.scheduleReopenRetry('duplicate-member');
+      expect(RoomConnectHelper.isReopenRetryPending()).toBeTrue();
+      jasmine.clock().tick(15_000);
+      expect(reopen).toHaveBeenCalledWith('duplicate-member', { skipJitter: true });
+    } finally {
+      jasmine.clock().uninstall();
+      RoomConnectHelper.abortReopenInFlight();
+    }
+  });
+
   it('reopens lobby peer only when this page never had a room', async () => {
     RoomConnectHelper.everHadRoomSession = false;
     spyOn(Network, 'getLastRoomSession').and.returnValue(null);

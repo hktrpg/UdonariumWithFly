@@ -45,6 +45,8 @@ describe('room-reconnect.util', () => {
     // Ghost member after sleep/WS drop — delayed reopen, not a hard stop.
     expect(shouldAttemptRoomReopen('already-same-name-member-exist')).toBeTrue();
     expect(shouldAttemptRoomReopen('alreadySameNameMemberExist')).toBeTrue();
+    // Keepalive passes OutageKind literal from skyWayRecoveryGate.lastOutageKind.
+    expect(shouldAttemptRoomReopen('duplicate-member')).toBeTrue();
   });
 
   it('RECOVERABLE_NETWORK_ERROR_TYPES includes internal', () => {

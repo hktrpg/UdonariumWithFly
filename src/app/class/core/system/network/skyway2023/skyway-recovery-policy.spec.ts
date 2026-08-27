@@ -26,6 +26,8 @@ describe('skyway-recovery-policy', () => {
     it('maps alreadySameNameMemberExist to duplicate-member', () => {
       expect(classifyOutageKind('alreadySameNameMemberExist')).toBe('duplicate-member');
       expect(classifyOutageKind('already-same-name-member-exist')).toBe('duplicate-member');
+      // Keepalive / timeout retry pass the OutageKind literal.
+      expect(classifyOutageKind('duplicate-member')).toBe('duplicate-member');
     });
   });
 
@@ -39,9 +41,10 @@ describe('skyway-recovery-policy', () => {
   it('reopenOpenNetworkTimeoutMs covers join duplicate-member retry budget', () => {
     expect(reopenOpenNetworkTimeoutMs('already-same-name-member-exist')).toBe(75000);
     expect(reopenOpenNetworkTimeoutMs('alreadySameNameMemberExist')).toBe(75000);
-    // Mesh-death path is disconnected but join may still hit ghosts.
-    expect(reopenOpenNetworkTimeoutMs('disconnected')).toBe(60000);
-    expect(reopenOpenNetworkTimeoutMs()).toBe(60000);
+    expect(reopenOpenNetworkTimeoutMs('duplicate-member')).toBe(75000);
+    // Mesh-death path is disconnected but join may still hit ghosts — same budget.
+    expect(reopenOpenNetworkTimeoutMs('disconnected')).toBe(75000);
+    expect(reopenOpenNetworkTimeoutMs()).toBe(75000);
     expect(reopenOpenNetworkTimeoutMs('disconnected'))
       .toBeGreaterThanOrEqual(
         duplicateMemberRetryDelayMs(0)

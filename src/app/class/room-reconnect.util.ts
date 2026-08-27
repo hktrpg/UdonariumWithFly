@@ -191,7 +191,9 @@ export function isRecoverableNetworkError(errorType: string): boolean {
 export function shouldAttemptRoomReopen(errorType: string): boolean {
   // Stale same-name member after sleep/WS drop — delayed reopen (duplicate-member outage),
   // not an immediate Network.open churn. joinRoomPerson also retries first.
-  if (/already-?same-?name-?member-?exist/i.test(errorType)) return true;
+  // Accept OutageKind literal too (keepalive / timeout retry pass lastOutageKind).
+  if (errorType === 'duplicate-member'
+    || /already-?same-?name-?member-?exist/i.test(errorType)) return true;
   if ((ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType)) return true;
   // SDK kebab-cases internalError → internal-error, Event asPromise timeout, etc.
   if (/^internal(-|$)/.test(errorType)) return true;
