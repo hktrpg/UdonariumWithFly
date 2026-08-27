@@ -40,9 +40,11 @@ import {
   CARD_STACK_HOLD_MS,
   findCardIdAtPoint,
   findCardStackIdAtPoint,
+  findMergeTargetIdAtPoint,
   holdProgressAt,
   isQuickDragMove,
   resolveQuickDragDrop,
+  setCardMergePreview,
   shouldHoldHaptic,
 } from './card-stack-gesture';
 import { ModalService } from 'service/modal.service';
@@ -179,6 +181,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   @ViewChild(MovableDirective) private movableDir: MovableDirective;
 
+  /** True while another card/stack is hovered for merge onto this stack. */
+  isMergeTarget = false;
   holdProgress = 0;
 
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
@@ -287,6 +291,16 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       .on('DISCONNECT_PEER', event => {
         let cursor = PeerCursor.findByPeerId(event.data.peerId);
         if (!cursor || this.cardStack.owner === cursor.userId) this.changeDetector.markForCheck();
+      })
+      .on('CARD_MERGE_PREVIEW', event => {
+        const next = !!event.data?.active
+          && !!this.cardStack?.identifier
+          && event.data?.targetId === this.cardStack.identifier;
+        if (this.isMergeTarget === next) return;
+        this.ngZone.run(() => {
+          this.isMergeTarget = next;
+          this.changeDetector.markForCheck();
+        });
       });
     this.movableOption = {
       tabletopObject: this.cardStack,
@@ -443,12 +457,16 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (this.quickDragging) {
       this.moveQuickDragGhost(event.clientX, event.clientY);
       const overHand = HandRailComponent.isDropTargetAt(event.clientX, event.clientY);
-      const overStack = !overHand
-        && !!findCardStackIdAtPoint(event.clientX, event.clientY, this.cardStack.identifier);
-      const overCard = !overHand && !overStack && !!findCardIdAtPoint(event.clientX, event.clientY);
-      const overTable = !overHand && !overStack && !overCard && this.isOverTable(event.clientX, event.clientY);
+      const stackId = !overHand
+        ? findCardStackIdAtPoint(event.clientX, event.clientY, this.cardStack.identifier)
+        : null;
+      const cardId = !overHand && !stackId
+        ? findCardIdAtPoint(event.clientX, event.clientY)
+        : null;
+      const overTable = !overHand && !stackId && !cardId && this.isOverTable(event.clientX, event.clientY);
       this.emitHandDropPreview(true, overHand);
       EventSystem.trigger('TABLE_DROP_PREVIEW', { active: overTable });
+      setCardMergePreview(stackId || cardId);
     }
   };
 
@@ -457,6 +475,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     this.cleanupQuickDragListeners();
     this.emitHandDropPreview(false);
     EventSystem.trigger('TABLE_DROP_PREVIEW', { active: false });
+    setCardMergePreview(null);
 
     if (this.quickDragging && this.quickDragPeekId) {
       this.finishQuickCardDrag(event.clientX, event.clientY);
@@ -674,6 +693,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private resetQuickDragState() {
     this.removeQuickDragGhost();
     this.emitHandDropPreview(false);
+    setCardMergePreview(null);
     this.clearHoldTimer();
     this.suppressStackMovable = false;
     this.quickDragging = false;
@@ -729,7 +749,17 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     SoundEffect.play(PresetSound.cardPick);
   }
 
+  onDragging(event: PointerEvent) {
+    if (this.GuestMode() || !this.cardStack) return;
+    setCardMergePreview(findMergeTargetIdAtPoint(
+      event.clientX,
+      event.clientY,
+      this.cardStack.identifier,
+    ));
+  }
+
   onMoved() {
+    setCardMergePreview(null);
     SoundEffect.play(PresetSound.cardPut);
     this.ngZone.run(() => this.dispatchCardDropEvent());
   }

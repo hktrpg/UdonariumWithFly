@@ -10,16 +10,23 @@ import {
 } from '@angular/core';
 
 import { Card } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import {
+  findCardIdAtPoint,
+  findCardStackIdAtPoint,
+  findMergeTargetIdAtPoint,
   HAND_RAIL_DROP_BAND_PX,
   isInHandDropBand,
+  resolveQuickDragDrop,
+  setCardMergePreview,
 } from 'component/card-stack/card-stack-gesture';
 import { CoordinateService } from 'service/coordinate.service';
 import { HandService } from 'service/hand.service';
+import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -181,6 +188,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     private coordinateService: CoordinateService,
     private pointerDeviceService: PointerDeviceService,
     private mobileLayout: MobileLayoutService,
+    private i18n: I18nService,
   ) {}
 
   ngOnInit() {
@@ -229,6 +237,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     document.removeEventListener('pointercancel', this.onScrollPanUp);
     this.detachScrollWheelListener();
     this.removeDragGhost();
+    setCardMergePreview(null);
   }
 
   toggleCollapsed() {
@@ -415,6 +424,10 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.moveDragGhost(event.clientX, event.clientY);
     const nextHover = HandRailComponent.isDropTargetAt(event.clientX, event.clientY);
     const nextReorder = nextHover ? this.handSlotIndexAt(event.clientX, event.clientY) : -1;
+    const mergeId = nextHover
+      ? null
+      : findMergeTargetIdAtPoint(event.clientX, event.clientY);
+    setCardMergePreview(mergeId);
     if (this.isDropOffer && this.isDropHover === nextHover && this.reorderHoverIndex === nextReorder) {
       return;
     }
@@ -441,10 +454,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
         card.moveToHand(Network.peer.userId);
         SoundEffect.play(PresetSound.cardPut);
       }
-    } else if (this.isOverTable(x, y)) {
-      this.dropCardOnTable(card, x, y);
     } else {
-      card.moveToHand(Network.peer.userId);
+      this.dropCardFromHand(card, x, y);
     }
     this.requestViewUpdate(true);
   };
@@ -467,6 +478,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.reorderHoverIndex = -1;
     this.refreshDropBandVisible();
     this.removeDragGhost();
+    setCardMergePreview(null);
   }
 
   private cancelCardDrag() {
@@ -538,6 +550,61 @@ export class HandRailComponent implements OnInit, OnDestroy {
       }
     }
     return -1;
+  }
+
+  /** Hand → stack / free card / empty table (same priority as table quick-drag). */
+  private dropCardFromHand(card: Card, clientX: number, clientY: number) {
+    const stackId = findCardStackIdAtPoint(clientX, clientY);
+    const cardId = !stackId ? findCardIdAtPoint(clientX, clientY) : null;
+    const overTable = !stackId && !cardId && this.isOverTable(clientX, clientY);
+    switch (resolveQuickDragDrop(false, !!stackId, !!cardId, overTable)) {
+      case 'stack': {
+        const stack = ObjectStore.instance.get(stackId!) as CardStack;
+        if (stack instanceof CardStack && !stack.isLocked) {
+          card.owner = '';
+          stack.putOnTop(card);
+          SoundEffect.play(PresetSound.cardPut);
+          return;
+        }
+        break;
+      }
+      case 'card': {
+        const target = ObjectStore.instance.get(cardId!) as Card;
+        if (target instanceof Card) {
+          this.mergeHandCardOntoCard(card, target);
+          return;
+        }
+        break;
+      }
+      case 'table':
+        this.dropCardOnTable(card, clientX, clientY);
+        return;
+      default:
+        card.moveToHand(Network.peer.userId);
+        return;
+    }
+    if (this.isOverTable(clientX, clientY)) this.dropCardOnTable(card, clientX, clientY);
+    else card.moveToHand(Network.peer.userId);
+  }
+
+  private mergeHandCardOntoCard(dropped: Card, target: Card) {
+    if (!dropped || !target || dropped === target || target.isLocked || target.parent
+      || target.location.name !== 'table') {
+      dropped.moveToHand(Network.peer.userId);
+      return;
+    }
+    const cardStack = CardStack.create(this.i18n.t('card.deckDefault'));
+    cardStack.location.x = target.location.x;
+    cardStack.location.y = target.location.y;
+    cardStack.posZ = target.posZ;
+    cardStack.location.name = target.location.name;
+    cardStack.tableIdentifier = target.tableIdentifier;
+    cardStack.rotate = target.rotate;
+    cardStack.zindex = Math.max(dropped.zindex, target.zindex);
+    cardStack.putOnBottom(target);
+    dropped.owner = '';
+    cardStack.putOnTop(dropped);
+    SoundEffect.play(PresetSound.cardPut);
   }
 
   private dropCardOnTable(card: Card, clientX: number, clientY: number) {

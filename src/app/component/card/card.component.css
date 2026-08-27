@@ -253,6 +253,14 @@
   pointer-events: none;
 }
 
+.component.is-merge-target .component-content {
+  box-shadow:
+    0 0 0 3px rgba(125, 211, 252, 0.9),
+    0 0 16px rgba(125, 211, 252, 0.45);
+  outline: 2px solid rgba(56, 189, 248, 0.95);
+  outline-offset: 2px;
+}
+
 .hold-progress-ring {
   position: absolute;
   inset: -6px;

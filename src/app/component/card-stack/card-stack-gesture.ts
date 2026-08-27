@@ -1,9 +1,34 @@
+import { EventSystem } from '@udonarium/core/system';
+
 export const CARD_STACK_HOLD_MS = 550;
 export const CARD_STACK_QUICK_DRAG_PX = 8;
 export const CARD_STACK_HOLD_HAPTIC_MS = 400;
 
 /** Bottom drop-band height (px) used while quick-dragging a card into hand. */
 export const HAND_RAIL_DROP_BAND_PX = 132;
+
+/** Highlight a table card / stack as a merge drop target (or clear when `targetId` is null). */
+let lastMergePreviewId: string | null = null;
+export function setCardMergePreview(targetId: string | null) {
+  const next = targetId || null;
+  if (next === lastMergePreviewId) return;
+  lastMergePreviewId = next;
+  EventSystem.trigger('CARD_MERGE_PREVIEW', {
+    active: !!next,
+    targetId: next || '',
+  });
+}
+
+/** Stack under pointer wins; otherwise a free card (skips excluded ids). */
+export function findMergeTargetIdAtPoint(
+  clientX: number,
+  clientY: number,
+  excludeStackId?: string,
+  excludeCardId?: string,
+): string | null {
+  return findCardStackIdAtPoint(clientX, clientY, excludeStackId)
+    || findCardIdAtPoint(clientX, clientY, excludeCardId);
+}
 
 export function isQuickDragMove(dx: number, dy: number): boolean {
   return dx * dx + dy * dy > CARD_STACK_QUICK_DRAG_PX ** 2;

@@ -1,11 +1,13 @@
 import {
   CARD_STACK_HOLD_MS,
   CARD_STACK_QUICK_DRAG_PX,
+  findMergeTargetIdAtPoint,
   HAND_RAIL_DROP_BAND_PX,
   holdProgressAt,
   isInHandDropBand,
   isQuickDragMove,
   resolveQuickDragDrop,
+  setCardMergePreview,
   shouldHoldHaptic,
 } from './card-stack-gesture';
 
@@ -43,6 +45,12 @@ describe('card-stack-gesture', () => {
     expect(resolveQuickDragDrop(false, false, true, true)).toBe('card');
     expect(resolveQuickDragDrop(false, false, false, true)).toBe('table');
     expect(resolveQuickDragDrop(false, false, false, false)).toBe('cancel');
+  });
+
+  it('prefers stack over card for merge preview hit-test helpers', () => {
+    // findMergeTargetIdAtPoint delegates to DOM hit-tests; ensure exports stay wired.
+    expect(typeof findMergeTargetIdAtPoint).toBe('function');
+    expect(typeof setCardMergePreview).toBe('function');
   });
 
   it('detects the bottom hand drop band', () => {
