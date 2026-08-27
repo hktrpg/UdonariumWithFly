@@ -105,6 +105,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private fxTimer: any = null;
   /** Skip lighting/FoW redraw when darkness/lights/tokens/walls are unchanged. */
   private lastFxSig = '';
+  /** rAF coalesce for live shadows while dragging/rotating. */
+  private liveShadowRaf = 0;
   private _desktopLayerPieces: Stackable[] = [];
   private _desktopLayerSig = '';
   private readonly layerZIndexStyles = new Map<number, { 'z-index': number }>();
@@ -1028,6 +1030,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on('TABLETOP_DRAG_MOVE', () => {
         if (this.clueLinks.length) this.scheduleClueYarnRefresh();
+        this.scheduleLiveShadowRefresh();
       })
       .on('TABLE_PING', event => {
         this.ngZone.run(() => this.spawnPing(event.data));
@@ -1293,6 +1296,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchLayoutSub?.unsubscribe();
     this.touchLayoutSub = null;
     this.stopFxTimer();
+    this.cancelLiveShadowRefresh();
     if (this.debugPoseTimer) clearInterval(this.debugPoseTimer);
     if (this.weatherRender) this.weatherRender.destroy();
     if (this.lightingRender) this.lightingRender.release();
@@ -2067,6 +2071,30 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.fxTimer = null;
   }
 
+  /** Recompute decorative token shadows every animation frame while a piece is dragged/rotated. */
+  private scheduleLiveShadowRefresh() {
+    if (this.liveShadowRaf) return;
+    this.liveShadowRaf = requestAnimationFrame(() => {
+      this.liveShadowRaf = 0;
+      this.refreshTokenShadowsLive();
+    });
+  }
+
+  private cancelLiveShadowRefresh() {
+    if (!this.liveShadowRaf) return;
+    cancelAnimationFrame(this.liveShadowRaf);
+    this.liveShadowRaf = 0;
+  }
+
+  private refreshTokenShadowsLive() {
+    if (!this.currentTable) return;
+    const onTable = this.characters.filter(c => c.location?.name === 'table');
+    this.tableLighting.updateTokenShadows(this.currentTable, onTable);
+    this.ngZone.run(() => {
+      EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
+    });
+  }
+
   private refreshFx() {
     if (!this.lightingRender || !this.currentTable) return;
     const onTable = this.characters.filter(c => c.location?.name === 'table');
@@ -2146,8 +2174,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       parts.push(`O:${o.id}:${pts(o.points)}`);
     }
     for (const ch of onTable) {
+      const live = MovableDirective.livePoseFor(ch.identifier);
+      const x = live?.x ?? ch.location?.x;
+      const y = live?.y ?? ch.location?.y;
       parts.push(
-        `T:${ch.identifier}:${n(ch.location?.x)}:${n(ch.location?.y)}:${n(ch.size)}:${n(ch.visionRangeGrid)}:${n(ch.brightLightGrid)}:${n(ch.dimLightGrid)}`,
+        `T:${ch.identifier}:${n(x)}:${n(y)}:${n(ch.size)}:${n(ch.visionRangeGrid)}:${n(ch.brightLightGrid)}:${n(ch.dimLightGrid)}`,
       );
     }
     for (const ch of visionChars) parts.push(`V:${ch.identifier}`);
@@ -2502,45 +2533,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return out;
   }
 
-  /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */
+  /**
+   * Extra light occluders beyond walls / mask·terrain footprints.
+   * Token size×size rectangles used to cast umbra quads from lamps; that reads as a
+   * dark “grid tile” under every piece (often 1 cell or half a cell). Real blockers
+   * stay on walls + footprintWalls — do not reintroduce square token occluders here.
+   */
   private collectLightOccluders(): LightOccluder[] {
-    const table = this.currentTable;
-    if (!table) return [];
-    const grid = table.gridSize || 50;
-    const out: LightOccluder[] = [];
-
-    for (const ch of this.characters) {
-      if (ch.location?.name !== 'table') continue;
-      const s = Math.max(grid * 0.35, (ch.size || 1) * grid);
-      out.push({ id: ch.identifier, points: this.rectOccluder(ch.location.x, ch.location.y, s, s) });
-    }
-    return out;
-  }
-
-  private rectOccluder(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    rotateDeg: number = 0,
-  ): { x: number; y: number }[] {
-    const corners = [
-      { x: x, y: y },
-      { x: x + w, y: y },
-      { x: x + w, y: y + h },
-      { x: x, y: y + h },
-    ];
-    if (!rotateDeg) return corners;
-    const rad = rotateDeg * Math.PI / 180;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    return corners.map(p => {
-      const dx = p.x - cx;
-      const dy = p.y - cy;
-      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
-    });
+    return [];
   }
 
   @HostListener('pointerdown', ['$event'])

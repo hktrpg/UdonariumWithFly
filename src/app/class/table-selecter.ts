@@ -38,6 +38,12 @@ export class TableSelecter extends GameObject implements InnerXml {
   /** Per-client viewed table id (Foundry “viewed scene”). Not synced. */
   viewedTableIdentifier: string = '';
 
+  /**
+   * Last active id we already reacted to on a remote UPDATE.
+   * Re-sync of the same active (e.g. peer join) must not yank local viewers.
+   */
+  private lastRemoteActiveId: string = '';
+
   gridShow: boolean = false; // true=一律顯示格線
   gridSnap: boolean = true;
 
@@ -129,6 +135,7 @@ export class TableSelecter extends GameObject implements InnerXml {
         t.selected = t.identifier === targetId;
       }
       this.viewTableIdentifier = targetId;
+      this.lastRemoteActiveId = targetId;
       try { TabletopObject.migrateUnboundTablePieces(targetId); }
       catch (e) { console.warn('[TableSelecter] migrateUnboundTablePieces failed', e); }
       try { CharacterToken.migrateLegacyOnTableCharacters(); }
@@ -241,7 +248,15 @@ export class TableSelecter extends GameObject implements InnerXml {
         if (event.data?.identifier !== this.identifier) return;
         const activeId = this.viewTableIdentifier;
         if (!activeId) return;
-        // Remote active change → pull local view (Foundry Activate).
+        // Peer join / catalog re-sync often rebroadcasts TableSelecter with the SAME active id.
+        // Only yank local viewers when the room active scene actually changed.
+        if (this.lastRemoteActiveId === activeId) {
+          if (this.viewedTableIdentifier === activeId) {
+            TabletopObject.hydrateAllForView(activeId, true);
+          }
+          return;
+        }
+        this.lastRemoteActiveId = activeId;
         if (this.viewedTableIdentifier !== activeId) {
           this.applyViewLocal(activeId);
           EventSystem.trigger('SELECT_GAME_TABLE', { identifier: activeId, _fromSelecter: true });
@@ -304,6 +319,7 @@ export class TableSelecter extends GameObject implements InnerXml {
     const prev = ObjectStore.instance.get<GameTable>(this.viewTableIdentifier);
     if (prev && prev.identifier !== identifier) prev.selected = false;
     this.viewTableIdentifier = identifier;
+    this.lastRemoteActiveId = identifier;
     const next = ObjectStore.instance.get<GameTable>(identifier);
     if (next) next.selected = true;
     TabletopObject.migrateUnboundTablePieces(identifier);
@@ -389,14 +405,30 @@ export class TableSelecter extends GameObject implements InnerXml {
     }
 
     if (!activeObj || activeDeleted) {
+      // Joiners must wait for the host TableSelecter SyncVar. Inventing tables[0] here
+      // writes SyncVar and yanks every peer into that map when someone connects.
+      if (this.hasOtherPeers()) {
+        if (!this.viewedTableIdentifier) {
+          this.viewedTableIdentifier = tables[0].identifier;
+          TabletopObject.hydrateAllForView(this.viewedTableIdentifier, true);
+        }
+        this.syncMyViewedPresence();
+        return;
+      }
       this.viewTableIdentifier = tables[0].identifier;
+      this.lastRemoteActiveId = this.viewTableIdentifier;
       tables[0].selected = true;
     }
     if (!this.viewedTableIdentifier || !ObjectStore.instance.get<GameTable>(this.viewedTableIdentifier)) {
       this.viewedTableIdentifier = this.viewTableIdentifier;
     }
+    if (this.viewTableIdentifier) this.lastRemoteActiveId = this.viewTableIdentifier;
     TabletopObject.hydrateAllForView(this.viewedTableIdentifier, true);
     this.syncMyViewedPresence();
+  }
+
+  private hasOtherPeers(): boolean {
+    return (Network.peerIds?.length ?? 0) > 1;
   }
 
   private syncMyViewedPresence() {

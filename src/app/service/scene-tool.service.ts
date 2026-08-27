@@ -284,6 +284,7 @@ export class SceneToolService {
       const after = this.captureSceneNudgeState(perm);
       this.recordSceneNudge(before, after);
       this.notifyTableUpdate();
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-scene' });
     }
     return moved;
   }

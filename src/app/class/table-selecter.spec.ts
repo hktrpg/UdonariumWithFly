@@ -1,3 +1,5 @@
+import { EventSystem, Network } from './core/system';
+import { Event } from './core/system/event/event';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
@@ -119,5 +121,50 @@ describe('TableSelecter view / reload', () => {
 
     expect(TableSelecter.instance.viewTableIdentifier).toBe('mapPending');
     expect(TableSelecter.instance.viewedTableIdentifier).toBe('mapPending');
+  });
+
+  it('ensureActiveOrFirst does not invent active SyncVar when other peers are present', () => {
+    makeTable('mapA');
+    makeTable('mapB');
+    TableSelecter.instance.viewTableIdentifier = '';
+    TableSelecter.instance.viewedTableIdentifier = '';
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['me', 'other']);
+
+    TableSelecter.instance.ensureActiveOrFirst();
+
+    expect(TableSelecter.instance.viewTableIdentifier).toBe('');
+    expect(TableSelecter.instance.viewedTableIdentifier).toBe('mapA');
+  });
+
+  it('remote TableSelecter UPDATE with same active does not yank local viewer', () => {
+    makeTable('mapA');
+    makeTable('mapB');
+    viewTables('mapA', 'mapA');
+    (TableSelecter.instance as any).lastRemoteActiveId = 'mapA';
+    TableSelecter.instance.viewedTableIdentifier = 'mapB';
+
+    const applySpy = spyOn(TableSelecter.instance as any, 'applyViewLocal').and.callThrough();
+    EventSystem.trigger(new Event('UPDATE_GAME_OBJECT', {
+      identifier: TableSelecter.instance.identifier,
+    }, 'other-peer'));
+
+    expect(TableSelecter.instance.viewedTableIdentifier).toBe('mapB');
+    expect(applySpy).not.toHaveBeenCalled();
+  });
+
+  it('remote TableSelecter UPDATE with new active pulls local viewer', () => {
+    makeTable('mapA');
+    makeTable('mapB');
+    viewTables('mapA', 'mapA');
+    (TableSelecter.instance as any).lastRemoteActiveId = 'mapA';
+    TableSelecter.instance.viewTableIdentifier = 'mapB';
+    TableSelecter.instance.viewedTableIdentifier = 'mapA';
+
+    EventSystem.trigger(new Event('UPDATE_GAME_OBJECT', {
+      identifier: TableSelecter.instance.identifier,
+    }, 'other-peer'));
+
+    expect(TableSelecter.instance.viewedTableIdentifier).toBe('mapB');
+    expect((TableSelecter.instance as any).lastRemoteActiveId).toBe('mapB');
   });
 });
