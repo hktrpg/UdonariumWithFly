@@ -4,6 +4,7 @@ import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { skyWayRecoveryGate } from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
 import { Room } from '@udonarium/room';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { ConnectionBusyService } from 'service/connection-busy.service';
 
 import { RoomConnectHelper } from './room-connect-helper';
 
@@ -133,6 +134,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
     RoomConnectHelper.MESH_DEATH_MS_FOR_TEST = 0;
     RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
+    RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
     skyWayRecoveryGate.resetForTests();
   });
 
@@ -574,6 +576,89 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     } finally {
       jasmine.clock().uninstall();
       RoomConnectHelper.abortReopenInFlight();
+    }
+  });
+
+  it('auto-reopen delays fullscreen busy so brief recoveries stay soft', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    const busy = {
+      show: jasmine.createSpy('show'),
+      hide: jasmine.createSpy('hide'),
+    };
+    const prev = (ConnectionBusyService as any)._instance;
+    (ConnectionBusyService as any)._instance = busy;
+    try {
+      RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 5_000;
+      RoomConnectHelper.everHadRoomSession = true;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      spyOn(Network, 'open');
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({
+        userId: 'u1', peerId: 'self', isRoom: true,
+      } as IPeerContext);
+      spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+      spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+
+      expect(RoomConnectHelper.reopenLastRoomOrLobby('disconnected', { skipJitter: true })).toBe('started');
+      expect(busy.show).not.toHaveBeenCalled();
+      expect(RoomConnectHelper.isNetworkReconnecting()).toBeTrue();
+
+      jasmine.clock().tick(4_999);
+      expect(busy.show).not.toHaveBeenCalled();
+
+      jasmine.clock().tick(1);
+      expect(busy.show).toHaveBeenCalledWith('net.reconnectingRoom');
+    } finally {
+      jasmine.clock().uninstall();
+      RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
+      RoomConnectHelper.abortReopenInFlight();
+      (ConnectionBusyService as any)._instance = prev;
+    }
+  });
+
+  it('auto-reopen that finishes before busy delay never freezes the screen', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    const busy = {
+      show: jasmine.createSpy('show'),
+      hide: jasmine.createSpy('hide'),
+    };
+    const prev = (ConnectionBusyService as any)._instance;
+    (ConnectionBusyService as any)._instance = busy;
+    try {
+      RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 5_000;
+      RoomConnectHelper.everHadRoomSession = true;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      spyOn(Network, 'open');
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({
+        userId: 'u1', peerId: 'self', isRoom: true,
+      } as IPeerContext);
+      spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+      spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+
+      expect(RoomConnectHelper.reopenLastRoomOrLobby('disconnected', { skipJitter: true })).toBe('started');
+      jasmine.clock().tick(1_000);
+      // Recovery completes before the soft window ends.
+      RoomConnectHelper.abortReopenInFlight();
+      expect(busy.show).not.toHaveBeenCalled();
+
+      jasmine.clock().tick(10_000);
+      expect(busy.show).not.toHaveBeenCalled();
+    } finally {
+      jasmine.clock().uninstall();
+      RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
+      RoomConnectHelper.abortReopenInFlight();
+      (ConnectionBusyService as any)._instance = prev;
     }
   });
 

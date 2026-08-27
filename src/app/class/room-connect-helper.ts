@@ -108,6 +108,15 @@ export class RoomConnectHelper {
    * Cleared on success / clearReopenRetry; exhausts auto-recovery so UI can show a fatal.
    */
   private static duplicateMemberReopenCount = 0;
+  /**
+   * Auto-reopen: keep the tabletop interactive for this long, then escalate to
+   * fullscreen busy. Brief recoveries only show the top-right「同步中」indicator.
+   */
+  private static readonly REOPEN_BUSY_DELAY_MS = 20000;
+  /** Tests may shorten busy delay (0 = use REOPEN_BUSY_DELAY_MS). */
+  static REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
+  private static reopenBusyTimer: ReturnType<typeof setTimeout> | null = null;
+  private static reopenBusyShown = false;
   /** Jitter timer before starting reopen (desync token POSTs). */
   private static reopenJitterTimer: ReturnType<typeof setTimeout> | null = null;
   /** Throttle mid-session gap reconnect warns (avoid 5s spam while ICE is stuck). */
@@ -204,6 +213,39 @@ export class RoomConnectHelper {
     return RoomConnectHelper.MESH_DEATH_MS_FOR_TEST > 0
       ? RoomConnectHelper.MESH_DEATH_MS_FOR_TEST
       : RoomConnectHelper.MESH_DEATH_MS;
+  }
+
+  private static reopenBusyDelayMs(): number {
+    return RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST > 0
+      ? RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST
+      : RoomConnectHelper.REOPEN_BUSY_DELAY_MS;
+  }
+
+  /**
+   * Soft auto-reopen: delay fullscreen freeze so brief recoveries stay interactive.
+   * Top-right network-indicator + chat banner cover the soft window.
+   */
+  private static scheduleReopenBusyOverlay(busyKey: string) {
+    RoomConnectHelper.dismissReopenBusyOverlay();
+    const delayMs = RoomConnectHelper.reopenBusyDelayMs();
+    RoomConnectHelper.reopenBusyTimer = setTimeout(() => {
+      RoomConnectHelper.reopenBusyTimer = null;
+      if (!RoomConnectHelper.reopenInFlight || RoomConnectHelper.reopenBusyShown) return;
+      ConnectionBusyService.instance?.show(busyKey);
+      RoomConnectHelper.reopenBusyShown = true;
+      console.warn(`reopen: escalate busy overlay after ${delayMs}ms`);
+    }, delayMs);
+  }
+
+  private static dismissReopenBusyOverlay() {
+    if (RoomConnectHelper.reopenBusyTimer != null) {
+      clearTimeout(RoomConnectHelper.reopenBusyTimer);
+      RoomConnectHelper.reopenBusyTimer = null;
+    }
+    if (RoomConnectHelper.reopenBusyShown) {
+      ConnectionBusyService.instance?.hide();
+      RoomConnectHelper.reopenBusyShown = false;
+    }
   }
 
   private static wakeMinHiddenMs(): number {
@@ -960,6 +1002,7 @@ export class RoomConnectHelper {
       EventSystem.unregister(RoomConnectHelper.reopenListenerKey);
       RoomConnectHelper.reopenListenerKey = null;
     }
+    RoomConnectHelper.dismissReopenBusyOverlay();
     RoomConnectHelper.reopenInFlight = false;
   }
 
@@ -1069,7 +1112,8 @@ export class RoomConnectHelper {
 
     RoomConnectHelper.reopenInFlight = true;
     const busyKey = willReopenRoom ? 'net.reconnectingRoom' : 'net.reconnecting';
-    ConnectionBusyService.instance?.show(busyKey);
+    // Soft first: top-right「同步中」via isNetworkReconnecting. Freeze only if still open after delay.
+    RoomConnectHelper.scheduleReopenBusyOverlay(busyKey);
     console.warn(`reopen: started willReopenRoom=${willReopenRoom}`);
 
     const key = { autoReconnect: true };
@@ -1086,7 +1130,7 @@ export class RoomConnectHelper {
       if (RoomConnectHelper.reopenFinish === finish) {
         RoomConnectHelper.reopenFinish = null;
       }
-      ConnectionBusyService.instance?.hide();
+      RoomConnectHelper.dismissReopenBusyOverlay();
       RoomConnectHelper.reopenInFlight = false;
     };
     RoomConnectHelper.reopenFinish = finish;
