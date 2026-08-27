@@ -15,6 +15,8 @@ import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
 import { installSkyWayQuietLogger, isAlreadySameNameMemberExist } from './skyway-log';
 import {
+  DUPLICATE_MEMBER_JOIN_ATTEMPTS,
+  duplicateMemberRetryDelayMs,
   nextRefreshDelayMs,
   skyWayRecoveryGate,
 } from './skyway-recovery-policy';
@@ -311,7 +313,7 @@ export class SkyWayFacade {
   }
 
   private async joinLobbyPerson() {
-    const maxAttempts = 4;
+    const maxAttempts = DUPLICATE_MEMBER_JOIN_ATTEMPTS;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.leaveLobbyPerson();
       if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
@@ -333,7 +335,7 @@ export class SkyWayFacade {
         return;
       } catch (err) {
         if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
-        const delayMs = 400 * (attempt + 1);
+        const delayMs = duplicateMemberRetryDelayMs(attempt);
         console.warn(`skyWay joinLobbyPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
         await new Promise<void>(resolve => setTimeout(resolve, delayMs));
         await this.leaveLobbyChannel();
@@ -374,7 +376,7 @@ export class SkyWayFacade {
   }
 
   private async joinRoomPerson() {
-    const maxAttempts = 4;
+    const maxAttempts = DUPLICATE_MEMBER_JOIN_ATTEMPTS;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.leaveRoomPerson();
       if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
@@ -409,7 +411,7 @@ export class SkyWayFacade {
         return;
       } catch (err) {
         if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
-        const delayMs = 400 * (attempt + 1);
+        const delayMs = duplicateMemberRetryDelayMs(attempt);
         console.warn(`skyWay joinRoomPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
         await new Promise<void>(resolve => setTimeout(resolve, delayMs));
         await this.leaveRoomChannel();

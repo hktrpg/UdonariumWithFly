@@ -28,6 +28,7 @@ import {
 import {
   classifyOutageKind,
   reopenJitterMs,
+  reopenOpenNetworkTimeoutMs,
   skyWayRecoveryGate,
 } from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
 import { ConnectionBusyService } from 'service/connection-busy.service';
@@ -439,6 +440,9 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.openPeerCount() > 0) return false;
     if (!Network.getLastRoomSession()?.roomId) return false;
     if (RoomConnectHelper.wakeReopenTimer != null) return true;
+    // A pending backoff reopen already owns recovery — don't pile a wake open on top.
+    if (RoomConnectHelper.isReopenRetryPending()) return false;
+    if (RoomConnectHelper.reopenJitterTimer != null) return false;
     if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
 
     const start = () => {
@@ -446,6 +450,7 @@ export class RoomConnectHelper {
       if (!RoomConnectHelper.everHadRoomSession || !RoomConnectHelper.hadOpenPeerThisSession) return;
       if (!Network.peer?.isRoom) return;
       if (RoomConnectHelper.openPeerCount() > 0) return;
+      if (RoomConnectHelper.isReopenRetryPending()) return;
       if (!RoomConnectHelper.shouldAttemptReopenNow()) return;
       console.warn('reopen: wake (was meshed, openPeers=0)');
       RoomConnectHelper.reopenLastRoomOrLobby('disconnected');
@@ -938,7 +943,10 @@ export class RoomConnectHelper {
     if (RoomConnectHelper.isJoinOwningNetworkError) return;
     if (RoomConnectHelper.reopenRetryTimer != null) return;
     if (RoomConnectHelper.reopenJitterTimer != null) return;
-    if (RoomConnectHelper.wakeReopenTimer != null) return;
+    if (RoomConnectHelper.wakeReopenTimer != null) {
+      // Prefer scheduled backoff over a concurrent wake open.
+      RoomConnectHelper.clearWakeReopenTimer();
+    }
 
     const kind = classifyOutageKind(errorType);
     if (opts?.noteOutage !== false && kind !== 'disconnected') {
@@ -957,7 +965,7 @@ export class RoomConnectHelper {
         RoomConnectHelper.scheduleReopenRetry(errorType, { noteOutage: false });
         return;
       }
-      const result = RoomConnectHelper.reopenLastRoomOrLobby();
+      const result = RoomConnectHelper.reopenLastRoomOrLobby(errorType, { skipJitter: true });
       if (result !== 'started') {
         RoomConnectHelper.scheduleReopenRetry(errorType, { noteOutage: false });
       }
@@ -990,13 +998,19 @@ export class RoomConnectHelper {
     if (errorType && !opts?.skipJitter) {
       const kind = classifyOutageKind(errorType);
       if (kind !== 'disconnected') skyWayRecoveryGate.noteFailure(kind);
-      if (kind === 'rtc-api' || kind === 'server-error' || kind === 'token-api' || kind === 'token-expired') {
-        const jitter = reopenJitterMs(Network.peerId || session?.userId);
-        console.warn(`reopen: deferred-jitter ${jitter}ms kind=${kind}`);
+      if (kind === 'rtc-api' || kind === 'server-error' || kind === 'token-api'
+        || kind === 'token-expired' || kind === 'duplicate-member') {
+        // duplicate-member: wait for ghost TTL before Network.open (peerId jitter alone is too short).
+        const delayMs = kind === 'duplicate-member'
+          ? skyWayRecoveryGate.nextReopenDelayMs(0, 'duplicate-member')
+            + reopenJitterMs(Network.peerId || session?.userId, 2000)
+          : reopenJitterMs(Network.peerId || session?.userId);
+        console.warn(`reopen: deferred-jitter ${delayMs}ms kind=${kind}`);
+        RoomConnectHelper.clearWakeReopenTimer();
         RoomConnectHelper.reopenJitterTimer = setTimeout(() => {
           RoomConnectHelper.reopenJitterTimer = null;
           RoomConnectHelper.reopenLastRoomOrLobby(errorType, { skipJitter: true });
-        }, jitter);
+        }, delayMs);
         return 'started';
       }
     }
@@ -1004,6 +1018,13 @@ export class RoomConnectHelper {
     // Drop a leaked prior reopen listener (e.g. test afterEach forced reopenInFlight=false).
     if (RoomConnectHelper.reopenFinish || RoomConnectHelper.reopenListenerKey) {
       RoomConnectHelper.abortReopenInFlight();
+    }
+
+    // This attempt owns recovery — cancel wake / pending retry timers that would double-open.
+    RoomConnectHelper.clearWakeReopenTimer();
+    if (RoomConnectHelper.reopenRetryTimer != null) {
+      clearTimeout(RoomConnectHelper.reopenRetryTimer);
+      RoomConnectHelper.reopenRetryTimer = null;
     }
 
     RoomConnectHelper.reopenInFlight = true;
@@ -1031,11 +1052,13 @@ export class RoomConnectHelper {
     RoomConnectHelper.reopenFinish = finish;
     const reopenErrorType = errorType
       || (skyWayRecoveryGate.lastOutageKind !== 'disconnected' ? skyWayRecoveryGate.lastOutageKind : 'disconnected');
+    // Cover joinRoomPerson duplicate-member retries (delays ~30s) + remesh before giving up.
+    const openTimeoutMs = reopenOpenNetworkTimeoutMs(reopenErrorType);
     const timer = setTimeout(() => {
       console.warn('RoomConnectHelper reopenLastRoomOrLobby timeout');
       finish();
       RoomConnectHelper.scheduleReopenRetry(reopenErrorType);
-    }, 30000);
+    }, openTimeoutMs);
 
     EventSystem.register(key)
       .on('OPEN_NETWORK', () => {

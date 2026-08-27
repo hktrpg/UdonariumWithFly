@@ -670,6 +670,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
 
+          // Ghost same-name member is recovered via delayed reopen — never a fatal modal.
+          if (/already-?same-?name-?member-?exist/i.test(errorType)) return;
+
           await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
         });
       })

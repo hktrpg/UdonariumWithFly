@@ -42,8 +42,9 @@ describe('room-reconnect.util', () => {
     expect(shouldAttemptRoomReopen('rtcApiFatalError')).toBeTrue();
     expect(shouldAttemptRoomReopen('token-api')).toBeTrue();
     expect(shouldAttemptRoomReopen('peer-unavailable')).toBeFalse();
-    expect(shouldAttemptRoomReopen('already-same-name-member-exist')).toBeFalse();
-    expect(shouldAttemptRoomReopen('alreadySameNameMemberExist')).toBeFalse();
+    // Ghost member after sleep/WS drop — delayed reopen, not a hard stop.
+    expect(shouldAttemptRoomReopen('already-same-name-member-exist')).toBeTrue();
+    expect(shouldAttemptRoomReopen('alreadySameNameMemberExist')).toBeTrue();
   });
 
   it('RECOVERABLE_NETWORK_ERROR_TYPES includes internal', () => {

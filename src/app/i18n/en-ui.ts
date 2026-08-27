@@ -875,6 +875,7 @@ export const en_ui: I18nDictionary = {
   'skyway.socket-error': 'A problem occurred communicating with the SkyWay signaling server.',
   'skyway.invalid-id': 'Invalid Peer ID.',
   'skyway.unavailable-id': 'That Peer ID is already in use.',
+  'skyway.already-same-name-member-exist': 'A previous session is still clearing. Rejoining the room automatically — please wait.',
   'skyway.invalid-key': 'Invalid SkyWay API key.',
   'skyway.invalid-domain': 'The current domain is not registered for this SkyWay API key.',
   'skyway.authentication': 'Authentication error.',
