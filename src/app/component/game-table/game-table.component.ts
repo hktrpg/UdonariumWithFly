@@ -2068,11 +2068,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     footprintWalls: { points: { x: number; y: number }[] }[],
     occluders: LightOccluder[],
   ): string {
+    const n = (v: number) => String(v ?? 0);
+    const pts = (points: { x: number; y: number }[]) =>
+      (points || []).map(p => `${n(p.x)},${n(p.y)}`).join(';');
     const table = this.currentTable;
     const parts: string[] = [
       table.identifier,
-      String(table.darkness ?? 0),
-      String(table.globalIllumination ?? 1),
+      n(table.darkness ?? 0),
+      n(table.globalIllumination ?? 1),
       table.globalIlluminationEnabled ? '1' : '0',
       String(table.globalIlluminationThreshold ?? ''),
       table.visionEnabled ? '1' : '0',
@@ -2083,22 +2086,23 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     ];
     for (const light of table.lights || []) {
       parts.push(
-        `L:${light.identifier}:${light.x|0}:${light.y|0}:${light.brightRadius|0}:${light.dimRadius|0}:${light.color}:${light.intensity ?? 0}`,
+        `L:${light.identifier}:${n(light.x)}:${n(light.y)}:${n(light.brightRadius)}:${n(light.dimRadius)}:${light.color}:${n(light.intensity ?? 0)}`,
       );
     }
     for (const wall of table.walls || []) {
-      const pts = (wall.points || []).map(p => `${p.x|0},${p.y|0}`).join(';');
-      parts.push(`W:${wall.identifier}:${wall.blocksLight ? 1 : 0}:${wall.blocksVision ? 1 : 0}:${pts}`);
+      parts.push(
+        `W:${wall.identifier}:${wall.blocksLight ? 1 : 0}:${wall.blocksVision ? 1 : 0}:${pts(wall.points)}`,
+      );
     }
     for (const fp of footprintWalls) {
-      parts.push(`F:${(fp.points || []).map(p => `${p.x|0},${p.y|0}`).join(';')}`);
+      parts.push(`F:${pts(fp.points)}`);
     }
     for (const o of occluders) {
-      parts.push(`O:${o.id}:${(o.points || []).map(p => `${p.x|0},${p.y|0}`).join(';')}`);
+      parts.push(`O:${o.id}:${pts(o.points)}`);
     }
     for (const ch of onTable) {
       parts.push(
-        `T:${ch.identifier}:${ch.location?.x|0}:${ch.location?.y|0}:${ch.size}:${ch.visionRangeGrid}:${ch.brightLightGrid}:${ch.dimLightGrid}`,
+        `T:${ch.identifier}:${n(ch.location?.x)}:${n(ch.location?.y)}:${n(ch.size)}:${n(ch.visionRangeGrid)}:${n(ch.brightLightGrid)}:${n(ch.dimLightGrid)}`,
       );
     }
     for (const ch of visionChars) parts.push(`V:${ch.identifier}`);
