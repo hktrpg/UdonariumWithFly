@@ -140,16 +140,21 @@ export function collectPointLightSources(
   return sources;
 }
 
-/** Stretch multiplier vs default floor length: 1 = base, max 2.3× when close to light. */
-export const MAX_SHADOW_LENGTH_FACTOR = 2.3;
+/** Stretch multiplier vs default floor length: 1 = base, max 3.3× token size when close to light. */
+export const MAX_SHADOW_LENGTH_FACTOR = 3.3;
 /** Default ground projection of standing art (same idea as former outer scale Y). */
 const BASE_FLOOR_ALONG = 0.66;
 
-/** Stretch factor from proximity (closer → longer), capped at {@link MAX_SHADOW_LENGTH_FACTOR}. */
+/**
+ * Stretch from proximity + intensity, capped at {@link MAX_SHADOW_LENGTH_FACTOR}.
+ * Sub-linear falloff / soft intensity so mid-range and dimmer lights still move the cast a lot.
+ */
 export function shadowStretchForDistance(dist: number, reach: number, intensity: number): number {
   const falloff = 1 - Math.min(1, Math.max(0, dist) / Math.max(reach, 1));
   const intensity01 = Math.max(0, Math.min(1, intensity));
-  return 1 + (MAX_SHADOW_LENGTH_FACTOR - 1) * falloff * falloff * intensity01;
+  const proximity = Math.pow(falloff, 0.55);
+  const light = Math.pow(intensity01, 0.75);
+  return 1 + (MAX_SHADOW_LENGTH_FACTOR - 1) * proximity * light;
 }
 
 /**
@@ -167,9 +172,9 @@ export function directionalShadowStretch(dirX: number, dirY: number, stretch: nu
   const angle = Math.abs(angleDeg) < 1e-6 ? 0 : angleDeg;
   const factor = Math.min(MAX_SHADOW_LENGTH_FACTOR, Math.max(1, stretch));
   const along = BASE_FLOOR_ALONG * factor;
-  // Longer casts skim narrower (simple ground-projection deform).
+  // Longer casts skim narrower — wider range so length changes read clearly.
   const t = (factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1);
-  const width = 0.95 - 0.22 * t;
+  const width = 0.95 - 0.38 * t;
   return `rotateZ(${angle}deg) scale(${width}, ${along})`;
 }
 
@@ -230,8 +235,9 @@ export function shadowCastsForPoint(
 
     const falloff = 1 - Math.min(1, dist / reach);
     const intensity = Math.max(0, Math.min(1, light.intensity ?? 0.7));
-    const strength = Math.min(1, intensity * (0.25 + 0.75 * falloff));
-    if (strength < 0.06) continue;
+    // Favor proximity so nearer lights dominate ranking and visual change.
+    const strength = Math.min(1, intensity * (0.12 + 0.88 * Math.pow(falloff, 0.55)));
+    if (strength < 0.05) continue;
 
     const stretch = shadowStretchForDistance(dist, reach, intensity);
 

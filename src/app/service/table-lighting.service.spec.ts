@@ -69,12 +69,16 @@ describe('table-lighting shadows', () => {
     expect(r.dy).toBeCloseTo(-10, 5);
   });
 
-  it('leans more when closer to the light, up to 2.3×', () => {
+  it('leans more when closer to the light, up to 3.3×', () => {
     const near = shadowStretchForDistance(10, 100, 1);
+    const mid = shadowStretchForDistance(50, 100, 1);
     const far = shadowStretchForDistance(90, 100, 1);
-    expect(near).toBeGreaterThan(far);
+    expect(near).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(far);
     expect(near).toBeLessThanOrEqual(MAX_SHADOW_LENGTH_FACTOR);
     expect(shadowStretchForDistance(0, 100, 1)).toBeCloseTo(MAX_SHADOW_LENGTH_FACTOR, 5);
+    // Mid-range still elongates meaningfully (not crushed by falloff²).
+    expect(mid).toBeGreaterThan(1 + (MAX_SHADOW_LENGTH_FACTOR - 1) * 0.35);
   });
 
   it('caps at 3 casts even with many lights, strongest first', () => {
@@ -92,14 +96,14 @@ describe('table-lighting shadows', () => {
 
   it('aligns silhouette up (−Y) with cast +X and elongates on the floor', () => {
     const factor = 1.5;
-    const width = 0.95 - 0.22 * ((factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1));
+    const width = 0.95 - 0.38 * ((factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1));
     const t = directionalShadowStretch(1, 0, factor);
     expect(t).toBe(`rotateZ(90deg) scale(${width}, ${0.66 * factor})`);
   });
 
   it('aligns silhouette up (−Y) with cast +Y (CSS down = away “south”)', () => {
     const factor = 1.5;
-    const width = 0.95 - 0.22 * ((factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1));
+    const width = 0.95 - 0.38 * ((factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1));
     const t = directionalShadowStretch(0, 1, factor);
     expect(t).toBe(`rotateZ(180deg) scale(${width}, ${0.66 * factor})`);
   });
@@ -117,9 +121,9 @@ describe('table-lighting shadows', () => {
       .toBe('rotateZ(0deg) scale(0.95, 0.66)');
   });
 
-  it('caps length at 2.3× base floor projection', () => {
+  it('caps length at 3.3× base floor projection', () => {
     const t = directionalShadowStretch(1, 0, 99);
-    expect(t).toBe(`rotateZ(90deg) scale(0.73, ${0.66 * MAX_SHADOW_LENGTH_FACTOR})`);
+    expect(t).toBe(`rotateZ(90deg) scale(0.57, ${0.66 * MAX_SHADOW_LENGTH_FACTOR})`);
   });
 
   it('narrows as it elongates (deform)', () => {
