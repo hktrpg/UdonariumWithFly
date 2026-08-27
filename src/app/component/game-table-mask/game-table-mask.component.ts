@@ -358,10 +358,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         this.changeDetector.markForCheck();
       })
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.gameTableMask?.identifier}`, event => {
         this.changeDetector.markForCheck();

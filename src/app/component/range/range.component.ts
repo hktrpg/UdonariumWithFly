@@ -469,10 +469,8 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       .on('UPDATE_FILE_RESOURE', -1000, event => {
         this.changeDetector.markForCheck();
       }).on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       });
     this.movableOption = {
       tabletopObject: this.range,

@@ -899,11 +899,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.changeDetector.markForCheck();
       })
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateX = event.data['x'];
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        // Already inside setTransform's ngZone.run — nested run was redundant.
+        this.viewRotateX = event.data['x'];
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on<object>('SELECT_TABLETOP_OBJECT', -1000, event => {
         // 暫且如此
