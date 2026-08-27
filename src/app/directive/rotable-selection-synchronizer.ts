@@ -1,4 +1,5 @@
 import { GameCharacter } from '@udonarium/game-character';
+import { EventSystem } from '@udonarium/core/system';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import {
@@ -375,6 +376,7 @@ export class RotableSelectionSynchronizer {
         if (object) after.set(id, poseFromObjectAngles(object));
       }
       UndoService.instance?.recordTransform(property, before, after, property);
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'rotate' });
     }
     return rotated;
   }

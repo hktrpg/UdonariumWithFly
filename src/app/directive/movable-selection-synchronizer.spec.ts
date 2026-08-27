@@ -25,6 +25,7 @@ function stubMovable(
     tabletopObject: object,
     isDisable: false,
     isDragFollower: false,
+    isKeyboardNudge: false,
     isPointerMoved: true,
     width: 50,
     height: 50,

@@ -21,7 +21,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
 import { MovableOption } from 'directive/movable.directive';
-import { RotableOption } from 'directive/rotable.directive';
+import { RotableDirective, RotableOption } from 'directive/rotable.directive';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -43,7 +43,12 @@ import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-s
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
-import { TableLightingService, rotateTableOffset, TokenShadowCast } from 'service/table-lighting.service';
+import {
+  TableLightingService,
+  directionalShadowStretch,
+  rotateTableOffset,
+  TokenShadowCast,
+} from 'service/table-lighting.service';
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 import { TabletopActionService } from 'service/tabletop-action.service';
@@ -631,18 +636,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   get characterShadowImageHeight(): number {
-    // Follow token image height (size / height), then shrink with altitude.
     return this.characterImageHeight * this.shadowAltitudeFactor;
   }
 
   get characterShadowImageWidth(): number {
-    // Follow token image width (size / height), then shrink with altitude.
     return this.characterImageWidth * this.shadowAltitudeFactor;
   }
 
   get characterShadowOffset(): number {
-    // With Fly: pin near pedestal with *0.99 so the flattened silhouette falls
-    // behind the upright art — not centered on the token base.
     let offset = 0;
     if (0.2 < this.height && this.height <= 0.3) {
       offset = 0.09;
@@ -664,7 +665,6 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return Math.min(1, this.shadowOpacity * (0.55 + 0.45 * Math.max(0, strength)));
   }
 
-  /** Ground shadow mirror: horizontal flip only (match token facing, not vertical FX). */
   get shadowImageTransform(): string | null {
     return this.isInverse ? 'scale(-1, 1)' : null;
   }
@@ -673,30 +673,29 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
   }
 
-  /** Light push from feet; roll is applied by inner CSS, not here. */
-  private shadowLocalOffset(dx: number, dy: number): { dx: number; dy: number } {
-    return rotateTableOffset(dx, dy, this.rotate);
+  private shadowLocalDir(dirX: number, dirY: number): { dx: number; dy: number } {
+    const id = this.shadowLookupId;
+    const live = id ? RotableDirective.liveRotateFor(id, 'rotate') : null;
+    return rotateTableOffset(dirX, dirY, live ?? this.rotate);
   }
 
-  /** Pin every silhouette to token feet — never offset the anchor per light. */
+  /** Translate only — floor squash is inside directionalShadowStretch for light casts. */
+  shadowFeetLightOuterTransform(): string {
+    return `translateX(${this.shadowTranslateX}px) translateY(${this.characterShadowOffset}px)`;
+  }
+
   shadowFeetOuterTransform(): string {
     return `translateX(${this.shadowTranslateX}px) translateY(${this.characterShadowOffset}px) scale(1, 0.66)`;
   }
 
   /**
-   * Stretch from feet toward light (pivot = center bottom); token roll applied last.
-   * translate() is intentionally avoided so shadows cannot detach from the base.
+   * Align silhouette away from the strongest light (feet pinned).
+   * Map cast dir is converted into token-local space so token yaw is respected.
    */
   shadowCastInnerTransform(cast: TokenShadowCast): string {
-    const local = this.shadowLocalOffset(cast.dx, cast.dy);
-    const dist = Math.hypot(local.dx, local.dy);
-    const roll = `rotateZ(${this.roll}deg)`;
-    if (dist < 0.5) return roll;
-
-    const angle = (Math.atan2(local.dy, local.dx) * 180) / Math.PI;
-    const h = Math.max(1, this.characterShadowImageHeight);
-    const stretch = 1 + dist / h;
-    return `rotateZ(${angle}deg) scale(${stretch}, 1) rotateZ(${-angle}deg) ${roll}`;
+    const local = this.shadowLocalDir(cast.dirX, cast.dirY);
+    const altitudeBoost = 1 + Math.max(0, this.altitude) * 0.2;
+    return directionalShadowStretch(local.dx, local.dy, cast.stretch * altitudeBoost);
   }
 
   defaultShadowInnerTransform(): string {
@@ -707,12 +706,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return 1 + Math.max(0, this.altitude) * 0.6;
   }
 
-  /** Tabletop piece id (CharacterToken on map; body when legacy). */
   private get shadowLookupId(): string | null {
     return this.tablePiece?.identifier ?? this.gameCharacter?.identifier ?? null;
   }
 
-  /** Per-light casts when map lights are active; empty → default under-token shadow. */
   get lightShadowCasts() {
     const id = this.shadowLookupId;
     if (!id) return [];
@@ -723,9 +720,12 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     return this.lightShadowCasts.length > 0;
   }
 
-  /** Hide the compact default blob when map lights drive silhouettes instead. */
   get showDefaultTokenShadow(): boolean {
     return !this.useLightShadows;
+  }
+
+  trackLightShadowCast(index: number, cast: TokenShadowCast): string {
+    return `${index}:${cast.dirX.toFixed(3)}:${cast.dirY.toFixed(3)}:${cast.stretch.toFixed(3)}`;
   }
 
   get chatBubbleAltitude(): number {

@@ -119,6 +119,27 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
+  /**
+   * Live yaw/roll while rotating (before SyncVar flush on pointer up).
+   * Defaults to property `rotate` (token yaw); pass `roll` for tip.
+   */
+  static liveRotateFor(objectId: string, propName: string = 'rotate'): number | null {
+    if (!objectId) return null;
+    for (const rotable of RotableDirective.allRotables) {
+      const obj = rotable.tabletopObject;
+      if (!obj || obj.identifier !== objectId) continue;
+      const prop = rotable.targetPropertyName || 'rotate';
+      if (prop !== propName) continue;
+      if (rotable.input?.isGrabbing || rotable.input?.isDragging) {
+        return rotable.rotate;
+      }
+      if (prop in obj && Number(obj[prop]) !== rotable.rotate) {
+        return rotable.rotate;
+      }
+    }
+    return null;
+  }
+
   ngAfterViewInit() {
     RotableDirective.allRotables.add(this);
     this.batchService.add(() => this.initialize(), this.onstart);
@@ -220,6 +241,9 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.ondrag.emit(e as PointerEvent);
     this.rotate = angle;
     this.synchronizer.updateRotate();
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onInputEnd(e: MouseEvent | TouchEvent) {
@@ -232,6 +256,9 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.flushDragRotatesToTable();
     this.cancel();
     this.onend.emit(e as PointerEvent);
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onContextMenu(e: MouseEvent | TouchEvent) {

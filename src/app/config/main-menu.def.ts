@@ -15,7 +15,6 @@ export interface MainMenuItemDef {
   gated?: boolean;
   badge?: 'chat' | 'update';
   showOnMobile?: MainMenuMobileSlot;
-  selfOnlyHint?: boolean;
 }
 
 export const MAIN_MENU_ITEMS: MainMenuItemDef[] = [
@@ -32,7 +31,7 @@ export const MAIN_MENU_ITEMS: MainMenuItemDef[] = [
   { tourId: 'menu.scenarioText', icon: 'menu_book', labelKey: 'menu.scenarioText', tipKey: 'tip.menu.scenarioText', kind: 'toggle', component: 'ScenarioTextComponent', gated: true },
   { tourId: 'menu.inventory', icon: 'folder_shared', labelKey: 'menu.inventory', tipKey: 'tip.menu.inventory', kind: 'toggle', component: 'GameObjectInventoryComponent', gated: true, showOnMobile: 'play' },
   { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', kind: 'toggle', component: 'NoteInventoryComponent', gated: true, showOnMobile: 'both' },
-  { tourId: 'menu.settings', icon: 'how_to_reg', labelKey: 'menu.settings', tipKey: 'tip.menu.settings', kind: 'contextMenu', contextMenu: 'settings', selfOnlyHint: true },
+  { tourId: 'menu.settings', icon: 'how_to_reg', labelKey: 'menu.settings', tipKey: 'tip.menu.settings', kind: 'contextMenu', contextMenu: 'settings' },
   { tourId: 'menu.disconnect', icon: 'logout', labelKey: 'menu.disconnect', tipKey: 'tip.menu.disconnect', kind: 'logout' },
   { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', kind: 'contextMenu', showOnMobile: 'both' },
 ];

@@ -665,6 +665,20 @@
   pointer-events: none;
 }
 
+/* All floor silhouettes share the token origin — without this, *ngFor stacks them in
+   document flow and secondary casts look like detached copies down the page. */
+.token-floor-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: center bottom;
+  pointer-events: none;
+}
+
+.token-floor-shadow > .image-box {
+  overflow: visible;
+}
+
 .inverser {
   transition: transform 132ms 0s ease, opacity 132ms 0s ease;
 }

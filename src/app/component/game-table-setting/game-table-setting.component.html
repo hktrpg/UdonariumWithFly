@@ -64,7 +64,7 @@
               type="button"
               class="thumb-frame"
               (click)="openBgImageModal()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableBackgroundImage)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
@@ -95,7 +95,7 @@
               type="button"
               class="thumb-frame"
               (click)="openDistanceViewImageModal()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableDistanceviewImage)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
@@ -126,7 +126,7 @@
               type="button"
               class="thumb-frame"
               (click)="openDistanceViewImageModal2()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableDistanceviewImage2)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">

@@ -15,14 +15,16 @@
       (click)="onDesktopMenuClick(item, $event)">
       <a routerLink="/" routerLinkActive="active" [style.pointer-events]="item.kind === 'contextMenu' || item.kind === 'logout' ? 'none' : null"
         [attr.aria-label]="item.labelKey | i18n">
-        <div [class.menu-chat-icon]="item.badge === 'chat' || item.badge === 'update'">
-          <i class="material-icons icon-size">{{ item.icon }}</i>
-          <span *ngIf="item.badge === 'chat' && showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span>
-          <i *ngIf="item.badge === 'update' && showAppUpdateBadge" class="material-icons menu-update-badge"
-            [attr.title]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n"
-            aria-hidden="true">system_update</i>
+        <div class="menu-icon-slot">
+          <div class="menu-icon-glyph">
+            <i class="material-icons icon-size">{{ item.icon }}</i>
+          </div>
+          <div class="menu-badge-layer" aria-hidden="true">
+            <span *ngIf="item.badge === 'chat' && showChatUnreadBadge" class="menu-chat-badge">{{ chatUnreadBadgeLabel }}</span>
+            <span *ngIf="item.badge === 'update' && showAppUpdateBadge" class="menu-update-dot"
+              [attr.title]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n"></span>
+          </div>
         </div>
-        <sup *ngIf="item.selfOnlyHint" class="self-only" aria-hidden="true">*</sup>
       </a>
     </li>
   </ul>
@@ -44,11 +46,14 @@
       <a routerLink="/" routerLinkActive="active" style="pointer-events: none"
         [attr.aria-label]="item.labelKey | i18n"
         [attr.title]="item.labelKey | i18n">
-        <div [class.menu-chat-icon]="item.chatBadge || item.updateBadge">
-          <i class="material-icons" [class.icon-size]="!isTabletLandscape">{{ item.icon }}</i>
-          <span *ngIf="item.chatBadge && showChatUnreadBadge" class="menu-chat-badge" aria-hidden="true">{{ chatUnreadBadgeLabel }}</span>
-          <i *ngIf="item.updateBadge && showAppUpdateBadge" class="material-icons menu-update-badge"
-            aria-hidden="true">system_update</i>
+        <div class="menu-icon-slot">
+          <div class="menu-icon-glyph">
+            <i class="material-icons" [class.icon-size]="!isTabletLandscape">{{ item.icon }}</i>
+          </div>
+          <div class="menu-badge-layer" aria-hidden="true">
+            <span *ngIf="item.chatBadge && showChatUnreadBadge" class="menu-chat-badge">{{ chatUnreadBadgeLabel }}</span>
+            <span *ngIf="item.updateBadge && showAppUpdateBadge" class="menu-update-dot"></span>
+          </div>
         </div>
       </a>
     </li>

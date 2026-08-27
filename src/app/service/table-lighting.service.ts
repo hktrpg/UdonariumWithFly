@@ -14,44 +14,34 @@ export interface PointLightSource {
   actorId?: string;
 }
 
-/** One decorative silhouette cast by a single light (away from the source). */
+/**
+ * Directional under-foot shadow (map space).
+ * Up to three strongest lights fan out from the feet.
+ */
 export interface TokenShadowCast {
-  dx: number;
-  dy: number;
+  /** Unit direction away from the light (map space). */
+  dirX: number;
+  dirY: number;
+  /** Elongation along dir: 1 = base floor length, up to {@link MAX_SHADOW_LENGTH_FACTOR}. */
+  stretch: number;
   strength: number;
 }
 
-/** @deprecated Prefer TokenShadowCast[]; kept for callers that expect a blend. */
-export interface TokenShadowVector {
-  dx: number;
-  dy: number;
-  strength: number;
+export interface ShadowCastMetrics {
+  radiusPx: number;
+  heightPx: number;
+  excludeActorId?: string;
 }
 
-const MAX_SHADOWS_PER_TOKEN = 5;
+/** Up to three strongest casts when multiple lights are in range (fan-out). */
+const MAX_SHADOWS_PER_TOKEN = 3;
 
 @Injectable({ providedIn: 'root' })
 export class TableLightingService {
   private shadowsByCharacterId = new Map<string, TokenShadowCast[]>();
 
-  /** Latest per-light shadow casts for a tabletop character (updated by game-table refreshFx). */
   getShadowsForCharacter(characterId: string): TokenShadowCast[] {
     return this.shadowsByCharacterId.get(characterId) ?? [];
-  }
-
-  /** Blended single vector (legacy). Prefer getShadowsForCharacter. */
-  getShadowForCharacter(characterId: string): TokenShadowVector | null {
-    const casts = this.getShadowsForCharacter(characterId);
-    if (!casts.length) return null;
-    let sumDx = 0;
-    let sumDy = 0;
-    let strength = 0;
-    for (const c of casts) {
-      sumDx += c.dx;
-      sumDy += c.dy;
-      strength = Math.max(strength, c.strength);
-    }
-    return { dx: sumDx / casts.length, dy: sumDy / casts.length, strength };
   }
 
   clearShadows() {
@@ -59,9 +49,8 @@ export class TableLightingService {
   }
 
   /**
-   * Recompute per-token decorative shadows from map/token lights.
-   * When lights are present, each nearby light casts its own silhouette.
-   * Called from game-table refreshFx alongside the lighting canvas.
+   * Recompute under-foot directional shadows from map lamps + token-carried lights.
+   * Self-lights are skipped via actorId (a lit token does not cast on itself).
    */
   updateTokenShadows(table: GameTable, lightCharacters: VisionLightActor[]) {
     this.shadowsByCharacterId.clear();
@@ -75,13 +64,18 @@ export class TableLightingService {
     for (const ch of lightCharacters || []) {
       if (!ch?.identifier) continue;
       const center = actorCenter(ch, grid);
-      const casts = shadowCastsForPoint(center.x, center.y, sources, ch.identifier);
+      const radiusPx = (ch.size * grid) / 2;
+      const heightPx = Math.max(ch.size * grid, 1);
+      const casts = shadowCastsForPoint(center.x, center.y, sources, {
+        radiusPx,
+        heightPx,
+        excludeActorId: ch.identifier,
+      });
       if (casts.length) this.shadowsByCharacterId.set(ch.identifier, casts);
     }
   }
 }
 
-/** Tabletop center in map pixels (live drag pose when available). */
 export function actorCenter(
   ch: VisionLightActor,
   grid: number,
@@ -95,7 +89,6 @@ export function actorCenter(
   };
 }
 
-/** Map-space offset → token-local offset (pedestal rotateZ). */
 export function rotateTableOffset(dx: number, dy: number, rotateDeg: number): { dx: number; dy: number } {
   if (!rotateDeg) return { dx, dy };
   const rad = (-rotateDeg * Math.PI) / 180;
@@ -107,14 +100,9 @@ export function rotateTableOffset(dx: number, dy: number, rotateDeg: number): { 
   };
 }
 
-export function collectPointLightSources(
-  table: GameTable,
-  lightCharacters: VisionLightActor[],
-  darkness: number,
-): PointLightSource[] {
-  const grid = table.gridSize || 50;
+/** Map-placed lamps only (see updateTokenShadows). */
+export function collectMapLightSources(table: GameTable, darkness: number): PointLightSource[] {
   const sources: PointLightSource[] = [];
-
   for (const light of table.lights || []) {
     if (!light.isActiveAtDarkness(darkness)) continue;
     sources.push({
@@ -125,7 +113,17 @@ export function collectPointLightSources(
       intensity: light.intensity ?? 0.7,
     });
   }
+  return sources;
+}
 
+/** Map lamps + token-carried lights (token lights tagged with actorId). */
+export function collectPointLightSources(
+  table: GameTable,
+  lightCharacters: VisionLightActor[],
+  darkness: number,
+): PointLightSource[] {
+  const grid = table.gridSize || 50;
+  const sources = collectMapLightSources(table, darkness);
   for (const ch of lightCharacters || []) {
     const dimGrid = ch.dimLightGrid;
     if (dimGrid <= 0) continue;
@@ -139,63 +137,117 @@ export function collectPointLightSources(
       actorId: ch.identifier,
     });
   }
-
   return sources;
 }
 
-/** One cast per contributing light, strongest first (capped). */
+/** Stretch multiplier vs default floor length: 1 = base, max 2.3× when close to light. */
+export const MAX_SHADOW_LENGTH_FACTOR = 2.3;
+/** Default ground projection of standing art (same idea as former outer scale Y). */
+const BASE_FLOOR_ALONG = 0.66;
+
+/** Stretch factor from proximity (closer → longer), capped at {@link MAX_SHADOW_LENGTH_FACTOR}. */
+export function shadowStretchForDistance(dist: number, reach: number, intensity: number): number {
+  const falloff = 1 - Math.min(1, Math.max(0, dist) / Math.max(reach, 1));
+  const intensity01 = Math.max(0, Math.min(1, intensity));
+  return 1 + (MAX_SHADOW_LENGTH_FACTOR - 1) * falloff * falloff * intensity01;
+}
+
+/**
+ * Feet-pinned cast (transform-origin: center bottom).
+ * Aligns image “up” with the light-away direction, then elongates/deforms along
+ * that axis up to {@link MAX_SHADOW_LENGTH_FACTOR}× the base floor length.
+ * Floor squash is baked into the along-axis scale (not an outer scale(1,0.66)).
+ */
+export function directionalShadowStretch(dirX: number, dirY: number, stretch: number): string {
+  const len = Math.hypot(dirX, dirY);
+  if (len < 1e-6) return 'none';
+  const nx = dirX / len;
+  const ny = dirY / len;
+  const angleDeg = (Math.atan2(nx, -ny) * 180) / Math.PI;
+  const angle = Math.abs(angleDeg) < 1e-6 ? 0 : angleDeg;
+  const factor = Math.min(MAX_SHADOW_LENGTH_FACTOR, Math.max(1, stretch));
+  const along = BASE_FLOOR_ALONG * factor;
+  // Longer casts skim narrower (simple ground-projection deform).
+  const t = (factor - 1) / (MAX_SHADOW_LENGTH_FACTOR - 1);
+  const width = 0.95 - 0.22 * t;
+  return `rotateZ(${angle}deg) scale(${width}, ${along})`;
+}
+
+/** @deprecated */
+export function projectiveShadowTransform(
+  dirX: number,
+  dirY: number,
+  length: number,
+  _width: number,
+  _imgW: number,
+  imgH: number,
+): string {
+  const stretch = 1 + Math.min(0.85, Math.max(0, length) / Math.max(imgH, 1));
+  return directionalShadowStretch(dirX, dirY, stretch);
+}
+
+/** @deprecated */
+export function projectiveShadowMatrix(
+  dirX: number,
+  dirY: number,
+  length: number,
+  width: number,
+  imgW: number,
+  imgH: number,
+): string {
+  return projectiveShadowTransform(dirX, dirY, length, width, imgW, imgH);
+}
+
+/** @deprecated length helper kept for older specs */
+export function clampedShadowLength(
+  dist: number,
+  _radiusPx: number,
+  reach: number,
+  heightPx: number,
+): number {
+  const H = Math.max(heightPx, 1);
+  const stretch = shadowStretchForDistance(dist, reach, 1);
+  return H * stretch;
+}
+
 export function shadowCastsForPoint(
   x: number,
   y: number,
   sources: PointLightSource[],
-  excludeActorId?: string,
+  metrics: ShadowCastMetrics,
 ): TokenShadowCast[] {
   const casts: TokenShadowCast[] = [];
+  const excludeActorId = metrics.excludeActorId;
 
   for (const light of sources) {
     if (excludeActorId && light.actorId === excludeActorId) continue;
-    const dx = x - light.x;
-    const dy = y - light.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ox = x - light.x;
+    const oy = y - light.y;
+    const dist = Math.sqrt(ox * ox + oy * oy) || 1;
     const reach = Math.max(light.dimRadius, light.brightRadius, 1);
-    if (dist > reach * 1.35) continue;
-
-    const falloff = 1 - Math.min(1, dist / (reach * 1.35));
-    const proximity = falloff;
-    const intensity = Math.max(0, Math.min(1, light.intensity ?? 0.7));
-    const strength = Math.min(1, intensity * (0.25 + 0.75 * proximity));
-    if (strength < 0.06) continue;
+    if (dist > reach) continue;
     if (dist < 8) continue;
 
-    // Closer + brighter → longer cast; far or dim → shorter (5–64px).
-    const lengthFactor = proximity * proximity * intensity;
-    const scale = 5 + 59 * lengthFactor;
+    const falloff = 1 - Math.min(1, dist / reach);
+    const intensity = Math.max(0, Math.min(1, light.intensity ?? 0.7));
+    const strength = Math.min(1, intensity * (0.25 + 0.75 * falloff));
+    if (strength < 0.06) continue;
+
+    const stretch = shadowStretchForDistance(dist, reach, intensity);
+
     casts.push({
-      dx: (dx / dist) * scale,
-      dy: (dy / dist) * scale,
+      dirX: ox / dist,
+      dirY: oy / dist,
+      stretch,
       strength,
     });
   }
 
   casts.sort((a, b) => b.strength - a.strength);
-  return casts.slice(0, MAX_SHADOWS_PER_TOKEN);
-}
-
-/** Blended single vector (tests / legacy). */
-export function shadowVectorForPoint(
-  x: number,
-  y: number,
-  sources: PointLightSource[],
-): TokenShadowVector {
-  const casts = shadowCastsForPoint(x, y, sources);
-  if (!casts.length) return { dx: 0, dy: 0, strength: 0 };
-  let sumDx = 0;
-  let sumDy = 0;
-  let strength = 0;
-  for (const c of casts) {
-    sumDx += c.dx;
-    sumDy += c.dy;
-    strength = Math.max(strength, c.strength);
-  }
-  return { dx: sumDx / casts.length, dy: sumDy / casts.length, strength };
+  // Weaker / shorter trailing casts so fan-out stays feet-anchored.
+  return casts.slice(0, MAX_SHADOWS_PER_TOKEN).map((c, i) => ({
+    ...c,
+    stretch: 1 + (Math.max(1, c.stretch) - 1) * (1 - i * 0.28),
+    strength: c.strength * (1 - i * 0.22),
+  }));
 }

@@ -30,12 +30,14 @@
       </ng-container>
       <div *ngIf="hasTokenFrame && isSelected" class="selected-highlight"
         [ngClass]="{'is-magnetic': isMagnetic, 'is-temporary': gameCharacter.isTemporaryCopy}"></div>
+      <!-- Feet silhouette (character art). Square “grid tile” shadows were from lighting
+           occluders on the fx canvas — those stay disabled; this is only the under-foot drop. -->
       <ng-container *ngIf="!is2DMode && isDropShadow && (0 < imageFile?.url?.length || 0 < shadowImageFile?.url?.length)">
-        <div *ngFor="let cast of lightShadowCasts" class="is-pointer-events-none is-3d" style="transform-origin: center bottom"
-          [style.transform]="shadowFeetOuterTransform()">
+        <div *ngFor="let cast of lightShadowCasts; trackBy: trackLightShadowCast" class="token-floor-shadow is-pointer-events-none is-3d"
+          [style.transform]="shadowFeetLightOuterTransform()">
           <div class="image-box is-3d" [style.width.px]="characterShadowImageWidth" [style.height.px]="characterShadowImageHeight"
-            style="pointer-events: none; transform-origin: center bottom" [style.transform]="shadowCastInnerTransform(cast)">
-            <div class="inverser is-3d" style="pointer-events: none; transform-origin: center bottom; transition: transform 132ms 0s ease;"
+            style="pointer-events: none; transform-origin: center bottom; overflow: visible" [style.transform]="shadowCastInnerTransform(cast)">
+            <div class="inverser is-3d" style="pointer-events: none; transform-origin: center bottom"
               [style.transform]="shadowImageTransform">
               <img [style.height.px]="characterShadowImageHeight" class="image drop-shadow is-3d chrome-smooth-image-trick" style="pointer-events: none"
                 [src]="((0 < shadowImageFile?.url?.length) ? shadowImageFile.url : imageFile.url) | safe: 'resourceUrl'"
@@ -44,11 +46,11 @@
             </div>
           </div>
         </div>
-        <div *ngIf="showDefaultTokenShadow" class="is-pointer-events-none is-3d" style="transform-origin: center bottom"
+        <div *ngIf="showDefaultTokenShadow" class="token-floor-shadow is-pointer-events-none is-3d"
           [style.transform]="shadowFeetOuterTransform()">
           <div class="image-box is-3d" [style.width.px]="characterShadowImageWidth" [style.height.px]="characterShadowImageHeight"
-            style="pointer-events: none; transform-origin: center bottom" [style.transform]="defaultShadowInnerTransform()">
-            <div class="inverser is-3d" style="pointer-events: none; transform-origin: center bottom; transition: transform 132ms 0s ease;"
+            style="pointer-events: none; transform-origin: center bottom; overflow: visible" [style.transform]="defaultShadowInnerTransform()">
+            <div class="inverser is-3d" style="pointer-events: none; transform-origin: center bottom"
               [style.transform]="shadowImageTransform">
               <img [style.height.px]="characterShadowImageHeight" class="image drop-shadow is-3d chrome-smooth-image-trick" style="pointer-events: none"
                 [src]="((0 < shadowImageFile?.url?.length) ? shadowImageFile.url : imageFile.url) | safe: 'resourceUrl'"

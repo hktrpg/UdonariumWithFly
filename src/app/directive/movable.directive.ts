@@ -78,6 +78,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   @Input('movable.interact') isInteract: boolean = true;
   /** True while this piece follows another token's multi-drag (not the primary grab). */
   isDragFollower = false;
+  /** True while WASD/arrow keyboard nudge is in progress (no SyncVar flush until release). */
+  isKeyboardNudge = false;
   @Output('movable.onstart') onstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondragstart') ondragstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondrag') ondrag: EventEmitter<PointerEvent> = new EventEmitter();
@@ -384,6 +386,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     this.cancel();
     this.onend.emit(e as PointerEvent);
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onContextMenu(e: MouseEvent | TouchEvent) {
@@ -478,7 +483,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       for (const movable of set) {
         const obj = movable.tabletopObject;
         if (!obj || obj.identifier !== objectId) continue;
-        if (movable.input?.isGrabbing || movable.input?.isDragging || movable.isDragFollower) {
+        if (movable.input?.isGrabbing || movable.input?.isDragging || movable.isDragFollower || movable.isKeyboardNudge) {
           return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
         }
         const pose = obj.getPoseForView();
@@ -492,8 +497,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   private setUpdateBatching() {
     this.updateTransformCss();
-    // Network sync only on pointer up — dragging used to version-bump every frame and flood the mesh.
-    if (this.input.isGrabbing || this.isDragFollower) return;
+    // Network sync only on pointer up / keyboard-nudge end — mid-gesture used to flood the mesh.
+    if (this.input.isGrabbing || this.isDragFollower || this.isKeyboardNudge) return;
     if (!this.isUpdateBatching && this.tabletopObject) {
       this.isUpdateBatching = true;
       // Pin the map id at queue time — resolveViewTableIdentifier() at flush can be a different map.
@@ -766,12 +771,15 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
    */
   private isHitOnColideLayer(hit: HTMLElement): boolean {
     if (!hit || !this.colideLayers?.length) return false;
+    const noCharacterRide = !!this.tabletopObject?.isNotRide
+      || !!TableSelecter.instance?.viewTable?.is2DMode;
     for (const layerName of this.colideLayers) {
       const layer = MovableDirective.layerMap.get(layerName);
       if (!layer) continue;
       for (const movable of layer) {
         if (movable === this) continue;
-        if (layerName === 'character' && (this.tabletopObject?.isNotRide || !!TableSelecter.instance?.viewTable?.is2DMode)) continue;
+        // ☐ Can stack on other characters: never climb onto character / character-token.
+        if (noCharacterRide && (layerName === 'character' || layerName === 'character-token')) continue;
         const root = movable.nativeElement;
         if (!root) continue;
         if (root === hit || root.contains(hit)) return true;
@@ -801,10 +809,31 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
    */
   private hitStackHasNonRidePeer(hitStack?: Element[]): boolean {
     if (!hitStack?.length) return false;
+    const blockCharacters = !!this.tabletopObject?.isNotRide
+      || !!TableSelecter.instance?.viewTable?.is2DMode;
     for (const el of hitStack) {
       if (!(el instanceof HTMLElement)) continue;
       if (this.nativeElement === el || this.nativeElement.contains(el)) continue;
       if (this.isHitOnNonRidePeer(el)) return true;
+      // ☐ Stack on characters: other tokens must block climb even when PE-none
+      // (elementsFromPoint still lists them; without this we adopt terrain Z behind).
+      if (blockCharacters && this.isHitOnCharacterPeer(el)) return true;
+    }
+    return false;
+  }
+
+  /** True when hit is under another character / character-token movable. */
+  private isHitOnCharacterPeer(hit: HTMLElement): boolean {
+    if (!hit) return false;
+    for (const layerName of ['character', 'character-token'] as const) {
+      const layer = MovableDirective.layerMap.get(layerName);
+      if (!layer) continue;
+      for (const movable of layer) {
+        if (movable === this) continue;
+        const root = movable.nativeElement;
+        if (!root) continue;
+        if (root === hit || root.contains(hit)) return true;
+      }
     }
     return false;
   }
@@ -840,8 +869,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     let isEnable = isCollidable;
     for (let layerName of MovableDirective.layerMap.keys()) {
       if (this.colideLayers.includes(layerName)) {
-        //isEnable = this.input.isGrabbing ? isCollidable : true;
-        if (layerName == 'character') {
+        if (layerName === 'character' || layerName === 'character-token') {
           const canRide = !this.tabletopObject.isNotRide && !TableSelecter.instance?.viewTable?.is2DMode;
           isEnable = this.input.isGrabbing ? isCollidable && canRide : true;
         } else {

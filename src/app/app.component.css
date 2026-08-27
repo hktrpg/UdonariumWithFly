@@ -58,18 +58,41 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   font-size: 40px;
 }
 
-.menu-chat-icon {
+/*
+ * Icon + badge as two layers inside one fixed slot.
+ * Badge stays inset (no outward translate) so parents can clip safely
+ * without horizontal ◀▶ scroll and without covering the corner badge.
+ */
+.menu-icon-slot {
   position: relative;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
   line-height: 0;
-  vertical-align: top;
+  overflow: hidden;
+}
+
+.menu-icon-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.menu-badge-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 .menu-chat-badge {
   position: absolute;
-  /* Stay inside the icon — negative offsets expand side-menu scroll and show ◀▶. */
-  top: 0;
-  right: 0;
+  top: 2px;
+  right: 2px;
   z-index: 1;
   pointer-events: none;
   box-sizing: border-box;
@@ -91,10 +114,27 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   transform: none;
 }
 
+/* Compact update cue — not a Material glyph (was reading as a stray “*”). */
+.menu-update-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c45c26;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transform: none;
+}
+
 .menu-update-badge {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: 0;
+  right: 0;
   z-index: 1;
   pointer-events: none;
   font-size: 16px !important;
@@ -105,6 +145,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 
 .mobile-bottom-nav .menu-chat-badge,
 .mobile-side-rail .menu-chat-badge {
+  top: 1px;
+  right: 1px;
   min-width: 14px;
   height: 14px;
   padding: 0 3px;
@@ -405,7 +447,7 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   position: fixed;
   z-index: 100000;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: hidden;
   background: rgba(28, 26, 24, 0.92);
   -webkit-overflow-scrolling: touch;
 }
@@ -418,6 +460,7 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   overflow-x: hidden;
   overflow-y: auto;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  /* Do not reserve scrollbar gutter — it shrinks the 52px rail and clips badges. */
 }
 
 .desktop-icon-rail.horizontal {
@@ -450,6 +493,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   padding: 6px 0;
   width: 52px;
   color: #888;
+  overflow: hidden;
+  position: relative;
 }
 
 .desktop-icon-rail ul > li:hover,
@@ -465,23 +510,31 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   width: 52px;
   height: 40px;
   font-size: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .desktop-icon-rail .icon-size {
   font-size: 26px;
 }
 
-.desktop-icon-rail .menu-chat-badge {
-  top: -2px;
-  right: -2px;
+/* Slot fills the hit target; badge pins to cell top-right (over the glyph). */
+.desktop-icon-rail .menu-icon-slot {
+  width: 100%;
+  height: 100%;
 }
 
-.desktop-icon-rail .self-only {
-  position: absolute;
-  top: 2px;
-  right: 6px;
-  font-size: 9px;
-  color: #c45c26;
+.desktop-icon-rail .menu-chat-badge {
+  top: 1px;
+  right: 4px;
+  min-width: 15px;
+  height: 15px;
+  font-size: 8px;
+}
+
+.desktop-icon-rail .menu-update-dot {
+  top: 3px;
+  right: 8px;
 }
 
 #app-table-layer.is-card-drop-target::after {

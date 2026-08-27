@@ -71,6 +71,20 @@ export class TabletopKeyboardService {
   private altHeld = false;
   /** Last pointer context for Ctrl+A (inventory vs map vs other panels). */
   private interactionContext: 'inventory' | 'map' | 'other' = 'map';
+  /** rAF id while WASD/arrows are held — continuous move + live shadows (like drag). */
+  private moveLoopRaf = 0;
+  private moveLoopLastTs = 0;
+  /** rAF id while finishing a short tap to the next grid cell. */
+  private tapGlideRaf = 0;
+  private moveSessionStartMs = 0;
+  private moveSessionStartPos = new Map<string, { x: number; y: number }>();
+  private moveSessionLastDir: { dx: number; dy: number } | null = null;
+  /** Guard against keyup + rAF both finishing the same session. */
+  private moveReleaseHandled = true;
+  private static readonly MOVE_CELLS_PER_SEC = 5.5;
+  /** Short press → glide the remainder of one grid cell (drag-like). */
+  private static readonly TAP_COMPLETE_MS = 280;
+  private static readonly TAP_GLIDE_MS = 150;
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
@@ -82,6 +96,8 @@ export class TabletopKeyboardService {
     this.wheelAcc = 0;
     this.altHeld = false;
     this.selectionService.setCanvasHighlight(false);
+    this.cancelTapGlide();
+    this.stopContinuousMoveLoop(true);
   };
 
   constructor(
@@ -158,6 +174,12 @@ export class TabletopKeyboardService {
     this.pressed.clear();
     this.altHeld = false;
     this.selectionService.setCanvasHighlight(false);
+    this.cancelTapGlide();
+    if (this.moveLoopRaf) {
+      cancelAnimationFrame(this.moveLoopRaf);
+      this.moveLoopRaf = 0;
+    }
+    this.finishContinuousMove();
     this.listening = false;
   }
 
@@ -385,17 +407,12 @@ export class TabletopKeyboardService {
 
     if (!MOVE_CODES.has(code) || mod || this.altHeld) return;
 
-    // Scene-tool selection: WASD / arrows nudge drawings, lights, walls.
+    // Scene-tool selection: continuous WASD / arrows (live shadows while lights move).
     if (this.sceneTools.selectionCount > 0) {
       if (e.shiftKey) return;
-      const sceneDelta = this.moveDeltaFromPressed();
-      if (!sceneDelta) return;
-      const sceneGrid = TableSelecter.instance.viewTable?.gridSize ?? 50;
-      if (this.sceneTools.nudgeSelection(sceneDelta.dx * sceneGrid, sceneDelta.dy * sceneGrid)) {
-        // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
-        if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
-        this.consume(e);
-      }
+      if (!this.moveDeltaFromPressed()) return;
+      this.beginOrContinueMoveSession([]);
+      this.consume(e);
       return;
     }
 
@@ -411,14 +428,10 @@ export class TabletopKeyboardService {
       return;
     }
 
-    const delta = this.moveDeltaFromPressed();
-    if (!delta) return;
-    const gridSize = TableSelecter.instance.viewTable?.gridSize ?? 50;
-    if (MovableSelectionSynchronizer.nudge(moveTargets, delta.dx * gridSize, delta.dy * gridSize)) {
-      // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
-      if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
-      this.consume(e);
-    }
+    if (!this.moveDeltaFromPressed()) return;
+    // Drag-like: continuous rAF from the first frame (no instant grid teleport).
+    this.beginOrContinueMoveSession(moveTargets);
+    this.consume(e);
   }
 
   private handleKeyUp(e: KeyboardEvent) {
@@ -433,6 +446,9 @@ export class TabletopKeyboardService {
       this.runInAngular(() => this.selectionService.setCanvasHighlight(false));
     }
     this.pressed.delete(e.code);
+    if (MOVE_CODES.has(e.code) && !this.moveDeltaFromPressed()) {
+      this.stopContinuousMoveLoop(true);
+    }
   }
 
   private handleWheel(e: WheelEvent) {
@@ -619,6 +635,201 @@ export class TabletopKeyboardService {
     if (this.pressed.has('KeyD') || this.pressed.has('ArrowRight')) dx += 1;
     if (dx === 0 && dy === 0) return null;
     return { dx, dy };
+  }
+
+  private beginOrContinueMoveSession(moveTargets: TabletopObject[]) {
+    this.cancelTapGlide();
+    const delta = this.moveDeltaFromPressed();
+    if (delta) this.moveSessionLastDir = delta;
+    if (!this.moveLoopRaf) {
+      this.moveReleaseHandled = false;
+      this.moveSessionStartMs = performance.now();
+      this.moveSessionStartPos.clear();
+      const targets = moveTargets.length
+        ? moveTargets
+        : (this.sceneTools.selectionCount > 0 ? [] : this.shortcutTargets());
+      if (targets.length) {
+        MovableSelectionSynchronizer.beginKeyboardNudge(targets);
+        for (const object of targets) {
+          const pos = this.livePosOf(object);
+          if (pos) this.moveSessionStartPos.set(object.identifier, pos);
+        }
+      }
+    }
+    this.ensureContinuousMoveLoop();
+  }
+
+  private livePosOf(object: TabletopObject): { x: number; y: number } | null {
+    const live = MovableDirective.livePoseFor(object.identifier);
+    if (live) return { x: live.x, y: live.y };
+    const pose = object.getPoseForView?.() ?? object.location;
+    if (!pose) return null;
+    return { x: pose.x, y: pose.y };
+  }
+
+  /** While WASD/arrows held: move every frame and refresh shadows (pointer-drag parity). */
+  private ensureContinuousMoveLoop() {
+    if (this.moveLoopRaf) return;
+    this.moveLoopLastTs = performance.now();
+    this.ngZone.runOutsideAngular(() => {
+      const tick = (now: number) => {
+        if (!this.moveDeltaFromPressed()) {
+          this.moveLoopRaf = 0;
+          this.onMoveKeysReleased();
+          return;
+        }
+        const dt = Math.min(0.05, Math.max(0, (now - this.moveLoopLastTs) / 1000));
+        this.moveLoopLastTs = now;
+        this.runInAngular(() => this.applyContinuousMove(dt));
+        this.moveLoopRaf = requestAnimationFrame(tick);
+      };
+      this.moveLoopRaf = requestAnimationFrame(tick);
+    });
+  }
+
+  private stopContinuousMoveLoop(finish: boolean) {
+    if (this.moveLoopRaf) {
+      cancelAnimationFrame(this.moveLoopRaf);
+      this.moveLoopRaf = 0;
+    }
+    if (finish) this.onMoveKeysReleased();
+  }
+
+  private applyContinuousMove(dt: number) {
+    if (dt <= 0) return;
+    const delta = this.moveDeltaFromPressed();
+    if (!delta) return;
+    this.moveSessionLastDir = delta;
+    const grid = TableSelecter.instance.viewTable?.gridSize ?? 50;
+    const len = Math.hypot(delta.dx, delta.dy) || 1;
+    const speed = grid * TabletopKeyboardService.MOVE_CELLS_PER_SEC;
+    const dx = (delta.dx / len) * speed * dt;
+    const dy = (delta.dy / len) * speed * dt;
+
+    if (this.sceneTools.selectionCount > 0) {
+      this.sceneTools.nudgeSelection(dx, dy);
+      return;
+    }
+    const moveTargets = this.shortcutTargets();
+    if (moveTargets.length < 1) return;
+    MovableSelectionSynchronizer.nudge(moveTargets, dx, dy);
+  }
+
+  /** Key released: short tap glides to one cell; longer hold snaps/flushes like drag end. */
+  private onMoveKeysReleased() {
+    if (this.moveReleaseHandled || this.tapGlideRaf) return;
+    if (this.sceneTools.selectionCount > 0) {
+      this.finishContinuousMove();
+      return;
+    }
+    const targets = this.shortcutTargets();
+    const dir = this.moveSessionLastDir;
+    const grid = TableSelecter.instance.viewTable?.gridSize ?? 50;
+    const elapsed = performance.now() - this.moveSessionStartMs;
+    if (targets.length && dir && elapsed <= TabletopKeyboardService.TAP_COMPLETE_MS
+      && this.shouldCompleteTapCell(targets, dir, grid)) {
+      this.startTapGlide(targets, dir, grid);
+      return;
+    }
+    this.finishContinuousMove();
+  }
+
+  private shouldCompleteTapCell(
+    targets: TabletopObject[],
+    dir: { dx: number; dy: number },
+    grid: number,
+  ): boolean {
+    const len = Math.hypot(dir.dx, dir.dy) || 1;
+    const need = grid * 0.45;
+    for (const object of targets) {
+      const start = this.moveSessionStartPos.get(object.identifier);
+      const now = this.livePosOf(object);
+      if (!start || !now) continue;
+      const along = ((now.x - start.x) * dir.dx + (now.y - start.y) * dir.dy) / len;
+      if (along < need) return true;
+    }
+    return false;
+  }
+
+  private startTapGlide(
+    targets: TabletopObject[],
+    dir: { dx: number; dy: number },
+    grid: number,
+  ) {
+    this.cancelTapGlide();
+    MovableSelectionSynchronizer.beginKeyboardNudge(targets);
+    const len = Math.hypot(dir.dx, dir.dy) || 1;
+    const nx = dir.dx / len;
+    const ny = dir.dy / len;
+    const from = new Map<string, { x: number; y: number }>();
+    const to = new Map<string, { x: number; y: number }>();
+    for (const object of targets) {
+      const start = this.moveSessionStartPos.get(object.identifier) ?? this.livePosOf(object);
+      const cur = this.livePosOf(object);
+      if (!start || !cur) continue;
+      from.set(object.identifier, cur);
+      to.set(object.identifier, {
+        x: start.x + nx * grid,
+        y: start.y + ny * grid,
+      });
+    }
+    if (to.size < 1) {
+      this.finishContinuousMove();
+      return;
+    }
+    const duration = TabletopKeyboardService.TAP_GLIDE_MS;
+    const t0 = performance.now();
+    this.ngZone.runOutsideAngular(() => {
+      const tick = (now: number) => {
+        const u = Math.min(1, (now - t0) / duration);
+        const ease = u * (2 - u);
+        this.runInAngular(() => {
+          for (const object of targets) {
+            const a = from.get(object.identifier);
+            const b = to.get(object.identifier);
+            if (!a || !b) continue;
+            const x = a.x + (b.x - a.x) * ease;
+            const y = a.y + (b.y - a.y) * ease;
+            this.setObjectLivePos(object, x, y);
+          }
+          EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-glide' });
+        });
+        if (u < 1) {
+          this.tapGlideRaf = requestAnimationFrame(tick);
+        } else {
+          this.tapGlideRaf = 0;
+          SoundEffect.playLocal(PresetSound.piecePut);
+          this.finishContinuousMove();
+        }
+      };
+      this.tapGlideRaf = requestAnimationFrame(tick);
+    });
+  }
+
+  private setObjectLivePos(object: TabletopObject, x: number, y: number) {
+    const cur = this.livePosOf(object);
+    if (!cur) return;
+    MovableSelectionSynchronizer.nudge([object], x - cur.x, y - cur.y);
+  }
+
+  private cancelTapGlide() {
+    if (!this.tapGlideRaf) return;
+    cancelAnimationFrame(this.tapGlideRaf);
+    this.tapGlideRaf = 0;
+  }
+
+  /** Snap + flush after hold/glide ends so SyncVars match the final visual pose. */
+  private finishContinuousMove() {
+    this.cancelTapGlide();
+    this.moveReleaseHandled = true;
+    this.runInAngular(() => {
+      MovableSelectionSynchronizer.finishKeyboardNudge(
+        this.shortcutTargets(),
+        TableSelecter.instance.gridSnap,
+      );
+    });
+    this.moveSessionStartPos.clear();
+    this.moveSessionLastDir = null;
   }
 
   private facingAngleFromPressed(): number | null {

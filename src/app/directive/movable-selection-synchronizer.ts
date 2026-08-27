@@ -605,12 +605,46 @@ export class MovableSelectionSynchronizer {
     MovableSelectionSynchronizer.objectMap.delete(object);
   }
 
-  static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
-    if (dx === 0 && dy === 0) return false;
+  /** Pose for undo: prefer live movable when present. */
+  private static poseForUndo(object: TabletopObject): TransformPose {
+    const movables = MovableSelectionSynchronizer.objectMap.get(object);
+    if (movables) {
+      for (const movable of movables) {
+        if (!movable.isDisable) return poseFromMovable(movable);
+      }
+    }
+    return poseFromObject(object);
+  }
+
+  private static keyboardNudgeBefore: Map<string, TransformPose> | null = null;
+
+  /** Start a WASD/arrow session: live pose only, flush on {@link finishKeyboardNudge}. */
+  static beginKeyboardNudge(targets: TabletopObject[]): void {
+    if (MovableSelectionSynchronizer.keyboardNudgeBefore) return;
     const before = new Map<string, TransformPose>();
     for (const object of targets) {
       if (MovableSelectionSynchronizer.isLocked(object)) continue;
-      before.set(object.identifier, poseFromObject(object));
+      before.set(object.identifier, MovableSelectionSynchronizer.poseForUndo(object));
+      const movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (!movables) continue;
+      for (const movable of movables) {
+        if (movable.isDisable) continue;
+        movable.setAnimatedTransition(false);
+        movable.isKeyboardNudge = true;
+      }
+    }
+    MovableSelectionSynchronizer.keyboardNudgeBefore = before;
+  }
+
+  static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
+    if (dx === 0 && dy === 0) return false;
+    const session = MovableSelectionSynchronizer.keyboardNudgeBefore;
+    const before = session ?? new Map<string, TransformPose>();
+    if (!session) {
+      for (const object of targets) {
+        if (MovableSelectionSynchronizer.isLocked(object)) continue;
+        before.set(object.identifier, MovableSelectionSynchronizer.poseForUndo(object));
+      }
     }
     let moved = false;
     for (let object of targets) {
@@ -626,6 +660,8 @@ export class MovableSelectionSynchronizer {
       }
       for (let movable of movables) {
         if (movable.isDisable) continue;
+        // Match pointer-drag: no CSS slide — live shadows track pos every frame.
+        movable.setAnimatedTransition(false);
         movable.posX += dx;
         movable.posY += dy;
         MovableSelectionSynchronizer.syncTerrainFloor(movable);
@@ -633,14 +669,42 @@ export class MovableSelectionSynchronizer {
       }
     }
     if (moved) {
+      if (!session) {
+        const after = new Map<string, TransformPose>();
+        for (const id of before.keys()) {
+          const object = targets.find(t => t.identifier === id);
+          if (object) after.set(id, MovableSelectionSynchronizer.poseForUndo(object));
+        }
+        UndoService.instance?.recordTransform('nudge', before, after, 'nudge');
+      }
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge' });
+    }
+    return moved;
+  }
+
+  /** After continuous WASD: optional grid snap + flush SyncVars, then shadow refresh. */
+  static finishKeyboardNudge(targets: TabletopObject[], gridSnap: boolean): void {
+    for (const object of targets) {
+      const movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (!movables) continue;
+      for (const movable of movables) {
+        if (movable.isDisable) continue;
+        if (gridSnap) movable.snapToGrid();
+        movable.isKeyboardNudge = false;
+        movable.flushPoseToTable();
+      }
+    }
+    const before = MovableSelectionSynchronizer.keyboardNudgeBefore;
+    MovableSelectionSynchronizer.keyboardNudgeBefore = null;
+    if (before?.size) {
       const after = new Map<string, TransformPose>();
       for (const id of before.keys()) {
-        const object = targets.find(t => t.identifier === id);
-        if (object) after.set(id, poseFromObject(object));
+        const object = targets.find(t => t.identifier === id) ?? ObjectStore.instance.get(id) as TabletopObject;
+        if (object) after.set(id, MovableSelectionSynchronizer.poseForUndo(object));
       }
       UndoService.instance?.recordTransform('nudge', before, after, 'nudge');
     }
-    return moved;
+    EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-end' });
   }
 
   /** Move object centers to (x, y) with optional CSS transition duration. */
