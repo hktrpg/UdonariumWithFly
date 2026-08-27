@@ -1,5 +1,6 @@
 import { AfterViewInit, Directive, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { BatchService } from 'service/batch.service';
@@ -129,6 +130,7 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.tabletopObject?.identifier}`, event => {
         if ((event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) || !this.shouldTransition(this.tabletopObject)) return;
+        if (!event.isSendFromSelf && this.input.isGrabbing) return;
         this.batchService.add(() => {
           if (this.input.isGrabbing) {
             UndoService.instance?.discardTransformGesture();
@@ -224,9 +226,10 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
     if (this.isDisable) return this.cancelWithoutCommit();
     e.stopPropagation();
     if (this.input.isDragging) this.ondragend.emit(e as PointerEvent);
-    // Snap first, then commit undo from final angle, then release grab state.
+    // Snap first, then commit undo from final angle, flush network pose, then release grab state.
     this.snapToPolygonal(this.polygonal);
     this.synchronizer.finishRotate();
+    this.flushDragRotatesToTable();
     this.cancel();
     this.onend.emit(e as PointerEvent);
   }
@@ -269,6 +272,9 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private setUpdateBatching() {
+    this.updateTransformCss();
+    // Network sync only on pointer up — dragging used to version-bump every frame and flood the mesh.
+    if (this.input.isGrabbing) return;
     if (!this.isUpdateBatching) {
       this.isUpdateBatching = true;
       // Pin map id at queue time — resolveViewTableIdentifier() at flush can be another map.
@@ -281,7 +287,38 @@ export class RotableDirective implements AfterViewInit, OnChanges, OnDestroy {
         this.isUpdateBatching = false;
       }, this);
     }
-    this.updateTransformCss();
+  }
+
+  /** Commit rotate into SyncVars + tablePlacements once (primary + multi-select). */
+  private flushDragRotatesToTable() {
+    const rotables = new Set<RotableDirective>(this.synchronizer.selectedRotables);
+    rotables.add(this);
+    for (const rotable of rotables) {
+      if (rotable.tabletopObject?.identifier) {
+        ObjectSynchronizer.instance.markPoseGraceReleased(rotable.tabletopObject.identifier);
+      }
+      rotable.flushRotateToTable();
+    }
+  }
+
+  /** Write directive rotate into tablePlacements for the given (or current) view. */
+  flushRotateToTable(viewTableId?: string) {
+    if (!this.tabletopObject) return;
+    this.batchService.remove(this);
+    this.isUpdateBatching = false;
+    const prop = this.targetPropertyName;
+    if (this.tabletopObject.location.name !== 'table') {
+      if (prop in this.tabletopObject) this.tabletopObject[prop] = this.rotate;
+      return;
+    }
+    const viewId = viewTableId || TabletopObject.resolveViewTableIdentifier();
+    if (!viewId || !this.tabletopObject.hasPlacement(viewId)) {
+      if (prop in this.tabletopObject) this.tabletopObject[prop] = this.rotate;
+      return;
+    }
+    this.tabletopObject.mutateAppearance(() => {
+      if (prop in this.tabletopObject) this.tabletopObject[prop] = this.rotate;
+    });
   }
 
   private setRotate(object: TabletopObject) {
