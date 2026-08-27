@@ -25,9 +25,11 @@ describe('streetscape-ui-session', () => {
       status: 'Streetscape ready',
       attribution: 'LandsD / Open3Dhk',
       street: '彌敦道',
+      country: 'hk',
       maxFeatures: 6,
       addModelCount: 3,
       active: {
+        country: 'hk',
         tableId: 'table-1',
         sheet: '11-SW-4B',
         worldExtent: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 },

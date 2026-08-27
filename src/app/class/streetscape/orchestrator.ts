@@ -22,6 +22,7 @@ import { featureCenterTablePx, featureDistanceToOrigin, streetscapeScaleFromPack
 import { applyStreetscapeMapCredit } from './map-credit';
 import { packCatalogSource } from './catalog-source';
 import { open3dhkSource } from './open3dhk-source';
+import { plateauSource } from './plateau-source';
 import { packFileSource } from './pack-file-source';
 import { getStreetscapeSource, registerStreetscapeSource, resolveStreetscapeSource } from './registry';
 import { StreetscapePackLoad, StreetscapeQuery, throwIfAborted } from './source';
@@ -437,4 +438,5 @@ export function registerBuiltinStreetscapeSources(): void {
   if (!getStreetscapeSource('pack-file')) registerStreetscapeSource(packFileSource);
   if (!getStreetscapeSource('pack-catalog')) registerStreetscapeSource(packCatalogSource);
   if (!getStreetscapeSource('open3dhk')) registerStreetscapeSource(open3dhkSource);
+  if (!getStreetscapeSource('plateau')) registerStreetscapeSource(plateauSource);
 }

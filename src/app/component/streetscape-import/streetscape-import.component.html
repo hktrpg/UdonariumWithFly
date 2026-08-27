@@ -1,4 +1,15 @@
 <div class="settings-ui dense streetscape-import" *ngIf="canActivate; else streetscapeDenied" appFitPanel [fitMinHeight]="360" [fitMaxHeight]="640">
+  <label class="streetscape-label" for="streetscape-country">{{ 'streetscape.countryLabel' | i18n }}</label>
+  <select
+    id="streetscape-country"
+    class="streetscape-select"
+    [(ngModel)]="streetscapeCountry"
+    (ngModelChange)="onStreetscapeCountryChange()"
+    [disabled]="streetscapeBusy"
+  >
+    <option *ngFor="let c of streetscapeCountries" [value]="c.id">{{ c.labelKey | i18n }}</option>
+  </select>
+
   <div class="streetscape-primary-row">
     <div class="streetscape-field streetscape-field-street">
       <label class="streetscape-label" for="streetscape-street">{{ 'streetscape.streetLabel' | i18n }}</label>
@@ -10,14 +21,14 @@
           [(ngModel)]="streetscapeStreet"
           (ngModelChange)="onStreetscapeStreetInput()"
           [disabled]="streetscapeBusy"
-          [placeholder]="'streetscape.streetPlaceholder' | i18n"
+          [placeholder]="(streetscapeIsJapan ? 'streetscape.streetPlaceholderJp' : 'streetscape.streetPlaceholder') | i18n"
           autocomplete="off"
         >
         <ul class="streetscape-suggest" *ngIf="streetscapeStreetSuggestions.length && !streetscapeBusy">
           <li *ngFor="let s of streetscapeStreetSuggestions">
             <button type="button" class="streetscape-suggest-item" (click)="pickStreetscapeSuggestion(s)">
               <span class="streetscape-suggest-name">{{ s.label }}</span>
-              <span class="streetscape-suggest-code">{{ s.sheet }}</span>
+              <span class="streetscape-suggest-code">{{ s.code }}</span>
             </button>
           </li>
         </ul>
@@ -106,7 +117,7 @@
     <input #streetscapePackInput type="file" accept=".zip,application/zip" hidden (change)="onStreetscapePack($event)">
   </div>
 
-  <aside class="map-credit" aria-label="Lands Department map credit">
+  <aside class="map-credit" *ngIf="streetscapeShowLandsdCredit" aria-label="Lands Department map credit">
     <a class="map-credit-logo" href="https://www.landsd.gov.hk/" target="_blank" rel="noopener noreferrer">
       <img src="assets/streetscape/landsd-wordmark.svg" width="140" height="28" alt="Lands Department 地政總署">
     </a>
@@ -115,6 +126,14 @@
       <span>{{ 'streetscape.mapCreditModels' | i18n }}</span>
       <span>{{ 'streetscape.mapCreditCopyright' | i18n }}</span>
       <a href="https://3d.map.gov.hk/" target="_blank" rel="noopener noreferrer">Open3Dhk</a>
+    </p>
+  </aside>
+
+  <aside class="map-credit" *ngIf="streetscapeIsJapan" aria-label="Project PLATEAU credit">
+    <p class="map-credit-lines">
+      <span>{{ 'streetscape.mapCreditPlateau' | i18n }}</span>
+      <span>{{ 'streetscape.mapCreditPlateauLicense' | i18n }}</span>
+      <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener noreferrer">PLATEAU</a>
     </p>
   </aside>
 </div>

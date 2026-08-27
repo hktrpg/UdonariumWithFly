@@ -20,6 +20,7 @@ export function resolveStreetscapeSource(query: StreetscapeQuery): StreetscapeSo
   const id = query.type === 'file' ? 'pack-file'
     : query.type === 'catalog' ? 'pack-catalog'
     : query.type === 'open3dhk' ? 'open3dhk'
+    : query.type === 'plateau' ? 'plateau'
     : '';
   const source = sources.get(id);
   if (!source) throw new Error(STREETSCAPE_ERRORS.UNKNOWN_SOURCE);

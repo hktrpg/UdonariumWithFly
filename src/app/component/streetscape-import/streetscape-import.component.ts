@@ -18,8 +18,19 @@ import {
   StreetscapeProgress,
 } from '@udonarium/streetscape/orchestrator';
 import { StreetscapePackV1 } from '@udonarium/streetscape/pack-schema';
+import {
+  loadPlateauCities,
+  pickPlateauBldgFile,
+  searchPlateauCityGml,
+  suggestPlateauCities,
+} from '@udonarium/streetscape/plateau-catalog';
 import { resolveStreetscapeSource } from '@udonarium/streetscape/registry';
 import { StreetscapeQuery } from '@udonarium/streetscape/source';
+import {
+  STREETSCAPE_COUNTRIES,
+  StreetscapeCountryId,
+  normalizeStreetscapeCountry,
+} from '@udonarium/streetscape/streetscape-country';
 import {
   loadStreetSheetIndex,
   looksLikeOpen3dhkSheetId,
@@ -37,6 +48,11 @@ import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 
+type StreetscapeSuggestItem = {
+  label: string;
+  code: string;
+  streetValue: string;
+};
 @Component({
   selector: 'streetscape-import',
   templateUrl: './streetscape-import.component.html',
@@ -44,10 +60,12 @@ import { PanelService } from 'service/panel.service';
   standalone: false,
 })
 export class StreetscapeImportComponent implements OnInit, OnDestroy {
+  readonly streetscapeCountries = STREETSCAPE_COUNTRIES;
+  streetscapeCountry: StreetscapeCountryId = 'hk';
   streetscapeBusy = false;
   streetscapeStatus = '';
   streetscapeStreet = '';
-  streetscapeStreetSuggestions: StreetSheetSuggestion[] = [];
+  streetscapeStreetSuggestions: StreetscapeSuggestItem[] = [];
   streetscapeAttribution = '';
   /** Soft UX threshold — above this, show a lag / memory warning (not a hard cap). */
   static readonly MAX_FEATURES_WARN = 10;
@@ -57,12 +75,19 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   streetscapeAddCount = 4;
   /** After create: sheet context for incremental model adds. */
   streetscapeActive: {
+    country: StreetscapeCountryId;
     tableId: string;
     sheet: string;
     title?: string;
     street?: string;
     worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
     placedBuildingIds: string[];
+    plateau?: {
+      cityCode: string;
+      cityName: string;
+      meshCode: string;
+      gmlUrl: string;
+    };
   } | null = null;
 
   get streetscapeMaxFeaturesWarn(): boolean {
@@ -150,11 +175,29 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   }
 
   /** Panel close destroys this component — keep download info for reopen. */
+  get streetscapeIsJapan(): boolean {
+    return this.streetscapeCountry === 'jp';
+  }
+
+  get streetscapeShowLandsdCredit(): boolean {
+    return !this.streetscapeIsJapan;
+  }
+
+  onStreetscapeCountryChange() {
+    this.streetscapeCountry = normalizeStreetscapeCountry(this.streetscapeCountry);
+    this.streetscapeStreetSuggestions = [];
+    this.streetscapeActive = null;
+    this.streetscapeDeferred = null;
+    this.persistStreetscapeUiSession();
+    this.changeDetector.markForCheck();
+  }
+
   private persistStreetscapeUiSession() {
     setStreetscapeUiSession({
       status: this.streetscapeStatus,
       attribution: this.streetscapeAttribution,
       street: this.streetscapeStreet,
+      country: this.streetscapeCountry,
       maxFeatures: this.streetscapeMaxFeatures,
       addModelCount: this.streetscapeAddCount,
       active: this.streetscapeActive,
@@ -168,6 +211,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.streetscapeStatus = s.status;
     this.streetscapeAttribution = s.attribution;
     this.streetscapeStreet = s.street;
+    this.streetscapeCountry = normalizeStreetscapeCountry(s.country);
     this.streetscapeMaxFeatures = s.maxFeatures;
     this.streetscapeAddCount = s.addModelCount;
     this.streetscapeActive = s.active;
@@ -192,6 +236,11 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     if (!this.canActivate || this.streetscapeBusy) return;
     const q = this.streetscapeStreet.trim();
     if (!q) return;
+
+    if (this.streetscapeCountry === 'jp') {
+      await this.createStreetscapeFromJapan(q);
+      return;
+    }
 
     if (looksLikeOpen3dhkSheetId(q)) {
       await this.startOpen3dhk({ sheet: q });
@@ -236,24 +285,101 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     });
   }
 
+  private async createStreetscapeFromJapan(q: string) {
+    let hits;
+    try {
+      hits = await searchPlateauCityGml(q);
+    } catch {
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('streetscape.errorTitle'),
+        text: this.i18n.t('streetscape.error.noStreetMatchJp'),
+        type: ConfirmationType.OK,
+        materialIcon: 'error',
+      });
+      return;
+    }
+    const hintCode = this.streetscapeStreetSuggestions.find(s => s.streetValue === q)?.code || '';
+    const hit = (hintCode && hits.find(h => h.cityCode === hintCode))
+      || hits.find(h => h.cityName && (q.includes(h.cityName) || h.cityName.includes(q)))
+      || hits[0];
+    const file = pickPlateauBldgFile(hit.files);
+    const ok = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('streetscape.confirmSheetTitle'),
+      text: this.i18n.t('streetscape.confirmPlateauMesh', {
+        name: hit.cityName || q,
+        sheet: file.code,
+      }),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'map',
+      okLabel: this.i18n.t('streetscape.confirmSheetOk'),
+      cancelLabel: this.i18n.t('streetscape.confirmCancel'),
+    });
+    if (!ok) return;
+
+    this.streetscapeStreetSuggestions = [];
+    const max = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
+    this.streetscapeMaxFeatures = max;
+    await this.runStreetscape({
+      type: 'plateau',
+      street: q,
+      title: `PLATEAU ${hit.cityName}`,
+      cityCode: hit.cityCode,
+      cityName: hit.cityName,
+      meshCode: file.code,
+      gmlUrl: file.url,
+      maxFeatures: max,
+    }, {
+      country: 'jp',
+      plateau: {
+        cityCode: hit.cityCode,
+        cityName: hit.cityName,
+        meshCode: file.code,
+        gmlUrl: file.url,
+      },
+    });
+  }
+
   async onStreetscapeStreetInput() {
     const q = this.streetscapeStreet.trim();
-    if (!q || looksLikeOpen3dhkSheetId(q) || q.length < 1) {
+    if (!q || q.length < 1) {
+      this.streetscapeStreetSuggestions = [];
+      this.changeDetector.markForCheck();
+      return;
+    }
+    if (this.streetscapeCountry === 'jp') {
+      try {
+        const cities = await loadPlateauCities();
+        this.streetscapeStreetSuggestions = suggestPlateauCities(cities, q, 10).map(s => ({
+          label: s.label,
+          code: s.cityCode,
+          streetValue: s.city,
+        }));
+      } catch {
+        this.streetscapeStreetSuggestions = [];
+      }
+      this.changeDetector.markForCheck();
+      return;
+    }
+    if (looksLikeOpen3dhkSheetId(q)) {
       this.streetscapeStreetSuggestions = [];
       this.changeDetector.markForCheck();
       return;
     }
     try {
       const index = await loadStreetSheetIndex();
-      this.streetscapeStreetSuggestions = suggestStreetSheets(index, q, 10);
+      this.streetscapeStreetSuggestions = suggestStreetSheets(index, q, 10).map(s => ({
+        label: s.label,
+        code: s.sheet,
+        streetValue: s.zh || s.en || s.sheet,
+      }));
     } catch {
       this.streetscapeStreetSuggestions = [];
     }
     this.changeDetector.markForCheck();
   }
 
-  pickStreetscapeSuggestion(s: StreetSheetSuggestion) {
-    this.streetscapeStreet = s.zh || s.en || s.sheet;
+  pickStreetscapeSuggestion(s: StreetscapeSuggestItem) {
+    this.streetscapeStreet = s.streetValue || s.label;
     this.streetscapeStreetSuggestions = [];
     this.changeDetector.markForCheck();
   }
@@ -360,17 +486,29 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     try {
       registerBuiltinStreetscapeSources();
       const exclude = this.mergePlacedBuildingIds(active.placedBuildingIds);
-      const query: StreetscapeQuery = {
-        type: 'open3dhk',
-        sheet: active.sheet,
-        street: active.street,
-        format: 'GLTF0',
-        maxFeatures: count,
-        useRange: true,
-        rangeMode: 'buildings',
-        reuseWorldExtent: active.worldExtent,
-        excludeBuildingIds: exclude,
-      };
+      const query: StreetscapeQuery = active.country === 'jp' && active.plateau
+        ? {
+          type: 'plateau',
+          street: active.street,
+          title: active.title,
+          cityCode: active.plateau.cityCode,
+          cityName: active.plateau.cityName,
+          meshCode: active.plateau.meshCode,
+          gmlUrl: active.plateau.gmlUrl,
+          maxFeatures: count,
+          excludeBuildingIds: exclude,
+        }
+        : {
+          type: 'open3dhk',
+          sheet: active.sheet,
+          street: active.street,
+          format: 'GLTF0',
+          maxFeatures: count,
+          useRange: true,
+          rangeMode: 'buildings',
+          reuseWorldExtent: active.worldExtent,
+          excludeBuildingIds: exclude,
+        };
       const source = resolveStreetscapeSource(query);
       const load = await source.resolve(query, undefined, (p) => {
         this.applyStreetscapeSourceProgress(p);
@@ -387,7 +525,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       };
       this.streetscapeAttribution = result.attribution || this.streetscapeAttribution;
       this.rememberStreetscapeExport(result.pack, result.exportFiles);
-      if (newIds.length && active.sheet) {
+      if (newIds.length && active.country === 'hk' && active.sheet) {
         const prev = this.streetscapeDeferred;
         const pendingIds = this.mergePlacedBuildingIds([
           ...(prev?.tableId === table.identifier ? prev.buildingIds : []),
@@ -490,6 +628,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     }
 
     await this.runStreetscape(query, {
+      country: 'hk',
       deferFacades: {
         sheet: query.sheet || '',
         title: base.title,
@@ -501,6 +640,13 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   private async runStreetscape(
     query: StreetscapeQuery,
     opts: {
+      country?: StreetscapeCountryId;
+      plateau?: {
+        cityCode: string;
+        cityName: string;
+        meshCode: string;
+        gmlUrl: string;
+      };
       deferFacades?: {
         sheet: string;
         title?: string;
@@ -509,7 +655,9 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     } = {},
   ) {
     this.streetscapeBusy = true;
-    this.streetscapeStatus = this.i18n.t('streetscape.busy');
+    this.streetscapeStatus = this.i18n.t(
+      opts.country === 'jp' ? 'streetscape.busyJapan' : 'streetscape.busy',
+    );
     this.streetscapeAttribution = '';
     this.streetscapeExport = null;
     this.changeDetector.markForCheck();
@@ -522,19 +670,27 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       this.streetscapeAttribution = result.attribution;
       this.rememberStreetscapeExport(result.pack, result.exportFiles);
       const buildingIds = (result.pack.features || []).map(f => f.id).filter(Boolean);
-      if (opts.deferFacades?.sheet && result.worldExtent) {
+      const country: StreetscapeCountryId = opts.country
+        || (query.type === 'plateau' ? 'jp' : 'hk');
+      const sheet = opts.plateau?.meshCode
+        || opts.deferFacades?.sheet
+        || (query.type === 'open3dhk' ? (query.sheet || '') : '')
+        || (query.type === 'plateau' ? (query.meshCode || '') : '');
+      if (result.worldExtent && sheet) {
         this.streetscapeActive = {
+          country,
           tableId: result.table.identifier,
-          sheet: opts.deferFacades.sheet,
-          title: opts.deferFacades.title,
-          street: opts.deferFacades.street,
+          sheet,
+          title: opts.plateau?.cityName || opts.deferFacades?.title,
+          street: opts.plateau?.cityName || opts.deferFacades?.street,
           worldExtent: result.worldExtent,
           placedBuildingIds: buildingIds.slice(),
+          plateau: opts.plateau,
         };
       } else {
         this.streetscapeActive = null;
       }
-      if (opts.deferFacades?.sheet && result.worldExtent && buildingIds.length) {
+      if (country === 'hk' && opts.deferFacades?.sheet && result.worldExtent && buildingIds.length) {
         this.streetscapeDeferred = {
           tableId: result.table.identifier,
           sheet: opts.deferFacades.sheet,

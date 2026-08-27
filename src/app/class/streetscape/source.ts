@@ -26,6 +26,19 @@ export type StreetscapeQuery =
     buildingIds?: string[];
     /** Skip these ids (and GLTF0↔GLTF variants) when picking the next N buildings. */
     excludeBuildingIds?: string[];
+  }
+  | {
+    type: 'plateau';
+    /** Free-text municipality / area (e.g. 渋谷区). */
+    street?: string;
+    title?: string;
+    cityCode?: string;
+    cityName?: string;
+    meshCode?: string;
+    /** Direct CityGML URL when re-adding models on the same mesh. */
+    gmlUrl?: string;
+    maxFeatures?: number;
+    excludeBuildingIds?: string[];
   };
 
 export type StreetscapePackLoad = {
