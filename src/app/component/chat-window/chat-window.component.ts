@@ -11,6 +11,7 @@ import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-set
 import { ChatTabComponent } from 'component/chat-tab/chat-tab.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { setSkipEmptyDialogQuotes } from '@udonarium/chat-balloon';
@@ -287,6 +288,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     return Network.GuestMode();
   }
 
+  get showMeshReconnectBanner(): boolean {
+    return !!Network.peer?.isRoom && RoomConnectHelper.isNetworkReconnecting();
+  }
+
+  private refreshReconnectBanner() {
+    this.changeDetector.markForCheck();
+  }
+
 
   ngOnInit() {
     const preferred = GameCharacter.preferredChatCharacter();
@@ -331,7 +340,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
         if (!id || !this.chatTabs.some(t => t.identifier === id)) return;
         this.chatTabidentifier = id;
         this.changeDetector.markForCheck();
-      });
+      })
+      .on('CONNECT_PEER', () => this.refreshReconnectBanner())
+      .on('DISCONNECT_PEER', () => this.refreshReconnectBanner())
+      .on('OPEN_NETWORK', () => this.refreshReconnectBanner())
+      .on('NETWORK_ERROR', () => this.refreshReconnectBanner());
     Promise.resolve().then(() => this.updatePanelTitle());
   }
 

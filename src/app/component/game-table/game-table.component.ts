@@ -56,7 +56,7 @@ import { TableMouseGesture, TableMouseGestureEvent } from './table-mouse-gesture
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
 import { collectFootprintWalls } from './footprint-walls';
-import { isCharacterRevealedToViewer } from './vision-math';
+import { isCharacterRevealedToViewer, visionAndLightWalls } from './vision-math';
 import { WeatherRender } from './weather-render';
 
 /** Formal touch interaction mode (mobile gesture state machine). */
@@ -103,6 +103,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private lightingRender: LightingRender = null;
   private weatherRender: WeatherRender = null;
   private fxTimer: any = null;
+  /** Skip lighting/FoW redraw when darkness/lights/tokens/walls are unchanged. */
+  private lastFxSig = '';
+  private _desktopLayerPieces: Stackable[] = [];
+  private _desktopLayerSig = '';
+  private readonly layerZIndexStyles = new Map<number, { 'z-index': number }>();
   private pingHoldTimer: any = null;
   private pingHoldOrigin: { x: number; y: number } = null;
   private pingHoldLast: { x: number; y: number } = null;
@@ -417,7 +422,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       ...this.cardStacks,
       ...chars,
     ];
-    return pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
+    // Same paint order; skip sort+alloc when membership unchanged.
+    let sig = `${this.isGMMode ? 1 : 0}|${pieces.length}`;
+    for (let i = 0; i < pieces.length; i++) sig += `|${pieces[i].identifier}`;
+    if (sig === this._desktopLayerSig) return this._desktopLayerPieces;
+    pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
+    this._desktopLayerSig = sig;
+    this._desktopLayerPieces = pieces;
+    return pieces;
   }
 
   /**
@@ -427,7 +439,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
    * translateZ(4px) can sit above clueStringsZ (photo < yarn < pin).
    */
   layerHostStyle(zindex: number): { [key: string]: number } {
-    return { 'z-index': zindex };
+    let style = this.layerZIndexStyles.get(zindex);
+    if (!style) {
+      style = { 'z-index': zindex };
+      this.layerZIndexStyles.set(zindex, style);
+    }
+    return style;
   }
 
   private setCanvasHighlightActive(active: boolean) {
@@ -1248,11 +1265,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.applyCameraForTable(this.currentTable);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
-    this.weatherRender = new WeatherRender([
-      this.weatherCanvasLow.nativeElement,
-      this.weatherCanvasMid.nativeElement,
-      this.weatherCanvasHigh.nativeElement,
-    ]);
+    this.weatherRender = new WeatherRender(
+      [
+        this.weatherCanvasLow.nativeElement,
+        this.weatherCanvasMid.nativeElement,
+        this.weatherCanvasHigh.nativeElement,
+      ],
+      fn => this.ngZone.runOutsideAngular(fn),
+    );
     this.refreshFx();
     this.ensureFxTimer();
     if (this.showDebugPose) {
@@ -2052,18 +2072,26 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const onTable = this.characters.filter(c => c.location?.name === 'table');
     const userId = Network.peer?.userId || '';
     const visionChars = onTable.filter(c => c.providesVisionTo(userId));
-    this.lightingRender.render(
-      this.currentTable,
-      visionChars,
-      onTable,
-      this.collectLightOccluders(),
-      this.isGMMode,
-      collectFootprintWalls(this.currentTable, this.tableMasks, this.terrains),
-    );
-    this.tableLighting.updateTokenShadows(this.currentTable, onTable);
-    EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
+    const footprintWalls = collectFootprintWalls(this.currentTable, this.tableMasks, this.terrains);
+    const wallSets = visionAndLightWalls(this.currentTable, this.tableMasks, this.terrains, footprintWalls);
+    const occluders = this.collectLightOccluders();
+    const fxSig = this.buildFxSignature(onTable, visionChars, footprintWalls, occluders);
+    let revealedChanged = false;
+    if (fxSig !== this.lastFxSig) {
+      this.lastFxSig = fxSig;
+      this.lightingRender.render(
+        this.currentTable,
+        visionChars,
+        onTable,
+        occluders,
+        this.isGMMode,
+        footprintWalls,
+      );
+      this.tableLighting.updateTokenShadows(this.currentTable, onTable);
+      EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
+      revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId, wallSets);
+    }
     this.weatherRender?.sync(this.currentTable);
-    const revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId);
     let needMark = revealedChanged;
     if (this.pings.length > 0) {
       const prev = this.offscreenArrows;
@@ -2078,11 +2106,60 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  /** Pose/light/wall fingerprint — identical input ⇒ identical lighting/FoW pixels. */
+  private buildFxSignature(
+    onTable: CharacterToken[],
+    visionChars: CharacterToken[],
+    footprintWalls: { points: { x: number; y: number }[] }[],
+    occluders: LightOccluder[],
+  ): string {
+    const n = (v: number) => String(v ?? 0);
+    const pts = (points: { x: number; y: number }[]) =>
+      (points || []).map(p => `${n(p.x)},${n(p.y)}`).join(';');
+    const table = this.currentTable;
+    const parts: string[] = [
+      table.identifier,
+      n(table.darkness ?? 0),
+      n(table.globalIllumination ?? 1),
+      table.globalIlluminationEnabled ? '1' : '0',
+      String(table.globalIlluminationThreshold ?? ''),
+      table.visionEnabled ? '1' : '0',
+      this.isGMMode ? '1' : '0',
+      String(table.width),
+      String(table.height),
+      String(table.gridSize),
+    ];
+    for (const light of table.lights || []) {
+      parts.push(
+        `L:${light.identifier}:${n(light.x)}:${n(light.y)}:${n(light.brightRadius)}:${n(light.dimRadius)}:${light.color}:${n(light.intensity ?? 0)}`,
+      );
+    }
+    for (const wall of table.walls || []) {
+      parts.push(
+        `W:${wall.identifier}:${wall.blocksLight ? 1 : 0}:${wall.blocksVision ? 1 : 0}:${pts(wall.points)}`,
+      );
+    }
+    for (const fp of footprintWalls) {
+      parts.push(`F:${pts(fp.points)}`);
+    }
+    for (const o of occluders) {
+      parts.push(`O:${o.id}:${pts(o.points)}`);
+    }
+    for (const ch of onTable) {
+      parts.push(
+        `T:${ch.identifier}:${n(ch.location?.x)}:${n(ch.location?.y)}:${n(ch.size)}:${n(ch.visionRangeGrid)}:${n(ch.brightLightGrid)}:${n(ch.dimLightGrid)}`,
+      );
+    }
+    for (const ch of visionChars) parts.push(`V:${ch.identifier}`);
+    return parts.join('|');
+  }
+
   /** Update which tokens players may see under FoW; returns true if the set changed. */
   private refreshVisionRevealed(
     onTable: CharacterToken[],
     visionChars: CharacterToken[],
     userId: string,
+    wallSets?: ReturnType<typeof visionAndLightWalls>,
   ): boolean {
     const next = new Set<string>();
     const table = this.currentTable;
@@ -2094,7 +2171,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     for (const ch of onTable) {
       if (!ch) continue;
-      if (isCharacterRevealedToViewer(ch, table, visionChars, onTable, userId, this.tableMasks, this.terrains)) {
+      if (isCharacterRevealedToViewer(
+        ch, table, visionChars, onTable, userId, this.tableMasks, this.terrains, wallSets,
+      )) {
         next.add(ch.identifier);
       }
     }
@@ -2175,6 +2254,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       table.isShowNumber,
     );
     this.applyCameraForTable(table);
+    this.lastFxSig = '';
+    this._desktopLayerSig = '';
     this.refreshFx();
     this.ensureFxTimer();
     this.removeFocus();

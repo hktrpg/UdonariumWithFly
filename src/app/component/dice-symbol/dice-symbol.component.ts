@@ -241,11 +241,9 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
         }
       })
       .on<object>('TABLE_VIEW_ROTATE', event => {
-        this.ngZone.run(() => {
-          this.viewRotateX = event.data['x'];
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateX = event.data['x'];
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_GAME_OBJECT/identifier/${this.diceSymbol?.identifier}`, event => {
         this.changeDetector.markForCheck();

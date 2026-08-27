@@ -10,6 +10,7 @@ import { WebRTCConnection, WebRTCStatsMonitor } from '../webrtc/webrtc-stats-mon
 import { meshWarnThrottled, netDebug } from '../net-debug';
 import { navigatorEffectiveType, poorNetworkCloseDebounceMs } from '@udonarium/room-reconnect.util';
 import { isRetriableSubscribeError } from './skyway-log';
+import { computeStreamHealthMetrics, isInboundStale, shouldRecycleStaleDataChannel } from './skyway-stream-health';
 import { SkyWayFacade } from './skyway-facade';
 
 interface Ping {
@@ -626,18 +627,19 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     await this.stats.updateAsync();
     this.candidateType = this.stats.candidateType;
 
-    let deltaTime = performance.now() - this.timestamp;
-    let healthRate = deltaTime <= 10000 ? 1 : 5000 / ((deltaTime - 10000) + 5000);
-    let ping = healthRate < 1 ? deltaTime : this.ping;
-    let pingRate = 500 / (ping + 500);
+    const deltaTime = performance.now() - this.timestamp;
+    const { healthRate, ping, speed } = computeStreamHealthMetrics(deltaTime, this.ping);
 
-    if (deltaTime > 45000 && healthRate < 0.12) {
+    if (isInboundStale(deltaTime, healthRate)) {
       meshWarnThrottled(
         `stale-dc-${this.peer.peerId}`,
-        'DataChannel stale (no inbound); recycling',
+        'DataChannel stale (no inbound); metrics only',
         this.peer.peerId.slice(0, 10),
         { silentMs: Math.round(deltaTime) },
       );
+    }
+
+    if (shouldRecycleStaleDataChannel(deltaTime, healthRate)) {
       this.stopMonitoring();
       this.scheduleCloseEmit();
       return;
@@ -645,7 +647,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
 
     this.peer.session.health = healthRate;
     this.peer.session.ping = ping;
-    this.peer.session.speed = pingRate * healthRate;
+    this.peer.session.speed = speed;
     this.peer.session.bitrateInstantBps = this.stats.instantBitrateBps;
     this.peer.session.bitrateBps = this.stats.bitrateBps;
 

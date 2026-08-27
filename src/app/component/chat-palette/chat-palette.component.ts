@@ -34,6 +34,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
       if (0 < gameType.length) this._gameType = gameType;
       this.updatePanelTitle();
     }
+    this.renewPaletteCache();
   }
 
   get palette(): ChatPalette {
@@ -43,19 +44,18 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   }
   
   paletteCache: string[] = [];
-  paletteRenewInterval: boolean = true;
-  paletteRenewIntervalId = setInterval(() => {
-    this.paletteRenewInterval = true;
-  }, 200);
+  /** Refresh palette list on a timer — do not call ngZone from the template getter. */
+  paletteRenewIntervalId: ReturnType<typeof setInterval> = null;
   get filteredPaletteStrings(): string[] {
-    if (!this.character || !this.character.chatPalette) return this.paletteCache;
-    this.ngZone.run(() => {
-      if (this.paletteRenewInterval) {
-        this.paletteRenewInterval = false;
-        this.paletteCache = this.character.chatPalette.getPalette().filter(text => this.filter(text));
-      }
-    });
     return this.paletteCache;
+  }
+
+  private renewPaletteCache() {
+    if (!this.character?.chatPalette) {
+      this.paletteCache = [];
+      return;
+    }
+    this.paletteCache = this.character.chatPalette.getPalette().filter(text => this.filter(text));
   }
 
   get color(): string {
@@ -81,7 +81,12 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
   isEdit: boolean = false;
   editPalette: string = '';
 
-  filterText: string = '';
+  private _filterText: string = '';
+  get filterText(): string { return this._filterText; }
+  set filterText(value: string) {
+    this._filterText = value ?? '';
+    this.renewPaletteCache();
+  }
 
   private doubleClickTimer: NodeJS.Timer = null;
 
@@ -107,6 +112,13 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     if (this.character?.chatPalette) {
       this.gameType = this.character.chatPalette.dicebot || '';
     }
+    this.renewPaletteCache();
+    this.ngZone.runOutsideAngular(() => {
+      this.paletteRenewIntervalId = setInterval(() => {
+        this.renewPaletteCache();
+        this.ngZone.run(() => { });
+      }, 200);
+    });
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', event => {
         if (this.character && this.character.identifier === event.data.identifier) {
@@ -121,7 +133,8 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
-    clearInterval(this.paletteRenewIntervalId);
+    if (this.paletteRenewIntervalId != null) clearInterval(this.paletteRenewIntervalId);
+    this.paletteRenewIntervalId = null;
     // Persist in-progress edits when the panel closes (confirm path).
     if (this.isEdit) this.toggleEditMode();
   }
@@ -265,6 +278,7 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
       // Create-with-content if missing so the first sync is not an empty palette.
       const palette = this.character.ensureChatPalette(this.editPalette);
       palette.setPalette(this.editPalette);
+      this.renewPaletteCache();
     }
   }
 

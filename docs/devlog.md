@@ -243,6 +243,19 @@ FILES 進度條入房期間穩定顯示；圖片優先，跟住正在播嘅 BGM
 ---
 
 Udonarium烏冬ユドナリウム開發日誌29
+長團約 1 小時後全員 mesh 靜默失活、訊息互不可見又冇提示
+所以 token 刷新後 remesh、open=0 且房內有人 30s 升級 full reopen、聊天窗重連 banner
+詳見 `docs/hktrpg-backend.md` 長 session 排查
+
+---
+
+Udonarium烏冬ユドナリウム開發日誌30
+長團失聯對照上游：WithFly 只降 health、唔會 45s 強拆 DataChannel
+所以移除 HKTRPG 獨有 stale recycle，改 warn-only 監測；日誌 29 recovery 保留
+
+---
+
+Udonarium烏冬ユドナリウム開發日誌31
 對齊 Axe 嘅 VTT 功能包
 細 icon 選單、桌面隨暗度變暗、關 GI 時角色陰影
 全桌計時器（倒數／順數、歸零動作、畫面拖動）
