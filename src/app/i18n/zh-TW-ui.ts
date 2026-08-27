@@ -887,6 +887,7 @@ export const zhTW_ui: I18nDictionary = {
   'skyway.invalid-id': 'Peer ID 無效。',
   'skyway.unavailable-id': '該 Peer ID 已被使用。',
   'skyway.already-same-name-member-exist': '連線尚未完成清理，正在自動重試加入房間。請稍候。',
+  'skyway.already-same-name-member-exist-give-up': '無法加入房間：相同連線名稱仍被佔用。請關閉此房間的其他分頁後，重新整理或再次加入。',
   'skyway.invalid-key': 'SkyWay API 金鑰無效。',
   'skyway.invalid-domain': '目前網域未登錄到此 SkyWay API 金鑰。',
   'skyway.authentication': '認證錯誤。',

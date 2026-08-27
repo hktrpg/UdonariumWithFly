@@ -1,6 +1,8 @@
 import {
   classifyOutageKind,
   duplicateMemberRetryDelayMs,
+  DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS,
+  isDuplicateMemberErrorType,
   isOutageReopenable,
   nextRefreshDelayMs,
   reopenJitterMs,
@@ -29,6 +31,14 @@ describe('skyway-recovery-policy', () => {
       // Keepalive / timeout retry pass the OutageKind literal.
       expect(classifyOutageKind('duplicate-member')).toBe('duplicate-member');
     });
+  });
+
+  it('isDuplicateMemberErrorType covers SDK strings and OutageKind literal', () => {
+    expect(isDuplicateMemberErrorType('duplicate-member')).toBeTrue();
+    expect(isDuplicateMemberErrorType('alreadySameNameMemberExist')).toBeTrue();
+    expect(isDuplicateMemberErrorType('already-same-name-member-exist')).toBeTrue();
+    expect(isDuplicateMemberErrorType('disconnected')).toBeFalse();
+    expect(DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS).toBe(4);
   });
 
   it('duplicateMemberRetryDelayMs grows toward a 12s cap', () => {

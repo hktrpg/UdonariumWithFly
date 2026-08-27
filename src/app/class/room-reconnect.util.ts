@@ -192,6 +192,7 @@ export function shouldAttemptRoomReopen(errorType: string): boolean {
   // Stale same-name member after sleep/WS drop — delayed reopen (duplicate-member outage),
   // not an immediate Network.open churn. joinRoomPerson also retries first.
   // Accept OutageKind literal too (keepalive / timeout retry pass lastOutageKind).
+  // RoomConnectHelper wraps this to enforce DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS.
   if (errorType === 'duplicate-member'
     || /already-?same-?name-?member-?exist/i.test(errorType)) return true;
   if ((ROOM_REOPEN_NETWORK_ERROR_TYPES as readonly string[]).includes(errorType)) return true;

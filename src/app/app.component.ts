@@ -86,6 +86,7 @@ import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import {
+  isDuplicateMemberErrorType,
   shouldSuppressConfigErrorModal,
   skyWayRecoveryGate,
 } from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
@@ -670,8 +671,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
 
-          // Ghost same-name member is recovered via delayed reopen — never a fatal modal.
-          if (/already-?same-?name-?member-?exist/i.test(errorType)) return;
+          // Ghost same-name: suppress fatal only while auto-recovery still owns the outage.
+          // After DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS, surface a give-up message.
+          if (isDuplicateMemberErrorType(errorType)) {
+            if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) return;
+            await this.modalService.open(TextViewComponent, {
+              title: this.i18n.t('net.errorTitle'),
+              text: this.i18n.t('skyway.already-same-name-member-exist-give-up'),
+            });
+            return;
+          }
 
           await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
         });

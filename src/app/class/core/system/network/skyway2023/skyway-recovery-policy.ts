@@ -40,6 +40,18 @@ const REOPEN_MAX_MS: Record<OutageKind, number> = {
   disconnected: 60000,
 };
 
+/** True for SDK alreadySameName* strings and the OutageKind literal. */
+export function isDuplicateMemberErrorType(errorType: string): boolean {
+  const t = String(errorType || '').toLowerCase();
+  return t === 'duplicate-member' || /already-?same-?name-?member-?exist/i.test(t);
+}
+
+/**
+ * Max scheduleReopenRetry cycles for duplicate-member before surfacing a fatal modal.
+ * Backoff 15s→30s→60s→90s spans well past SkyWay ghost TTL (~30s).
+ */
+export const DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS = 4;
+
 /** Map NETWORK_ERROR / formatFatalError types onto an outage kind. */
 export function classifyOutageKind(errorType: string): OutageKind {
   const t = String(errorType || '').toLowerCase();
