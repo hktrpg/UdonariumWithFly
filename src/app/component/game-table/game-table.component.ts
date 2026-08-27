@@ -410,10 +410,23 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       ...this.cardStacks,
       ...chars,
     ];
-    // Same paint order; skip sort+alloc when membership unchanged.
-    let sig = `${this.isGMMode ? 1 : 0}|${pieces.length}`;
+    // Membership + remount epochs. On cache hit, still refresh object refs (same ids after
+    // ZIP/store recreate must not keep dead instances).
+    let sig = `${this.pieceRenderEpoch}|${this.characterViewEpoch}|${this.isGMMode ? 1 : 0}|${pieces.length}`;
     for (let i = 0; i < pieces.length; i++) sig += `|${pieces[i].identifier}`;
-    if (sig === this._desktopLayerSig) return this._desktopLayerPieces;
+    if (sig === this._desktopLayerSig && this._desktopLayerPieces.length === pieces.length) {
+      const byId = new Map(pieces.map(p => [p.identifier, p]));
+      const refreshed: Stackable[] = [];
+      for (const prev of this._desktopLayerPieces) {
+        const cur = byId.get(prev.identifier);
+        if (!cur) break;
+        refreshed.push(cur);
+      }
+      if (refreshed.length === pieces.length) {
+        this._desktopLayerPieces = refreshed;
+        return refreshed;
+      }
+    }
     pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
     this._desktopLayerSig = sig;
     this._desktopLayerPieces = pieces;
