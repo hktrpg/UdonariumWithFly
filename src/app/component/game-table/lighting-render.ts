@@ -26,10 +26,32 @@ interface PointLightSource {
 export class LightingRender {
   constructor(readonly canvasElement: HTMLCanvasElement) {}
 
+  /** Reused FoW scratch canvases (same pixels; avoid alloc every 200ms). */
+  private revealCanvas: HTMLCanvasElement | null = null;
+  private litPosCanvas: HTMLCanvasElement | null = null;
+  private fogCanvas: HTMLCanvasElement | null = null;
+
   /** Free the canvas buffer while lighting/vision are unused. */
   release() {
     if (this.canvasElement.width !== 0) this.canvasElement.width = 0;
     if (this.canvasElement.height !== 0) this.canvasElement.height = 0;
+    this.revealCanvas = null;
+    this.litPosCanvas = null;
+    this.fogCanvas = null;
+  }
+
+  private ensureScratch(
+    current: HTMLCanvasElement | null,
+    width: number,
+    height: number,
+  ): HTMLCanvasElement {
+    if (!current || current.width !== width || current.height !== height) {
+      const c = current || document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      return c;
+    }
+    return current;
   }
 
   render(
@@ -308,11 +330,10 @@ export class LightingRender {
     }
 
     const grid = table.gridSize || 50;
-    // Positive reveal mask (opaque = can see).
-    const reveal = document.createElement('canvas');
-    reveal.width = width;
-    reveal.height = height;
-    const rctx = reveal.getContext('2d');
+    // Positive reveal mask (opaque = can see). Reuse scratch canvases across ticks.
+    this.revealCanvas = this.ensureScratch(this.revealCanvas, width, height);
+    const rctx = this.revealCanvas.getContext('2d');
+    rctx.clearRect(0, 0, width, height);
 
     for (const ch of characters) {
       const cx = ch.location.x + (ch.size * grid) / 2;
@@ -352,31 +373,31 @@ export class LightingRender {
       rctx.restore();
     }
 
-    // Foundry GI off: vision only reveals illuminated areas (vision ??lit).
+    // Foundry GI off: vision only reveals illuminated areas (vision ∩ lit).
     if (!giActive) {
-      const litPos = document.createElement('canvas');
-      litPos.width = width;
-      litPos.height = height;
-      const lp = litPos.getContext('2d');
+      this.litPosCanvas = this.ensureScratch(this.litPosCanvas, width, height);
+      const lp = this.litPosCanvas.getContext('2d');
+      lp.clearRect(0, 0, width, height);
       for (const light of sources) {
         this.drawPositiveLightMask(lp, light, wallsLight, occluders, width, height);
       }
       rctx.globalCompositeOperation = 'destination-in';
-      rctx.drawImage(litPos, 0, 0);
+      rctx.drawImage(this.litPosCanvas, 0, 0);
+      rctx.globalCompositeOperation = 'source-over';
     }
 
     // Fog = opaque black, then cut out revealed areas.
-    const fog = document.createElement('canvas');
-    fog.width = width;
-    fog.height = height;
-    const fctx = fog.getContext('2d');
+    this.fogCanvas = this.ensureScratch(this.fogCanvas, width, height);
+    const fctx = this.fogCanvas.getContext('2d');
+    fctx.globalCompositeOperation = 'source-over';
     fctx.fillStyle = 'rgba(0,0,0,0.96)';
     fctx.fillRect(0, 0, width, height);
     fctx.globalCompositeOperation = 'destination-out';
-    fctx.drawImage(reveal, 0, 0);
+    fctx.drawImage(this.revealCanvas, 0, 0);
+    fctx.globalCompositeOperation = 'source-over';
 
     ctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(fog, 0, 0);
+    ctx.drawImage(this.fogCanvas, 0, 0);
   }
 
   /** Opaque light footprint for intersecting with vision when GI is off. */

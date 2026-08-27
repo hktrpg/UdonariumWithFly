@@ -242,10 +242,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       .on('UPDATE_VIDEO_RESOURE', () => this.changeDetector.markForCheck())
       .on('SYNCHRONIZE_VIDEO_LIST', () => this.changeDetector.markForCheck())
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.textNote?.identifier}`, () => this.changeDetector.markForCheck())
       .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck());
