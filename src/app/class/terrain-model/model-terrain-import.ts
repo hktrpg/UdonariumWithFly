@@ -63,6 +63,8 @@ export type ImportModelAsTerrainOptions = {
    * Used for Open3Dhk GLTF0 (official vertex colors are flat gray).
    */
   colorTint?: { r: number; g: number; b: number };
+  /** When true, Terrain.isLocked after place (streetscape buildings default locked). */
+  locked?: boolean;
 };
 
 export type BakeBoxPreviewContext = {
@@ -145,6 +147,7 @@ export async function importModelAsTerrain(
       modelD,
       cropNow: false,
       bakeGroupId,
+      locked: !!opts.locked,
     });
     viewTable.appendChild(terrain);
     terrains.push(terrain);
@@ -223,6 +226,7 @@ async function createTerrainBox(
     modelD: number;
     cropNow: boolean;
     bakeGroupId: string;
+    locked?: boolean;
   },
 ): Promise<Terrain> {
   const sourceIds = await addFaceImages(box.blobs);
@@ -243,6 +247,7 @@ async function createTerrainBox(
     terrain.mirrorWallTop = false;
     terrain.mirrorWallLeft = false;
     terrain.isInteract = true;
+    if (layout.locked) terrain.isLocked = true;
   });
 
   const faceOrder: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];

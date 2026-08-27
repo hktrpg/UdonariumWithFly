@@ -156,6 +156,7 @@ export async function appendStreetscapeFacadesToTable(
         parentTable: table,
         yawDeg: feature.yawDeg,
         colorTint,
+        locked: true,
       });
       terrains.push(...result.terrains);
       warnings.push(...(result.warnings || []));
