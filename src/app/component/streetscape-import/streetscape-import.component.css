@@ -33,6 +33,39 @@
   width: 100%;
 }
 
+.streetscape-street-primary {
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.streetscape-secondary {
+  margin-top: 4px;
+}
+
+.streetscape-pack-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6b5a48;
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.streetscape-pack-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
+.streetscape-pack-link:not(:disabled):hover {
+  color: #3f3428;
+}
+
 .streetscape-suggest {
   position: absolute;
   z-index: 5;

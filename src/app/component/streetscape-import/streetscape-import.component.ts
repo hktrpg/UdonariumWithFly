@@ -4,7 +4,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { GameTable } from '@udonarium/game-table';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { StreetscapeCatalogEntry, fetchStreetscapeCatalog } from '@udonarium/streetscape/catalog-source';
+import { fetchStreetscapeCatalog } from '@udonarium/streetscape/catalog-source';
 import { streetscapeErrorI18nKey } from '@udonarium/streetscape/errors';
 import {
   downloadStreetscapePack,
@@ -45,8 +45,6 @@ import { PanelService } from 'service/panel.service';
 export class StreetscapeImportComponent implements OnInit, OnDestroy {
   streetscapeBusy = false;
   streetscapeStatus = '';
-  streetscapeCatalog: StreetscapeCatalogEntry[] = [];
-  streetscapeCatalogId = '';
   streetscapeStreet = '';
   streetscapeStreetSuggestions: StreetSheetSuggestion[] = [];
   streetscapeAttribution = '';
@@ -113,7 +111,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     Promise.resolve().then(() => this.refreshPanelTitle());
     registerBuiltinStreetscapeSources();
     this.restoreStreetscapeUiSession();
-    void this.loadStreetscapeCatalog();
     EventSystem.register(this)
       .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck())
       .on('CHANGE_GM_MODE', () => this.changeDetector.markForCheck())
@@ -131,7 +128,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       status: this.streetscapeStatus,
       attribution: this.streetscapeAttribution,
       street: this.streetscapeStreet,
-      catalogId: this.streetscapeCatalogId,
       maxFeatures: this.streetscapeMaxFeatures,
       deferred: this.streetscapeDeferred,
       exportPack: this.streetscapeExport,
@@ -143,7 +139,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.streetscapeStatus = s.status;
     this.streetscapeAttribution = s.attribution;
     this.streetscapeStreet = s.street;
-    this.streetscapeCatalogId = s.catalogId;
     this.streetscapeMaxFeatures = s.maxFeatures;
     this.streetscapeDeferred = s.deferred;
     this.streetscapeExport = s.exportPack;
@@ -153,16 +148,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.panelService.title = this.i18n.t('streetscape.title');
   }
 
-  async loadStreetscapeCatalog() {
-    try {
-      const catalog = await fetchStreetscapeCatalog();
-      this.streetscapeCatalog = catalog.streets;
-      this.changeDetector.markForCheck();
-    } catch {
-      this.streetscapeCatalog = [];
-    }
-  }
-
   async onStreetscapePack(ev: Event) {
     if (!this.canActivate || this.streetscapeBusy) return;
     const input = ev.target as HTMLInputElement;
@@ -170,22 +155,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     input.value = '';
     if (!files.length) return;
     await this.runStreetscape({ type: 'file', files });
-  }
-
-  async createStreetscapeFromCatalog() {
-    if (!this.canActivate || this.streetscapeBusy || !this.streetscapeCatalogId) return;
-    const entry = this.streetscapeCatalog.find(s => s.id === this.streetscapeCatalogId);
-    if (!entry) return;
-    // Live Open3Dhk sheet when catalog lists a map-sheet id.
-    if (entry.sheet) {
-      await this.startOpen3dhk({
-        sheet: entry.sheet,
-        street: entry.street,
-        title: entry.title,
-      });
-      return;
-    }
-    await this.runStreetscape({ type: 'catalog', id: this.streetscapeCatalogId });
   }
 
   async createStreetscapeFromStreet() {

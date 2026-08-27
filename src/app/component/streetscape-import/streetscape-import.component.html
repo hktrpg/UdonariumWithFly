@@ -1,40 +1,9 @@
 <div class="settings-ui dense streetscape-import" *ngIf="canActivate; else streetscapeDenied" appFitPanel [fitMinHeight]="360" [fitMaxHeight]="640">
-  <button type="button" class="btn btn-block btn-sm" (click)="streetscapePackInput.click()" [disabled]="streetscapeBusy">
-    <i class="material-icons">location_city</i>{{ 'streetscape.importPack' | i18n }}
-  </button>
-  <input #streetscapePackInput type="file" accept=".zip,application/zip" hidden (change)="onStreetscapePack($event)">
-
-  <label class="streetscape-label" for="streetscape-catalog">{{ 'streetscape.catalog' | i18n }}</label>
-  <select
-    id="streetscape-catalog"
-    class="streetscape-select"
-    [(ngModel)]="streetscapeCatalogId"
-    [disabled]="streetscapeBusy || !streetscapeCatalog.length"
-  >
-    <option value="">{{ 'streetscape.catalogPlaceholder' | i18n }}</option>
-    <option *ngFor="let street of streetscapeCatalog" [value]="street.id">{{ street.title }}</option>
-  </select>
-  <button type="button" class="btn btn-block btn-sm" (click)="createStreetscapeFromCatalog()" [disabled]="streetscapeBusy || !streetscapeCatalogId">
-    {{ 'streetscape.loadSelected' | i18n }}
-  </button>
-
-  <label class="streetscape-label" for="streetscape-max-features">{{ 'streetscape.maxFeatures' | i18n }}</label>
-  <input
-    id="streetscape-max-features"
-    class="streetscape-street"
-    type="number"
-    min="1"
-    step="1"
-    [(ngModel)]="streetscapeMaxFeatures"
-    [disabled]="streetscapeBusy"
-  >
-  <p class="streetscape-status streetscape-warn" *ngIf="streetscapeMaxFeaturesWarn">
-    {{ 'streetscape.maxFeaturesWarn' | i18n }}
-  </p>
-
+  <label class="streetscape-label" for="streetscape-street">{{ 'streetscape.streetLabel' | i18n }}</label>
   <div class="streetscape-street-wrap">
     <input
-      class="streetscape-street"
+      id="streetscape-street"
+      class="streetscape-street streetscape-street-primary"
       type="text"
       [(ngModel)]="streetscapeStreet"
       (ngModelChange)="onStreetscapeStreetInput()"
@@ -51,9 +20,28 @@
       </li>
     </ul>
   </div>
-  <button type="button" class="btn btn-block btn-sm" (click)="createStreetscapeFromStreet()" [disabled]="streetscapeBusy || !streetscapeStreet.trim()">
+  <button
+    type="button"
+    class="btn btn-block btn-sm btn-primary"
+    (click)="createStreetscapeFromStreet()"
+    [disabled]="streetscapeBusy || !streetscapeStreet.trim()"
+  >
     {{ 'streetscape.fromStreet' | i18n }}
   </button>
+
+  <label class="streetscape-label" for="streetscape-max-features">{{ 'streetscape.maxFeatures' | i18n }}</label>
+  <input
+    id="streetscape-max-features"
+    class="streetscape-street"
+    type="number"
+    min="1"
+    step="1"
+    [(ngModel)]="streetscapeMaxFeatures"
+    [disabled]="streetscapeBusy"
+  >
+  <p class="streetscape-status streetscape-warn" *ngIf="streetscapeMaxFeaturesWarn">
+    {{ 'streetscape.maxFeaturesWarn' | i18n }}
+  </p>
 
   <button
     type="button"
@@ -76,6 +64,18 @@
 
   <p class="streetscape-status" *ngIf="streetscapeStatus">{{ streetscapeStatus }}</p>
   <p class="streetscape-status" *ngIf="streetscapeAttribution">{{ 'streetscape.attribution' | i18n:{ name: streetscapeAttribution } }}</p>
+
+  <div class="streetscape-secondary">
+    <button
+      type="button"
+      class="streetscape-pack-link"
+      (click)="streetscapePackInput.click()"
+      [disabled]="streetscapeBusy"
+    >
+      {{ 'streetscape.importPack' | i18n }}
+    </button>
+    <input #streetscapePackInput type="file" accept=".zip,application/zip" hidden (change)="onStreetscapePack($event)">
+  </div>
 
   <aside class="map-credit" aria-label="Lands Department map credit">
     <a class="map-credit-logo" href="https://www.landsd.gov.hk/" target="_blank" rel="noopener noreferrer">

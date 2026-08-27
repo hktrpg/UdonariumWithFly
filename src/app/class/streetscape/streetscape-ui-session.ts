@@ -5,7 +5,6 @@ export type StreetscapeUiSession = {
   status: string;
   attribution: string;
   street: string;
-  catalogId: string;
   maxFeatures: number;
   deferred: {
     tableId: string;
@@ -28,7 +27,6 @@ const EMPTY: StreetscapeUiSession = {
   status: '',
   attribution: '',
   street: '',
-  catalogId: '',
   maxFeatures: 4,
   deferred: null,
   exportPack: null,
@@ -45,7 +43,6 @@ export function setStreetscapeUiSession(next: StreetscapeUiSession): void {
     status: next.status || '',
     attribution: next.attribution || '',
     street: next.street || '',
-    catalogId: next.catalogId || '',
     maxFeatures: Math.max(1, Math.floor(Number(next.maxFeatures) || 4)),
     deferred: next.deferred
       ? {

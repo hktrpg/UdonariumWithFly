@@ -25,7 +25,6 @@ describe('streetscape-ui-session', () => {
       status: 'Streetscape ready',
       attribution: 'LandsD / Open3Dhk',
       street: '彌敦道',
-      catalogId: '',
       maxFeatures: 6,
       deferred: {
         tableId: 'table-1',
