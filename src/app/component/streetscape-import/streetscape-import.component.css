@@ -141,6 +141,8 @@
   line-height: 1.25;
   color: #1a1a1a;
   font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .map-credit-lines a {
