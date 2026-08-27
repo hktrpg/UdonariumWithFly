@@ -3,13 +3,21 @@
  * Triggers only on classified fatal / token-fetch outcomes — not SDK ice-params URLs.
  */
 
-export type OutageKind = 'rtc-api' | 'token-api' | 'server-error' | 'token-expired' | 'disconnected';
+export type OutageKind =
+  | 'rtc-api'
+  | 'token-api'
+  | 'server-error'
+  | 'token-expired'
+  | 'duplicate-member'
+  | 'disconnected';
 
 const OUTAGE_COOLDOWN_MS: Record<OutageKind, number> = {
   'rtc-api': 45000,
   'token-api': 30000,
   'server-error': 30000,
   'token-expired': 10000,
+  /** Ghost member TTL (~2× keepalive) — avoid hammering join while the stale name remains. */
+  'duplicate-member': 20000,
   disconnected: 0,
 };
 
@@ -18,6 +26,8 @@ const REOPEN_BASE_MS: Record<OutageKind, number> = {
   'token-api': 8000,
   'server-error': 8000,
   'token-expired': 4000,
+  /** Wait for SkyWay to drop the stale same-name member before Network.open. */
+  'duplicate-member': 15000,
   disconnected: 3000,
 };
 
@@ -26,17 +36,61 @@ const REOPEN_MAX_MS: Record<OutageKind, number> = {
   'token-api': 180000,
   'server-error': 180000,
   'token-expired': 60000,
+  'duplicate-member': 90000,
   disconnected: 60000,
 };
+
+/** True for SDK alreadySameName* strings and the OutageKind literal. */
+export function isDuplicateMemberErrorType(errorType: string): boolean {
+  const t = String(errorType || '').toLowerCase();
+  return t === 'duplicate-member' || /already-?same-?name-?member-?exist/i.test(t);
+}
+
+/**
+ * Max scheduleReopenRetry cycles for duplicate-member before surfacing a fatal modal.
+ * Backoff 15s→30s→60s→90s spans well past SkyWay ghost TTL (~30s).
+ */
+export const DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS = 4;
 
 /** Map NETWORK_ERROR / formatFatalError types onto an outage kind. */
 export function classifyOutageKind(errorType: string): OutageKind {
   const t = String(errorType || '').toLowerCase();
-  if (/rtc-?api/.test(t)) return 'rtc-api';
-  if (t === 'token-api' || t === 'token-fetch') return 'token-api';
-  if (t === 'server-error' || t === 'authentication') return 'server-error';
+  // Identity for OutageKind literals (keepalive / timeout retry paths pass these).
+  if (t === 'duplicate-member') return 'duplicate-member';
+  if (t === 'rtc-api') return 'rtc-api';
+  if (t === 'token-api') return 'token-api';
+  if (t === 'server-error') return 'server-error';
   if (t === 'token-expired') return 'token-expired';
+  if (t === 'disconnected') return 'disconnected';
+  if (/rtc-?api/.test(t)) return 'rtc-api';
+  if (t === 'token-fetch') return 'token-api';
+  if (t === 'authentication') return 'server-error';
+  if (/already-?same-?name-?member-?exist/i.test(t)) return 'duplicate-member';
   return 'disconnected';
+}
+
+/**
+ * Delay between alreadySameNameMemberExist join retries.
+ * Spans toward SkyWay ghost TTL (keepaliveIntervalSec≈15 → drop ~30s) without
+ * exceeding the room reopen OPEN_NETWORK timeout.
+ */
+export function duplicateMemberRetryDelayMs(attempt: number): number {
+  return Math.min(2000 + Math.max(0, attempt) * 2000, 12000);
+}
+
+/** Join attempts for room/lobby person when the previous same-name member is still present. */
+export const DUPLICATE_MEMBER_JOIN_ATTEMPTS = 6;
+
+/**
+ * OPEN_NETWORK wait during reopenLastRoomOrLobby.
+ * Must cover joinRoomPerson duplicate-member delays (2+4+6+8+10=30s across 6 attempts)
+ * plus leave/rejoin + remesh wall time. Mesh-death uses `disconnected` but join may
+ * still hit ghosts, so that path gets the same budget.
+ */
+export function reopenOpenNetworkTimeoutMs(errorType?: string): number {
+  const kind = errorType ? classifyOutageKind(errorType) : 'disconnected';
+  if (kind === 'duplicate-member' || kind === 'disconnected') return 75000;
+  return 60000;
 }
 
 /** True when this error type should attempt room reopen (extends room-reconnect.util). */

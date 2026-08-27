@@ -2,6 +2,7 @@ import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, NgZone, OnDest
 
 import { FileSyncProgress } from '@udonarium/core/file-storage/file-sync-progress';
 import { Network } from '@udonarium/core/system';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 
 const SHOW_THRESHOLD = 12 * 1024;
 const SHOW_MIN_MS = 400;
@@ -37,6 +38,8 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
     const isBandwidthBusy = () =>
       Network.bandwidthPeak >= SHOW_THRESHOLD || Network.bandwidthUsage >= SHOW_THRESHOLD;
 
+    const isReconnectSoft = () => RoomConnectHelper.isNetworkReconnecting();
+
     const applyView = (show: boolean, fileMode: boolean, loaded: number, filled: number) => {
       this.visible = show;
       this.fileSyncMode = fileMode;
@@ -53,7 +56,7 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
       if (this.hideTimer) clearTimeout(this.hideTimer);
       this.hideTimer = setTimeout(() => {
         this.hideTimer = null;
-        if (isBandwidthBusy()) {
+        if (isBandwidthBusy() || isReconnectSoft()) {
           Network.clearBandwidthPeak();
           scheduleHide();
           return;
@@ -74,7 +77,8 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
         const snap = FileSyncProgress.snapshot(BAR_SEGMENTS);
         const fileBusy = snap.active;
         const bandwidthBusy = isBandwidthBusy();
-        if (!fileBusy && !bandwidthBusy) {
+        const reconnectSoft = isReconnectSoft();
+        if (!fileBusy && !bandwidthBusy && !reconnectSoft) {
           if (this.visible) {
             this.ngZone.run(() => applyView(false, false, 0, 0));
             this.showSince = 0;
@@ -83,10 +87,12 @@ export class NetworkIndicatorComponent implements AfterViewInit, OnDestroy {
         }
 
         const now = performance.now();
+        // Prefer file progress UI when transferring; otherwise cube「同步中」
+        // covers bandwidth peaks and soft auto-reopen (no fullscreen freeze yet).
         const fileMode = fileBusy;
         if (!this.visible) {
           if (this.showSince === 0) this.showSince = now;
-          if (!fileMode && bandwidthBusy && now - this.showSince < SHOW_MIN_MS) return;
+          if (!fileMode && bandwidthBusy && !reconnectSoft && now - this.showSince < SHOW_MIN_MS) return;
         }
 
         this.ngZone.run(() => {
