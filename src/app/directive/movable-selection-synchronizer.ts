@@ -144,6 +144,16 @@ export class MovableSelectionSynchronizer {
     return selected;
   }
 
+  /**
+   * Primary + drag followers for the active multi-drag session.
+   * Stable across mid-drag selection clears (peer sync / disable races).
+   */
+  get sessionMovables(): Set<MovableDirective> {
+    const set = new Set<MovableDirective>(this.dragFollowers);
+    if (this.movable) set.add(this.movable);
+    return set;
+  }
+
   private callbackOnPickStart = this.onPickStart.bind(this);
   private callbackOnPickObject = this.onPickObject.bind(this);
   private callbackOnPickRegion = this.onPickRegion.bind(this);
@@ -155,6 +165,9 @@ export class MovableSelectionSynchronizer {
   private latestRectPoints: IPoint2D[] = [];
   /** Movables participating in the current drag (includes absorbed MAGNETIC). */
   private undoTargets: Set<MovableDirective> = new Set();
+  /** Secondaries snapped at prepareMove — moved even if selection drops mid-drag. */
+  private dragFollowers: Set<MovableDirective> = new Set();
+  private dragSessionActive = false;
 
   constructor(
     private movable: MovableDirective,
@@ -263,20 +276,57 @@ export class MovableSelectionSynchronizer {
   prepareMove() {
     this.beginUndoCapture();
     this.absorbBakeGroupIntoSelection();
+    this.clearDragFollowers();
+    this.dragSessionActive = this.movable.state !== SelectionState.NONE;
 
-    if (!this.shouldSynchronize()) return;
+    if (!this.dragSessionActive) return;
 
     for (let movable of this.selectedMovables) {
       if (movable === this.movable) continue;
       if (movable.isDisable) {
         movable.state = SelectionState.NONE;
       } else {
-        movable.state = SelectionState.SELECTED;
-        movable.setPointerEvents(false);
-        movable.setAnimatedTransition(false);
+        this.attachDragFollower(movable);
         this.trackUndoTarget(movable);
       }
     }
+  }
+
+  /**
+   * Cancel mid-drag without flush — restore follower PE/flags.
+   * Also ends a completed session after flush (onInputEnd → cancel).
+   * Called from MovableDirective.cancel() (context menu, destroy, etc.).
+   */
+  abortMove() {
+    if (!this.dragSessionActive && this.dragFollowers.size < 1) return;
+    const midDragAbort = this.undoTargets.size > 0;
+    for (const movable of this.dragFollowers) {
+      movable.isDragFollower = false;
+      movable.setPointerEvents(true);
+      movable.setAnimatedTransition(true);
+      movable.width = movable.height = -1;
+    }
+    this.clearDragFollowers();
+    this.dragSessionActive = false;
+    if (midDragAbort) {
+      this.undoTargets.clear();
+      UndoService.instance?.discardTransformGesture();
+    }
+  }
+
+  private attachDragFollower(movable: MovableDirective) {
+    movable.state = SelectionState.SELECTED;
+    movable.setPointerEvents(false);
+    movable.setAnimatedTransition(false);
+    movable.isDragFollower = true;
+    this.dragFollowers.add(movable);
+  }
+
+  private clearDragFollowers() {
+    for (const movable of this.dragFollowers) {
+      movable.isDragFollower = false;
+    }
+    this.dragFollowers.clear();
   }
 
   /** Multi-box model parts share bakeGroupId — select siblings so they drag as one. */
@@ -305,7 +355,7 @@ export class MovableSelectionSynchronizer {
   }
 
   updateMove(delta: PointerCoordinate) {
-    if (!this.shouldSynchronize()) {
+    if (!this.dragSessionActive) {
       if (this.movable.isPointerMoved) this.selection.clear();
       return;
     }
@@ -318,9 +368,8 @@ export class MovableSelectionSynchronizer {
             if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
             if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
             if (this.isProximity(movable)) {
+              this.attachDragFollower(movable);
               movable.state = SelectionState.MAGNETIC;
-              movable.setPointerEvents(false);
-              movable.setAnimatedTransition(false);
               this.trackUndoTarget(movable);
               //movable.ondragstart.emit(e as PointerEvent);
             }
@@ -329,7 +378,7 @@ export class MovableSelectionSynchronizer {
       }
     }
 
-    for (let movable of this.selectedMovables) {
+    for (let movable of this.dragFollowers) {
       if (movable === this.movable) continue;
       movable.posX += delta.x;
       movable.posY += delta.y;
@@ -346,21 +395,21 @@ export class MovableSelectionSynchronizer {
   }
 
   finishMove(delta: PointerCoordinate) {
-    if (!this.shouldSynchronize()) {
+    if (!this.dragSessionActive) {
       // Do not clear here: a plain click may end with no sync window while
       // click-to-select already registered the object on input start.
       this.commitUndoCapture();
       return;
     }
 
-    for (let movable of this.selectedMovables) {
+    for (let movable of this.dragFollowers) {
       if (movable === this.movable) continue;
       movable.posX += delta.x;
       movable.posY += delta.y;
       movable.posZ += delta.z;
     }
 
-    let movables = Array.from(this.selectedMovables).sort((a, b) => {
+    let movables = Array.from(this.dragFollowers).sort((a, b) => {
       let zindexA = (a.tabletopObject as Stackable).zindex;
       let zindexB = (b.tabletopObject as Stackable).zindex;
       if (zindexA == null || zindexB == null) return 0;
@@ -402,6 +451,7 @@ export class MovableSelectionSynchronizer {
     } else {
       this.refreshState();
     }
+    // Keep dragFollowers until abortMove (after flushDragPosesToTable).
   }
 
   private beginUndoCapture() {
@@ -436,14 +486,12 @@ export class MovableSelectionSynchronizer {
     undo.commitTransformGesture(after, 'move');
   }
 
-  private shouldSynchronize(): boolean {
-    let isSynchronize = this.movable.state !== SelectionState.NONE;
-    return isSynchronize;
-  }
-
   private refreshState() {
-    for (let movable of this.selectedMovables) {
-      movable.state = SelectionState.SELECTED;
+    // Restore PE on session followers (may have been dropped from live selection mid-drag).
+    for (let movable of this.sessionMovables) {
+      if (movable.state !== SelectionState.MAGNETIC) {
+        movable.state = SelectionState.SELECTED;
+      }
       if (movable === this.movable) continue;
       movable.setPointerEvents(true);
       movable.setAnimatedTransition(true);
@@ -539,9 +587,22 @@ export class MovableSelectionSynchronizer {
         let rad = MathUtil.radians(angle);
         movable.posX = center.x + distance * Math.sin(rad) - (movable.width / 2);
         movable.posY = center.y + distance * Math.cos(rad) - (movable.height / 2);
-        movable.posZ = center.z;
+        // settle_floor: never adopt pointer pick Z; sample terrain/stack under new XY.
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
       }
     }
+  }
+
+  /** @internal test helper — register a movable into the static object map. */
+  static __testRegister(object: TabletopObject, movable: MovableDirective) {
+    let movableSet = MovableSelectionSynchronizer.objectMap.get(object) ?? new Set();
+    movableSet.add(movable);
+    MovableSelectionSynchronizer.objectMap.set(object, movableSet);
+  }
+
+  /** @internal test helper — clear static object map entries for targets. */
+  static __testUnregister(object: TabletopObject) {
+    MovableSelectionSynchronizer.objectMap.delete(object);
   }
 
   static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {

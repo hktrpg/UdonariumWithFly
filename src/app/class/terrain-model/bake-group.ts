@@ -99,8 +99,9 @@ export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordina
     })),
   });
 
+  // Keep each part's own height — do not adopt pointer pick Z (T congregate settle_floor).
   for (const p of locals) {
-    commitTerrainPose(p.terrain, originX + p.lx, originY + p.ly, center.z, { restoreSize: true });
+    commitTerrainPose(p.terrain, originX + p.lx, originY + p.ly, p.terrain.posZ || 0, { restoreSize: true });
   }
 
   footprintDebug('assembleBakeGroupAt after', {

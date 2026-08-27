@@ -24,6 +24,7 @@
     "src/app/component/card-stack/card-stack-gesture.spec.ts",
     "src/app/service/timer.service.spec.ts",
     "src/app/service/table-lighting.service.spec.ts",
-    "src/app/class/card-stack.surface.spec.ts"
+    "src/app/class/card-stack.surface.spec.ts",
+    "src/app/directive/movable-selection-synchronizer.spec.ts"
   ]
 }

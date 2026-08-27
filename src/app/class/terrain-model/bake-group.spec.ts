@@ -19,6 +19,7 @@ function stubTerrain(opts: {
   depth?: number;
   x?: number;
   y?: number;
+  posZ?: number;
   groupSize?: number;
   isLocked?: boolean;
 }): Terrain {
@@ -41,7 +42,7 @@ function stubTerrain(opts: {
     rotate: 0,
     isLocked: !!opts.isLocked,
     location: { name: 'table', x: opts.x ?? 0, y: opts.y ?? 0 },
-    posZ: 0,
+    posZ: opts.posZ ?? 0,
     tablePlacements: '',
     bakeCropJson: serializeBakeCropState(crop),
     update() { /* no-op */ },
@@ -248,6 +249,14 @@ describe('bake-group', () => {
     const a = stubTerrain({ groupId: 'g1', localX: 0, localY: 0, width: 2, depth: 2, isLocked: true });
     const b = stubTerrain({ groupId: 'g1', localX: 200, localY: 0, width: 2, depth: 2 });
     expect(assembleBakeGroupAt([a, b], { x: 500, y: 400, z: 0 })).toBe(false);
+  });
+
+  it('assembleBakeGroupAt ignores elevated pointer pick Z (settle_floor)', () => {
+    const a = stubTerrain({ groupId: 'g1', localX: 0, localY: 0, width: 2, depth: 2, posZ: 12 });
+    const b = stubTerrain({ groupId: 'g1', localX: 200, localY: 0, width: 2, depth: 2, posZ: 7 });
+    assembleBakeGroupAt([a, b], { x: 500, y: 400, z: 99 });
+    expect(a.posZ).toBe(12);
+    expect(b.posZ).toBe(7);
   });
 
   it('formBakeGroup refuses locked parts', () => {

@@ -29,6 +29,7 @@ import { UndoService } from 'service/undo.service';
 
 import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
+import { shouldClearSelectionOnRemotePoseUpdate } from './movable-pose-sync-policy';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 
@@ -75,6 +76,8 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
   @Input('movable.disable') isDisable: boolean = false;
   @Input('movable.interact') isInteract: boolean = true;
+  /** True while this piece follows another token's multi-drag (not the primary grab). */
+  isDragFollower = false;
   @Output('movable.onstart') onstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondragstart') ondragstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondrag') ondrag: EventEmitter<PointerEvent> = new EventEmitter();
@@ -152,12 +155,14 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.tabletopObject?.identifier}`, event => {
         if (event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) return;
-        // Keep local drag pose; commit once on pointer up (avoid snap-back when peers move the same token).
-        if (!event.isSendFromSelf && this.input.isGrabbing) return;
+        // Keep local drag pose (primary grab or multi-drag follower); flush wins on pointer up (LWW).
+        if (!event.isSendFromSelf && (this.input.isGrabbing || this.isDragFollower)) return;
         if (!this.shouldTransition(this.tabletopObject)) return;
         this.batchService.add(() => {
           this.setAnimatedTransition(true);
-          this.state = SelectionState.NONE;
+          if (shouldClearSelectionOnRemotePoseUpdate()) {
+            this.state = SelectionState.NONE;
+          }
           this.stopTransition();
           this.setPosition(this.tabletopObject);
         }, this);
@@ -191,6 +196,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   cancel() {
+    this.synchronizer.abortMove();
     this.input.cancel();
     this.setPointerEvents(true);
     this.setAnimatedTransition(true);
@@ -472,7 +478,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
       for (const movable of set) {
         const obj = movable.tabletopObject;
         if (!obj || obj.identifier !== objectId) continue;
-        if (movable.input?.isGrabbing || movable.input?.isDragging) {
+        if (movable.input?.isGrabbing || movable.input?.isDragging || movable.isDragFollower) {
           return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
         }
         const pose = obj.getPoseForView();
@@ -487,7 +493,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   private setUpdateBatching() {
     this.updateTransformCss();
     // Network sync only on pointer up — dragging used to version-bump every frame and flood the mesh.
-    if (this.input.isGrabbing) return;
+    if (this.input.isGrabbing || this.isDragFollower) return;
     if (!this.isUpdateBatching && this.tabletopObject) {
       this.isUpdateBatching = true;
       // Pin the map id at queue time — resolveViewTableIdentifier() at flush can be a different map.
@@ -513,8 +519,7 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   /** Commit drag poses to SyncVars once (primary + multi-select / magnetic group). */
   private flushDragPosesToTable() {
-    const movables = new Set<MovableDirective>(this.synchronizer.selectedMovables);
-    movables.add(this);
+    const movables = this.synchronizer.sessionMovables;
     for (const movable of movables) {
       if (movable.tabletopObject?.identifier) {
         ObjectSynchronizer.instance.markPoseGraceReleased(movable.tabletopObject.identifier);
