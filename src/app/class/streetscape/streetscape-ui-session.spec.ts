@@ -26,6 +26,13 @@ describe('streetscape-ui-session', () => {
       attribution: 'LandsD / Open3Dhk',
       street: '彌敦道',
       maxFeatures: 6,
+      addModelCount: 3,
+      active: {
+        tableId: 'table-1',
+        sheet: '11-SW-4B',
+        worldExtent: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 },
+        placedBuildingIds: ['b1'],
+      },
       deferred: {
         tableId: 'table-1',
         sheet: '11-SW-4B',
@@ -44,6 +51,8 @@ describe('streetscape-ui-session', () => {
     expect(restored.deferred?.buildingIds).toEqual(['b1', 'b2']);
     expect(restored.exportPack?.files.length).toBe(1);
     expect(restored.maxFeatures).toBe(6);
+    expect(restored.addModelCount).toBe(3);
+    expect(restored.active?.placedBuildingIds).toEqual(['b1']);
   });
 
   it('does not clamp maxFeatures to 8', () => {
@@ -66,5 +75,6 @@ describe('streetscape-ui-session', () => {
     expect(s.attribution).toBe('');
     expect(s.deferred).toBeNull();
     expect(s.exportPack).toBeNull();
+    expect(s.active).toBeNull();
   });
 });

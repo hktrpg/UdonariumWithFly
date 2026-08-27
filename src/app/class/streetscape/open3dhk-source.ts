@@ -112,6 +112,7 @@ export const open3dhkSource: StreetscapeSource = {
       rangeMode: query.rangeMode,
       reuseWorldExtent: query.reuseWorldExtent,
       buildingIds: query.buildingIds,
+      excludeBuildingIds: query.excludeBuildingIds,
       signal,
       onProgress,
     });
@@ -182,6 +183,7 @@ async function fetchOfficialSheetAsPack(
     rangeMode?: Open3dhkRangeMode;
     reuseWorldExtent?: StreetscapePackLoad['worldExtent'];
     buildingIds?: string[];
+    excludeBuildingIds?: string[];
     signal?: AbortSignal;
     onProgress?: (p: StreetscapeSourceProgress) => void;
   },
@@ -201,6 +203,7 @@ async function fetchOfficialSheetAsPack(
       opts.signal,
       opts.onProgress,
       opts.buildingIds,
+      opts.excludeBuildingIds,
     );
     opts.onProgress?.({ phase: 'unpack', current: 1, total: 2 });
     const pack = await packLoadFromOpen3dhkSheetFiles(files, {
@@ -211,6 +214,7 @@ async function fetchOfficialSheetAsPack(
       floorOnly: rangeMode === 'floorOnly',
       reuseWorldExtent: opts.reuseWorldExtent,
       preferredBuildingIds: opts.buildingIds,
+      excludeBuildingIds: opts.excludeBuildingIds,
     });
     opts.onProgress?.({ phase: 'unpack', current: 2, total: 2 });
     return pack;
@@ -230,6 +234,7 @@ async function fetchOfficialSheetAsPack(
     floorOnly: rangeMode === 'floorOnly',
     reuseWorldExtent: opts.reuseWorldExtent,
     preferredBuildingIds: opts.buildingIds,
+    excludeBuildingIds: opts.excludeBuildingIds,
   });
   opts.onProgress?.({ phase: 'unpack', current: 2, total: 2 });
   return pack;
@@ -243,18 +248,20 @@ async function fetchSheetZipSubsetFiles(
   signal?: AbortSignal,
   onProgress?: (p: StreetscapeSourceProgress) => void,
   buildingIds?: string[],
+  excludeBuildingIds?: string[],
 ): Promise<File[]> {
   const urls = open3dhkSheetZipFetchUrls(sheet, format);
   let lastErr: unknown;
   for (const url of urls) {
     try {
-      open3dhkDebug('fetchSheetZipSubsetFiles: try', { sheet, format, maxFeatures, mode, url, buildingIds });
+      open3dhkDebug('fetchSheetZipSubsetFiles: try', { sheet, format, maxFeatures, mode, url, buildingIds, excludeBuildingIds });
       onProgress?.({ phase: 'download', current: 0, total: 0, message: 'index' });
       const files = await fetchOpen3dhkRangeSubsetFiles({
         url,
         maxFeatures,
         mode,
         buildingIds,
+        excludeBuildingIds,
         signal,
         onProgress,
       });

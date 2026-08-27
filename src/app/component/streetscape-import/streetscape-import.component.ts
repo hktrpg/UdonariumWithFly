@@ -12,6 +12,7 @@ import {
 } from '@udonarium/streetscape/export-pack';
 import {
   appendStreetscapeFacadesToTable,
+  appendStreetscapeModelsToTable,
   generateStreetscape,
   registerBuiltinStreetscapeSources,
   StreetscapeProgress,
@@ -50,11 +51,27 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   streetscapeAttribution = '';
   /** Soft UX threshold — above this, show a lag / memory warning (not a hard cap). */
   static readonly MAX_FEATURES_WARN = 10;
-  /** Buildings to keep (≥1). */
+  /** Buildings to keep on first create (≥1). */
   streetscapeMaxFeatures = 4;
+  /** Buildings to append on each「新增模型」click. */
+  streetscapeAddCount = 4;
+  /** After create: sheet context for incremental model adds. */
+  streetscapeActive: {
+    tableId: string;
+    sheet: string;
+    title?: string;
+    street?: string;
+    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
+    placedBuildingIds: string[];
+  } | null = null;
 
   get streetscapeMaxFeaturesWarn(): boolean {
     const n = Number(this.streetscapeMaxFeatures);
+    return Number.isFinite(n) && n > StreetscapeImportComponent.MAX_FEATURES_WARN;
+  }
+
+  get streetscapeAddCountWarn(): boolean {
+    const n = Number(this.streetscapeAddCount);
     return Number.isFinite(n) && n > StreetscapeImportComponent.MAX_FEATURES_WARN;
   }
   /** After gray create: pending textured facade download for the same building ids. */
@@ -96,6 +113,16 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     return !!this.streetscapeExport?.files?.length && !this.streetscapeBusy;
   }
 
+  get streetscapeCanAddModels(): boolean {
+    const table = this.viewTable;
+    const active = this.streetscapeActive;
+    return !!active
+      && !!table
+      && active.tableId === table.identifier
+      && !!active.sheet
+      && !!active.worldExtent;
+  }
+
   constructor(
     private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
@@ -129,6 +156,8 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       attribution: this.streetscapeAttribution,
       street: this.streetscapeStreet,
       maxFeatures: this.streetscapeMaxFeatures,
+      addModelCount: this.streetscapeAddCount,
+      active: this.streetscapeActive,
       deferred: this.streetscapeDeferred,
       exportPack: this.streetscapeExport,
     });
@@ -140,6 +169,8 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.streetscapeAttribution = s.attribution;
     this.streetscapeStreet = s.street;
     this.streetscapeMaxFeatures = s.maxFeatures;
+    this.streetscapeAddCount = s.addModelCount;
+    this.streetscapeActive = s.active;
     this.streetscapeDeferred = s.deferred;
     this.streetscapeExport = s.exportPack;
   }
@@ -314,6 +345,98 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     }
   }
 
+  async addStreetscapeModels() {
+    if (!this.canActivate || this.streetscapeBusy || !this.streetscapeCanAddModels) return;
+    const active = this.streetscapeActive!;
+    const table = this.viewTable;
+    if (!table || table.identifier !== active.tableId) return;
+
+    const count = Math.max(1, Math.floor(Number(this.streetscapeAddCount) || 4));
+    this.streetscapeAddCount = count;
+
+    this.streetscapeBusy = true;
+    this.streetscapeStatus = this.i18n.t('streetscape.busyAddModels');
+    this.changeDetector.markForCheck();
+    try {
+      registerBuiltinStreetscapeSources();
+      const exclude = this.mergePlacedBuildingIds(active.placedBuildingIds);
+      const query: StreetscapeQuery = {
+        type: 'open3dhk',
+        sheet: active.sheet,
+        street: active.street,
+        format: 'GLTF0',
+        maxFeatures: count,
+        useRange: true,
+        rangeMode: 'buildings',
+        reuseWorldExtent: active.worldExtent,
+        excludeBuildingIds: exclude,
+      };
+      const source = resolveStreetscapeSource(query);
+      const load = await source.resolve(query, undefined, (p) => {
+        this.applyStreetscapeSourceProgress(p);
+      });
+      const result = await appendStreetscapeModelsToTable(table, load, {
+        onProgress: (p) => this.applyStreetscapeBakeProgress(p),
+      });
+      const newIds = (result.pack.features || []).map(f => f.id).filter(Boolean);
+      const placed = this.mergePlacedBuildingIds([...exclude, ...newIds]);
+      this.streetscapeActive = {
+        ...active,
+        placedBuildingIds: placed,
+        worldExtent: result.worldExtent || active.worldExtent,
+      };
+      this.streetscapeAttribution = result.attribution || this.streetscapeAttribution;
+      this.rememberStreetscapeExport(result.pack, result.exportFiles);
+      if (newIds.length && active.sheet) {
+        const prev = this.streetscapeDeferred;
+        const pendingIds = this.mergePlacedBuildingIds([
+          ...(prev?.tableId === table.identifier ? prev.buildingIds : []),
+          ...newIds,
+        ]);
+        this.streetscapeDeferred = {
+          tableId: table.identifier,
+          sheet: active.sheet,
+          title: active.title,
+          street: active.street,
+          maxFeatures: pendingIds.length,
+          buildingIds: pendingIds,
+          estimatedFacadeBytes: 0,
+          worldExtent: this.streetscapeActive.worldExtent,
+        };
+      }
+      const warn = result.warnings.filter(w => w && !w.includes('already on map')).slice(0, 4).join('; ');
+      this.streetscapeStatus = warn
+        ? this.i18n.t('streetscape.warnings', { detail: warn })
+        : this.i18n.t('streetscape.doneAddModels', { count: String(newIds.length) });
+    } catch (err) {
+      this.streetscapeStatus = '';
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('streetscape.errorTitle'),
+        text: this.i18n.t(streetscapeErrorI18nKey(err)),
+        type: ConfirmationType.OK,
+        materialIcon: 'error',
+      });
+    } finally {
+      this.streetscapeBusy = false;
+      this.persistStreetscapeUiSession();
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  private mergePlacedBuildingIds(ids: string[]): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of ids) {
+      const id = String(raw || '').trim();
+      if (!id) continue;
+      const key = id.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(id);
+    }
+    return out;
+  }
+
   private open3dhkQuery(
     base: { sheet?: string; street?: string },
     extra: Partial<Extract<StreetscapeQuery, { type: 'open3dhk' }>> = {},
@@ -399,6 +522,18 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       this.streetscapeAttribution = result.attribution;
       this.rememberStreetscapeExport(result.pack, result.exportFiles);
       const buildingIds = (result.pack.features || []).map(f => f.id).filter(Boolean);
+      if (opts.deferFacades?.sheet && result.worldExtent) {
+        this.streetscapeActive = {
+          tableId: result.table.identifier,
+          sheet: opts.deferFacades.sheet,
+          title: opts.deferFacades.title,
+          street: opts.deferFacades.street,
+          worldExtent: result.worldExtent,
+          placedBuildingIds: buildingIds.slice(),
+        };
+      } else {
+        this.streetscapeActive = null;
+      }
       if (opts.deferFacades?.sheet && result.worldExtent && buildingIds.length) {
         this.streetscapeDeferred = {
           tableId: result.table.identifier,

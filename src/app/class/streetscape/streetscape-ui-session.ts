@@ -6,6 +6,17 @@ export type StreetscapeUiSession = {
   attribution: string;
   street: string;
   maxFeatures: number;
+  /** Count for the post-create「新增模型」row. */
+  addModelCount: number;
+  /** Open3Dhk sheet context after a successful create — enables incremental models. */
+  active: {
+    tableId: string;
+    sheet: string;
+    title?: string;
+    street?: string;
+    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
+    placedBuildingIds: string[];
+  } | null;
   deferred: {
     tableId: string;
     sheet: string;
@@ -28,6 +39,8 @@ const EMPTY: StreetscapeUiSession = {
   attribution: '',
   street: '',
   maxFeatures: 4,
+  addModelCount: 4,
+  active: null,
   deferred: null,
   exportPack: null,
 };
@@ -44,6 +57,14 @@ export function setStreetscapeUiSession(next: StreetscapeUiSession): void {
     attribution: next.attribution || '',
     street: next.street || '',
     maxFeatures: Math.max(1, Math.floor(Number(next.maxFeatures) || 4)),
+    addModelCount: Math.max(1, Math.floor(Number(next.addModelCount) || 4)),
+    active: next.active
+      ? {
+        ...next.active,
+        placedBuildingIds: (next.active.placedBuildingIds || []).slice(),
+        worldExtent: { ...next.active.worldExtent },
+      }
+      : null,
     deferred: next.deferred
       ? {
         ...next.deferred,
@@ -63,5 +84,5 @@ export function setStreetscapeUiSession(next: StreetscapeUiSession): void {
 
 /** Test / room-reset helper. */
 export function clearStreetscapeUiSession(): void {
-  session = { ...EMPTY, deferred: null, exportPack: null };
+  session = { ...EMPTY, active: null, deferred: null, exportPack: null };
 }

@@ -1,4 +1,4 @@
-import { MODEL_BAKE_SIZE_MAX, MODEL_MAX_FILE_BYTES, fitModelGridSize, uniformFitScale, gridPerWorldForImport, MODEL_GRID_EDGE_MAX, MODEL_GRID_EDGE_MIN } from './mesh-ir';
+import { MODEL_BAKE_SIZE_MAX, MODEL_MAX_FILE_BYTES, fitModelGridSize, uniformFitScale, gridPerWorldForImport, gridPerWorldForStreetscape, MODEL_GRID_EDGE_MAX, MODEL_GRID_EDGE_MIN } from './mesh-ir';
 import { MODEL_ZIP_MAX_BYTES } from './model-package-files';
 import { canvasSizeForFace, faceOrthoSize } from './ortho-face-views';
 import { createDevModelLayoutCursor, placeDevModelAndAdvance } from './dev-3dmodel-layout';
@@ -85,6 +85,20 @@ describe('gridPerWorldForImport', () => {
     const fitted = gridPerWorldForImport(huge, 1000, true);
     const unfitted = gridPerWorldForImport(huge, 1000, false);
     expect(fitted).toBeLessThan(unfitted);
+  });
+});
+
+describe('gridPerWorldForStreetscape', () => {
+  it('corrects when mesh AABB is ~1000× smaller than surveyed sizeMeters', () => {
+    const aabb = { min: [0, 0, 0] as [number, number, number], max: [0.02, 0.03, 0.02] as [number, number, number] };
+    const g = gridPerWorldForStreetscape(aabb, 2.5, { w: 20, d: 20, h: 30 }, 2.5);
+    expect(g).toBeCloseTo(8 / 0.02, 5);
+  });
+
+  it('keeps mm-based scale when sizeMeters already matches mesh', () => {
+    const aabb = { min: [0, 0, 0] as [number, number, number], max: [20, 30, 20] as [number, number, number] };
+    const g = gridPerWorldForStreetscape(aabb, 2.5, { w: 20, d: 20 }, 2.5);
+    expect(g).toBeCloseTo(1 / 2.5, 5);
   });
 });
 

@@ -100,6 +100,30 @@ export async function appendStreetscapeFacadesToTable(
   load: StreetscapePackLoad,
   opts: Omit<GenerateStreetscapeOptions, 'query'> & { caps?: StreetscapeCapsV1 } = {},
 ): Promise<GenerateStreetscapeResult> {
+  return appendStreetscapeFeaturesToTable(table, load, { ...opts, replaceMatching: true });
+}
+
+/**
+ * Append new building models onto an existing streetscape table.
+ * Skips features already present (by id / Open3Dhk variant). Does not recreate the floor.
+ */
+export async function appendStreetscapeModelsToTable(
+  table: GameTable,
+  load: StreetscapePackLoad,
+  opts: Omit<GenerateStreetscapeOptions, 'query'> & { caps?: StreetscapeCapsV1 } = {},
+): Promise<GenerateStreetscapeResult> {
+  return appendStreetscapeFeaturesToTable(table, load, { ...opts, replaceMatching: false });
+}
+
+async function appendStreetscapeFeaturesToTable(
+  table: GameTable,
+  load: StreetscapePackLoad,
+  opts: Omit<GenerateStreetscapeOptions, 'query'> & {
+    caps?: StreetscapeCapsV1;
+    /** When true, destroy matching gray shells before import (facade upgrade). */
+    replaceMatching: boolean;
+  },
+): Promise<GenerateStreetscapeResult> {
   registerBuiltinStreetscapeSources();
   const caps = resolveStreetscapeCaps(opts.caps);
   const pack = load.pack;
@@ -124,6 +148,7 @@ export async function appendStreetscapeFacadesToTable(
 
   const importModel = opts.importModel || importModelAsTerrain;
   const terrains: Terrain[] = [];
+  let imported = 0;
   for (let i = 0; i < selected.length; i++) {
     throwIfAborted(opts.signal);
     const feature = selected[i];
@@ -134,9 +159,41 @@ export async function appendStreetscapeFacadesToTable(
       featureId: feature.id,
     });
     try {
-      // Replace gray GLTF0 shells with textured facades.
-      // GLTF0 ids end in C0 / GLTF in A0 — match by variant key, keep the gray name.
-      const replacedName = removeTerrainsNamedOnTable(table, feature.id);
+      if (opts.replaceMatching) {
+        const replacedName = removeTerrainsNamedOnTable(table, feature.id);
+        const files = await load.openFeature(feature.id, opts.signal);
+        const center = featureCenterTablePx(feature, pack, scale);
+        let colorTint: { r: number; g: number; b: number } | undefined;
+        const hasFacadeTexture = files.some(f => /\.(png|jpe?g|webp)$/i.test(packagePathOf(f)));
+        if (floorBlob && !hasFacadeTexture) {
+          try {
+            colorTint = await sampleBlobRgbAtUv(floorBlob, ...featureFloorUv(feature, pack));
+          } catch {
+            // best-effort
+          }
+        }
+        const result = await importModel(files, { x: center.x, y: center.y, z: 0 }, {
+          name: replacedName || feature.id,
+          fitGrid: quality.fitGrid,
+          bakeSize: quality.bakeMaxEdgePx,
+          mmPerGrid: scale.mmPerGrid,
+          metersPerGrid: scale.metersPerGrid,
+          sizeMeters: feature.sizeMeters,
+          parentTable: table,
+          yawDeg: feature.yawDeg,
+          colorTint,
+          locked: true,
+        });
+        terrains.push(...result.terrains);
+        warnings.push(...(result.warnings || []));
+        imported += 1;
+        continue;
+      }
+
+      if (tableHasTerrainNamed(table, feature.id)) {
+        warnings.push(`${feature.id}: already on map`);
+        continue;
+      }
       const files = await load.openFeature(feature.id, opts.signal);
       const center = featureCenterTablePx(feature, pack, scale);
       let colorTint: { r: number; g: number; b: number } | undefined;
@@ -149,10 +206,12 @@ export async function appendStreetscapeFacadesToTable(
         }
       }
       const result = await importModel(files, { x: center.x, y: center.y, z: 0 }, {
-        name: replacedName || feature.id,
+        name: feature.id,
         fitGrid: quality.fitGrid,
         bakeSize: quality.bakeMaxEdgePx,
         mmPerGrid: scale.mmPerGrid,
+        metersPerGrid: scale.metersPerGrid,
+        sizeMeters: feature.sizeMeters,
         parentTable: table,
         yawDeg: feature.yawDeg,
         colorTint,
@@ -160,10 +219,19 @@ export async function appendStreetscapeFacadesToTable(
       });
       terrains.push(...result.terrains);
       warnings.push(...(result.warnings || []));
+      imported += 1;
     } catch (err) {
       if (isStreetscapeAbort(err)) throw err;
       warnings.push(`${feature.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  if (!opts.replaceMatching && imported < 1 && selected.length > 0) {
+    // All candidates already present or failed — treat as no new models.
+    throw new Error(STREETSCAPE_ERRORS.NO_MORE_MODELS);
+  }
+  if (!opts.replaceMatching && selected.length < 1) {
+    throw new Error(STREETSCAPE_ERRORS.NO_MORE_MODELS);
   }
 
   applyStreetscapeMapCredit(table, pack);
@@ -178,6 +246,15 @@ export async function appendStreetscapeFacadesToTable(
     worldExtent: load.worldExtent,
     exportFiles: load.files?.slice(),
   };
+}
+
+function tableHasTerrainNamed(table: GameTable, featureId: string): boolean {
+  if (!featureId || !table) return false;
+  for (const t of ObjectStore.instance.getObjects(Terrain)) {
+    if (!streetscapeTerrainNameMatches(t.name, featureId)) continue;
+    if (t.tableIdentifier === table.identifier || t.hasPlacement(table.identifier)) return true;
+  }
+  return false;
 }
 
 /** Exact name, or Open3Dhk GLTF0↔GLTF product-letter variant (`…C0` ↔ `…A0`). */
@@ -280,9 +357,12 @@ export async function generateStreetscapeFromLoad(
           fitGrid: quality.fitGrid,
           bakeSize: quality.bakeMaxEdgePx,
           mmPerGrid: scale.mmPerGrid,
+          metersPerGrid: scale.metersPerGrid,
+          sizeMeters: feature.sizeMeters,
           parentTable: table,
           yawDeg: feature.yawDeg,
           colorTint,
+          locked: true,
         });
         terrains.push(...result.terrains);
         warnings.push(...(result.warnings || []));

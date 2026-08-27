@@ -1,4 +1,5 @@
 import {
+  filterOutOpen3dhkBuildingIds,
   matchOpen3dhkBuildingsByIds,
   open3dhkBuildingVariantKey,
 } from './open3dhk-building-id';
@@ -46,5 +47,17 @@ describe('matchOpen3dhkBuildingsByIds', () => {
 
   it('returns none when preferred ids are not in the sheet', () => {
     expect(matchOpen3dhkBuildingsByIds(gltf, ['b999999999999999c0'], 8)).toEqual([]);
+  });
+});
+
+describe('filterOutOpen3dhkBuildingIds', () => {
+  it('drops already-placed buildings including GLTF0↔GLTF variants', () => {
+    const pool = [
+      { id: 'b352541799701063a0' },
+      { id: 'b352671784102063a0' },
+      { id: 'other' },
+    ];
+    const left = filterOutOpen3dhkBuildingIds(pool, ['B352541799701063C0', 'other']);
+    expect(left.map(b => b.id)).toEqual(['b352671784102063a0']);
   });
 });

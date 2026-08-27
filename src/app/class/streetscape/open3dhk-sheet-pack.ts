@@ -3,7 +3,7 @@ import { attachPackagePath, packagePathOf } from '@udonarium/terrain-model/model
 import { BUILTIN_STREETSCAPE_CAPS } from './caps';
 import { STREETSCAPE_ERRORS } from './errors';
 import { composeStreetscapeFloor } from './floor-composer';
-import { matchOpen3dhkBuildingsByIds } from './open3dhk-building-id';
+import { filterOutOpen3dhkBuildingIds, matchOpen3dhkBuildingsByIds } from './open3dhk-building-id';
 import {
   chooseBuildingsForSheet,
   filterBuildingsOnTerrain,
@@ -58,6 +58,8 @@ export async function packLoadFromOpen3dhkSheetFiles(
     reuseWorldExtent?: { minX: number; maxX: number; minZ: number; maxZ: number };
     /** Prefer these Open3Dhk building folder ids when present in `files`. */
     preferredBuildingIds?: string[];
+    /** Skip already-placed buildings when ranking. */
+    excludeBuildingIds?: string[];
   },
 ): Promise<StreetscapePackLoad> {
   const format: Open3dhkZipFormat = opts.format === 'GLTF' ? 'GLTF' : 'GLTF0';
@@ -115,12 +117,13 @@ export async function packLoadFromOpen3dhkSheetFiles(
     ? Math.max(1, Math.floor(opts.maxFeatures))
     : Math.max(1, members.length);
   const preferred = (opts.preferredBuildingIds || []).map(id => String(id || '').trim()).filter(Boolean);
+  const pool = filterOutOpen3dhkBuildingIds(members, opts.excludeBuildingIds);
   let selected: Open3dhkBuildingMember[];
   if (preferred.length) {
     selected = matchOpen3dhkBuildingsByIds(members, preferred, maxN);
-    if (!selected.length) selected = chooseBuildingsForSheet(members, maxN, terrainBox);
+    if (!selected.length) selected = chooseBuildingsForSheet(pool, maxN, terrainBox);
   } else {
-    selected = chooseBuildingsForSheet(members, maxN, terrainBox);
+    selected = chooseBuildingsForSheet(pool, maxN, terrainBox);
   }
 
   let minX: number;

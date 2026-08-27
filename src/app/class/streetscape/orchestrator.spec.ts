@@ -53,6 +53,9 @@ describe('generateStreetscapeFromLoad', () => {
       importModel: async (files, position, opts) => {
         const table = opts?.parentTable as GameTable;
         expect(table).toBeTruthy();
+        expect(opts?.locked).toBeTrue();
+        expect(opts?.fitGrid).toBeFalse();
+        expect(opts?.metersPerGrid).toBeGreaterThan(0);
         const t = { name: opts?.name || '', location: { x: position.x, y: position.y } } as Terrain;
         placed.push({ name: String(opts?.name), x: position.x });
         return { terrain: t, terrains: [t], warnings: [] };

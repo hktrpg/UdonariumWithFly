@@ -13,6 +13,30 @@ export function open3dhkBuildingVariantKey(id: string): string | null {
   return m ? `${m[1]}${m[2]}` : null;
 }
 
+/** Drop buildings already placed (exact id or GLTF0↔GLTF variant key). */
+export function filterOutOpen3dhkBuildingIds<T extends { id: string }>(
+  buildings: T[],
+  excludeIds: string[] | undefined | null,
+): T[] {
+  if (!excludeIds?.length) return buildings.slice();
+  const exact = new Set<string>();
+  const variants = new Set<string>();
+  for (const raw of excludeIds) {
+    const id = String(raw || '').trim().toLowerCase();
+    if (!id) continue;
+    exact.add(id);
+    const key = open3dhkBuildingVariantKey(id);
+    if (key) variants.add(key);
+  }
+  return buildings.filter(b => {
+    const id = String(b.id || '').trim().toLowerCase();
+    if (!id) return true;
+    if (exact.has(id)) return false;
+    const key = open3dhkBuildingVariantKey(id);
+    return !(key && variants.has(key));
+  });
+}
+
 /** Pick ZIP members for previously placed buildings (GLTF0 ids → GLTF folders). */
 export function matchOpen3dhkBuildingsByIds<T extends { id: string }>(
   buildings: T[],

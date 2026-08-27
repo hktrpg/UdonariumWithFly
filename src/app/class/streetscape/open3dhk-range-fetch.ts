@@ -5,7 +5,7 @@ import {
   normalizePackagePath,
 } from '@udonarium/terrain-model/model-package-files';
 
-import { matchOpen3dhkBuildingsByIds } from './open3dhk-building-id';
+import { filterOutOpen3dhkBuildingIds, matchOpen3dhkBuildingsByIds } from './open3dhk-building-id';
 import { open3dhkDebug, open3dhkDebugHeartbeat, open3dhkDebugWarn } from './open3dhk-debug';
 import { isStreetscapeAbort, STREETSCAPE_ERRORS } from './errors';
 import {
@@ -51,6 +51,8 @@ export type Open3dhkRangeFetchOpts = {
   mode?: Open3dhkRangeMode;
   /** Prefer these building folder ids (skip size/probe ranking). */
   buildingIds?: string[];
+  /** Skip already-placed buildings when ranking the next batch. */
+  excludeBuildingIds?: string[];
   signal?: AbortSignal;
   onProgress?: (p: StreetscapeSourceProgress) => void;
 };
@@ -125,10 +127,11 @@ async function estimateByProbingMapPlacement(
   opts: Omit<Open3dhkRangeFetchOpts, 'mode'>,
   rangeReader: Open3dhkHttpRangeReader,
 ): Promise<Open3dhkRangeEstimate> {
-  const buildings = listBuildingsFromCentralDirectory(byPath);
+  const buildingsAll = listBuildingsFromCentralDirectory(byPath);
+  const buildings = filterOutOpen3dhkBuildingIds(buildingsAll, opts.excludeBuildingIds);
   if (!buildings.length) {
     return {
-      buildingCount: 0,
+      buildingCount: buildingsAll.length,
       selectedCount: 0,
       facadeCompressedBytes: 0,
       floorCompressedBytes: estimateTerrainFloorBytes(byPath),
@@ -200,7 +203,7 @@ async function estimateByProbingMapPlacement(
     probed: probed.size,
     ids: selected.map(s => s.id),
   });
-  return estimateForSelected(byPath, buildings.length, selected);
+  return estimateForSelected(byPath, buildingsAll.length, selected);
 }
 
 function estimateForSelected(
@@ -247,9 +250,13 @@ export async function fetchOpen3dhkRangeSubsetFiles(
     throwIfAborted(opts.signal);
     const byPath = indexEntries(entries);
 
-    const buildings = listBuildingsFromCentralDirectory(byPath);
-    if (mode !== 'floorOnly' && !buildings.length) {
+    const buildingsAll = listBuildingsFromCentralDirectory(byPath);
+    const buildings = filterOutOpen3dhkBuildingIds(buildingsAll, opts.excludeBuildingIds);
+    if (mode !== 'floorOnly' && !buildingsAll.length) {
       throw new Error(STREETSCAPE_ERRORS.NOT_A_PACK);
+    }
+    if (mode !== 'floorOnly' && !buildings.length && !(opts.buildingIds || []).length) {
+      throw new Error(STREETSCAPE_ERRORS.NO_MORE_MODELS);
     }
 
     const terrainGltfPath = [...byPath.keys()].find(p => TERRAIN_GLTF_RE.test(p));
@@ -321,13 +328,13 @@ export async function fetchOpen3dhkRangeSubsetFiles(
 
     let selected: Open3dhkBuildingMember[];
     if (fixedIds) {
-      selected = matchOpen3dhkBuildingsByIds(buildings, wantIds, maxN);
+      selected = matchOpen3dhkBuildingsByIds(buildingsAll, wantIds, maxN);
       open3dhkDebug('fetch subset: fixed building ids', {
         want: wantIds.length,
         selected: selected.length,
-        zipBuildings: buildings.length,
+        zipBuildings: buildingsAll.length,
         wantSample: wantIds.slice(0, 3),
-        zipSample: buildings.slice(0, 3).map(b => b.id),
+        zipSample: buildingsAll.slice(0, 3).map(b => b.id),
         ids: selected.map(s => s.id),
       });
     } else {
@@ -355,6 +362,7 @@ export async function fetchOpen3dhkRangeSubsetFiles(
           probed: probed.size,
           onMap: onMap.length,
           maxN,
+          excluded: (opts.excludeBuildingIds || []).length,
         });
         await pullPlanned(planned, byPath, opts, rangeReader, bag, 'probe');
         for (const b of batch) {

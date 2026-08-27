@@ -27,6 +27,7 @@ import {
   MODEL_MM_PER_GRID_DEFAULT,
   MODEL_PHOTO_BAKE_SIZE,
   gridPerWorldForImport,
+  gridPerWorldForStreetscape,
 } from './mesh-ir';
 import { isPrimaryModelFile, packagePathOf } from './model-package-files';
 import { BakedFaceBlobs, bakeSixOrthoFaces } from './ortho-bake';
@@ -65,6 +66,13 @@ export type ImportModelAsTerrainOptions = {
   colorTint?: { r: number; g: number; b: number };
   /** When true, Terrain.isLocked after place (streetscape buildings default locked). */
   locked?: boolean;
+  /**
+   * Surveyed footprint in metres. With `metersPerGrid`, corrects bake scale when the
+   * mesh AABB disagrees with the streetscape map (Open3Dhk unit quirks).
+   */
+  sizeMeters?: { w: number; d: number; h?: number };
+  /** Metres represented by one table grid cell (streetscape scale). */
+  metersPerGrid?: number;
 };
 
 export type BakeBoxPreviewContext = {
@@ -109,7 +117,9 @@ export async function importModelAsTerrain(
   const baked = await bakeModelBoxes(files, opts.bakeSize, opts.colorTint);
   const mm = opts.mmPerGrid ?? MODEL_MM_PER_GRID_DEFAULT;
   const fitGrid = opts.fitGrid !== false;
-  const gridPerWorld = gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
+  const gridPerWorld = (!fitGrid && opts.sizeMeters && opts.metersPerGrid)
+    ? gridPerWorldForStreetscape(baked.fullAabb, mm, opts.sizeMeters, opts.metersPerGrid)
+    : gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
   const fullSx = Math.max(1e-9, baked.fullAabb.max[0] - baked.fullAabb.min[0]);
   const fullSz = Math.max(1e-9, baked.fullAabb.max[2] - baked.fullAabb.min[2]);
   const fullSy = Math.max(0, baked.fullAabb.max[1] - baked.fullAabb.min[1]);
@@ -128,6 +138,8 @@ export async function importModelAsTerrain(
     modelW: +modelW.toFixed(3),
     modelD: +modelD.toFixed(3),
     height: +height.toFixed(3),
+    sizeMeters: opts.sizeMeters || null,
+    metersPerGrid: opts.metersPerGrid ?? null,
     fullAabb: footprintBoxSummary(baked.fullAabb),
     boxes: baked.boxes.map((b, i) => ({ i, ...footprintBoxSummary(b.aabb, baked.fullAabb) })),
   });
@@ -150,6 +162,10 @@ export async function importModelAsTerrain(
       locked: !!opts.locked,
     });
     viewTable.appendChild(terrain);
+    // Re-assert after appendChild — some tabletop paths reset lock on place.
+    if (opts.locked) {
+      terrain.mutateAppearance(() => { terrain.isLocked = true; });
+    }
     terrains.push(terrain);
 
     if (opts.previewBox) {

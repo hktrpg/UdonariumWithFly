@@ -24,6 +24,8 @@ export type StreetscapeQuery =
     reuseWorldExtent?: { minX: number; maxX: number; minZ: number; maxZ: number };
     /** When set, Range-fetch / select only these Open3Dhk building folder ids. */
     buildingIds?: string[];
+    /** Skip these ids (and GLTF0↔GLTF variants) when picking the next N buildings. */
+    excludeBuildingIds?: string[];
   };
 
 export type StreetscapePackLoad = {
