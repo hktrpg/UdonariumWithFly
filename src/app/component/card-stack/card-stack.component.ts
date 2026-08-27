@@ -9,7 +9,8 @@ import {
   Input,
   NgZone,
   OnChanges,
-  OnDestroy
+  OnDestroy,
+  ViewChild,
 } from '@angular/core';
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
@@ -25,17 +26,30 @@ import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { CardStackListComponent } from 'component/card-stack-list/card-stack-list.component';
 import { CardStackSettingsComponent } from 'component/card-stack-settings/card-stack-settings.component';
+import { HandRailComponent } from 'component/hand-rail/hand-rail.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ObjectInteractGesture } from 'component/game-table/object-interact-gesture';
-import { MovableOption } from 'directive/movable.directive';
+import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
 import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import {
+  CARD_STACK_HOLD_MS,
+  findCardIdAtPoint,
+  findCardStackIdAtPoint,
+  findMergeTargetIdAtPoint,
+  holdProgressAt,
+  isQuickDragMove,
+  resolveQuickDragDrop,
+  setCardMergePreview,
+  shouldHoldHaptic,
+} from './card-stack-gesture';
 import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
+import { CoordinateService } from 'service/coordinate.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
@@ -106,7 +120,48 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   get ownerColor(): string { return this.cardStack.ownerColor; }
 
   get topCard(): Card { return this.cardStack.topCard; }
+  get coverCard(): Card { return this.cardStack.coverCard; }
   get imageFile(): ImageFile { return this.imageService.getSkeletonOr(this.cardStack.imageFile); }
+
+  /**
+   * Deck height in table Z (px). Scales with count so a full pile reads as a real block.
+   * Tokens ride this height via MovableSelectionSynchronizer (see CardStack.visualHeightPx).
+   */
+  get stackHeightPx(): number {
+    return this.cardStack?.visualHeightPx ?? 0;
+  }
+
+  get hasStackThickness(): boolean {
+    return this.stackHeightPx > 0;
+  }
+
+  get stackTopTransform(): string {
+    const h = this.stackHeightPx;
+    return h > 0 ? `translateZ(${h}px)` : '';
+  }
+
+  /** Hold ring must sit above stack underlay/top translateZ or it is occluded. */
+  get holdRingTransform(): string {
+    return `translateZ(${this.stackHeightPx + 16}px)`;
+  }
+
+  /**
+   * Z offsets for underlay card faces (bottom + middle). Top is rendered separately.
+   * Cap layer count for perf — still looks like a solid deck, not a hollow box.
+   */
+  get stackUnderlayZs(): number[] {
+    const h = this.stackHeightPx;
+    const n = this.cards.length;
+    if (h < 1 || n <= 1) return [];
+    // faces including top; underlays = faces - 1
+    const faces = Math.min(n, Math.max(2, Math.min(12, Math.round(h / 2) + 2)));
+    const underlays = faces - 1;
+    const zs: number[] = [];
+    for (let i = 0; i < underlays; i++) {
+      zs.push(Math.round((h * i) / (faces - 1) * 100) / 100);
+    }
+    return zs;
+  }
 
   get selectionState(): SelectionState { return this.selectionService.state(this.cardStack); }
   get isSelected(): boolean { return this.selectionState !== SelectionState.NONE; }
@@ -117,10 +172,34 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private iconHiddenTimer: NodeJS.Timeout = null;
   get isIconHidden(): boolean { return this.iconHiddenTimer != null };
 
-  get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.topCard.text)) }
+  get rubiedText(): string { return StringUtil.rubyToHtml(StringUtil.escapeHtml(this.coverCard.text)) }
 
   get isLocked(): boolean { return this.cardStack ? this.cardStack.isLocked : false; }
   set isLocked(isLocked: boolean) { if (this.cardStack) { this.cardStack.mutateAppearance(() => { this.cardStack.isLocked = isLocked; }); } }
+
+  get stackMovableDisabled(): boolean { return this.isLocked || this.suppressStackMovable; }
+
+  @ViewChild(MovableDirective) private movableDir: MovableDirective;
+
+  /** True while another card/stack is hovered for merge onto this stack. */
+  isMergeTarget = false;
+  holdProgress = 0;
+
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
+  private holdStartedAt = 0;
+  private holdVibrated = false;
+  private holdProgressFrame = 0;
+  private suppressStackMovable = false;
+  private quickDragging = false;
+  /** Top card identifier at drag start — stack is not mutated until drop commits. */
+  private quickDragPeekId = '';
+  private quickDragGhost: HTMLElement | null = null;
+  private quickPointerId = -1;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
+  private holdComplete = false;
+  private handDropPreviewActive = false;
+  private handDropPreviewHover = false;
 
   gridSize: number = 50;
 
@@ -148,6 +227,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
     private tabletopActionService: TabletopActionService,
+    private coordinateService: CoordinateService,
     private i18n: I18nService
   ) { }
 
@@ -211,6 +291,16 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       .on('DISCONNECT_PEER', event => {
         let cursor = PeerCursor.findByPeerId(event.data.peerId);
         if (!cursor || this.cardStack.owner === cursor.userId) this.changeDetector.markForCheck();
+      })
+      .on('CARD_MERGE_PREVIEW', event => {
+        const next = !!event.data?.active
+          && !!this.cardStack?.identifier
+          && event.data?.targetId === this.cardStack.identifier;
+        if (this.isMergeTarget === next) return;
+        this.ngZone.run(() => {
+          this.isMergeTarget = next;
+          this.changeDetector.markForCheck();
+        });
       });
     this.movableOption = {
       tabletopObject: this.cardStack,
@@ -232,6 +322,9 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.cleanupQuickDragListeners();
+    this.clearHoldTimer();
+    this.removeQuickDragGhost();
     this.interactGesture.destroy();
     EventSystem.unregister(this);
   }
@@ -251,13 +344,13 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (this.cardStack === e.detail || (e.detail instanceof Card === false && e.detail instanceof CardStack === false)) {
       return;
     }
-    e.stopPropagation();
-    e.preventDefault();
 
     if (e.detail instanceof Card) {
       let card: Card = e.detail;
       let distance: number = this.cardStack.calcSqrDistance(card);
       if (distance < 50 ** 2) {
+        e.stopPropagation();
+        e.preventDefault();
         this.chatMessageService.sendOperationLog(this.i18n.t('stack.putCard', {
         card: card.isFront ? (card.name == '' ? this.i18n.t('card.unnamed') : card.name) : this.i18n.t('card.facedown'),
         stack: this.stackDisplayName()
@@ -267,7 +360,9 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     } else if (e.detail instanceof CardStack) {
       let cardStack: CardStack = e.detail;
       let distance: number = this.cardStack.calcSqrDistance(cardStack);
-      if (distance < 25 ** 2) {
+      if (distance < 50 ** 2) {
+        e.stopPropagation();
+        e.preventDefault();
         this.chatMessageService.sendOperationLog(this.i18n.t('stack.putAll', {
         from: cardStack.name == '' ? this.i18n.t('stack.unnamed') : cardStack.name,
         to: this.stackDisplayName()
@@ -305,6 +400,324 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     });
   }
 
+  onStackPointerDown(event: PointerEvent) {
+    if (this.GuestMode() || event.button !== 0) return;
+    event.stopPropagation();
+    this.resetQuickDragState();
+    // Suppress movable immediately so the companion mousedown cannot start a stack drag.
+    this.suppressStackMovable = true;
+    this.changeDetector.detectChanges();
+    this.pointerStartX = event.clientX;
+    this.pointerStartY = event.clientY;
+    this.quickPointerId = event.pointerId;
+    this.holdStartedAt = Date.now();
+    this.holdVibrated = false;
+    this.holdProgress = 0;
+    this.holdTimer = setTimeout(() => this.onHoldTimerComplete(event), CARD_STACK_HOLD_MS);
+    this.scheduleHoldProgressFrame();
+    document.addEventListener('pointermove', this.onQuickPointerMove);
+    document.addEventListener('pointerup', this.onQuickPointerUp);
+    document.addEventListener('pointercancel', this.onQuickPointerUp);
+    this.changeDetector.markForCheck();
+  }
+
+  private onHoldTimerComplete(event: PointerEvent) {
+    this.holdTimer = null;
+    if (this.isLocked) {
+      this.resetQuickDragState();
+      return;
+    }
+    this.holdComplete = true;
+    this.suppressStackMovable = false;
+    this.holdProgress = 0;
+    this.ngZone.run(() => {
+      this.onInputStart(event);
+      this.changeDetector.detectChanges();
+      this.movableDir?.startDeferredDrag({
+        pageX: event.pageX,
+        pageY: event.pageY,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      this.changeDetector.markForCheck();
+    });
+  }
+
+  private onQuickPointerMove = (event: PointerEvent) => {
+    if (event.pointerId !== this.quickPointerId) return;
+    const dx = event.clientX - this.pointerStartX;
+    const dy = event.clientY - this.pointerStartY;
+
+    if (!this.quickDragging && !this.holdComplete && this.holdTimer && isQuickDragMove(dx, dy)) {
+      this.clearHoldTimer();
+      this.startQuickCardDrag(event);
+      return;
+    }
+
+    if (this.quickDragging) {
+      this.moveQuickDragGhost(event.clientX, event.clientY);
+      const overHand = HandRailComponent.isDropTargetAt(event.clientX, event.clientY);
+      const stackId = !overHand
+        ? findCardStackIdAtPoint(event.clientX, event.clientY, this.cardStack.identifier)
+        : null;
+      const cardId = !overHand && !stackId
+        ? findCardIdAtPoint(event.clientX, event.clientY)
+        : null;
+      const overTable = !overHand && !stackId && !cardId && this.isOverTable(event.clientX, event.clientY);
+      this.emitHandDropPreview(true, overHand);
+      EventSystem.trigger('TABLE_DROP_PREVIEW', { active: overTable });
+      setCardMergePreview(stackId || cardId);
+    }
+  };
+
+  private onQuickPointerUp = (event: PointerEvent) => {
+    if (event.pointerId !== this.quickPointerId) return;
+    this.cleanupQuickDragListeners();
+    this.emitHandDropPreview(false);
+    EventSystem.trigger('TABLE_DROP_PREVIEW', { active: false });
+    setCardMergePreview(null);
+
+    if (this.quickDragging && this.quickDragPeekId) {
+      this.finishQuickCardDrag(event.clientX, event.clientY);
+    } else {
+      this.clearHoldTimer();
+    }
+
+    this.resetQuickDragState();
+    this.changeDetector.markForCheck();
+  };
+
+  private startQuickCardDrag(event: PointerEvent) {
+    const top = this.cardStack?.topCard;
+    if (!top) {
+      this.resetQuickDragState();
+      return;
+    }
+    this.quickDragging = true;
+    this.quickDragPeekId = top.identifier;
+    SoundEffect.play(PresetSound.cardPick);
+    this.createQuickDragGhost(top, event.clientX, event.clientY);
+    this.emitHandDropPreview(
+      true,
+      HandRailComponent.isDropTargetAt(event.clientX, event.clientY),
+    );
+    this.changeDetector.markForCheck();
+  }
+
+  private finishQuickCardDrag(clientX: number, clientY: number) {
+    if (!this.quickDragPeekId || this.cardStack.topCard?.identifier !== this.quickDragPeekId) {
+      this.removeQuickDragGhost();
+      this.quickDragging = false;
+      this.quickDragPeekId = '';
+      return;
+    }
+
+    const overHand = HandRailComponent.isDropTargetAt(clientX, clientY);
+    const otherStackId = !overHand
+      ? findCardStackIdAtPoint(clientX, clientY, this.cardStack.identifier)
+      : null;
+    const cardId = !overHand && !otherStackId ? findCardIdAtPoint(clientX, clientY) : null;
+    const overTable = !overHand && !otherStackId && !cardId && this.isOverTable(clientX, clientY);
+    const dropTarget = resolveQuickDragDrop(overHand, !!otherStackId, !!cardId, overTable);
+
+    if (dropTarget === 'hand' || dropTarget === 'table' || dropTarget === 'card' || dropTarget === 'stack') {
+      const card = this.cardStack.drawCard();
+      if (!card) return;
+      if (dropTarget === 'hand') {
+        HandRailComponent.acceptQuickDragCard(card);
+      } else if (dropTarget === 'stack') {
+        const target = ObjectStore.instance.get(otherStackId!) as CardStack;
+        if (target instanceof CardStack) {
+          target.putOnTop(card);
+          SoundEffect.play(PresetSound.cardPut);
+        } else {
+          this.placeQuickDragOnTable(card, clientX, clientY);
+        }
+      } else if (dropTarget === 'card') {
+        const target = ObjectStore.instance.get(cardId!) as Card;
+        if (target instanceof Card) this.mergeDrawnCardOntoCard(card, target);
+        else this.placeQuickDragOnTable(card, clientX, clientY);
+      } else {
+        this.placeQuickDragOnTable(card, clientX, clientY);
+      }
+    }
+    // Dropped on same stack or outside valid zones: peek only — stack unchanged.
+
+    this.removeQuickDragGhost();
+    this.quickDragging = false;
+    this.quickDragPeekId = '';
+  }
+
+  private placeQuickDragOnTable(card: Card, clientX: number, clientY: number) {
+    const pointer = { x: clientX, y: clientY, z: 0 };
+    const local = this.coordinateService.calcTabletopLocalCoordinate(
+      pointer,
+      this.pointerDeviceService.targetElement,
+    );
+    card.location.x = local.x;
+    card.location.y = local.y;
+    card.owner = '';
+    card.setLocation('table');
+    card.raiseInTier();
+    SoundEffect.play(PresetSound.cardPut);
+  }
+
+  private mergeDrawnCardOntoCard(dropped: Card, target: Card) {
+    if (!dropped || !target || dropped === target || target.isLocked || target.parent) {
+      dropped.owner = '';
+      dropped.setLocation('table', this.cardStack.tableIdentifier);
+      dropped.raiseInTier();
+      SoundEffect.play(PresetSound.cardPut);
+      return;
+    }
+    const cardStack = CardStack.create(this.i18n.t('card.deckDefault'));
+    cardStack.location.x = target.location.x;
+    cardStack.location.y = target.location.y;
+    cardStack.posZ = target.posZ;
+    cardStack.location.name = target.location.name;
+    cardStack.tableIdentifier = target.tableIdentifier;
+    cardStack.rotate = target.rotate;
+    cardStack.zindex = Math.max(dropped.zindex, target.zindex);
+    cardStack.putOnBottom(target);
+    cardStack.putOnTop(dropped);
+    SoundEffect.play(PresetSound.cardPut);
+  }
+
+  private isOverTable(clientX: number, clientY: number): boolean {
+    const layer = document.querySelector('#app-table-layer');
+    if (!layer) return false;
+    const rect = layer.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right
+      && clientY >= rect.top && clientY <= rect.bottom;
+  }
+
+  private createQuickDragGhost(topCard: Card, x: number, y: number) {
+    this.removeQuickDragGhost();
+    const ghost = document.createElement('div');
+    ghost.className = 'hand-rail-drag-ghost';
+    const w = this.size * this.gridSize;
+    const h = Math.round(w * 1.25);
+    Object.assign(ghost.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: `${w}px`,
+      height: `${h}px`,
+      zIndex: '100000',
+      pointerEvents: 'none',
+      willChange: 'transform',
+      filter: 'drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5))',
+    } as CSSStyleDeclaration);
+    if (this.isLocked) {
+      ghost.classList.add('is-locked-quick-drag');
+      ghost.style.outline = '2px dashed rgba(251, 191, 36, 0.95)';
+      ghost.style.outlineOffset = '2px';
+      ghost.style.borderRadius = '6px';
+    }
+    const img = document.createElement('img');
+    const cover = this.cardStack.coverCard;
+    const pileFaceDown = !!(cover && !cover.isFront);
+    const visible = pileFaceDown
+      ? cover.backImage
+      : (topCard.isFront ? topCard.frontImage : topCard.backImage);
+    const ghostRotate = pileFaceDown ? cover.rotate : topCard.rotate;
+    img.src = visible?.url || '';
+    img.alt = '';
+    img.draggable = false;
+    Object.assign(img.style, {
+      width: '100%',
+      height: '100%',
+      objectFit: 'contain',
+      display: 'block',
+      pointerEvents: 'none',
+      transform: `rotate(${ghostRotate}deg)`,
+    } as CSSStyleDeclaration);
+    ghost.appendChild(img);
+    document.body.appendChild(ghost);
+    this.quickDragGhost = ghost;
+    this.moveQuickDragGhost(x, y);
+  }
+
+  private moveQuickDragGhost(x: number, y: number) {
+    if (!this.quickDragGhost) return;
+    const w = this.size * this.gridSize;
+    const h = Math.round(w * 1.25);
+    this.quickDragGhost.style.transform = `translate(${x - w / 2}px, ${y - h / 2}px)`;
+  }
+
+  private removeQuickDragGhost() {
+    if (this.quickDragGhost?.parentElement) {
+      this.quickDragGhost.parentElement.removeChild(this.quickDragGhost);
+    }
+    this.quickDragGhost = null;
+  }
+
+  private clearHoldTimer() {
+    if (this.holdTimer) {
+      clearTimeout(this.holdTimer);
+      this.holdTimer = null;
+    }
+    cancelAnimationFrame(this.holdProgressFrame);
+    this.holdProgressFrame = 0;
+    this.holdProgress = 0;
+  }
+
+  private scheduleHoldProgressFrame() {
+    cancelAnimationFrame(this.holdProgressFrame);
+    this.holdProgressFrame = requestAnimationFrame(() => this.updateHoldProgress());
+  }
+
+  private updateHoldProgress() {
+    if (!this.holdTimer) {
+      this.holdProgress = 0;
+      return;
+    }
+    const elapsed = Date.now() - this.holdStartedAt;
+    this.holdProgress = holdProgressAt(elapsed);
+    if (shouldHoldHaptic(elapsed, this.holdVibrated) && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(12);
+      this.holdVibrated = true;
+    }
+    if (this.holdProgress < 1) {
+      this.scheduleHoldProgressFrame();
+    }
+    this.ngZone.run(() => this.changeDetector.markForCheck());
+  }
+
+  private cleanupQuickDragListeners() {
+    document.removeEventListener('pointermove', this.onQuickPointerMove);
+    document.removeEventListener('pointerup', this.onQuickPointerUp);
+    document.removeEventListener('pointercancel', this.onQuickPointerUp);
+  }
+
+  private resetQuickDragState() {
+    this.removeQuickDragGhost();
+    this.emitHandDropPreview(false);
+    setCardMergePreview(null);
+    this.clearHoldTimer();
+    this.suppressStackMovable = false;
+    this.quickDragging = false;
+    this.quickDragPeekId = '';
+    this.quickPointerId = -1;
+    this.holdComplete = false;
+    this.holdVibrated = false;
+    this.holdStartedAt = 0;
+  }
+
+  private emitHandDropPreview(active: boolean, hover = false) {
+    if (this.handDropPreviewActive === active && this.handDropPreviewHover === hover) return;
+    this.handDropPreviewActive = active;
+    this.handDropPreviewHover = hover;
+    EventSystem.trigger('HAND_RAIL_DROP_PREVIEW', { active, hover });
+  }
+
+  get holdRingDashOffset(): number {
+    const circumference = 2 * Math.PI * 22;
+    return circumference * (1 - this.holdProgress);
+  }
+
+  readonly holdRingCircumference = 2 * Math.PI * 22;
+
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
     e.stopPropagation();
@@ -336,7 +749,17 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     SoundEffect.play(PresetSound.cardPick);
   }
 
+  onDragging(event: PointerEvent) {
+    if (this.GuestMode() || !this.cardStack) return;
+    setCardMergePreview(findMergeTargetIdAtPoint(
+      event.clientX,
+      event.clientY,
+      this.cardStack.identifier,
+    ));
+  }
+
   onMoved() {
+    setCardMergePreview(null);
     SoundEffect.play(PresetSound.cardPut);
     this.ngZone.run(() => this.dispatchCardDropEvent());
   }
@@ -431,9 +854,11 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private dispatchCardDropEvent() {
     let element: HTMLElement = this.elementRef.nativeElement;
     let parent = element.parentElement;
+    if (!parent) return;
     let children = parent.children;
-    let event = new CustomEvent('carddrop', { detail: this.cardStack, bubbles: true });
     for (let i = 0; i < children.length; i++) {
+      // Fresh event per sibling — a shared event stopped by one host never reaches the rest.
+      let event = new CustomEvent('carddrop', { detail: this.cardStack, bubbles: true });
       children[i].dispatchEvent(event);
     }
   }
@@ -459,7 +884,11 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       y: this.cardStack.location.y + (size * this.gridSize) / 2,
       z: this.cardStack.posZ
     };
-    actions.push({ name: this.i18n.t('stack.menu.1'), hotkey: 'T', action: () => this.selectionService.congregate(objectPosition) });
+    actions.push({
+      name: this.i18n.t('stack.menu.1'),
+      hotkey: 'T',
+      action: () => this.tabletopActionService.congregateOrMergeSelection(objectPosition),
+    });
 
     if (this.isMultiSelectedStacks()) {
       let selectedCardStacks = () => this.selectedCardStacks();
@@ -582,12 +1011,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
         disabled: this.cards.length == 0
       },
       ContextMenuSeparator,
-      (this.cards.length == 0 || !this.cardStack.topCard.isFront ? {
+      (this.cards.length == 0 || !this.cardStack.coverCard?.isFront ? {
         name: this.i18n.t('stack.menu.11'), action: () => {
-          if (!this.cardStack.topCard) return;
-          if (!this.cardStack.topCard.isFront) this.chatMessageService.sendOperationLog(this.i18n.t('stack.revealedTop', {
+          if (!this.cardStack.coverCard) return;
+          if (!this.cardStack.coverCard.isFront) this.chatMessageService.sendOperationLog(this.i18n.t('stack.revealedTop', {
             stack: this.stackDisplayName(),
-            card: this.cardStack.topCard.name == '' ? this.i18n.t('card.unnamed') : this.cardStack.topCard.name
+            card: this.cardStack.coverCard.name == '' ? this.i18n.t('card.unnamed') : this.cardStack.coverCard.name
           }));
           this.cardStack.faceUp();
           SoundEffect.play(PresetSound.cardDraw);
@@ -628,7 +1057,9 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       },
       ContextMenuSeparator,
       {
-        name: this.i18n.t('stack.menu.16'), action: () => {
+        name: this.i18n.t('stack.menu.16'),
+        hotkey: 'R',
+        action: () => {
           this.cardStack.shuffle();
           SoundEffect.play(PresetSound.cardShuffle);
           EventSystem.call('SHUFFLE_CARD_STACK', { identifier: this.cardStack.identifier });

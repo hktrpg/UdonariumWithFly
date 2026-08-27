@@ -665,6 +665,10 @@
   pointer-events: none;
 }
 
+.inverser {
+  transition: transform 132ms 0s ease, opacity 132ms 0s ease;
+}
+
 .face-icon-box {
   display: block;
   position: relative;

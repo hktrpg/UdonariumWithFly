@@ -15,6 +15,7 @@ export const zhTW: I18nDictionary = {
   'menu.music': '播放音樂',
   'menu.toolbox': '工具箱',
   'menu.combat': '戰鬥輪',
+  'menu.timer': '計時器',
   'menu.sceneTools': '場景工具',
   'menu.scenePreset': '預設場面',
   'menu.scenarioText': '劇本文字',

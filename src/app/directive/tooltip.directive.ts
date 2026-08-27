@@ -49,6 +49,7 @@ export class TooltipDirective implements AfterViewInit, OnDestroy {
   ) { }
 
   ngAfterViewInit() {
+    if (!this.tabletopObject) return;
     this.addEventListeners(this.viewContainerRef.element.nativeElement);
   }
 

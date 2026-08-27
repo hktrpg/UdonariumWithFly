@@ -51,6 +51,11 @@ export class TabletopActionService {
     return Network.GuestMode();
   }
 
+  /** Hotkey T: merge cards/stacks into a deck when possible, else congregate. */
+  congregateOrMergeSelection(position?: PointerCoordinate): boolean {
+    return this.keyboard.congregateOrMergeSelection(position);
+  }
+
   /** Right-click: select the target when it was not already in the selection. */
   ensureObjectSelected(object: TabletopObject): void {
     this.keyboard.ensureObjectSelected(object);

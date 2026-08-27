@@ -401,3 +401,96 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   margin-top: 2px;
 }
 
+.desktop-icon-rail {
+  position: fixed;
+  z-index: 100000;
+  box-sizing: border-box;
+  overflow: auto;
+  background: rgba(28, 26, 24, 0.92);
+  -webkit-overflow-scrolling: touch;
+}
+
+.desktop-icon-rail.vertical {
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.desktop-icon-rail.horizontal {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 52px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.desktop-icon-rail.horizontal ul {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 52px;
+  margin: 0;
+  padding: 0;
+}
+
+.desktop-icon-rail.horizontal ul > li {
+  flex: 0 0 auto;
+  width: 52px;
+  padding: 0;
+}
+
+.desktop-icon-rail ul > li {
+  padding: 6px 0;
+  width: 52px;
+  color: #888;
+}
+
+.desktop-icon-rail ul > li:hover,
+.desktop-icon-rail ul > li.is-active {
+  color: #ddd;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.desktop-icon-rail ul > li > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 40px;
+  font-size: 0;
+}
+
+.desktop-icon-rail .icon-size {
+  font-size: 26px;
+}
+
+.desktop-icon-rail .menu-chat-badge {
+  top: -2px;
+  right: -2px;
+}
+
+.desktop-icon-rail .self-only {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  font-size: 9px;
+  color: #c45c26;
+}
+
+#app-table-layer.is-card-drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 45;
+  box-shadow: inset 0 0 0 3px rgba(125, 211, 252, 0.65);
+  background: rgba(125, 211, 252, 0.06);
+}
+

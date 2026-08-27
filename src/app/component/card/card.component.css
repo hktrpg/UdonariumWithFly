@@ -248,6 +248,46 @@
   transform: rotateZ(180deg);
 }
 
+.component-content.is-quick-drag-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.component.is-merge-target .component-content {
+  box-shadow:
+    0 0 0 3px rgba(125, 211, 252, 0.9),
+    0 0 16px rgba(125, 211, 252, 0.45);
+  outline: 2px solid rgba(56, 189, 248, 0.95);
+  outline-offset: 2px;
+}
+
+.hold-progress-ring {
+  position: absolute;
+  inset: -6px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hold-progress-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.hold-ring-track {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 3;
+}
+
+.hold-ring-progress {
+  stroke: rgba(125, 211, 252, 0.95);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 50ms linear;
+}
+
 .component:hover .name-tag {
   visibility: hidden;
 }

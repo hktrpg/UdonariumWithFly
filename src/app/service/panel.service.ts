@@ -445,7 +445,10 @@ export class PanelService {
    */
   static getDesktopMenuInsets(gap: number = 8, margin: number = 8): { left: number; top: number; right: number; bottom: number } {
     const insets = { left: margin, top: margin, right: margin, bottom: margin };
-    const el = document.querySelector('.draggable-panel[data-geometry-key="menu.main"]') as HTMLElement | null;
+    const el = (
+      document.querySelector('.desktop-icon-rail[data-geometry-key="menu.main"]')
+      || document.querySelector('.draggable-panel[data-geometry-key="menu.main"]')
+    ) as HTMLElement | null;
     if (!el?.isConnected) return insets;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return insets;

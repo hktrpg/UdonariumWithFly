@@ -43,6 +43,7 @@ import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-s
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
+import { TableLightingService, rotateTableOffset, TokenShadowCast } from 'service/table-lighting.service';
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 import { TabletopActionService } from 'service/tabletop-action.service';
@@ -655,15 +656,76 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   get shadowOpacity(): number {
     const base = (this.isHollow ? 0.5 : 0.7) * (this.isHideIn ? 0.85 : 1);
-    return base * Math.max(0.3, 1 / (1 + Math.max(0, this.altitude) * 0.35));
+    const altitudeFactor = Math.max(0.3, 1 / (1 + Math.max(0, this.altitude) * 0.35));
+    return Math.min(1, base * altitudeFactor);
+  }
+
+  shadowOpacityFor(strength: number): number {
+    return Math.min(1, this.shadowOpacity * (0.55 + 0.45 * Math.max(0, strength)));
+  }
+
+  /** Ground shadow mirror: horizontal flip only (match token facing, not vertical FX). */
+  get shadowImageTransform(): string | null {
+    return this.isInverse ? 'scale(-1, 1)' : null;
+  }
+
+  get shadowTranslateX(): number {
+    return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
+  }
+
+  /** Light push from feet; roll is applied by inner CSS, not here. */
+  private shadowLocalOffset(dx: number, dy: number): { dx: number; dy: number } {
+    return rotateTableOffset(dx, dy, this.rotate);
+  }
+
+  /** Pin every silhouette to token feet — never offset the anchor per light. */
+  shadowFeetOuterTransform(): string {
+    return `translateX(${this.shadowTranslateX}px) translateY(${this.characterShadowOffset}px) scale(1, 0.66)`;
+  }
+
+  /**
+   * Stretch from feet toward light (pivot = center bottom); token roll applied last.
+   * translate() is intentionally avoided so shadows cannot detach from the base.
+   */
+  shadowCastInnerTransform(cast: TokenShadowCast): string {
+    const local = this.shadowLocalOffset(cast.dx, cast.dy);
+    const dist = Math.hypot(local.dx, local.dy);
+    const roll = `rotateZ(${this.roll}deg)`;
+    if (dist < 0.5) return roll;
+
+    const angle = (Math.atan2(local.dy, local.dx) * 180) / Math.PI;
+    const h = Math.max(1, this.characterShadowImageHeight);
+    const stretch = 1 + dist / h;
+    return `rotateZ(${angle}deg) scale(${stretch}, 1) rotateZ(${-angle}deg) ${roll}`;
+  }
+
+  defaultShadowInnerTransform(): string {
+    return `rotateZ(${this.roll}deg)`;
   }
 
   get shadowBlurPx(): number {
     return 1 + Math.max(0, this.altitude) * 0.6;
   }
 
-  get shadowTranslateX(): number {
-    return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
+  /** Tabletop piece id (CharacterToken on map; body when legacy). */
+  private get shadowLookupId(): string | null {
+    return this.tablePiece?.identifier ?? this.gameCharacter?.identifier ?? null;
+  }
+
+  /** Per-light casts when map lights are active; empty → default under-token shadow. */
+  get lightShadowCasts() {
+    const id = this.shadowLookupId;
+    if (!id) return [];
+    return this.tableLighting.getShadowsForCharacter(id);
+  }
+
+  get useLightShadows(): boolean {
+    return this.lightShadowCasts.length > 0;
+  }
+
+  /** Hide the compact default blob when map lights drive silhouettes instead. */
+  get showDefaultTokenShadow(): boolean {
+    return !this.useLightShadows;
   }
 
   get chatBubbleAltitude(): number {
@@ -741,6 +803,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private characterFxMenu: CharacterFxMenuService,
     private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
+    private tableLighting: TableLightingService,
   ) { }
 
   GuestMode() {
@@ -861,6 +924,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.changeDetector.markForCheck();
         }
       })
+      .on('TABLE_TOKEN_SHADOWS_UPDATED', () => {
+        this.changeDetector.markForCheck();
+      })
       .on('AFTER_VIEW_TABLE_CHANGE', () => {
         // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
         this.enforce2DRollZero();
@@ -948,7 +1014,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.movableOption = {
       tabletopObject: this.tablePiece,
       transformCssOffset: layerPeerMovableTransform(),
-      colideLayers: ['terrain', 'text-note', 'character', 'character-token']
+      colideLayers: ['terrain', 'text-note', 'character', 'character-token', 'card-stack']
     };
     this.rotableOption = {
       tabletopObject: this.tablePiece

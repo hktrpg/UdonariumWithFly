@@ -1,4 +1,8 @@
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { CardStack } from '@udonarium/card-stack';
+import { CharacterToken } from '@udonarium/character-token';
+import { EventSystem } from '@udonarium/core/system';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -16,19 +20,67 @@ import { MovableDirective } from './movable.directive';
 
 export class MovableSelectionSynchronizer {
   private static readonly objectMap: Map<TabletopObject, Set<MovableDirective>> = new Map();
-  /** Tracks whether the last sync placed this token on a terrain floor. */
+  /** Tracks whether the last sync placed this token on a terrain / card-stack floor. */
   private static readonly floorRideActive = new WeakMap<object, boolean>();
-  /** Last terrain floor Z we wrote while riding — used so leave-to-0 does not wipe stacks. */
+  /** Last floor Z we wrote while riding — used so leave-to-0 does not wipe stacks. */
   private static readonly floorRidePosZ = new WeakMap<object, number>();
   private static readonly FLOOR_Z_EPS = 0.05;
+  private static cardStackRideHooksInstalled = false;
+
+  /** Register once: keep tokens on card-stack tops when deck height changes. */
+  static ensureCardStackRideHooks() {
+    if (MovableSelectionSynchronizer.cardStackRideHooksInstalled) return;
+    MovableSelectionSynchronizer.cardStackRideHooksInstalled = true;
+    EventSystem.register(MovableSelectionSynchronizer)
+      .on('CARD_STACK_DECREASED', () => MovableSelectionSynchronizer.resyncAllTokenFloors())
+      .on(`UPDATE_GAME_OBJECT/aliasName/${CardStack.aliasName}`, () => {
+        MovableSelectionSynchronizer.resyncAllTokenFloors();
+      });
+  }
+
+  /** Re-sample every table character/token (cheap; only writes when Z changes). */
+  static resyncAllTokenFloors() {
+    if (TableSelecter.instance?.viewTable?.is2DMode) return;
+    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
+      if (ch.location?.name === 'table') MovableSelectionSynchronizer.syncTerrainFloor(ch);
+    }
+    for (const tok of ObjectStore.instance.getObjects(CharacterToken)) {
+      if (tok.location?.name === 'table') MovableSelectionSynchronizer.syncTerrainFloor(tok);
+    }
+  }
 
   /**
-   * Keep character/token feet on Terrain.floorHitAt while nudging / pathing.
+   * Analytic ride Z at a world XY — max of terrain floor and card-stack top.
+   * Used while dragging and after snap so tokens sit on deck thickness.
+   */
+  static sampleRidePosZ(worldX: number, worldY: number, gridSize: number = 50): number | null {
+    MovableSelectionSynchronizer.ensureCardStackRideHooks();
+    const table = TableSelecter.instance?.viewTable;
+    if (!table || table.is2DMode) return null;
+
+    let best: number | null = null;
+    const terrains = table.terrains;
+    if (terrains?.length) {
+      const hit = Terrain.floorHitAt(terrains, worldX, worldY, gridSize);
+      if (hit) best = hit.posZ;
+    }
+    const stacks = ObjectStore.instance.getObjects(CardStack)
+      .filter(s => s.location?.name === 'table');
+    const stackHit = CardStack.surfaceHitAt(stacks, worldX, worldY, gridSize);
+    if (stackHit) {
+      best = best == null ? stackHit.posZ : Math.max(best, stackHit.posZ);
+    }
+    return best;
+  }
+
+  /**
+   * Keep character/token feet on terrain / card-stack tops while nudging / pathing / drop.
    * No new SyncVars; only adjusts posZ when over an interactable floor.
    * Leaving a floor drops to 0 only when posZ still matches the last ride Z
    * (character-stack / manual lifts that diverged are left alone).
    */
   static syncTerrainFloor(target: MovableDirective | TabletopObject): void {
+    MovableSelectionSynchronizer.ensureCardStackRideHooks();
     const asMovable = target as MovableDirective;
     const isMovable = !!asMovable && typeof asMovable.posX === 'number' && !!asMovable.tabletopObject
       && asMovable.nativeElement != null;
@@ -46,19 +98,6 @@ export class MovableSelectionSynchronizer {
       else object.posZ = z;
     };
 
-    const terrains = TableSelecter.instance?.viewTable?.terrains;
-    if (!terrains?.length) {
-      // Map switch / empty table: drop ride tracking only — do not force posZ.
-      MovableSelectionSynchronizer.floorRideActive.delete(key);
-      MovableSelectionSynchronizer.floorRidePosZ.delete(key);
-      return;
-    }
-    // Fast path: no interactable floors and not currently riding → skip O(n) sample.
-    if (!MovableSelectionSynchronizer.floorRideActive.get(key)
-      && !terrains.some(t => t?.hasFloor && t.isInteract && t.location?.name === 'table')) {
-      return;
-    }
-
     let cx: number;
     let cy: number;
     if (isMovable) {
@@ -73,11 +112,11 @@ export class MovableSelectionSynchronizer {
       cy = object.location.y + half;
     }
 
-    const hit = Terrain.floorHitAt(terrains, cx, cy, 50);
-    if (hit) {
+    const rideZ = MovableSelectionSynchronizer.sampleRidePosZ(cx, cy, 50);
+    if (rideZ != null) {
       MovableSelectionSynchronizer.floorRideActive.set(key, true);
-      MovableSelectionSynchronizer.floorRidePosZ.set(key, hit.posZ);
-      writeZ(hit.posZ);
+      MovableSelectionSynchronizer.floorRidePosZ.set(key, rideZ);
+      writeZ(rideZ);
       return;
     }
     if (!MovableSelectionSynchronizer.floorRideActive.get(key)) return;

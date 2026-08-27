@@ -1,9 +1,11 @@
-<div class="component is-3d is-pointer-events-none" [ngClass]="{'is-grab': !isLocked}" [style.width.px]="size * gridSize"
-  appMovable [movable.option]="movableOption" [movable.disable]="isLocked"
-  (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()"
+<div class="component is-3d is-pointer-events-none" [ngClass]="{'is-grab': !isLocked, 'is-merge-target': isMergeTarget}" [style.width.px]="size * gridSize"
+  appMovable [movable.option]="movableOption" [movable.disable]="cardMovableDisabled"
+  (movable.ondragstart)="onMove()" (movable.ondrag)="onDragging($event)" (movable.ondragend)="onMoved()"
   (keyup.r)="turnRight()" (keyup.u)="vertical()" (keyup.shift.r)="turnLeft()" [attr.tabindex]="isLocked ? null : -1">
   <div @slidInOut class="is-3d" [@.disabled]="skipEnterBounce">
-    <div class="component-content is-pointer-events-auto is-3d" (dblclick)="onDoubleClick($event)"
+    <div class="component-content is-pointer-events-auto is-3d" [ngClass]="{'is-grab': !isLocked, 'is-quick-drag-hidden': isQuickDragging}"
+      (dblclick)="onDoubleClick($event)"
+      (pointerdown)="onCardPointerDown($event)"
       appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
       <img #cardImage [@inverse]="state" *ngIf="imageFile" (load)="onImageLoad()" class="card-image is-3d chrome-smooth-image-trick" [src]="(isFront ? frontImage.url : backImage.url) | safe: 'resourceUrl'">
       <div [style.opacity]="!isFront ? 0.8 : 1.0" [style.transform]="!isFront ? 'scale(0.9)' : ''" class="is-3d is-pointer-events-none" style="position: absolute"
@@ -31,6 +33,14 @@
       </ng-container>
       <div *ngIf="!isFront && ownerIsOnline && 0 < ownerName?.length" class="name-tag is-nowrap has-length-limit is-pointer-events-none is-black-background is-3d" [ngStyle]="{'background-color': ownerColor, 'transform': 'translateY(' + (isHand ? 'calc(' + -backImageClientHeight / 2 + 'px - 75%)' : '-50%') + ') translateX(-50%) translateX(' + size * gridSize / 2 +'px)'}">
         <span class="is-3d" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}"><b>{{ownerName}}</b></span>
+      </div>
+      <div *ngIf="holdProgress > 0 && holdProgress < 1" class="hold-progress-ring is-pointer-events-none">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <circle class="hold-ring-track" cx="24" cy="24" r="22" fill="none" />
+          <circle class="hold-ring-progress" cx="24" cy="24" r="22" fill="none"
+            [attr.stroke-dasharray]="holdRingCircumference"
+            [attr.stroke-dashoffset]="holdRingDashOffset" />
+        </svg>
       </div>
       <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
     </div>

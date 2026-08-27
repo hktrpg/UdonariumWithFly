@@ -2,6 +2,8 @@
 <img style="visibility: hidden; pointer-events: none; position: absolute" [src]="backgroundImageUrl2 | safe: 'resourceUrl'" (load)="isBackgroundImageLoaded2 = true">
 <div class="background-image is-pointer-events-none" [ngClass]="[(backgroundFilterType ? 'is-filter' : ''), (isStealthMode && !isGMMode ? 'is-hide-in' : ''), backgroundFilterType]"
 [style.background-image]="backgroundImageCss | safe: 'style'"></div>
+<div *ngIf="backgroundDarknessOverlayAlpha > 0" class="background-darkness-overlay is-pointer-events-none"
+  [style.background-color]="backgroundDarknessOverlayColor"></div>
 <div class="component is-fill is-perspective" [ngClass]="{'is-grabbing': isPointerDragging}" #root>
   <div class="component-content is-fill is-3d" #gameTable>
     <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'" #gameObjects>
@@ -137,7 +139,9 @@
         </div>
       </div>
       <div *ngIf="showSceneEditOverlay" class="edit-markers is-pointer-events-none" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.5) + 'px)'}">
-        <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
+        <div *ngFor="let light of lights" class="light-marker"
+          [class.selected]="isLightSelected(light)"
+          [class.hovered]="isLightHovered(light)"
           [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
       </div>
       <div *ngIf="!isTable2DMode" class="clue-strings-3d is-pointer-events-none is-3d">

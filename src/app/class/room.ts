@@ -14,6 +14,7 @@ import { GameTableMask } from './game-table-mask';
 import { RangeArea } from './range';
 import { AuraNameConfig } from './table-fx/aura-name-config';
 import { CombatTracker } from './table-fx/combat-tracker';
+import { TableTimerList } from './table-fx/table-timer';
 import { SceneToolPermission } from './table-fx/scene-tool-permission';
 import { TableSelecter } from './table-selecter';
 import { TabletopObject } from './tabletop-object';
@@ -67,6 +68,7 @@ export class Room extends GameObject implements InnerXml {
     objects = objects.concat(ObjectStore.instance.getObjects(ClueLink));
     objects.push(AuraNameConfig.instance);
     objects.push(CombatTracker.instance);
+    objects.push(TableTimerList.instance);
     objects.push(SceneToolPermission.instance);
     objects.push(TableSelecter.instance);
     const report: RoomSaveReport = { written: 0, skipped: [] };
@@ -223,6 +225,7 @@ export class Room extends GameObject implements InnerXml {
     return [
       AuraNameConfig.instance,
       CombatTracker.instance,
+      TableTimerList.instance,
       SceneToolPermission.instance,
       TableSelecter.instance,
     ];

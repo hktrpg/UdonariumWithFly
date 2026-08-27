@@ -64,6 +64,7 @@ import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting/dice-roll-table-setting.component';
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
 import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
+import { TableTimerPanelComponent } from 'component/table-timer-panel/table-timer-panel.component';
 import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
@@ -73,10 +74,12 @@ import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import { TableTimerList } from '@udonarium/table-fx/table-timer';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { CutInService } from 'service/cut-in.service';
+import { TimerService } from 'service/timer.service';
 import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -101,6 +104,7 @@ import { WeatherSeService } from 'service/weather-se.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
+import { MAIN_MENU_ITEMS, MainMenuItemDef, tourIdForMenuComponent } from './config/main-menu.def';
 
 interface MobileNavItemDef {
   tourId: string;
@@ -144,6 +148,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('modalLayer', { read: ViewContainerRef, static: true }) modalLayerViewContainerRef: ViewContainerRef;
   private immediateUpdateTimer: NodeJS.Timeout = null;
   private lazyUpdateTimer: NodeJS.Timeout = null;
+  tableDropHighlight = false;
+  private static readonly MENU_RAIL_HORIZONTAL_KEY = 'udonarium.menu-rail.horizontal';
   private openPanelCount: number = 0;
   isSaveing: boolean = false;
   progresPercent: number = 0;
@@ -160,19 +166,49 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private mobileSub: Subscription = null;
 
   /** Bottom / rail items — Play vs Edit is a filter, not duplicated markup. */
-  private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = [
-    { tourId: 'menu.connection', icon: 'people', labelKey: 'menu.connection', tipKey: 'tip.menu.connection', mode: 'play', action: 'open', component: 'PeerMenuComponent', updateBadge: true },
-    { tourId: 'menu.chat', icon: 'speaker_notes', labelKey: 'menu.chat', tipKey: 'tip.menu.chat', mode: 'play', action: 'open', component: 'ChatWindowComponent', chatBadge: true },
-    { tourId: 'menu.combat', icon: 'sports_mma', labelKey: 'menu.combat', tipKey: 'tip.menu.combat', mode: 'play', action: 'open', component: 'CombatTrackerComponent' },
-    { tourId: 'menu.inventory', icon: 'folder_shared', labelKey: 'menu.inventory', tipKey: 'tip.menu.inventory', mode: 'play', action: 'open', component: 'GameObjectInventoryComponent', gated: true },
-    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'play', action: 'open', component: 'NoteInventoryComponent', gated: true },
-    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'play', action: 'more' },
-    { tourId: 'menu.table', icon: 'layers', labelKey: 'menu.table', tipKey: 'tip.menu.table', mode: 'edit', action: 'open', component: 'GameTableSettingComponent', gated: true },
-    { tourId: 'menu.images', icon: 'photo_library', labelKey: 'menu.images', tipKey: 'tip.menu.images', mode: 'edit', action: 'open', component: 'FileStorageComponent', gated: true },
-    { tourId: 'menu.music', icon: 'queue_music', labelKey: 'menu.music', tipKey: 'tip.menu.music', mode: 'edit', action: 'open', component: 'JukeboxComponent', gated: true },
-    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'edit', action: 'open', component: 'NoteInventoryComponent', gated: true },
-    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'edit', action: 'more' },
-  ];
+  private static buildMobileNavDefs(): MobileNavItemDef[] {
+    const items: MobileNavItemDef[] = [];
+    for (const def of MAIN_MENU_ITEMS) {
+      if (!def.showOnMobile || def.tourId === 'menu.more') continue;
+      const base = {
+        tourId: def.tourId,
+        icon: def.icon,
+        labelKey: def.labelKey,
+        tipKey: def.tipKey || def.labelKey,
+        action: (def.kind === 'contextMenu' ? 'more' : 'open') as 'open' | 'more',
+        component: def.component,
+        gated: def.gated,
+        chatBadge: def.badge === 'chat',
+        updateBadge: def.badge === 'update',
+      };
+      if (def.showOnMobile === 'play' || def.showOnMobile === 'both') {
+        items.push({ ...base, mode: 'play' });
+      }
+      if (def.showOnMobile === 'edit' || def.showOnMobile === 'both') {
+        items.push({ ...base, mode: 'edit' });
+      }
+    }
+    const more = MAIN_MENU_ITEMS.find(d => d.tourId === 'menu.more')!;
+    items.push({
+      tourId: more.tourId,
+      icon: more.icon,
+      labelKey: more.labelKey,
+      tipKey: more.tipKey || more.labelKey,
+      mode: 'play',
+      action: 'more',
+    });
+    items.push({
+      tourId: more.tourId,
+      icon: more.icon,
+      labelKey: more.labelKey,
+      tipKey: more.tipKey || more.labelKey,
+      mode: 'edit',
+      action: 'more',
+    });
+    return items;
+  }
+
+  private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = AppComponent.buildMobileNavDefs();
 
   /** Visible mobile nav for current Play/Edit (+ guest forces Play). */
   get mobileNavItems(): MobileNavItemDef[] {
@@ -182,6 +218,40 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (item.gated && !this.canShowMenu(item.tourId)) return false;
       return true;
     });
+  }
+
+  /** Desktop slim icon rail (excludes More overflow). */
+  get desktopMenuItems(): MainMenuItemDef[] {
+    return MAIN_MENU_ITEMS.filter(item => {
+      if (item.tourId === 'menu.more') return false;
+      if (item.gated && !this.canShowMenu(item.tourId)) return false;
+      if (item.tourId === 'menu.timer' && this.GuestMode()) return false;
+      return true;
+    });
+  }
+
+  onDesktopMenuClick(item: MainMenuItemDef, event: Event) {
+    this.guidedTour.notifyMenuClick(item.tourId);
+    switch (item.kind) {
+      case 'open':
+        if (item.component) this.open(item.component);
+        break;
+      case 'toggle':
+        if (item.component) this.openOrToggle(item.component);
+        break;
+      case 'contextMenu':
+        if (item.contextMenu === 'toolbox') this.toolBox(event);
+        else if (item.contextMenu === 'settings') this.standSetteings(event);
+        break;
+      case 'logout':
+        this.logout();
+        break;
+    }
+  }
+
+  isDesktopNavActive(item: MainMenuItemDef): boolean {
+    if (item.kind === 'contextMenu') return this.navContextMenuActive;
+    return this.navActiveTourIds.has(item.tourId);
   }
 
   onMobileNavClick(item: MobileNavItemDef, event: Event) {
@@ -216,11 +286,65 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   chatUnreadBadgeLabel = '0';
   /** Cached so APP_UPDATE_READY can refresh the menu badge without NG0100. */
   showAppUpdateBadge = false;
+  /** Cached nav active flags — do not read PanelService / context menu live in template. */
+  navActiveTourIds = new Set<string>();
+  navContextMenuActive = false;
 
-  private syncChatUnreadBadge() {
+  private syncNavActiveState(): boolean {
+    const next = new Set<string>();
+    for (const item of MAIN_MENU_ITEMS) {
+      if (item.tourId && PanelService.isTourPanelOpen(item.tourId)) {
+        next.add(item.tourId);
+      }
+    }
+    for (const item of AppComponent.MOBILE_NAV_DEFS) {
+      if (item.tourId && PanelService.isTourPanelOpen(item.tourId)) {
+        next.add(item.tourId);
+      }
+    }
+    if (PanelService.isTourPanelOpen('menu.lobby')) {
+      next.add('menu.lobby');
+    }
+    const contextActive = this.contextMenuService.isShow;
+    if (this.navContextMenuActive === contextActive && AppComponent.tourIdSetsEqual(next, this.navActiveTourIds)) {
+      return false;
+    }
+    this.navContextMenuActive = contextActive;
+    this.navActiveTourIds = next;
+    return true;
+  }
+
+  private static tourIdSetsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) return false;
+    for (const id of a) {
+      if (!b.has(id)) return false;
+    }
+    return true;
+  }
+
+  private syncMenuChromeState(): boolean {
+    const badgeChanged = this.syncChatUnreadBadge();
+    const navChanged = this.syncNavActiveState();
+    return badgeChanged || navChanged;
+  }
+
+  /** Defer menu chrome sync to the next macrotask so dev-mode CD stays stable. */
+  private deferSyncMenuChromeState() {
+    setTimeout(() => {
+      this.syncMenuChromeState();
+    }, 0);
+  }
+
+  private syncChatUnreadBadge(): boolean {
     const n = ChatTabList.instance.unreadLength;
-    this.showChatUnreadBadge = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
-    this.chatUnreadBadgeLabel = n > 99 ? '99+' : String(n);
+    const nextShow = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
+    const nextLabel = n > 99 ? '99+' : String(n);
+    if (this.showChatUnreadBadge === nextShow && this.chatUnreadBadgeLabel === nextLabel) {
+      return false;
+    }
+    this.showChatUnreadBadge = nextShow;
+    this.chatUnreadBadgeLabel = nextLabel;
+    return true;
   }
 
   private syncAppUpdateBadge() {
@@ -270,6 +394,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private standImageService: StandImageService,
     private cutInService: CutInService,
+    public timerService: TimerService,
     private i18n: I18nService,
     private roomInvite: RoomInviteService,
     private folderBackup: FolderBackupService,
@@ -333,6 +458,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     );
     AuraNameConfig.instance;
     CombatTracker.instance;
+    TableTimerList.instance;
     SceneToolPermission.instance;
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
@@ -464,6 +590,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         const rejects = (event.data?.rejects || []) as JukeboxImportReject[];
         if (!rejects.length) return;
         this.ngZone.run(() => this.showAudioRejectToast(rejects));
+      })
+      .on('TABLE_DROP_PREVIEW', event => {
+        this.ngZone.run(() => {
+          this.tableDropHighlight = !!event.data?.active;
+        });
       })
       .on<AppConfig>('LOAD_CONFIG', event => {
         if (event.data.dice && event.data.dice.url) {
@@ -972,6 +1103,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    localForage.getItem<boolean>(AppComponent.MENU_RAIL_HORIZONTAL_KEY).then(v => {
+      if (typeof v === 'boolean') {
+        this.ngZone.run(() => { this.isHorizontal = v; });
+      }
+    });
     this.maskTokenFx.start();
     // Invite deep-link: freeze UI immediately (before SkyWay open / lobby), including corrupt tokens.
     if (this.roomInvite.hasInviteInLocation()) {
@@ -981,7 +1117,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('keydown', this.onWindowKeydown, true);
     document.addEventListener('visibilitychange', this.onDocumentVisibilityChange);
     window.addEventListener('pageshow', this.onWindowPageShow);
-    this.syncChatUnreadBadge();
+    this.syncMenuChromeState();
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
@@ -1018,10 +1154,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       const active = s.phase === 'welcome' || s.phase === 'running';
       if (active && !tourWasActive) {
         // Keep the tour unobstructed: no cold-start lobby over welcome / steps.
-        this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+        this.ngZone.run(() => {
+          PanelService.closePanelsByTourId('menu.lobby');
+          this.deferSyncMenuChromeState();
+        });
       }
       if (tourWasActive && !active) {
-        this.ngZone.run(() => this.openDefaultPanels());
+        this.ngZone.run(() => {
+          this.openDefaultPanels();
+        });
       }
       tourWasActive = active;
     });
@@ -1135,6 +1276,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         option = { width: 520, height: 480, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
+      case 'TableTimerPanelComponent':
+        component = TableTimerPanelComponent;
+        option = { width: 520, height: 520, left: 100, title: this.i18n.t('timer.panelTitle') };
+        if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
+        break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
         component = SceneToolsComponent;
@@ -1201,6 +1347,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (componentName === 'ChatWindowComponent') {
         EventSystem.trigger('CHAT_PANEL_CHANGED', null);
       }
+      this.deferSyncMenuChromeState();
     }
   }
 
@@ -1224,7 +1371,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Network.isOpen && !Network.peer?.isRoom) {
       this.openLobbyIfNeeded();
     }
-    this.syncChatUnreadBadge();
+    this.deferSyncMenuChromeState();
   }
 
   /** Show lobby once on cold start when not already in a room / invite join. */
@@ -1245,28 +1392,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private tourIdForComponent(componentName: string): string | null {
-    switch (componentName) {
-      case 'PeerMenuComponent': return 'menu.connection';
-      case 'ChatWindowComponent': return 'menu.chat';
-      case 'GameTableSettingComponent': return 'menu.table';
-      case 'FileStorageComponent': return 'menu.images';
-      case 'JukeboxComponent': return 'menu.music';
-      case 'CombatTrackerComponent': return 'menu.combat';
-      case 'SceneToolsComponent': return 'menu.sceneTools';
-      case 'ScenePresetComponent': return 'menu.scenePreset';
-      case 'ScenarioTextComponent': return 'menu.scenarioText';
-      case 'GameObjectInventoryComponent': return 'menu.inventory';
-      case 'NoteInventoryComponent': return 'menu.notes';
-      case 'DiceRollTableSettingComponent': return 'menu.diceTable';
-      case 'CutInSettingComponent': return 'menu.cutIn';
-      default: return null;
-    }
+    return tourIdForMenuComponent(componentName);
   }
 
   isNavActive(tourId: string): boolean {
     if (!this.isMobileLayout) return false;
-    if (tourId === 'menu.more') return this.contextMenuService.isShow;
-    return PanelService.isTourPanelOpen(tourId);
+    if (tourId === 'menu.more') return this.navContextMenuActive;
+    return this.navActiveTourIds.has(tourId);
   }
 
   /**
@@ -1290,6 +1422,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       } else {
         PanelService.bringTourPanelToFront(tourId);
       }
+      this.deferSyncMenuChromeState();
       return;
     }
     this.open(componentName);
@@ -1377,6 +1510,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private lazyNgZoneUpdate(isImmediate: boolean) {
+    const flush = () => {
+      this.syncMenuChromeState();
+    };
     if (isImmediate) {
       if (this.immediateUpdateTimer !== null) return;
       this.immediateUpdateTimer = setTimeout(() => {
@@ -1385,9 +1521,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.lazyUpdateTimer);
           this.lazyUpdateTimer = null;
         }
-        // Sync before CD so template bindings stay stable within the check.
-        this.syncChatUnreadBadge();
-        this.ngZone.run(() => { });
+        flush();
       }, 0);
     } else {
       if (this.lazyUpdateTimer !== null) return;
@@ -1397,8 +1531,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.immediateUpdateTimer);
           this.immediateUpdateTimer = null;
         }
-        this.syncChatUnreadBadge();
-        this.ngZone.run(() => { });
+        flush();
       }, 100);
     }
   }
@@ -1408,6 +1541,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.canShowMenu('menu.toolbox')) return;
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1422,6 +1556,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
     this.openToolboxAt(position);
+    this.deferSyncMenuChromeState();
   }
 
   /** Mobile primary-nav "More" — mode-aware secondary actions; tap again to collapse. */
@@ -1431,6 +1566,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Second tap on More closes the action sheet (outside-click ignores this button).
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1470,6 +1606,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.canShowMenu('menu.scenarioText')) {
         menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.openOrToggle('ScenarioTextComponent') });
       }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.timer'), materialIcon: 'timer', action: () => this.openOrToggle('TableTimerPanelComponent') });
+      }
     } else {
       if (!this.GuestMode()) {
         menu.push({
@@ -1490,6 +1629,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
       }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.timer'), materialIcon: 'timer', action: () => this.openOrToggle('TableTimerPanelComponent') });
+      }
     }
     pushSep();
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
@@ -1502,6 +1644,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
+    this.deferSyncMenuChromeState();
   }
 
   private openToolboxAt(
@@ -1579,6 +1722,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
     }
     menu.push(ContextMenuSeparator);
+    if (!this.GuestMode()) {
+      menu.push({
+        name: this.i18n.t('menu.timer'),
+        materialIcon: 'timer',
+        action: () => this.openOrToggle('TableTimerPanelComponent'),
+      });
+    }
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
@@ -1618,6 +1768,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       subActions: [
         { name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') },
         { name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') },
+        ...(!this.GuestMode() ? [{
+          name: this.i18n.t('menu.timer'),
+          materialIcon: 'timer',
+          action: () => this.openOrToggle('TableTimerPanelComponent'),
+        }] : []),
       ]
     });
     menu.push({
@@ -1951,6 +2106,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Nav toggle: second tap closes. Nested opens (More → Settings) use openSettingsAt.
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1971,6 +2127,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private openSettingsAt(position: { x: number; y: number }) {
     this.guidedTour.notifyMenuClick('menu.settings');
     this.contextMenuService.open(position, this.buildSettingsMenuActions(), this.i18n.t('menu.settings'));
+    this.deferSyncMenuChromeState();
   }
 
   /** Settings actions — shared by nav open and More drill-down. */
@@ -2035,6 +2192,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           set: (v) => MusicHudComponent.setVisible(v),
           on: `☑${this.i18n.t('menu.settings.musicHud')}`,
           off: `☐${this.i18n.t('menu.settings.musicHud')}`,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.isHorizontal,
+          set: (v) => this.setMenuRailHorizontal(v),
+          on: `☑${this.i18n.t('menu.settings.horizontalMenu')}`,
+          off: `☐${this.i18n.t('menu.settings.horizontalMenu')}`,
         }),
       ]),
       ContextMenuSeparator,
@@ -2213,8 +2376,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     throw new Error('Method not implemented.');
   }
 
-  rotateChange(isHorizontal) {
+  rotateChange(isHorizontal: boolean) {
+    this.setMenuRailHorizontal(isHorizontal);
+  }
+
+  private setMenuRailHorizontal(isHorizontal: boolean) {
     this.isHorizontal = isHorizontal;
+    localForage.setItem(AppComponent.MENU_RAIL_HORIZONTAL_KEY, isHorizontal).catch(() => {});
+    this.ngZone.run(() => this.lazyNgZoneUpdate(false));
   }
 
   closeImagePreview() {

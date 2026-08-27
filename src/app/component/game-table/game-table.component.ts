@@ -46,6 +46,7 @@ import { TabletopService } from 'service/tabletop.service';
 import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { TableLightingService } from 'service/table-lighting.service';
 import { folderBackupDebug, folderBackupWarn, approxCssScale, summarizeCharPlacements, TokenDomProbe, TokenHideReason } from 'service/folder-backup-debug';
 import { MovableDirective } from 'directive/movable.directive';
 
@@ -129,6 +130,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private sceneMarqueeCurrent: { x: number; y: number } = null;
   /** True once drag exceeds threshold — commit as box select instead of click. */
   private sceneMarqueeActive = false;
+  /** Pointer-drag reposition for a light (select / light mode). */
+  private lightDrag: {
+    light: TableLight;
+    fromX: number;
+    fromY: number;
+    grabOffsetX: number;
+    grabOffsetY: number;
+  } | null = null;
+  /** Light under cursor while select/light tools are active (visual hover). */
+  hoveredLightId: string | null = null;
+  private static readonly LIGHT_HIT_RADIUS = 20;
   /** Path gesture candidate: Ctrl+click adds a waypoint; plain click starts move. */
   private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number; mode: 'add' | 'go' } = null;
 
@@ -855,6 +867,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private tokenPath: TokenPathMoveService,
     private i18n: I18nService,
     private mobileLayout: MobileLayoutService,
+    private tableLighting: TableLightingService,
   ) { }
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
@@ -877,6 +890,31 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const userId = Network.peer?.userId;
     if (!userId) return false;
     return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
+  }
+
+  /** Parallax background dims with table darkness unless the player has token vision. */
+  get shouldDimBackgroundImage(): boolean {
+    const table = this.currentTable;
+    if (!table) return false;
+    if (!table.visionEnabled || this.isGMMode) return true;
+    const userId = Network.peer?.userId;
+    if (!userId) return true;
+    return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
+  }
+
+  get backgroundDarknessOverlayAlpha(): number {
+    if (!this.shouldDimBackgroundImage) return 0;
+    const table = this.currentTable;
+    if (!table) return 0;
+    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
+    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
+    return darkness * (1 - globalLight * 0.35);
+  }
+
+  get backgroundDarknessOverlayColor(): string {
+    const alpha = this.backgroundDarknessOverlayAlpha;
+    if (alpha <= 0) return 'transparent';
+    return `rgba(8, 6, 4, ${alpha})`;
   }
   get pathPointsAttr(): string {
     const pts: string[] = [];
@@ -1997,6 +2035,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sceneTools.isLightSelected(l);
   }
 
+  isLightHovered(l: TableLight): boolean {
+    return !!l && this.hoveredLightId === l.identifier;
+  }
+
   /** Darkness / vision need a tick while tokens move; pings need arrow follow. Weather has its own RAF. */
   private needsPeriodicFx(): boolean {
     const table = this.currentTable;
@@ -2004,7 +2046,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
     const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
     const baseAlpha = darkness * (1 - globalLight * 0.35);
-    return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0;
+    return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0
+      || (table.lights?.length ?? 0) > 0;
   }
 
   private ensureFxTimer() {
@@ -2044,6 +2087,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isGMMode,
         footprintWalls,
       );
+      this.tableLighting.updateTokenShadows(this.currentTable, onTable);
+      EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
       revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId, wallSets);
     }
     this.weatherRender?.sync(this.currentTable);
@@ -2550,15 +2595,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (!this.canUseSceneTools) return;
 
-    // Scene select: drag a marquee to multi-select; short click hits one object.
+    // Scene select: drag a hovered/hit light, else marquee / click-select.
     if (this.sceneTools.isSceneSelectMode) {
       if (!this.canModifyScene) return;
       e.preventDefault();
       e.stopPropagation();
       this.selectionService.clear();
       this.clearSceneMarquee();
+      this.clearLightDrag();
       this.pickGesture?.cancel();
       const tablePos = this.tablePosFromClient(e.pageX, e.pageY);
+      if (this.tryBeginLightDrag(tablePos.x, tablePos.y)) return;
       this.sceneMarqueeStart = { x: tablePos.x, y: tablePos.y };
       this.sceneMarqueeCurrent = { x: tablePos.x, y: tablePos.y };
       this.sceneMarqueeActive = false;
@@ -2568,14 +2615,23 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Idle scene tools: do not intercept tabletop interaction.
     if (!this.sceneTools.isBlockingPick) return;
-    if (!this.canCreateCurrentMode) return;
 
     if (this.sceneTools.mode === 'light') {
+      if (!this.canModifyScene && !this.canCreateCurrentMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectionService.clear();
+      this.pickGesture?.cancel();
+      // Prefer dragging an existing light under the cursor over placing a new one.
+      if (this.canModifyScene && this.tryBeginLightDrag(pos.x, pos.y)) return;
+      if (!this.canCreateCurrentMode) return;
       this.drawDragStart = { x: pos.x, y: pos.y };
       this.drawDragCurrent = { x: pos.x, y: pos.y };
       this.scheduleDrawDraftRefresh();
       return;
     }
+
+    if (!this.canCreateCurrentMode) return;
     if (this.sceneTools.mode === 'wall') {
       this.sceneTools.wallDraftPoints.push({ x: pos.x, y: pos.y });
       // Double-click finishes wall (also available via panel button / right-click).
@@ -2633,12 +2689,21 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
       }
     }
+    this.updateLightHoverFromEvent(e);
+    if (this.lightDrag) {
+      this.updateLightDragFromEvent(e);
+      return;
+    }
     this.updateSceneMarqueeFromEvent(e);
     this.updateDrawDraftFromPointer();
   }
 
   @HostListener('document:pointermove', ['$event'])
   onDocumentPointerMove(e: PointerEvent) {
+    if (this.lightDrag) {
+      this.updateLightDragFromEvent(e);
+      return;
+    }
     if (this.sceneMarqueeStart) {
       this.updateSceneMarqueeFromEvent(e);
       return;
@@ -2652,6 +2717,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.activePointerIds.delete(e.pointerId);
     this.clearPingHold();
     if (this.finishPathClick(e)) return;
+    if (this.lightDrag) {
+      this.commitLightDrag();
+      return;
+    }
     if (this.sceneMarqueeStart) {
       this.commitSceneMarquee();
       return;
@@ -2663,6 +2732,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onPointerCancel(e: PointerEvent) {
     this.activePointerIds.delete(e.pointerId);
     this.clearPingHold();
+    if (this.lightDrag) this.commitLightDrag();
   }
 
   @HostListener('document:pointerup', ['$event'])
@@ -2670,6 +2740,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.activePointerIds.delete(e.pointerId);
     if (this.finishPathClick(e)) {
       this.clearPingHold();
+      return;
+    }
+    if (this.lightDrag) {
+      this.clearPingHold();
+      this.commitLightDrag();
       return;
     }
     if (this.sceneMarqueeStart) {
@@ -3134,6 +3209,89 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.scheduleDrawDraftRefresh();
   }
 
+  private tryBeginLightDrag(x: number, y: number): boolean {
+    if (!SceneToolPermission.instance.canModifyKind('light')) return false;
+    const light = this.findLightAt(x, y);
+    if (!light) return false;
+    this.sceneTools.selectLight(light);
+    this.hoveredLightId = light.identifier;
+    this.lightDrag = {
+      light,
+      fromX: light.x,
+      fromY: light.y,
+      grabOffsetX: x - light.x,
+      grabOffsetY: y - light.y,
+    };
+    this.clearSceneMarquee();
+    this.clearDrawDragState();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+    return true;
+  }
+
+  private findLightAt(x: number, y: number): TableLight | null {
+    const r = GameTableComponent.LIGHT_HIT_RADIUS;
+    const rSq = r * r;
+    for (let i = this.lights.length - 1; i >= 0; i--) {
+      const l = this.lights[i];
+      const dx = l.x - x;
+      const dy = l.y - y;
+      if (dx * dx + dy * dy <= rSq) return l;
+    }
+    return null;
+  }
+
+  private hitLight(light: TableLight, x: number, y: number): boolean {
+    const r = GameTableComponent.LIGHT_HIT_RADIUS;
+    const dx = light.x - x;
+    const dy = light.y - y;
+    return dx * dx + dy * dy <= r * r;
+  }
+
+  private updateLightHoverFromEvent(e: PointerEvent) {
+    const mode = this.sceneTools.mode;
+    if (!this.showSceneEditOverlay || (mode !== 'select' && mode !== 'light') || this.lightDrag) {
+      if (this.hoveredLightId) {
+        this.hoveredLightId = null;
+        this.changeDetector.detectChanges();
+      }
+      return;
+    }
+    if (!SceneToolPermission.instance.canModifyKind('light')) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    const hit = this.findLightAt(pos.x, pos.y);
+    const nextId = hit?.identifier || null;
+    if (nextId === this.hoveredLightId) return;
+    this.hoveredLightId = nextId;
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private updateLightDragFromEvent(e: PointerEvent) {
+    if (!this.lightDrag) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    const light = this.lightDrag.light;
+    light.x = pos.x - this.lightDrag.grabOffsetX;
+    light.y = pos.y - this.lightDrag.grabOffsetY;
+    this.refreshFx();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private commitLightDrag() {
+    const drag = this.lightDrag;
+    this.lightDrag = null;
+    if (!drag) return;
+    this.sceneTools.recordLightMove(drag.light, drag.fromX, drag.fromY, drag.light.x, drag.light.y);
+    this.refreshFx();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private clearLightDrag() {
+    this.lightDrag = null;
+  }
+
   /** Hit-test scene objects under cursor (select mode). */
   private trySelectSceneObject(x: number, y: number): boolean {
     const pad = 12;
@@ -3151,8 +3309,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (perm.canModifyKind('light')) {
       for (let i = this.lights.length - 1; i >= 0; i--) {
         const l = this.lights[i];
-        const dx = l.x - x, dy = l.y - y;
-        if (dx * dx + dy * dy <= 16 * 16) {
+        if (this.hitLight(l, x, y)) {
           this.sceneTools.selectLight(l);
           return true;
         }

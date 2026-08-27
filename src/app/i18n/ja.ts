@@ -15,6 +15,7 @@ export const ja: I18nDictionary = {
   'menu.music': '音楽',
   'menu.toolbox': 'ツールボックス',
   'menu.combat': '戦闘トラッカー',
+  'menu.timer': 'タイマー',
   'menu.sceneTools': 'シーンツール',
   'menu.scenePreset': 'プリセットシーン',
   'menu.scenarioText': 'シナリオテキスト',

@@ -254,3 +254,11 @@ Udonarium烏冬ユドナリウム開發日誌30
 所以移除 HKTRPG 獨有 stale recycle，改 warn-only 監測；日誌 29 recovery 保留
 
 ---
+
+Udonarium烏冬ユドナリウム開發日誌31
+對齊 Axe 嘅 VTT 功能包
+細 icon 選單、桌面隨暗度變暗、關 GI 時角色陰影
+全桌計時器（倒數／順數、歸零動作、畫面拖動）
+手牌欄：扇形手牌、快速拖出、長按兩秒、KeyR 洗牌
+
+---

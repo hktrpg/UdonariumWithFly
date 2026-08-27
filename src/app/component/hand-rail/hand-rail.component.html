@@ -1,0 +1,64 @@
+<div class="hand-rail-root" *ngIf="!isGuest"
+  [class.is-mobile]="isMobileLayout"
+  [style.bottom.px]="railBottomPx">
+
+  <div class="hand-rail-drop-band"
+    *ngIf="showDropBand"
+    [class.is-hover]="isDropHover"
+    data-tour-id="hand.rail">
+    <span class="hand-rail-drop-band-label">{{ 'hand.dropHint' | i18n }}</span>
+  </div>
+
+  <div class="hand-rail" *ngIf="showHud"
+    data-tour-id="hand.rail"
+    [class.is-collapsed]="collapsed"
+    [class.has-cards]="cards.length > 0"
+    [class.is-drop-target]="isDropHover"
+    [class.is-read-only]="isPeekingOther"
+    [class.is-chrome-forced]="isDraggingCard || isDropHover || isDropOffer">
+    <div class="hand-rail-hover-zone">
+    <div class="hand-rail-chrome" [class.is-drop-target]="isDropHover && collapsed">
+      <span class="hand-rail-title">{{ 'hand.title' | i18n }}</span>
+      <span class="hand-rail-count">{{ cards.length }}</span>
+
+      <label *ngIf="isGm && !collapsed" class="hand-gm-peek" (click)="$event.stopPropagation()">
+        <select [ngModel]="gmPeekUserId" (ngModelChange)="onGmPeekChange($event)">
+          <option [ngValue]="''">{{ 'hand.myHand' | i18n }}</option>
+          <option *ngFor="let peer of peersWithHands" [ngValue]="peer.userId">{{ peer.name }}</option>
+        </select>
+      </label>
+
+      <span class="hand-viewing" *ngIf="isPeekingOther && viewOwnerName && !collapsed">
+        {{ 'hand.viewing' | i18n:{ name: viewOwnerName } }}
+      </span>
+
+      <button type="button" class="hand-collapse" (click)="toggleCollapsed()"
+        [attr.title]="(collapsed ? 'hand.expand' : 'hand.collapse') | i18n">
+        <i class="material-icons">{{ collapsed ? 'expand_less' : 'expand_more' }}</i>
+      </button>
+    </div>
+
+    <div #dropZone class="hand-rail-drop-zone" *ngIf="showFan"
+      (dragover)="onRailDragOver($event)"
+      (dragleave)="onRailDragLeave($event)"
+      (drop)="onRailDrop($event)">
+      <div #scrollViewport class="hand-rail-scroll"
+        [class.is-panning]="isPanningScroll"
+        (pointerdown)="onScrollPanDown($event)">
+        <div class="hand-fan hand-fan-row" *ngIf="cards.length > 0">
+          <div class="hand-card-slot"
+            *ngFor="let card of cards; let i = index"
+            [style.zIndex]="i + 1"
+            [class.is-reorder-target]="reorderHoverIndex === i && isDraggingCard"
+            [style.transform]="'translateY(' + fanLift(i) + 'px) translateZ(' + fanDepth(i) + 'px) rotate(' + fanRotate(i, cards.length) + 'deg)'"
+            (pointerdown)="onCardPointerDown($event, card)">
+            <card-list-image [card]="card" [enableTooltip]="false" [singleFace]="true"></card-list-image>
+          </div>
+        </div>
+      </div>
+
+      <p class="hand-peek-hint" *ngIf="isPeekingOther">{{ 'hand.peekReadOnly' | i18n }}</p>
+    </div>
+    </div>
+  </div>
+</div>

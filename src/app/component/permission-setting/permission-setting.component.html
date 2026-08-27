@@ -62,6 +62,11 @@
         <i class="material-icons perm-icon">build</i>
         {{ 'menu.toolbox' | i18n }}
       </label>
+      <label class="perm-readonly-hint">
+        <i class="material-icons perm-icon">architecture</i>
+        {{ 'menu.sceneTools' | i18n }}
+        <span class="hint">（{{ 'peer.scenePermTitle' | i18n }}）</span>
+      </label>
       <label>
         <input type="checkbox" [(ngModel)]="playerCanOpenScenePreset">
         <i class="material-icons perm-icon">theaters</i>
@@ -81,6 +86,14 @@
         <input type="checkbox" [(ngModel)]="playerCanOpenNotes">
         <i class="material-icons perm-icon">note</i>
         {{ 'menu.notes' | i18n }}
+      </label>
+      <label class="perm-readonly-hint">
+        <i class="material-icons perm-icon">sports_mma</i>
+        {{ 'menu.combat' | i18n }}
+      </label>
+      <label class="perm-readonly-hint">
+        <i class="material-icons perm-icon">timer</i>
+        {{ 'menu.timer' | i18n }}
       </label>
     </div>
   </div>
