@@ -17,6 +17,7 @@ import {
   registerBuiltinStreetscapeSources,
   StreetscapeProgress,
 } from '@udonarium/streetscape/orchestrator';
+import { estimateOpen3dhkSheetDownload } from '@udonarium/streetscape/open3dhk-source';
 import { StreetscapePackV1 } from '@udonarium/streetscape/pack-schema';
 import {
   loadPlateauCities,
@@ -303,12 +304,17 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       || hits.find(h => h.cityName && (q.includes(h.cityName) || h.cityName.includes(q)))
       || hits[0];
     const file = pickPlateauBldgFile(hit.files);
+    const defaultCount = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
     const ok = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('streetscape.confirmSheetTitle'),
       text: this.i18n.t('streetscape.confirmPlateauMesh', {
         name: hit.cityName || q,
         sheet: file.code,
       }),
+      help: this.i18n.t('streetscape.confirmPreviewAddLater'),
+      hasInput: true,
+      inputLabel: this.i18n.t('streetscape.modelCount'),
+      inputValue: String(defaultCount),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'map',
       okLabel: this.i18n.t('streetscape.confirmSheetOk'),
@@ -317,7 +323,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     if (!ok) return;
 
     this.streetscapeStreetSuggestions = [];
-    const max = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
+    const max = Math.max(1, Math.floor(Number(ok) || defaultCount));
     this.streetscapeMaxFeatures = max;
     await this.runStreetscape({
       type: 'plateau',
@@ -575,6 +581,98 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     return out;
   }
 
+  private async confirmOpen3dhkDownload(opts: {
+    sheet: string;
+    title?: string;
+    street?: string;
+  }): Promise<number | false> {
+    this.streetscapeBusy = true;
+    this.streetscapeStatus = this.i18n.t('streetscape.progressIndex');
+    this.changeDetector.markForCheck();
+
+    let previewUrl = '';
+    let buildingCount = 0;
+    try {
+      registerBuiltinStreetscapeSources();
+      const est = await estimateOpen3dhkSheetDownload(opts.sheet, {
+        format: 'GLTF0',
+        maxFeatures: 99999,
+        onProgress: (p) => this.applyStreetscapeSourceProgress(p),
+      });
+      buildingCount = Math.max(0, est.buildingCount);
+      if (buildingCount < 1) {
+        await this.modalService.open(ConfirmationComponent, {
+          title: this.i18n.t('streetscape.errorTitle'),
+          text: this.i18n.t('streetscape.error.noFeature'),
+          type: ConfirmationType.OK,
+          materialIcon: 'error',
+        });
+        return false;
+      }
+
+      this.streetscapeStatus = this.i18n.t('streetscape.progressFloor');
+      this.changeDetector.markForCheck();
+      const source = resolveStreetscapeSource({
+        type: 'open3dhk',
+        sheet: opts.sheet,
+        format: 'GLTF0',
+        useRange: true,
+        rangeMode: 'floorOnly',
+      });
+      const load = await source.resolve(undefined, (p) => this.applyStreetscapeSourceProgress(p));
+      const floorBlob = await load.openFloor();
+      previewUrl = URL.createObjectURL(floorBlob);
+    } catch (err) {
+      this.streetscapeStatus = '';
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('streetscape.errorTitle'),
+        text: this.i18n.t(streetscapeErrorI18nKey(err)),
+        type: ConfirmationType.OK,
+        materialIcon: 'error',
+      });
+      return false;
+    } finally {
+      this.streetscapeBusy = false;
+      this.streetscapeStatus = '';
+      this.changeDetector.markForCheck();
+    }
+
+    const remembered = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
+    const defaultCount = Math.min(remembered, buildingCount);
+    const helpLines = [this.i18n.t('streetscape.confirmPreviewAddLater')];
+    if (defaultCount > StreetscapeImportComponent.MAX_FEATURES_WARN) {
+      helpLines.unshift(this.i18n.t('streetscape.maxFeaturesWarn'));
+    }
+
+    const picked = await this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('streetscape.confirmPreviewTitle'),
+      text: this.i18n.t('streetscape.confirmPreviewText', {
+        sheet: opts.sheet,
+        name: opts.title || opts.street || opts.sheet,
+        total: String(buildingCount),
+      }),
+      helpHtml: previewUrl
+        ? `<img src="${previewUrl}" alt="" style="max-width:100%;max-height:220px;display:block;margin:8px auto;border:1px solid rgba(0,0,0,.15);border-radius:4px;" />`
+        : '',
+      help: helpLines.join('\n'),
+      hasInput: true,
+      inputLabel: this.i18n.t('streetscape.modelCount'),
+      inputValue: String(defaultCount),
+      inputPlaceholder: `1–${buildingCount}`,
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'map',
+      okLabel: this.i18n.t('streetscape.confirmDownload'),
+      cancelLabel: this.i18n.t('streetscape.confirmCancel'),
+    });
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (!picked) return false;
+
+    const count = Math.max(1, Math.min(buildingCount, Math.floor(Number(picked) || defaultCount)));
+    this.streetscapeMaxFeatures = count;
+    this.persistStreetscapeUiSession();
+    return count;
+  }
+
   private open3dhkQuery(
     base: { sheet?: string; street?: string },
     extra: Partial<Extract<StreetscapeQuery, { type: 'open3dhk' }>> = {},
@@ -626,6 +724,25 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         // fall through; resolve() will retry catalog / index
       }
     }
+
+    if (!query.sheet) {
+      await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('streetscape.errorTitle'),
+        text: this.i18n.t('streetscape.error.noStreetMatch'),
+        type: ConfirmationType.OK,
+        materialIcon: 'error',
+      });
+      return;
+    }
+
+    const count = await this.confirmOpen3dhkDownload({
+      sheet: query.sheet,
+      title: base.title,
+      street: query.street,
+    });
+    if (!count) return;
+
+    query = this.open3dhkQuery({ sheet: query.sheet, street: query.street });
 
     await this.runStreetscape(query, {
       country: 'hk',

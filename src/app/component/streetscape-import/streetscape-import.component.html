@@ -34,22 +34,7 @@
         </ul>
       </div>
     </div>
-    <div class="streetscape-field streetscape-field-count">
-      <label class="streetscape-label" for="streetscape-max-features">{{ 'streetscape.modelCount' | i18n }}</label>
-      <input
-        id="streetscape-max-features"
-        class="streetscape-street streetscape-count"
-        type="number"
-        min="1"
-        step="1"
-        [(ngModel)]="streetscapeMaxFeatures"
-        [disabled]="streetscapeBusy"
-      >
-    </div>
   </div>
-  <p class="streetscape-status streetscape-warn" *ngIf="streetscapeMaxFeaturesWarn">
-    {{ 'streetscape.maxFeaturesWarn' | i18n }}
-  </p>
 
   <button
     type="button"

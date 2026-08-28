@@ -1,9 +1,12 @@
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { GameTable } from '@udonarium/game-table';
 import { Terrain } from '@udonarium/terrain';
 
 import { resolveStreetscapeCaps } from './caps';
 import {
+  appendStreetscapeModelsToTable,
   generateStreetscapeFromLoad,
+  resolveStreetscapeFloorBlob,
   streetscapeTerrainNameMatches,
 } from './orchestrator';
 import { StreetscapePackV1 } from './pack-schema';
@@ -88,5 +91,93 @@ describe('generateStreetscapeFromLoad', () => {
       addFloorImage: async () => 'floor-id',
       importModel: async () => { throw new Error('unused'); },
     })).toBeRejected();
+  });
+});
+
+describe('resolveStreetscapeFloorBlob', () => {
+  async function makeSolidPng(w: number, h: number): Promise<Blob> {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('NO_CANVAS');
+    ctx.fillStyle = '#b4aa9c';
+    ctx.fillRect(0, 0, w, h);
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('PNG'))), 'image/png');
+    });
+  }
+
+  it('prefers the live table floor over a tiny pack placeholder', async () => {
+    const table = new GameTable();
+    table.initialize();
+    const floorImage = await ImageStorage.instance.addAsync(await makeSolidPng(64, 64));
+    table.imageIdentifier = floorImage.identifier;
+
+    const tiny = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' });
+    const resolved = await resolveStreetscapeFloorBlob(table, {
+      pack: pack,
+      openFloor: async () => tiny,
+      openFeature: async () => [],
+    });
+
+    expect(resolved).toBe(floorImage.blob);
+    expect(resolved!.size).toBeGreaterThan(512);
+    table.destroy();
+  });
+});
+
+describe('appendStreetscapeModelsToTable', () => {
+  async function makeSolidPng(w: number, h: number, rgb: [number, number, number]): Promise<Blob> {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('NO_CANVAS');
+    ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.fillRect(0, 0, w, h);
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('PNG'))), 'image/png');
+    });
+  }
+
+  it('passes aerial tint to glTF imports when appending onto an existing table', async () => {
+    const table = new GameTable();
+    table.name = 'Existing';
+    table.initialize();
+
+    const floorBlob = await makeSolidPng(64, 64, [180, 170, 160]);
+    const floorImage = await ImageStorage.instance.addAsync(floorBlob);
+    table.imageIdentifier = floorImage.identifier;
+
+    const appendPack: StreetscapePackV1 = {
+      ...pack,
+      features: [
+        { id: 'c', kind: 'building', path: 'building/c/c.gltf', positionMeters: { x: 40, z: 0 }, sizeMeters: { w: 10, d: 10, h: 12 } },
+      ],
+    };
+    const tints: ({ r: number; g: number; b: number } | undefined)[] = [];
+    const load: StreetscapePackLoad = {
+      pack: appendPack,
+      openFeature: async () => [new File(['{}'], 'c.gltf', { type: 'model/gltf+json' })],
+      openFloor: async () => new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' }),
+    };
+
+    await appendStreetscapeModelsToTable(table, load, {
+      caps: resolveStreetscapeCaps(),
+      importModel: async (_files, _position, opts) => {
+        tints.push(opts?.colorTint);
+        const t = { name: opts?.name || '', location: { x: 0, y: 0 } } as Terrain;
+        return { terrain: t, terrains: [t], warnings: [] };
+      },
+    });
+
+    expect(tints.length).toBe(1);
+    expect(tints[0]).toEqual(jasmine.objectContaining({
+      r: jasmine.any(Number),
+      g: jasmine.any(Number),
+      b: jasmine.any(Number),
+    }));
+    table.destroy();
   });
 });

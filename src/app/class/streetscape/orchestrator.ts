@@ -20,6 +20,9 @@ import { sampleBlobRgbAtUv } from './floor-tint';
 import { StreetscapeFeatureV1, StreetscapePackV1, StreetscapeQualityV1 } from './pack-schema';
 import { featureCenterTablePx, featureDistanceToOrigin, streetscapeScaleFromPack } from './placement';
 import { applyStreetscapeMapCredit } from './map-credit';
+
+/** Real aerial floors are large; Open3Dhk building-only packs ship a 1×1 placeholder. */
+const MIN_FLOOR_BYTES_FOR_TINT = 512;
 import { packCatalogSource } from './catalog-source';
 import { open3dhkSource } from './open3dhk-source';
 import { plateauSource } from './plateau-source';
@@ -140,12 +143,7 @@ async function appendStreetscapeFeaturesToTable(
 
   const scale = streetscapeScaleFromPack(pack, caps, table.gridSize || 50);
   const warnings: string[] = [];
-  let floorBlob: Blob | null = null;
-  try {
-    floorBlob = await load.openFloor(opts.signal);
-  } catch {
-    // Optional for tint; textured facades skip tint anyway.
-  }
+  const floorBlob = await resolveStreetscapeFloorBlob(table, load, opts.signal);
 
   const importModel = opts.importModel || importModelAsTerrain;
   const terrains: Terrain[] = [];
@@ -388,6 +386,28 @@ export async function generateStreetscapeFromLoad(
     table?.destroy();
     throw err;
   }
+}
+
+/** Prefer the table's aerial floor when appending (pack may only carry a tiny placeholder). */
+export async function resolveStreetscapeFloorBlob(
+  table: GameTable | undefined,
+  load: StreetscapePackLoad,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
+  const tableId = table?.imageIdentifier;
+  if (tableId && tableId !== 'imageIdentifier') {
+    const img = ImageStorage.instance.get(tableId);
+    if (img?.blob && img.blob.size >= MIN_FLOOR_BYTES_FOR_TINT) {
+      return img.blob;
+    }
+  }
+  try {
+    const blob = await load.openFloor(signal);
+    if (blob && blob.size >= MIN_FLOOR_BYTES_FOR_TINT) return blob;
+  } catch {
+    // Tint is optional; GLTF textured facades skip it anyway.
+  }
+  return null;
 }
 
 function featureFloorUv(
