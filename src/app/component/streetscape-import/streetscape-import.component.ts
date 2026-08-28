@@ -612,14 +612,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
 
       this.streetscapeStatus = this.i18n.t('streetscape.progressFloor');
       this.changeDetector.markForCheck();
-      const source = resolveStreetscapeSource({
+      const floorQuery: Extract<StreetscapeQuery, { type: 'open3dhk' }> = {
         type: 'open3dhk',
         sheet: opts.sheet,
         format: 'GLTF0',
         useRange: true,
         rangeMode: 'floorOnly',
-      });
-      const load = await source.resolve(undefined, (p) => this.applyStreetscapeSourceProgress(p));
+      };
+      const source = resolveStreetscapeSource(floorQuery);
+      const load = await source.resolve(floorQuery, undefined, (p) => this.applyStreetscapeSourceProgress(p));
       const floorBlob = await load.openFloor();
       previewUrl = URL.createObjectURL(floorBlob);
     } catch (err) {
