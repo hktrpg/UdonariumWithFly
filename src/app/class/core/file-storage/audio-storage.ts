@@ -1,14 +1,16 @@
 import { EventSystem } from '../system';
-import { ResettableTimeout } from '../system/util/resettable-timeout';
-import { catalogByteSize } from './file-transfer-scheduler';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
-import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
+import {
+  addPackedByContentHash,
+  buildCompleteBlobCatalog,
+  deleteMediaFromHash,
+  getFromHash,
+  insertOrUpdateMediaFile,
+  LazyCatalogSynchronizer,
+  MediaCatalogItem,
+} from './media-storage-helpers';
 
-export type CatalogItem = {
-  readonly identifier: string;
-  readonly state: number;
-  readonly byteSize?: number;
-};
+export type CatalogItem = MediaCatalogItem;
 
 export class AudioStorage {
   private static _instance: AudioStorage
@@ -17,7 +19,9 @@ export class AudioStorage {
     return AudioStorage._instance;
   }
 
-  private lazyTimer: ResettableTimeout;
+  private readonly catalogSync = new LazyCatalogSynchronizer(peer => {
+    EventSystem.call('SYNCHRONIZE_AUDIO_LIST', this.getCatalog(), peer);
+  });
   private hash: { [identifier: string]: AudioFile } = {};
 
   get audios(): AudioFile[] {
@@ -46,11 +50,14 @@ export class AudioStorage {
   }
 
   async addPackedAsync(file: File): Promise<AudioFile> {
-    const hash = mediaHashFromName(file.name);
-    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
-    const existing = this.get(hash);
-    if (existing && existing.state >= AudioState.COMPLETE) return existing;
-    return this._add(await AudioFile.createPackedAsync(file, hash));
+    return addPackedByContentHash({
+      file,
+      completeState: AudioState.COMPLETE,
+      get: id => this.get(id),
+      addAsync: f => this.addAsync(f),
+      createPacked: (f, hash) => AudioFile.createPackedAsync(f, hash),
+      store: audio => this._add(audio),
+    });
   }
 
   add(url: string): AudioFile
@@ -70,10 +77,13 @@ export class AudioStorage {
   }
 
   private _add(audio: AudioFile): AudioFile {
-    if (audio.state === AudioState.COMPLETE) this.lazySynchronize(100);
-    if (this.update(audio)) return this.hash[audio.identifier];
-    this.hash[audio.identifier] = audio;
-    return audio;
+    return insertOrUpdateMediaFile({
+      hash: this.hash,
+      file: audio,
+      completeState: AudioState.COMPLETE,
+      lazySynchronize: ms => this.lazySynchronize(ms),
+      tryUpdate: file => this.update(file),
+    });
   }
 
   private update(audio: AudioFile): boolean
@@ -94,43 +104,22 @@ export class AudioStorage {
   }
 
   delete(identifier: string): boolean {
-    let audio: AudioFile = this.hash[identifier];
-    if (audio) {
-      audio.destroy();
-      delete this.hash[identifier];
-      return true;
-    }
-    return false;
+    return deleteMediaFromHash(this.hash, identifier);
   }
 
   get(identifier: string): AudioFile {
-    let audio: AudioFile = this.hash[identifier];
-    if (audio) return audio;
-    return null;
+    return getFromHash(this.hash, identifier);
   }
 
   synchronize(peer?: string) {
-    if (this.lazyTimer) this.lazyTimer.stop();
-    EventSystem.call('SYNCHRONIZE_AUDIO_LIST', this.getCatalog(), peer);
+    this.catalogSync.synchronize(peer);
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    const delay = Math.max(ms, 1500);
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
-    this.lazyTimer.reset(delay);
+    this.catalogSync.lazySynchronize(ms, peer);
   }
 
   getCatalog(): CatalogItem[] {
-    let catalog: CatalogItem[] = [];
-    for (let audio of AudioStorage.instance.audios) {
-      if (audio.state === AudioState.COMPLETE) {
-        catalog.push({
-          identifier: audio.identifier,
-          state: audio.state,
-          byteSize: catalogByteSize(audio.blob),
-        });
-      }
-    }
-    return catalog;
+    return buildCompleteBlobCatalog(this.audios, AudioState.COMPLETE);
   }
 }

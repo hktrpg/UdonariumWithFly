@@ -1,14 +1,16 @@
 import { EventSystem } from '../system';
-import { ResettableTimeout } from '../system/util/resettable-timeout';
-import { catalogByteSize } from './file-transfer-scheduler';
+import {
+  addPackedByContentHash,
+  buildCompleteBlobCatalog,
+  deleteMediaFromHash,
+  getFromHash,
+  insertOrUpdateMediaFile,
+  LazyCatalogSynchronizer,
+  MediaCatalogItem,
+} from './media-storage-helpers';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
-import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
-export type VideoCatalogItem = {
-  readonly identifier: string;
-  readonly state: number;
-  readonly byteSize?: number;
-};
+export type VideoCatalogItem = MediaCatalogItem;
 
 export class VideoStorage {
   private static _instance: VideoStorage;
@@ -17,7 +19,9 @@ export class VideoStorage {
     return VideoStorage._instance;
   }
 
-  private lazyTimer: ResettableTimeout;
+  private readonly catalogSync = new LazyCatalogSynchronizer(peer => {
+    EventSystem.call('SYNCHRONIZE_VIDEO_LIST', this.getCatalog(), peer);
+  });
   private hash: { [identifier: string]: VideoFile } = {};
 
   get videos(): VideoFile[] {
@@ -35,11 +39,14 @@ export class VideoStorage {
   }
 
   async addPackedAsync(file: File): Promise<VideoFile> {
-    const hash = mediaHashFromName(file.name);
-    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
-    const existing = this.get(hash);
-    if (existing && existing.state >= VideoState.COMPLETE) return existing;
-    return this._add(await VideoFile.createPackedAsync(file, hash));
+    return addPackedByContentHash({
+      file,
+      completeState: VideoState.COMPLETE,
+      get: id => this.get(id),
+      addAsync: f => this.addAsync(f),
+      createPacked: (f, hash) => VideoFile.createPackedAsync(f, hash),
+      store: video => this._add(video),
+    });
   }
 
   add(url: string): VideoFile
@@ -59,10 +66,13 @@ export class VideoStorage {
   }
 
   private _add(video: VideoFile): VideoFile {
-    if (video.state === VideoState.COMPLETE) this.lazySynchronize(100);
-    if (this.update(video)) return this.hash[video.identifier];
-    this.hash[video.identifier] = video;
-    return video;
+    return insertOrUpdateMediaFile({
+      hash: this.hash,
+      file: video,
+      completeState: VideoState.COMPLETE,
+      lazySynchronize: ms => this.lazySynchronize(ms),
+      tryUpdate: file => this.update(file),
+    });
   }
 
   private update(video: VideoFile): boolean
@@ -77,39 +87,22 @@ export class VideoStorage {
   }
 
   delete(identifier: string): boolean {
-    const video = this.hash[identifier];
-    if (!video) return false;
-    video.destroy();
-    delete this.hash[identifier];
-    return true;
+    return deleteMediaFromHash(this.hash, identifier);
   }
 
   get(identifier: string): VideoFile {
-    return this.hash[identifier] || null;
+    return getFromHash(this.hash, identifier);
   }
 
   synchronize(peer?: string) {
-    if (this.lazyTimer) this.lazyTimer.stop();
-    EventSystem.call('SYNCHRONIZE_VIDEO_LIST', this.getCatalog(), peer);
+    this.catalogSync.synchronize(peer);
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    const delay = Math.max(ms, 1500);
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
-    this.lazyTimer.reset(delay);
+    this.catalogSync.lazySynchronize(ms, peer);
   }
 
   getCatalog(): VideoCatalogItem[] {
-    const catalog: VideoCatalogItem[] = [];
-    for (const video of this.videos) {
-      if (video.state === VideoState.COMPLETE) {
-        catalog.push({
-          identifier: video.identifier,
-          state: video.state,
-          byteSize: catalogByteSize(video.blob),
-        });
-      }
-    }
-    return catalog;
+    return buildCompleteBlobCatalog(this.videos, VideoState.COMPLETE);
   }
 }
