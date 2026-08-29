@@ -114,7 +114,8 @@ export class RoomFileSyncWatchdog {
   private maybeReplyCatalog(binding: RoomSyncKindBinding, peerId: string) {
     const key = `${binding.kind}:${peerId}`;
     const now = performance.now();
-    if (now - (this.lastCatalogReply.get(key) ?? 0) < CATALOG_REPLY_COOLDOWN_MS) return;
+    const last = this.lastCatalogReply.get(key);
+    if (last != null && now - last < CATALOG_REPLY_COOLDOWN_MS) return;
     this.lastCatalogReply.set(key, now);
     binding.synchronize(peerId);
   }

@@ -231,8 +231,8 @@ export class ImageSharingSystem {
 
   private isSendDeclined(sendTo: string, identifier: string): boolean {
     const key = mediaSendTaskKey(sendTo, identifier);
-    const last = this.declinedSendKeys.get(key) ?? 0;
-    return performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
+    const last = this.declinedSendKeys.get(key);
+    return last != null && performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
   }
 
   private stopReceiveTask(identifier: string) {
