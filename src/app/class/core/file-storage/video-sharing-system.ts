@@ -1,6 +1,6 @@
 import { EventSystem, Network } from '../system';
 import { BufferSharingTask } from './buffer-sharing-task';
-import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
@@ -10,11 +10,16 @@ import {
   mediaSendTaskKey,
   meshCandidatePeerIds,
 } from './media-sharing-helpers';
+import {
+  collectMissingDownloadRequests,
+  ensureRoomMissingDownloads,
+  MissingDownloadHooks,
+  queueMissingDownloads,
+} from './missing-download-pipeline';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 import { VideoCatalogItem, VideoStorage } from './video-storage';
-import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class VideoSharingSystem {
   private static _instance: VideoSharingSystem;
@@ -40,25 +45,13 @@ export class VideoSharingSystem {
       .on('SYNCHRONIZE_VIDEO_LIST', event => {
         if (event.isSendFromSelf) return;
         const otherCatalog: VideoCatalogItem[] = event.data;
-        const request: VideoCatalogItem[] = [];
-        for (const item of otherCatalog) {
-          if (this.hydrateUrlBackedIfNeeded(item)) continue;
-          let video = VideoStorage.instance.get(item.identifier);
-          if (video === null) {
-            video = VideoFile.createEmpty(item.identifier);
-            VideoStorage.instance.add(video);
-          }
-          if (video.state < VideoState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('video', item.identifier)) {
-            request.push({ identifier: item.identifier, state: video.state });
-          }
-        }
+        const hooks = this.missingDownloadHooks();
+        const request = collectMissingDownloadRequests(otherCatalog, hooks);
         if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < VideoStorage.instance.getCatalog().length) {
           VideoStorage.instance.synchronize(event.sendFrom);
         }
         if (request.length < 1) return;
-        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        queueMissingDownloads(request, event.sendFrom, otherCatalog, hooks);
       })
       .on('REQUEST_VIDEO_RESOURE', event => {
         if (event.isSendFromSelf) return;
@@ -166,24 +159,8 @@ export class VideoSharingSystem {
   }
 
   ensureRoomDownloads(catalogsByPeer: Map<string, VideoCatalogItem[]>) {
-    for (const [peerId, catalog] of catalogsByPeer) {
-      if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
-      const request: VideoCatalogItem[] = [];
-      for (const item of catalog) {
-        if (this.hydrateUrlBackedIfNeeded(item)) continue;
-        let video = VideoStorage.instance.get(item.identifier);
-        if (video === null) {
-          video = VideoFile.createEmpty(item.identifier);
-          VideoStorage.instance.add(video);
-        }
-        if (video.state < VideoState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('video', item.identifier)) {
-          request.push({ identifier: item.identifier, state: video.state });
-        }
-      }
-      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
-    }
+    const hooks = this.missingDownloadHooks();
+    ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
   /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
@@ -198,23 +175,24 @@ export class VideoSharingSystem {
     return true;
   }
 
-  private queueMissingDownloads(request: VideoCatalogItem[], peerId: string, catalogMeta: VideoCatalogItem[]) {
-    const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
-    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', request, item => {
-      const video = VideoStorage.instance.get(item.identifier);
-      return video?.state ?? VideoState.NULL;
-    });
-    FolderMediaHydrator.instance.beginHydrateMissing('video', sorted.map(item => item.identifier));
-    for (const item of sorted) {
-      const video = VideoStorage.instance.get(item.identifier);
-      const localState = video?.state ?? VideoState.NULL;
-      if (localState >= VideoState.COMPLETE) continue;
-      const meta = metaById.get(item.identifier) ?? item;
-      const bytes = estimateNextReceiveBytes('video', localState, meta);
-      FileReceiveScheduler.enqueueReceiveRequest('video', peerId, item.identifier, bytes, () => {
-        this.request([{ identifier: item.identifier, state: localState }], peerId);
-      });
-    }
+  private missingDownloadHooks(): MissingDownloadHooks {
+    return {
+      kind: 'video',
+      completeState: VideoState.COMPLETE,
+      nullState: VideoState.NULL,
+      isReceiving: id => this.receiveTaskMap.has(id),
+      getLocalState: id => {
+        const video = VideoStorage.instance.get(id);
+        return video ? video.state : null;
+      },
+      ensurePlaceholder: id => {
+        VideoStorage.instance.add(VideoFile.createEmpty(id));
+      },
+      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      requestOne: (identifier, localState, peerId) => {
+        this.request([{ identifier, state: localState }], peerId);
+      },
+    };
   }
 
   private request(request: VideoCatalogItem[], peerId: string) {

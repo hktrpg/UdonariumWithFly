@@ -5,7 +5,7 @@ import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
-import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
@@ -15,9 +15,14 @@ import {
   mediaSendTaskKey,
   meshCandidatePeerIds,
 } from './media-sharing-helpers';
+import {
+  collectMissingDownloadRequests,
+  ensureRoomMissingDownloads,
+  MissingDownloadHooks,
+  queueMissingDownloads,
+} from './missing-download-pipeline';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
-import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class ImageSharingSystem {
   private static _instance: ImageSharingSystem
@@ -54,21 +59,8 @@ export class ImageSharingSystem {
         netDebug('SYNCHRONIZE_FILE_LIST ImageStorageService ' + event.sendFrom);
 
         let otherCatalog: CatalogItem[] = event.data;
-        let request: CatalogItem[] = [];
-
-        for (let item of otherCatalog) {
-          if (this.hydrateUrlBackedIfNeeded(item)) continue;
-          let image: ImageFile = ImageStorage.instance.get(item.identifier);
-          if (image === null) {
-            image = ImageFile.createEmpty(item.identifier);
-            ImageStorage.instance.add(image);
-          }
-          if (image.state < ImageState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('image', item.identifier)) {
-            request.push({ identifier: item.identifier, state: image.state });
-          }
-        }
+        const hooks = this.missingDownloadHooks();
+        const request = collectMissingDownloadRequests(otherCatalog, hooks);
 
         // Handle edge cases such as Peer disconnect
         if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
@@ -78,7 +70,7 @@ export class ImageSharingSystem {
         if (request.length < 1) {
           return;
         }
-        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        queueMissingDownloads(request, event.sendFrom, otherCatalog, hooks);
       })
       .on('REQUEST_FILE_RESOURE', async event => {
         if (event.isSendFromSelf) return;
@@ -246,23 +238,24 @@ export class ImageSharingSystem {
     netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
-  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
-    const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
-    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('image', request, item => {
-      const image = ImageStorage.instance.get(item.identifier);
-      return image?.state ?? ImageState.NULL;
-    });
-    FolderMediaHydrator.instance.beginHydrateMissing('image', sorted.map(item => item.identifier));
-    for (const item of sorted) {
-      const image = ImageStorage.instance.get(item.identifier);
-      const localState = image?.state ?? ImageState.NULL;
-      if (localState >= ImageState.COMPLETE) continue;
-      const meta = metaById.get(item.identifier) ?? item;
-      const bytes = estimateNextReceiveBytes('image', localState, meta);
-      FileReceiveScheduler.enqueueReceiveRequest('image', peerId, item.identifier, bytes, () => {
-        this.request([{ identifier: item.identifier, state: localState }], peerId);
-      });
-    }
+  private missingDownloadHooks(): MissingDownloadHooks {
+    return {
+      kind: 'image',
+      completeState: ImageState.COMPLETE,
+      nullState: ImageState.NULL,
+      isReceiving: id => this.receiveTaskMap.has(id),
+      getLocalState: id => {
+        const image = ImageStorage.instance.get(id);
+        return image ? image.state : null;
+      },
+      ensurePlaceholder: id => {
+        ImageStorage.instance.add(ImageFile.createEmpty(id));
+      },
+      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      requestOne: (identifier, localState, peerId) => {
+        this.request([{ identifier, state: localState }], peerId);
+      },
+    };
   }
 
   private clearDeclinedForPeer(peerId: string) {
@@ -274,24 +267,8 @@ export class ImageSharingSystem {
   }
 
   ensureRoomDownloads(catalogsByPeer: Map<string, CatalogItem[]>) {
-    for (const [peerId, catalog] of catalogsByPeer) {
-      if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
-      const request: CatalogItem[] = [];
-      for (const item of catalog) {
-        if (this.hydrateUrlBackedIfNeeded(item)) continue;
-        let image = ImageStorage.instance.get(item.identifier);
-        if (image === null) {
-          image = ImageFile.createEmpty(item.identifier);
-          ImageStorage.instance.add(image);
-        }
-        if (image.state < ImageState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('image', item.identifier)) {
-          request.push({ identifier: item.identifier, state: image.state });
-        }
-      }
-      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
-    }
+    const hooks = this.missingDownloadHooks();
+    ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
   /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
