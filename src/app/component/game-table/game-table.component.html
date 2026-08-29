@@ -6,7 +6,8 @@
   [style.background-color]="backgroundDarknessOverlayColor"></div>
 <div class="component is-fill is-perspective" [ngClass]="{'is-grabbing': isPointerDragging}" #root>
   <div class="component-content is-fill is-3d" #gameTable>
-    <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'" #gameObjects>
+    <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'"
+      [style.background-color]="tableSurfaceUnderlayColor" #gameObjects>
       <canvas class="grid-canvas is-fill is-pointer-events-none" #gridCanvas [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.1) + 'px)', 'clip': clipCss}"></canvas>
       <svg class="drawings-layer is-fill is-pointer-events-none" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.2) + 'px)'}">
@@ -104,8 +105,10 @@
       <range class="is-3d" *ngFor="let range of ranges; trackBy: trackByGameObject" [range]="range" [attr.data-stack-id]="range.identifier" [appTooltip]="range"></range>
       <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [attr.data-stack-id]="diceSymbol.identifier" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
+      <!-- Keep lighting coplanar with the map (not gridHeight+N): elevated veil
+           leaves a bright map rim at low camera angles. -->
       <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
-        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
+        [ngStyle]="{'transform': 'translateZ(0.22px)', 'clip': clipCss}"></canvas>
       <div class="weather-stack is-pointer-events-none is-3d" aria-hidden="true"
         [style.width.px]="weatherPixelWidth"
         [style.height.px]="weatherPixelHeight"

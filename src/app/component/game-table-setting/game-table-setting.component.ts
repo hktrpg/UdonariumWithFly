@@ -96,6 +96,17 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableDarkness(v: number) { if (this.isEditable && this.canControlDayNight) this.selectedTable.darkness = Number(v); }
   get tableGlobalIllumination(): number { return this.selectedTable?.globalIllumination ?? 1; }
   set tableGlobalIllumination(v: number) { if (this.isEditable) this.selectedTable.globalIllumination = Number(v); }
+  /**
+   * Ambient slider UI: left=0 bright, right=1 dark (same orientation as darkness).
+   * Stored globalIllumination remains 1=bright, 0=dark.
+   */
+  get tableAmbientDimSlider(): number {
+    return 1 - (this.selectedTable?.globalIllumination ?? 1);
+  }
+  set tableAmbientDimSlider(v: number) {
+    if (!this.isEditable || !this.selectedTable) return;
+    this.selectedTable.globalIllumination = 1 - Math.max(0, Math.min(1, Number(v)));
+  }
   get tableGlobalIlluminationEnabled(): boolean { return this.selectedTable?.globalIlluminationEnabled !== false; }
   set tableGlobalIlluminationEnabled(v: boolean) {
     if (this.isEditable) this.selectedTable.globalIlluminationEnabled = !!v;
