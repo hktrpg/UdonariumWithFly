@@ -3,7 +3,7 @@ import { netDebug } from '../system/network/net-debug';
 import { AudioSharingSystem } from './audio-sharing-system';
 import { AudioState } from './audio-file';
 import { AudioStorage } from './audio-storage';
-import { TransferCatalogMeta, FileReceiveScheduler } from './file-transfer-scheduler';
+import { TransferCatalogMeta, FileReceiveScheduler, FileResourceKind } from './file-transfer-scheduler';
 import { ImageSharingSystem } from './image-sharing-system';
 import { ImageState } from './image-file';
 import { ImageStorage } from './image-storage';
@@ -19,6 +19,21 @@ const TICK_WHILE_INCOMPLETE_MS = 3_000;
 const TICK_IDLE_MS = 8_000;
 const CATALOG_REPLY_COOLDOWN_MS = 2_500;
 
+type SyncListEvent =
+  | 'SYNCHRONIZE_FILE_LIST'
+  | 'SYNCHRONIZE_AUDIO_LIST'
+  | 'SYNCHRONIZE_PDF_LIST'
+  | 'SYNCHRONIZE_VIDEO_LIST';
+
+interface RoomSyncKindBinding {
+  kind: FileResourceKind;
+  listEvent: SyncListEvent;
+  catalogs: Map<string, TransferCatalogMeta[]>;
+  synchronize: (peerId: string) => void;
+  ensureRoomDownloads: (catalogsByPeer: Map<string, TransferCatalogMeta[]>) => void;
+  hasIncomplete: () => boolean;
+}
+
 export class RoomFileSyncWatchdog {
   private static _instance: RoomFileSyncWatchdog;
   static get instance(): RoomFileSyncWatchdog {
@@ -27,17 +42,47 @@ export class RoomFileSyncWatchdog {
   }
 
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private remoteImageCatalogs = new Map<string, TransferCatalogMeta[]>();
-  private remoteAudioCatalogs = new Map<string, TransferCatalogMeta[]>();
-  private remotePdfCatalogs = new Map<string, TransferCatalogMeta[]>();
-  private remoteVideoCatalogs = new Map<string, TransferCatalogMeta[]>();
   private lastCatalogReply = new Map<string, number>();
+  private readonly kinds: RoomSyncKindBinding[] = [
+    {
+      kind: 'image',
+      listEvent: 'SYNCHRONIZE_FILE_LIST',
+      catalogs: new Map(),
+      synchronize: peerId => ImageStorage.instance.synchronize(peerId),
+      ensureRoomDownloads: catalogs => ImageSharingSystem.instance.ensureRoomDownloads(catalogs),
+      hasIncomplete: () => ImageStorage.instance.images.some(f => f.state < ImageState.COMPLETE),
+    },
+    {
+      kind: 'audio',
+      listEvent: 'SYNCHRONIZE_AUDIO_LIST',
+      catalogs: new Map(),
+      synchronize: peerId => AudioStorage.instance.synchronize(peerId),
+      ensureRoomDownloads: catalogs => AudioSharingSystem.instance.ensureRoomDownloads(catalogs),
+      hasIncomplete: () => AudioStorage.instance.audios.some(f => f.state < AudioState.COMPLETE),
+    },
+    {
+      kind: 'pdf',
+      listEvent: 'SYNCHRONIZE_PDF_LIST',
+      catalogs: new Map(),
+      synchronize: peerId => PdfStorage.instance.synchronize(peerId),
+      ensureRoomDownloads: catalogs => PdfSharingSystem.instance.ensureRoomDownloads(catalogs),
+      hasIncomplete: () => PdfStorage.instance.pdfs.some(f => f.state < PdfState.COMPLETE),
+    },
+    {
+      kind: 'video',
+      listEvent: 'SYNCHRONIZE_VIDEO_LIST',
+      catalogs: new Map(),
+      synchronize: peerId => VideoStorage.instance.synchronize(peerId),
+      ensureRoomDownloads: catalogs => VideoSharingSystem.instance.ensureRoomDownloads(catalogs),
+      hasIncomplete: () => VideoStorage.instance.videos.some(f => f.state < VideoState.COMPLETE),
+    },
+  ];
 
   private constructor() { }
 
   initialize() {
     EventSystem.unregister(this);
-    EventSystem.register(this)
+    let registration = EventSystem.register(this)
       .on('OPEN_NETWORK', () => this.scheduleTick(500))
       .on('CONNECT_PEER', () => {
         FileReceiveScheduler.schedule();
@@ -46,51 +91,32 @@ export class RoomFileSyncWatchdog {
       .on('DISCONNECT_PEER', event => {
         this.forgetPeer(event.data.peerId);
         this.scheduleTick(500);
-      })
-      .on('SYNCHRONIZE_FILE_LIST', event => {
-        if (event.isSendFromSelf) return;
-        this.remoteImageCatalogs.set(event.sendFrom, event.data);
-        this.maybeReplyCatalog('image', event.sendFrom);
-      })
-      .on('SYNCHRONIZE_AUDIO_LIST', event => {
-        if (event.isSendFromSelf) return;
-        this.remoteAudioCatalogs.set(event.sendFrom, event.data);
-        this.maybeReplyCatalog('audio', event.sendFrom);
-      })
-      .on('SYNCHRONIZE_PDF_LIST', event => {
-        if (event.isSendFromSelf) return;
-        this.remotePdfCatalogs.set(event.sendFrom, event.data);
-        this.maybeReplyCatalog('pdf', event.sendFrom);
-      })
-      .on('SYNCHRONIZE_VIDEO_LIST', event => {
-        if (event.isSendFromSelf) return;
-        this.remoteVideoCatalogs.set(event.sendFrom, event.data);
-        this.maybeReplyCatalog('video', event.sendFrom);
       });
+    for (const binding of this.kinds) {
+      registration = registration.on(binding.listEvent, event => {
+        if (event.isSendFromSelf) return;
+        binding.catalogs.set(event.sendFrom, event.data);
+        this.maybeReplyCatalog(binding, event.sendFrom);
+      });
+    }
     this.scheduleTick(2000);
   }
 
   private forgetPeer(peerId: string) {
-    this.remoteImageCatalogs.delete(peerId);
-    this.remoteAudioCatalogs.delete(peerId);
-    this.remotePdfCatalogs.delete(peerId);
-    this.remoteVideoCatalogs.delete(peerId);
+    for (const binding of this.kinds) {
+      binding.catalogs.delete(peerId);
+    }
     for (const key of this.lastCatalogReply.keys()) {
       if (key.endsWith(`:${peerId}`)) this.lastCatalogReply.delete(key);
     }
   }
 
-  private maybeReplyCatalog(kind: 'image' | 'audio' | 'pdf' | 'video', peerId: string) {
-    const key = `${kind}:${peerId}`;
+  private maybeReplyCatalog(binding: RoomSyncKindBinding, peerId: string) {
+    const key = `${binding.kind}:${peerId}`;
     const now = performance.now();
     if (now - (this.lastCatalogReply.get(key) ?? 0) < CATALOG_REPLY_COOLDOWN_MS) return;
     this.lastCatalogReply.set(key, now);
-    switch (kind) {
-      case 'image': ImageStorage.instance.synchronize(peerId); break;
-      case 'audio': AudioStorage.instance.synchronize(peerId); break;
-      case 'pdf': PdfStorage.instance.synchronize(peerId); break;
-      case 'video': VideoStorage.instance.synchronize(peerId); break;
-    }
+    binding.synchronize(peerId);
   }
 
   private scheduleTick(ms: number) {
@@ -113,41 +139,26 @@ export class RoomFileSyncWatchdog {
       return;
     }
 
-    const incomplete = this.hasIncompleteAssets();
-    if (!incomplete) {
+    if (!this.hasIncompleteAssets()) {
       this.scheduleTick(TICK_IDLE_MS);
       return;
     }
 
     for (const peerId of Network.peerIds) {
-      ImageStorage.instance.synchronize(peerId);
-      AudioStorage.instance.synchronize(peerId);
-      PdfStorage.instance.synchronize(peerId);
-      VideoStorage.instance.synchronize(peerId);
+      for (const binding of this.kinds) {
+        binding.synchronize(peerId);
+      }
     }
 
-    ImageSharingSystem.instance.ensureRoomDownloads(this.remoteImageCatalogs);
-    AudioSharingSystem.instance.ensureRoomDownloads(this.remoteAudioCatalogs);
-    PdfSharingSystem.instance.ensureRoomDownloads(this.remotePdfCatalogs);
-    VideoSharingSystem.instance.ensureRoomDownloads(this.remoteVideoCatalogs);
+    for (const binding of this.kinds) {
+      binding.ensureRoomDownloads(binding.catalogs);
+    }
 
     netDebug('room file sync watchdog: incomplete assets, will retry');
     this.scheduleTick(TICK_WHILE_INCOMPLETE_MS);
   }
 
   private hasIncompleteAssets(): boolean {
-    for (const image of ImageStorage.instance.images) {
-      if (image.state < ImageState.COMPLETE) return true;
-    }
-    for (const audio of AudioStorage.instance.audios) {
-      if (audio.state < AudioState.COMPLETE) return true;
-    }
-    for (const pdf of PdfStorage.instance.pdfs) {
-      if (pdf.state < PdfState.COMPLETE) return true;
-    }
-    for (const video of VideoStorage.instance.videos) {
-      if (video.state < VideoState.COMPLETE) return true;
-    }
-    return false;
+    return this.kinds.some(binding => binding.hasIncomplete());
   }
 }
