@@ -4,8 +4,10 @@ import { FileReceiveScheduler } from './file-transfer-scheduler';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import {
   acceptOrDeclineStartTransmission,
+  applyBlobContextsToStorage,
   applyReceiveProgressPercent,
   fulfillOrRelaySingleFileRequest,
+  repackTransferredBlob,
   startSingleFileSendTask,
 } from './single-file-media-transfer';
 
@@ -119,5 +121,20 @@ describe('single-file-media-transfer', () => {
     })).toBeRejectedWithError('pack failed');
 
     expect(sendTaskMap.size).toBe(0);
+  });
+
+  it('repackTransferredBlob / applyBlobContextsToStorage restore MIME', () => {
+    const raw = new Blob([new Uint8Array([1, 2])], { type: '' });
+    const packed = repackTransferredBlob(raw, '', 'application/pdf') as Blob;
+    expect(packed.type).toBe('application/pdf');
+
+    const added: Array<{ type?: string }> = [];
+    applyBlobContextsToStorage(
+      [{ blob: raw, type: '' }],
+      ctx => added.push(ctx),
+      'video/mp4',
+    );
+    expect(added[0].type).toBe('');
+    expect((added[0] as any).blob.type).toBe('video/mp4');
   });
 });

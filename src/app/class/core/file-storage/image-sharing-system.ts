@@ -18,10 +18,11 @@ import {
 import {
   collectMissingDownloadRequests,
   ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
+import { repackTransferredBlob } from './single-file-media-transfer';
 import { MimeType } from './mime-type';
 
 export class ImageSharingSystem {
@@ -117,8 +118,13 @@ export class ImageSharingSystem {
         let updateImages: ImageContext[] = event.data.updateImages;
         netDebug('UPDATE_FILE_RESOURE ImageStorageService ' + event.sendFrom + ' -> ', updateImages);
         for (let context of updateImages) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
-          if (context.thumbnail.blob) context.thumbnail.blob = new Blob([context.thumbnail.blob], { type: context.thumbnail.type });
+          if (context.blob) context.blob = repackTransferredBlob(context.blob, context.type) as Blob;
+          if (context.thumbnail?.blob) {
+            context.thumbnail.blob = repackTransferredBlob(
+              context.thumbnail.blob,
+              context.thumbnail.type,
+            ) as Blob;
+          }
           ImageStorage.instance.add(context);
         }
       })
@@ -239,23 +245,19 @@ export class ImageSharingSystem {
   }
 
   private missingDownloadHooks(): MissingDownloadHooks {
-    return {
+    return buildMissingDownloadHooks({
       kind: 'image',
       completeState: ImageState.COMPLETE,
       nullState: ImageState.NULL,
+      urlState: ImageState.URL,
       isReceiving: id => this.receiveTaskMap.has(id),
-      getLocalState: id => {
-        const image = ImageStorage.instance.get(id);
-        return image ? image.state : null;
-      },
-      ensurePlaceholder: id => {
-        ImageStorage.instance.add(ImageFile.createEmpty(id));
-      },
-      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      get: id => ImageStorage.instance.get(id),
+      addEmpty: id => { ImageStorage.instance.add(ImageFile.createEmpty(id)); },
+      addUrlBacked: id => { ImageStorage.instance.add(ImageFile.create(id)); },
       requestOne: (identifier, localState, peerId) => {
         this.request([{ identifier, state: localState }], peerId);
       },
-    };
+    });
   }
 
   private clearDeclinedForPeer(peerId: string) {
@@ -269,18 +271,6 @@ export class ImageSharingSystem {
   ensureRoomDownloads(catalogsByPeer: Map<string, CatalogItem[]>) {
     const hooks = this.missingDownloadHooks();
     ensureRoomMissingDownloads(catalogsByPeer, hooks);
-  }
-
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
-    if (item.state !== ImageState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = ImageStorage.instance.get(item.identifier);
-    if (!existing || existing.state < ImageState.URL) {
-      ImageStorage.instance.add(ImageFile.create(item.identifier));
-    }
-    return true;
   }
 
   private request(request: CatalogItem[], peerId: string) {

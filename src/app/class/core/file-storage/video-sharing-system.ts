@@ -10,18 +10,19 @@ import {
 import {
   collectMissingDownloadRequests,
   ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
 import {
   acceptOrDeclineStartTransmission,
+  applyBlobContextsToStorage,
   applyReceiveProgressPercent,
   buildBlobOrUrlSendContext,
   fulfillOrRelaySingleFileRequest,
   startSingleFileReceiveTask,
   startSingleFileSendTask,
 } from './single-file-media-transfer';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 import { VideoCatalogItem, VideoStorage } from './video-storage';
 
@@ -75,10 +76,11 @@ export class VideoSharingSystem {
       })
       .on('UPDATE_VIDEO_RESOURE', 1000, event => {
         const updateVideos: VideoFileContext[] = event.data;
-        for (const context of updateVideos) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type || 'video/mp4' });
-          VideoStorage.instance.add(context);
-        }
+        applyBlobContextsToStorage(
+          updateVideos,
+          ctx => VideoStorage.instance.add(ctx),
+          'video/mp4',
+        );
       })
       .on('START_VIDEO_TRANSMISSION', event => {
         const identifier: string = event.data.fileIdentifier;
@@ -142,36 +144,20 @@ export class VideoSharingSystem {
     ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: VideoCatalogItem): boolean {
-    if (item.state !== VideoState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = VideoStorage.instance.get(item.identifier);
-    if (!existing || existing.state < VideoState.URL) {
-      VideoStorage.instance.add(VideoFile.create(item.identifier));
-    }
-    return true;
-  }
-
   private missingDownloadHooks(): MissingDownloadHooks {
-    return {
+    return buildMissingDownloadHooks({
       kind: 'video',
       completeState: VideoState.COMPLETE,
       nullState: VideoState.NULL,
+      urlState: VideoState.URL,
       isReceiving: id => this.receiveTaskMap.has(id),
-      getLocalState: id => {
-        const video = VideoStorage.instance.get(id);
-        return video ? video.state : null;
-      },
-      ensurePlaceholder: id => {
-        VideoStorage.instance.add(VideoFile.createEmpty(id));
-      },
-      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      get: id => VideoStorage.instance.get(id),
+      addEmpty: id => { VideoStorage.instance.add(VideoFile.createEmpty(id)); },
+      addUrlBacked: id => { VideoStorage.instance.add(VideoFile.create(id)); },
       requestOne: (identifier, localState, peerId) => {
         this.request([{ identifier, state: localState }], peerId);
       },
-    };
+    });
   }
 
   private request(request: VideoCatalogItem[], peerId: string) {

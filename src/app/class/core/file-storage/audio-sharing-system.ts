@@ -10,11 +10,13 @@ import {
 import {
   collectMissingDownloadRequests,
   ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
 import {
   acceptOrDeclineStartTransmission,
+  applyBlobContextsToStorage,
   applyReceiveProgressPercent,
   buildBlobOrUrlSendContext,
   fulfillOrRelaySingleFileRequest,
@@ -24,7 +26,6 @@ import {
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
 
 export class AudioSharingSystem {
   private static _instance: AudioSharingSystem
@@ -89,10 +90,7 @@ export class AudioSharingSystem {
       .on('UPDATE_AUDIO_RESOURE', 1000, event => {
         let updateAudios: AudioFileContext[] = event.data;
         netDebug('UPDATE_AUDIO_RESOURE AudioStorageService ' + event.sendFrom + ' -> ', updateAudios);
-        for (let context of updateAudios) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
-          AudioStorage.instance.add(context);
-        }
+        applyBlobContextsToStorage(updateAudios, ctx => AudioStorage.instance.add(ctx));
       })
       .on('START_AUDIO_TRANSMISSION', event => {
         netDebug('START_AUDIO_TRANSMISSION ' + event.data.fileIdentifier);
@@ -163,36 +161,20 @@ export class AudioSharingSystem {
     ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
-    if (item.state !== AudioState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = AudioStorage.instance.get(item.identifier);
-    if (!existing || existing.state < AudioState.URL) {
-      AudioStorage.instance.add(AudioFile.create(item.identifier));
-    }
-    return true;
-  }
-
   private missingDownloadHooks(): MissingDownloadHooks {
-    return {
+    return buildMissingDownloadHooks({
       kind: 'audio',
       completeState: AudioState.COMPLETE,
       nullState: AudioState.NULL,
+      urlState: AudioState.URL,
       isReceiving: id => this.receiveTaskMap.has(id),
-      getLocalState: id => {
-        const audio = AudioStorage.instance.get(id);
-        return audio ? audio.state : null;
-      },
-      ensurePlaceholder: id => {
-        AudioStorage.instance.add(AudioFile.createEmpty(id));
-      },
-      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      get: id => AudioStorage.instance.get(id),
+      addEmpty: id => { AudioStorage.instance.add(AudioFile.createEmpty(id)); },
+      addUrlBacked: id => { AudioStorage.instance.add(AudioFile.create(id)); },
       requestOne: (identifier, localState, peerId) => {
         this.request([{ identifier, state: localState }], peerId);
       },
-    };
+    });
   }
 
   private request(request: CatalogItem[], peerId: string) {

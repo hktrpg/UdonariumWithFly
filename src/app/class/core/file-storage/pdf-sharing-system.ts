@@ -10,18 +10,19 @@ import {
 import {
   collectMissingDownloadRequests,
   ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
 import {
   acceptOrDeclineStartTransmission,
+  applyBlobContextsToStorage,
   applyReceiveProgressPercent,
   buildBlobOrUrlSendContext,
   fulfillOrRelaySingleFileRequest,
   startSingleFileReceiveTask,
   startSingleFileSendTask,
 } from './single-file-media-transfer';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 import { PdfCatalogItem, PdfStorage } from './pdf-storage';
 
@@ -75,10 +76,11 @@ export class PdfSharingSystem {
       })
       .on('UPDATE_PDF_RESOURE', 1000, event => {
         const updatePdfs: PdfFileContext[] = event.data;
-        for (const context of updatePdfs) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type || 'application/pdf' });
-          PdfStorage.instance.add(context);
-        }
+        applyBlobContextsToStorage(
+          updatePdfs,
+          ctx => PdfStorage.instance.add(ctx),
+          'application/pdf',
+        );
       })
       .on('START_PDF_TRANSMISSION', event => {
         const identifier: string = event.data.fileIdentifier;
@@ -142,36 +144,20 @@ export class PdfSharingSystem {
     ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: PdfCatalogItem): boolean {
-    if (item.state !== PdfState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = PdfStorage.instance.get(item.identifier);
-    if (!existing || existing.state < PdfState.URL) {
-      PdfStorage.instance.add(PdfFile.create(item.identifier));
-    }
-    return true;
-  }
-
   private missingDownloadHooks(): MissingDownloadHooks {
-    return {
+    return buildMissingDownloadHooks({
       kind: 'pdf',
       completeState: PdfState.COMPLETE,
       nullState: PdfState.NULL,
+      urlState: PdfState.URL,
       isReceiving: id => this.receiveTaskMap.has(id),
-      getLocalState: id => {
-        const pdf = PdfStorage.instance.get(id);
-        return pdf ? pdf.state : null;
-      },
-      ensurePlaceholder: id => {
-        PdfStorage.instance.add(PdfFile.createEmpty(id));
-      },
-      hydrateUrlBacked: item => this.hydrateUrlBackedIfNeeded(item),
+      get: id => PdfStorage.instance.get(id),
+      addEmpty: id => { PdfStorage.instance.add(PdfFile.createEmpty(id)); },
+      addUrlBacked: id => { PdfStorage.instance.add(PdfFile.create(id)); },
       requestOne: (identifier, localState, peerId) => {
         this.request([{ identifier, state: localState }], peerId);
       },
-    };
+    });
   }
 
   private request(request: PdfCatalogItem[], peerId: string) {

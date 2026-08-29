@@ -164,6 +164,30 @@ export function startSingleFileReceiveTask<TContext>(options: {
   options.onStarted?.();
 }
 
+/** After structured-clone / peer transfer, rebuild Blob so MIME type sticks. */
+export function repackTransferredBlob(
+  blob: Blob | null | undefined,
+  type: string | undefined,
+  defaultMime = '',
+): Blob | null | undefined {
+  if (!blob) return blob;
+  return new Blob([blob], { type: type || defaultMime });
+}
+
+/** APPLY UPDATE_* contexts: repack blobs then add to storage. */
+export function applyBlobContextsToStorage<T extends { blob?: Blob | null; type?: string }>(
+  contexts: T[],
+  add: (ctx: T) => void,
+  defaultMime = '',
+): void {
+  for (const context of contexts) {
+    if (context.blob) {
+      context.blob = repackTransferredBlob(context.blob, context.type, defaultMime) as Blob;
+    }
+    add(context);
+  }
+}
+
 /** Apply download percent into a media object's display name. */
 export function applyReceiveProgressPercent(
   media: { toContext(): { name: string }; apply(context: { name: string }): void },
