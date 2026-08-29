@@ -1,8 +1,8 @@
 import { EventSystem, Network } from '../system';
-import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
@@ -219,11 +219,9 @@ export class VideoSharingSystem {
 
   private request(request: VideoCatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('video', identifier);
-      meshWarnThrottled(`video-skip-${peerId.slice(0, 12)}`,
-        'video request skipped (peer not open)', peerId.slice(0, 16));
-      VideoStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('video', peerId, identifier, (ms, peer) => {
+      VideoStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     EventSystem.call('REQUEST_VIDEO_RESOURE', {

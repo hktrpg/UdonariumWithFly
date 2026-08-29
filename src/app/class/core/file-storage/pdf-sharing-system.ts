@@ -1,8 +1,8 @@
 import { EventSystem, Network } from '../system';
-import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
@@ -226,11 +226,9 @@ export class PdfSharingSystem {
 
   private request(request: PdfCatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('pdf', identifier);
-      meshWarnThrottled(`pdf-skip-${peerId.slice(0, 12)}`,
-        'pdf request skipped (peer not open)', peerId.slice(0, 16));
-      PdfStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('pdf', peerId, identifier, (ms, peer) => {
+      PdfStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     EventSystem.call('REQUEST_PDF_RESOURE', {

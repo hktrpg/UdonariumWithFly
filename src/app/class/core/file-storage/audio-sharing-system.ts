@@ -1,7 +1,8 @@
 import { EventSystem, Network } from '../system';
-import { netDebug, meshWarnThrottled } from '../system/network/net-debug';
+import { netDebug } from '../system/network/net-debug';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
@@ -261,11 +262,9 @@ export class AudioSharingSystem {
 
   private request(request: CatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('audio', identifier);
-      meshWarnThrottled(`audio-skip-${peerId.slice(0, 12)}`,
-        'audio request skipped (peer not open)', peerId.slice(0, 16));
-      AudioStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('audio', peerId, identifier, (ms, peer) => {
+      AudioStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     netDebug('requestFile() ' + peerId);

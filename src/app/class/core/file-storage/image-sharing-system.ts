@@ -7,6 +7,7 @@ import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
@@ -316,10 +317,9 @@ export class ImageSharingSystem {
 
   private request(request: CatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('image', identifier);
-      netDebug('image request deferred (peer not open)', peerId.slice(0, 16));
-      ImageStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('image', peerId, identifier, (ms, peer) => {
+      ImageStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     netDebug('requestFile() ' + peerId);
