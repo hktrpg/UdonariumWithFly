@@ -7,6 +7,7 @@ import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
@@ -20,7 +21,7 @@ export class ImageSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
-  private declinedStartKeys = new Map<string, number>();
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
   /** Peer declined our outbound transfer — pause resend (peerId:imageId). */
   private declinedSendKeys = new Map<string, number>();
   private static readonly SEND_DECLINE_COOLDOWN_MS = 45_000;
@@ -132,15 +133,8 @@ export class ImageSharingSystem {
           return;
         }
         if (image && ImageState.COMPLETE <= image.state) {
-          const declineKey = `${event.sendFrom}:${identifier}`;
-          const lastDecline = this.declinedStartKeys.get(declineKey) ?? 0;
-          if (performance.now() - lastDecline < 60_000) {
-            netDebug('START_FILE_TRANSMISSION ignored (already complete)', identifier);
-            return;
-          }
-          this.declinedStartKeys.set(declineKey, performance.now());
           netDebug('START_FILE_TRANSMISSION decline (already complete)', identifier);
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
+          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
           return;
         }
         this.startReceiveTask(identifier, event.sendFrom);

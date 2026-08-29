@@ -3,6 +3,7 @@ import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
@@ -18,6 +19,7 @@ export class PdfSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<PdfFileContext>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<PdfFileContext>> = new Map();
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
   private maxSendTask = 2;
   private maxReceiveTask = 4;
 
@@ -92,10 +94,10 @@ export class PdfSharingSystem {
           return;
         }
         if (pdf && PdfState.COMPLETE <= pdf.state) {
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
-        } else {
-          this.startReceiveTask(identifier, event.sendFrom);
+          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
+          return;
         }
+        this.startReceiveTask(identifier, event.sendFrom);
       });
   }
 

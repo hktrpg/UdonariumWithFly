@@ -2,6 +2,7 @@ import { EventSystem, Network } from '../system';
 import { netDebug, meshWarnThrottled } from '../system/network/net-debug';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
 import { finishMediaReceiveTask } from './receive-task-finish';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
@@ -18,7 +19,7 @@ export class AudioSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
-  private declinedStartKeys = new Map<string, number>();
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
   private maxSendTask: number = 2;
   private maxReceiveTask: number = 4;
 
@@ -113,13 +114,7 @@ export class AudioSharingSystem {
           return;
         }
         if (audio && AudioState.COMPLETE <= audio.state) {
-          const declineKey = `${event.sendFrom}:${identifier}`;
-          const lastDecline = this.declinedStartKeys.get(declineKey) ?? 0;
-          if (performance.now() - lastDecline < 60_000) {
-            return;
-          }
-          this.declinedStartKeys.set(declineKey, performance.now());
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
+          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
           return;
         }
         this.startReceiveTask(identifier, event.sendFrom);
