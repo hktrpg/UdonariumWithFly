@@ -142,7 +142,7 @@ export class ImageSharingSystem {
           EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
           return;
         }
-        this.startReceiveTask(identifier);
+        this.startReceiveTask(identifier, event.sendFrom);
       });
   }
 
@@ -177,10 +177,12 @@ export class ImageSharingSystem {
     }
     /* */
 
-    task.oncancel = () => {
-      this.declinedSendKeys.set(taskKey, performance.now());
+    task.oncancel = (canceled) => {
       this.removeSendTask(taskKey);
-      const retryTo = task.sendTo;
+      // Peer CANCEL_TASK = decline. DISCONNECT / local cancel must not poison declinedSendKeys.
+      if (!canceled.didCancelFromPeer) return;
+      this.declinedSendKeys.set(taskKey, performance.now());
+      const retryTo = canceled.sendTo;
       setTimeout(() => {
         this.declinedSendKeys.delete(taskKey);
         if (retryTo) ImageStorage.instance.lazySynchronize(1500, retryTo);
@@ -197,16 +199,18 @@ export class ImageSharingSystem {
     task.start(updateImages);
   }
 
-  private startReceiveTask(identifier: string) {
+  private startReceiveTask(identifier: string, fromPeerId?: string) {
     FileReceiveScheduler.markReceiveStart('image', identifier);
-    let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier);
+    let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onfinish = (task, data) => {
       const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('image', task.identifier, ok);
+      // Cancel is not a transfer failure — clear retry gate so remesh can re-enqueue immediately.
+      FileReceiveScheduler.noteReceiveEnded('image', task.identifier, ok || task.didCancel);
       this.stopReceiveTask(task.identifier);
-      if (data) EventSystem.trigger('UPDATE_FILE_RESOURE', { identifier: task.identifier, updateImages: data });
-      if (!ok) ImageStorage.instance.lazySynchronize(20_000);
+      if (ok && data) EventSystem.trigger('UPDATE_FILE_RESOURE', { identifier: task.identifier, updateImages: data });
+      if (task.didCancel) ImageStorage.instance.lazySynchronize(800);
+      else if (!ok) ImageStorage.instance.lazySynchronize(20_000);
       else ImageStorage.instance.lazySynchronize(1000);
     }
 

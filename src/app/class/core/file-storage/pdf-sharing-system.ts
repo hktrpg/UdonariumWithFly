@@ -93,7 +93,7 @@ export class PdfSharingSystem {
         if (pdf && PdfState.COMPLETE <= pdf.state) {
           EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
         } else {
-          this.startReceiveTask(identifier);
+          this.startReceiveTask(identifier, event.sendFrom);
         }
       });
   }
@@ -125,10 +125,10 @@ export class PdfSharingSystem {
     task.start(context);
   }
 
-  private startReceiveTask(identifier: string) {
+  private startReceiveTask(identifier: string, fromPeerId?: string) {
     FileReceiveScheduler.markReceiveStart('pdf', identifier);
     const pdf = PdfStorage.instance.get(identifier);
-    const task = BufferSharingTask.createReceiveTask<PdfFileContext>(identifier);
+    const task = BufferSharingTask.createReceiveTask<PdfFileContext>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onprogress = (task, loaded, total) => {
       const context = pdf.toContext();
@@ -137,10 +137,10 @@ export class PdfSharingSystem {
     };
     task.onfinish = (task, data) => {
       const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('pdf', task.identifier, ok);
+      FileReceiveScheduler.noteReceiveEnded('pdf', task.identifier, ok || task.didCancel);
       this.stopReceiveTask(task.identifier);
-      if (data) EventSystem.trigger('UPDATE_PDF_RESOURE', [data]);
-      PdfStorage.instance.lazySynchronize(ok ? 800 : 20_000);
+      if (ok && data) EventSystem.trigger('UPDATE_PDF_RESOURE', [data]);
+      PdfStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
     };
     task.start();
   }

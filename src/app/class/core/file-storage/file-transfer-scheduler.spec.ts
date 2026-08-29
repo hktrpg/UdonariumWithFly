@@ -225,4 +225,39 @@ describe('FileReceiveScheduler', () => {
     expect([...dispatched].sort()).toEqual(['a0', 'a1', 'a2', 'a3', 'thumb']);
     expect(FileReceiveScheduler.pendingReceiveCount()).toBe(0);
   });
+
+  it('DISCONNECT_PEER drops pending and outbound slots for that peer', () => {
+    FileReceiveScheduler.ensureNetworkHooks();
+    peerIds = ['alive', 'dead'];
+    const order: string[] = [];
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'dead', 'd1', 4_000, () => order.push('dead'));
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'alive', 'a1', 4_000, () => order.push('alive'));
+    FileReceiveScheduler.schedule();
+    expect(order).toContain('dead');
+    expect(FileReceiveScheduler.isTransferActive('image', 'd1')).toBe(true);
+
+    EventSystem.trigger('DISCONNECT_PEER', { peerId: 'dead' });
+    peerIds = ['alive'];
+
+    expect(FileReceiveScheduler.isTransferActive('image', 'd1')).toBe(false);
+    expect(FileReceiveScheduler.isTransferPending('image', 'd1')).toBe(false);
+    // Peer abort must not apply failure backoff — same file can enqueue again immediately.
+    expect(FileReceiveScheduler.canEnqueueReceive('image', 'd1')).toBe(true);
+    FileReceiveScheduler.schedule();
+    expect(order).toContain('alive');
+  });
+
+  it('peer-abort flaps do not grow pending/outbound unboundedly', () => {
+    FileReceiveScheduler.ensureNetworkHooks();
+    const CYCLES = 20;
+    for (let i = 0; i < CYCLES; i++) {
+      peerIds = ['dead'];
+      FileReceiveScheduler.enqueueReceiveRequest('image', 'dead', `f${i % 4}`, 4_000, () => {});
+      FileReceiveScheduler.schedule();
+      EventSystem.trigger('DISCONNECT_PEER', { peerId: 'dead' });
+    }
+    expect(FileReceiveScheduler.pendingReceiveCount()).toBe(0);
+    expect(FileReceiveScheduler.outboundPendingCount()).toBe(0);
+    expect(FileReceiveScheduler.activeReceiveCount()).toBe(0);
+  });
 });

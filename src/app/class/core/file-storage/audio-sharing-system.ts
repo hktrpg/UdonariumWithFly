@@ -121,7 +121,7 @@ export class AudioSharingSystem {
           EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
           return;
         }
-        this.startReceiveTask(identifier);
+        this.startReceiveTask(identifier, event.sendFrom);
       });
   }
 
@@ -163,10 +163,10 @@ export class AudioSharingSystem {
     task.start(context);
   }
 
-  private startReceiveTask(identifier: string) {
+  private startReceiveTask(identifier: string, fromPeerId?: string) {
     FileReceiveScheduler.markReceiveStart('audio', identifier);
     let audio: AudioFile = AudioStorage.instance.get(identifier);
-    let task = BufferSharingTask.createReceiveTask<AudioFileContext>(identifier);
+    let task = BufferSharingTask.createReceiveTask<AudioFileContext>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
 
     task.onprogress = (task, loaded, total) => {
@@ -176,10 +176,10 @@ export class AudioSharingSystem {
     }
     task.onfinish = (task, data) => {
       const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('audio', task.identifier, ok);
+      FileReceiveScheduler.noteReceiveEnded('audio', task.identifier, ok || task.didCancel);
       this.stopReceiveTask(task.identifier);
-      if (data) EventSystem.trigger('UPDATE_AUDIO_RESOURE', [data]);
-      AudioStorage.instance.lazySynchronize(ok ? 800 : 20_000);
+      if (ok && data) EventSystem.trigger('UPDATE_AUDIO_RESOURE', [data]);
+      AudioStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
     }
 
     task.start();

@@ -21,6 +21,8 @@ export class BufferSharingTask<T> {
   private chankSize: number = 32 * 1024;
   private chankReceiveCount: number = 0;
   private sendChankTimer: number;
+  /** Peer we are exchanging chunks with. Send tasks set this from sendTo; receive from first FILE_SEND_CHANK. */
+  private remotePeerId: string = null;
 
   private sentChankIndex = 0;
   private bufferingChankRange: number = 4;
@@ -29,8 +31,16 @@ export class BufferSharingTask<T> {
   private startTime = 0;
   private isCanceled = false;
   private completedSuccessfully = false;
+  /** Local cancel (DISCONNECT, cancel(), receive CANCEL_TASK). Distinct from peer declining a send. */
+  private canceledLocally = false;
+  /** Peer sent CANCEL_TASK on a send task (_cancelFromPeer). */
+  private canceledByPeer = false;
 
   get didCompleteSuccessfully(): boolean { return this.completedSuccessfully; }
+  /** True when the task ended via cancel (local or peer), not success or timeout. */
+  get didCancel(): boolean { return this.canceledLocally || this.canceledByPeer; }
+  get didCancelLocally(): boolean { return this.canceledLocally; }
+  get didCancelFromPeer(): boolean { return this.canceledByPeer; }
 
   private onstart: () => void;
   onprogress: (task: BufferSharingTask<T>, loaded: number, total: number) => void;
@@ -52,8 +62,9 @@ export class BufferSharingTask<T> {
     return task;
   }
 
-  static createReceiveTask<T>(identifier: string): BufferSharingTask<T> {
+  static createReceiveTask<T>(identifier: string, fromPeerId?: string): BufferSharingTask<T> {
     let task = new BufferSharingTask<T>(identifier);
+    if (fromPeerId) task.remotePeerId = fromPeerId;
     task.onstart = () => task.initializeReceive();
     return task;
   }
@@ -99,6 +110,7 @@ export class BufferSharingTask<T> {
   private _cancelFromPeer() {
     if (this.isCanceled) return;
     this.isCanceled = true;
+    this.canceledByPeer = true;
     if (this.oncancel) this.oncancel(this);
     this.dispose();
   }
@@ -106,6 +118,7 @@ export class BufferSharingTask<T> {
   private _cancelLocal() {
     if (this.isCanceled) return;
     this.isCanceled = true;
+    this.canceledLocally = true;
     if (this.oncancel) this.oncancel(this);
     if (this.onfinish) this.onfinish(this, this.data);
     this.dispose();
@@ -122,10 +135,15 @@ export class BufferSharingTask<T> {
     if (this.timeoutTimer) this.timeoutTimer.clear();
     this.sendChankTimer = null;
     this.timeoutTimer = null;
+    this.chanks = [];
+    this.uint8Array = null;
+    this.data = null;
+    this.remotePeerId = null;
     this.onprogress = this.onfinish = this.ontimeout = this.oncancel = null;
   }
 
   private initializeSend() {
+    this.remotePeerId = this.sendTo;
     this.uint8Array = MessagePack.encode(this.data);
     let total = Math.ceil(this.uint8Array.byteLength / this.chankSize);
     this.chanks = new Array(total);
@@ -142,7 +160,7 @@ export class BufferSharingTask<T> {
         this.resetTimeout();
       })
       .on('DISCONNECT_PEER', event => {
-        if (event.data.peerId !== this.sendTo) return;
+        if (!this.remotePeerId || event.data.peerId !== this.remotePeerId) return;
         console.warn('send canceled (peer disconnected)', this, event.data.peerId);
         this._cancel();
       })
@@ -157,10 +175,11 @@ export class BufferSharingTask<T> {
       });
     this.sentChankIndex = this.completedChankIndex = 0;
     this.startTime = performance.now();
-    setZeroTimeout(() => this.sendChank(0));
+    this.sendChankTimer = setZeroTimeout(() => this.sendChank(0));
   }
 
   private sendChank(index: number) {
+    if (this.isCanceled || !this.uint8Array) return;
     let chank = this.uint8Array.slice(index * this.chankSize, (index + 1) * this.chankSize);
     let data = { index: index, length: this.chanks.length, chank: chank };
     EventSystem.call('FILE_SEND_CHANK_' + this.identifier, data, this.sendTo);
@@ -170,7 +189,9 @@ export class BufferSharingTask<T> {
     if (this.chanks.length <= index + 1) {
       netDebug('buffer send complete', this.identifier);
       this.outputTransferRate(this.uint8Array.byteLength);
-      setZeroTimeout(() => this.finish());
+      setZeroTimeout(() => {
+        if (!this.isCanceled) this.finish();
+      });
     } else if (this.completedChankIndex + this.bufferingChankRange <= index) {
       this.resetTimeout();
     } else {
@@ -184,6 +205,7 @@ export class BufferSharingTask<T> {
     this.chankReceiveCount = 0;
     EventSystem.register(this)
       .on<ChankData>('FILE_SEND_CHANK_' + this.identifier, event => {
+        if (!this.remotePeerId && event.sendFrom) this.remotePeerId = event.sendFrom;
         if (this.chanks.length < 1) this.chanks = new Array(event.data.length);
 
         if (this.chanks[event.data.index] != null) {
@@ -201,7 +223,8 @@ export class BufferSharingTask<T> {
         }
       })
       .on('DISCONNECT_PEER', event => {
-        if (event.data.peerId !== this.sendTo) return;
+        // Receive tasks have no sendTo — remotePeerId is set from the first chunk's sendFrom.
+        if (!this.remotePeerId || event.data.peerId !== this.remotePeerId) return;
         console.warn('receive canceled (peer disconnected)', this, event.data.peerId);
         this._cancel();
       })

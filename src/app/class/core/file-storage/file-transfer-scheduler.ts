@@ -61,6 +61,9 @@ export class FileReceiveScheduler {
         FileReceiveScheduler.clearPeerRetryTimers();
         FileReceiveScheduler.schedule();
       })
+      .on('DISCONNECT_PEER', event => {
+        FileReceiveScheduler.abortRequestsForPeer(event.data.peerId);
+      })
       // Inbound apply uses markForChanged → identifier/aliasName events (not plain UPDATE_GAME_OBJECT).
       .on(`UPDATE_GAME_OBJECT/identifier/${JUKEBOX_OBJECT_ID}`, () => {
         FileReceiveScheduler.onPlayingMusicMaybeChanged();
@@ -72,6 +75,30 @@ export class FileReceiveScheduler {
         if (event.data?.identifier !== JUKEBOX_OBJECT_ID) return;
         FileReceiveScheduler.onPlayingMusicMaybeChanged();
       });
+  }
+
+  /**
+   * Drop queued / outbound slots aimed at a peer that left.
+   * Active receives are canceled by BufferSharingTask DISCONNECT handlers.
+   * Does not set receiveRetryAfter — peer death is not a transfer failure; other peers may serve the file immediately.
+   */
+  static abortRequestsForPeer(peerId: string): void {
+    if (!peerId) return;
+    FileReceiveScheduler.pending = FileReceiveScheduler.pending.filter(p => p.peerId !== peerId);
+    const dropKeys: string[] = [];
+    for (const [key, req] of FileReceiveScheduler.outboundRequests) {
+      if (req.peerId === peerId) dropKeys.push(key);
+    }
+    for (const key of dropKeys) {
+      FileReceiveScheduler.outboundPending.delete(key);
+      FileReceiveScheduler.outboundRequests.delete(key);
+    }
+    const retryTimer = FileReceiveScheduler.peerRetryTimers.get(peerId);
+    if (retryTimer != null) {
+      clearTimeout(retryTimer);
+      FileReceiveScheduler.peerRetryTimers.delete(peerId);
+    }
+    FileReceiveScheduler.scheduleDeferred();
   }
 
   /** Re-sort pending downloads when room jukebox playing ids change. */

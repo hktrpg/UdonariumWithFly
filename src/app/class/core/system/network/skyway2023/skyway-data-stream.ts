@@ -157,6 +157,7 @@ export class SkyWayDataStream extends EventEmitter implements WebRTCConnection {
     this.clearQueueRetryTimer();
     this.prioritySendQueue.clear();
     this.sendQueue.clear();
+    this.receivedMap.clear();
     this.isQueuing = false;
     this.peer.isOpen = false;
     this.stopMonitoring();

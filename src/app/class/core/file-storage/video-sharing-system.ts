@@ -93,7 +93,7 @@ export class VideoSharingSystem {
         if (video && VideoState.COMPLETE <= video.state) {
           EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
         } else {
-          this.startReceiveTask(identifier);
+          this.startReceiveTask(identifier, event.sendFrom);
         }
       });
   }
@@ -125,10 +125,10 @@ export class VideoSharingSystem {
     task.start(context);
   }
 
-  private startReceiveTask(identifier: string) {
+  private startReceiveTask(identifier: string, fromPeerId?: string) {
     FileReceiveScheduler.markReceiveStart('video', identifier);
     const video = VideoStorage.instance.get(identifier);
-    const task = BufferSharingTask.createReceiveTask<VideoFileContext>(identifier);
+    const task = BufferSharingTask.createReceiveTask<VideoFileContext>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onprogress = (task, loaded, total) => {
       const context = video.toContext();
@@ -137,10 +137,10 @@ export class VideoSharingSystem {
     };
     task.onfinish = (task, data) => {
       const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('video', task.identifier, ok);
+      FileReceiveScheduler.noteReceiveEnded('video', task.identifier, ok || task.didCancel);
       this.stopReceiveTask(task.identifier);
-      if (data) EventSystem.trigger('UPDATE_VIDEO_RESOURE', [data]);
-      VideoStorage.instance.lazySynchronize(ok ? 800 : 20_000);
+      if (ok && data) EventSystem.trigger('UPDATE_VIDEO_RESOURE', [data]);
+      VideoStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
     };
     task.start();
   }
