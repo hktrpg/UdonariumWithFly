@@ -264,8 +264,8 @@
         </div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.ambientLight' | i18n }}</span>
-          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable">
-          <span class="val">{{ tableGlobalIllumination | number:'1.0-2' }}</span>
+          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableAmbientDimSlider" [disabled]="!isEditable">
+          <span class="val">{{ tableAmbientDimSlider | number:'1.0-2' }}</span>
         </div>
         <div class="compact-row wrap" style="gap:10px;align-items:center">
           <label class="check" [title]="'table.globalIlluminationHint' | i18n">

@@ -192,7 +192,7 @@ export const ja_ui: I18nDictionary = {
   'roomJoin.role.guest.label': 'ゲスト',
   'roomJoin.role.guest.hint': '機能制限あり',
   'roomJoin.noPassword': 'パスワードなし',
-  'roomJoin.passwordNotNeeded': '不要',
+  'roomJoin.passwordNotNeeded': 'パスワードなし',
   'roomJoin.passwordLabel': '{{role}}パスワード',
   'roomJoin.passwordPlaceholder': 'パスワード入力',
   'roomJoin.submit': '入室',

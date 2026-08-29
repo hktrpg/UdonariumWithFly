@@ -19,6 +19,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
+import { animateDayNightAtmosphere } from '@udonarium/table-fx/day-night-atmosphere';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -95,6 +96,17 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
   set tableDarkness(v: number) { if (this.isEditable && this.canControlDayNight) this.selectedTable.darkness = Number(v); }
   get tableGlobalIllumination(): number { return this.selectedTable?.globalIllumination ?? 1; }
   set tableGlobalIllumination(v: number) { if (this.isEditable) this.selectedTable.globalIllumination = Number(v); }
+  /**
+   * Ambient slider UI: left=0 bright, right=1 dark (same orientation as darkness).
+   * Stored globalIllumination remains 1=bright, 0=dark.
+   */
+  get tableAmbientDimSlider(): number {
+    return 1 - (this.selectedTable?.globalIllumination ?? 1);
+  }
+  set tableAmbientDimSlider(v: number) {
+    if (!this.isEditable || !this.selectedTable) return;
+    this.selectedTable.globalIllumination = 1 - Math.max(0, Math.min(1, Number(v)));
+  }
   get tableGlobalIlluminationEnabled(): boolean { return this.selectedTable?.globalIlluminationEnabled !== false; }
   set tableGlobalIlluminationEnabled(v: boolean) {
     if (this.isEditable) this.selectedTable.globalIlluminationEnabled = !!v;
@@ -131,29 +143,15 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   transitionDay() {
     if (!this.isEditable || !this.canControlDayNight) return;
-    this.animateDarkness(0);
+    animateDayNightAtmosphere(this.selectedTable, 'day');
   }
   transitionDusk() {
     if (!this.isEditable || !this.canControlDayNight) return;
-    this.animateDarkness(0.4);
+    animateDayNightAtmosphere(this.selectedTable, 'dusk');
   }
   transitionNight() {
     if (!this.isEditable || !this.canControlDayNight) return;
-    this.animateDarkness(0.85);
-  }
-  private animateDarkness(target: number) {
-    const table = this.selectedTable;
-    if (!table) return;
-    table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
-    const start = table.darkness;
-    const t0 = performance.now();
-    const dur = 800;
-    const step = (now: number) => {
-      const p = Math.min(1, (now - t0) / dur);
-      table.darkness = start + (target - start) * p;
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
+    animateDayNightAtmosphere(this.selectedTable, 'night');
   }
 
   get tableSelecter(): TableSelecter { return TableSelecter.instance; }

@@ -192,7 +192,7 @@ export const en_ui: I18nDictionary = {
   'roomJoin.role.guest.label': 'Guest',
   'roomJoin.role.guest.hint': 'Limited features',
   'roomJoin.noPassword': 'No password',
-  'roomJoin.passwordNotNeeded': 'Not needed',
+  'roomJoin.passwordNotNeeded': 'No password',
   'roomJoin.passwordLabel': '{{role}} password',
   'roomJoin.passwordPlaceholder': 'Enter password',
   'roomJoin.submit': 'Enter room',

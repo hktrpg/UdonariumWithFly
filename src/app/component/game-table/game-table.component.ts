@@ -19,6 +19,7 @@ import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
 import { TableLight } from '@udonarium/table-fx/table-light';
+import { darknessOverlayAlpha, darknessOverlayRgb, surroundingsDimAlpha } from '@udonarium/table-fx/day-night-atmosphere';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { notePinAnchorPx, pinAnchorPx, stringBeamStyle3d, stringPathD, tokenCenterAnchorPx, tokenVisualHeightPx } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
@@ -894,7 +895,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
   }
 
-  /** Parallax background dims with table darkness unless the player has token vision. */
+  /** Parallax surroundings follow ambient light unless the player has token vision. */
   get shouldDimBackgroundImage(): boolean {
     const table = this.currentTable;
     if (!table) return false;
@@ -908,15 +909,22 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.shouldDimBackgroundImage) return 0;
     const table = this.currentTable;
     if (!table) return 0;
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    return darkness * (1 - globalLight * 0.35);
+    return surroundingsDimAlpha(table.globalIllumination ?? 1);
   }
 
   get backgroundDarknessOverlayColor(): string {
     const alpha = this.backgroundDarknessOverlayAlpha;
     if (alpha <= 0) return 'transparent';
     return `rgba(8, 6, 4, ${alpha})`;
+  }
+
+  /** Underlay so map plane AA edges match the darkness veil (not a bright rim). */
+  get tableSurfaceUnderlayColor(): string {
+    const table = this.currentTable;
+    if (!table) return 'transparent';
+    const alpha = darknessOverlayAlpha(table.darkness ?? 0);
+    if (alpha <= 0.001) return 'transparent';
+    return darknessOverlayRgb(table.darkness ?? 0);
   }
   get pathPointsAttr(): string {
     const pts: string[] = [];
@@ -2047,10 +2055,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private needsPeriodicFx(): boolean {
     const table = this.currentTable;
     if (!table) return this.pings.length > 0;
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - globalLight * 0.35);
-    return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0
+    const mapDark = darknessOverlayAlpha(table.darkness ?? 0);
+    const surroundDim = surroundingsDimAlpha(table.globalIllumination ?? 1);
+    return mapDark > 0.001 || surroundDim > 0.001 || !!table.visionEnabled || this.pings.length > 0
       || (table.lights?.length ?? 0) > 0;
   }
 

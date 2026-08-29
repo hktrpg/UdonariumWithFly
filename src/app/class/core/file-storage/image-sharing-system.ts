@@ -5,10 +5,25 @@ import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
-import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
+import { FileReceiveScheduler } from './file-transfer-scheduler';
+import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  isSendTaskLimitReached,
+  mediaSendTaskKey,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
+import {
+  collectMissingDownloadRequests,
+  ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
+  MissingDownloadHooks,
+  queueMissingDownloads,
+} from './missing-download-pipeline';
+import { repackTransferredBlob } from './single-file-media-transfer';
 import { MimeType } from './mime-type';
-import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class ImageSharingSystem {
   private static _instance: ImageSharingSystem
@@ -19,13 +34,11 @@ export class ImageSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
-  private declinedStartKeys = new Map<string, number>();
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
   /** Peer declined our outbound transfer — pause resend (peerId:imageId). */
   private declinedSendKeys = new Map<string, number>();
   private static readonly SEND_DECLINE_COOLDOWN_MS = 45_000;
   private static readonly SEND_DECLINE_RETRY_MS = 20_000;
-  private maxSendTask: number = 2;
-  private maxReceiveTask: number = 4;
 
   private constructor() {
   }
@@ -47,31 +60,18 @@ export class ImageSharingSystem {
         netDebug('SYNCHRONIZE_FILE_LIST ImageStorageService ' + event.sendFrom);
 
         let otherCatalog: CatalogItem[] = event.data;
-        let request: CatalogItem[] = [];
-
-        for (let item of otherCatalog) {
-          if (this.hydrateUrlBackedIfNeeded(item)) continue;
-          let image: ImageFile = ImageStorage.instance.get(item.identifier);
-          if (image === null) {
-            image = ImageFile.createEmpty(item.identifier);
-            ImageStorage.instance.add(image);
-          }
-          if (image.state < ImageState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('image', item.identifier)) {
-            request.push({ identifier: item.identifier, state: image.state });
-          }
-        }
+        const hooks = this.missingDownloadHooks();
+        const request = collectMissingDownloadRequests(otherCatalog, hooks);
 
         // Handle edge cases such as Peer disconnect
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
           ImageStorage.instance.synchronize(event.sendFrom);
         }
 
         if (request.length < 1) {
           return;
         }
-        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        queueMissingDownloads(request, event.sendFrom, otherCatalog, hooks);
       })
       .on('REQUEST_FILE_RESOURE', async event => {
         if (event.isSendFromSelf) return;
@@ -87,7 +87,7 @@ export class ImageSharingSystem {
           }
         }
 
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length) {
+        if (!isSendTaskLimitReached(this.sendTaskMap.size) && 0 < randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes(
             'image',
             randomRequest,
@@ -118,8 +118,13 @@ export class ImageSharingSystem {
         let updateImages: ImageContext[] = event.data.updateImages;
         netDebug('UPDATE_FILE_RESOURE ImageStorageService ' + event.sendFrom + ' -> ', updateImages);
         for (let context of updateImages) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
-          if (context.thumbnail.blob) context.thumbnail.blob = new Blob([context.thumbnail.blob], { type: context.thumbnail.type });
+          if (context.blob) context.blob = repackTransferredBlob(context.blob, context.type) as Blob;
+          if (context.thumbnail?.blob) {
+            context.thumbnail.blob = repackTransferredBlob(
+              context.thumbnail.blob,
+              context.thumbnail.type,
+            ) as Blob;
+          }
           ImageStorage.instance.add(context);
         }
       })
@@ -131,15 +136,8 @@ export class ImageSharingSystem {
           return;
         }
         if (image && ImageState.COMPLETE <= image.state) {
-          const declineKey = `${event.sendFrom}:${identifier}`;
-          const lastDecline = this.declinedStartKeys.get(declineKey) ?? 0;
-          if (performance.now() - lastDecline < 60_000) {
-            netDebug('START_FILE_TRANSMISSION ignored (already complete)', identifier);
-            return;
-          }
-          this.declinedStartKeys.set(declineKey, performance.now());
           netDebug('START_FILE_TRANSMISSION decline (already complete)', identifier);
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
+          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
           return;
         }
         this.startReceiveTask(identifier, event.sendFrom);
@@ -156,7 +154,7 @@ export class ImageSharingSystem {
       netDebug('startSendTask skipped (peer declined)', sendTo, identifier);
       return;
     }
-    const taskKey = this.sendTaskKey(sendTo, identifier);
+    const taskKey = mediaSendTaskKey(sendTo, identifier);
     const prev = this.sendTaskMap.get(taskKey);
     if (prev) {
       netDebug('startSendTask skipped (already sending)', sendTo, identifier);
@@ -204,14 +202,15 @@ export class ImageSharingSystem {
     let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onfinish = (task, data) => {
-      const ok = task.didCompleteSuccessfully;
-      // Cancel is not a transfer failure — clear retry gate so remesh can re-enqueue immediately.
-      FileReceiveScheduler.noteReceiveEnded('image', task.identifier, ok || task.didCancel);
-      this.stopReceiveTask(task.identifier);
-      if (ok && data) EventSystem.trigger('UPDATE_FILE_RESOURE', { identifier: task.identifier, updateImages: data });
-      if (task.didCancel) ImageStorage.instance.lazySynchronize(800);
-      else if (!ok) ImageStorage.instance.lazySynchronize(20_000);
-      else ImageStorage.instance.lazySynchronize(1000);
+      finishMediaReceiveTask('image', task, data, {
+        stopReceiveTask: id => this.stopReceiveTask(id),
+        onSuccess: updateImages => EventSystem.trigger('UPDATE_FILE_RESOURE', {
+          identifier: task.identifier,
+          updateImages,
+        }),
+        lazySynchronize: ms => ImageStorage.instance.lazySynchronize(ms),
+        successLazyMs: 1000,
+      });
     }
 
     task.start();
@@ -230,14 +229,10 @@ export class ImageSharingSystem {
     this.sendTaskMap.delete(sendKey);
   }
 
-  private sendTaskKey(sendTo: string, identifier: string): string {
-    return `${sendTo}:${identifier}`;
-  }
-
   private isSendDeclined(sendTo: string, identifier: string): boolean {
-    const key = this.sendTaskKey(sendTo, identifier);
-    const last = this.declinedSendKeys.get(key) ?? 0;
-    return performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
+    const key = mediaSendTaskKey(sendTo, identifier);
+    const last = this.declinedSendKeys.get(key);
+    return last != null && performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
   }
 
   private stopReceiveTask(identifier: string) {
@@ -249,32 +244,20 @@ export class ImageSharingSystem {
     netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
-  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
-    const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
-    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('image', request, item => {
-      const image = ImageStorage.instance.get(item.identifier);
-      return image?.state ?? ImageState.NULL;
+  private missingDownloadHooks(): MissingDownloadHooks {
+    return buildMissingDownloadHooks({
+      kind: 'image',
+      completeState: ImageState.COMPLETE,
+      nullState: ImageState.NULL,
+      urlState: ImageState.URL,
+      isReceiving: id => this.receiveTaskMap.has(id),
+      get: id => ImageStorage.instance.get(id),
+      addEmpty: id => { ImageStorage.instance.add(ImageFile.createEmpty(id)); },
+      addUrlBacked: id => { ImageStorage.instance.add(ImageFile.create(id)); },
+      requestOne: (identifier, localState, peerId) => {
+        this.request([{ identifier, state: localState }], peerId);
+      },
     });
-    FolderMediaHydrator.instance.beginHydrateMissing('image', sorted.map(item => item.identifier));
-    for (const item of sorted) {
-      const image = ImageStorage.instance.get(item.identifier);
-      const localState = image?.state ?? ImageState.NULL;
-      if (localState >= ImageState.COMPLETE) continue;
-      const meta = metaById.get(item.identifier) ?? item;
-      const bytes = estimateNextReceiveBytes('image', localState, meta);
-      FileReceiveScheduler.enqueueReceiveRequest('image', peerId, item.identifier, bytes, () => {
-        this.request([{ identifier: item.identifier, state: localState }], peerId);
-      });
-    }
-  }
-
-  private meshCandidatePeerIds(): string[] {
-    const ids = new Set<string>();
-    for (const id of Network.listRoomMemberPeerIds()) {
-      if (id && id !== Network.peerId) ids.add(id);
-    }
-    for (const id of Network.peerIds) ids.add(id);
-    return Array.from(ids);
   }
 
   private clearDeclinedForPeer(peerId: string) {
@@ -286,51 +269,22 @@ export class ImageSharingSystem {
   }
 
   ensureRoomDownloads(catalogsByPeer: Map<string, CatalogItem[]>) {
-    for (const [peerId, catalog] of catalogsByPeer) {
-      if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
-      const request: CatalogItem[] = [];
-      for (const item of catalog) {
-        if (this.hydrateUrlBackedIfNeeded(item)) continue;
-        let image = ImageStorage.instance.get(item.identifier);
-        if (image === null) {
-          image = ImageFile.createEmpty(item.identifier);
-          ImageStorage.instance.add(image);
-        }
-        if (image.state < ImageState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('image', item.identifier)) {
-          request.push({ identifier: item.identifier, state: image.state });
-        }
-      }
-      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
-    }
-  }
-
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
-    if (item.state !== ImageState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = ImageStorage.instance.get(item.identifier);
-    if (!existing || existing.state < ImageState.URL) {
-      ImageStorage.instance.add(ImageFile.create(item.identifier));
-    }
-    return true;
+    const hooks = this.missingDownloadHooks();
+    ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
   private request(request: CatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('image', identifier);
-      netDebug('image request deferred (peer not open)', peerId.slice(0, 16));
-      ImageStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('image', peerId, identifier, (ms, peer) => {
+      ImageStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     netDebug('requestFile() ' + peerId);
     EventSystem.call('REQUEST_FILE_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: this.meshCandidatePeerIds()
+      candidatePeers: meshCandidatePeerIds()
     }, peerId);
   }
 
@@ -374,25 +328,6 @@ export class ImageSharingSystem {
       if (maxSize < byteSize) break;
     }
     return updateImages;
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return FileReceiveScheduler.isReceiveBudgetFull();
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (let task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }
 

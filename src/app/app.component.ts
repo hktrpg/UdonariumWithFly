@@ -26,7 +26,13 @@ import { AudioLibrary } from '@udonarium/audio-library';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { FilterType, WeatherType } from '@udonarium/game-table';
+import {
+  animateDayNightAtmosphere,
+  isDayAtmosphere,
+  isDuskAtmosphere,
+  isNightAtmosphere,
+} from '@udonarium/table-fx/day-night-atmosphere';
+import { WeatherType } from '@udonarium/game-table';
 import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
@@ -2003,27 +2009,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private makeDayNightToolboxMenu() {
-    const DAY_TARGET = 0;
-    const DUSK_TARGET = 0.4;
-    const NIGHT_TARGET = 0.85;
-    const animateDarkness = (target: number) => {
-      const table = TableSelecter.instance.viewTable;
-      if (!table) return;
-      table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
-      const start = table.darkness ?? 0;
-      const t0 = performance.now();
-      const dur = 800;
-      const step = (now: number) => {
-        const p = Math.min(1, (now - t0) / dur);
-        table.darkness = p < 1 ? start + (target - start) * p : target;
-        if (p < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    };
     const darkness = () => TableSelecter.instance.viewTable?.darkness ?? 0;
-    const isDay = () => darkness() < 0.2;
-    const isDusk = () => darkness() >= 0.2 && darkness() < 0.5;
-    const isNight = () => darkness() >= 0.5;
+    const isDay = () => isDayAtmosphere(darkness());
+    const isDusk = () => isDuskAtmosphere(darkness());
+    const isNight = () => isNightAtmosphere(darkness());
     return {
       name: this.i18n.t('table.dayNight'),
       materialIcon: 'brightness_6',
@@ -2031,19 +2020,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
-          action: () => animateDarkness(DAY_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'day');
+          },
           checkBox: 'radio' as const,
         },
         {
           name: `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
           nameUpdate: () => `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
-          action: () => animateDarkness(DUSK_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'dusk');
+          },
           checkBox: 'radio' as const,
         },
         {
           name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
           nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
-          action: () => animateDarkness(NIGHT_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'night');
+          },
           checkBox: 'radio' as const,
         },
       ],

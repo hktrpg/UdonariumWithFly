@@ -39,7 +39,7 @@ export class GameTable extends ObjectNode {
   @SyncVar() isShowNumber: boolean = true;
 
   @SyncVar() darkness: number = 0;
-  /** Ambient fill that softens the darkness overlay (0–1). Not Foundry GI. */
+  /** Surroundings / parallax brightness (0–1). Independent of map darkness. Not Foundry GI. */
   @SyncVar() globalIllumination: number = 1;
   /**
    * Foundry-style Global Illumination: when true (and threshold allows), tokens with

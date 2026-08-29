@@ -996,12 +996,11 @@ export class RoomConnectHelper {
     RoomConnectHelper.clearWakeReopenTimer();
     if (RoomConnectHelper.reopenFinish) {
       RoomConnectHelper.reopenFinish();
-      return;
-    }
-    if (RoomConnectHelper.reopenListenerKey) {
+    } else if (RoomConnectHelper.reopenListenerKey) {
       EventSystem.unregister(RoomConnectHelper.reopenListenerKey);
       RoomConnectHelper.reopenListenerKey = null;
     }
+    // Always clear busy/in-flight — reopenFinish is idempotent but may be null after it runs.
     RoomConnectHelper.dismissReopenBusyOverlay();
     RoomConnectHelper.reopenInFlight = false;
   }

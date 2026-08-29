@@ -110,12 +110,15 @@ describe('RoomConnectHelper settle predicates', () => {
 describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
   beforeEach(() => {
     RoomConnectHelper.abortReopenInFlight();
+    (RoomConnectHelper as any).joinOwnedUntil = 0;
     (RoomConnectHelper as any).rekeyInFlight = false;
     (RoomConnectHelper as any).backupRoomOpenInFlight = false;
     RoomConnectHelper.createRoomInFlight = false;
     (RoomConnectHelper as any).meshHealInFlight = false;
     (RoomConnectHelper as any).meshHealDebounceTimer = null;
     RoomConnectHelper.joinInProgress = false;
+    RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
+    skyWayRecoveryGate.resetForTests();
   });
 
   afterEach(() => {
@@ -311,11 +314,11 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       RoomConnectHelper.abortReopenInFlight();
       expect(RoomConnectHelper.maybeSoftDeathReopen()).toBeFalse();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
       RoomConnectHelper.hadOpenPeerThisSession = false;
       (RoomConnectHelper as any).clearSoftDeathState();
-      RoomConnectHelper.abortReopenInFlight();
     }
   });
 
@@ -388,11 +391,11 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       RoomConnectHelper.abortReopenInFlight();
       expect(RoomConnectHelper.maybeMeshDeathReopen()).toBeFalse();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.MESH_DEATH_MS_FOR_TEST = 0;
       RoomConnectHelper.hadOpenPeerThisSession = false;
       (RoomConnectHelper as any).clearMeshDeathState();
-      RoomConnectHelper.abortReopenInFlight();
     }
   });
 
@@ -445,9 +448,9 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(17_000);
       expect(open).toHaveBeenCalled();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
-      RoomConnectHelper.abortReopenInFlight();
       (RoomConnectHelper as any).documentHiddenAt = 0;
     }
   });
@@ -474,6 +477,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       RoomConnectHelper.onDocumentVisible({ skipJitter: true });
       expect(open).not.toHaveBeenCalled();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
       (RoomConnectHelper as any).documentHiddenAt = 0;
@@ -501,6 +505,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       RoomConnectHelper.onDocumentVisible({ skipJitter: true });
       expect(open).not.toHaveBeenCalled();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
       (RoomConnectHelper as any).documentHiddenAt = 0;
@@ -537,9 +542,9 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       expect(RoomConnectHelper.maybeScheduleWakeReopen(true)).toBeFalse();
       expect(open).not.toHaveBeenCalled();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
-      RoomConnectHelper.abortReopenInFlight();
       (RoomConnectHelper as any).documentHiddenAt = 0;
     }
   });
@@ -574,8 +579,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(5_000);
       expect(open).toHaveBeenCalled();
     } finally {
-      jasmine.clock().uninstall();
       RoomConnectHelper.abortReopenInFlight();
+      jasmine.clock().uninstall();
     }
   });
 
@@ -614,9 +619,9 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(1);
       expect(busy.show).toHaveBeenCalledWith('net.reconnectingRoom');
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
-      RoomConnectHelper.abortReopenInFlight();
       (ConnectionBusyService as any)._instance = prev;
     }
   });
@@ -655,9 +660,9 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(10_000);
       expect(busy.show).not.toHaveBeenCalled();
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
       RoomConnectHelper.REOPEN_BUSY_DELAY_MS_FOR_TEST = 0;
-      RoomConnectHelper.abortReopenInFlight();
       (ConnectionBusyService as any)._instance = prev;
     }
   });
@@ -683,8 +688,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(15_000);
       expect(reopen).toHaveBeenCalledWith('duplicate-member', { skipJitter: true });
     } finally {
-      jasmine.clock().uninstall();
       RoomConnectHelper.abortReopenInFlight();
+      jasmine.clock().uninstall();
     }
   });
 
@@ -719,8 +724,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       expect(RoomConnectHelper.isReopenRetryPending()).toBeFalse();
       expect(reopen).toHaveBeenCalledTimes(4);
     } finally {
-      jasmine.clock().uninstall();
       RoomConnectHelper.abortReopenInFlight();
+      jasmine.clock().uninstall();
     }
   });
 
@@ -839,9 +844,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       jasmine.clock().tick(8000);
       expect(open).toHaveBeenCalledTimes(2);
     } finally {
+      RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();
-      RoomConnectHelper.clearReopenRetry();
-      (RoomConnectHelper as any).reopenInFlight = false;
       skyWayRecoveryGate.resetForTests();
     }
   });

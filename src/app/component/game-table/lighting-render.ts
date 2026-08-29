@@ -1,5 +1,6 @@
 import { GameTable } from '@udonarium/game-table';
 import { TableLight } from '@udonarium/table-fx/table-light';
+import { darknessOverlayAlpha, darknessOverlayCssColor } from '@udonarium/table-fx/day-night-atmosphere';
 
 import { WallPolyline } from './footprint-walls';
 import { isGlobalIlluminationActive, VisionLightActor } from './vision-math';
@@ -64,8 +65,7 @@ export class LightingRender {
     footprintWalls: WallPolyline[] = [],
   ) {
     const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const ambient = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - ambient * 0.35);
+    const baseAlpha = darknessOverlayAlpha(darkness);
     const giActive = isGlobalIlluminationActive(table);
     if (baseAlpha <= 0.001 && !table.visionEnabled) {
       this.release();
@@ -131,18 +131,8 @@ export class LightingRender {
     }
   }
 
-  /**
-   * Warm amber at dusk (~0.4); fades toward near-black by night.
-   * Pure black looked too cool for the dusk preset.
-   */
   private darknessOverlayFill(darkness: number, alpha: number): string {
-    const duskCenter = 0.4;
-    const warmth = Math.max(0, 1 - Math.abs(darkness - duskCenter) / 0.42);
-    const a = Math.min(0.92, alpha);
-    const r = Math.round(8 + 220 * warmth);
-    const g = Math.round(4 + 140 * warmth);
-    const b = Math.round(12 + 8 * warmth);
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
+    return darknessOverlayCssColor(darkness, alpha);
   }
 
   private collectLightSources(

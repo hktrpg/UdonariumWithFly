@@ -1,12 +1,31 @@
 import { EventSystem, Network } from '../system';
-import { netDebug, meshWarnThrottled } from '../system/network/net-debug';
-import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { netDebug } from '../system/network/net-debug';
+import { FileReceiveScheduler } from './file-transfer-scheduler';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
+import {
+  collectMissingDownloadRequests,
+  ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
+  MissingDownloadHooks,
+  queueMissingDownloads,
+} from './missing-download-pipeline';
+import {
+  acceptOrDeclineStartTransmission,
+  applyBlobContextsToStorage,
+  applyReceiveProgressPercent,
+  buildBlobOrUrlSendContext,
+  fulfillOrRelaySingleFileRequest,
+  startSingleFileReceiveTask,
+  startSingleFileSendTask,
+} from './single-file-media-transfer';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
-import { FileReaderUtil } from './file-reader-util';
-import { isUrlBackedMediaIdentifier } from './media-identifier';
-import { FolderMediaHydrator } from 'service/folder-media-hydrator';
 
 export class AudioSharingSystem {
   private static _instance: AudioSharingSystem
@@ -17,9 +36,7 @@ export class AudioSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
-  private declinedStartKeys = new Map<string, number>();
-  private maxSendTask: number = 2;
-  private maxReceiveTask: number = 4;
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
 
   private constructor() { }
 
@@ -37,91 +54,56 @@ export class AudioSharingSystem {
         netDebug('SYNCHRONIZE_AUDIO_LIST ' + event.sendFrom);
 
         let otherCatalog: CatalogItem[] = event.data;
-        let request: CatalogItem[] = [];
-
         netDebug('SYNCHRONIZE_AUDIO_LIST active tasks ', this.sendTaskMap.size + this.receiveTaskMap.size);
-        for (let item of otherCatalog) {
-          if (this.hydrateUrlBackedIfNeeded(item)) continue;
-          let audio: AudioFile = AudioStorage.instance.get(item.identifier);
-          if (audio === null) {
-            audio = AudioFile.createEmpty(item.identifier);
-            AudioStorage.instance.add(audio);
-          }
-          if (audio.state < AudioState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('audio', item.identifier)) {
-            request.push({ identifier: item.identifier, state: audio.state });
-          }
-        }
+        const hooks = this.missingDownloadHooks();
+        const request = collectMissingDownloadRequests(otherCatalog, hooks);
 
         // Handle edge cases such as Peer disconnect
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < AudioStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < AudioStorage.instance.getCatalog().length) {
           AudioStorage.instance.synchronize(event.sendFrom);
         }
 
         if (request.length < 1) {
           return;
         }
-        void this.queueMissingDownloads(request, event.sendFrom, otherCatalog);
+        queueMissingDownloads(request, event.sendFrom, otherCatalog, hooks);
       })
       .on('REQUEST_AUDIO_RESOURE', event => {
         if (event.isSendFromSelf) return;
-
-        let request: CatalogItem[] = event.data.identifiers;
-        let randomRequest: CatalogItem[] = [];
-
-        for (let item of request) {
-          let audio: AudioFile = AudioStorage.instance.get(item.identifier);
-          if (audio && item.state < audio.state) randomRequest.push({ identifier: item.identifier, state: item.state });
-        }
-
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length) {
-          const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', randomRequest, item => item.state);
-          const item = sorted[0];
-          const audio: AudioFile = AudioStorage.instance.get(item.identifier);
-          netDebug('REQUEST_AUDIO_RESOURE Send!!! ' + event.data.receiver + ' -> ' + item.identifier);
-          this.startSendTask(audio, event.data.receiver);
-        } else {
-          // ??
-          let candidatePeers: string[] = event.data.candidatePeers
-            .filter((id: string) => Network.peerIds.includes(id));
-          let index = candidatePeers.indexOf(Network.peerId);
-          if (-1 < index) candidatePeers.splice(index, 1);
-
-          for (let peerId of candidatePeers) {
-            netDebug('REQUEST_AUDIO_RESOURE AudioStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers);
-            EventSystem.call(event, peerId);
-            return;
-          }
-          netDebug('REQUEST_FILE_RESOURE AudioStorageService overflow...' + event.data.receiver, randomRequest.length);
-        }
+        fulfillOrRelaySingleFileRequest({
+          kind: 'audio',
+          identifiers: event.data.identifiers,
+          receiver: event.data.receiver,
+          candidatePeers: event.data.candidatePeers,
+          sendTaskCount: this.sendTaskMap.size,
+          getLocalState: id => AudioStorage.instance.get(id)?.state ?? null,
+          startSend: (id, receiver) => {
+            const audio = AudioStorage.instance.get(id);
+            if (audio) this.startSendTask(audio, receiver);
+          },
+          relayTo: peerId => EventSystem.call(event, peerId),
+          onSend: (receiver, id) => netDebug('REQUEST_AUDIO_RESOURE Send!!! ' + receiver + ' -> ' + id),
+          onRelay: peerId => netDebug('REQUEST_AUDIO_RESOURE AudioStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers),
+          onOverflow: (receiver, count) => netDebug('REQUEST_FILE_RESOURE AudioStorageService overflow...' + receiver, count),
+        });
       })
       .on('UPDATE_AUDIO_RESOURE', 1000, event => {
         let updateAudios: AudioFileContext[] = event.data;
         netDebug('UPDATE_AUDIO_RESOURE AudioStorageService ' + event.sendFrom + ' -> ', updateAudios);
-        for (let context of updateAudios) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
-          AudioStorage.instance.add(context);
-        }
+        applyBlobContextsToStorage(updateAudios, ctx => AudioStorage.instance.add(ctx));
       })
       .on('START_AUDIO_TRANSMISSION', event => {
         netDebug('START_AUDIO_TRANSMISSION ' + event.data.fileIdentifier);
-        let identifier: string = event.data.fileIdentifier;
-        let audio: AudioFile = AudioStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier)) {
-          return;
-        }
-        if (audio && AudioState.COMPLETE <= audio.state) {
-          const declineKey = `${event.sendFrom}:${identifier}`;
-          const lastDecline = this.declinedStartKeys.get(declineKey) ?? 0;
-          if (performance.now() - lastDecline < 60_000) {
-            return;
-          }
-          this.declinedStartKeys.set(declineKey, performance.now());
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
-          return;
-        }
-        this.startReceiveTask(identifier, event.sendFrom);
+        const identifier: string = event.data.fileIdentifier;
+        acceptOrDeclineStartTransmission({
+          identifier,
+          sendFrom: event.sendFrom,
+          isReceiving: this.receiveTaskMap.has(identifier),
+          localState: AudioStorage.instance.get(identifier)?.state ?? null,
+          completeState: AudioState.COMPLETE,
+          declineGate: this.startDeclineGate,
+          startReceive: (id, from) => this.startReceiveTask(id, from),
+        });
       });
   }
 
@@ -130,76 +112,39 @@ export class AudioSharingSystem {
   }
 
   private async startSendTask(audio: AudioFile, sendTo: string) {
-    const taskKey = this.sendTaskKey(sendTo, audio.identifier);
-    if (this.sendTaskMap.has(taskKey)) return;
-
-    let task = BufferSharingTask.createSendTask<AudioFileContext>(audio.identifier, sendTo);
-    this.sendTaskMap.set(taskKey, task);
-
-    EventSystem.call('START_AUDIO_TRANSMISSION', { fileIdentifier: audio.identifier }, sendTo);
-
-    let context: AudioFileContext = {
+    await startSingleFileSendTask({
       identifier: audio.identifier,
-      name: audio.name,
-      blob: null,
-      type: '',
-      url: null
-    };
-
-    if (audio.state === AudioState.URL) {
-      context.url = audio.url;
-    } else {
-      context.blob = <any>await FileReaderUtil.readAsArrayBufferAsync(audio.blob);
-      context.type = audio.blob.type;
-    }
-
-    task.onfinish = () => {
-      this.removeSendTask(taskKey);
-      if (task.didCompleteSuccessfully) {
-        AudioStorage.instance.synchronize();
-      }
-    }
-
-    task.start(context);
+      sendTo,
+      sendTaskMap: this.sendTaskMap,
+      startEventName: 'START_AUDIO_TRANSMISSION',
+      synchronizeWhen: 'success',
+      synchronize: () => AudioStorage.instance.synchronize(),
+      buildContext: () => buildBlobOrUrlSendContext({
+        identifier: audio.identifier,
+        name: audio.name,
+        state: audio.state,
+        urlState: AudioState.URL,
+        url: audio.url,
+        blob: audio.blob,
+      }),
+    });
   }
 
   private startReceiveTask(identifier: string, fromPeerId?: string) {
-    FileReceiveScheduler.markReceiveStart('audio', identifier);
-    let audio: AudioFile = AudioStorage.instance.get(identifier);
-    let task = BufferSharingTask.createReceiveTask<AudioFileContext>(identifier, fromPeerId);
-    this.receiveTaskMap.set(identifier, task);
-
-    task.onprogress = (task, loaded, total) => {
-      let context = audio.toContext();
-      context.name = (loaded * 100 / total).toFixed(1) + '%';
-      audio.apply(context);
-    }
-    task.onfinish = (task, data) => {
-      const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('audio', task.identifier, ok || task.didCancel);
-      this.stopReceiveTask(task.identifier);
-      if (ok && data) EventSystem.trigger('UPDATE_AUDIO_RESOURE', [data]);
-      AudioStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
-    }
-
-    task.start();
-    netDebug('startReceiveTask => ', this.receiveTaskMap.size);
-  }
-
-  private stopSendTask(identifier: string) {
-    let task = this.sendTaskMap.get(identifier);
-    if (task) { task.cancel(); }
-    this.removeSendTask(identifier);
-
-    netDebug('stopSendTask => ', this.sendTaskMap.size);
-  }
-
-  private removeSendTask(sendKey: string) {
-    this.sendTaskMap.delete(sendKey);
-  }
-
-  private sendTaskKey(sendTo: string, identifier: string): string {
-    return `${sendTo}:${identifier}`;
+    const audio = AudioStorage.instance.get(identifier);
+    startSingleFileReceiveTask({
+      kind: 'audio',
+      identifier,
+      fromPeerId,
+      receiveTaskMap: this.receiveTaskMap,
+      applyProgress: (loaded, total) => {
+        if (audio) applyReceiveProgressPercent(audio, loaded, total);
+      },
+      updateEventName: 'UPDATE_AUDIO_RESOURE',
+      lazySynchronize: ms => AudioStorage.instance.lazySynchronize(ms),
+      stopReceiveTask: id => this.stopReceiveTask(id),
+      onStarted: () => netDebug('startReceiveTask => ', this.receiveTaskMap.size),
+    });
   }
 
   private stopReceiveTask(identifier: string) {
@@ -212,99 +157,38 @@ export class AudioSharingSystem {
   }
 
   ensureRoomDownloads(catalogsByPeer: Map<string, CatalogItem[]>) {
-    for (const [peerId, catalog] of catalogsByPeer) {
-      if (!Network.peerIds.includes(peerId) || !catalog?.length) continue;
-      const request: CatalogItem[] = [];
-      for (const item of catalog) {
-        if (this.hydrateUrlBackedIfNeeded(item)) continue;
-        let audio = AudioStorage.instance.get(item.identifier);
-        if (audio === null) {
-          audio = AudioFile.createEmpty(item.identifier);
-          AudioStorage.instance.add(audio);
-        }
-        if (audio.state < AudioState.COMPLETE
-          && !this.receiveTaskMap.has(item.identifier)
-          && FileReceiveScheduler.canEnqueueReceive('audio', item.identifier)) {
-          request.push({ identifier: item.identifier, state: audio.state });
-        }
-      }
-      if (request.length) void this.queueMissingDownloads(request, peerId, catalog);
-    }
+    const hooks = this.missingDownloadHooks();
+    ensureRoomMissingDownloads(catalogsByPeer, hooks);
   }
 
-  /** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
-  private hydrateUrlBackedIfNeeded(item: CatalogItem): boolean {
-    if (item.state !== AudioState.URL && !isUrlBackedMediaIdentifier(item.identifier)) {
-      return false;
-    }
-    const existing = AudioStorage.instance.get(item.identifier);
-    if (!existing || existing.state < AudioState.URL) {
-      AudioStorage.instance.add(AudioFile.create(item.identifier));
-    }
-    return true;
-  }
-
-  private queueMissingDownloads(request: CatalogItem[], peerId: string, catalogMeta: CatalogItem[]) {
-    const metaById = new Map(catalogMeta.map(item => [item.identifier, item]));
-    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', request, item => {
-      const audio = AudioStorage.instance.get(item.identifier);
-      return audio?.state ?? AudioState.NULL;
+  private missingDownloadHooks(): MissingDownloadHooks {
+    return buildMissingDownloadHooks({
+      kind: 'audio',
+      completeState: AudioState.COMPLETE,
+      nullState: AudioState.NULL,
+      urlState: AudioState.URL,
+      isReceiving: id => this.receiveTaskMap.has(id),
+      get: id => AudioStorage.instance.get(id),
+      addEmpty: id => { AudioStorage.instance.add(AudioFile.createEmpty(id)); },
+      addUrlBacked: id => { AudioStorage.instance.add(AudioFile.create(id)); },
+      requestOne: (identifier, localState, peerId) => {
+        this.request([{ identifier, state: localState }], peerId);
+      },
     });
-    FolderMediaHydrator.instance.beginHydrateMissing('audio', sorted.map(item => item.identifier));
-    for (const item of sorted) {
-      const audio = AudioStorage.instance.get(item.identifier);
-      const localState = audio?.state ?? AudioState.NULL;
-      if (localState >= AudioState.COMPLETE) continue;
-      const meta = metaById.get(item.identifier) ?? item;
-      const bytes = estimateNextReceiveBytes('audio', localState, meta);
-      FileReceiveScheduler.enqueueReceiveRequest('audio', peerId, item.identifier, bytes, () => {
-        this.request([{ identifier: item.identifier, state: localState }], peerId);
-      });
-    }
   }
 
   private request(request: CatalogItem[], peerId: string) {
     const identifier = request[0]?.identifier;
-    if (!Network.peerIds.includes(peerId)) {
-      if (identifier) FileReceiveScheduler.abortOutboundRequest('audio', identifier);
-      meshWarnThrottled(`audio-skip-${peerId.slice(0, 12)}`,
-        'audio request skipped (peer not open)', peerId.slice(0, 16));
-      AudioStorage.instance.lazySynchronize(1500, peerId);
+    if (deferRequestIfPeerNotOpen('audio', peerId, identifier, (ms, peer) => {
+      AudioStorage.instance.lazySynchronize(ms, peer);
+    })) {
       return;
     }
     netDebug('requestFile() ' + peerId);
     EventSystem.call('REQUEST_AUDIO_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: this.meshCandidatePeerIds()
+      candidatePeers: meshCandidatePeerIds()
     }, peerId);
-  }
-
-  private meshCandidatePeerIds(): string[] {
-    const ids = new Set<string>();
-    for (const id of Network.listRoomMemberPeerIds()) {
-      if (id && id !== Network.peerId) ids.add(id);
-    }
-    for (const id of Network.peerIds) ids.add(id);
-    return Array.from(ids);
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return FileReceiveScheduler.isReceiveBudgetFull();
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (let task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }
