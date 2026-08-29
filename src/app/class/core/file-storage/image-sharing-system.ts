@@ -6,6 +6,7 @@ import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { finishMediaReceiveTask } from './receive-task-finish';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
@@ -204,14 +205,15 @@ export class ImageSharingSystem {
     let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onfinish = (task, data) => {
-      const ok = task.didCompleteSuccessfully;
-      // Cancel is not a transfer failure — clear retry gate so remesh can re-enqueue immediately.
-      FileReceiveScheduler.noteReceiveEnded('image', task.identifier, ok || task.didCancel);
-      this.stopReceiveTask(task.identifier);
-      if (ok && data) EventSystem.trigger('UPDATE_FILE_RESOURE', { identifier: task.identifier, updateImages: data });
-      if (task.didCancel) ImageStorage.instance.lazySynchronize(800);
-      else if (!ok) ImageStorage.instance.lazySynchronize(20_000);
-      else ImageStorage.instance.lazySynchronize(1000);
+      finishMediaReceiveTask('image', task, data, {
+        stopReceiveTask: id => this.stopReceiveTask(id),
+        onSuccess: updateImages => EventSystem.trigger('UPDATE_FILE_RESOURE', {
+          identifier: task.identifier,
+          updateImages,
+        }),
+        lazySynchronize: ms => ImageStorage.instance.lazySynchronize(ms),
+        successLazyMs: 1000,
+      });
     }
 
     task.start();

@@ -2,6 +2,7 @@ import { EventSystem, Network } from '../system';
 import { meshWarnThrottled } from '../system/network/net-debug';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { finishMediaReceiveTask } from './receive-task-finish';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
@@ -136,11 +137,11 @@ export class PdfSharingSystem {
       pdf.apply(context);
     };
     task.onfinish = (task, data) => {
-      const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('pdf', task.identifier, ok || task.didCancel);
-      this.stopReceiveTask(task.identifier);
-      if (ok && data) EventSystem.trigger('UPDATE_PDF_RESOURE', [data]);
-      PdfStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
+      finishMediaReceiveTask('pdf', task, data, {
+        stopReceiveTask: id => this.stopReceiveTask(id),
+        onSuccess: payload => EventSystem.trigger('UPDATE_PDF_RESOURE', [payload]),
+        lazySynchronize: ms => PdfStorage.instance.lazySynchronize(ms),
+      });
     };
     task.start();
   }

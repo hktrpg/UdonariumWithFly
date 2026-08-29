@@ -1,6 +1,7 @@
 import { EventSystem, Network } from '../system';
 import { netDebug, meshWarnThrottled } from '../system/network/net-debug';
 import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-scheduler';
+import { finishMediaReceiveTask } from './receive-task-finish';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
@@ -175,11 +176,11 @@ export class AudioSharingSystem {
       audio.apply(context);
     }
     task.onfinish = (task, data) => {
-      const ok = task.didCompleteSuccessfully;
-      FileReceiveScheduler.noteReceiveEnded('audio', task.identifier, ok || task.didCancel);
-      this.stopReceiveTask(task.identifier);
-      if (ok && data) EventSystem.trigger('UPDATE_AUDIO_RESOURE', [data]);
-      AudioStorage.instance.lazySynchronize(task.didCancel ? 800 : (ok ? 800 : 20_000));
+      finishMediaReceiveTask('audio', task, data, {
+        stopReceiveTask: id => this.stopReceiveTask(id),
+        onSuccess: payload => EventSystem.trigger('UPDATE_AUDIO_RESOURE', [payload]),
+        lazySynchronize: ms => AudioStorage.instance.lazySynchronize(ms),
+      });
     }
 
     task.start();
