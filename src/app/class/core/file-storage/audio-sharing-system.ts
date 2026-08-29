@@ -4,6 +4,12 @@ import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-
 import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  isSendTaskLimitReached,
+  mediaSendTaskKey,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
@@ -21,8 +27,6 @@ export class AudioSharingSystem {
   private sendTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<AudioFileContext>> = new Map();
   private readonly startDeclineGate = new StartTransmissionDeclineGate();
-  private maxSendTask: number = 2;
-  private maxReceiveTask: number = 4;
 
   private constructor() { }
 
@@ -58,7 +62,7 @@ export class AudioSharingSystem {
         }
 
         // Handle edge cases such as Peer disconnect
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < AudioStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < AudioStorage.instance.getCatalog().length) {
           AudioStorage.instance.synchronize(event.sendFrom);
         }
 
@@ -78,7 +82,7 @@ export class AudioSharingSystem {
           if (audio && item.state < audio.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
 
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length) {
+        if (!isSendTaskLimitReached(this.sendTaskMap.size) && 0 < randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', randomRequest, item => item.state);
           const item = sorted[0];
           const audio: AudioFile = AudioStorage.instance.get(item.identifier);
@@ -127,7 +131,7 @@ export class AudioSharingSystem {
   }
 
   private async startSendTask(audio: AudioFile, sendTo: string) {
-    const taskKey = this.sendTaskKey(sendTo, audio.identifier);
+    const taskKey = mediaSendTaskKey(sendTo, audio.identifier);
     if (this.sendTaskMap.has(taskKey)) return;
 
     let task = BufferSharingTask.createSendTask<AudioFileContext>(audio.identifier, sendTo);
@@ -193,10 +197,6 @@ export class AudioSharingSystem {
 
   private removeSendTask(sendKey: string) {
     this.sendTaskMap.delete(sendKey);
-  }
-
-  private sendTaskKey(sendTo: string, identifier: string): string {
-    return `${sendTo}:${identifier}`;
   }
 
   private stopReceiveTask(identifier: string) {
@@ -271,35 +271,7 @@ export class AudioSharingSystem {
     EventSystem.call('REQUEST_AUDIO_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: this.meshCandidatePeerIds()
+      candidatePeers: meshCandidatePeerIds()
     }, peerId);
-  }
-
-  private meshCandidatePeerIds(): string[] {
-    const ids = new Set<string>();
-    for (const id of Network.listRoomMemberPeerIds()) {
-      if (id && id !== Network.peerId) ids.add(id);
-    }
-    for (const id of Network.peerIds) ids.add(id);
-    return Array.from(ids);
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return FileReceiveScheduler.isReceiveBudgetFull();
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (let task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }

@@ -4,6 +4,12 @@ import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-
 import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  isSendTaskLimitReached,
+  mediaSendTaskKey,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
 import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
@@ -20,8 +26,6 @@ export class VideoSharingSystem {
   private sendTaskMap: Map<string, BufferSharingTask<VideoFileContext>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<VideoFileContext>> = new Map();
   private readonly startDeclineGate = new StartTransmissionDeclineGate();
-  private maxSendTask = 2;
-  private maxReceiveTask = 4;
 
   private constructor() { }
 
@@ -50,7 +54,7 @@ export class VideoSharingSystem {
             request.push({ identifier: item.identifier, state: video.state });
           }
         }
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < VideoStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < VideoStorage.instance.getCatalog().length) {
           VideoStorage.instance.synchronize(event.sendFrom);
         }
         if (request.length < 1) return;
@@ -64,7 +68,7 @@ export class VideoSharingSystem {
           const video = VideoStorage.instance.get(item.identifier);
           if (video && item.state < video.state) randomRequest.push({ identifier: item.identifier, state: item.state });
         }
-        if (!this.isLimitSendTask() && randomRequest.length) {
+        if (!isSendTaskLimitReached(this.sendTaskMap.size) && randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', randomRequest, item => item.state);
           const item = sorted[0];
           const video = VideoStorage.instance.get(item.identifier);
@@ -102,7 +106,7 @@ export class VideoSharingSystem {
   }
 
   private async startSendTask(video: VideoFile, sendTo: string) {
-    const taskKey = this.sendTaskKey(sendTo, video.identifier);
+    const taskKey = mediaSendTaskKey(sendTo, video.identifier);
     if (this.sendTaskMap.has(taskKey)) return;
 
     const task = BufferSharingTask.createSendTask<VideoFileContext>(video.identifier, sendTo);
@@ -152,10 +156,6 @@ export class VideoSharingSystem {
     const task = this.sendTaskMap.get(sendKey);
     if (task) task.cancel();
     this.sendTaskMap.delete(sendKey);
-  }
-
-  private sendTaskKey(sendTo: string, identifier: string): string {
-    return `${sendTo}:${identifier}`;
   }
 
   private stopReceiveTask(identifier: string) {
@@ -227,35 +227,7 @@ export class VideoSharingSystem {
     EventSystem.call('REQUEST_VIDEO_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: this.meshCandidatePeerIds()
+      candidatePeers: meshCandidatePeerIds()
     }, peerId);
-  }
-
-  private meshCandidatePeerIds(): string[] {
-    const ids = new Set<string>();
-    for (const id of Network.listRoomMemberPeerIds()) {
-      if (id && id !== Network.peerId) ids.add(id);
-    }
-    for (const id of Network.peerIds) ids.add(id);
-    return Array.from(ids);
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return FileReceiveScheduler.isReceiveBudgetFull();
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (const task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }

@@ -9,6 +9,12 @@ import { estimateNextReceiveBytes, FileReceiveScheduler } from './file-transfer-
 import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  isSendTaskLimitReached,
+  mediaSendTaskKey,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { MimeType } from './mime-type';
 import { FolderMediaHydrator } from 'service/folder-media-hydrator';
@@ -27,8 +33,6 @@ export class ImageSharingSystem {
   private declinedSendKeys = new Map<string, number>();
   private static readonly SEND_DECLINE_COOLDOWN_MS = 45_000;
   private static readonly SEND_DECLINE_RETRY_MS = 20_000;
-  private maxSendTask: number = 2;
-  private maxReceiveTask: number = 4;
 
   private constructor() {
   }
@@ -67,7 +71,7 @@ export class ImageSharingSystem {
         }
 
         // Handle edge cases such as Peer disconnect
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
           ImageStorage.instance.synchronize(event.sendFrom);
         }
 
@@ -90,7 +94,7 @@ export class ImageSharingSystem {
           }
         }
 
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length) {
+        if (!isSendTaskLimitReached(this.sendTaskMap.size) && 0 < randomRequest.length) {
           const sorted = FileReceiveScheduler.sortByNextReceiveBytes(
             'image',
             randomRequest,
@@ -152,7 +156,7 @@ export class ImageSharingSystem {
       netDebug('startSendTask skipped (peer declined)', sendTo, identifier);
       return;
     }
-    const taskKey = this.sendTaskKey(sendTo, identifier);
+    const taskKey = mediaSendTaskKey(sendTo, identifier);
     const prev = this.sendTaskMap.get(taskKey);
     if (prev) {
       netDebug('startSendTask skipped (already sending)', sendTo, identifier);
@@ -227,12 +231,8 @@ export class ImageSharingSystem {
     this.sendTaskMap.delete(sendKey);
   }
 
-  private sendTaskKey(sendTo: string, identifier: string): string {
-    return `${sendTo}:${identifier}`;
-  }
-
   private isSendDeclined(sendTo: string, identifier: string): boolean {
-    const key = this.sendTaskKey(sendTo, identifier);
+    const key = mediaSendTaskKey(sendTo, identifier);
     const last = this.declinedSendKeys.get(key) ?? 0;
     return performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
   }
@@ -263,15 +263,6 @@ export class ImageSharingSystem {
         this.request([{ identifier: item.identifier, state: localState }], peerId);
       });
     }
-  }
-
-  private meshCandidatePeerIds(): string[] {
-    const ids = new Set<string>();
-    for (const id of Network.listRoomMemberPeerIds()) {
-      if (id && id !== Network.peerId) ids.add(id);
-    }
-    for (const id of Network.peerIds) ids.add(id);
-    return Array.from(ids);
   }
 
   private clearDeclinedForPeer(peerId: string) {
@@ -326,7 +317,7 @@ export class ImageSharingSystem {
     EventSystem.call('REQUEST_FILE_RESOURE', {
       identifiers: request,
       receiver: Network.peerId,
-      candidatePeers: this.meshCandidatePeerIds()
+      candidatePeers: meshCandidatePeerIds()
     }, peerId);
   }
 
@@ -370,25 +361,6 @@ export class ImageSharingSystem {
       if (maxSize < byteSize) break;
     }
     return updateImages;
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return FileReceiveScheduler.isReceiveBudgetFull();
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (let task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }
 
