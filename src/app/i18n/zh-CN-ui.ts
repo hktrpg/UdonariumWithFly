@@ -192,7 +192,7 @@ export const zhCN_ui: I18nDictionary = {
   'roomJoin.role.guest.label': '访客',
   'roomJoin.role.guest.hint': '功能受限',
   'roomJoin.noPassword': '无密码',
-  'roomJoin.passwordNotNeeded': '无需',
+  'roomJoin.passwordNotNeeded': '无密码',
   'roomJoin.passwordLabel': '{{role}}密码',
   'roomJoin.passwordPlaceholder': '输入密码',
   'roomJoin.submit': '进入房间',
