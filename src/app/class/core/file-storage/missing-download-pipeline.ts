@@ -7,6 +7,8 @@ import {
   TransferCatalogMeta,
 } from './file-transfer-scheduler';
 
+import { isUrlBackedMediaIdentifier } from './media-identifier';
+
 export type MissingCatalogItem = TransferCatalogMeta;
 
 export interface MissingDownloadCollector {
@@ -28,6 +30,53 @@ export interface MissingDownloadQueuer extends Pick<
 }
 
 export interface MissingDownloadHooks extends MissingDownloadCollector, MissingDownloadQueuer {}
+
+/** Path/HTTP assets load locally; never enqueue for P2P (compat with older hosts). */
+export function hydrateUrlBackedMediaIfNeeded(options: {
+  item: MissingCatalogItem;
+  urlState: number;
+  getExisting: (identifier: string) => { state: number } | null | undefined;
+  addUrlBacked: (identifier: string) => void;
+}): boolean {
+  const { item, urlState } = options;
+  if (item.state !== urlState && !isUrlBackedMediaIdentifier(item.identifier)) {
+    return false;
+  }
+  const existing = options.getExisting(item.identifier);
+  if (!existing || existing.state < urlState) {
+    options.addUrlBacked(item.identifier);
+  }
+  return true;
+}
+
+/** Build MissingDownloadHooks for one media kind (A/P/V/image). */
+export function buildMissingDownloadHooks(options: {
+  kind: FileResourceKind;
+  completeState: number;
+  nullState: number;
+  urlState: number;
+  isReceiving: (identifier: string) => boolean;
+  get: (identifier: string) => { state: number } | null | undefined;
+  addEmpty: (identifier: string) => void;
+  addUrlBacked: (identifier: string) => void;
+  requestOne: (identifier: string, localState: number, peerId: string) => void;
+}): MissingDownloadHooks {
+  return {
+    kind: options.kind,
+    completeState: options.completeState,
+    nullState: options.nullState,
+    isReceiving: options.isReceiving,
+    getLocalState: id => options.get(id)?.state ?? null,
+    ensurePlaceholder: id => options.addEmpty(id),
+    hydrateUrlBacked: item => hydrateUrlBackedMediaIfNeeded({
+      item,
+      urlState: options.urlState,
+      getExisting: options.get,
+      addUrlBacked: options.addUrlBacked,
+    }),
+    requestOne: options.requestOne,
+  };
+}
 
 /** Collect incomplete local files from a peer catalog (SYNCHRONIZE / ensureRoomDownloads). */
 export function collectMissingDownloadRequests(

@@ -2,8 +2,10 @@ import { Network } from '../system';
 import { FileReceiveScheduler } from './file-transfer-scheduler';
 import { ImageState } from './image-file';
 import {
+  buildMissingDownloadHooks,
   collectMissingDownloadRequests,
   ensureRoomMissingDownloads,
+  hydrateUrlBackedMediaIfNeeded,
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
@@ -89,5 +91,37 @@ describe('missing-download-pipeline', () => {
     );
     FileReceiveScheduler.schedule();
     expect(enqueued).toEqual([]);
+  });
+
+  it('hydrateUrlBackedMediaIfNeeded returns true and may create slot', () => {
+    const created: string[] = [];
+    expect(hydrateUrlBackedMediaIfNeeded({
+      item: { identifier: 'u1', state: ImageState.URL },
+      urlState: ImageState.URL,
+      getExisting: () => null,
+      addUrlBacked: id => created.push(id),
+    })).toBe(true);
+    expect(created).toEqual(['u1']);
+  });
+
+  it('buildMissingDownloadHooks wires hydrate skip for URL assets', () => {
+    const storage = new Map<string, number>();
+    const built = buildMissingDownloadHooks({
+      kind: 'pdf',
+      completeState: 2,
+      nullState: 0,
+      urlState: 1000,
+      isReceiving: () => false,
+      get: id => (storage.has(id) ? { state: storage.get(id)! } : null),
+      addEmpty: id => { storage.set(id, 0); },
+      addUrlBacked: id => { storage.set(id, 1000); },
+      requestOne: () => fail('should not request url'),
+    });
+    const request = collectMissingDownloadRequests(
+      [{ identifier: 'path-asset', state: 1000 }],
+      built,
+    );
+    expect(request).toEqual([]);
+    expect(storage.get('path-asset')).toBe(1000);
   });
 });
