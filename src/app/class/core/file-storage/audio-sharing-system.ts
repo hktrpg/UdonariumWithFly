@@ -1,13 +1,10 @@
 import { EventSystem, Network } from '../system';
 import { netDebug } from '../system/network/net-debug';
 import { FileReceiveScheduler } from './file-transfer-scheduler';
-import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import {
   hasActiveMediaTasks,
-  isSendTaskLimitReached,
-  mediaSendTaskKey,
   meshCandidatePeerIds,
 } from './media-sharing-helpers';
 import {
@@ -16,10 +13,17 @@ import {
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
+import {
+  acceptOrDeclineStartTransmission,
+  applyReceiveProgressPercent,
+  buildBlobOrUrlSendContext,
+  fulfillOrRelaySingleFileRequest,
+  startSingleFileReceiveTask,
+  startSingleFileSendTask,
+} from './single-file-media-transfer';
 import { AudioFile, AudioFileContext, AudioState } from './audio-file';
 import { AudioStorage, CatalogItem } from './audio-storage';
 import { BufferSharingTask } from './buffer-sharing-task';
-import { FileReaderUtil } from './file-reader-util';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 
 export class AudioSharingSystem {
@@ -65,35 +69,22 @@ export class AudioSharingSystem {
       })
       .on('REQUEST_AUDIO_RESOURE', event => {
         if (event.isSendFromSelf) return;
-
-        let request: CatalogItem[] = event.data.identifiers;
-        let randomRequest: CatalogItem[] = [];
-
-        for (let item of request) {
-          let audio: AudioFile = AudioStorage.instance.get(item.identifier);
-          if (audio && item.state < audio.state) randomRequest.push({ identifier: item.identifier, state: item.state });
-        }
-
-        if (!isSendTaskLimitReached(this.sendTaskMap.size) && 0 < randomRequest.length) {
-          const sorted = FileReceiveScheduler.sortByNextReceiveBytes('audio', randomRequest, item => item.state);
-          const item = sorted[0];
-          const audio: AudioFile = AudioStorage.instance.get(item.identifier);
-          netDebug('REQUEST_AUDIO_RESOURE Send!!! ' + event.data.receiver + ' -> ' + item.identifier);
-          this.startSendTask(audio, event.data.receiver);
-        } else {
-          // ??
-          let candidatePeers: string[] = event.data.candidatePeers
-            .filter((id: string) => Network.peerIds.includes(id));
-          let index = candidatePeers.indexOf(Network.peerId);
-          if (-1 < index) candidatePeers.splice(index, 1);
-
-          for (let peerId of candidatePeers) {
-            netDebug('REQUEST_AUDIO_RESOURE AudioStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers);
-            EventSystem.call(event, peerId);
-            return;
-          }
-          netDebug('REQUEST_FILE_RESOURE AudioStorageService overflow...' + event.data.receiver, randomRequest.length);
-        }
+        fulfillOrRelaySingleFileRequest({
+          kind: 'audio',
+          identifiers: event.data.identifiers,
+          receiver: event.data.receiver,
+          candidatePeers: event.data.candidatePeers,
+          sendTaskCount: this.sendTaskMap.size,
+          getLocalState: id => AudioStorage.instance.get(id)?.state ?? null,
+          startSend: (id, receiver) => {
+            const audio = AudioStorage.instance.get(id);
+            if (audio) this.startSendTask(audio, receiver);
+          },
+          relayTo: peerId => EventSystem.call(event, peerId),
+          onSend: (receiver, id) => netDebug('REQUEST_AUDIO_RESOURE Send!!! ' + receiver + ' -> ' + id),
+          onRelay: peerId => netDebug('REQUEST_AUDIO_RESOURE AudioStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers),
+          onOverflow: (receiver, count) => netDebug('REQUEST_FILE_RESOURE AudioStorageService overflow...' + receiver, count),
+        });
       })
       .on('UPDATE_AUDIO_RESOURE', 1000, event => {
         let updateAudios: AudioFileContext[] = event.data;
@@ -105,16 +96,16 @@ export class AudioSharingSystem {
       })
       .on('START_AUDIO_TRANSMISSION', event => {
         netDebug('START_AUDIO_TRANSMISSION ' + event.data.fileIdentifier);
-        let identifier: string = event.data.fileIdentifier;
-        let audio: AudioFile = AudioStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier)) {
-          return;
-        }
-        if (audio && AudioState.COMPLETE <= audio.state) {
-          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
-          return;
-        }
-        this.startReceiveTask(identifier, event.sendFrom);
+        const identifier: string = event.data.fileIdentifier;
+        acceptOrDeclineStartTransmission({
+          identifier,
+          sendFrom: event.sendFrom,
+          isReceiving: this.receiveTaskMap.has(identifier),
+          localState: AudioStorage.instance.get(identifier)?.state ?? null,
+          completeState: AudioState.COMPLETE,
+          declineGate: this.startDeclineGate,
+          startReceive: (id, from) => this.startReceiveTask(id, from),
+        });
       });
   }
 
@@ -123,72 +114,39 @@ export class AudioSharingSystem {
   }
 
   private async startSendTask(audio: AudioFile, sendTo: string) {
-    const taskKey = mediaSendTaskKey(sendTo, audio.identifier);
-    if (this.sendTaskMap.has(taskKey)) return;
-
-    let task = BufferSharingTask.createSendTask<AudioFileContext>(audio.identifier, sendTo);
-    this.sendTaskMap.set(taskKey, task);
-
-    EventSystem.call('START_AUDIO_TRANSMISSION', { fileIdentifier: audio.identifier }, sendTo);
-
-    let context: AudioFileContext = {
+    await startSingleFileSendTask({
       identifier: audio.identifier,
-      name: audio.name,
-      blob: null,
-      type: '',
-      url: null
-    };
-
-    if (audio.state === AudioState.URL) {
-      context.url = audio.url;
-    } else {
-      context.blob = <any>await FileReaderUtil.readAsArrayBufferAsync(audio.blob);
-      context.type = audio.blob.type;
-    }
-
-    task.onfinish = () => {
-      this.removeSendTask(taskKey);
-      if (task.didCompleteSuccessfully) {
-        AudioStorage.instance.synchronize();
-      }
-    }
-
-    task.start(context);
+      sendTo,
+      sendTaskMap: this.sendTaskMap,
+      startEventName: 'START_AUDIO_TRANSMISSION',
+      synchronizeWhen: 'success',
+      synchronize: () => AudioStorage.instance.synchronize(),
+      buildContext: () => buildBlobOrUrlSendContext({
+        identifier: audio.identifier,
+        name: audio.name,
+        state: audio.state,
+        urlState: AudioState.URL,
+        url: audio.url,
+        blob: audio.blob,
+      }),
+    });
   }
 
   private startReceiveTask(identifier: string, fromPeerId?: string) {
-    FileReceiveScheduler.markReceiveStart('audio', identifier);
-    let audio: AudioFile = AudioStorage.instance.get(identifier);
-    let task = BufferSharingTask.createReceiveTask<AudioFileContext>(identifier, fromPeerId);
-    this.receiveTaskMap.set(identifier, task);
-
-    task.onprogress = (task, loaded, total) => {
-      let context = audio.toContext();
-      context.name = (loaded * 100 / total).toFixed(1) + '%';
-      audio.apply(context);
-    }
-    task.onfinish = (task, data) => {
-      finishMediaReceiveTask('audio', task, data, {
-        stopReceiveTask: id => this.stopReceiveTask(id),
-        onSuccess: payload => EventSystem.trigger('UPDATE_AUDIO_RESOURE', [payload]),
-        lazySynchronize: ms => AudioStorage.instance.lazySynchronize(ms),
-      });
-    }
-
-    task.start();
-    netDebug('startReceiveTask => ', this.receiveTaskMap.size);
-  }
-
-  private stopSendTask(identifier: string) {
-    let task = this.sendTaskMap.get(identifier);
-    if (task) { task.cancel(); }
-    this.removeSendTask(identifier);
-
-    netDebug('stopSendTask => ', this.sendTaskMap.size);
-  }
-
-  private removeSendTask(sendKey: string) {
-    this.sendTaskMap.delete(sendKey);
+    const audio = AudioStorage.instance.get(identifier);
+    startSingleFileReceiveTask({
+      kind: 'audio',
+      identifier,
+      fromPeerId,
+      receiveTaskMap: this.receiveTaskMap,
+      applyProgress: (loaded, total) => {
+        if (audio) applyReceiveProgressPercent(audio, loaded, total);
+      },
+      updateEventName: 'UPDATE_AUDIO_RESOURE',
+      lazySynchronize: ms => AudioStorage.instance.lazySynchronize(ms),
+      stopReceiveTask: id => this.stopReceiveTask(id),
+      onStarted: () => netDebug('startReceiveTask => ', this.receiveTaskMap.size),
+    });
   }
 
   private stopReceiveTask(identifier: string) {

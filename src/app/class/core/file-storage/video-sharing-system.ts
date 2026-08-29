@@ -1,13 +1,10 @@
 import { EventSystem, Network } from '../system';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReceiveScheduler } from './file-transfer-scheduler';
-import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import {
   hasActiveMediaTasks,
-  isSendTaskLimitReached,
-  mediaSendTaskKey,
   meshCandidatePeerIds,
 } from './media-sharing-helpers';
 import {
@@ -16,7 +13,14 @@ import {
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
-import { FileReaderUtil } from './file-reader-util';
+import {
+  acceptOrDeclineStartTransmission,
+  applyReceiveProgressPercent,
+  buildBlobOrUrlSendContext,
+  fulfillOrRelaySingleFileRequest,
+  startSingleFileReceiveTask,
+  startSingleFileSendTask,
+} from './single-file-media-transfer';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 import { VideoCatalogItem, VideoStorage } from './video-storage';
@@ -55,27 +59,19 @@ export class VideoSharingSystem {
       })
       .on('REQUEST_VIDEO_RESOURE', event => {
         if (event.isSendFromSelf) return;
-        const request: VideoCatalogItem[] = event.data.identifiers;
-        const randomRequest: VideoCatalogItem[] = [];
-        for (const item of request) {
-          const video = VideoStorage.instance.get(item.identifier);
-          if (video && item.state < video.state) randomRequest.push({ identifier: item.identifier, state: item.state });
-        }
-        if (!isSendTaskLimitReached(this.sendTaskMap.size) && randomRequest.length) {
-          const sorted = FileReceiveScheduler.sortByNextReceiveBytes('video', randomRequest, item => item.state);
-          const item = sorted[0];
-          const video = VideoStorage.instance.get(item.identifier);
-          this.startSendTask(video, event.data.receiver);
-        } else {
-          const candidatePeers: string[] = event.data.candidatePeers
-            .filter((id: string) => Network.peerIds.includes(id));
-          const index = candidatePeers.indexOf(Network.peerId);
-          if (-1 < index) candidatePeers.splice(index, 1);
-          for (const peerId of candidatePeers) {
-            EventSystem.call(event, peerId);
-            return;
-          }
-        }
+        fulfillOrRelaySingleFileRequest({
+          kind: 'video',
+          identifiers: event.data.identifiers,
+          receiver: event.data.receiver,
+          candidatePeers: event.data.candidatePeers,
+          sendTaskCount: this.sendTaskMap.size,
+          getLocalState: id => VideoStorage.instance.get(id)?.state ?? null,
+          startSend: (id, receiver) => {
+            const video = VideoStorage.instance.get(id);
+            if (video) this.startSendTask(video, receiver);
+          },
+          relayTo: peerId => EventSystem.call(event, peerId),
+        });
       })
       .on('UPDATE_VIDEO_RESOURE', 1000, event => {
         const updateVideos: VideoFileContext[] = event.data;
@@ -86,69 +82,52 @@ export class VideoSharingSystem {
       })
       .on('START_VIDEO_TRANSMISSION', event => {
         const identifier: string = event.data.fileIdentifier;
-        const video = VideoStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier)) {
-          return;
-        }
-        if (video && VideoState.COMPLETE <= video.state) {
-          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
-          return;
-        }
-        this.startReceiveTask(identifier, event.sendFrom);
+        acceptOrDeclineStartTransmission({
+          identifier,
+          sendFrom: event.sendFrom,
+          isReceiving: this.receiveTaskMap.has(identifier),
+          localState: VideoStorage.instance.get(identifier)?.state ?? null,
+          completeState: VideoState.COMPLETE,
+          declineGate: this.startDeclineGate,
+          startReceive: (id, from) => this.startReceiveTask(id, from),
+        });
       });
   }
 
   private async startSendTask(video: VideoFile, sendTo: string) {
-    const taskKey = mediaSendTaskKey(sendTo, video.identifier);
-    if (this.sendTaskMap.has(taskKey)) return;
-
-    const task = BufferSharingTask.createSendTask<VideoFileContext>(video.identifier, sendTo);
-    this.sendTaskMap.set(taskKey, task);
-    EventSystem.call('START_VIDEO_TRANSMISSION', { fileIdentifier: video.identifier }, sendTo);
-    const context: VideoFileContext = {
+    await startSingleFileSendTask({
       identifier: video.identifier,
-      name: video.name,
-      blob: null,
-      type: '',
-      url: null
-    };
-    if (video.state === VideoState.URL) {
-      context.url = video.url;
-    } else {
-      context.blob = <any>await FileReaderUtil.readAsArrayBufferAsync(video.blob);
-      context.type = video.blob.type || 'video/mp4';
-    }
-    task.onfinish = () => {
-      this.stopSendTask(taskKey);
-      VideoStorage.instance.synchronize();
-    };
-    task.start(context);
+      sendTo,
+      sendTaskMap: this.sendTaskMap,
+      startEventName: 'START_VIDEO_TRANSMISSION',
+      synchronizeWhen: 'always',
+      synchronize: () => VideoStorage.instance.synchronize(),
+      buildContext: () => buildBlobOrUrlSendContext({
+        identifier: video.identifier,
+        name: video.name,
+        state: video.state,
+        urlState: VideoState.URL,
+        url: video.url,
+        blob: video.blob,
+        defaultMime: 'video/mp4',
+      }),
+    });
   }
 
   private startReceiveTask(identifier: string, fromPeerId?: string) {
-    FileReceiveScheduler.markReceiveStart('video', identifier);
     const video = VideoStorage.instance.get(identifier);
-    const task = BufferSharingTask.createReceiveTask<VideoFileContext>(identifier, fromPeerId);
-    this.receiveTaskMap.set(identifier, task);
-    task.onprogress = (task, loaded, total) => {
-      const context = video.toContext();
-      context.name = (loaded * 100 / total).toFixed(1) + '%';
-      video.apply(context);
-    };
-    task.onfinish = (task, data) => {
-      finishMediaReceiveTask('video', task, data, {
-        stopReceiveTask: id => this.stopReceiveTask(id),
-        onSuccess: payload => EventSystem.trigger('UPDATE_VIDEO_RESOURE', [payload]),
-        lazySynchronize: ms => VideoStorage.instance.lazySynchronize(ms),
-      });
-    };
-    task.start();
-  }
-
-  private stopSendTask(sendKey: string) {
-    const task = this.sendTaskMap.get(sendKey);
-    if (task) task.cancel();
-    this.sendTaskMap.delete(sendKey);
+    startSingleFileReceiveTask({
+      kind: 'video',
+      identifier,
+      fromPeerId,
+      receiveTaskMap: this.receiveTaskMap,
+      applyProgress: (loaded, total) => {
+        if (video) applyReceiveProgressPercent(video, loaded, total);
+      },
+      updateEventName: 'UPDATE_VIDEO_RESOURE',
+      lazySynchronize: ms => VideoStorage.instance.lazySynchronize(ms),
+      stopReceiveTask: id => this.stopReceiveTask(id),
+    });
   }
 
   private stopReceiveTask(identifier: string) {

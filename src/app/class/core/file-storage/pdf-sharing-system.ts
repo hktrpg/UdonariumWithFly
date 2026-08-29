@@ -1,13 +1,10 @@
 import { EventSystem, Network } from '../system';
 import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReceiveScheduler } from './file-transfer-scheduler';
-import { finishMediaReceiveTask } from './receive-task-finish';
 import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
 import { StartTransmissionDeclineGate } from './start-transmission-decline';
 import {
   hasActiveMediaTasks,
-  isSendTaskLimitReached,
-  mediaSendTaskKey,
   meshCandidatePeerIds,
 } from './media-sharing-helpers';
 import {
@@ -16,7 +13,14 @@ import {
   MissingDownloadHooks,
   queueMissingDownloads,
 } from './missing-download-pipeline';
-import { FileReaderUtil } from './file-reader-util';
+import {
+  acceptOrDeclineStartTransmission,
+  applyReceiveProgressPercent,
+  buildBlobOrUrlSendContext,
+  fulfillOrRelaySingleFileRequest,
+  startSingleFileReceiveTask,
+  startSingleFileSendTask,
+} from './single-file-media-transfer';
 import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 import { PdfCatalogItem, PdfStorage } from './pdf-storage';
@@ -55,27 +59,19 @@ export class PdfSharingSystem {
       })
       .on('REQUEST_PDF_RESOURE', event => {
         if (event.isSendFromSelf) return;
-        const request: PdfCatalogItem[] = event.data.identifiers;
-        const randomRequest: PdfCatalogItem[] = [];
-        for (const item of request) {
-          const pdf = PdfStorage.instance.get(item.identifier);
-          if (pdf && item.state < pdf.state) randomRequest.push({ identifier: item.identifier, state: item.state });
-        }
-        if (!isSendTaskLimitReached(this.sendTaskMap.size) && randomRequest.length) {
-          const sorted = FileReceiveScheduler.sortByNextReceiveBytes('pdf', randomRequest, item => item.state);
-          const item = sorted[0];
-          const pdf = PdfStorage.instance.get(item.identifier);
-          this.startSendTask(pdf, event.data.receiver);
-        } else {
-          const candidatePeers: string[] = event.data.candidatePeers
-            .filter((id: string) => Network.peerIds.includes(id));
-          const index = candidatePeers.indexOf(Network.peerId);
-          if (-1 < index) candidatePeers.splice(index, 1);
-          for (const peerId of candidatePeers) {
-            EventSystem.call(event, peerId);
-            return;
-          }
-        }
+        fulfillOrRelaySingleFileRequest({
+          kind: 'pdf',
+          identifiers: event.data.identifiers,
+          receiver: event.data.receiver,
+          candidatePeers: event.data.candidatePeers,
+          sendTaskCount: this.sendTaskMap.size,
+          getLocalState: id => PdfStorage.instance.get(id)?.state ?? null,
+          startSend: (id, receiver) => {
+            const pdf = PdfStorage.instance.get(id);
+            if (pdf) this.startSendTask(pdf, receiver);
+          },
+          relayTo: peerId => EventSystem.call(event, peerId),
+        });
       })
       .on('UPDATE_PDF_RESOURE', 1000, event => {
         const updatePdfs: PdfFileContext[] = event.data;
@@ -86,69 +82,52 @@ export class PdfSharingSystem {
       })
       .on('START_PDF_TRANSMISSION', event => {
         const identifier: string = event.data.fileIdentifier;
-        const pdf = PdfStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier)) {
-          return;
-        }
-        if (pdf && PdfState.COMPLETE <= pdf.state) {
-          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
-          return;
-        }
-        this.startReceiveTask(identifier, event.sendFrom);
+        acceptOrDeclineStartTransmission({
+          identifier,
+          sendFrom: event.sendFrom,
+          isReceiving: this.receiveTaskMap.has(identifier),
+          localState: PdfStorage.instance.get(identifier)?.state ?? null,
+          completeState: PdfState.COMPLETE,
+          declineGate: this.startDeclineGate,
+          startReceive: (id, from) => this.startReceiveTask(id, from),
+        });
       });
   }
 
   private async startSendTask(pdf: PdfFile, sendTo: string) {
-    const taskKey = mediaSendTaskKey(sendTo, pdf.identifier);
-    if (this.sendTaskMap.has(taskKey)) return;
-
-    const task = BufferSharingTask.createSendTask<PdfFileContext>(pdf.identifier, sendTo);
-    this.sendTaskMap.set(taskKey, task);
-    EventSystem.call('START_PDF_TRANSMISSION', { fileIdentifier: pdf.identifier }, sendTo);
-    const context: PdfFileContext = {
+    await startSingleFileSendTask({
       identifier: pdf.identifier,
-      name: pdf.name,
-      blob: null,
-      type: '',
-      url: null
-    };
-    if (pdf.state === PdfState.URL) {
-      context.url = pdf.url;
-    } else {
-      context.blob = <any>await FileReaderUtil.readAsArrayBufferAsync(pdf.blob);
-      context.type = pdf.blob.type || 'application/pdf';
-    }
-    task.onfinish = () => {
-      this.stopSendTask(taskKey);
-      PdfStorage.instance.synchronize();
-    };
-    task.start(context);
+      sendTo,
+      sendTaskMap: this.sendTaskMap,
+      startEventName: 'START_PDF_TRANSMISSION',
+      synchronizeWhen: 'always',
+      synchronize: () => PdfStorage.instance.synchronize(),
+      buildContext: () => buildBlobOrUrlSendContext({
+        identifier: pdf.identifier,
+        name: pdf.name,
+        state: pdf.state,
+        urlState: PdfState.URL,
+        url: pdf.url,
+        blob: pdf.blob,
+        defaultMime: 'application/pdf',
+      }),
+    });
   }
 
   private startReceiveTask(identifier: string, fromPeerId?: string) {
-    FileReceiveScheduler.markReceiveStart('pdf', identifier);
     const pdf = PdfStorage.instance.get(identifier);
-    const task = BufferSharingTask.createReceiveTask<PdfFileContext>(identifier, fromPeerId);
-    this.receiveTaskMap.set(identifier, task);
-    task.onprogress = (task, loaded, total) => {
-      const context = pdf.toContext();
-      context.name = (loaded * 100 / total).toFixed(1) + '%';
-      pdf.apply(context);
-    };
-    task.onfinish = (task, data) => {
-      finishMediaReceiveTask('pdf', task, data, {
-        stopReceiveTask: id => this.stopReceiveTask(id),
-        onSuccess: payload => EventSystem.trigger('UPDATE_PDF_RESOURE', [payload]),
-        lazySynchronize: ms => PdfStorage.instance.lazySynchronize(ms),
-      });
-    };
-    task.start();
-  }
-
-  private stopSendTask(sendKey: string) {
-    const task = this.sendTaskMap.get(sendKey);
-    if (task) task.cancel();
-    this.sendTaskMap.delete(sendKey);
+    startSingleFileReceiveTask({
+      kind: 'pdf',
+      identifier,
+      fromPeerId,
+      receiveTaskMap: this.receiveTaskMap,
+      applyProgress: (loaded, total) => {
+        if (pdf) applyReceiveProgressPercent(pdf, loaded, total);
+      },
+      updateEventName: 'UPDATE_PDF_RESOURE',
+      lazySynchronize: ms => PdfStorage.instance.lazySynchronize(ms),
+      stopReceiveTask: id => this.stopReceiveTask(id),
+    });
   }
 
   private stopReceiveTask(identifier: string) {
