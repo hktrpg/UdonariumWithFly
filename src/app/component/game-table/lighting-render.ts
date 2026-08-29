@@ -1,5 +1,6 @@
 import { GameTable } from '@udonarium/game-table';
 import { TableLight } from '@udonarium/table-fx/table-light';
+import { darknessOverlayAlpha } from '@udonarium/table-fx/day-night-atmosphere';
 
 import { WallPolyline } from './footprint-walls';
 import { isGlobalIlluminationActive, VisionLightActor } from './vision-math';
@@ -65,7 +66,7 @@ export class LightingRender {
   ) {
     const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
     const ambient = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - ambient * 0.35);
+    const baseAlpha = darknessOverlayAlpha(darkness, ambient);
     const giActive = isGlobalIlluminationActive(table);
     if (baseAlpha <= 0.001 && !table.visionEnabled) {
       this.release();

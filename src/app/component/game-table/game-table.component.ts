@@ -19,6 +19,7 @@ import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
 import { TableLight } from '@udonarium/table-fx/table-light';
+import { darknessOverlayAlpha } from '@udonarium/table-fx/day-night-atmosphere';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { notePinAnchorPx, pinAnchorPx, stringBeamStyle3d, stringPathD, tokenCenterAnchorPx, tokenVisualHeightPx } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
@@ -908,9 +909,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.shouldDimBackgroundImage) return 0;
     const table = this.currentTable;
     if (!table) return 0;
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    return darkness * (1 - globalLight * 0.35);
+    return darknessOverlayAlpha(table.darkness ?? 0, table.globalIllumination ?? 1);
   }
 
   get backgroundDarknessOverlayColor(): string {
@@ -2047,9 +2046,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private needsPeriodicFx(): boolean {
     const table = this.currentTable;
     if (!table) return this.pings.length > 0;
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - globalLight * 0.35);
+    const baseAlpha = darknessOverlayAlpha(table.darkness ?? 0, table.globalIllumination ?? 1);
     return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0
       || (table.lights?.length ?? 0) > 0;
   }
