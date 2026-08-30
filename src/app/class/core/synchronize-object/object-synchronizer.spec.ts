@@ -140,4 +140,39 @@ describe('ObjectSynchronizer peer-sync hold', () => {
     ObjectSynchronizer.instance.disableJoinFetch();
     ObjectSynchronizer.instance.releasePeerSync(false);
   });
+
+  it('requests game-table identifiers before other catalog objects during join fetch', async () => {
+    spyOnProperty(Network, 'peers', 'get').and.returnValue([{ peerId: 'peer-a', isOpen: true } as any]);
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue(['peer-a']);
+    const requested: string[] = [];
+    spyOn(EventSystem, 'call').and.callFake(((name: string, data?: unknown) => {
+      if (name === 'REQUEST_GAME_OBJECT') requested.push(String(data));
+    }) as typeof EventSystem.call);
+
+    const table = { aliasName: 'game-table' };
+    const other = { aliasName: 'chat-tab' };
+    spyOn(ObjectStore.instance, 'get').and.callFake((id: string) => {
+      if (id === 'gameTable') return table as any;
+      if (id === 'chatTab') return other as any;
+      return null;
+    });
+
+    ObjectSynchronizer.instance.holdPeerSync();
+    ObjectSynchronizer.instance.enableJoinFetch();
+    EventSystem.trigger({
+      eventName: 'SYNCHRONIZE_GAME_OBJECT',
+      data: [
+        { identifier: 'chatTab', version: 1 },
+        { identifier: 'gameTable', version: 99 },
+        { identifier: 'misc', version: 1 },
+      ],
+      sendFrom: 'peer-a',
+    });
+    await new Promise<void>(resolve => setTimeout(resolve, 30));
+    expect(requested[0]).toBe('gameTable');
+    expect(requested).toContain('chatTab');
+
+    ObjectSynchronizer.instance.disableJoinFetch();
+    ObjectSynchronizer.instance.releasePeerSync(false);
+  });
 });

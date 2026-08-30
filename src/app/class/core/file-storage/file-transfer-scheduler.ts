@@ -52,6 +52,11 @@ export class FileReceiveScheduler {
   private static receiveRetryAfter = new Map<string, number>();
   private static networkHooksRegistered = false;
   private static playingMusicPriorityKey = '';
+  /**
+   * Join probe needs the DataChannel for game-table object sync first.
+   * Catalogs may still enqueue; dispatch resumes when the hold clears.
+   */
+  private static joinProbeHold = false;
 
   static ensureNetworkHooks(): void {
     if (FileReceiveScheduler.networkHooksRegistered) return;
@@ -241,7 +246,24 @@ export class FileReceiveScheduler {
     });
   }
 
+  /** Pause bulk file receives while a lobby join probe waits for game-table. */
+  static beginJoinProbeHold(): void {
+    FileReceiveScheduler.joinProbeHold = true;
+  }
+
+  /** Resume file receives after join probe settles (success or fail). */
+  static endJoinProbeHold(): void {
+    if (!FileReceiveScheduler.joinProbeHold) return;
+    FileReceiveScheduler.joinProbeHold = false;
+    FileReceiveScheduler.schedule();
+  }
+
+  static isJoinProbeHold(): boolean {
+    return FileReceiveScheduler.joinProbeHold;
+  }
+
   static schedule(): void {
+    if (FileReceiveScheduler.joinProbeHold) return;
     primePlayingMusicCache();
     try {
       FileReceiveScheduler.pending.sort((a, b) => compareFileSyncPriority(
@@ -415,6 +437,7 @@ export class FileReceiveScheduler {
   static resetForTests(): void {
     EventSystem.unregister(FileReceiveScheduler);
     FileReceiveScheduler.networkHooksRegistered = false;
+    FileReceiveScheduler.joinProbeHold = false;
     FileReceiveScheduler.activeReceives.clear();
     FileReceiveScheduler.outboundPending.clear();
     FileReceiveScheduler.outboundRequests.clear();

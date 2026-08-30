@@ -2,6 +2,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { skyWayRecoveryGate } from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
+import { FileReceiveScheduler } from '@udonarium/core/file-storage/file-transfer-scheduler';
 import { Room } from '@udonarium/room';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { ConnectionBusyService } from 'service/connection-busy.service';
@@ -1163,6 +1164,9 @@ describe('RoomConnectHelper.openAndConnect', () => {
     RoomConnectHelper.joinInProgress = false;
     RoomConnectHelper.lastJoinFailReason = '';
     RoomConnectHelper.clearLobbyRoomSuppression();
+    // openAndConnect may leave the hold set if a test settles without endJoinProbe pairing.
+    FileReceiveScheduler.endJoinProbeHold();
+    FileReceiveScheduler.resetForTests();
   });
 
   it('settles tabletop remount after a successful mesh join', async () => {
@@ -1303,6 +1307,27 @@ describe('RoomConnectHelper.openAndConnect', () => {
     await expectAsync(result).toBeResolvedTo(true);
     expect(resetSpy).not.toHaveBeenCalled();
     expect(Room.clearLocalTabletopForJoin).toHaveBeenCalled();
+  });
+
+  it('restarts connect budget after first peer so late game-table can still succeed', async () => {
+    RoomConnectHelper.JOIN_DATA_MS = 5000;
+    RoomConnectHelper.CONNECT_TIMEOUT_MS_FOR_TEST = 100;
+    const result = RoomConnectHelper.openAndConnect(room, '', [peer('live')]);
+
+    EventSystem.trigger('OPEN_NETWORK', { peerId: 'self' });
+    // Burn most of the open-phase budget before any DataChannel opens (slow ICE).
+    await new Promise<void>(resolve => setTimeout(resolve, 70));
+    expect(RoomConnectHelper.joinInProgress).toBeTrue();
+
+    openPeers = [peer('live')];
+    EventSystem.trigger('CONNECT_PEER', { peerId: 'live' });
+    // Without restart, CONNECT_TIMEOUT would fire ~30ms after connect.
+    await new Promise<void>(resolve => setTimeout(resolve, 70));
+    expect(RoomConnectHelper.joinInProgress).toBeTrue();
+
+    hostTabletop('live');
+    await expectAsync(result).toBeResolvedTo(true);
+    expect(RoomConnectHelper.lastJoinFailReason).toBe('');
   });
 
   it('aborts missing tabletop only after becoming alone', async () => {

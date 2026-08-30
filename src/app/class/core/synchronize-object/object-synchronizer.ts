@@ -317,14 +317,20 @@ export class ObjectSynchronizer {
   }
 
   private makeRequestList(targetPeerId: PeerId, maxRequest: number = 32): SynchronizeRequest[] {
-    let requests: SynchronizeRequest[] = [];
+    const entries = [...this.requestMap.entries()].filter(([, request]) =>
+      request.holderIds.includes(targetPeerId));
+    if (this.joinFetch) {
+      entries.sort(([idA], [idB]) => joinFetchRequestRank(idA) - joinFetchRequestRank(idB));
+    }
 
-    for (let [identifier, request] of this.requestMap) {
+    const requests: SynchronizeRequest[] = [];
+    for (const [identifier, request] of entries) {
       if (maxRequest <= requests.length) break;
-      if (!request.holderIds.includes(targetPeerId)) continue;
 
-      let gameObject = ObjectStore.instance.get(request.identifier);
-      if (!gameObject || gameObject.version < request.version || this.joinFetch) requests.push(request);
+      const gameObject = ObjectStore.instance.get(identifier);
+      if (!gameObject || gameObject.version < request.version || this.joinFetch) {
+        requests.push(request);
+      }
 
       this.requestMap.delete(identifier);
     }
@@ -358,4 +364,16 @@ export class ObjectSynchronizer {
 function inboundApplyRank(aliasName: string): number {
   if (aliasName === 'data' || aliasName === 'node') return 0;
   return 1;
+}
+
+/**
+ * During joinFetch, pull game-table before the rest of the catalog so the join
+ * probe can confirm before bulk object/file sync saturates the DataChannel.
+ */
+function joinFetchRequestRank(identifier: string): number {
+  const obj = ObjectStore.instance.get(identifier);
+  const alias = obj?.aliasName || '';
+  if (alias === 'game-table') return 0;
+  if (alias === 'table-selecter') return 1;
+  return 2;
 }

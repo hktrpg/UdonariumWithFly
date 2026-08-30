@@ -260,4 +260,18 @@ describe('FileReceiveScheduler', () => {
     expect(FileReceiveScheduler.outboundPendingCount()).toBe(0);
     expect(FileReceiveScheduler.activeReceiveCount()).toBe(0);
   });
+
+  it('join probe hold queues receives without dispatching until released', () => {
+    const order: string[] = [];
+    FileReceiveScheduler.beginJoinProbeHold();
+    expect(FileReceiveScheduler.isJoinProbeHold()).toBeTrue();
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'thumb', 4_000, () => order.push('thumb'));
+    FileReceiveScheduler.schedule();
+    expect(order).toEqual([]);
+    expect(FileReceiveScheduler.pendingReceiveCount()).toBe(1);
+
+    FileReceiveScheduler.endJoinProbeHold();
+    expect(FileReceiveScheduler.isJoinProbeHold()).toBeFalse();
+    expect(order).toEqual(['thumb']);
+  });
 });
