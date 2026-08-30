@@ -76,6 +76,7 @@ import { ScenePresetComponent } from 'component/scene-preset/scene-preset.compon
 import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
 import { CharacterResourceHudComponent } from 'component/character-resource-hud/character-resource-hud.component';
 import { MusicHudComponent } from 'component/music-hud/music-hud.component';
+import { UiThemeService, UI_THEME_IDS, UiThemeId } from 'service/ui-theme.service';
 import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
@@ -409,6 +410,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private mobileLayout: MobileLayoutService,
     private maskTokenFx: MaskTokenFxService,
     private weatherSe: WeatherSeService,
+    private uiTheme: UiThemeService,
     _audioImportName: AudioImportNameService,
     private connectionBusy: ConnectionBusyService,
   ) {
@@ -2177,14 +2179,25 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
       }),
       ContextMenuSeparator,
-      // Desktop UI (music / resource floats are forced off on mobile)
+      // UI theme (local preference) + HUD toggles
+      {
+        name: this.i18n.t('menu.settings.uiTheme'),
+        materialIcon: 'palette',
+        subActions: UI_THEME_IDS.map(id => ({
+          name: `${this.uiTheme.theme === id ? '☑' : '☐'} ${this.i18n.t(`menu.settings.uiTheme.${id}`)}`,
+          checkBox: 'check',
+          keepOpen: true,
+          action: () => this.uiTheme.setTheme(id as UiThemeId),
+          nameUpdate: () => `${this.uiTheme.theme === id ? '☑' : '☐'} ${this.i18n.t(`menu.settings.uiTheme.${id}`)}`,
+        })),
+      },
+      contextMenuToggleCheck({
+        get: () => CharacterResourceHudComponent.isVisible,
+        set: (v) => CharacterResourceHudComponent.setVisible(v),
+        on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
+        off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
+      }),
       ...(this.mobileLayout.isMobile ? [] : [
-        contextMenuToggleCheck({
-          get: () => CharacterResourceHudComponent.isVisible,
-          set: (v) => CharacterResourceHudComponent.setVisible(v),
-          on: `☑${this.i18n.t('menu.settings.resourceHud')}`,
-          off: `☐${this.i18n.t('menu.settings.resourceHud')}`,
-        }),
         contextMenuToggleCheck({
           get: () => MusicHudComponent.isVisible,
           set: (v) => MusicHudComponent.setVisible(v),

@@ -7,24 +7,79 @@
   position: fixed;
   z-index: 40;
   min-width: 260px;
-  max-width: 360px;
-  max-height: 50vh;
-  overflow: auto;
+  max-width: min(380px, calc(100vw - 16px));
+  /* Shell stays overflow:visible so remake skew / expedition brush are not clipped */
+  overflow: visible;
   padding: 6px 8px 8px;
-  background: rgba(28, 24, 20, 0.88);
-  color: #f3ebe0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: var(--udon-hud-bg, rgba(28, 24, 20, 0.88));
+  color: var(--udon-hud-text, #f3ebe0);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--udon-hud-radius, 8px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   font-size: 12px;
   user-select: none;
+  backdrop-filter: blur(var(--udon-panel-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--udon-panel-blur, 0px));
+}
+
+.hud-body {
+  max-height: min(50vh, 420px);
+  overflow: auto;
+}
+
+.resource-hud.is-docked {
+  right: 12px;
+  bottom: calc(var(--udon-bottom-chrome, 0px) + 12px);
+  left: auto;
+  top: auto;
+}
+
+.resource-hud.is-docked.is-mobile {
+  right: 8px;
+  bottom: calc(var(--udon-bottom-chrome, 56px) + 8px);
+  min-width: 200px;
+  max-width: min(280px, calc(100vw - var(--udon-left-chrome, 0px) - 16px));
+}
+.resource-hud.is-docked.is-mobile .hud-body {
+  max-height: 36vh;
 }
 
 .resource-hud.is-collapsed {
   min-width: 0;
-  max-height: none;
-  overflow: visible;
   padding-bottom: 6px;
+}
+
+/* Remake / Expedition: decorative shell only — hitbox stays rectangular so tier scale works */
+:host-context(html[data-ui-theme='remake']) .resource-hud,
+:host-context(html[data-ui-theme='expedition']) .resource-hud {
+  border-radius: 0;
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+:host-context(html[data-ui-theme='remake']) .resource-hud::before,
+:host-context(html[data-ui-theme='expedition']) .resource-hud::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--udon-hud-bg, rgba(28, 24, 20, 0.88));
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.12));
+}
+:host-context(html[data-ui-theme='remake']) .resource-hud::before {
+  inset: 0;
+  transform: skewX(var(--udon-hud-skew, -10deg));
+  box-shadow:
+    0 0 0 1px var(--udon-hud-accent, #5ec8ff),
+    0 10px 28px rgba(0, 40, 80, 0.45);
+}
+:host-context(html[data-ui-theme='expedition']) .resource-hud::before {
+  inset: -2px -4px -4px -2px;
+  clip-path: polygon(
+    2% 0, 98% 1%, 100% 8%, 99% 92%, 96% 100%,
+    4% 99%, 0 90%, 1% 6%
+  );
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
 
 .hud-head {
@@ -35,6 +90,10 @@
   margin-bottom: 6px;
   cursor: grab;
   touch-action: none;
+}
+
+.resource-hud.is-docked .hud-head {
+  cursor: default;
 }
 
 .hud-head:active {
@@ -53,13 +112,12 @@
   white-space: nowrap;
 }
 
-.hud-drag,
-.hud-collapse {
+.hud-btn {
   flex: 0 0 auto;
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.18));
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
@@ -67,19 +125,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  touch-action: none;
 }
 
-.hud-drag {
-  cursor: grab;
+.hud-btn.tiny {
+  width: 24px;
+  height: 24px;
 }
 
-.hud-drag:active {
-  cursor: grabbing;
-}
-
-.hud-drag .material-icons,
-.hud-collapse .material-icons {
+.hud-btn .material-icons {
   font-size: 18px;
   line-height: 1;
 }
@@ -90,18 +143,150 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
+  color: var(--udon-hud-muted, rgba(243, 235, 224, 0.7));
 }
 
-.char-block + .char-block {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+.char-block {
+  position: relative;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+}
+/* Parallelogram fill is decorative only — hitbox stays rectangular */
+.char-block::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.18);
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+.char-block > * {
+  position: relative;
+  z-index: 1;
+}
+
+.char-block.is-turn::before {
+  background: var(--udon-hud-bg-active, rgba(36, 32, 26, 0.94));
+  box-shadow: inset 0 0 0 1px var(--udon-hud-accent, #ffb454);
+}
+.char-block.is-turn {
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+/* Active hierarchy only matters in combat; idle claimed stays full size */
+.resource-hud.is-in-combat .char-block.is-mine:not(.is-turn) {
+  opacity: 0.95;
+  transform: scale(0.96);
+  transform-origin: right center;
+}
+
+.resource-hud.is-in-combat .char-block.is-other {
+  opacity: 0.78;
+  transform: scale(0.9);
+  transform-origin: right center;
+  padding: 4px 8px;
+}
+
+.char-block.is-other {
+  opacity: 0.85;
+}
+
+.char-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
 }
 
 .char-name {
+  flex: 1 1 auto;
   font-weight: 700;
-  margin-bottom: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.gauge-label {
+  flex: 0 0 1.8em;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--udon-hud-muted, rgba(243, 235, 224, 0.7));
+}
+
+.gauge {
+  position: relative;
+  flex: 1 1 auto;
+  height: 14px;
+  background: transparent;
+  overflow: hidden;
+}
+.gauge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--udon-bar-hp-track, rgba(0, 0, 0, 0.35));
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+
+.gauge.mp {
+  flex: 0 1 88px;
+}
+.gauge.mp::before {
+  background: var(--udon-bar-mp-track, rgba(0, 0, 0, 0.35));
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  background: var(--udon-bar-hp, #3d9a5f);
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+
+.gauge.mp .gauge-fill {
+  background: var(--udon-bar-mp, #4a7ec8);
+}
+
+.gauge-text {
+  position: relative;
+  z-index: 1;
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.mp-row .gauge {
+  height: 12px;
+}
+
+.mp-row .gauge-text {
+  line-height: 12px;
+}
+
+.expand-panel {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.1));
+  max-height: 160px;
+  overflow: auto;
 }
 
 .res-row {
@@ -116,14 +301,14 @@
   font-weight: 600;
 }
 
-.res-row input[type="range"] {
+.res-row input[type='range'] {
   flex: 1;
-  min-width: 60px;
+  min-width: 48px;
 }
 
 .res-num {
   width: 3.2em;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.2));
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.25);
   color: inherit;
@@ -138,7 +323,7 @@
 .btn-nudge {
   width: 22px;
   height: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.2));
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;

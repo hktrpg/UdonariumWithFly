@@ -1828,7 +1828,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const target = e.target as Element | null;
     // Fixed chrome / HUDs sit above the table — never show the browser menu there.
     if (target?.closest?.(
-      '.map-zoom-hud, .map-action-hud, .music-hud, .resource-hud, .path-move-hud, .debug-pose, .mobile-bottom-nav, .mobile-side-rail, .is-mobile-action-sheet',
+      '.map-zoom-hud, .map-action-hud, .music-hud, .resource-hud, .combat-rail, .path-move-hud, .debug-pose, .mobile-bottom-nav, .mobile-side-rail, .is-mobile-action-sheet',
     )) {
       e.preventDefault();
       return;

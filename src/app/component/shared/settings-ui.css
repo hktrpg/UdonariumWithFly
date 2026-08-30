@@ -6,7 +6,7 @@
 .settings-ui {
   display: block;
   font-size: 12px;
-  color: #3a2f24;
+  color: var(--udon-settings-ink, #3a2f24);
   /* Note-inventory density: default content should fit default panel height. */
   --udon-settings-gap: 4px;
   --udon-settings-pad: 5px 7px;
@@ -105,9 +105,9 @@
 }
 
 .card {
-  border: 1px solid #d2c2ab;
+  border: 1px solid var(--udon-settings-card-border, #d2c2ab);
   border-radius: 5px;
-  background: linear-gradient(180deg, #fffaf2 0%, #f7efe3 100%);
+  background: var(--udon-settings-card-bg, linear-gradient(180deg, #fffaf2 0%, #f7efe3 100%));
   padding: var(--udon-settings-pad, 5px 7px);
 }
 

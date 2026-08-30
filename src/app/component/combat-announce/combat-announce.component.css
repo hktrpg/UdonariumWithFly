@@ -12,26 +12,40 @@
 .combat-announce-glow {
   position: absolute;
   inset: -18px -40px;
-  background: radial-gradient(ellipse at center, rgba(255, 170, 64, 0.35) 0%, rgba(255, 120, 40, 0.12) 45%, transparent 70%);
+  background: radial-gradient(ellipse at center, var(--udon-announce-glow, rgba(255, 170, 64, 0.35)) 0%, transparent 70%);
   filter: blur(8px);
   animation: combat-announce-pulse 1.4s ease-in-out infinite;
 }
 
 .combat-announce-bar {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   padding: 14px 36px 16px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 196, 120, 0.45);
-  background:
-    linear-gradient(180deg, rgba(36, 28, 18, 0.92) 0%, rgba(18, 14, 10, 0.94) 100%);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--udon-announce-text, #ffe7c2);
+  font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  letter-spacing: 0.06em;
+}
+.combat-announce-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 4px;
+  border: 1px solid var(--udon-announce-border, rgba(255, 196, 120, 0.45));
+  background: var(--udon-announce-bg, linear-gradient(180deg, rgba(36, 28, 18, 0.92) 0%, rgba(18, 14, 10, 0.94) 100%));
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.45),
     0 12px 36px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 220, 160, 0.18);
-  color: #ffe7c2;
-  font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
-  letter-spacing: 0.06em;
+  transform: skewX(calc(var(--udon-hud-skew, 0deg) * 0.4));
+}
+.combat-announce-bar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .combat-announce-shine {
@@ -48,7 +62,7 @@
 .combat-announce-label {
   font-size: 12px;
   font-weight: 600;
-  color: #ffb454;
+  color: var(--udon-announce-accent, #ffb454);
   text-transform: uppercase;
   letter-spacing: 0.28em;
   margin-bottom: 4px;
@@ -65,37 +79,37 @@
 .combat-announce-round-prefix {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(255, 214, 160, 0.7);
+  color: color-mix(in srgb, var(--udon-announce-accent, #ffb454) 70%, transparent);
   letter-spacing: 0.2em;
 }
 
 .combat-announce-round-num {
   font-size: 42px;
   font-weight: 800;
-  color: #fff6e8;
-  text-shadow: 0 0 18px rgba(255, 170, 64, 0.55);
+  color: var(--udon-announce-text, #ffe7c2);
+  text-shadow: 0 0 18px var(--udon-announce-glow, rgba(255, 170, 64, 0.55));
   animation: combat-announce-num 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .combat-announce-round-suffix {
   font-size: 18px;
   font-weight: 700;
-  color: #ffd9a0;
+  color: var(--udon-announce-accent, #ffb454);
 }
 
 .combat-announce-name {
   margin-top: 8px;
   font-size: 12px;
-  color: rgba(255, 230, 196, 0.72);
+  color: color-mix(in srgb, var(--udon-announce-text, #ffe7c2) 72%, transparent);
   letter-spacing: 0.12em;
 }
 
 .combat-announce[data-kind='begin'] .combat-announce-bar {
-  border-color: rgba(255, 120, 72, 0.55);
+  border-color: var(--udon-hud-accent, #ffb454);
 }
 
 .combat-announce[data-kind='begin'] .combat-announce-label {
-  color: #ff8a4a;
+  color: var(--udon-hud-accent, #ffb454);
 }
 
 @keyframes combat-announce-shine {

@@ -5,10 +5,26 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { CharacterToken } from '@udonarium/character-token';
 import { DataElement } from '@udonarium/data-element';
 import { GameCharacter } from '@udonarium/game-character';
+import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { CombatTracker, CombatantData } from '@udonarium/table-fx/combat-tracker';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import {
+  isCombatSurfaceDocked,
+  loadCombatSurfaceDocked,
+  onCombatSurfaceDockedChange,
+  toggleCombatSurfaceDocked,
+} from 'service/combat-surface-prefs';
 
 import * as localForage from 'localforage';
+
+export type PartyTier = 'turn' | 'mine' | 'other';
+
+export interface PartyRow {
+  character: GameCharacter;
+  tier: PartyTier;
+  combatant?: CombatantData;
+}
 
 @Component({
   selector: 'character-resource-hud',
@@ -27,42 +43,60 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   left = 12;
   top = 72;
   collapsed = false;
+  docked = true;
+  expandedCharId: string | null = null;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
   private dragging = false;
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
   private mobileSub: { unsubscribe: () => void } | null = null;
+  private unsubDock: (() => void) | null = null;
   private charactersSignature = '';
 
-  /** Forced off on mobile — use character sheet instead. */
+  /** Shown when toggled on (desktop + compact mobile dock). */
   get visible(): boolean {
-    return CharacterResourceHudComponent.isVisible && !this.mobileLayout.isMobile;
+    return CharacterResourceHudComponent.isVisible;
   }
   get showAllForGm(): boolean { return CharacterResourceHudComponent.showAllForGm; }
   get isGm(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
-  get isGuest(): boolean { return Network.GuestMode(); }
+  get isGuest(): boolean { return GuestSession.isGuest; }
   get canEdit(): boolean { return !this.isGuest; }
+  get isMobile(): boolean { return this.mobileLayout.isMobile; }
 
   get claimed(): GameCharacter | null {
     return GameCharacter.preferredChatCharacter();
   }
 
-  get characters(): GameCharacter[] {
-    if (this.isGm && this.showAllForGm) {
-      // Bodies are off-table; list unique sheets that have a visible Token on the current view.
-      const seen = new Set<string>();
-      const out: GameCharacter[] = [];
-      for (const tok of ObjectStore.instance.getObjects(CharacterToken)) {
-        if (!tok.isVisibleOnTable || tok.isTemporaryCopy) continue;
-        const body = tok.character;
-        if (!body || body.isTemporaryCopy || seen.has(body.identifier)) continue;
-        seen.add(body.identifier);
-        out.push(body);
+  get inCombat(): boolean {
+    return !!CombatTracker.instance.activeEncounter?.isStarted;
+  }
+
+  get partyRows(): PartyRow[] {
+    const claimed = this.claimed;
+    const encounter = CombatTracker.instance.activeEncounter;
+    if (encounter?.isStarted) {
+      const turn = CombatTracker.instance.currentCombatant();
+      const rows: PartyRow[] = [];
+      for (const c of encounter.combatants) {
+        if (!this.isGm && c.isHidden) continue;
+        const ch = ObjectStore.instance.get<GameCharacter>(c.characterIdentifier);
+        if (!ch) continue;
+        let tier: PartyTier = 'other';
+        if (turn && c.id === turn.id) tier = 'turn';
+        else if (claimed && ch.identifier === claimed.identifier) tier = 'mine';
+        rows.push({ character: ch, tier, combatant: c });
       }
-      return out;
+      rows.sort((a, b) => this.tierRank(a.tier) - this.tierRank(b.tier));
+      return rows;
     }
-    const mine = this.claimed;
-    return mine ? [mine] : [];
+    return this.idleCharacters().map(ch => ({
+      character: ch,
+      tier: (claimed && ch.identifier === claimed.identifier ? 'mine' : 'other') as PartyTier,
+    }));
+  }
+
+  get characters(): GameCharacter[] {
+    return this.partyRows.map(r => r.character);
   }
 
   constructor(
@@ -72,11 +106,22 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.mobileSub = this.mobileLayout.isMobile$.subscribe(() => this.changeDetector.markForCheck());
+    this.unsubDock = onCombatSurfaceDockedChange(() => {
+      this.docked = isCombatSurfaceDocked();
+      this.changeDetector.markForCheck();
+    });
+    loadCombatSurfaceDocked().then(v => {
+      this.docked = v;
+      this.changeDetector.markForCheck();
+    });
     localForage.getItem(CharacterResourceHudComponent.VISIBLE_KEY).then(v => {
       if (typeof v === 'boolean') {
         CharacterResourceHudComponent.isVisible = v;
-        this.changeDetector.markForCheck();
+      } else if (this.isMobile) {
+        // Plan: mobile defaults to compact Party Status visible
+        CharacterResourceHudComponent.isVisible = true;
       }
+      this.changeDetector.markForCheck();
     });
     localForage.getItem(CharacterResourceHudComponent.GM_ALL_KEY).then(v => {
       if (typeof v === 'boolean') {
@@ -109,6 +154,8 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.mobileSub?.unsubscribe();
     this.mobileSub = null;
+    this.unsubDock?.();
+    this.unsubDock = null;
     EventSystem.unregister(this);
     document.removeEventListener('pointermove', this.onPointerMove);
     document.removeEventListener('pointerup', this.onPointerUp);
@@ -134,15 +181,50 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     localForage.setItem(CharacterResourceHudComponent.COLLAPSED_KEY, this.collapsed).catch(() => {});
   }
 
+  toggleDocked() {
+    toggleCombatSurfaceDocked();
+  }
+
+  toggleExpand(ch: GameCharacter) {
+    this.expandedCharId = this.expandedCharId === ch.identifier ? null : ch.identifier;
+  }
+
+  isExpanded(ch: GameCharacter): boolean {
+    return this.expandedCharId === ch.identifier;
+  }
+
   resourcesOf(ch: GameCharacter): DataElement[] {
     if (!ch?.detailDataElement) return [];
     return ch.detailDataElement.getElementsByType('numberResource');
   }
 
+  hpOf(ch: GameCharacter): DataElement | null {
+    return this.findResource(ch, 'HP') || this.findResource(ch, 'hp');
+  }
+
+  mpOf(ch: GameCharacter): DataElement | null {
+    return this.findResource(ch, 'MP') || this.findResource(ch, 'mp');
+  }
+
+  otherResourcesOf(ch: GameCharacter): DataElement[] {
+    return this.resourcesOf(ch).filter(el => {
+      const n = (el.name || '').toLowerCase();
+      return n !== 'hp' && n !== 'mp';
+    });
+  }
+
+  barPct(el: DataElement | null): number {
+    if (!el) return 0;
+    const max = this.max(el);
+    if (max <= 0) return 0;
+    return Math.max(0, Math.min(100, (this.current(el) / max) * 100));
+  }
+
   canEditCharacter(ch: GameCharacter): boolean {
     if (!this.canEdit) return false;
     if (this.isGm) return true;
-    return ch.playerOwner === Network.peer?.userId;
+    const userId = Network.peer?.userId;
+    return !!userId && ch.isControlledBy(userId);
   }
 
   current(el: DataElement): number {
@@ -174,7 +256,8 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
   }
 
   startDrag(event: PointerEvent) {
-    if ((event.target as HTMLElement).closest('button.hud-collapse, label, input')) return;
+    if (this.docked) return;
+    if ((event.target as HTMLElement).closest('button, label, input')) return;
     event.preventDefault();
     event.stopPropagation();
     this.dragging = true;
@@ -183,8 +266,35 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     (event.currentTarget as HTMLElement)?.setPointerCapture?.(event.pointerId);
   }
 
+  private idleCharacters(): GameCharacter[] {
+    if (this.isGm && this.showAllForGm) {
+      const seen = new Set<string>();
+      const out: GameCharacter[] = [];
+      for (const tok of ObjectStore.instance.getObjects(CharacterToken)) {
+        if (!tok.isVisibleOnTable || tok.isTemporaryCopy) continue;
+        const body = tok.character;
+        if (!body || body.isTemporaryCopy || seen.has(body.identifier)) continue;
+        seen.add(body.identifier);
+        out.push(body);
+      }
+      return out;
+    }
+    const mine = this.claimed;
+    return mine ? [mine] : [];
+  }
+
+  private findResource(ch: GameCharacter, name: string): DataElement | null {
+    return ch?.detailDataElement?.getFirstElementByName(name) || null;
+  }
+
+  private tierRank(tier: PartyTier): number {
+    if (tier === 'turn') return 0;
+    if (tier === 'mine') return 1;
+    return 2;
+  }
+
   private onPointerMove = (event: PointerEvent) => {
-    if (!this.dragging) return;
+    if (!this.dragging || this.docked) return;
     this.left = event.clientX - this.dragOffsetX;
     this.top = event.clientY - this.dragOffsetY;
     this.clampToViewport();
@@ -218,8 +328,7 @@ export class CharacterResourceHudComponent implements OnInit, OnDestroy {
     this.lazyUpdateTimer = setTimeout(() => {
       this.lazyUpdateTimer = null;
       if (!this.visible) return;
-      const signature = this.characters.map(ch => ch.identifier).join('\0');
-      if (signature === this.charactersSignature) return;
+      const signature = this.partyRows.map(r => `${r.character.identifier}:${r.tier}`).join('\0');
       this.charactersSignature = signature;
       this.changeDetector.markForCheck();
     }, 80);

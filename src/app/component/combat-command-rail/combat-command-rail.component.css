@@ -1,0 +1,160 @@
+:host {
+  pointer-events: none;
+}
+
+.combat-rail {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 40;
+  min-width: 160px;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 8px 8px;
+  background: var(--udon-hud-bg, rgba(28, 24, 20, 0.88));
+  color: var(--udon-hud-text, #f3ebe0);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--udon-hud-radius, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  user-select: none;
+  backdrop-filter: blur(var(--udon-panel-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--udon-panel-blur, 0px));
+}
+
+.combat-rail.is-docked {
+  left: 12px;
+  bottom: calc(var(--udon-bottom-chrome, 0px) + 12px);
+  right: auto;
+  top: auto;
+}
+
+.combat-rail.is-docked.is-mobile {
+  left: calc(var(--udon-left-chrome, 0px) + 8px);
+  bottom: calc(var(--udon-bottom-chrome, 56px) + 8px);
+  min-width: 0;
+  max-width: min(200px, calc(100vw - 24px));
+}
+
+/* Decorative remake/expedition shell — rectangular hitbox for drag / buttons */
+:host-context(html[data-ui-theme='remake']) .combat-rail,
+:host-context(html[data-ui-theme='expedition']) .combat-rail {
+  border-radius: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+:host-context(html[data-ui-theme='remake']) .combat-rail::before,
+:host-context(html[data-ui-theme='expedition']) .combat-rail::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--udon-hud-bg, rgba(28, 24, 20, 0.88));
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.12));
+}
+:host-context(html[data-ui-theme='remake']) .combat-rail::before {
+  inset: 0;
+  transform: skewX(var(--udon-hud-skew, -10deg));
+  box-shadow:
+    0 0 0 1px var(--udon-hud-accent, #5ec8ff),
+    0 10px 28px rgba(0, 40, 80, 0.45);
+}
+:host-context(html[data-ui-theme='expedition']) .combat-rail::before {
+  inset: -2px -6px -4px -2px;
+  clip-path: polygon(
+    0 4%, 8% 0, 100% 2%, 98% 96%, 90% 100%,
+    2% 98%, 0 88%
+  );
+}
+
+.rail-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  cursor: grab;
+  touch-action: none;
+}
+
+.combat-rail.is-docked .rail-head {
+  cursor: default;
+}
+
+.rail-head:active {
+  cursor: grabbing;
+}
+
+.rail-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-btn {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-weight: 600;
+}
+/* Parallelogram look on a non-interactive layer — hitbox stays rectangular */
+.rail-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--udon-hud-border, rgba(255, 255, 255, 0.18));
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.rail-btn.icon {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.rail-btn.icon::before {
+  clip-path: none;
+  border-radius: 4px;
+}
+
+.rail-btn.primary::before {
+  background: color-mix(in srgb, var(--udon-hud-accent, #5ec8ff) 22%, transparent);
+  border-color: var(--udon-hud-accent, #5ec8ff);
+}
+
+.rail-btn.danger::before {
+  background: rgba(196, 60, 60, 0.18);
+  border-color: rgba(220, 100, 100, 0.45);
+}
+
+.rail-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rail-btn .material-icons {
+  font-size: 18px;
+}

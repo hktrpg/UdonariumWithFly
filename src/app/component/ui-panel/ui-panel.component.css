@@ -7,9 +7,12 @@
   overflow: visible;
   position: absolute;
 
-  color: #444;
-  background: linear-gradient(-30deg, rgba(240,218,189, 0.9), rgba(255, 244, 232, 0.9));
-  border: solid 1px #999;
+  color: var(--udon-panel-text, #444);
+  background: var(--udon-panel-body, linear-gradient(-30deg, rgba(240,218,189, 0.9), rgba(255, 244, 232, 0.9)));
+  border: solid 1px var(--udon-panel-border, #999);
+  border-radius: var(--udon-panel-radius, 0);
+  backdrop-filter: blur(var(--udon-panel-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--udon-panel-blur, 0px));
 
   padding: 0px;
   top: 200px;
@@ -40,12 +43,70 @@
   font-size: 12px;
   height: 25px;
   width: 100%;
-  background-color: #555;
-  color: #CCC;
+  background-color: var(--udon-panel-title, #555);
+  color: var(--udon-panel-title-text, #CCC);
   user-select: none;
   cursor: grab;
 
   display: flex;
+  position: relative;
+}
+
+/* Decorative slant — hitbox stays axis-aligned; fill lives on ::before so skew is visible */
+.title::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--udon-panel-title, #555);
+  transform: skewX(var(--udon-panel-skew, 0deg));
+  transform-origin: left center;
+  z-index: 0;
+}
+:host-context(html[data-ui-theme='remake']) .title,
+:host-context(html[data-ui-theme='expedition']) .title {
+  background-color: transparent;
+}
+:host-context(html[data-ui-theme='remake']) .title::before {
+  box-shadow: 0 0 0 1px var(--udon-panel-border, rgba(100, 180, 255, 0.4));
+}
+.title-text,
+.title-button,
+.title button {
+  position: relative;
+  z-index: 1;
+}
+
+:host-context(html[data-ui-theme='expedition']) .draggable-panel {
+  border-color: transparent;
+  box-shadow: none;
+}
+:host-context(html[data-ui-theme='expedition']) .draggable-panel::before {
+  content: '';
+  position: absolute;
+  inset: -3px -5px -4px -3px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--udon-panel-body, rgba(12, 10, 8, 0.94));
+  border: 1px solid var(--udon-panel-border, rgba(196, 160, 80, 0.45));
+  clip-path: polygon(
+    1% 0, 97% 1%, 100% 6%, 99% 94%, 96% 100%,
+    3% 99%, 0 92%, 1% 5%
+  );
+}
+:host-context(html[data-ui-theme='remake']) .draggable-panel {
+  box-shadow:
+    0 0 0 1px var(--udon-panel-border, rgba(100, 180, 255, 0.4)),
+    0 12px 32px rgba(0, 30, 60, 0.4);
+}
+
+.title button {
+  background: none;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  color: var(--udon-panel-title-text, #CCC);
+  cursor: pointer;
 }
 
 .title-text {
@@ -63,15 +124,6 @@
 .title-button {
   align-self: center;
   flex-shrink: 0;
-}
-
-.title button {
-  background: none;
-  border: none;
-  border-radius: 0;
-  outline: none;
-  color: #CCC;
-  cursor: pointer;
 }
 
 .pointer-events-none {
@@ -113,8 +165,7 @@
 }
 
 .draggable-panel.i-am-gm {
-  background: linear-gradient(-30deg, rgba(240, 208, 208, 0.9), rgba(255, 236, 236, 0.9));
-  /*background: linear-gradient(-30deg, rgba(240,218,189, 0.9), rgba(255, 244, 232, 0.9));*/
+  background: var(--udon-panel-body-gm, linear-gradient(-30deg, rgba(240, 208, 208, 0.9), rgba(255, 236, 236, 0.9)));
 }
 
 /* Phone/tablet sheets: leave room for bottom nav; nav sits above sheets.
@@ -133,7 +184,7 @@
   z-index: 12000;
   transition: height 120ms ease-out, max-height 120ms ease-out, bottom 120ms ease-out;
   /* Classic cream body (PeerMenu etc.); only the title bar uses dark chrome. */
-  background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1)) !important;
+  background: var(--udon-panel-body, linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1))) !important;
   border: 1px solid var(--udon-chrome-border, #555) !important;
   border-top: 1px solid var(--udon-chrome-border, #555);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
@@ -144,7 +195,7 @@
 }
 
 .draggable-panel.is-mobile-sheet.i-am-gm {
-  background: linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1)) !important;
+  background: var(--udon-panel-body-gm, linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1))) !important;
 }
 
 .draggable-panel.is-mobile-sheet .title {
@@ -201,7 +252,7 @@
 }
 
 .draggable-panel.is-mobile-sheet .scrollable-panel {
-  color: #444;
+  color: var(--udon-panel-text, #444);
   position: relative;
   top: auto;
   bottom: auto;
@@ -212,12 +263,12 @@
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
-  /* Opaque cream so PeerMenu / combat / etc. stay readable. */
-  background: linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1));
+  /* Opaque body so PeerMenu / combat / etc. stay readable under themes. */
+  background: var(--udon-panel-body, linear-gradient(-30deg, rgba(240, 218, 189, 1), rgba(255, 244, 232, 1)));
 }
 
 .draggable-panel.is-mobile-sheet.i-am-gm .scrollable-panel {
-  background: linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1));
+  background: var(--udon-panel-body-gm, linear-gradient(-30deg, rgba(240, 208, 208, 1), rgba(255, 236, 236, 1)));
 }
 
 /* Custom resize: no height transition fighting the pointer. */

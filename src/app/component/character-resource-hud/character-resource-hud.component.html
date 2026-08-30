@@ -1,7 +1,14 @@
-<div class="resource-hud" *ngIf="visible" [class.is-collapsed]="collapsed" [style.left.px]="left" [style.top.px]="top"
+<div class="resource-hud"
+  *ngIf="visible"
+  [class.is-collapsed]="collapsed"
+  [class.is-docked]="docked"
+  [class.is-mobile]="isMobile"
+  [class.is-in-combat]="inCombat"
+  [style.left.px]="docked ? null : left"
+  [style.top.px]="docked ? null : top"
   (contextmenu)="$event.preventDefault()">
   <header class="hud-head" (pointerdown)="startDrag($event)">
-    <button type="button" class="hud-drag" [attr.title]="'resourceHud.move' | i18n" [attr.aria-label]="'resourceHud.move' | i18n">
+    <button *ngIf="!docked" type="button" class="hud-btn" [attr.title]="'resourceHud.move' | i18n" [attr.aria-label]="'resourceHud.move' | i18n">
       <i class="material-icons">drag_indicator</i>
     </button>
     <span class="hud-title">{{ 'resourceHud.title' | i18n }}</span>
@@ -9,36 +16,69 @@
       <input type="checkbox" [checked]="showAllForGm" (change)="toggleShowAll()" />
       {{ 'resourceHud.showAll' | i18n }}
     </label>
-    <button type="button" class="hud-collapse" (pointerdown)="$event.stopPropagation()" (click)="toggleCollapsed()" [attr.title]="(collapsed ? 'resourceHud.expand' : 'resourceHud.collapse') | i18n">
+    <button type="button" class="hud-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleDocked()"
+      [attr.title]="(docked ? 'resourceHud.undock' : 'resourceHud.dock') | i18n">
+      <i class="material-icons">{{ docked ? 'push_pin' : 'pin_drop' }}</i>
+    </button>
+    <button type="button" class="hud-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleCollapsed()"
+      [attr.title]="(collapsed ? 'resourceHud.expand' : 'resourceHud.collapse') | i18n">
       <i class="material-icons">{{ collapsed ? 'expand_more' : 'expand_less' }}</i>
     </button>
   </header>
-  <ng-container *ngIf="!collapsed">
-    <p class="empty" *ngIf="!characters.length">{{ 'resourceHud.noClaim' | i18n }}</p>
-    <section class="char-block" *ngFor="let ch of characters">
-      <div class="char-name">{{ ch.name }}</div>
-      <div class="res-row" *ngFor="let el of resourcesOf(ch)">
-        <span class="res-label">{{ el.name }}</span>
-        <button type="button" class="btn-nudge" (click)="nudge(el, ch, -1)" [disabled]="!canEditCharacter(ch)">−</button>
-        <input
-          type="range"
-          [min]="0"
-          [max]="max(el) || 1"
-          [value]="current(el)"
-          (input)="onRange(el, ch, $event)"
-          [disabled]="!canEditCharacter(ch)"
-        />
-        <input
-          type="number"
-          class="res-num"
-          [ngModel]="current(el)"
-          (ngModelChange)="setCurrent(el, ch, $event)"
-          [disabled]="!canEditCharacter(ch)"
-        />
-        <span class="res-max">/ {{ max(el) }}</span>
-        <button type="button" class="btn-nudge" (click)="nudge(el, ch, 1)" [disabled]="!canEditCharacter(ch)">+</button>
+
+  <div class="hud-body" *ngIf="!collapsed">
+    <p class="empty" *ngIf="!partyRows.length">{{ 'resourceHud.noClaim' | i18n }}</p>
+    <section class="char-block"
+      *ngFor="let row of partyRows"
+      [class.is-turn]="row.tier === 'turn'"
+      [class.is-mine]="row.tier === 'mine'"
+      [class.is-other]="row.tier === 'other'">
+      <div class="char-head">
+        <div class="char-name">{{ row.character.name }}</div>
+        <button type="button" class="hud-btn tiny" *ngIf="otherResourcesOf(row.character).length"
+          (click)="toggleExpand(row.character)"
+          [attr.title]="'resourceHud.moreResources' | i18n">
+          <i class="material-icons">{{ isExpanded(row.character) ? 'expand_less' : 'more_horiz' }}</i>
+        </button>
       </div>
-      <p class="empty" *ngIf="!resourcesOf(ch).length">{{ 'resourceHud.noResources' | i18n }}</p>
+
+      <div class="gauge-row" *ngIf="hpOf(row.character) as hp">
+        <span class="gauge-label">HP</span>
+        <div class="gauge hp">
+          <div class="gauge-fill" [style.width.%]="barPct(hp)"></div>
+          <span class="gauge-text">{{ current(hp) }} / {{ max(hp) }}</span>
+        </div>
+        <ng-container *ngIf="!isMobile && canEditCharacter(row.character)">
+          <button type="button" class="btn-nudge" (click)="nudge(hp, row.character, -1)">−</button>
+          <button type="button" class="btn-nudge" (click)="nudge(hp, row.character, 1)">+</button>
+        </ng-container>
+      </div>
+
+      <div class="gauge-row mp-row" *ngIf="mpOf(row.character) as mp">
+        <span class="gauge-label">MP</span>
+        <div class="gauge mp">
+          <div class="gauge-fill" [style.width.%]="barPct(mp)"></div>
+          <span class="gauge-text">{{ current(mp) }}</span>
+        </div>
+        <ng-container *ngIf="!isMobile && canEditCharacter(row.character)">
+          <button type="button" class="btn-nudge" (click)="nudge(mp, row.character, -1)">−</button>
+          <button type="button" class="btn-nudge" (click)="nudge(mp, row.character, 1)">+</button>
+        </ng-container>
+      </div>
+
+      <div class="expand-panel" *ngIf="isExpanded(row.character)">
+        <div class="res-row" *ngFor="let el of otherResourcesOf(row.character)">
+          <span class="res-label">{{ el.name }}</span>
+          <button type="button" class="btn-nudge" (click)="nudge(el, row.character, -1)" [disabled]="!canEditCharacter(row.character)">−</button>
+          <input type="range" [min]="0" [max]="max(el) || 1" [value]="current(el)"
+            (input)="onRange(el, row.character, $event)" [disabled]="!canEditCharacter(row.character)" />
+          <input type="number" class="res-num" [ngModel]="current(el)"
+            (ngModelChange)="setCurrent(el, row.character, $event)" [disabled]="!canEditCharacter(row.character)" />
+          <span class="res-max">/ {{ max(el) }}</span>
+          <button type="button" class="btn-nudge" (click)="nudge(el, row.character, 1)" [disabled]="!canEditCharacter(row.character)">+</button>
+        </div>
+        <p class="empty" *ngIf="!otherResourcesOf(row.character).length">{{ 'resourceHud.noResources' | i18n }}</p>
+      </div>
     </section>
-  </ng-container>
+  </div>
 </div>

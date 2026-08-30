@@ -4,6 +4,138 @@
   --udon-control-border: #c4b29a;
   --udon-control-radius: 4px;
   --udon-control-bg: #fff;
+
+  /* Panel / chrome (classic cream — default tokens; themes override below) */
+  --udon-panel-body: linear-gradient(-30deg, rgba(240, 218, 189, 0.9), rgba(255, 244, 232, 0.9));
+  --udon-panel-body-gm: linear-gradient(-30deg, rgba(240, 208, 208, 0.9), rgba(255, 236, 236, 0.9));
+  --udon-panel-title: #555;
+  --udon-panel-title-text: #ccc;
+  --udon-panel-border: #999;
+  --udon-panel-text: #444;
+  --udon-panel-radius: 0px;
+  --udon-panel-blur: 0px;
+  --udon-panel-skew: 0deg;
+  --udon-panel-clip: none;
+
+  /* Mobile / map HUD chrome (also used on desktop HUDs) */
+  --udon-chrome-bg: rgba(36, 36, 36, 0.96);
+  --udon-chrome-bg-solid: #2a2a2a;
+  --udon-chrome-title: #1f1f1f;
+  --udon-chrome-border: #555;
+  --udon-chrome-text: #e8e8e8;
+  --udon-chrome-muted: #aaa;
+  --udon-chrome-active: rgba(255, 255, 255, 0.1);
+  --udon-chrome-radius: 12px;
+
+  /* Combat / floating HUD */
+  --udon-hud-bg: rgba(28, 24, 20, 0.88);
+  --udon-hud-bg-active: rgba(36, 32, 26, 0.94);
+  --udon-hud-text: #f3ebe0;
+  --udon-hud-muted: rgba(243, 235, 224, 0.7);
+  --udon-hud-border: rgba(255, 255, 255, 0.12);
+  --udon-hud-accent: #ffb454;
+  --udon-hud-radius: 8px;
+  --udon-hud-skew: 0deg;
+  --udon-bar-hp: #3d9a5f;
+  --udon-bar-hp-track: rgba(0, 0, 0, 0.35);
+  --udon-bar-mp: #4a7ec8;
+  --udon-bar-mp-track: rgba(0, 0, 0, 0.35);
+  --udon-announce-bg: linear-gradient(180deg, rgba(36, 28, 18, 0.92) 0%, rgba(18, 14, 10, 0.94) 100%);
+  --udon-announce-border: rgba(255, 196, 120, 0.45);
+  --udon-announce-text: #ffe7c2;
+  --udon-announce-accent: #ffb454;
+  --udon-announce-glow: rgba(255, 170, 64, 0.35);
+
+  /* Settings cards */
+  --udon-settings-card-bg: linear-gradient(180deg, #fffaf2, #f7efe3);
+  --udon-settings-card-border: #d2c2ab;
+  --udon-settings-ink: #3a2f24;
+}
+
+/* Remake — glass + neon blue parallelograms */
+html[data-ui-theme='remake'] {
+  --udon-control-border: rgba(120, 180, 255, 0.45);
+  --udon-control-bg: rgba(12, 24, 40, 0.72);
+  --udon-panel-body: linear-gradient(135deg, rgba(18, 36, 64, 0.82), rgba(10, 22, 42, 0.88));
+  --udon-panel-body-gm: linear-gradient(135deg, rgba(40, 28, 56, 0.84), rgba(18, 24, 48, 0.9));
+  --udon-panel-title: rgba(20, 48, 88, 0.92);
+  --udon-panel-title-text: #d8ecff;
+  --udon-panel-border: rgba(100, 180, 255, 0.4);
+  --udon-panel-text: #e8f2ff;
+  --udon-panel-radius: 2px;
+  --udon-panel-blur: 8px;
+  --udon-panel-skew: -8deg;
+  --udon-chrome-bg: rgba(12, 28, 48, 0.88);
+  --udon-chrome-bg-solid: #0e1c30;
+  --udon-chrome-title: #0a1628;
+  --udon-chrome-border: rgba(90, 170, 255, 0.35);
+  --udon-chrome-text: #e4f0ff;
+  --udon-chrome-muted: #8eb4d8;
+  --udon-chrome-active: rgba(80, 170, 255, 0.18);
+  --udon-chrome-radius: 4px;
+  --udon-hud-bg: rgba(10, 28, 52, 0.78);
+  --udon-hud-bg-active: rgba(14, 42, 78, 0.9);
+  --udon-hud-text: #f0f7ff;
+  --udon-hud-muted: rgba(200, 224, 255, 0.72);
+  --udon-hud-border: rgba(100, 190, 255, 0.45);
+  --udon-hud-accent: #5ec8ff;
+  --udon-hud-radius: 0;
+  --udon-hud-skew: -10deg;
+  --udon-bar-hp: #3eb8ff;
+  --udon-bar-hp-track: rgba(0, 40, 80, 0.55);
+  --udon-bar-mp: #6a9cff;
+  --udon-bar-mp-track: rgba(0, 30, 70, 0.55);
+  --udon-announce-bg: linear-gradient(180deg, rgba(12, 36, 68, 0.92), rgba(6, 18, 36, 0.94));
+  --udon-announce-border: rgba(90, 190, 255, 0.5);
+  --udon-announce-text: #e8f4ff;
+  --udon-announce-accent: #5ec8ff;
+  --udon-announce-glow: rgba(64, 170, 255, 0.4);
+  --udon-settings-card-bg: linear-gradient(180deg, rgba(20, 40, 68, 0.92), rgba(12, 28, 48, 0.94));
+  --udon-settings-card-border: rgba(90, 160, 220, 0.35);
+  --udon-settings-ink: #d8e8f8;
+}
+
+/* Expedition — ink + gold brushstroke */
+html[data-ui-theme='expedition'] {
+  --udon-control-border: rgba(180, 150, 90, 0.55);
+  --udon-control-bg: rgba(18, 16, 14, 0.88);
+  --udon-panel-body: linear-gradient(160deg, rgba(22, 18, 14, 0.94), rgba(10, 8, 6, 0.96));
+  --udon-panel-body-gm: linear-gradient(160deg, rgba(36, 22, 16, 0.94), rgba(16, 10, 8, 0.96));
+  --udon-panel-title: #1a1410;
+  --udon-panel-title-text: #e8d5a8;
+  --udon-panel-border: rgba(196, 160, 80, 0.45);
+  --udon-panel-text: #efe6d4;
+  --udon-panel-radius: 0;
+  --udon-panel-blur: 2px;
+  --udon-panel-skew: -6deg;
+  --udon-chrome-bg: rgba(16, 12, 10, 0.94);
+  --udon-chrome-bg-solid: #14100c;
+  --udon-chrome-title: #0e0a08;
+  --udon-chrome-border: rgba(180, 140, 70, 0.4);
+  --udon-chrome-text: #efe4cc;
+  --udon-chrome-muted: #a89068;
+  --udon-chrome-active: rgba(220, 170, 70, 0.16);
+  --udon-chrome-radius: 2px;
+  --udon-hud-bg: rgba(12, 10, 8, 0.9);
+  --udon-hud-bg-active: rgba(28, 22, 14, 0.94);
+  --udon-hud-text: #f2e8d4;
+  --udon-hud-muted: rgba(220, 200, 160, 0.7);
+  --udon-hud-border: rgba(200, 160, 80, 0.4);
+  --udon-hud-accent: #d4a84a;
+  --udon-hud-radius: 0;
+  --udon-hud-skew: -8deg;
+  --udon-bar-hp: #c43c3c;
+  --udon-bar-hp-track: rgba(40, 10, 10, 0.55);
+  --udon-bar-mp: #3a6aaa;
+  --udon-bar-mp-track: rgba(10, 20, 40, 0.55);
+  --udon-announce-bg: linear-gradient(180deg, rgba(24, 18, 12, 0.94), rgba(8, 6, 4, 0.96));
+  --udon-announce-border: rgba(200, 150, 60, 0.5);
+  --udon-announce-text: #f0e2c0;
+  --udon-announce-accent: #d4a84a;
+  --udon-announce-glow: rgba(200, 140, 40, 0.35);
+  --udon-settings-card-bg: linear-gradient(180deg, rgba(28, 22, 16, 0.94), rgba(14, 10, 8, 0.96));
+  --udon-settings-card-border: rgba(160, 130, 70, 0.4);
+  --udon-settings-ink: #e8dcc4;
 }
 
 select,
@@ -339,21 +471,14 @@ input {
 :root {
   /* Filled from env() so JS can read --udon-safe-bottom via getComputedStyle */
   --udon-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --udon-bottom-chrome: 56px;
+  /* Desktop: no bottom nav. MobileLayoutService sets these under .udon-mobile-layout. */
+  --udon-bottom-chrome: 0px;
   --udon-left-chrome: 0px;
   --udon-keyboard-inset: 0px;
 }
 
 html.udon-mobile-layout {
-  /* Shared mobile chrome palette (nav / sheets / menus / HUD) */
-  --udon-chrome-bg: rgba(36, 36, 36, 0.96);
-  --udon-chrome-bg-solid: #2a2a2a;
-  --udon-chrome-title: #1f1f1f;
-  --udon-chrome-border: #555;
-  --udon-chrome-text: #e8e8e8;
-  --udon-chrome-muted: #aaa;
-  --udon-chrome-active: rgba(255, 255, 255, 0.1);
-  --udon-chrome-radius: 12px;
+  /* Chrome colors come from :root / [data-ui-theme] tokens */
 }
 
 body.udon-mobile-layout {
@@ -365,10 +490,10 @@ body.udon-mobile-layout .networkIndicator {
   right: 8px;
 }
 
-body.udon-mobile-layout .resource-hud {
-  max-width: calc(100vw - 16px);
-  max-height: calc(40vh);
-  bottom: calc(var(--udon-bottom-chrome, 56px) + 8px) !important;
+/* Soft ceiling only — compact width/height come from the component (.is-mobile). */
+body.udon-mobile-layout .resource-hud.is-docked {
+  max-width: min(280px, calc(100vw - var(--udon-left-chrome, 0px) - 16px));
+  max-height: 36vh;
 }
 
 /* Drag: parent PE none is not enough — children with PE auto still receive hits and leak 3D Z into posZ. */

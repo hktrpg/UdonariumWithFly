@@ -47,8 +47,8 @@
   height: 28px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
-  background: rgba(18, 20, 24, 0.72);
-  color: #e8eaed;
+  background: var(--udon-chrome-bg, rgba(18, 20, 24, 0.72));
+  color: var(--udon-chrome-text, #e8eaed);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -69,8 +69,8 @@
   justify-content: flex-start;
   padding: 4px;
   border-radius: 8px;
-  background: rgba(18, 20, 24, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--udon-chrome-bg, rgba(18, 20, 24, 0.72));
+  border: 1px solid var(--udon-chrome-border, rgba(255, 255, 255, 0.12));
   backdrop-filter: blur(6px);
   overflow: visible;
   max-width: 100%;

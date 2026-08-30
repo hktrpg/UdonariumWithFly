@@ -1,0 +1,37 @@
+<div class="combat-rail" *ngIf="visible"
+  [class.is-docked]="docked"
+  [class.is-mobile]="isMobile"
+  [class.is-running]="inCombat"
+  [style.left.px]="docked ? null : left"
+  [style.top.px]="docked ? null : top"
+  (contextmenu)="$event.preventDefault()">
+  <header class="rail-head" (pointerdown)="startDrag($event)">
+    <span class="rail-title">{{ 'combatRail.title' | i18n }}</span>
+    <button type="button" class="rail-btn icon" (pointerdown)="$event.stopPropagation()" (click)="toggleDocked()"
+      [attr.title]="(docked ? 'combatRail.undock' : 'combatRail.dock') | i18n">
+      <i class="material-icons">{{ docked ? 'push_pin' : 'pin_drop' }}</i>
+    </button>
+  </header>
+
+  <div class="rail-actions" *ngIf="!inCombat">
+    <button type="button" class="rail-btn primary" (click)="begin()"
+      [disabled]="isGuest || !encounter?.combatants?.length">
+      <span>{{ 'combat.start' | i18n }}</span>
+    </button>
+  </div>
+
+  <div class="rail-actions" *ngIf="inCombat">
+    <button type="button" class="rail-btn primary" (click)="nextTurn()" [disabled]="isGuest">
+      <span>{{ 'combat.nextTurn' | i18n }}</span>
+    </button>
+    <button type="button" class="rail-btn primary" *ngIf="isMyCombatTurn()" (click)="endMyTurn()">
+      <span>{{ 'combat.endMyTurn' | i18n }}</span>
+    </button>
+    <button type="button" class="rail-btn" *ngIf="!isMobile" (click)="nextRound()" [disabled]="isGuest">
+      <span>{{ 'combat.nextRound' | i18n }}</span>
+    </button>
+    <button type="button" class="rail-btn danger" (click)="end()" [disabled]="isGuest">
+      <span>{{ 'combat.end' | i18n }}</span>
+    </button>
+  </div>
+</div>
