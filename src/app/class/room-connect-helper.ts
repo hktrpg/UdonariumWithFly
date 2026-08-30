@@ -1225,6 +1225,7 @@ export class RoomConnectHelper {
        */
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       let meshDataBudgetArmed = false;
+      const probeStartedAt = Date.now();
 
       const finish = (ok: boolean) => {
         if (settled) return;
@@ -1253,6 +1254,16 @@ export class RoomConnectHelper {
         ConnectionBusyService.instance?.hide();
         if (!ok) RoomConnectHelper.lastJoinFailReason = failReason || 'unknown';
         else RoomConnectHelper.lastJoinFailReason = '';
+        meshWarn('join probe: finish', {
+          ok,
+          reason: ok ? '' : (RoomConnectHelper.lastJoinFailReason || failReason || 'unknown'),
+          open: RoomConnectHelper.openPeerCount(),
+          sawTabletop: sawTabletopData,
+          meshBudgetArmed: meshDataBudgetArmed,
+          tried: tried.size,
+          targets: joinTargets.length,
+          elapsedMs: Date.now() - probeStartedAt,
+        });
         RoomConnectHelper.endJoinProbe(ok);
         if (!ok) {
           if (RoomConnectHelper.shouldSuppressLobbyRoom(RoomConnectHelper.lastJoinFailReason)) {
@@ -1273,18 +1284,38 @@ export class RoomConnectHelper {
         }
         const budgetMs = RoomConnectHelper.connectTimeoutMs();
         if (reason === 'first-peer') {
-          netDebug(`join mesh data budget armed (${budgetMs}ms after first peer)`);
+          meshWarn('join probe: mesh data budget armed', {
+            budgetMs,
+            open: RoomConnectHelper.openPeerCount(),
+            elapsedMs: Date.now() - probeStartedAt,
+          });
         }
         timeoutId = setTimeout(() => {
           timeoutId = null;
           if (settled) return;
-          console.warn('RoomConnectHelper connect timeout');
+          const open = RoomConnectHelper.openPeerCount();
           // Pre-probe behavior: first live peer means we stay in the room. Never kick a meshed client.
-          if (RoomConnectHelper.openPeerCount() >= 1) {
+          if (open >= 1) {
+            meshWarn('join probe: connect timeout while meshed — staying', {
+              open,
+              sawTabletop: sawTabletopData,
+              meshBudgetArmed: meshDataBudgetArmed,
+              elapsedMs: Date.now() - probeStartedAt,
+            });
+            console.warn('RoomConnectHelper connect timeout');
             Room.clearLocalTabletopForJoin();
             finish(true);
             return;
           }
+          meshWarn('join probe: connect timeout alone — fail', {
+            open,
+            sawTabletop: sawTabletopData,
+            meshBudgetArmed: meshDataBudgetArmed,
+            tried: tried.size,
+            targets: joinTargets.length,
+            elapsedMs: Date.now() - probeStartedAt,
+          });
+          console.warn('RoomConnectHelper connect timeout');
           failReason = 'connect_timeout';
           finish(false);
         }, budgetMs);
@@ -1442,7 +1473,15 @@ export class RoomConnectHelper {
             if (settled || event.isSendFromSelf) return;
             const aliasName = event.data?.aliasName || '';
             if (aliasName === 'PeerCursor') return;
-            if (RoomConnectHelper.isJoinTabletopData(aliasName)) sawTabletopData = true;
+            if (RoomConnectHelper.isJoinTabletopData(aliasName)) {
+              if (!sawTabletopData) {
+                meshWarn('join probe: game-table received', {
+                  open: RoomConnectHelper.openPeerCount(),
+                  elapsedMs: Date.now() - probeStartedAt,
+                });
+              }
+              sawTabletopData = true;
+            }
             if (sawTabletopData) scheduleQuiesceConfirm();
           })
           .on('NETWORK_ERROR', () => {

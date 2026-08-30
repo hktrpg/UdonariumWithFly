@@ -248,13 +248,18 @@ export class FileReceiveScheduler {
 
   /** Pause bulk file receives while a lobby join probe waits for game-table. */
   static beginJoinProbeHold(): void {
+    if (FileReceiveScheduler.joinProbeHold) return;
     FileReceiveScheduler.joinProbeHold = true;
+    console.warn('[file-sync] join probe hold — defer receives until tabletop sync');
   }
 
   /** Resume file receives after join probe settles (success or fail). */
   static endJoinProbeHold(): void {
     if (!FileReceiveScheduler.joinProbeHold) return;
     FileReceiveScheduler.joinProbeHold = false;
+    console.warn(
+      `[file-sync] join probe hold released — pending=${FileReceiveScheduler.pending.length}`,
+    );
     FileReceiveScheduler.schedule();
   }
 
