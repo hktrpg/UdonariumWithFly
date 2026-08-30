@@ -171,6 +171,29 @@ export class FileReceiveScheduler {
     return FileReceiveScheduler.outboundPending.size;
   }
 
+  /** Estimated bytes still queued for receive (catalog sizes; unknown → counted separately). */
+  static pendingReceiveBytes(): { knownBytes: number; unknownCount: number } {
+    let knownBytes = 0;
+    let unknownCount = 0;
+    for (const p of FileReceiveScheduler.pending) {
+      if (!Number.isFinite(p.bytes) || p.bytes < 0 || p.bytes >= DEFAULT_UNKNOWN_BYTES) {
+        unknownCount++;
+      } else {
+        knownBytes += p.bytes;
+      }
+    }
+    return { knownBytes, unknownCount };
+  }
+
+  /** Pending receive counts by kind (for mesh diag). */
+  static pendingReceiveCountsByKind(): Record<FileResourceKind, number> {
+    const counts: Record<FileResourceKind, number> = { image: 0, audio: 0, pdf: 0, video: 0 };
+    for (const p of FileReceiveScheduler.pending) {
+      counts[p.kind] = (counts[p.kind] || 0) + 1;
+    }
+    return counts;
+  }
+
   static isTransferPending(kind: FileResourceKind, identifier: string): boolean {
     const key = FileReceiveScheduler.receiveKey(kind, identifier);
     return FileReceiveScheduler.pending.some(

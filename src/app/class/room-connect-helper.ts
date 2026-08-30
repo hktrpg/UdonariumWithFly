@@ -2,6 +2,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { netDebug, meshWarn } from '@udonarium/core/system/network/net-debug';
+import { registerJoinDiagProvider } from '@udonarium/core/system/network/mesh-diag-stats';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { FileReceiveScheduler } from '@udonarium/core/file-storage/file-transfer-scheduler';
@@ -1636,3 +1637,9 @@ export class RoomConnectHelper {
     // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent).
   }
 }
+
+registerJoinDiagProvider(() => ({
+  joinInProgress: RoomConnectHelper.joinInProgress,
+  reopenInFlight: RoomConnectHelper.isReopenInFlight,
+  reconnecting: RoomConnectHelper.isNetworkReconnecting(),
+}));

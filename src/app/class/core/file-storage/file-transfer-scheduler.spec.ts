@@ -274,4 +274,16 @@ describe('FileReceiveScheduler', () => {
     expect(FileReceiveScheduler.isJoinProbeHold()).toBeFalse();
     expect(order).toEqual(['thumb']);
   });
+
+  it('pendingReceiveBytes separates known sizes from unknown placeholders', () => {
+    FileReceiveScheduler.enqueueReceiveRequest('image', 'p1', 'a', 4_000, () => {});
+    FileReceiveScheduler.enqueueReceiveRequest('pdf', 'p1', 'b', 999_999_999, () => {});
+    expect(FileReceiveScheduler.pendingReceiveBytes()).toEqual({ knownBytes: 4_000, unknownCount: 1 });
+    expect(FileReceiveScheduler.pendingReceiveCountsByKind()).toEqual({
+      image: 1,
+      audio: 0,
+      pdf: 1,
+      video: 0,
+    });
+  });
 });
