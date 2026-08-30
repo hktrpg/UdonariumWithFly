@@ -47,5 +47,7 @@ describe('net-debug', () => {
     expect(text).toContain('# Udonarium mesh diag');
     expect(text).toContain('recent');
     expect(text).toContain('UDONARIUM_NET_DEBUG');
+    expect(text).toContain('room-data (local complete blobs):');
+    expect(text).toContain('load:');
   });
 });

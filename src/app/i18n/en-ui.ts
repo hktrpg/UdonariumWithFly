@@ -23,7 +23,7 @@ export const en_ui: I18nDictionary = {
   'peer.copyRoomInfo': 'Copy room info to clipboard',
   'peer.connectionStatusTitle': 'Connection status with others',
   'peer.copyMeshDiag': 'Copy mesh diag',
-  'peer.copyMeshDiag.title': 'Copy a short network snapshot for bug reports / AI',
+  'peer.copyMeshDiag.title': 'Copy network snapshot (room media MB, sync load, recent mesh events)',
   'peer.copyMeshDiag.copied': 'Mesh diag copied.',
   'peer.kick': 'Kick',
   'peer.kick.confirmTitle': 'Kick participant',

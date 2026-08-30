@@ -23,7 +23,7 @@ export const ja_ui: I18nDictionary = {
   'peer.copyRoomInfo': '部屋情報をクリップボードにコピー',
   'peer.connectionStatusTitle': '他参加者との接続状態',
   'peer.copyMeshDiag': '接続診断をコピー',
-  'peer.copyMeshDiag.title': '不具合報告・AI用の短いネットワーク情報をコピー',
+  'peer.copyMeshDiag.title': '接続診断をコピー（部屋メディアMB・同期負荷・直近mesh）',
   'peer.copyMeshDiag.copied': '接続診断をコピーしました。',
   'peer.kick': '退出させる',
   'peer.kick.confirmTitle': '参加者を退出',

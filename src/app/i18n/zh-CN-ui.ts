@@ -23,7 +23,7 @@ export const zhCN_ui: I18nDictionary = {
   'peer.copyRoomInfo': '将房间信息复制到剪贴板',
   'peer.connectionStatusTitle': '与其他参加者的连接状态',
   'peer.copyMeshDiag': '复制连接诊断',
-  'peer.copyMeshDiag.title': '复制精简网络快照（给除错或 AI）',
+  'peer.copyMeshDiag.title': '复制连接诊断（含房间素材 MB、同步负荷、近期 mesh 事件）',
   'peer.copyMeshDiag.copied': '已复制连接诊断。',
   'peer.kick': '踢出',
   'peer.kick.confirmTitle': '踢出参加者',

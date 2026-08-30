@@ -1,4 +1,5 @@
 import { Network } from './network';
+import { formatMeshDiagStatsLines } from './mesh-diag-stats';
 
 /**
  * Mesh / P2P logging modes (localStorage key `UDONARIUM_NET_DEBUG`):
@@ -134,6 +135,8 @@ export function exportMeshDiagText(): string {
   } catch (e) {
     lines.push(`snapshot-error: ${e instanceof Error ? e.message : String(e)}`);
   }
+
+  lines.push(...formatMeshDiagStatsLines());
 
   const warns = ring.warnings();
   if (warns.length) {

@@ -52,6 +52,11 @@ export class FileReceiveScheduler {
   private static receiveRetryAfter = new Map<string, number>();
   private static networkHooksRegistered = false;
   private static playingMusicPriorityKey = '';
+  /**
+   * Join probe needs the DataChannel for game-table object sync first.
+   * Catalogs may still enqueue; dispatch resumes when the hold clears.
+   */
+  private static joinProbeHold = false;
 
   static ensureNetworkHooks(): void {
     if (FileReceiveScheduler.networkHooksRegistered) return;
@@ -166,6 +171,29 @@ export class FileReceiveScheduler {
     return FileReceiveScheduler.outboundPending.size;
   }
 
+  /** Estimated bytes still queued for receive (catalog sizes; unknown → counted separately). */
+  static pendingReceiveBytes(): { knownBytes: number; unknownCount: number } {
+    let knownBytes = 0;
+    let unknownCount = 0;
+    for (const p of FileReceiveScheduler.pending) {
+      if (!Number.isFinite(p.bytes) || p.bytes < 0 || p.bytes >= DEFAULT_UNKNOWN_BYTES) {
+        unknownCount++;
+      } else {
+        knownBytes += p.bytes;
+      }
+    }
+    return { knownBytes, unknownCount };
+  }
+
+  /** Pending receive counts by kind (for mesh diag). */
+  static pendingReceiveCountsByKind(): Record<FileResourceKind, number> {
+    const counts: Record<FileResourceKind, number> = { image: 0, audio: 0, pdf: 0, video: 0 };
+    for (const p of FileReceiveScheduler.pending) {
+      counts[p.kind] = (counts[p.kind] || 0) + 1;
+    }
+    return counts;
+  }
+
   static isTransferPending(kind: FileResourceKind, identifier: string): boolean {
     const key = FileReceiveScheduler.receiveKey(kind, identifier);
     return FileReceiveScheduler.pending.some(
@@ -241,7 +269,29 @@ export class FileReceiveScheduler {
     });
   }
 
+  /** Pause bulk file receives while a lobby join probe waits for game-table. */
+  static beginJoinProbeHold(): void {
+    if (FileReceiveScheduler.joinProbeHold) return;
+    FileReceiveScheduler.joinProbeHold = true;
+    console.warn('[file-sync] join probe hold — defer receives until tabletop sync');
+  }
+
+  /** Resume file receives after join probe settles (success or fail). */
+  static endJoinProbeHold(): void {
+    if (!FileReceiveScheduler.joinProbeHold) return;
+    FileReceiveScheduler.joinProbeHold = false;
+    console.warn(
+      `[file-sync] join probe hold released — pending=${FileReceiveScheduler.pending.length}`,
+    );
+    FileReceiveScheduler.schedule();
+  }
+
+  static isJoinProbeHold(): boolean {
+    return FileReceiveScheduler.joinProbeHold;
+  }
+
   static schedule(): void {
+    if (FileReceiveScheduler.joinProbeHold) return;
     primePlayingMusicCache();
     try {
       FileReceiveScheduler.pending.sort((a, b) => compareFileSyncPriority(
@@ -415,6 +465,7 @@ export class FileReceiveScheduler {
   static resetForTests(): void {
     EventSystem.unregister(FileReceiveScheduler);
     FileReceiveScheduler.networkHooksRegistered = false;
+    FileReceiveScheduler.joinProbeHold = false;
     FileReceiveScheduler.activeReceives.clear();
     FileReceiveScheduler.outboundPending.clear();
     FileReceiveScheduler.outboundRequests.clear();

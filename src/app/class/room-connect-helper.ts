@@ -2,8 +2,10 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { netDebug, meshWarn } from '@udonarium/core/system/network/net-debug';
+import { registerJoinDiagProvider } from '@udonarium/core/system/network/mesh-diag-stats';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { FileReceiveScheduler } from '@udonarium/core/file-storage/file-transfer-scheduler';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
@@ -933,6 +935,8 @@ export class RoomConnectHelper {
     RoomConnectHelper.joinOwnedUntil = 0;
     RoomConnectHelper.lastJoinFailReason = '';
     FolderBackupService.instance?.beginJoinQuarantine();
+    // Hold bulk file receives so game-table object sync can use the DataChannel first.
+    FileReceiveScheduler.beginJoinProbeHold();
     ObjectSynchronizer.instance.enableJoinFetch();
     ObjectSynchronizer.instance.holdPeerSync();
   }
@@ -941,6 +945,8 @@ export class RoomConnectHelper {
     RoomConnectHelper.joinInProgress = false;
     ObjectSynchronizer.instance.disableJoinFetch();
     ObjectSynchronizer.instance.releasePeerSync(ok);
+    // Resume file receives after object sync hold ends (queued catalogs stay intact).
+    FileReceiveScheduler.endJoinProbeHold();
     if (ok) {
       RoomConnectHelper.joinOwnedUntil = 0;
       FolderBackupService.instance?.markContentTrusted();
@@ -1213,8 +1219,14 @@ export class RoomConnectHelper {
       let roomOpenRetries = 0;
       /** Lobby seed plus SkyWay room members discovered during the probe. */
       let joinTargets = targetPeers.slice();
-      /** Mesh budget starts at OPEN_NETWORK — room open must not burn the join ceiling. */
+      /**
+       * Mesh budget starts at OPEN_NETWORK (room open must not burn the join ceiling).
+       * Restarted once on the first live peer so slow ICE does not leave zero time for
+       * game-table sync (see join logs: peers open then immediate connect timeout).
+       */
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      let meshDataBudgetArmed = false;
+      const probeStartedAt = Date.now();
 
       const finish = (ok: boolean) => {
         if (settled) return;
@@ -1243,6 +1255,16 @@ export class RoomConnectHelper {
         ConnectionBusyService.instance?.hide();
         if (!ok) RoomConnectHelper.lastJoinFailReason = failReason || 'unknown';
         else RoomConnectHelper.lastJoinFailReason = '';
+        meshWarn('join probe: finish', {
+          ok,
+          reason: ok ? '' : (RoomConnectHelper.lastJoinFailReason || failReason || 'unknown'),
+          open: RoomConnectHelper.openPeerCount(),
+          sawTabletop: sawTabletopData,
+          meshBudgetArmed: meshDataBudgetArmed,
+          tried: tried.size,
+          targets: joinTargets.length,
+          elapsedMs: Date.now() - probeStartedAt,
+        });
         RoomConnectHelper.endJoinProbe(ok);
         if (!ok) {
           if (RoomConnectHelper.shouldSuppressLobbyRoom(RoomConnectHelper.lastJoinFailReason)) {
@@ -1255,21 +1277,49 @@ export class RoomConnectHelper {
         resolve(ok);
       };
 
-      const startConnectTimeout = () => {
-        if (timeoutId != null || settled) return;
+      const startConnectTimeout = (reason: 'open' | 'first-peer' = 'open') => {
+        if (settled) return;
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        const budgetMs = RoomConnectHelper.connectTimeoutMs();
+        if (reason === 'first-peer') {
+          meshWarn('join probe: mesh data budget armed', {
+            budgetMs,
+            open: RoomConnectHelper.openPeerCount(),
+            elapsedMs: Date.now() - probeStartedAt,
+          });
+        }
         timeoutId = setTimeout(() => {
           timeoutId = null;
           if (settled) return;
-          console.warn('RoomConnectHelper connect timeout');
+          const open = RoomConnectHelper.openPeerCount();
           // Pre-probe behavior: first live peer means we stay in the room. Never kick a meshed client.
-          if (RoomConnectHelper.openPeerCount() >= 1) {
+          if (open >= 1) {
+            meshWarn('join probe: connect timeout while meshed — staying', {
+              open,
+              sawTabletop: sawTabletopData,
+              meshBudgetArmed: meshDataBudgetArmed,
+              elapsedMs: Date.now() - probeStartedAt,
+            });
+            console.warn('RoomConnectHelper connect timeout');
             Room.clearLocalTabletopForJoin();
             finish(true);
             return;
           }
+          meshWarn('join probe: connect timeout alone — fail', {
+            open,
+            sawTabletop: sawTabletopData,
+            meshBudgetArmed: meshDataBudgetArmed,
+            tried: tried.size,
+            targets: joinTargets.length,
+            elapsedMs: Date.now() - probeStartedAt,
+          });
+          console.warn('RoomConnectHelper connect timeout');
           failReason = 'connect_timeout';
           finish(false);
-        }, RoomConnectHelper.connectTimeoutMs());
+        }, budgetMs);
       };
 
       const confirmIfStable = () => {
@@ -1362,6 +1412,12 @@ export class RoomConnectHelper {
         netDebug('連線成功！', peerId);
         tried.add(peerId);
         netDebug(`連線進度 ${tried.size}/${joinTargets.length}（成功 ${RoomConnectHelper.openPeerCount()}）`);
+        // ICE often consumes most of the open-to-mesh window; give a full budget for
+        // game-table once the first DataChannel is actually open.
+        if (!meshDataBudgetArmed && RoomConnectHelper.openPeerCount() >= 1) {
+          meshDataBudgetArmed = true;
+          startConnectTimeout('first-peer');
+        }
         scheduleConfirm();
         scheduleDataDeadline();
       };
@@ -1392,7 +1448,7 @@ export class RoomConnectHelper {
         if (settled) return;
         netDebug('RoomConnectHelper OPEN_PEER', peerId ?? Network.peerId);
         EventSystem.unregister(listenerKey);
-        startConnectTimeout();
+        startConnectTimeout('open');
         joinTargets = RoomConnectHelper.gatherJoinTargets(targetPeers);
         if (joinTargets.length < 1) {
           finish(true);
@@ -1401,6 +1457,11 @@ export class RoomConnectHelper {
         // Probe first: keep local tabletop until a live peer sends a game-table.
         meshJoinTargets();
         if (settled) return;
+        // Already-open peers (rejoin while still meshed) will not re-fire CONNECT_PEER.
+        if (!meshDataBudgetArmed && RoomConnectHelper.openPeerCount() >= 1) {
+          meshDataBudgetArmed = true;
+          startConnectTimeout('first-peer');
+        }
         // Lobby list can lag SkyWay membership; keep remeshing while alone.
         remeshTimer = setInterval(() => {
           if (settled) return;
@@ -1413,7 +1474,15 @@ export class RoomConnectHelper {
             if (settled || event.isSendFromSelf) return;
             const aliasName = event.data?.aliasName || '';
             if (aliasName === 'PeerCursor') return;
-            if (RoomConnectHelper.isJoinTabletopData(aliasName)) sawTabletopData = true;
+            if (RoomConnectHelper.isJoinTabletopData(aliasName)) {
+              if (!sawTabletopData) {
+                meshWarn('join probe: game-table received', {
+                  open: RoomConnectHelper.openPeerCount(),
+                  elapsedMs: Date.now() - probeStartedAt,
+                });
+              }
+              sawTabletopData = true;
+            }
             if (sawTabletopData) scheduleQuiesceConfirm();
           })
           .on('NETWORK_ERROR', () => {
@@ -1568,3 +1637,9 @@ export class RoomConnectHelper {
     // PeerCursor.peerId is set on OPEN_NETWORK (AppComponent).
   }
 }
+
+registerJoinDiagProvider(() => ({
+  joinInProgress: RoomConnectHelper.joinInProgress,
+  reopenInFlight: RoomConnectHelper.isReopenInFlight,
+  reconnecting: RoomConnectHelper.isNetworkReconnecting(),
+}));

@@ -24,7 +24,7 @@ export const zhTW_ui: I18nDictionary = {
   'peer.copyRoomInfo': '將房間資訊複製到剪貼簿',
   'peer.connectionStatusTitle': '與其他參加者的連線狀態',
   'peer.copyMeshDiag': '複製連線診斷',
-  'peer.copyMeshDiag.title': '複製精簡網路快照（給除錯或 AI）',
+  'peer.copyMeshDiag.title': '複製連線診斷（含房間素材 MB、同步負荷、近期 mesh 事件）',
   'peer.copyMeshDiag.copied': '已複製連線診斷。',
   'peer.kick': '踢出',
   'peer.kick.confirmTitle': '踢出參加者',
