@@ -1113,7 +1113,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     localForage.getItem<boolean>(AppComponent.MENU_RAIL_HORIZONTAL_KEY).then(v => {
       if (typeof v === 'boolean') {
-        this.ngZone.run(() => { this.isHorizontal = v; });
+        this.ngZone.run(() => {
+          this.isHorizontal = v;
+          this.syncDesktopMenuRailAttr();
+        });
       }
     });
     this.maskTokenFx.start();
@@ -1134,15 +1137,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       this.mobileLayout.setUiMode('play');
       this.isMobileEdit = false;
     }
+    this.syncDesktopMenuRailAttr();
     this.mobileSub = this.mobileLayout.isMobile$.subscribe(v => {
       this.isMobileLayout = v;
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
       this.isMobileEdit = v && this.mobileLayout.isEdit;
+      this.syncDesktopMenuRailAttr();
     });
     this.mobileSub.add(this.mobileLayout.chromeMode$.subscribe(() => {
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
       this.isMobileLayout = this.mobileLayout.isMobile;
       this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
+      this.syncDesktopMenuRailAttr();
     }));
     this.mobileSub.add(this.mobileLayout.uiMode$.subscribe(() => {
       this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
@@ -2394,7 +2400,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private setMenuRailHorizontal(isHorizontal: boolean) {
     this.isHorizontal = isHorizontal;
     localForage.setItem(AppComponent.MENU_RAIL_HORIZONTAL_KEY, isHorizontal).catch(() => {});
+    this.syncDesktopMenuRailAttr();
     this.ngZone.run(() => this.lazyNgZoneUpdate(false));
+  }
+
+  /**
+   * Tag html with desktop icon-rail orientation so pinned combat HUDs can clear the 52px rail.
+   * Does not write --udon-*-chrome (MobileLayoutService owns those on mobile).
+   */
+  private syncDesktopMenuRailAttr() {
+    const root = document.documentElement;
+    if (this.isMobileLayout) {
+      root.removeAttribute('data-menu-rail');
+      return;
+    }
+    root.setAttribute('data-menu-rail', this.isHorizontal ? 'horizontal' : 'vertical');
   }
 
   closeImagePreview() {

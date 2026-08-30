@@ -27,6 +27,15 @@
   top: auto;
 }
 
+/* Desktop vertical icon rail is 52px (.desktop-icon-rail) and sits above HUDs. */
+:host-context(html[data-menu-rail='vertical']) .combat-rail.is-docked:not(.is-mobile) {
+  left: calc(52px + 12px);
+}
+
+:host-context(html[data-menu-rail='horizontal']) .combat-rail.is-docked:not(.is-mobile) {
+  bottom: calc(52px + 12px);
+}
+
 .combat-rail.is-docked.is-mobile {
   left: calc(var(--udon-left-chrome, 0px) + 8px);
   bottom: calc(var(--udon-bottom-chrome, 56px) + 8px);

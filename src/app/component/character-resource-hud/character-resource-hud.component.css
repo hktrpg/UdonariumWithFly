@@ -34,6 +34,10 @@
   top: auto;
 }
 
+:host-context(html[data-menu-rail='horizontal']) .resource-hud.is-docked:not(.is-mobile) {
+  bottom: calc(52px + 12px);
+}
+
 .resource-hud.is-docked.is-mobile {
   right: 8px;
   bottom: calc(var(--udon-bottom-chrome, 56px) + 8px);

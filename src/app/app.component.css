@@ -445,6 +445,7 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 
 .desktop-icon-rail {
   position: fixed;
+  /* Above pinned combat HUDs (z-index ~40); insets keep docked HUDs clear of this rail. */
   z-index: 100000;
   box-sizing: border-box;
   overflow: hidden;
@@ -455,6 +456,7 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 .desktop-icon-rail.vertical {
   top: 0;
   left: 0;
+  /* 52px — keep in sync with docked combat HUD clearances */
   width: 52px;
   height: 100%;
   overflow-x: hidden;
@@ -468,6 +470,7 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   right: 0;
   bottom: 0;
   width: 100%;
+  /* 52px — keep in sync with docked combat HUD clearances */
   height: 52px;
   overflow-x: auto;
   overflow-y: hidden;
