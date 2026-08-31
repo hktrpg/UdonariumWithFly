@@ -218,13 +218,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
     });
     if (!result) return;
 
+    const rolePw = RoomAuth.coalesceRolePassword(result.role, result.password);
     const meshPassword = RoomAuth.resolveMeshPassword(
-      room.id, room.name, result.role, result.password || RoomAuth.getSessionRolePassword(result.role));
+      room.id, room.name, result.role, rolePw);
     // Mesh is channel-only; peerIds have empty password digests.
     const targetPeers = room.filterByPassword('');
     if (targetPeers.length < 1) return;
 
-    const rolePw = result.password || RoomAuth.getSessionRolePassword(result.role);
     RoomAuth.applyIdentity(result.role, room.id);
     RoomAuth.rememberSession(result.role, rolePw, meshPassword);
     this.roomInvite.setRolePassword(result.role, rolePw);

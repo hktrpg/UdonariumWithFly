@@ -630,10 +630,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
             await this.folderBackup.flush({ timeoutMs: 60000 });
           }
           RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
-          this.roomInvite.setRolePassword(result.role, result.password || '');
+          // Coalesce before any write: setRolePassword('') would wipe session first,
+          // making the later getSessionRolePassword fallback useless.
+          const rolePw = RoomAuth.coalesceRolePassword(
+            result.role,
+            result.password,
+            this.roomInvite.getRolePassword(result.role),
+          );
+          this.roomInvite.setRolePassword(result.role, rolePw);
           RoomAuth.rememberSession(
             result.role,
-            result.password || RoomAuth.getSessionRolePassword(result.role),
+            rolePw,
             RoomAuth.getSessionMeshPassword() || Network.peer?.password || undefined,
           );
           // Clear legacy hold state.

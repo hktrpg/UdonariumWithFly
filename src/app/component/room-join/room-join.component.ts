@@ -43,8 +43,19 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     return this.i18n.t(`roomJoin.role.${this.role}.label`);
   }
 
+  get currentRoleLabel(): string {
+    if (!this.currentRole) return '';
+    return this.i18n.t(`roomJoin.role.${this.currentRole}.label`);
+  }
+
   get submitLabel(): string {
     return this.i18n.t(this.switchMode ? 'roomJoin.confirmSwitch' : 'roomJoin.submit');
+  }
+
+  get canSubmit(): boolean {
+    if (!this.isRoleAvailable(this.role)) return false;
+    if (this.isCurrentRole(this.role)) return false;
+    return true;
   }
 
   ngOnInit() {
@@ -59,13 +70,7 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     if (this.switchMode && this.currentRole && this.room?.id) {
       RoomAuth.noteAttained(this.currentRole, this.room.id);
     }
-    if (this.currentRole && this.isRoleAvailable(this.currentRole)) {
-      this.role = this.currentRole;
-      return;
-    }
-    const order: RoomRole[] = ['user', 'gm', 'guest'];
-    const first = order.find(r => this.isRoleAvailable(r));
-    if (first) this.role = first;
+    this.selectInitialRole();
   }
 
   ngOnDestroy() {
@@ -91,11 +96,37 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
       : head;
   }
 
+  /** Prefer another role when switching; avoid pre-selecting the identity you already have. */
+  private selectInitialRole() {
+    const order: RoomRole[] = ['user', 'gm', 'guest'];
+    if (this.switchMode && this.currentRole) {
+      const other = order.find(r => this.isRoleAvailable(r) && !this.isCurrentRole(r));
+      if (other) {
+        this.role = other;
+        return;
+      }
+    }
+    if (this.currentRole && this.isRoleAvailable(this.currentRole) && !this.switchMode) {
+      this.role = this.currentRole;
+      return;
+    }
+    const first = order.find(r => this.isRoleAvailable(r));
+    if (first) this.role = first;
+  }
+
   isRoleAvailable(role: RoomRole): boolean {
     if (!this.room) {
       return role === 'gm' || role === 'user';
     }
     return RoomAuth.isRoleAvailable(this.room.name, role);
+  }
+
+  isCurrentRole(role: RoomRole): boolean {
+    return this.switchMode && !!this.currentRole && this.currentRole === role;
+  }
+
+  isRoleDisabled(role: RoomRole): boolean {
+    return !this.isRoleAvailable(role) || this.isCurrentRole(role);
   }
 
   needsPassword(): boolean {
@@ -124,9 +155,9 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
     return RoomAuth.roleNeedsPassword(this.room.name, role);
   }
 
-  /** Role has a password gate, but current/unlocked rank skips it. */
+  /** Role has a password gate, but current/unlocked rank skips it (already entered this session). */
   isPasswordBypassed(role: RoomRole): boolean {
-    if (!this.room || !this.isRoleAvailable(role)) return false;
+    if (!this.room || !this.isRoleAvailable(role) || this.isCurrentRole(role)) return false;
     if (!RoomAuth.isRoleAuthRoom(this.room.name)) return false;
     if (!RoomAuth.roleNeedsPassword(this.room.name, role)) return false;
     return !this.needsPasswordFor(role);
@@ -134,7 +165,7 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
 
   /** Open gate (no password configured) — not the same as bypass. */
   isRoleOpen(role: RoomRole): boolean {
-    if (!this.room || !this.isRoleAvailable(role)) return false;
+    if (!this.room || !this.isRoleAvailable(role) || this.isCurrentRole(role)) return false;
     if (this.needsPasswordFor(role) || this.isPasswordBypassed(role)) return false;
     if (!RoomAuth.isRoleAuthRoom(this.room.name)) return true;
     return !RoomAuth.roleNeedsPassword(this.room.name, role);
@@ -150,7 +181,7 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
       this.help = this.i18n.t('roomJoin.errorRoleUnavailable');
       return;
     }
-    if (this.switchMode && this.currentRole && this.role === this.currentRole) {
+    if (this.isCurrentRole(this.role)) {
       this.help = this.i18n.t('roomJoin.errorAlreadyRole');
       return;
     }
@@ -173,7 +204,9 @@ export class RoomJoinComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    const result: RoomJoinResult = { role: this.role, password: this.password || '' };
+    // Keep session role password when UI skipped re-entry (bypass ≠ open gate).
+    const password = RoomAuth.coalesceRolePassword(this.role, this.password);
+    const result: RoomJoinResult = { role: this.role, password };
     this.modalService.resolve(result);
   }
 

@@ -1,13 +1,37 @@
 <div class="settings-ui dense room-join">
   <section class="card">
-    <header class="card-head"><h3>{{ 'roomJoin.selectRole' | i18n }}</h3></header>
-    <div class="roles">
-      <label *ngFor="let r of roles; trackBy: trackByRoleId" class="role" [class.disabled]="!isRoleAvailable(r.id)" [class.active]="role === r.id">
-        <input type="radio" name="roomRole" [value]="r.id" [(ngModel)]="role" [disabled]="!isRoleAvailable(r.id)" (ngModelChange)="onRoleChange()">
+    <header class="card-head">
+      <h3>{{ (switchMode ? 'roomJoin.switchRole' : 'roomJoin.selectRole') | i18n }}</h3>
+    </header>
+    <p class="hint current-role-hint" *ngIf="switchMode && currentRole">
+      {{ 'roomJoin.yourRole' | i18n }}：<b>{{ currentRoleLabel }}</b>
+    </p>
+    <div class="roles" role="radiogroup" [attr.aria-label]="(switchMode ? 'roomJoin.switchRole' : 'roomJoin.selectRole') | i18n">
+      <label
+        *ngFor="let r of roles; trackBy: trackByRoleId"
+        class="role"
+        [class.disabled]="isRoleDisabled(r.id)"
+        [class.current]="isCurrentRole(r.id)"
+        [class.active]="role === r.id"
+      >
+        <input
+          type="radio"
+          name="roomRole"
+          [value]="r.id"
+          [(ngModel)]="role"
+          [disabled]="isRoleDisabled(r.id)"
+          (ngModelChange)="onRoleChange()"
+        >
         <span class="label">{{ r.label }}</span>
         <span class="role-hint">{{ r.hint }}</span>
-        <span class="lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)">🔒</span>
-        <span class="open" *ngIf="isPasswordBypassed(r.id) || isRoleOpen(r.id)">{{ 'roomJoin.noPassword' | i18n }}</span>
+        <span class="badge current" *ngIf="isCurrentRole(r.id)">{{ 'roomJoin.currentYou' | i18n }}</span>
+        <span class="badge lock" *ngIf="isRoleAvailable(r.id) && needsPasswordFor(r.id)" [attr.title]="'roomJoin.passwordRequired' | i18n">
+          <i class="material-icons" aria-hidden="true">lock</i>
+        </span>
+        <span class="badge bypass" *ngIf="isPasswordBypassed(r.id)" [attr.title]="'roomJoin.passwordNotNeeded' | i18n">
+          <i class="material-icons" aria-hidden="true">verified</i>{{ 'roomJoin.passwordNotNeeded' | i18n }}
+        </span>
+        <span class="badge open" *ngIf="isRoleOpen(r.id)">{{ 'roomJoin.noPassword' | i18n }}</span>
       </label>
     </div>
     <div class="field-row" *ngIf="needsPassword()">
@@ -17,7 +41,7 @@
       </label>
     </div>
     <footer class="actions">
-      <button type="button" class="btn btn-primary" (click)="submit()">{{ submitLabel }}</button>
+      <button type="button" class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit">{{ submitLabel }}</button>
       <button type="button" class="btn" (click)="cancel()">{{ 'roomJoin.cancel' | i18n }}</button>
     </footer>
     <p class="error-text" *ngIf="help">{{ help }}</p>

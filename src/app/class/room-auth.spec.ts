@@ -124,3 +124,40 @@ describe('RoomAuth join after host rekey (stale roomName snapshot)', () => {
     expect(meshFromStale).not.toBe(after.meshPassword);
   });
 });
+
+describe('RoomAuth session password overwrite on identity switch', () => {
+  afterEach(() => {
+    RoomAuth.clearAttained();
+  });
+
+  it('empty write before fallback clobbers the stored role password (regression pattern)', () => {
+    RoomAuth.rememberSession('user', 'secret-user', 'mesh-x');
+    expect(RoomAuth.getSessionRolePassword('user')).toBe('secret-user');
+
+    // Mirrors the old peer-menu switchIdentity order: setRolePassword('') first,
+    // then rememberSession(result.password || getSessionRolePassword(...)).
+    const resultPassword = '';
+    RoomAuth.rememberSession('user', resultPassword || '');
+    const afterBug = resultPassword || RoomAuth.getSessionRolePassword('user');
+    RoomAuth.rememberSession('user', afterBug, RoomAuth.getSessionMeshPassword() || undefined);
+
+    expect(afterBug).toBe('');
+    expect(RoomAuth.getSessionRolePassword('user')).toBe('');
+    expect(RoomAuth.getSessionMeshPassword()).toBe('mesh-x');
+  });
+
+  it('coalesceRolePassword keeps session secret when UI returns empty', () => {
+    RoomAuth.rememberSession('user', 'secret-user', 'mesh-x');
+    const rolePw = RoomAuth.coalesceRolePassword('user', '', undefined);
+    expect(rolePw).toBe('secret-user');
+
+    RoomAuth.rememberSession('user', rolePw, RoomAuth.getSessionMeshPassword() || undefined);
+    expect(RoomAuth.getSessionRolePassword('user')).toBe('secret-user');
+    expect(RoomAuth.getSessionMeshPassword()).toBe('mesh-x');
+  });
+
+  it('coalesceRolePassword prefers an explicit new password over session', () => {
+    RoomAuth.rememberSession('gm', 'old-gm', 'mesh-x');
+    expect(RoomAuth.coalesceRolePassword('gm', 'new-gm')).toBe('new-gm');
+  });
+});

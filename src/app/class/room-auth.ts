@@ -207,6 +207,18 @@ export class RoomAuth {
     if (meshPassword != null) RoomAuth.sessionMeshPassword = meshPassword;
   }
 
+  /**
+   * First non-empty candidate, else the session-stored role password.
+   * Use before any write when a UI path may return '' after password bypass
+   * (empty write would otherwise clobber the in-session secret).
+   */
+  static coalesceRolePassword(role: RoomRole, ...candidates: Array<string | null | undefined>): string {
+    for (const c of candidates) {
+      if (c) return c;
+    }
+    return RoomAuth.getSessionRolePassword(role) || '';
+  }
+
   static getSessionMeshPassword(): string {
     return RoomAuth.sessionMeshPassword;
   }

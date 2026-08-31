@@ -165,7 +165,7 @@
       <button type="button" class="btn btn-sm btn-primary" (click)="showLobby()" [disabled]="!networkService.isOpen">
         <i class="material-icons">meeting_room</i>{{ 'peer.lobby' | i18n }}
       </button>
-      <button type="button" class="btn btn-sm" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
+      <button type="button" class="btn btn-sm" *ngIf="!networkService.peer.isRoom" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
       </button>
       <button type="button" class="btn btn-sm" *ngIf="isGMMode && networkService.peer.isRoom && isRoleAuthRoom" (click)="editRoomPasswords()">
