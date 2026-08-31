@@ -981,6 +981,8 @@ export class RoomConnectHelper {
       RoomConnectHelper.joinOwnedUntil = Date.now() + RoomConnectHelper.JOIN_OWNED_MS;
       FolderBackupService.instance?.abortJoinQuarantine();
     }
+    // After release: room chat tabs exist — deferred "connected" opelog can post safely.
+    EventSystem.trigger('JOIN_PROBE_FINISHED', { ok });
   }
 
   /** Remount + re-request images after a successful mesh join probe. */

@@ -1,6 +1,7 @@
 import { Card } from './card';
 import { CardStack } from './card-stack';
 import { CharacterToken } from './character-token';
+import { ChatTabList } from './chat-tab-list';
 import { ClueLink } from './clue-link';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
@@ -175,8 +176,8 @@ export class Room extends GameObject implements InnerXml {
   }
 
   /**
-   * Before mesh-joining a room: drop local tabletop samples so we pull the host's
-   * house instead of pushing lobby defaults onto shared syncIds.
+   * Before mesh-joining a room: drop local tabletop + lobby chat samples so we pull
+   * the host's house instead of pushing lobby defaults (MainTab/SubTab) onto shared syncIds.
    */
   static clearLocalTabletopForJoin() {
     for (const object of Room.listTabletopObjects()) {
@@ -184,6 +185,10 @@ export class Room extends GameObject implements InnerXml {
       // Must cascade: ObjectStore.delete(parent) leaves DataElement children orphaned
       // (not in parent._children after recreate) and their high lobby versions win LWW.
       object.destroyLocal();
+    }
+    // Lobby always seeds MainTab/SubTab; if kept through join they reappear on the host.
+    for (const tab of [...ChatTabList.instance.allChatTabs]) {
+      tab.destroyLocal();
     }
     ObjectStore.instance.clearDeleteHistory();
     TableSelecter.instance.prepareForRoomReload();

@@ -7,6 +7,7 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { Network } from '@udonarium/core/system';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { I18nService } from './i18n.service';
 
@@ -111,6 +112,9 @@ export class ChatMessageService {
   }
 
   sendOperationLog(text: string, logLevel: number=1) {
+    // During join, lobby SubTab still exists until clearLocalTabletopForJoin — posting
+    // here would CREATE SubTab (+ message) on the host before lobby samples are dropped.
+    if (RoomConnectHelper.joinInProgress) return;
     for (const chatTab of this.chatTabs) {
       if (chatTab.recieveOperationLogLevel < logLevel) continue;
       let chatMessage: ChatMessageContext = {
