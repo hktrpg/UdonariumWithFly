@@ -13,7 +13,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
-import { renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
+import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -838,7 +838,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private queuePdfRender() {
     if (!this.isPdfContent) return;
     // ":hi" = sharp tabletop render tier (forces one re-render after quality bump).
-    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}:hi`;
+    const key = pdfPageRenderKey(this.textNote.pdfIdentifier, this.textNote.pdfPage);
     if (key !== this.lastPdfKey) this.needsPdfRender = true;
   }
 
@@ -849,6 +849,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const seq = ++this.pdfRenderSeq;
     const wantPage = this.textNote.pdfPage;
     const id = this.textNote.pdfIdentifier;
+    const attemptKey = pdfPageRenderKey(id, wantPage);
     try {
       // Display width on the table is small (e.g. 4×50=200); render much sharper so text stays
       // readable in 3D view — CSS then scales the bitmap down into the paper box.
@@ -858,13 +859,16 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
       // Ignore stale / superseded renders (rapid page flips).
       if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
-      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}:hi`;
+      this.lastPdfKey = pdfPageRenderKey(this.textNote.pdfIdentifier, result.page);
       if (this.textNote.pdfPageCount !== result.pageCount) this.textNote.pdfPageCount = result.pageCount;
       if (this.textNote.pdfPage !== result.page) this.textNote.pdfPage = result.page;
       this.fitPaperToPdfCanvas(canvas);
       this.changeDetector.markForCheck();
     } catch (err) {
-      if (seq === this.pdfRenderSeq) console.warn('text-note PDF render failed', err);
+      if (seq !== this.pdfRenderSeq) return;
+      // Stop sync/CD cycles from retrying the same page forever (Chrome tab freeze).
+      this.lastPdfKey = attemptKey;
+      console.warn('text-note PDF render failed', err);
     }
   }
 

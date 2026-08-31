@@ -10,7 +10,7 @@ import {
   OnInit,
   ViewChild
 } from '@angular/core';
-import { renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
+import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
@@ -100,6 +100,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
   previewPanY = 0;
   isPreviewDragging = false;
   private needsPdfRender = false;
+  private lastPdfKey = '';
   private previewNoteId = '';
   private pdfRenderSeq = 0;
   private dragLastX = 0;
@@ -153,6 +154,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
         this.previewNoteId = data.noteIdentifier || '';
         this.resetPreviewView();
         this.pdfRenderSeq++;
+        this.lastPdfKey = '';
         this.needsPdfRender = !!this.pdfIdentifier;
         this.syncPreviewWheelFlag();
         this.changeDetector.markForCheck();
@@ -168,7 +170,9 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
         if (data?.force) this.close();
       })
       .on('UPDATE_PDF_RESOURE', () => {
-        if (this.pdfIdentifier) {
+        if (!this.pdfIdentifier) return;
+        const key = pdfPageRenderKey(this.pdfIdentifier, this.pdfPage);
+        if (key !== this.lastPdfKey) {
           this.needsPdfRender = true;
           this.changeDetector.markForCheck();
         }
@@ -325,6 +329,8 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     this.title = '';
     this.pdfPage = 1;
     this.pdfPageCount = 0;
+    this.lastPdfKey = '';
+    this.needsPdfRender = false;
     this.isPreview = false;
     this.previewNoteId = '';
     this.resetPreviewView();
@@ -367,6 +373,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     const seq = ++this.pdfRenderSeq;
     const wantPage = Math.max(1, Math.floor(Number(this.pdfPage)) || 1);
     const id = this.pdfIdentifier;
+    const attemptKey = pdfPageRenderKey(id, wantPage);
     try {
       const result = await renderPdfPage(canvas, pdf.url, wantPage, id, 1100);
       // Ignore stale renders so an older page cannot overwrite the current one.
@@ -374,9 +381,12 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
       this.pdfPageCount = result.pageCount;
       // Keep clamped page; if we asked past the end, stay on last (result.page === pageCount).
       this.pdfPage = result.page;
+      this.lastPdfKey = pdfPageRenderKey(id, result.page);
       this.changeDetector.markForCheck();
     } catch (err) {
-      if (seq === this.pdfRenderSeq) console.warn('note handout PDF render failed', err);
+      if (seq !== this.pdfRenderSeq) return;
+      this.lastPdfKey = attemptKey;
+      console.warn('note handout PDF render failed', err);
     }
   }
 }

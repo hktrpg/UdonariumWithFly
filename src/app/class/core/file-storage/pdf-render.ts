@@ -4,6 +4,35 @@ type PdfjsModule = typeof import('pdfjs-dist');
 
 let pdfjsPromise: Promise<PdfjsModule> | null = null;
 let workerReady = false;
+/** After a worker setup/runtime failure, skip further pdf.js work (prevents tab freeze). */
+let fatalWorkerError: Error | null = null;
+
+/** Stable key used by notes to avoid re-queueing the same page after success or hard fail. */
+export function pdfPageRenderKey(identifier: string, page: number): string {
+  return `${identifier}:${page}:hi`;
+}
+
+export function isPdfWorkerFatalError(err: unknown): boolean {
+  const msg = String(
+    (err && typeof err === 'object' && 'message' in err)
+      ? (err as { message?: unknown }).message
+      : err
+  );
+  return /fake worker|pdf\.worker|Failed to resolve module specifier|Setting up fake worker/i.test(msg);
+}
+
+/** @internal tests only */
+export function resetPdfRenderStateForTests(): void {
+  pdfjsPromise = null;
+  workerReady = false;
+  fatalWorkerError = null;
+  docCache.clear();
+}
+
+/** @internal tests only */
+export function markPdfWorkerFatalForTests(err: Error): void {
+  fatalWorkerError = err;
+}
 
 /**
  * Hosts often serve `.mjs` as `application/octet-stream`. Chrome then rejects
@@ -25,6 +54,7 @@ async function resolvePdfWorkerSrc(): Promise<string> {
 }
 
 async function ensurePdfjs(): Promise<PdfjsModule> {
+  if (fatalWorkerError) throw fatalWorkerError;
   if (!pdfjsPromise) {
     pdfjsPromise = import('pdfjs-dist');
   }
@@ -35,6 +65,12 @@ async function ensurePdfjs(): Promise<PdfjsModule> {
     workerReady = true;
   }
   return pdfjs;
+}
+
+function noteFatalWorkerError(err: unknown): void {
+  if (fatalWorkerError || !isPdfWorkerFatalError(err)) return;
+  fatalWorkerError = err instanceof Error ? err : new Error(String(err));
+  console.warn('[pdf] worker unavailable — further renders will fail fast');
 }
 
 const docCache = new Map<string, Promise<PDFDocumentProxy>>();
@@ -67,13 +103,17 @@ async function cancelActiveCanvasRender(canvas: HTMLCanvasElement): Promise<void
 }
 
 export async function loadPdfDocument(url: string, cacheKey?: string): Promise<PDFDocumentProxy> {
+  if (fatalWorkerError) throw fatalWorkerError;
   const pdfjs = await ensurePdfjs();
   const key = cacheKey || url;
   let pending = docCache.get(key);
   if (!pending) {
     pending = pdfjs.getDocument({ url, withCredentials: false }).promise;
     docCache.set(key, pending);
-    pending.catch(() => docCache.delete(key));
+    pending.catch(err => {
+      docCache.delete(key);
+      noteFatalWorkerError(err);
+    });
   }
   return pending;
 }
@@ -89,6 +129,8 @@ export async function renderPdfPage(
   cacheKey?: string,
   maxWidthPx = 800
 ): Promise<{ pageCount: number; page: number } | null> {
+  if (fatalWorkerError) throw fatalWorkerError;
+
   const serial = (canvasRenderSerial.get(canvas) || 0) + 1;
   canvasRenderSerial.set(canvas, serial);
 
@@ -96,7 +138,13 @@ export async function renderPdfPage(
   await cancelActiveCanvasRender(canvas);
   if (canvasRenderSerial.get(canvas) !== serial) return null;
 
-  const doc = await loadPdfDocument(url, cacheKey);
+  let doc: PDFDocumentProxy;
+  try {
+    doc = await loadPdfDocument(url, cacheKey);
+  } catch (err) {
+    noteFatalWorkerError(err);
+    throw err;
+  }
   if (canvasRenderSerial.get(canvas) !== serial) return null;
 
   const pageCount = Math.max(1, doc.numPages | 0);
@@ -122,6 +170,7 @@ export async function renderPdfPage(
     await task.promise;
   } catch (err) {
     if (isRenderCancelled(err)) return null;
+    noteFatalWorkerError(err);
     throw err;
   } finally {
     if (activeCanvasRender.get(canvas) === task) {
