@@ -8,6 +8,7 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
+import { Subscription } from 'rxjs';
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
@@ -24,10 +25,20 @@ import {
   resolveQuickDragDrop,
   setCardMergePreview,
 } from 'component/card-stack/card-stack-gesture';
+import {
+  CardHoverCaptionController,
+  cardCaptionName,
+  cardCaptionRubiedText,
+  wireCardHoverCaptionDismiss,
+} from 'service/card-hover-caption';
+import { ChatMessageService } from 'service/chat-message.service';
+import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { HandService } from 'service/hand.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { buildCardPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
 @Component({
@@ -72,6 +83,23 @@ export class HandRailComponent implements OnInit, OnDestroy {
   private panStartX = 0;
   private panStartScrollLeft = 0;
 
+  hoveredCardId: string | null = null;
+  captionCardId: string | null = null;
+  private readonly caption = new CardHoverCaptionController(() => this.changeDetector.markForCheck());
+  private previewOpenedSub: Subscription | null = null;
+
+  get captionVisible(): boolean { return this.caption.isVisible; }
+  get captionShowName(): boolean { return this.caption.showName; }
+  get captionShowText(): boolean { return this.caption.showText; }
+
+  captionNameFor(card: Card): string {
+    return cardCaptionName(card, this.i18n.t('overview.cardBack'));
+  }
+
+  captionTextHtmlFor(card: Card): string {
+    return cardCaptionRubiedText(card);
+  }
+
   get isGuest(): boolean { return Network.GuestMode(); }
   get isMobileLayout(): boolean { return this.mobileLayout.isMobile; }
   get railBottomPx(): number {
@@ -82,6 +110,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
   get isGm(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
   get viewUserId(): string { return this.handService.viewUserId; }
   get gmPeekUserId(): string { return this.handService.gmPeekUserId; }
+  get playFaceUp(): boolean { return this.handService.playFaceUp; }
   get isViewingOwnHand(): boolean { return this.viewUserId === Network.peer.userId; }
   get isPeekingOther(): boolean {
     return this.isGm && !!this.gmPeekUserId && this.gmPeekUserId !== Network.peer.userId;
@@ -100,8 +129,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
   /** Fan / chrome HUD — shown whenever the viewed hand has cards (collapse never hides cards). */
   get showHud(): boolean { return this.hudVisible; }
 
-  /** Card fan — always on when there are cards; also when expanded (empty drop zone). */
-  get showFan(): boolean {
+  /** Card row / drop zone — always on when there are cards; also when expanded (empty drop zone). */
+  get showCardRow(): boolean {
     return !this.collapsed || this.cards.length > 0;
   }
 
@@ -111,7 +140,9 @@ export class HandRailComponent implements OnInit, OnDestroy {
   private computeHudVisible(cardCount: number): boolean {
     if (this.isGuest) return false;
     if (this.isMobileLayout && this.mobileLayout.isEdit) return false;
-    // Hand rail chrome/fan only when there are cards.
+    // Always show while GM-peeking so empty peek cannot hide the rail forever
+    // (stored peek in normal browser vs empty private profile).
+    if (this.isPeekingOther) return true;
     return cardCount > 0;
   }
 
@@ -126,6 +157,16 @@ export class HandRailComponent implements OnInit, OnDestroy {
 
   /** Sync cached card list / HUD visibility; returns true when display state changed. */
   private syncFromModel(): boolean {
+    // Stale GM peek (IndexedDB): empty target while own hand has cards → snap back to self.
+    // Only when own hand already has cards (avoids clearing a valid peek before ObjectStore sync).
+    if (this.isPeekingOther) {
+      const viewedEmpty = this.handService.cardsInHand().length < 1;
+      const ownId = Network.peer?.userId || '';
+      const ownHasCards = !!ownId && this.handService.cardsInHand(ownId).length > 0;
+      if (viewedEmpty && ownHasCards) {
+        this.handService.setGmPeekUserId('');
+      }
+    }
     const cards = this.handService.cardsInHand();
     const signature = cards.map(card =>
       `${card.identifier}:${card.handOrder}:${card.state}:${card.rotate}`,
@@ -189,11 +230,20 @@ export class HandRailComponent implements OnInit, OnDestroy {
     private pointerDeviceService: PointerDeviceService,
     private mobileLayout: MobileLayoutService,
     private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+    private contextMenuService: ContextMenuService,
+    private chatMessageService: ChatMessageService,
   ) {}
 
   ngOnInit() {
+    // Collapse chevron UI removed — always keep rail expanded.
+    if (this.handService.collapsed) this.handService.setCollapsed(false);
     this.syncFromModel();
     this.mobileSub = this.mobileLayout.isMobile$.subscribe(() => this.requestViewUpdate(true));
+    this.previewOpenedSub = wireCardHoverCaptionDismiss(this.objectPreview, this.caption, () => {
+      this.captionCardId = null;
+      this.changeDetector.markForCheck();
+    });
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', event => {
         if (this.isHandRelevantCardEvent(event.data)) this.scheduleViewRefresh();
@@ -224,6 +274,15 @@ export class HandRailComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.mobileSub?.unsubscribe();
     this.mobileSub = null;
+    this.previewOpenedSub?.unsubscribe();
+    this.previewOpenedSub = null;
+    if (this.hoveredCardId) {
+      this.objectPreview.clearHovered(this.hoveredCardId);
+      this.objectPreview.closeForObject(this.hoveredCardId);
+    }
+    this.caption.clear();
+    this.hoveredCardId = null;
+    this.captionCardId = null;
     if (this.lazyUpdateTimer !== null) {
       clearTimeout(this.lazyUpdateTimer);
       this.lazyUpdateTimer = null;
@@ -250,19 +309,118 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.requestViewUpdate(true);
   }
 
-  fanRotate(index: number, total: number): number {
-    if (total <= 1) return 0;
-    const spread = Math.min(16, 4 + total);
-    const step = spread / (total - 1);
-    return -spread / 2 + step * index;
+  onPlayFaceChange(event: Event) {
+    const checked = !!(event.target as HTMLInputElement)?.checked;
+    this.handService.setPlayFaceUp(checked);
+    this.changeDetector.markForCheck();
   }
 
-  fanLift(index: number): number {
-    return -Math.min(index * 1.5, 12);
+  onCardContextMenu(event: MouseEvent, card: Card) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canEditOwnHand || !card || this.isGuest) return;
+    if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
+    const actions = this.makeHandCardContextMenu(card);
+    if (!actions.length) return;
+    this.contextMenuService.open(
+      this.pointerDeviceService.pointers[0],
+      actions,
+      card.name || this.i18n.t('card.unnamed'),
+    );
   }
 
-  fanDepth(index: number): number {
-    return index * 0.4;
+  private makeHandCardContextMenu(card: Card): ContextMenuAction[] {
+    const actions: ContextMenuAction[] = [];
+    actions.push({
+      name: this.i18n.t('hand.menu.playFaceUp'),
+      action: () => this.playCardToTable(card, true),
+      materialIcon: 'visibility',
+      default: true,
+    });
+    actions.push({
+      name: this.i18n.t('hand.menu.playFaceDown'),
+      action: () => this.playCardToTable(card, false),
+      materialIcon: 'visibility_off',
+    });
+    actions.push(ContextMenuSeparator);
+
+    const peers = this.handService.onlinePeers();
+    if (peers.length > 0) {
+      actions.push({
+        name: this.i18n.t('hand.menu.giveTo'),
+        action: null,
+        materialIcon: 'person_add',
+        subActions: peers.map(peer => ({
+          name: peer.name,
+          action: () => {
+            card.moveToHand(peer.userId);
+            SoundEffect.play(PresetSound.cardDraw);
+            this.chatMessageService.sendOperationLog(this.i18n.t('hand.gaveTo', {
+              card: card.name || this.i18n.t('card.unnamed'),
+              name: peer.name,
+            }));
+            this.requestViewUpdate(true);
+          },
+        })),
+      });
+      actions.push(ContextMenuSeparator);
+    }
+
+    actions.push({
+      name: this.i18n.t('hand.menu.discard'),
+      action: () => {
+        card.destroy();
+        SoundEffect.play(PresetSound.sweep);
+        this.requestViewUpdate(true);
+      },
+      materialIcon: 'delete',
+    });
+    return actions;
+  }
+
+  /** Place a hand card onto the table near the pointer (or slight offset from origin). */
+  private playCardToTable(card: Card, faceUp: boolean) {
+    if (!card || !this.canEditOwnHand) return;
+    const pointer = this.pointerDeviceService.pointers[0] || { x: 0, y: 0, z: 0 };
+    const local = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: pointer.x, y: pointer.y, z: 0 },
+      this.pointerDeviceService.targetElement,
+    );
+    card.location.x = local.x;
+    card.location.y = local.y;
+    card.setLocation('table');
+    if (faceUp) card.faceUp();
+    else card.faceDown();
+    card.raiseInTier();
+    SoundEffect.play(PresetSound.cardPut);
+    this.chatMessageService.sendOperationLog(faceUp
+      ? this.i18n.t('card.revealedOne', { name: card.name || this.i18n.t('card.unnamed') })
+      : this.i18n.t('hand.playedFaceDown', { name: card.name || this.i18n.t('card.facedown') }));
+    this.requestViewUpdate(true);
+  }
+
+  onCardMouseEnter(card: Card) {
+    if (!card) return;
+    this.hoveredCardId = card.identifier;
+    this.objectPreview.setHovered(card.identifier, () => buildCardPreviewPayload(card));
+    if (!this.isDraggingCard) {
+      this.captionCardId = card.identifier;
+      this.caption.startIfDesktop(this.mobileLayout.isMobile);
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  onCardMouseLeave(card: Card) {
+    if (!card) return;
+    if (this.hoveredCardId === card.identifier) {
+      this.objectPreview.clearHovered(card.identifier);
+      this.hoveredCardId = null;
+    }
+    if (this.captionCardId === card.identifier) {
+      this.caption.clear();
+      this.captionCardId = null;
+    }
+    this.changeDetector.markForCheck();
   }
 
   onScrollWheel = (event: WheelEvent) => {
@@ -461,6 +619,11 @@ export class HandRailComponent implements OnInit, OnDestroy {
   };
 
   private startCardDrag(event: PointerEvent, card: Card) {
+    if (this.hoveredCardId) {
+      this.objectPreview.clearHovered(this.hoveredCardId);
+    }
+    this.caption.clear();
+    this.captionCardId = null;
     this.dragCard = card;
     this.dragPointerId = event.pointerId;
     this.isDropOffer = true;
@@ -493,8 +656,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
       position: 'fixed',
       top: '0',
       left: '0',
-      width: '64px',
-      height: '88px',
+      width: '108px',
+      height: '150px',
       zIndex: '100000',
       pointerEvents: 'none',
       filter: 'none',
@@ -503,7 +666,10 @@ export class HandRailComponent implements OnInit, OnDestroy {
       borderRadius: '4px',
     } as CSSStyleDeclaration);
     const img = document.createElement('img');
-    img.src = card.imageFile?.url || '';
+    const playUrl = this.handService.playFaceUp
+      ? (card.frontImage?.url || card.imageFile?.url || '')
+      : (card.backImage?.url || card.frontImage?.url || '');
+    img.src = playUrl;
     img.alt = '';
     img.draggable = false;
     Object.assign(img.style, {
@@ -520,7 +686,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
 
   private moveDragGhost(x: number, y: number) {
     if (!this.dragGhost) return;
-    this.dragGhost.style.transform = `translate(${x - 32}px, ${y - 44}px)`;
+    this.dragGhost.style.transform = `translate(${x - 54}px, ${y - 75}px)`;
   }
 
   private removeDragGhost() {
@@ -561,7 +727,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
       case 'stack': {
         const stack = ObjectStore.instance.get(stackId!) as CardStack;
         if (stack instanceof CardStack && !stack.isLocked) {
-          card.owner = '';
+          this.handService.applyPlayFace(card);
           stack.putOnTop(card);
           SoundEffect.play(PresetSound.cardPut);
           return;
@@ -602,7 +768,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     cardStack.rotate = target.rotate;
     cardStack.zindex = Math.max(dropped.zindex, target.zindex);
     cardStack.putOnBottom(target);
-    dropped.owner = '';
+    this.handService.applyPlayFace(dropped);
     cardStack.putOnTop(dropped);
     SoundEffect.play(PresetSound.cardPut);
   }
@@ -615,8 +781,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
     );
     card.location.x = local.x;
     card.location.y = local.y;
-    card.owner = '';
     card.setLocation('table');
+    this.handService.applyPlayFace(card);
     card.raiseInTier();
     SoundEffect.play(PresetSound.cardPut);
   }

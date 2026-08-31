@@ -3,7 +3,6 @@
   <div class="handout-chrome" (click)="$event.stopPropagation()">
     <div class="handout-bar">
       <span class="handout-title">
-        <span *ngIf="isPreview" class="preview-badge">{{ 'note.previewBadge' | i18n }}</span>
         {{ title }}
         <span *ngIf="isPreview && previewZoom !== 1" class="preview-zoom-label">{{ previewZoomPercent }}%</span>
       </span>

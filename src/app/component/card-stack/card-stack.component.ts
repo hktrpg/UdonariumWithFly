@@ -50,14 +50,28 @@ import {
 import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { CoordinateService } from 'service/coordinate.service';
+import { HandService } from 'service/hand.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import {
+  CardHoverCaptionController,
+  cardCaptionName,
+  cardCaptionRubiedText,
+  publishCardCaptionOverlay,
+  wireCardHoverCaptionDismiss,
+} from 'service/card-hover-caption';
+import { CardCaptionOverlayService } from 'service/card-caption-overlay.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildCardStackPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'card-stack',
     templateUrl: './card-stack.component.html',
-    styleUrls: ['./card-stack.component.css'],
+    styleUrls: ['./card-stack.component.css', '../card/card-hover-caption.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('shuffle', [
@@ -200,6 +214,22 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private holdComplete = false;
   private handDropPreviewActive = false;
   private handDropPreviewHover = false;
+  private readonly caption = new CardHoverCaptionController(() => this.onCaptionChanged());
+  private previewOpenedSub: Subscription | null = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
+
+  get captionVisible(): boolean { return this.caption.isVisible; }
+  get captionShowName(): boolean { return this.caption.showName; }
+  get captionShowText(): boolean { return this.caption.showText; }
+  get captionCard(): Card | null {
+    return this.coverCard || this.topCard || null;
+  }
+  get captionName(): string {
+    return cardCaptionName(this.captionCard, this.i18n.t('overview.cardBack'));
+  }
+  get captionTextHtml(): string {
+    return cardCaptionRubiedText(this.captionCard);
+  }
 
   gridSize: number = 50;
 
@@ -228,8 +258,21 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     private chatMessageService: ChatMessageService,
     private tabletopActionService: TabletopActionService,
     private coordinateService: CoordinateService,
-    private i18n: I18nService
-  ) { }
+    private handService: HandService,
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+    private captionOverlay: CardCaptionOverlayService,
+    private mobileLayout: MobileLayoutService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.cardStack?.identifier,
+      () => buildCardStackPreviewPayload(this.cardStack),
+    );
+    this.previewOpenedSub = wireCardHoverCaptionDismiss(this.objectPreview, this.caption, () => {
+      this.captionOverlay.clear();
+    });
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -322,11 +365,40 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
+    this.previewOpenedSub?.unsubscribe();
+    this.previewOpenedSub = null;
+    this.caption.clear();
+    this.captionOverlay.clear();
     this.cleanupQuickDragListeners();
     this.clearHoldTimer();
     this.removeQuickDragGhost();
     this.interactGesture.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+    this.caption.startIfDesktop(this.mobileLayout.isMobile);
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
+    this.caption.clear();
+    this.captionOverlay.clear();
+  }
+
+  private onCaptionChanged() {
+    publishCardCaptionOverlay(
+      this.captionOverlay,
+      this.caption,
+      this.elementRef?.nativeElement,
+      this.captionName,
+      this.captionTextHtml,
+    );
+    this.changeDetector.markForCheck();
   }
 
   animationShuffleStarted(event: any) {
@@ -345,10 +417,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       return;
     }
 
+    // XY-only: ride height must not block merges.
+    const mergeReach = 75 ** 2;
     if (e.detail instanceof Card) {
       let card: Card = e.detail;
-      let distance: number = this.cardStack.calcSqrDistance(card);
-      if (distance < 50 ** 2) {
+      let distance: number = this.cardStack.calcSqrDistanceXY(card);
+      if (distance < mergeReach) {
         e.stopPropagation();
         e.preventDefault();
         this.chatMessageService.sendOperationLog(this.i18n.t('stack.putCard', {
@@ -359,8 +433,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       }
     } else if (e.detail instanceof CardStack) {
       let cardStack: CardStack = e.detail;
-      let distance: number = this.cardStack.calcSqrDistance(cardStack);
-      if (distance < 50 ** 2) {
+      let distance: number = this.cardStack.calcSqrDistanceXY(cardStack);
+      if (distance < mergeReach) {
         e.stopPropagation();
         e.preventDefault();
         this.chatMessageService.sendOperationLog(this.i18n.t('stack.putAll', {
@@ -493,6 +567,9 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       this.resetQuickDragState();
       return;
     }
+    this.previewHover.clearHover();
+    this.caption.clear();
+    this.captionOverlay.clear();
     this.quickDragging = true;
     this.quickDragPeekId = top.identifier;
     SoundEffect.play(PresetSound.cardPick);
@@ -758,20 +835,110 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
     ));
   }
 
-  onMoved() {
+  onMoved(event?: PointerEvent) {
     setCardMergePreview(null);
     SoundEffect.play(PresetSound.cardPut);
-    this.ngZone.run(() => this.dispatchCardDropEvent());
+    this.ngZone.run(() => {
+      if (this.tryMergeAtPointer(event)) return;
+      this.dispatchCardDropEvent();
+    });
   }
 
-  private drawCard(): Card {
-    let card = this.cardStack.drawCard();
+  /** Prefer screen hit-test merge so stacks do not end up riding another deck's height. */
+  private tryMergeAtPointer(event?: PointerEvent): boolean {
+    if (this.GuestMode() || !this.cardStack || !event) return false;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    if (typeof clientX !== 'number' || typeof clientY !== 'number') return false;
+
+    const otherStackId = findCardStackIdAtPoint(clientX, clientY, this.cardStack.identifier);
+    if (otherStackId) {
+      const target = ObjectStore.instance.get(otherStackId);
+      if (target instanceof CardStack) {
+        this.chatMessageService.sendOperationLog(this.i18n.t('stack.putAll', {
+          from: this.cardStack.name == '' ? this.i18n.t('stack.unnamed') : this.cardStack.name,
+          to: target.name == '' ? this.i18n.t('stack.unnamed') : target.name,
+        }));
+        // Dropped stack goes on top of the target (same as carddrop → concatStack).
+        this.concatStack(this.cardStack, target);
+        return true;
+      }
+    }
+
+    const cardId = findCardIdAtPoint(clientX, clientY);
+    if (cardId) {
+      const target = ObjectStore.instance.get(cardId);
+      if (target instanceof Card && !target.isLocked) {
+        this.cardStack.location.x = target.location.x;
+        this.cardStack.location.y = target.location.y;
+        this.cardStack.posZ = target.posZ || 0;
+        this.cardStack.putOnBottom(target);
+        SoundEffect.play(PresetSound.cardPut);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Draw top card into the local player's hand library. */
+  private drawCardToHand(): Card {
+    const card = this.cardStack.drawCard();
     if (card) {
-      card.location.x += 100 + (Math.random() * 50);
-      card.location.y += 25 + (Math.random() * 50);
-      card.setLocation(this.cardStack.location.name, this.cardStack.tableIdentifier);
+      card.moveToHand(Network.peer.userId);
+      EventSystem.trigger('HAND_RAIL_SYNC', {});
     }
     return card;
+  }
+
+  /** Self + online peers, for dealing. */
+  private dealRecipients(): { userId: string; name: string }[] {
+    const selfId = Network.peer?.userId || '';
+    const recipients: { userId: string; name: string }[] = [];
+    if (selfId) {
+      recipients.push({
+        userId: selfId,
+        name: PeerCursor.myCursor?.name || selfId,
+      });
+    }
+    for (const peer of this.handService.onlinePeers()) {
+      recipients.push(peer);
+    }
+    return recipients;
+  }
+
+  /** Round-robin deal: each recipient gets `n` cards into their hand. */
+  private dealCardsPerPlayer(n: number) {
+    if (n < 1 || this.GuestMode()) return;
+    const recipients = this.dealRecipients();
+    if (recipients.length < 1) return;
+
+    let dealt = 0;
+    for (let round = 0; round < n; round++) {
+      for (const peer of recipients) {
+        const card = this.cardStack.drawCard();
+        if (!card) {
+          if (dealt > 0) {
+            this.chatMessageService.sendOperationLog(this.i18n.t('stack.dealtPartial', {
+              stack: this.stackDisplayName(),
+              count: n,
+              players: recipients.length,
+              dealt,
+            }));
+            EventSystem.trigger('HAND_RAIL_SYNC', {});
+          }
+          return;
+        }
+        card.moveToHand(peer.userId);
+        dealt++;
+        if (dealt === 1 || dealt % 4 === 0) SoundEffect.play(PresetSound.cardDraw);
+      }
+    }
+    this.chatMessageService.sendOperationLog(this.i18n.t('stack.dealt', {
+      stack: this.stackDisplayName(),
+      count: n,
+      players: recipients.length,
+    }));
+    EventSystem.trigger('HAND_RAIL_SYNC', {});
   }
 
   textShadowCss(textColor: string): string {
@@ -801,11 +968,16 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   private splitStack(split: number) {
     if (this.GuestMode()) return;
     if (split < 2) return;
+    const cardSizePx = (this.cardStack.topCard?.size ?? 2) * this.gridSize;
+    const spacing = cardSizePx + this.gridSize; // one card width + 1 grid gap
     let cardStacks: CardStack[] = [];
     for (let i = 0; i < split; i++) {
       let cardStack = CardStack.create(`${this.cardStack.name}_${('0' + (i+1).toString()).slice(-2)}`);
-      cardStack.location.x = this.cardStack.location.x + 50 - (Math.random() * 100);
-      cardStack.location.y = this.cardStack.location.y + 50 - (Math.random() * 100);
+      const offsetX = (i - (split - 1) / 2) * spacing;
+      const jitterX = 12 - Math.random() * 24;
+      const jitterY = 20 - Math.random() * 40;
+      cardStack.location.x = this.cardStack.location.x + offsetX + jitterX;
+      cardStack.location.y = this.cardStack.location.y + jitterY;
       cardStack.posZ = this.cardStack.posZ;
       cardStack.location.name = this.cardStack.location.name;
       cardStack.tableIdentifier = this.cardStack.tableIdentifier;
@@ -894,36 +1066,13 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       let selectedCardStacks = () => this.selectedCardStacks();
       actions.push(
         {
-          name: this.i18n.t('stack.menu.2'), action: null, subActions: [
-            {
-              name: this.i18n.t('stack.menu.3'), action: () => {
-                selectedCardStacks().forEach(cardStack => cardStack.faceUpAll());
-                SoundEffect.play(PresetSound.cardDraw);
-              }
-            },
-            {
-              name: this.i18n.t('stack.menu.4'), action: () => {
-                selectedCardStacks().forEach(cardStack => cardStack.faceDownAll());
-                SoundEffect.play(PresetSound.cardDraw);
-              }
-            },
-            {
-              name: this.i18n.t('stack.menu.5'), action: () => {
-                selectedCardStacks().forEach(cardStack => cardStack.uprightAll());
-                SoundEffect.play(PresetSound.cardDraw);
-              }
-            },
-            ContextMenuSeparator,
-            {
-              name: this.i18n.t('stack.menu.6'), action: () => {
-                SoundEffect.play(PresetSound.cardShuffle);
-                selectedCardStacks().forEach(cardStack => {
-                  cardStack.shuffle();
-                  EventSystem.call('SHUFFLE_CARD_STACK', { identifier: cardStack.identifier });
-                });
-              }
-            },
-          ]
+          name: this.i18n.t('stack.menu.6'), action: () => {
+            SoundEffect.play(PresetSound.cardShuffle);
+            selectedCardStacks().forEach(cardStack => {
+              cardStack.shuffle();
+              EventSystem.call('SHUFFLE_CARD_STACK', { identifier: cardStack.identifier });
+            });
+          }
         },
         ContextMenuSeparator,
         {
@@ -951,19 +1100,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       ContextMenuSeparator,
       {
         name: this.i18n.t('stack.menu.9'), action: () => {
-          const card = this.drawCard();
+          const card = this.drawCardToHand();
           if (card) {
             SoundEffect.play(PresetSound.cardDraw);
-            let text: string;
-            if (card.isFront) {
-              text = this.i18n.t('stack.drewCard', {
-                stack: this.cardStack.name,
-                card: card.name == '' ? this.i18n.t('card.unnamed') : card.name
-              });
-            } else {
-              text = this.i18n.t('stack.drewFacedown', { stack: this.cardStack.name });
-            }
-            this.chatMessageService.sendOperationLog(text);
+            this.chatMessageService.sendOperationLog(this.i18n.t('stack.drewToHand', {
+              stack: this.stackDisplayName(),
+            }));
           }
         },
         default: this.cards.length > 0,
@@ -975,85 +1117,52 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
           return {
             name: this.i18n.t('stack.nCards', { count: n }),
             action: () => {
-              const cards: Card[] = [];
+              let count = 0;
               for (let i = 0; i < n; i++) {
-                const card = this.drawCard();
-                if (card) {
-                  cards.push(card);
-                  if (i == 0 || i == 3 || i == 9) SoundEffect.play(PresetSound.cardDraw);
-                }
+                const card = this.drawCardToHand();
+                if (!card) break;
+                count++;
+                if (i == 0 || i == 3 || i == 9) SoundEffect.play(PresetSound.cardDraw);
               }
-              if (cards.length > 0) {
-                const frontCards = cards.filter(card => card.isFront);
-                if (frontCards.length == 0) {
-                  this.chatMessageService.sendOperationLog(this.i18n.t('stack.drewNFacedown', { stack: this.stackDisplayName(), count: cards.length }));
-                } else {
-                  const counter = new Map();
-                  for (const card of frontCards) {
-                    const name = card.name == '' ? this.i18n.t('card.unnamed') : card.name;
-                    let count = counter.get(name) || 0;
-                    count += 1;
-                    counter.set(name, count);
-                  }
-                  let text = this.i18n.t('stack.drewMulti', {
-                    stack: this.stackDisplayName(),
-                    cards: [...counter.keys()].map(key => key + (counter.get(key) <= 1 ? '' : this.i18n.t('stack.times', { count: counter.get(key) }))).join(this.i18n.t('common.listSep'))
-                  });
-                  if (frontCards.length !== cards.length) {
-                    text += this.i18n.t('stack.alsoFacedown', { count: cards.length - frontCards.length });
-                  }
-                  this.chatMessageService.sendOperationLog(text);
-                }
+              if (count > 0) {
+                this.chatMessageService.sendOperationLog(this.i18n.t('stack.drewNToHand', {
+                  stack: this.stackDisplayName(),
+                  count,
+                }));
               }
             }
           };
         }),
         disabled: this.cards.length == 0
       },
+      {
+        name: this.i18n.t('stack.menu.deal'), action: null,
+        subActions: [1, 2, 3, 4, 5, 10].map(n => {
+          return {
+            name: this.i18n.t('stack.menu.dealN', { count: n }),
+            action: () => this.dealCardsPerPlayer(n),
+          };
+        }),
+        disabled: this.cards.length == 0
+      },
       ContextMenuSeparator,
-      (this.cards.length == 0 || !this.cardStack.coverCard?.isFront ? {
+      {
         name: this.i18n.t('stack.menu.11'), action: () => {
-          if (!this.cardStack.coverCard) return;
-          if (!this.cardStack.coverCard.isFront) this.chatMessageService.sendOperationLog(this.i18n.t('stack.revealedTop', {
-            stack: this.stackDisplayName(),
-            card: this.cardStack.coverCard.name == '' ? this.i18n.t('card.unnamed') : this.cardStack.coverCard.name
-          }));
-          this.cardStack.faceUp();
+          const cover = this.cardStack.coverCard;
+          if (!cover) return;
+          if (cover.isFront) {
+            this.cardStack.faceDown();
+          } else {
+            this.chatMessageService.sendOperationLog(this.i18n.t('stack.revealedTop', {
+              stack: this.stackDisplayName(),
+              card: cover.name == '' ? this.i18n.t('card.unnamed') : cover.name
+            }));
+            this.cardStack.faceUp();
+          }
           SoundEffect.play(PresetSound.cardDraw);
         },
         disabled: this.cards.length == 0,
         hotkey: 'F',
-      } : {
-        name: this.i18n.t('stack.menu.12'), action: () => {
-          this.cardStack.faceDown();
-          SoundEffect.play(PresetSound.cardDraw);
-        },
-        disabled: this.cards.length == 0,
-        hotkey: 'F',
-      }),
-      ContextMenuSeparator,
-      {
-        name: this.i18n.t('stack.menu.13'), action: () => {
-          //if (!this.cardStack.topCard) return;
-          //if (!this.cardStack.topCard.isFront) this.chatMessageService.sendOperationLog(`${this.cardStack.name} 全部翻正面，並公開最上方的 ${this.cardStack.topCard.name}`);
-          this.cardStack.faceUpAll();
-          SoundEffect.play(PresetSound.cardDraw);
-        },
-        disabled: this.cards.length == 0
-      },
-      {
-        name: this.i18n.t('stack.menu.14'), action: () => {
-          this.cardStack.faceDownAll();
-          SoundEffect.play(PresetSound.cardDraw);
-        },
-        disabled: this.cards.length == 0
-      },
-      {
-        name: this.i18n.t('stack.menu.15'), action: () => {
-          this.cardStack.uprightAll();
-          SoundEffect.play(PresetSound.cardDraw);
-        },
-        disabled: this.cards.length == 0
       },
       ContextMenuSeparator,
       {
@@ -1106,15 +1215,6 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
         name: this.i18n.t('stack.menu.23'), action: () => {
           this.breakStack();
           SoundEffect.play(PresetSound.cardShuffle);
-        },
-        disabled: this.cards.length == 0
-      },
-      {
-        name: this.i18n.t('stack.menu.24'), action: () => {
-          this.cardStack.inverse();
-          SoundEffect.play(PresetSound.cardDraw);
-          SoundEffect.play(PresetSound.cardDraw);
-          EventSystem.call('INVERSE_CARD_STACK', { identifier: this.cardStack.identifier });
         },
         disabled: this.cards.length == 0
       },

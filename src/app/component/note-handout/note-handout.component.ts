@@ -15,45 +15,10 @@ import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
-import { TextNote } from '@udonarium/text-note';
+import { ObjectPreviewService } from 'service/object-preview.service';
+import { NoteHandoutPayload } from './note-handout-payload';
 
-export type NoteHandoutPayload = {
-  name?: string;
-  imageUrl?: string;
-  pdfIdentifier?: string;
-  pdfPage?: number;
-  pdfPageCount?: number;
-  videoIdentifier?: string;
-  videoUrl?: string;
-  text?: string;
-  noteIdentifier?: string;
-  /** Local Ctrl+hover preview; stays open until Ctrl release. A/D turns PDF pages while open. */
-  preview?: boolean;
-};
-
-export function buildNoteHandoutPayload(note: TextNote, nameFallback: string): NoteHandoutPayload {
-  if (!note) return {};
-  // Match tabletop: flipped + back art replaces PDF/video/text with the back image.
-  if (note.isFlipped && note.hasBackImage) {
-    return {
-      name: note.title || nameFallback,
-      imageUrl: note.backImage?.url || '',
-      noteIdentifier: note.identifier,
-    };
-  }
-  const kind = note.contentKind;
-  return {
-    name: note.title || nameFallback,
-    imageUrl: (kind === 'image' || kind === 'text') ? TextNote.resolveHandoutImageUrl(note) : '',
-    pdfIdentifier: kind === 'pdf' ? note.pdfIdentifier : '',
-    pdfPage: note.pdfPage || 1,
-    pdfPageCount: note.pdfPageCount || 0,
-    videoIdentifier: kind === 'video' ? note.videoIdentifier : '',
-    videoUrl: kind === 'video' ? note.resolvedVideoUrl : '',
-    text: kind === 'text' ? (note.text || '') : '',
-    noteIdentifier: note.identifier,
-  };
-}
+export { buildNoteHandoutPayload, NoteHandoutPayload } from './note-handout-payload';
 
 @Component({
   selector: 'note-handout',
@@ -134,13 +99,20 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
 
   constructor(
     private changeDetector: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private objectPreview: ObjectPreviewService,
   ) { }
 
   ngOnInit() {
     EventSystem.register(this)
       .on('SHOW_NOTE_HANDOUT', event => {
         const data: NoteHandoutPayload = event.data || {};
+        // Ctrl-preview now lives on ObjectPreviewService; bridge legacy preview:true.
+        if (data.preview) {
+          const payload = this.objectPreview.fromNoteHandout(data);
+          if (payload) this.objectPreview.openTransient(payload);
+          return;
+        }
         this.title = data.name || '';
         this.imageUrl = data.imageUrl || '';
         this.text = data.text || '';
@@ -150,7 +122,7 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
         if (this.pdfPageCount > 0 && this.pdfPage > this.pdfPageCount) this.pdfPage = this.pdfPageCount;
         this.videoIdentifier = data.videoIdentifier || '';
         this.videoUrl = data.videoUrl || '';
-        this.isPreview = !!data.preview;
+        this.isPreview = false;
         this.previewNoteId = data.noteIdentifier || '';
         this.resetPreviewView();
         this.pdfRenderSeq++;
@@ -162,11 +134,6 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
       .on('HIDE_NOTE_HANDOUT', event => {
         const data = event.data || {};
         if (!this.isOpen) return;
-        if (this.isPreview) {
-          if (data?.noteIdentifier && this.previewNoteId && data.noteIdentifier !== this.previewNoteId) return;
-          this.close();
-          return;
-        }
         if (data?.force) this.close();
       })
       .on('UPDATE_PDF_RESOURE', () => {

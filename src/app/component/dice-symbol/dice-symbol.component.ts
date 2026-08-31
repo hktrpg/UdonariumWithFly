@@ -36,6 +36,9 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'dice-symbol',
@@ -175,6 +178,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   rotableOption: RotableOption = {};
 
   private interactGesture: ObjectInteractGesture = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   viewRotateX = 50;
   viewRotateZ = 10;
@@ -204,8 +208,15 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
     private tabletopActionService: TabletopActionService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.diceSymbol?.identifier,
+      () => buildTabletopImagePreviewPayload(this.diceSymbol),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -293,8 +304,19 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.interactGesture.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])

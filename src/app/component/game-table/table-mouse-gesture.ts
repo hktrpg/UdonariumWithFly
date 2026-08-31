@@ -1,5 +1,6 @@
 import { InputHandler } from 'directive/input-handler';
 import { NoteHandoutComponent } from 'component/note-handout/note-handout.component';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 type Callback = (srcEvent: TouchEvent | MouseEvent | PointerEvent) => void;
 type OnTransformCallback = (transformX: number, transformY: number, transformZ: number, rotateX: number, rotateY: number, rotateZ: number, event: TableMouseGestureEvent, srcEvent: TouchEvent | MouseEvent | PointerEvent | KeyboardEvent) => void;
@@ -83,7 +84,7 @@ export class TableMouseGesture {
   }
 
   onInputStart(ev: any) {
-    if (NoteHandoutComponent.previewConsumesPointer) return;
+    if (ObjectPreviewService.previewConsumesPointer || NoteHandoutComponent.previewConsumesPointer) return;
     this.currentPositionX = this.input.pointer.x;
     this.currentPositionY = this.input.pointer.y;
     this.buttonCode = ev.button;
@@ -95,7 +96,7 @@ export class TableMouseGesture {
   }
 
   onInputMove(ev: any) {
-    if (NoteHandoutComponent.previewConsumesPointer) return;
+    if (ObjectPreviewService.previewConsumesPointer || NoteHandoutComponent.previewConsumesPointer) return;
     let x = this.input.pointer.x;
     let y = this.input.pointer.y;
     let deltaX = x - this.currentPositionX;
@@ -129,8 +130,8 @@ export class TableMouseGesture {
   }
 
   onWheel(ev: WheelEvent) {
-    // Ctrl-preview handout owns the wheel (zoom content) — do not pan/zoom the map.
-    if (NoteHandoutComponent.previewConsumesWheel) {
+    // Object / note Ctrl-preview owns the wheel (zoom content) — do not pan/zoom the map.
+    if (ObjectPreviewService.previewConsumesWheel || NoteHandoutComponent.previewConsumesWheel) {
       if (ev.cancelable) ev.preventDefault();
       return;
     }

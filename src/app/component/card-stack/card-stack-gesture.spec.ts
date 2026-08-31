@@ -15,7 +15,7 @@ describe('card-stack-gesture', () => {
   it('uses 550ms hold and 8px quick-drag threshold', () => {
     expect(CARD_STACK_HOLD_MS).toBe(550);
     expect(CARD_STACK_QUICK_DRAG_PX).toBe(8);
-    expect(HAND_RAIL_DROP_BAND_PX).toBe(132);
+    expect(HAND_RAIL_DROP_BAND_PX).toBe(168);
   });
 
   it('flags quick drag above 8px movement', () => {

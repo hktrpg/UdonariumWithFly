@@ -1,5 +1,6 @@
 :host {
   pointer-events: none;
+  overflow: visible;
 }
 
 .hand-rail-root {
@@ -13,6 +14,7 @@
   align-items: center;
   justify-content: flex-end;
   pointer-events: none;
+  overflow: visible;
 }
 
 .hand-rail-root.is-mobile {
@@ -27,8 +29,8 @@
   transform: translateX(-50%);
   z-index: 1;
   pointer-events: none;
-  width: min(96vw, 720px);
-  height: 132px;
+  width: min(98vw, 960px);
+  height: 168px;
   margin: 0;
   border: 2px dashed rgba(125, 211, 252, 0.55);
   border-radius: 16px 16px 0 0;
@@ -60,12 +62,13 @@
   position: relative;
   z-index: 2;
   pointer-events: auto;
-  max-width: min(96vw, 720px);
-  width: max-content;
-  min-width: min(72vw, 320px);
+  /* Always full rail width — do not shrink with card count. */
+  width: min(98vw, 960px);
+  max-width: min(98vw, 960px);
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: visible;
 }
 
 .hand-rail-hover-zone {
@@ -76,16 +79,96 @@
   width: 100%;
 }
 
+.hand-play-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.hand-play-face:hover {
+  background: rgba(0, 0, 0, 0.42);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+.hand-play-face-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.hand-play-face-track {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex: 0 0 auto;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.hand-play-face-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f4f7fb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.hand-play-face-input:checked + .hand-play-face-track {
+  background: rgba(56, 189, 248, 0.45);
+  border-color: rgba(125, 211, 252, 0.7);
+}
+
+.hand-play-face-input:checked + .hand-play-face-track .hand-play-face-thumb {
+  transform: translateX(16px);
+  background: #e0f2fe;
+}
+
+.hand-play-face-input:focus-visible + .hand-play-face-track {
+  outline: 2px solid rgba(125, 211, 252, 0.85);
+  outline-offset: 2px;
+}
+
+.hand-play-face-label {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hand-gm-peek {
+  margin-left: 0;
+}
+
 .hand-rail-chrome {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
   border-radius: 10px 10px 0 0;
-  background: rgba(20, 20, 24, 0.88);
+  /* Light chrome only — card HUD itself stays fully transparent. */
+  background: rgba(20, 20, 24, 0.45);
   color: #f2f2f2;
   font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: none;
   width: 100%;
   box-sizing: border-box;
@@ -114,6 +197,16 @@
   color: inherit;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
+  /* No native chevron (V). */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 2px 8px;
+  background-image: none;
+}
+
+.hand-gm-peek select::-ms-expand {
+  display: none;
 }
 
 .hand-viewing {
@@ -121,38 +214,21 @@
   font-size: 11px;
 }
 
-.hand-collapse {
-  margin-left: auto;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  padding: 2px;
-  display: inline-flex;
-}
-
 .hand-rail-drop-zone {
   width: 100%;
-  padding: 6px 8px 8px;
-  border-radius: 12px 12px 0 0;
-  background: rgba(16, 16, 20, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: none;
-  transition:
-    box-shadow 120ms ease,
-    border-color 120ms ease,
-    background 160ms ease;
+  padding: 0;
+  border-radius: 0;
+  /* Card HUD always fully transparent — no panel behind cards. */
+  background: transparent;
+  border: none;
+  box-shadow: none;
   box-sizing: border-box;
+  overflow: visible;
 }
 
-/* Stealth HUD: cards always visible; hide panel chrome/background until hover.
-   Hover hit box = the HUD itself (no oversized pad above). */
+/* Stealth chrome: title bar only; card area stays transparent always. */
 @media (hover: hover) and (pointer: fine) {
-  .hand-rail:not(:hover):not(.is-chrome-forced):not(.is-collapsed) {
-    min-width: unset;
-  }
-
-  /* Title bar floats above cards so reveal never shifts the fan. */
+  /* Title bar floats above cards so reveal never shifts the row. */
   .hand-rail:not(.is-chrome-forced) .hand-rail-chrome {
     position: absolute;
     left: 0;
@@ -169,25 +245,17 @@
     border-color: transparent;
   }
 
-  /* Hide panel background only — cards stay put. */
-  .hand-rail:not(:hover):not(.is-chrome-forced) .hand-rail-drop-zone {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
   .hand-rail:not(:hover):not(.is-chrome-forced) .hand-peek-hint {
     opacity: 0;
   }
 
   .hand-rail.is-collapsed:not(:hover):not(.is-chrome-forced) {
     min-height: 28px;
-    min-width: min(50vw, 280px);
   }
 }
 
 .hand-rail-scroll,
-.hand-fan,
+.hand-row,
 .hand-card-slot,
 .hand-card-slot card-list-image {
   opacity: 1;
@@ -196,8 +264,9 @@
 
 .hand-rail.is-drop-target .hand-rail-drop-zone,
 .hand-rail-drop-zone.is-drop-target {
-  border-color: rgba(120, 200, 255, 0.85);
-  box-shadow: 0 0 0 2px rgba(80, 170, 255, 0.35), inset 0 0 24px rgba(80, 170, 255, 0.12);
+  /* Keep HUD transparent; only a light outline while dropping. */
+  outline: 2px solid rgba(125, 211, 252, 0.75);
+  outline-offset: 2px;
 }
 
 .hand-rail-chrome.is-drop-target {
@@ -207,14 +276,15 @@
 
 .hand-rail-scroll {
   width: 100%;
-  max-width: min(96vw, 720px);
+  max-width: min(98vw, 960px);
   overflow-x: auto;
-  overflow-y: hidden;
-  /* Inner inset so fan overlap / rotate is not clipped by the scroll edges */
-  padding: 4px 2px 2px;
+  overflow-y: visible;
+  /* Reserve scrollbar gutter so hover never shifts cards sideways. */
+  padding: 4px 0 0;
   box-sizing: border-box;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
   scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
@@ -235,38 +305,47 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-.hand-fan {
+.hand-row {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  /* Tall enough for fanLift + rotate corners (card is 88px) */
-  min-height: 108px;
-  perspective: 720px;
-  transform-style: preserve-3d;
-}
-
-.hand-fan-row {
-  justify-content: flex-start;
   width: max-content;
   min-width: 100%;
-  /* Compensate margin: 0 -10px overlap and rotate overhang on first/last cards */
-  padding: 12px 22px 14px;
+  /* Visible peek = top 20% of 150px card = 30px */
+  min-height: 32px;
+  padding: 6px 0 0;
   box-sizing: border-box;
+  gap: 0;
+  font-size: 0; /* kill inline whitespace gaps */
 }
 
 .hand-card-slot {
   position: relative;
-  width: 64px;
-  height: 88px;
-  margin: 0 -10px;
+  width: 108px;
+  height: 150px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 108px;
   transform-origin: bottom center;
-  transform-style: preserve-3d;
+  /* Tuck: only top ~20% peeks — vertical only. */
+  transform: translate3d(0, 80%, 0);
+  transition: transform 140ms ease;
   cursor: grab;
-  overflow: visible;
-  border-radius: 4px;
+  overflow: hidden;
+  border-radius: 0;
   filter: none;
   box-shadow: none;
+  will-change: transform;
+  --hand-card-w: 108px;
+  --hand-card-h: 150px;
+}
+
+/* Hovering the hand rail raises every card together. */
+.hand-rail:hover .hand-card-slot,
+.hand-rail.is-chrome-forced .hand-card-slot {
+  transform: translate3d(0, 0, 0);
+  overflow: visible; /* captions above when raised */
 }
 
 .hand-card-slot:active {
@@ -284,6 +363,38 @@
   pointer-events: none;
 }
 
+.hand-card-caption {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 96px;
+  max-width: min(240px, 70vw);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(12, 16, 24, 0.92);
+  color: #f2f2f2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  text-align: center;
+}
+
+.hand-card-caption-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hand-card-caption-text {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.92;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .hand-peek-hint {
   margin: 6px 0 0;
   font-size: 11px;
@@ -294,18 +405,30 @@
 
 .hand-card-slot card-list-image {
   display: block;
-  width: 64px;
-  height: 88px;
+  width: 108px;
+  height: 150px;
   filter: none;
   box-shadow: none;
+  line-height: 0;
 }
 
-/* Kill any inherited shadow / soft fringe on nested card art. */
+/* Fill the slot edge-to-edge — object-fit:contain leaves side gaps on many card assets. */
 :host ::ng-deep .hand-card-slot .image-box,
 :host ::ng-deep .hand-card-slot .image,
 :host ::ng-deep .hand-card-slot img {
+  display: block !important;
+  width: 108px !important;
+  height: 150px !important;
+  margin: 0 !important;
+  padding: 0 !important;
   filter: none !important;
   box-shadow: none !important;
+}
+
+:host ::ng-deep .hand-card-slot img {
+  object-fit: fill !important;
+  left: 0 !important;
+  top: 0 !important;
 }
 
 .hand-rail.is-collapsed:not(.has-cards) .hand-rail-drop-zone {
@@ -317,8 +440,8 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 64px;
-  height: 88px;
+  width: 108px;
+  height: 150px;
   z-index: 100000;
   pointer-events: none;
   filter: none;

@@ -1,0 +1,41 @@
+:host {
+  pointer-events: none;
+}
+
+.card-caption-overlay {
+  position: fixed;
+  z-index: 100040;
+  /* Default: grow to the right of the card. */
+  transform: translate(0, -50%);
+  box-sizing: border-box;
+  min-width: 96px;
+  max-width: min(280px, 70vw);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(12, 16, 24, 0.94);
+  color: #f2f2f2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  text-align: left;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.card-caption-overlay.is-flip-x {
+  transform: translate(-100%, -50%);
+  text-align: right;
+}
+
+.card-caption-overlay-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card-caption-overlay-text {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 8em;
+  overflow: hidden;
+}

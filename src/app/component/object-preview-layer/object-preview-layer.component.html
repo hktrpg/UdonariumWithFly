@@ -1,0 +1,137 @@
+<!-- Transient fullscreen preview (max one) -->
+<div *ngIf="transient as t" class="preview-backdrop is-fill is-transient"
+  [attr.data-preview-root]="t.id"
+  [@fadeInOut]="'in'">
+  <div class="preview-chrome" (click)="$event.stopPropagation()">
+    <div class="preview-bar">
+      <span class="preview-title">{{ t.title }}</span>
+      <div class="preview-actions">
+        <ng-container *ngIf="isPdf(t)">
+          <button type="button" class="nav-btn" data-no-dblclick
+            (click)="prevPage(t, $event)" (dblclick)="$event.stopPropagation(); $event.preventDefault()"
+            [disabled]="(t.pdfPageCount || 0) <= 1">
+            <i class="material-icons">chevron_left</i>
+          </button>
+          <span class="page-label">{{ t.pdfPage }}{{ t.pdfPageCount ? ' / ' + t.pdfPageCount : '' }}</span>
+          <button type="button" class="nav-btn" data-no-dblclick
+            (click)="nextPage(t, $event)" (dblclick)="$event.stopPropagation(); $event.preventDefault()"
+            [disabled]="(t.pdfPageCount || 0) <= 1">
+            <i class="material-icons">chevron_right</i>
+          </button>
+        </ng-container>
+        <button *ngIf="t.zoom !== 1 || t.panX !== 0 || t.panY !== 0"
+          type="button" class="nav-btn" data-no-dblclick
+          (click)="resetView(t, $event)"
+          [attr.title]="'note.previewResetView' | i18n"
+          [attr.aria-label]="'note.previewResetView' | i18n">
+          <i class="material-icons">restart_alt</i>
+        </button>
+        <button type="button" class="nav-btn pin-btn" data-no-dblclick
+          (click)="pinTransient($event)"
+          [attr.title]="'overview.pin' | i18n"
+          [attr.aria-label]="'overview.pin' | i18n">
+          <i class="material-icons">push_pin</i>
+        </button>
+        <button type="button" class="close-btn" (click)="closeTransient($event)"
+          [attr.aria-label]="'note.closeHandout' | i18n">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <div class="preview-content-stage is-preview-stage"
+        [class.is-dragging]="isContentDragging(t)"
+        [style.transform]="previewTransform(t)"
+        (pointerdown)="onContentPointerDown(t, $event)"
+        (pointermove)="onContentPointerMove(t, $event)"
+        (pointerup)="onContentPointerUp(t, $event)"
+        (pointercancel)="onContentPointerUp(t, $event)"
+        (dblclick)="onContentDblClick(t, $event)">
+        <img *ngIf="!isPdf(t) && !isVideo(t) && t.imageUrl" class="preview-image is-preview-media"
+          [src]="t.imageUrl | safe: 'resourceUrl'" draggable="false" />
+        <video *ngIf="isVideo(t)" class="preview-video is-preview-media"
+          [src]="resolvedVideoUrl(t) | safe: 'resourceUrl'"
+          controls playsinline
+          (pointerdown)="$event.stopPropagation()"></video>
+        <canvas *ngIf="isPdf(t)" #pdfCanvas class="preview-pdf is-preview-media"
+          [attr.data-preview-id]="t.id"></canvas>
+        <div *ngIf="isText(t)" class="preview-text note-md is-preview-media"
+          [innerHTML]="textHtml(t) | safe: 'html'"></div>
+      </div>
+      <aside *ngIf="t.asideHtml" class="preview-aside"
+        [innerHTML]="t.asideHtml | safe: 'html'"></aside>
+    </div>
+  </div>
+</div>
+
+<!-- Pinned floating windows (multiple allowed) -->
+<div *ngFor="let p of pinned; trackBy: trackById"
+  class="preview-float"
+  [attr.data-preview-root]="p.id"
+  [ngStyle]="floatStyle(p)"
+  (pointerdown)="onWindowPointerDown(p, $event)"
+  (pointermove)="onWindowPointerMove(p, $event)"
+  (pointerup)="onWindowPointerUp(p, $event)"
+  (pointercancel)="onWindowPointerUp(p, $event)"
+  [@fadeInOut]="'in'">
+  <div class="preview-chrome is-float">
+    <div class="preview-bar is-float-bar">
+      <span class="preview-title">{{ p.title }}</span>
+      <div class="preview-actions">
+        <ng-container *ngIf="isPdf(p)">
+          <button type="button" class="nav-btn" data-no-dblclick
+            (click)="prevPage(p, $event)" (dblclick)="$event.stopPropagation(); $event.preventDefault()"
+            [disabled]="(p.pdfPageCount || 0) <= 1">
+            <i class="material-icons">chevron_left</i>
+          </button>
+          <span class="page-label">{{ p.pdfPage }}{{ p.pdfPageCount ? ' / ' + p.pdfPageCount : '' }}</span>
+          <button type="button" class="nav-btn" data-no-dblclick
+            (click)="nextPage(p, $event)" (dblclick)="$event.stopPropagation(); $event.preventDefault()"
+            [disabled]="(p.pdfPageCount || 0) <= 1">
+            <i class="material-icons">chevron_right</i>
+          </button>
+        </ng-container>
+        <button *ngIf="p.zoom !== 1 || p.panX !== 0 || p.panY !== 0"
+          type="button" class="nav-btn" data-no-dblclick
+          (click)="resetView(p, $event)"
+          [attr.title]="'note.previewResetView' | i18n"
+          [attr.aria-label]="'note.previewResetView' | i18n">
+          <i class="material-icons">restart_alt</i>
+        </button>
+        <button type="button" class="nav-btn pin-btn is-pinned" data-no-dblclick
+          (click)="unpin(p.id, $event)"
+          [attr.title]="'overview.unpin' | i18n"
+          [attr.aria-label]="'overview.unpin' | i18n">
+          <i class="material-icons">push_pin</i>
+        </button>
+        <button type="button" class="close-btn" (click)="closePinned(p.id, $event)"
+          [attr.aria-label]="'note.closeHandout' | i18n">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <div class="preview-content-stage is-preview-stage is-float-stage"
+        [class.is-dragging]="isContentDragging(p)"
+        [style.transform]="previewTransform(p)"
+        (pointerdown)="onContentPointerDown(p, $event)"
+        (pointermove)="onContentPointerMove(p, $event)"
+        (pointerup)="onContentPointerUp(p, $event)"
+        (pointercancel)="onContentPointerUp(p, $event)"
+        (dblclick)="onContentDblClick(p, $event)">
+        <img *ngIf="!isPdf(p) && !isVideo(p) && p.imageUrl" class="preview-image is-preview-media"
+          [src]="p.imageUrl | safe: 'resourceUrl'" draggable="false" />
+        <video *ngIf="isVideo(p)" class="preview-video is-preview-media"
+          [src]="resolvedVideoUrl(p) | safe: 'resourceUrl'"
+          controls playsinline
+          (pointerdown)="$event.stopPropagation()"></video>
+        <canvas *ngIf="isPdf(p)" #pdfCanvas class="preview-pdf is-preview-media"
+          [attr.data-preview-id]="p.id"></canvas>
+        <div *ngIf="isText(p)" class="preview-text note-md is-preview-media"
+          [innerHTML]="textHtml(p) | safe: 'html'"></div>
+      </div>
+      <aside *ngIf="p.asideHtml" class="preview-aside"
+        [innerHTML]="p.asideHtml | safe: 'html'"></aside>
+    </div>
+  </div>
+</div>

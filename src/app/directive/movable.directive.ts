@@ -318,8 +318,11 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     let nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
     // Analytic terrain / card-stack tops (deck thickness is CSS-only, not in pick Z).
+    // Only characters / tokens ride decks — cards and card-stacks must merge instead of climb.
+    const alias = this.tabletopObject?.aliasName;
+    const allowDeckRide = alias === 'character' || alias === 'character-token';
     const blockedByPeer = this.hitStackHasNonRidePeer(hitStack) || this.isHitOnNonRidePeer(element);
-    if (!blockedByPeer) {
+    if (allowDeckRide && !blockedByPeer) {
       const rideZ = MovableSelectionSynchronizer.sampleRidePosZ(
         pointer3d.x + this.width / 2,
         pointer3d.y + this.height / 2,
@@ -866,6 +869,10 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   private setCollidableLayer(isCollidable: boolean) {
     // todo
+    const dragAlias = this.tabletopObject?.aliasName;
+    // Cards / stacks must stay hittable while dragging another card/stack so
+    // merge-preview (blue outline) can find them via elementsFromPoint.
+    const keepCardPeers = dragAlias === 'card' || dragAlias === 'card-stack';
     let isEnable = isCollidable;
     for (let layerName of MovableDirective.layerMap.keys()) {
       if (this.colideLayers.includes(layerName)) {
@@ -877,6 +884,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
         }
       } else {
         isEnable = !isCollidable;
+        if (keepCardPeers && (layerName === 'card' || layerName === 'card-stack')) {
+          isEnable = true;
+        }
       }
       MovableDirective.layerMap.get(layerName).forEach(movable => {
         if (movable === this || (movable.input?.isGrabbing)) return;

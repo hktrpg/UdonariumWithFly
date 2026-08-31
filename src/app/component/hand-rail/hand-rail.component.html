@@ -21,6 +21,19 @@
       <span class="hand-rail-title">{{ 'hand.title' | i18n }}</span>
       <span class="hand-rail-count">{{ cards.length }}</span>
 
+      <label *ngIf="canEditOwnHand" class="hand-play-face" (click)="$event.stopPropagation()"
+        [attr.title]="(playFaceUp ? 'hand.playFaceUpHint' : 'hand.playFaceDownHint') | i18n">
+        <input type="checkbox" class="hand-play-face-input"
+          [checked]="playFaceUp"
+          (change)="onPlayFaceChange($event)" />
+        <span class="hand-play-face-track" aria-hidden="true">
+          <span class="hand-play-face-thumb"></span>
+        </span>
+        <span class="hand-play-face-label">
+          {{ (playFaceUp ? 'hand.playFaceUp' : 'hand.playFaceDown') | i18n }}
+        </span>
+      </label>
+
       <label *ngIf="isGm && !collapsed" class="hand-gm-peek" (click)="$event.stopPropagation()">
         <select [ngModel]="gmPeekUserId" (ngModelChange)="onGmPeekChange($event)">
           <option [ngValue]="''">{{ 'hand.myHand' | i18n }}</option>
@@ -31,28 +44,31 @@
       <span class="hand-viewing" *ngIf="isPeekingOther && viewOwnerName && !collapsed">
         {{ 'hand.viewing' | i18n:{ name: viewOwnerName } }}
       </span>
-
-      <button type="button" class="hand-collapse" (click)="toggleCollapsed()"
-        [attr.title]="(collapsed ? 'hand.expand' : 'hand.collapse') | i18n">
-        <i class="material-icons">{{ collapsed ? 'expand_less' : 'expand_more' }}</i>
-      </button>
     </div>
 
-    <div #dropZone class="hand-rail-drop-zone" *ngIf="showFan"
+    <div #dropZone class="hand-rail-drop-zone" *ngIf="showCardRow"
       (dragover)="onRailDragOver($event)"
       (dragleave)="onRailDragLeave($event)"
       (drop)="onRailDrop($event)">
       <div #scrollViewport class="hand-rail-scroll"
         [class.is-panning]="isPanningScroll"
         (pointerdown)="onScrollPanDown($event)">
-        <div class="hand-fan hand-fan-row" *ngIf="cards.length > 0">
+        <div class="hand-row" *ngIf="cards.length > 0">
           <div class="hand-card-slot"
             *ngFor="let card of cards; let i = index"
             [style.zIndex]="i + 1"
             [class.is-reorder-target]="reorderHoverIndex === i && isDraggingCard"
-            [style.transform]="'translateY(' + fanLift(i) + 'px) translateZ(' + fanDepth(i) + 'px) rotate(' + fanRotate(i, cards.length) + 'deg)'"
-            (pointerdown)="onCardPointerDown($event, card)">
-            <card-list-image [card]="card" [enableTooltip]="false" [singleFace]="true"></card-list-image>
+            (pointerdown)="onCardPointerDown($event, card)"
+            (contextmenu)="onCardContextMenu($event, card)"
+            (mouseenter)="onCardMouseEnter(card)"
+            (mouseleave)="onCardMouseLeave(card)">
+            <card-list-image [card]="card" [enableTooltip]="false" [singleFace]="true" [showFaceText]="false"></card-list-image>
+            <div *ngIf="captionCardId === card.identifier && captionVisible"
+              class="hand-card-caption is-pointer-events-none">
+              <div *ngIf="captionShowName" class="hand-card-caption-name">{{ captionNameFor(card) }}</div>
+              <div *ngIf="captionShowText" class="hand-card-caption-text"
+                [innerHTML]="captionTextHtmlFor(card) | safe: 'html'"></div>
+            </div>
           </div>
         </div>
       </div>
