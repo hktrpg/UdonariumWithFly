@@ -17,6 +17,10 @@ import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { ObjectPreviewPayload, ObjectPreviewService } from 'service/object-preview.service';
+import { openObjectDetailById } from 'service/open-object-detail';
+import { I18nService } from 'service/i18n.service';
+import { PanelService } from 'service/panel.service';
+import { PointerDeviceService } from 'service/pointer-device.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -53,6 +57,11 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
   private windowDragId: string | null = null;
   private windowDragOffX = 0;
   private windowDragOffY = 0;
+  private pointerDownX = 0;
+  private pointerDownY = 0;
+  private pointerMoved = false;
+  private lastTapAt = 0;
+  private lastTapId = '';
   private needsPdfRender = new Set<string>();
   private lastPdfKey = new Map<string, string>();
   private pdfRenderSeq = new Map<string, number>();
@@ -64,6 +73,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     private objectPreview: ObjectPreviewService,
     private changeDetector: ChangeDetectorRef,
     private ngZone: NgZone,
+    private panelService: PanelService,
+    private pointerDeviceService: PointerDeviceService,
+    private i18n: I18nService,
   ) { }
 
   get transient(): ObjectPreviewPayload | null {
@@ -195,6 +207,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     if (t?.closest?.('video, button, a, input, textarea, .preview-actions, .preview-bar')) return;
     e.preventDefault();
     e.stopPropagation();
+    this.pointerDownX = e.clientX;
+    this.pointerDownY = e.clientY;
+    this.pointerMoved = false;
     if (p.pinned) {
       // Pinned: dragging the image moves the whole HUD (no content pan detach).
       const pos = this.floatPos.get(p.id) || { left: 64, top: 12 };
@@ -217,6 +232,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     if (this.windowDragId === p.id) {
       e.preventDefault();
       e.stopPropagation();
+      if (Math.hypot(e.clientX - this.pointerDownX, e.clientY - this.pointerDownY) > 6) {
+        this.pointerMoved = true;
+      }
       this.floatPos.set(p.id, {
         left: Math.max(0, e.clientX - this.windowDragOffX),
         top: Math.max(0, e.clientY - this.windowDragOffY),
@@ -230,6 +248,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     const dx = e.clientX - this.dragLastX;
     const dy = e.clientY - this.dragLastY;
     if (dx === 0 && dy === 0) return;
+    if (Math.hypot(e.clientX - this.pointerDownX, e.clientY - this.pointerDownY) > 6) {
+      this.pointerMoved = true;
+    }
     this.dragLastX = e.clientX;
     this.dragLastY = e.clientY;
     this.objectPreview.updateView(p.id, {
@@ -241,28 +262,89 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
   onContentPointerUp(p: ObjectPreviewPayload, e: PointerEvent) {
     if (this.windowDragId === p.id) {
       e.stopPropagation();
+      const moved = this.pointerMoved;
       this.windowDragId = null;
       ObjectPreviewService.previewConsumesPointer = false;
       try {
         (e.currentTarget as HTMLElement)?.releasePointerCapture?.(e.pointerId);
       } catch { /* ignore */ }
+      if (!moved) this.registerPreviewTap(p);
       this.changeDetector.markForCheck();
       return;
     }
     if (this.dragContentId !== p.id) return;
     e.stopPropagation();
+    const moved = this.pointerMoved;
     this.dragContentId = null;
     ObjectPreviewService.previewConsumesPointer = false;
     try {
       (e.currentTarget as HTMLElement)?.releasePointerCapture?.(e.pointerId);
     } catch { /* ignore */ }
+    if (!moved) this.registerPreviewTap(p);
     this.changeDetector.markForCheck();
   }
 
   onContentDblClick(p: ObjectPreviewPayload, e: Event) {
     e.preventDefault();
     e.stopPropagation();
-    this.resetView(p, e);
+    this.openPreviewDetail(p);
+  }
+
+  /** Double-click the HUD title bar to open that item's detail sheet. */
+  onHudDblClick(p: ObjectPreviewPayload, e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('button, a, input, textarea, select, .preview-actions')) return;
+    this.openPreviewDetail(p);
+  }
+
+  /** pointer capture often suppresses dblclick — detect double-tap on pointerup. */
+  private registerPreviewTap(p: ObjectPreviewPayload) {
+    const now = performance.now();
+    if (this.lastTapId === p.id && now - this.lastTapAt < 450) {
+      this.lastTapAt = 0;
+      this.lastTapId = '';
+      this.openPreviewDetail(p);
+      return;
+    }
+    this.lastTapAt = now;
+    this.lastTapId = p.id;
+  }
+
+  /**
+   * Open object detail sheet. Keep pinned previews; only dismiss fullscreen
+   * transient (it would cover the sheet). Raise the sheet above preview z-index.
+   */
+  private openPreviewDetail(p: ObjectPreviewPayload) {
+    if (!p?.id) return;
+    const opened = openObjectDetailById(p.id, {
+      panelService: this.panelService,
+      pointerDeviceService: this.pointerDeviceService,
+      i18n: this.i18n,
+    });
+    if (!opened) return;
+    if (this.transient?.id === p.id) {
+      this.objectPreview.closeTransient();
+    }
+    // Panels default ~12000; preview layer is 100050 — lift the sheet so it stays usable with pin open.
+    queueMicrotask(() => this.raiseNewestObjectDetailPanel());
+  }
+
+  private raiseNewestObjectDetailPanel() {
+    const nodes = document.querySelectorAll<HTMLElement>('[data-tour-panel^="obj.detail."]');
+    let bestEl: HTMLElement | null = null;
+    let bestZ = -Infinity;
+    nodes.forEach(el => {
+      if (!el.isConnected) return;
+      const z = parseInt(el.style.zIndex || '0', 10);
+      const zSafe = Number.isFinite(z) ? z : 0;
+      if (!bestEl || zSafe >= bestZ) {
+        bestEl = el;
+        bestZ = zSafe;
+      }
+    });
+    if (bestEl) bestEl.style.zIndex = '100060';
   }
 
   isContentDragging(p: ObjectPreviewPayload): boolean {
@@ -275,6 +357,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     if (t?.closest?.('button, .preview-content-stage, video, a, input, textarea')) return;
     e.preventDefault();
     e.stopPropagation();
+    this.pointerDownX = e.clientX;
+    this.pointerDownY = e.clientY;
+    this.pointerMoved = false;
     const pos = this.floatPos.get(p.id) || { left: 64, top: 12 };
     this.windowDragId = p.id;
     this.windowDragOffX = e.clientX - pos.left;
@@ -289,6 +374,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     if (this.windowDragId !== p.id) return;
     e.preventDefault();
     e.stopPropagation();
+    if (Math.hypot(e.clientX - this.pointerDownX, e.clientY - this.pointerDownY) > 6) {
+      this.pointerMoved = true;
+    }
     this.floatPos.set(p.id, {
       left: Math.max(0, e.clientX - this.windowDragOffX),
       top: Math.max(0, e.clientY - this.windowDragOffY),
@@ -299,11 +387,13 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
   onWindowPointerUp(p: ObjectPreviewPayload, e: PointerEvent) {
     if (this.windowDragId !== p.id) return;
     e.stopPropagation();
+    const moved = this.pointerMoved;
     this.windowDragId = null;
     if (!this.dragContentId) ObjectPreviewService.previewConsumesPointer = false;
     try {
       (e.currentTarget as HTMLElement)?.releasePointerCapture?.(e.pointerId);
     } catch { /* ignore */ }
+    if (!moved) this.registerPreviewTap(p);
   }
 
   private goToPage(p: ObjectPreviewPayload, page: number) {

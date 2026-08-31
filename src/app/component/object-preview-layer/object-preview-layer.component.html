@@ -3,7 +3,7 @@
   [attr.data-preview-root]="t.id"
   [@fadeInOut]="'in'">
   <div class="preview-chrome" (click)="$event.stopPropagation()">
-    <div class="preview-bar">
+    <div class="preview-bar" (dblclick)="onHudDblClick(t, $event)">
       <span class="preview-title">{{ t.title }}</span>
       <div class="preview-actions">
         <ng-container *ngIf="isPdf(t)">
@@ -75,7 +75,7 @@
   (pointercancel)="onWindowPointerUp(p, $event)"
   [@fadeInOut]="'in'">
   <div class="preview-chrome is-float">
-    <div class="preview-bar is-float-bar">
+    <div class="preview-bar is-float-bar" (dblclick)="onHudDblClick(p, $event)">
       <span class="preview-title">{{ p.title }}</span>
       <div class="preview-actions">
         <ng-container *ngIf="isPdf(p)">

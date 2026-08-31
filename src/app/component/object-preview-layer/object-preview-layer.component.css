@@ -72,6 +72,7 @@
   font-size: 12px;
   /* Keep HUD above zoomed/panned media for hit-testing. */
   pointer-events: auto;
+  cursor: default;
 }
 
 .preview-bar.is-float-bar {
