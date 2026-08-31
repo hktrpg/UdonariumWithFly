@@ -5,6 +5,25 @@ type PdfjsModule = typeof import('pdfjs-dist');
 let pdfjsPromise: Promise<PdfjsModule> | null = null;
 let workerReady = false;
 
+/**
+ * Hosts often serve `.mjs` as `application/octet-stream`. Chrome then rejects
+ * `new Worker(..., { type: 'module' })` (pdf.js always uses a module worker).
+ * Blob + explicit JS MIME avoids depending on server Content-Type.
+ */
+async function resolvePdfWorkerSrc(): Promise<string> {
+  const workerUrl = new URL('assets/pdf.worker.min.mjs', document.baseURI).href;
+  try {
+    const res = await fetch(workerUrl, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const source = await res.text();
+    const blob = new Blob([source], { type: 'text/javascript' });
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    console.warn('[pdf] worker blob fallback failed; using asset URL', err);
+    return workerUrl;
+  }
+}
+
 async function ensurePdfjs(): Promise<PdfjsModule> {
   if (!pdfjsPromise) {
     pdfjsPromise = import('pdfjs-dist');
@@ -12,7 +31,7 @@ async function ensurePdfjs(): Promise<PdfjsModule> {
   const pdfjs = await pdfjsPromise;
   if (!workerReady) {
     // Bundled via angular.json assets from node_modules/pdfjs-dist/build.
-    pdfjs.GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
+    pdfjs.GlobalWorkerOptions.workerSrc = await resolvePdfWorkerSrc();
     workerReady = true;
   }
   return pdfjs;

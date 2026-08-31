@@ -5,6 +5,9 @@ RewriteCond %{REQUEST_FILENAME} !"\.gz$"
 RewriteCond %{REQUEST_FILENAME}.gz -s
 RewriteRule .+ %{REQUEST_URI}.gz [L]
 
+# pdf.js module worker (pdf.worker.min.mjs) requires a JS MIME type.
+AddType text/javascript .mjs
+
 <FilesMatch "\.html\.gz$">
 AddEncoding x-gzip .gz 
 ForceType text/html
