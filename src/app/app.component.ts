@@ -162,6 +162,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isHorizontal = false;
   isLoggedin = false;
+  /** CONNECT_PEER during join must not opelog onto lobby SubTab; flush after JOIN_PROBE_FINISHED. */
+  private pendingRoomConnectLog = false;
   isMobileLayout = false;
   isTabletLandscape = false;
   isMobileEdit = false;
@@ -693,6 +695,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
+        this.pendingRoomConnectLog = false;
         if (Network.peer?.isRoom) {
           // Survive fatal close() which wipes peer to ??? — needed for room reopen.
           Network.rememberRoomSession({
@@ -829,11 +832,26 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
-            chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
+            if (RoomConnectHelper.joinInProgress) {
+              // Lobby SubTab still present — defer until join clears samples + applies host chat.
+              this.pendingRoomConnectLog = true;
+            } else {
+              chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
+            }
           }
         }
         if (Network.peer?.isRoom) RoomConnectHelper.noteOpenPeerPresence();
         this.lazyNgZoneUpdate(event.isSendFromSelf);
+      })
+      .on('JOIN_PROBE_FINISHED', event => {
+        if (!this.pendingRoomConnectLog) return;
+        this.pendingRoomConnectLog = false;
+        if (!event.data?.ok) return;
+        chatMessageService.sendOperationLog(
+          this.isRoom
+            ? this.i18n.t('net.connectedRoom', { name: Network.peer?.roomName || '' })
+            : this.i18n.t('net.connectedPeer'),
+        );
       })
       .on('DISCONNECT_PEER', event => {
         this.lazyNgZoneUpdate(event.isSendFromSelf);

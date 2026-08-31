@@ -1,5 +1,6 @@
 import { EventSystem, Network } from '../system';
 import { netDebug } from '../system/network/net-debug';
+import { ChatTabList } from '../../chat-tab-list';
 import { GameObject, ObjectContext } from './game-object';
 import { markForChanged } from './object-event-extension';
 import { ObjectFactory } from './object-factory';
@@ -183,6 +184,10 @@ export class ObjectSynchronizer {
     if (!Array.isArray(catalog) || catalog.length < 1) return;
     netDebug('SYNCHRONIZE_GAME_OBJECT ' + sendFrom);
     for (let item of catalog) {
+      // Do not request (or push DELETE for) lobby sample tabs we lack — refuse recreate only.
+      if (ChatTabList.isLobbySampleTabId(item.identifier) && !ObjectStore.instance.get(item.identifier)) {
+        continue;
+      }
       if (ObjectStore.instance.isDeleted(item.identifier) && !this.joinFetch) {
         EventSystem.call('DELETE_GAME_OBJECT', { aliasName: '', identifier: item.identifier }, sendFrom);
       } else {
@@ -203,6 +208,12 @@ export class ObjectSynchronizer {
   }
 
   private createObject(context: ObjectContext): GameObject {
+    // Lobby MainTab/SubTab use fixed syncIds. If this page does not already have them,
+    // do not create from peer catalog/UPDATE — that re-injects empty sample tabs into rooms.
+    if (context?.aliasName === 'chat-tab' && ChatTabList.isLobbySampleTabId(context.identifier)) {
+      console.warn('[ObjectSynchronizer] refuse peer create of lobby sample chat tab', context.identifier);
+      return null;
+    }
     let newObject: GameObject = ObjectFactory.instance.create(context.aliasName, context.identifier);
     if (!newObject) {
       console.warn(context.aliasName + ' is Unknown...?', context);
