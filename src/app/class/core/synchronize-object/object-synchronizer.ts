@@ -184,11 +184,8 @@ export class ObjectSynchronizer {
     if (!Array.isArray(catalog) || catalog.length < 1) return;
     netDebug('SYNCHRONIZE_GAME_OBJECT ' + sendFrom);
     for (let item of catalog) {
-      // Do not request lobby sample tabs we do not have — create would be refused anyway.
+      // Do not request (or push DELETE for) lobby sample tabs we lack — refuse recreate only.
       if (ChatTabList.isLobbySampleTabId(item.identifier) && !ObjectStore.instance.get(item.identifier)) {
-        if (ObjectStore.instance.isDeleted(item.identifier) && !this.joinFetch) {
-          EventSystem.call('DELETE_GAME_OBJECT', { aliasName: '', identifier: item.identifier }, sendFrom);
-        }
         continue;
       }
       if (ObjectStore.instance.isDeleted(item.identifier) && !this.joinFetch) {
