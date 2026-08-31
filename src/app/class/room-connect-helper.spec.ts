@@ -261,6 +261,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     (RoomConnectHelper as any).softDeathSince = Date.now();
     (RoomConnectHelper as any).softDeathAttempted = false;
     spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOn(Network, 'isRoomChannelReady').and.returnValue(false);
     spyOnProperty(Network, 'peer', 'get').and.returnValue({ isRoom: true, peerId: 'self' } as IPeerContext);
     spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
     spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
@@ -334,6 +335,80 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     expect(RoomConnectHelper.isSoftDeathArmed()).toBeFalse();
     expect(RoomConnectHelper.maybeSoftDeathReopen()).toBeFalse();
     RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
+  });
+
+  it('soft-death settles without reopen when alone with healthy room channel', () => {
+    RoomConnectHelper.everHadRoomSession = true;
+    RoomConnectHelper.hadOpenPeerThisSession = true;
+    (RoomConnectHelper as any).softDeathSince = 0;
+    (RoomConnectHelper as any).softDeathAttempted = false;
+    const open = spyOn(Network, 'open');
+    spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+    spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
+    spyOnProperty(Network, 'peer', 'get').and.returnValue({
+      isRoom: true,
+      peerId: 'self',
+    } as IPeerContext);
+    spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+    spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+    spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
+
+    RoomConnectHelper.noteOpenPeerPresence();
+    expect(RoomConnectHelper.isSoftDeathArmed()).toBeFalse();
+    expect((RoomConnectHelper as any).softDeathAttempted).toBeFalse();
+    expect(RoomConnectHelper.maybeSoftDeathReopen()).toBeFalse();
+    expect(open).not.toHaveBeenCalled();
+    expect(RoomConnectHelper.isNetworkReconnecting()).toBeFalse();
+  });
+
+  it('soft-death can re-arm after healthy settle when room channel later fails', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    try {
+      RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 1000;
+      RoomConnectHelper.everHadRoomSession = true;
+      RoomConnectHelper.hadOpenPeerThisSession = true;
+      (RoomConnectHelper as any).softDeathSince = 0;
+      (RoomConnectHelper as any).softDeathAttempted = false;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      const open = spyOn(Network, 'open');
+      const isOpen = spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+      const channelReady = spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({
+        userId: 'u1',
+        peerId: 'self',
+        isRoom: true,
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      } as IPeerContext);
+      spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+      spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+      spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
+
+      RoomConnectHelper.noteOpenPeerPresence();
+      expect(RoomConnectHelper.isSoftDeathArmed()).toBeFalse();
+
+      channelReady.and.returnValue(false);
+      isOpen.and.returnValue(true);
+      RoomConnectHelper.noteOpenPeerPresence();
+      expect(RoomConnectHelper.isSoftDeathArmed()).toBeTrue();
+      jasmine.clock().tick(1000);
+      expect(RoomConnectHelper.maybeSoftDeathReopen()).toBeTrue();
+      jasmine.clock().tick(17_000);
+      expect(open).toHaveBeenCalled();
+    } finally {
+      RoomConnectHelper.abortReopenInFlight();
+      jasmine.clock().uninstall();
+      RoomConnectHelper.SOFT_DEATH_MS_FOR_TEST = 0;
+      RoomConnectHelper.hadOpenPeerThisSession = false;
+      (RoomConnectHelper as any).clearSoftDeathState();
+    }
   });
 
   it('isMeshDeathArmed when open=0 with other room members', () => {
@@ -414,7 +489,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
     expect(heal).toHaveBeenCalled();
   });
 
-  it('wake schedules reopen after long hide when previously meshed and openPeers=0', () => {
+  it('wake schedules reopen after long hide when previously meshed and channel not ready', () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(1_700_000_000_000));
     try {
@@ -428,6 +503,8 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
         meshPassword: '',
       });
       const open = spyOn(Network, 'open');
+      spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+      spyOn(Network, 'isRoomChannelReady').and.returnValue(false);
       spyOnProperty(Network, 'peer', 'get').and.returnValue({
         userId: 'u1',
         peerId: 'self',
@@ -435,6 +512,7 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       } as IPeerContext);
       spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
       spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+      spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
 
       RoomConnectHelper.onDocumentHidden();
       jasmine.clock().tick(50);
@@ -448,6 +526,40 @@ describe('RoomConnectHelper.reopenLastRoomOrLobby', () => {
       expect(open).not.toHaveBeenCalled();
       jasmine.clock().tick(17_000);
       expect(open).toHaveBeenCalled();
+    } finally {
+      RoomConnectHelper.abortReopenInFlight();
+      jasmine.clock().uninstall();
+      RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 0;
+      (RoomConnectHelper as any).documentHiddenAt = 0;
+    }
+  });
+
+  it('wake does not reopen healthy solo room after brief mesh (openPeers=0)', () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1_700_000_000_000));
+    try {
+      RoomConnectHelper.WAKE_MIN_HIDDEN_MS_FOR_TEST = 100;
+      RoomConnectHelper.everHadRoomSession = true;
+      RoomConnectHelper.hadOpenPeerThisSession = true;
+      spyOn(Network, 'getLastRoomSession').and.returnValue({
+        userId: 'u1',
+        roomId: 'Ab1',
+        roomName: 'TestRoom',
+        meshPassword: '',
+      });
+      const open = spyOn(Network, 'open');
+      spyOnProperty(Network, 'isOpen', 'get').and.returnValue(true);
+      spyOn(Network, 'isRoomChannelReady').and.returnValue(true);
+      spyOnProperty(Network, 'peer', 'get').and.returnValue({ isRoom: true, peerId: 'self' } as IPeerContext);
+      spyOnProperty(Network, 'peerId', 'get').and.returnValue('self');
+      spyOnProperty(Network, 'peerIds', 'get').and.returnValue([]);
+      spyOn(Network, 'listRoomMemberPeerIds').and.returnValue(['self']);
+
+      RoomConnectHelper.onDocumentHidden();
+      jasmine.clock().tick(100);
+      RoomConnectHelper.onDocumentVisible({ skipJitter: true });
+      expect(open).not.toHaveBeenCalled();
+      expect(RoomConnectHelper.isNetworkReconnecting()).toBeFalse();
     } finally {
       RoomConnectHelper.abortReopenInFlight();
       jasmine.clock().uninstall();

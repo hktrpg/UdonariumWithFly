@@ -437,6 +437,12 @@ export class RoomConnectHelper {
     }
 
     RoomConnectHelper.clearMeshDeathState();
+    // Healthy alone is steady-state after peers leave — do not arm soft-death UI/reopen.
+    // Clear (do not burn softDeathAttempted) so a later unhealthy channel can still re-arm.
+    if (RoomConnectHelper.isHealthyAloneInRoom()) {
+      RoomConnectHelper.clearSoftDeathState();
+      return;
+    }
     if (RoomConnectHelper.softDeathAttempted) return;
     if (RoomConnectHelper.softDeathSince < 1) {
       RoomConnectHelper.softDeathSince = Date.now();
@@ -445,6 +451,8 @@ export class RoomConnectHelper {
 
   /**
    * If was meshed and alone past soft-death threshold, full-reopen once per alone spell.
+   * Healthy alone (SkyWay still joined) is normal after peers leave — settle without reopen
+   * so we do not thrash into duplicate-member / 「同步中」loops.
    * @returns true when a reopen was scheduled/started
    */
   static maybeSoftDeathReopen(): boolean {
@@ -506,6 +514,8 @@ export class RoomConnectHelper {
   /**
    * Schedule wake reopen with peerId jitter (disconnected path has no outage jitter).
    * Only when this page previously had a live mesh peer — solo rooms normally have openPeers=0.
+   * Healthy alone (SkyWay still joined, no other members) skips reopen — tab hide/show must not
+   * force duplicate-member recovery after a brief peer left.
    * @returns true when a reopen was scheduled or started
    */
   static maybeScheduleWakeReopen(skipJitter = false): boolean {
@@ -514,32 +524,42 @@ export class RoomConnectHelper {
     if (!Network.peer?.isRoom) return false;
     if (RoomConnectHelper.openPeerCount() > 0) return false;
     if (!Network.getLastRoomSession()?.roomId) return false;
+    // Healthy solo: openPeers=0 is expected; do not reopen.
+    if (RoomConnectHelper.isHealthyAloneInRoom()) return false;
     if (RoomConnectHelper.wakeReopenTimer != null) return true;
     // A pending backoff reopen already owns recovery — don't pile a wake open on top.
     if (RoomConnectHelper.isReopenRetryPending()) return false;
     if (RoomConnectHelper.reopenJitterTimer != null) return false;
     if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
 
-    const start = () => {
+    const start = (): boolean => {
       RoomConnectHelper.wakeReopenTimer = null;
-      if (!RoomConnectHelper.everHadRoomSession || !RoomConnectHelper.hadOpenPeerThisSession) return;
-      if (!Network.peer?.isRoom) return;
-      if (RoomConnectHelper.openPeerCount() > 0) return;
-      if (RoomConnectHelper.isReopenRetryPending()) return;
-      if (!RoomConnectHelper.shouldAttemptReopenNow()) return;
+      if (!RoomConnectHelper.everHadRoomSession || !RoomConnectHelper.hadOpenPeerThisSession) return false;
+      if (!Network.peer?.isRoom) return false;
+      if (RoomConnectHelper.openPeerCount() > 0) return false;
+      if (RoomConnectHelper.isHealthyAloneInRoom()) return false;
+      if (RoomConnectHelper.isReopenRetryPending()) return false;
+      if (!RoomConnectHelper.shouldAttemptReopenNow()) return false;
       console.warn('reopen: wake (was meshed, openPeers=0)');
       RoomConnectHelper.reopenLastRoomOrLobby(RoomConnectHelper.midSessionReopenErrorType());
+      return true;
     };
 
     if (skipJitter) {
-      start();
-      return true;
+      return start();
     }
     const session = Network.getLastRoomSession();
     const jitter = reopenJitterMs(Network.peerId || session?.userId);
     console.warn(`reopen: wake deferred-jitter ${jitter}ms`);
-    RoomConnectHelper.wakeReopenTimer = setTimeout(start, jitter);
+    RoomConnectHelper.wakeReopenTimer = setTimeout(() => { start(); }, jitter);
     return true;
+  }
+
+  /** In-room, alone, SkyWay membership still live — normal solo steady-state. */
+  private static isHealthyAloneInRoom(): boolean {
+    return Network.isOpen
+      && Network.isRoomChannelReady()
+      && RoomConnectHelper.otherRoomMemberCount() < 1;
   }
 
   /**
