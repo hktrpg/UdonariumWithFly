@@ -25,6 +25,14 @@ export class ChatTabList extends ObjectNode implements InnerXml {
     return ChatTabList._instance;
   }
 
+  /**
+   * Lobby seeds these fixed syncIds. Peer sync must never re-create them on a room
+   * that deliberately removed them — that would "suddenly" add blank Main/Sub tabs.
+   */
+  static isLobbySampleTabId(identifier: string): boolean {
+    return identifier === 'MainTab' || identifier === 'SubTab';
+  }
+
   /** Visible (non-archived) tabs for chat UI. */
   get chatTabs(): ChatTab[] {
     return (this.children as ChatTab[]).filter(tab => !tab.isArchived);

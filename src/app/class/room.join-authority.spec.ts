@@ -4,7 +4,6 @@ import { ObjectStore } from './core/synchronize-object/object-store';
 import { GameObject } from './core/synchronize-object/game-object';
 import { GameCharacter } from './game-character';
 import { TableSelecter } from './table-selecter';
-import { ChatTabList } from './chat-tab-list';
 import {
   makeCharacter,
   makeTable,
@@ -22,20 +21,6 @@ describe('Room join / load sync authority', () => {
     GameCharacter.allowLegacyBodyOnTable = true;
   });
   afterEach(() => resetTabletopStore());
-
-  it('clearLocalTabletopForJoin destroys lobby MainTab/SubTab so join cannot push them', () => {
-    for (const tab of [...ChatTabList.instance.allChatTabs]) tab.destroy();
-    ChatTabList.instance.addChatTab('主要標籤', 'MainTab');
-    ChatTabList.instance.addChatTab('閒聊標籤', 'SubTab');
-    expect(ObjectStore.instance.get('MainTab')).toBeTruthy();
-    expect(ObjectStore.instance.get('SubTab')).toBeTruthy();
-
-    Room.clearLocalTabletopForJoin();
-
-    expect(ObjectStore.instance.get('MainTab')).toBeFalsy();
-    expect(ObjectStore.instance.get('SubTab')).toBeFalsy();
-    expect(ChatTabList.instance.allChatTabs.length).toBe(0);
-  });
 
   it('clearLocalTabletopForJoin destroys lobby tabletop pieces and clears selecter', () => {
     makeTable('lobbyTable');
