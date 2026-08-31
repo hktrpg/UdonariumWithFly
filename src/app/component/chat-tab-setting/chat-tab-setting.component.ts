@@ -2,13 +2,12 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ChatTab } from '@udonarium/chat-tab';
 import { ChatTabList } from '@udonarium/chat-tab-list';
-import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatLogOutputComponent } from 'component/chat-log-output/chat-log-output.component';
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 
-import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -23,7 +22,6 @@ import { I18nService } from 'service/i18n.service';
 })
 export class ChatTabSettingComponent implements OnInit, OnDestroy {
   selectedTab: ChatTab = null;
-  selectedTabXml: string = '';
 
   get tabName(): string { return this.selectedTab.name; }
   set tabName(tabName: string) { if (this.isEditable) this.selectedTab.name = tabName; }
@@ -58,15 +56,19 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     this.selectedTab.setMembers(Array.from(set));
   }
 
-  get chatTabs(): ChatTab[] { return this.chatMessageService.chatTabs; }
+  /** Settings list: active + archived (archived stay in room data). */
+  get chatTabs(): ChatTab[] { return ChatTabList.instance.allChatTabs; }
+  get activeChatTabs(): ChatTab[] { return ChatTabList.instance.chatTabs; }
   /** Local display label — edit field still uses synced `tabName`. */
   tabLabel(tab: ChatTab): string {
     if (!tab || tab.name === '') return this.i18n.t('chatTab.untitled');
     return ChatTabList.localizedName(tab);
   }
-  get isEmpty(): boolean { return this.chatMessageService.chatTabs.length < 1 }
-  get isDeleted(): boolean { return this.selectedTab ? ObjectStore.instance.get(this.selectedTab.identifier) == null : false; }
-  get isEditable(): boolean { return !this.isEmpty && !this.isDeleted; }
+  get isEmpty(): boolean { return this.chatTabs.length < 1 }
+  get isArchived(): boolean { return !!this.selectedTab?.isArchived; }
+  get isEditable(): boolean { return !this.isEmpty && !!this.selectedTab && ObjectStore.instance.get(this.selectedTab.identifier) != null; }
+  /** Must keep at least one visible tab. */
+  get canArchiveOrDeleteActive(): boolean { return this.activeChatTabs.length > 1; }
 
   get roomName():string {
     let roomName = Network.peer && 0 < Network.peer.roomName.length
@@ -81,7 +83,6 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   constructor(
     private modalService: ModalService,
     private panelService: PanelService,
-    private chatMessageService: ChatMessageService,
     private saveDataService: SaveDataService,
     private pointerDeviceService: PointerDeviceService,
     private i18n: I18nService
@@ -97,10 +98,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', 2000, event => {
         if (!this.selectedTab || event.data.identifier !== this.selectedTab.identifier) return;
-        let object = ObjectStore.instance.get(event.data.identifier);
-        if (object !== null) {
-          this.selectedTabXml = object.toXml();
-        }
+        this.selectedTab = null;
       })
       .on('LOCALE_CHANGED', () => this.refreshPanelTitle());
   }
@@ -111,7 +109,6 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
 
   onChangeSelectTab(identifier: string) {
     this.selectedTab = ObjectStore.instance.get<ChatTab>(identifier);
-    this.selectedTabXml = '';
   }
 
   create() {
@@ -152,26 +149,51 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     this.saveDataService.pickAndLoadXmlOrZip();
   }
 
-  delete() {
+  async archive() {
     if (this.GuestMode()) return;
-    if (!this.isEmpty && this.selectedTab) {
-      this.selectedTabXml = this.selectedTab.toXml();
-      this.selectedTab.destroy();
-    }
+    if (!this.selectedTab || this.isArchived || !this.canArchiveOrDeleteActive) return;
+    const name = this.tabLabel(this.selectedTab);
+    const ok = await this.modalService.open<boolean>(ConfirmationComponent, {
+      title: this.i18n.t('chatTab.archiveConfirm.title'),
+      text: this.i18n.t('chatTab.archiveConfirm.text', { name }),
+      help: this.i18n.t('chatTab.archiveConfirm.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'inventory_2',
+      okLabel: this.i18n.t('chatTab.archive'),
+    });
+    if (ok !== true) return;
+    this.selectedTab.isArchived = true;
   }
 
-  restore() {
+  async unarchive() {
     if (this.GuestMode()) return;
-    if (this.selectedTab && this.selectedTabXml) {
-      let restoreTable = <ChatTab>ObjectSerializer.instance.parseXml(this.selectedTabXml);
-      ChatTabList.instance.addChatTab(restoreTable);
-      this.selectedTabXml = '';
-    }
+    if (!this.selectedTab || !this.isArchived) return;
+    this.selectedTab.isArchived = false;
+  }
+
+  async delete() {
+    if (this.GuestMode()) return;
+    if (!this.selectedTab) return;
+    // Active tabs: keep at least one visible. Archived may always be deleted.
+    if (!this.isArchived && !this.canArchiveOrDeleteActive) return;
+    const name = this.tabLabel(this.selectedTab);
+    const ok = await this.modalService.open<boolean>(ConfirmationComponent, {
+      title: this.i18n.t('chatTab.deleteConfirm.title'),
+      text: this.i18n.t('chatTab.deleteConfirm.text', { name }),
+      help: this.i18n.t('chatTab.deleteConfirm.help'),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'delete_forever',
+      okLabel: this.i18n.t('chatTab.delete'),
+    });
+    if (ok !== true) return;
+    const doomed = this.selectedTab;
+    this.selectedTab = null;
+    doomed.destroy();
   }
 
   upTabIndex() {
     if (this.GuestMode()) return;
-    if (!this.selectedTab) return;
+    if (!this.selectedTab || this.isArchived) return;
     let parentElement = this.selectedTab.parent;
     let index: number = parentElement.children.indexOf(this.selectedTab);
     if (0 < index) {
@@ -182,7 +204,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
 
   downTabIndex() {
     if (this.GuestMode()) return;
-    if (!this.selectedTab) return;
+    if (!this.selectedTab || this.isArchived) return;
     let parentElement = this.selectedTab.parent;
     let index: number = parentElement.children.indexOf(this.selectedTab);
     if (index < parentElement.children.length - 1) {

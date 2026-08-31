@@ -3,6 +3,7 @@ import { ChatTab } from './chat-tab';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
 import { InnerXml } from './core/synchronize-object/object-serializer';
+import { ObjectStore } from './core/synchronize-object/object-store';
 import { APP_LOCALES, AppLocale, translate } from 'i18n';
 import { StringUtil } from './core/system/util/string-util';
 
@@ -24,7 +25,19 @@ export class ChatTabList extends ObjectNode implements InnerXml {
     return ChatTabList._instance;
   }
 
-  get chatTabs(): ChatTab[] { return this.children as ChatTab[]; }
+  /** Visible (non-archived) tabs for chat UI. */
+  get chatTabs(): ChatTab[] {
+    return (this.children as ChatTab[]).filter(tab => !tab.isArchived);
+  }
+
+  /** All tabs including archived (settings / save / logs). */
+  get allChatTabs(): ChatTab[] {
+    return this.children as ChatTab[];
+  }
+
+  get archivedChatTabs(): ChatTab[] {
+    return (this.children as ChatTab[]).filter(tab => !!tab.isArchived);
+  }
 
   /** Unread count across tabs the local user can view. */
   get unreadLength(): number {
@@ -99,9 +112,30 @@ export class ChatTabList extends ObjectNode implements InnerXml {
 
   parseInnerXml(element: Element) {
     // 不允許從 XML 新建，改為更新既有物件
-    for (let child of ChatTabList.instance.children) {
-      child.destroy();
+    let xmlTabCount = 0;
+    for (let i = 0; i < element.children.length; i++) {
+      if ((element.children[i].tagName || '').toLowerCase() === 'chat-tab') xmlTabCount++;
     }
+    // Empty fly_chat must not wipe a live session that still has messages
+    // (poisoned latest / accident). Empty lobby sample tabs (Main/Sub) must still
+    // be replaceable when loading a room whose fly_chat has no tabs.
+    if (xmlTabCount < 1 && ChatTabList.instance.allChatTabs.length > 0) {
+      const hasMessages = ChatTabList.instance.allChatTabs.some(
+        tab => (tab.chatMessages?.length ?? 0) > 0
+      );
+      if (hasMessages) {
+        console.warn('[ChatTabList] refuse empty chat XML wipe; keeping', ChatTabList.instance.allChatTabs.length, 'tab(s)');
+        this.destroy();
+        return;
+      }
+    }
+
+    const doomed = ChatTabList.instance.children.map(c => c.identifier);
+    // Local-only: broadcasting DELETE wipes overlapping peers / ghosts that still hold chat.
+    for (const child of [...ChatTabList.instance.children]) {
+      child.destroyLocal();
+    }
+    for (const id of doomed) ObjectStore.instance.clearDeleted(id);
 
     let context = ChatTabList.instance.toContext();
     context.syncData = this.toContext().syncData;
@@ -113,9 +147,10 @@ export class ChatTabList extends ObjectNode implements InnerXml {
   }
 
   log(logFormat, dateFormat, isWriteOerationLog=true, imageDict?: {}, target?: ChatTab[]): string {
-    if (!this.chatTabs || (target && target.length == 0)) return '';
-    if (target && target.length > 1 && target.map(tab => tab.identifier).sort().join() == this.chatTabs.map(tab => tab.identifier).sort().join()) target = null;
-    const messages = (target ? target : this.chatTabs).reduce((ac, chatTab) => {
+    const tabs = this.allChatTabs;
+    if (!tabs || (target && target.length == 0)) return '';
+    if (target && target.length > 1 && target.map(tab => tab.identifier).sort().join() == tabs.map(tab => tab.identifier).sort().join()) target = null;
+    const messages = (target ? target : tabs).reduce((ac, chatTab) => {
         if (chatTab) ac.push(...chatTab.chatMessages.filter(chatMessage => chatMessage.isDisplayable && (isWriteOerationLog || !chatMessage.isOperationLog))
           .map(chatMessage => ({ index: chatMessage.index, tabName: ChatTabList.localizedName(chatTab), chatMessage: chatMessage }))); 
         return ac;

@@ -19,7 +19,7 @@
         [title]="tabLabel(chatTab)"
         [class.is-unnamed]="chatTab.name == ''"
       >
-        {{ tabLabel(chatTab) }}{{ chatTab.isPrivate ? ' 🔒' : '' }}
+        {{ chatTab.isArchived ? ('[' + ('chatTab.archive' | i18n) + '] ') : '' }}{{ tabLabel(chatTab) }}{{ chatTab.isPrivate ? ' 🔒' : '' }}
       </option>
     </select>
   </aside>
@@ -76,7 +76,7 @@
     </section>
 
     <footer class="actions">
-      <ng-container *ngIf="!isDeleted">
+      <ng-container *ngIf="!isArchived">
         <button type="button" class="btn btn-sm" (click)="upTabIndex()">↑</button>
         <button type="button" class="btn btn-sm" (click)="downTabIndex()">↓</button>
         <span class="actions-spacer">
@@ -90,16 +90,30 @@
           </button>
           <button
             type="button"
+            class="btn"
+            (click)="archive()"
+            [disabled]="!canArchiveOrDeleteActive"
+          >
+            {{ 'chatTab.archive' | i18n }}
+          </button>
+          <button
+            type="button"
             class="btn btn-danger"
             (click)="delete()"
-            [disabled]="chatTabs.length <= 1"
+            [disabled]="!canArchiveOrDeleteActive"
           >
             {{ 'chatTab.delete' | i18n }}
           </button>
         </span>
       </ng-container>
-      <ng-container *ngIf="isDeleted">
-        <button type="button" class="btn" (click)="restore()">{{ 'chatTab.restore' | i18n }}</button>
+      <ng-container *ngIf="isArchived">
+        <span class="actions-spacer">
+          <button type="button" class="btn" (click)="showLogOutput()">
+            <i class="material-icons">history_edu</i>{{ 'chatTab.log' | i18n }}
+          </button>
+          <button type="button" class="btn" (click)="unarchive()">{{ 'chatTab.unarchive' | i18n }}</button>
+          <button type="button" class="btn btn-danger" (click)="delete()">{{ 'chatTab.delete' | i18n }}</button>
+        </span>
       </ng-container>
     </footer>
   </main>

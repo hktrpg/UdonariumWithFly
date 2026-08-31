@@ -350,10 +350,12 @@ export class RoomConnectHelper {
 
   /**
    * Mid-session mesh wipe (mesh-death / wake / soft-death) commonly races SkyWay ghost TTL.
-   * Prefer duplicate-member defer over bare disconnected open.
+   * Use duplicate-member defer when a self-ghost is plausible; otherwise lighter disconnected backoff.
    */
   static midSessionReopenErrorType(): string {
-    return 'duplicate-member';
+    if (RoomConnectHelper.otherRoomMemberCount() > 0) return 'duplicate-member';
+    if (!Network.isOpen || !Network.isRoomChannelReady()) return 'duplicate-member';
+    return 'disconnected';
   }
 
   /**
@@ -1020,6 +1022,9 @@ export class RoomConnectHelper {
   static abortReopenInFlight() {
     RoomConnectHelper.clearReopenRetry();
     RoomConnectHelper.clearWakeReopenTimer();
+    // Drop queued sync before finish — finish may already have applyQueued=true after a
+    // stable wait; abort must never apply ghost catalogs/DELETEs held during remesh.
+    RoomConnectHelper.releaseReopenPeerSync(false);
     if (RoomConnectHelper.reopenFinish) {
       RoomConnectHelper.reopenFinish();
     } else if (RoomConnectHelper.reopenListenerKey) {
@@ -1029,6 +1034,41 @@ export class RoomConnectHelper {
     // Always clear busy/in-flight — reopenFinish is idempotent but may be null after it runs.
     RoomConnectHelper.dismissReopenBusyOverlay();
     RoomConnectHelper.reopenInFlight = false;
+  }
+
+  /** True while this page's mid-session reopen owns an ObjectSynchronizer hold. */
+  private static reopenPeerSyncHeld = false;
+
+  private static holdReopenPeerSync() {
+    if (RoomConnectHelper.reopenPeerSyncHeld) return;
+    ObjectSynchronizer.instance.holdPeerSync();
+    RoomConnectHelper.reopenPeerSyncHeld = true;
+  }
+
+  private static releaseReopenPeerSync(applyQueued: boolean) {
+    if (!RoomConnectHelper.reopenPeerSyncHeld) return;
+    RoomConnectHelper.reopenPeerSyncHeld = false;
+    ObjectSynchronizer.instance.releasePeerSync(applyQueued);
+  }
+
+  /**
+   * After remesh: require openPeers ≥ 1 for JOIN_STABLE_MS continuously before applying queued sync.
+   * Ghost flap (open then immediate close) returns false → drop queued DELETE/catalog.
+   * @param shouldAbort When true (reopen already finished/aborted), stop waiting and return false.
+   */
+  private static async waitStableOpenPeerForReopen(shouldAbort?: () => boolean): Promise<boolean> {
+    const stableMs = RoomConnectHelper.JOIN_STABLE_MS;
+    if (shouldAbort?.()) return false;
+    if (RoomConnectHelper.openPeerCount() < 1) return false;
+    if (stableMs <= 0) return !shouldAbort?.();
+    const start = Date.now();
+    while (Date.now() - start < stableMs) {
+      if (shouldAbort?.()) return false;
+      if (RoomConnectHelper.openPeerCount() < 1) return false;
+      await new Promise(r => setTimeout(r, 50));
+    }
+    if (shouldAbort?.()) return false;
+    return RoomConnectHelper.openPeerCount() >= 1;
   }
 
   /**
@@ -1144,6 +1184,8 @@ export class RoomConnectHelper {
     const key = { autoReconnect: true };
     RoomConnectHelper.reopenListenerKey = key;
     let settled = false;
+    /** Set true only after remesh leaves a peer open for JOIN_STABLE_MS. */
+    let applyQueuedOnRelease = false;
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -1155,10 +1197,14 @@ export class RoomConnectHelper {
       if (RoomConnectHelper.reopenFinish === finish) {
         RoomConnectHelper.reopenFinish = null;
       }
+      RoomConnectHelper.releaseReopenPeerSync(applyQueuedOnRelease);
+      applyQueuedOnRelease = false;
       RoomConnectHelper.dismissReopenBusyOverlay();
       RoomConnectHelper.reopenInFlight = false;
     };
     RoomConnectHelper.reopenFinish = finish;
+    // Quarantine inbound catalog/DELETE until remesh proves a stable peer (join-path parity).
+    RoomConnectHelper.holdReopenPeerSync();
     const reopenErrorType = errorType
       || (skyWayRecoveryGate.lastOutageKind !== 'disconnected' ? skyWayRecoveryGate.lastOutageKind : 'disconnected');
     // Cover joinRoomPerson duplicate-member retries (delays ~30s) + remesh before giving up.
@@ -1169,21 +1215,36 @@ export class RoomConnectHelper {
       RoomConnectHelper.scheduleReopenRetry(reopenErrorType);
     }, openTimeoutMs);
 
+    const remeshThenFinish = async (
+      roomId: string,
+      roomName: string,
+      meshPassword: string,
+      logLabel: string,
+    ) => {
+      const connectPassword = RoomConnectHelper.connectPasswordForRoom(roomName, meshPassword || '');
+      try {
+        await RoomConnectHelper.remeshRoomPeers(roomId, roomName, connectPassword);
+      } catch (e) {
+        console.warn(`RoomConnectHelper ${logLabel} failed`, e);
+      }
+      // Aborted / NETWORK_ERROR / timeout already finished — do not apply or finish again.
+      if (settled) return;
+      applyQueuedOnRelease = await RoomConnectHelper.waitStableOpenPeerForReopen(() => settled);
+      if (settled) return;
+      finish();
+    };
+
     EventSystem.register(key)
       .on('OPEN_NETWORK', () => {
         void (async () => {
           RoomConnectHelper.clearReopenRetry();
           skyWayRecoveryGate.noteSuccess();
           if (willReopenRoom && session) {
-            const connectPassword = RoomConnectHelper.connectPasswordForRoom(
-              session.roomName, session.meshPassword || '');
-            try {
-              await RoomConnectHelper.remeshRoomPeers(session.roomId, session.roomName, connectPassword);
-            } catch (e) {
-              console.warn('RoomConnectHelper remesh after reopen failed', e);
-            }
+            await remeshThenFinish(
+              session.roomId, session.roomName, session.meshPassword || '', 'remesh after reopen');
+          } else {
+            finish();
           }
-          finish();
         })();
       })
       .on('NETWORK_ERROR', event => {
@@ -1201,14 +1262,8 @@ export class RoomConnectHelper {
       void (async () => {
         RoomConnectHelper.clearReopenRetry();
         skyWayRecoveryGate.noteSuccess();
-        const connectPassword = RoomConnectHelper.connectPasswordForRoom(
-          session!.roomName, session!.meshPassword || '');
-        try {
-          await RoomConnectHelper.remeshRoomPeers(session!.roomId, session!.roomName, connectPassword);
-        } catch (e) {
-          console.warn('RoomConnectHelper remesh without reopen failed', e);
-        }
-        finish();
+        await remeshThenFinish(
+          session!.roomId, session!.roomName, session!.meshPassword || '', 'remesh without reopen');
       })();
     } else if (willReopenRoom) {
       const userId = session!.userId || Network.peer.userId;
