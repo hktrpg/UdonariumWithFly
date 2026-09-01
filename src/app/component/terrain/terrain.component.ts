@@ -36,6 +36,9 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TerrainBakeCropService, TERRAIN_BAKE_CROP_PREVIEW } from 'service/terrain-bake-crop.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTerrainPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { emptyInsets, faceCropBackgroundStyle, parseBakeCropState } from '@udonarium/terrain-model/bake-crop';
 import {
   assembleBakeGroupAt,
@@ -262,6 +265,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   slopeDirectionState = SlopeDirection;
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
   private scaleInputs: InputHandler[] = [];
   private scaleBoundEls: Array<HTMLElement | null> = [null, null];
   private scaleCorner: 'lt' | 'rb' = 'rb';
@@ -290,7 +294,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     private coordinateService: CoordinateService,
     private i18n: I18nService,
     private bakeCrop: TerrainBakeCropService,
-  ) { }
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.terrain?.identifier,
+      () => buildTerrainPreviewPayload(this.terrain),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -347,6 +358,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.input?.destroy();
     this.destroyScaleInputs();
     EventSystem.unregister(this);
@@ -354,6 +366,16 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
       if (entry.url?.startsWith('blob:')) URL.revokeObjectURL(entry.url);
     }
     this._faceCache.clear();
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   private destroyScaleInputs() {

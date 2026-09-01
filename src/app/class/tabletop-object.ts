@@ -768,6 +768,13 @@ export class TabletopObject extends ObjectNode {
     return MathUtil.sqrMagnitude(pos1, pos2);
   }
 
+  /** XY-only distance for card / stack merge (ignore ride height). */
+  calcSqrDistanceXY(other: TabletopObject): number {
+    const dx = (this.location?.x || 0) - (other?.location?.x || 0);
+    const dy = (this.location?.y || 0) - (other?.location?.y || 0);
+    return dx * dx + dy * dy;
+  }
+
   protected createDataElements() {
     this.initialize();
     let aliasName: string = this.aliasName;

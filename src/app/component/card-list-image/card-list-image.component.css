@@ -17,17 +17,18 @@
   object-fit: contain;
 }
 
-/* Hand rail: one face only, portrait card size, no #555 backside plate. */
+/* Hand rail: one face only, portrait card size, no #555 backside plate.
+   Host can override via --hand-card-w / --hand-card-h. */
 .image-box.is-single-face,
 .image-box.is-single-face .image {
-  width: 64px;
-  height: 88px;
+  width: var(--hand-card-w, 64px);
+  height: var(--hand-card-h, 88px);
   background: transparent;
 }
 
 .image-box.is-single-face .image img {
-  width: 64px;
-  height: 88px;
+  width: var(--hand-card-w, 64px);
+  height: var(--hand-card-h, 88px);
   object-fit: contain;
 }
 

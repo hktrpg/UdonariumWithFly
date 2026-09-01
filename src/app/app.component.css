@@ -445,7 +445,8 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
 
 .desktop-icon-rail {
   position: fixed;
-  z-index: 100000;
+  /* Above object-preview-layer (100050) so menu icons stay clickable during Ctrl preview. */
+  z-index: 100100;
   box-sizing: border-box;
   overflow: hidden;
   background: rgba(28, 26, 24, 0.92);

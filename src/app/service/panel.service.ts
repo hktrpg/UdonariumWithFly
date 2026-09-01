@@ -39,6 +39,11 @@ export interface PanelOption {
    * `half` / unset / `full` → restore last snap; `peek` forces peek. Never fullscreen.
    */
   mobileSheet?: 'full' | 'half' | 'peek';
+  /**
+   * Keep caller left/top (e.g. explicit placement). Default false → desktop opens
+   * at viewport center (slightly above mid) when no saved position exists.
+   */
+  keepPosition?: boolean;
 }
 
 @Injectable()
@@ -254,6 +259,22 @@ export class PanelService {
     PanelService.geometries.clear();
     localForage.removeItem(PanelService.GEOMETRY_STORAGE_KEY).catch(() => {});
     localForage.removeItem(PanelService.LEGACY_CHAT_GEOMETRY_KEY).catch(() => {});
+  }
+
+  /**
+   * Default desktop panel / popup placement: horizontally centered,
+   * vertically a bit above the viewport midpoint ("畫面中間偏上").
+   */
+  static viewportCenterPosition(width: number, height: number): { left: number; top: number } {
+    const w = Math.max(0, Math.round(width) || 0);
+    const h = Math.max(0, Math.round(height) || 0);
+    const vw = typeof window !== 'undefined' ? window.innerWidth : w;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : h;
+    const left = Math.max(0, Math.round((vw - w) / 2));
+    // Nudge ~6% of viewport height above true center (min 24px).
+    const above = Math.max(24, Math.round(vh * 0.06));
+    const top = Math.max(0, Math.round((vh - h) / 2 - above));
+    return { left, top };
   }
 
   /**
@@ -740,6 +761,21 @@ export class PanelService {
       if (geoKey === 'menu.table') {
         if ((resolved.width ?? 0) < 620) resolved.width = 620;
         if ((resolved.height ?? 0) < 520) resolved.height = 520;
+      }
+      // Default open: screen center (slightly above), unless saved pos or keepPosition.
+      if (!resolved.keepPosition) {
+        const geo = PanelService.getGeometry(geoKey);
+        const hasSavedPos = !isChat
+          && !!geo
+          && typeof geo.left === 'number'
+          && typeof geo.top === 'number';
+        if (!hasSavedPos) {
+          const w = resolved.width ?? 450;
+          const h = resolved.height ?? 560;
+          const pos = PanelService.viewportCenterPosition(w, h);
+          resolved.left = pos.left;
+          resolved.top = pos.top;
+        }
       }
       // Personal setting: one main-menu window at a time (chat / object sheets stay).
       if (PanelService.singleNonChatWindow) {

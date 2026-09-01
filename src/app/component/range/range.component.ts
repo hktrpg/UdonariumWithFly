@@ -47,6 +47,9 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'range',
@@ -404,6 +407,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   math = Math;
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotateDeg) % 360;
@@ -422,8 +426,15 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     private selectionService: TabletopSelectionService,
     private tabletopService: TabletopService,
     private modalService: ModalService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.range?.identifier,
+      () => buildTabletopImagePreviewPayload(this.range),
+    );
+  }
 
   ngOnChanges() {
     EventSystem.unregister(this);
@@ -495,8 +506,19 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.input.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])

@@ -53,12 +53,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
   static centeredPanelOption(extra: PanelOption = {}): PanelOption {
     const width = extra.width ?? LobbyComponent.DEFAULT_WIDTH;
     const height = extra.height ?? LobbyComponent.DEFAULT_HEIGHT;
+    const pos = PanelService.viewportCenterPosition(width, height);
     return {
       ...extra,
       width,
       height,
-      left: extra.left ?? Math.max(0, Math.round((window.innerWidth - width) / 2)),
-      top: extra.top ?? Math.max(0, Math.round((window.innerHeight - height) / 2)),
+      left: extra.left ?? pos.left,
+      top: extra.top ?? pos.top,
       tourPanelId: extra.tourPanelId ?? 'menu.lobby',
     };
   }

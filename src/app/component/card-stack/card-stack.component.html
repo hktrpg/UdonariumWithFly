@@ -1,10 +1,10 @@
 <div class="component is-3d is-pointer-events-none" [ngClass]="{'is-empty': isEmpty, 'is-merge-target': isMergeTarget}"
   [style.width.px]="size * gridSize"
   appMovable [movable.option]="movableOption" [movable.disable]="stackMovableDisabled"
-  (movable.ondragstart)="onMove()" (movable.ondrag)="onDragging($event)" (movable.ondragend)="onMoved()">
+  (movable.ondragstart)="onMove()" (movable.ondrag)="onDragging($event)" (movable.onend)="onMoved($event)">
   <div class="component-content is-pointer-events-auto is-3d" [ngClass]="{'is-grab': !isLocked}" (dblclick)="onDoubleClick($event)"
     (pointerdown)="onStackPointerDown($event)"
-    appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
+      appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.onend)="onMoved()">
     <div *ngIf="coverCard && imageFile" class="stack-volume is-3d"
       [class.has-thickness]="hasStackThickness"
       [style.--stack-h.px]="stackHeightPx"
@@ -18,10 +18,6 @@
         <img class="card-image chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false">
       </div>
       <div class="stack-top is-3d" [style.transform]="stackTopTransform">
-        <div *ngIf="coverCard.isFront" class="text is-3d" style="width: 100%; height: 100%"
-          [ngStyle]="{'transform': 'rotateZ(' + coverCard.rotate +'deg)'}">
-          <div class="is-3d" [style.font-size.px]="coverCard.fontsize + 9" [style.color]="coverCard.color" [style.text-shadow]="textShadowCss(coverCard.color)" [innerHTML]="rubiedText | safe: 'html'"></div>
-        </div>
         <img class="card-image chrome-smooth-image-trick" [ngStyle]="{'transform': 'rotateZ(' + coverCard.rotate +'deg)'}" [src]="imageFile.url | safe: 'resourceUrl'">
       </div>
     </div>

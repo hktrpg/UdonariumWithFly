@@ -51,6 +51,8 @@ export class CardListImageComponent implements OnChanges {
   @Input() enableTooltip = true;
   /** Hand rail: show only the front face (owner/peek view), ignore table face-down state. */
   @Input() singleFace = false;
+  /** When false, hide baked face text (hand / in-play). Inventory keeps default true. */
+  @Input() showFaceText = true;
   @ViewChild('cardImage') cardImageElement: ElementRef;
   
   readonly CardStateFront = CardState.FRONT;

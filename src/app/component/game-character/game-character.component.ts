@@ -52,6 +52,9 @@ import {
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildCharacterTokenPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { nameTagShouldWrap, NAME_TAG_WRAP_WIDTH_PX } from './name-tag-width';
 
 @Component({
@@ -791,6 +794,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   movableOption: MovableOption = {};
   rotableOption: RotableOption = {};
   rollOption: RotableOption = {};
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   constructor(
     private contextMenuService: ContextMenuService,
@@ -804,7 +808,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
     private tableLighting: TableLightingService,
-  ) { }
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.characterToken?.identifier,
+      () => buildCharacterTokenPreviewPayload(this.characterToken),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -1099,9 +1110,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.logUnmount();
     this.clearChatDialogLocal();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])

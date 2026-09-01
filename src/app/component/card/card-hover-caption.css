@@ -1,0 +1,35 @@
+/* Shared Card Hover Caption chrome — used by card + card-stack. */
+.card-hover-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%) translateY(-6px);
+  z-index: 30;
+  box-sizing: border-box;
+  max-width: 18em;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background-color: rgba(30, 30, 30, 0.88);
+  color: #f5f5f5;
+  text-align: center;
+  line-height: 1.35;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+.card-hover-caption-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card-hover-caption-text {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: 8em;
+  overflow: hidden;
+}

@@ -88,6 +88,8 @@ import { SceneToolsComponent } from './component/scene-tools/scene-tools.compone
 import { ScenePresetComponent } from './component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from './component/scenario-text/scenario-text.component';
 import { NoteHandoutComponent } from './component/note-handout/note-handout.component';
+import { ObjectPreviewLayerComponent } from './component/object-preview-layer/object-preview-layer.component';
+import { CardCaptionOverlayComponent } from './component/card-caption-overlay/card-caption-overlay.component';
 import { NoteSettingsComponent } from './component/note-settings/note-settings.component';
 import { MaskSettingsComponent } from './component/mask-settings/mask-settings.component';
 import { TerrainSettingsComponent } from './component/terrain-settings/terrain-settings.component';
@@ -187,6 +189,8 @@ import '@udonarium/table-fx/table-timer';
     ScenePresetComponent,
     ScenarioTextComponent,
     NoteHandoutComponent,
+    ObjectPreviewLayerComponent,
+    CardCaptionOverlayComponent,
     NoteSettingsComponent,
     MaskSettingsComponent,
     TerrainSettingsComponent,

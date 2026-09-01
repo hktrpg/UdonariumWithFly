@@ -33,11 +33,9 @@ import {
   findCardIdAtPoint,
   findCardStackIdAtPoint,
   findMergeTargetIdAtPoint,
-  holdProgressAt,
   isQuickDragMove,
   resolveQuickDragDrop,
   setCardMergePreview,
-  shouldHoldHaptic,
 } from 'component/card-stack/card-stack-gesture';
 import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
@@ -45,6 +43,7 @@ import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMen
 import { CoordinateService } from 'service/coordinate.service';
 import { I18nService } from 'service/i18n.service';
 import { ImageService } from 'service/image.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
@@ -52,11 +51,24 @@ import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopService } from 'service/tabletop.service';
 import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
+import {
+  CardHoverCaptionController,
+  canOpenCardDetail,
+  cardCaptionName,
+  cardCaptionRubiedText,
+  publishCardCaptionOverlay,
+  wireCardHoverCaptionDismiss,
+} from 'service/card-hover-caption';
+import { CardCaptionOverlayService } from 'service/card-caption-overlay.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildCardPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'card',
     templateUrl: './card.component.html',
-    styleUrls: ['./card.component.css'],
+    styleUrls: ['./card.component.css', './card-hover-caption.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [
         trigger('inverse', [
@@ -165,12 +177,10 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   /** True while another card/stack is hovered for merge onto this card. */
   isMergeTarget = false;
-  holdProgress = 0;
 
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private holdStartedAt = 0;
   private holdVibrated = false;
-  private holdProgressFrame = 0;
   private suppressCardMovable = false;
   private quickDragging = false;
   private quickDragGhost: HTMLElement | null = null;
@@ -180,6 +190,19 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   private holdComplete = false;
   private handDropPreviewActive = false;
   private handDropPreviewHover = false;
+  private readonly caption = new CardHoverCaptionController(() => this.onCaptionChanged());
+  private previewOpenedSub: Subscription | null = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
+
+  get captionVisible(): boolean { return this.caption.isVisible; }
+  get captionShowName(): boolean { return this.caption.showName; }
+  get captionShowText(): boolean { return this.caption.showText; }
+  get captionName(): string {
+    return cardCaptionName(this.card, this.i18n.t('overview.cardBack'));
+  }
+  get captionTextHtml(): string {
+    return cardCaptionRubiedText(this.card);
+  }
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;
@@ -218,8 +241,20 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     private chatMessageService: ChatMessageService,
     private tabletopActionService: TabletopActionService,
     private coordinateService: CoordinateService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+    private captionOverlay: CardCaptionOverlayService,
+    private mobileLayout: MobileLayoutService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.card?.identifier,
+      () => buildCardPreviewPayload(this.card),
+    );
+    this.previewOpenedSub = wireCardHoverCaptionDismiss(this.objectPreview, this.caption, () => {
+      this.captionOverlay.clear();
+    });
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -291,11 +326,40 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
+    this.previewOpenedSub?.unsubscribe();
+    this.previewOpenedSub = null;
+    this.caption.clear();
+    this.captionOverlay.clear();
     this.cleanupQuickDragListeners();
     this.clearHoldTimer();
     this.removeQuickDragGhost();
     this.interactGesture.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+    this.caption.startIfDesktop(this.mobileLayout.isMobile);
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
+    this.caption.clear();
+    this.captionOverlay.clear();
+  }
+
+  private onCaptionChanged() {
+    publishCardCaptionOverlay(
+      this.captionOverlay,
+      this.caption,
+      this.elementRef?.nativeElement,
+      this.captionName,
+      this.captionTextHtml,
+    );
+    this.changeDetector.markForCheck();
   }
 
   @HostListener('carddrop', ['$event'])
@@ -305,11 +369,12 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       return;
     }
 
+    const mergeReach = 75 ** 2;
     if (e.detail instanceof Card) {
       if (this.isLocked || e.detail.isLocked) return;
       const dropped: Card = e.detail;
-      const distance: number = this.card.calcSqrDistance(dropped);
-      if (distance < 50 ** 2) {
+      const distance: number = this.card.calcSqrDistanceXY(dropped);
+      if (distance < mergeReach) {
         e.stopPropagation();
         e.preventDefault();
         this.mergeCardsIntoStack(dropped, this.card);
@@ -320,8 +385,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     if (e.detail instanceof CardStack) {
       if (this.isLocked) return;
       let cardStack: CardStack = e.detail;
-      let distance: number = this.card.calcSqrDistance(cardStack);
-      if (distance < 50 ** 2) {
+      let distance: number = this.card.calcSqrDistanceXY(cardStack);
+      if (distance < mergeReach) {
         e.stopPropagation();
         e.preventDefault();
         cardStack.location.x = this.card.location.x;
@@ -361,6 +426,10 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     if (this.GuestMode() || event.button !== 0 || !this.card) return;
     if (this.card.location.name !== 'table') return;
     event.stopPropagation();
+    if (this.isLocked) {
+      this.onInputStart(event);
+      return;
+    }
     this.resetQuickDragState();
     this.suppressCardMovable = true;
     this.changeDetector.detectChanges();
@@ -369,9 +438,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     this.quickPointerId = event.pointerId;
     this.holdStartedAt = Date.now();
     this.holdVibrated = false;
-    this.holdProgress = 0;
     this.holdTimer = setTimeout(() => this.onHoldTimerComplete(event), CARD_STACK_HOLD_MS);
-    this.scheduleHoldProgressFrame();
     document.addEventListener('pointermove', this.onQuickPointerMove);
     document.addEventListener('pointerup', this.onQuickPointerUp);
     document.addEventListener('pointercancel', this.onQuickPointerUp);
@@ -386,7 +453,6 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     }
     this.holdComplete = true;
     this.suppressCardMovable = false;
-    this.holdProgress = 0;
     this.ngZone.run(() => {
       this.onInputStart(event);
       this.changeDetector.detectChanges();
@@ -443,10 +509,13 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   };
 
   private startQuickCardDrag(event: PointerEvent) {
-    if (!this.card) {
+    if (!this.card || this.isLocked) {
       this.resetQuickDragState();
       return;
     }
+    this.previewHover.clearHover();
+    this.caption.clear();
+    this.captionOverlay.clear();
     this.quickDragging = true;
     SoundEffect.play(PresetSound.cardPick);
     this.createQuickDragGhost(this.card, event.clientX, event.clientY);
@@ -459,7 +528,11 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private finishQuickCardDrag(clientX: number, clientY: number) {
     const card = this.card;
-    if (!card) return;
+    if (!card || this.isLocked) {
+      this.removeQuickDragGhost();
+      this.quickDragging = false;
+      return;
+    }
 
     const overHand = HandRailComponent.isDropTargetAt(clientX, clientY);
     const stackId = !overHand ? findCardStackIdAtPoint(clientX, clientY) : null;
@@ -591,31 +664,6 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       clearTimeout(this.holdTimer);
       this.holdTimer = null;
     }
-    cancelAnimationFrame(this.holdProgressFrame);
-    this.holdProgressFrame = 0;
-    this.holdProgress = 0;
-  }
-
-  private scheduleHoldProgressFrame() {
-    cancelAnimationFrame(this.holdProgressFrame);
-    this.holdProgressFrame = requestAnimationFrame(() => this.updateHoldProgress());
-  }
-
-  private updateHoldProgress() {
-    if (!this.holdTimer) {
-      this.holdProgress = 0;
-      return;
-    }
-    const elapsed = Date.now() - this.holdStartedAt;
-    this.holdProgress = holdProgressAt(elapsed);
-    if (shouldHoldHaptic(elapsed, this.holdVibrated) && typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(12);
-      this.holdVibrated = true;
-    }
-    if (this.holdProgress < 1) {
-      this.scheduleHoldProgressFrame();
-    }
-    this.ngZone.run(() => this.changeDetector.markForCheck());
   }
 
   private cleanupQuickDragListeners() {
@@ -643,13 +691,6 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     this.handDropPreviewHover = hover;
     EventSystem.trigger('HAND_RAIL_DROP_PREVIEW', { active, hover });
   }
-
-  get holdRingDashOffset(): number {
-    const circumference = 2 * Math.PI * 22;
-    return circumference * (1 - this.holdProgress);
-  }
-
-  readonly holdRingCircumference = 2 * Math.PI * 22;
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
@@ -690,10 +731,40 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     ));
   }
 
-  onMoved() {
+  onMoved(event?: PointerEvent) {
     setCardMergePreview(null);
     SoundEffect.play(PresetSound.cardPut);
-    this.ngZone.run(() => this.dispatchCardDropEvent());
+    this.ngZone.run(() => {
+      if (this.tryMergeAtPointer(event)) return;
+      this.dispatchCardDropEvent();
+    });
+  }
+
+  /** Screen hit-test merge when dropping a free card onto a stack / card. */
+  private tryMergeAtPointer(event?: PointerEvent): boolean {
+    if (this.GuestMode() || !this.card || this.isLocked || !event) return false;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    if (typeof clientX !== 'number' || typeof clientY !== 'number') return false;
+
+    const stackId = findCardStackIdAtPoint(clientX, clientY);
+    if (stackId) {
+      const stack = ObjectStore.instance.get(stackId);
+      if (stack instanceof CardStack) {
+        this.returnCardToStack(this.card, stack);
+        return true;
+      }
+    }
+
+    const cardId = findCardIdAtPoint(clientX, clientY, this.card.identifier);
+    if (cardId) {
+      const target = ObjectStore.instance.get(cardId);
+      if (target instanceof Card && !target.isLocked) {
+        this.mergeCardsIntoStack(this.card, target);
+        return true;
+      }
+    }
+    return false;
   }
 
   onImageLoad() {
@@ -926,7 +997,11 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       disabled: this.isLocked
     });
     actions.push(ContextMenuSeparator);
-    actions.push({ name: this.i18n.t('card.menu.16'), action: () => { this.showDetail(this.card); } });
+    actions.push({
+      name: this.i18n.t('card.menu.16'),
+      action: () => { this.showDetail(this.card); },
+      disabled: !canOpenCardDetail(this.card),
+    });
 
     if (this.isVisible && this.card.getUrls().length > 0) {
       actions.push({
@@ -995,6 +1070,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private showDetail(gameObject: Card) {
     if (this.GuestMode()) return;
+    if (!canOpenCardDetail(gameObject)) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let title = this.i18n.t('card.panelTitle');
     if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : this.i18n.t('card.back'));

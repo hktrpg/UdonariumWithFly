@@ -42,6 +42,9 @@ import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildPayloadFromNote } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 
@@ -196,10 +199,6 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private pdfRenderSeq = 0;
   /** Once per pdf id: grow paper height to the rendered page (+ title/nav) so the billboard bottom matches. */
   private pdfHeightFittedKey = '';
-  private selfPreviewOpen = false;
-  private isHovering = false;
-  /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
-  private pointerButtons = 0;
   private resizeStartW = 1;
   /** True if this note was already selected when the current pointer-down began. */
   private selectedOnPointerDown = false;
@@ -210,6 +209,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;
     return 90 < rotate && rotate < 270;
   }
+
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   constructor(
     private ngZone: NgZone,
@@ -223,8 +224,15 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     private tabletopActionService: TabletopActionService,
     private characterFxMenu: CharacterFxMenuService,
     private coordinateService: CoordinateService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.textNote?.identifier,
+      () => buildPayloadFromNote(this.textNote, this.i18n.t('note.untitled')),
+    );
+  }
 
   GuestMode() { return Network.GuestMode(); }
 
@@ -276,7 +284,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   ngOnDestroy() {
-    this.closeSelfPreview();
+    this.previewHover.onDestroy();
     EventSystem.unregister(this);
     this.input?.destroy();
     this.resizeInput?.destroy();
@@ -379,52 +387,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     }
   }
 
-  @HostListener('mouseenter', ['$event'])
-  onMouseEnter(e: MouseEvent) {
-    this.isHovering = true;
-    this.pointerButtons = e.buttons;
-    // Preview opens only when Ctrl is pressed while already hovering (not Ctrl+sweep).
-  }
-
-  @HostListener('mousemove', ['$event'])
-  onMouseMove(e: MouseEvent) {
-    this.isHovering = true;
-    this.pointerButtons = e.buttons;
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
   }
 
   @HostListener('mouseleave')
   onMouseLeave() {
-    this.isHovering = false;
-    // Keep Ctrl preview until Ctrl is released (mouse leave alone does not close).
-  }
-
-  @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(e: MouseEvent) {
-    this.pointerButtons = e.buttons;
-  }
-
-  @HostListener('window:keydown', ['$event'])
-  onWindowKeyDown(e: KeyboardEvent) {
-    if (e.key !== 'Control' && e.key !== 'Meta') return;
-    if (e.repeat) return;
-    this.tryOpenSelfPreviewFromCtrl();
-  }
-
-  @HostListener('window:keyup', ['$event'])
-  onWindowKeyUp(e: KeyboardEvent) {
-    if (e.key !== 'Control' && e.key !== 'Meta') return;
-    this.closeSelfPreview();
-  }
-
-  @HostListener('window:blur')
-  onWindowBlur() {
-    this.pointerButtons = 0;
-    this.closeSelfPreview();
+    this.previewHover.onLeave();
   }
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
-    this.pointerButtons = e?.buttons ?? this.pointerButtons;
     this.selectedOnPointerDown = this.isSelected;
     if (this.GuestMode()) return;
     if (e.ctrlKey || e.metaKey) return;
@@ -807,32 +781,6 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     if (!peerId) return;
     EventSystem.call('SHOW_NOTE_HANDOUT', data, peerId);
     if (peerId === PeerCursor.myCursor?.peerId) EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
-  }
-
-  /** Hover the note first, then press Ctrl/Meta to open; stays until Ctrl release. */
-  private tryOpenSelfPreviewFromCtrl() {
-    if (!this.isHovering) return;
-    // Ctrl+right-drag rotates the view — ignore Ctrl while any button is held.
-    if (this.pointerButtons !== 0 || this.pointerDeviceService.isDragging) return;
-    this.openSelfPreview();
-  }
-
-  private openSelfPreview() {
-    if (!this.textNote) return;
-    const data = this.handoutPayload();
-    data.preview = true;
-    if (!data.imageUrl && !data.pdfIdentifier && !data.videoUrl && !data.videoIdentifier && !data.text) {
-      data.text = this.textNote.title || this.i18n.t('note.untitled');
-    }
-    if (this.selfPreviewOpen) return;
-    this.selfPreviewOpen = true;
-    this.ngZone.run(() => EventSystem.trigger('SHOW_NOTE_HANDOUT', data));
-  }
-
-  private closeSelfPreview() {
-    if (!this.selfPreviewOpen) return;
-    this.selfPreviewOpen = false;
-    EventSystem.trigger('HIDE_NOTE_HANDOUT', { noteIdentifier: this.textNote?.identifier });
   }
 
   private queuePdfRender() {

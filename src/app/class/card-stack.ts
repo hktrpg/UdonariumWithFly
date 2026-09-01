@@ -1,4 +1,4 @@
-import { Card, CardState } from './card';
+import { Card } from './card';
 import { ImageFile } from './core/file-storage/image-file';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
@@ -92,27 +92,14 @@ export class CardStack extends TabletopObject {
     return null;
   }
   get cards(): Card[] { return this.cardRoot ? <Card[]>this.cardRoot.children : []; }
-  /** Card drawn / quick-drag target. Face-down pile: bottom of stack (reversed order). */
-  get topCard(): Card {
-    if (this.isEmpty) return null;
-    return this.pileShowsBack() ? this.bottomCard : this.firstCard;
-  }
+  /** Drawable top — always the cover (first slot). Real deck: one fixed draw end. */
+  get topCard(): Card { return this.firstCard; }
   /** Card face shown on the pile (always the first slot). */
   get coverCard(): Card { return this.firstCard; }
   get isEmpty(): boolean { return this.cards.length < 1 }
   get imageFile(): ImageFile { return this.coverCard ? this.coverCard.imageFile : null; }
 
   private get firstCard(): Card { return this.isEmpty ? null : this.cards[0]; }
-  private get bottomCard(): Card { return this.isEmpty ? null : this.cards[this.cards.length - 1]; }
-
-  private isAllFaceDown(): boolean {
-    return !this.isEmpty && this.cards.every(card => !card.isFront);
-  }
-
-  /** Cover card shows back — pile behaves as a face-down deck (draw from bottom). */
-  private pileShowsBack(): boolean {
-    return !!(this.firstCard && !this.firstCard.isFront);
-  }
 
   private normalizeCardOnStack(card: Card) {
     card.owner = '';
@@ -146,52 +133,24 @@ export class CardStack extends TabletopObject {
 
   shuffle(): Card[] {
     if (!this.cardRoot) return;
-    const pileFaceDown = this.pileShowsBack();
-    const allFaceDown = this.isAllFaceDown();
     const length = this.cardRoot.children.length;
     for (let card of this.cards) {
       card.index = Math.random() * length;
-      // Face-down piles stay flat; random 180° spins look like cards flipped face-up.
-      card.rotate = pileFaceDown ? 0 : Math.floor(Math.random() * 2) * 180;
+      // Keep flat — random 180° looks like a face flip.
+      card.rotate = 0;
       this.setSamePositionFor(card);
-    }
-    if (pileFaceDown) {
-      if (allFaceDown) {
-        for (const card of this.cards) {
-          if (card.isFront) card.faceDown();
-        }
-      } else {
-        if (this.firstCard?.isFront) {
-          this.firstCard.faceDown();
-          this.setSamePositionFor(this.firstCard);
-        }
-        if (this.topCard?.isFront) {
-          this.topCard.faceDown();
-          this.setSamePositionFor(this.topCard);
-        }
-      }
     }
     return this.cards;
   }
 
   drawCard(): Card {
-    const pileFaceDown = this.pileShowsBack();
     let card = this.topCard ? this.cardRoot.removeChild(this.topCard) : null;
     if (card) {
       card.rotate += this.rotate;
       if (360 < card.rotate) card.rotate -= 360;
       this.setSamePositionFor(card);
       card.raiseInTier();
-      // Drawn card must match the pile face (F may have flipped only the cover).
-      if (pileFaceDown) {
-        if (card.isFront) card.faceDown();
-      } else if (!card.isFront) {
-        card.faceUp();
-      }
-      if (pileFaceDown && this.topCard?.isFront) {
-        this.topCard.faceDown();
-        this.setSamePositionFor(this.topCard);
-      }
+      // Keep each card's own face; do not normalize to "pile face".
     }
     return card;
   }
@@ -247,6 +206,7 @@ export class CardStack extends TabletopObject {
     }
   }
 
+  /** Turn the whole deck over: reverse order and flip every card's face. */
   inverse() {
     this.suppressEmptyDestroy = true;
     try {
@@ -255,7 +215,8 @@ export class CardStack extends TabletopObject {
         let card = this.firstCard ? <Card>this.cardRoot.removeChild(this.firstCard) : null;
         if (card == null) break;
         tmp.unshift(card);
-        card.state = (card.state == CardState.FRONT ? CardState.BACK : CardState.FRONT);
+        if (card.isFront) card.faceDown();
+        else card.faceUp();
       }
       for (let card of tmp) {
         this.putOnBottom(card);
@@ -274,30 +235,14 @@ export class CardStack extends TabletopObject {
   putOnTop(card: Card): Card {
     if (!this.cardRoot) return null;
     if (!this.firstCard) return this.putOnBottom(card);
-    const pileFaceDown = this.pileShowsBack();
     this.normalizeCardOnStack(card);
-    const placed = pileFaceDown
-      ? this.cardRoot.appendChild(card)
-      : this.cardRoot.prependChild(card);
-    if (pileFaceDown && placed.isFront) {
-      placed.faceDown();
-      this.setSamePositionFor(placed);
-    }
-    return placed;
+    return this.cardRoot.prependChild(card);
   }
 
   putOnBottom(card: Card): Card {
     if (!this.cardRoot) return null;
-    const pileFaceDown = this.pileShowsBack();
     this.normalizeCardOnStack(card);
-    const placed = pileFaceDown
-      ? this.cardRoot.prependChild(card)
-      : this.cardRoot.appendChild(card);
-    if (pileFaceDown && placed.isFront) {
-      placed.faceDown();
-      this.setSamePositionFor(placed);
-    }
-    return placed;
+    return this.cardRoot.appendChild(card);
   }
 
   toTopmost() {

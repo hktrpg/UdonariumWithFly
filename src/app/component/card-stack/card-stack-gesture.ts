@@ -5,7 +5,7 @@ export const CARD_STACK_QUICK_DRAG_PX = 8;
 export const CARD_STACK_HOLD_HAPTIC_MS = 400;
 
 /** Bottom drop-band height (px) used while quick-dragging a card into hand. */
-export const HAND_RAIL_DROP_BAND_PX = 132;
+export const HAND_RAIL_DROP_BAND_PX = 168;
 
 /** Highlight a table card / stack as a merge drop target (or clear when `targetId` is null). */
 let lastMergePreviewId: string | null = null;

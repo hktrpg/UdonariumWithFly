@@ -39,6 +39,9 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { xor } from 'lodash';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'game-table-mask',
@@ -296,6 +299,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   movableOption: MovableOption = {};
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
   
   private _currentimageFile: ImageFile;
   private _currentImageFileUrl: string = '';
@@ -329,8 +333,15 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     private modalService: ModalService,
     private coordinateService: CoordinateService,
     private chatMessageService: ChatMessageService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.gameTableMask?.identifier,
+      () => buildTabletopImagePreviewPayload(this.gameTableMask),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -387,12 +398,23 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     GameTableMaskComponent.altPassThroughMasks.delete(this);
     GameTableMaskComponent.refreshAltPassThroughDocListener();
     this.input.destroy();
     EventSystem.unregister(this);
     clearTimeout(this._scratchingTimerId);
     if (this._currentImageFileUrl) URL.revokeObjectURL(this._currentImageFileUrl);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])
