@@ -3,7 +3,7 @@ import { CardStack } from './card-stack';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { resetTabletopStore } from '../../testing/tabletop-test.util';
 
-describe('CardStack pile behavior', () => {
+describe('CardStack real deck behavior', () => {
   beforeEach(() => {
     resetTabletopStore();
   });
@@ -16,90 +16,77 @@ describe('CardStack pile behavior', () => {
     return stack;
   }
 
-  it('draws from the first card when the pile is face-up', () => {
+  it('always draws from the cover (first card)', () => {
     const stack = stackWithCards('A', 'B', 'C');
+    expect(stack.topCard?.name).toBe('A');
     expect(stack.drawCard()?.name).toBe('A');
     expect(stack.drawCard()?.name).toBe('B');
   });
 
-  it('draws from the bottom in reverse order when the whole pile is face-down', () => {
+  it('still draws from cover when the pile is face-down', () => {
     const stack = stackWithCards('A', 'B', 'C');
     stack.faceDownAll();
-    expect(stack.topCard?.name).toBe('C');
-    expect(stack.drawCard()?.name).toBe('C');
-    expect(stack.topCard?.name).toBe('B');
-    expect(stack.drawCard()?.name).toBe('B');
+    expect(stack.topCard?.name).toBe('A');
     expect(stack.drawCard()?.name).toBe('A');
+    expect(stack.drawCard()?.name).toBe('B');
   });
 
-  it('draws from the bottom when only the cover is face-down (F flip)', () => {
+  it('preserves each card face when drawing', () => {
     const stack = stackWithCards('A', 'B', 'C');
-    stack.faceDown();
-    expect(stack.coverCard?.name).toBe('A');
-    expect(stack.topCard?.name).toBe('C');
-    expect(stack.drawCard()?.name).toBe('C');
-  });
-
-  it('drawn card matches pile face after cover-only F flip', () => {
-    const stack = stackWithCards('A', 'B', 'C');
-    stack.faceDown();
+    stack.cards[1].faceDown();
     const first = stack.drawCard();
-    expect(first?.name).toBe('C');
-    expect(first?.isFront).toBeFalse();
+    expect(first?.name).toBe('A');
+    expect(first?.isFront).toBeTrue();
     const second = stack.drawCard();
     expect(second?.name).toBe('B');
     expect(second?.isFront).toBeFalse();
   });
 
-  it('keeps cover face-down after drawing from a partially covered pile', () => {
+  it('putOnTop prepends without forcing face', () => {
     const stack = stackWithCards('A', 'B');
-    stack.faceDown();
-    expect(stack.drawCard()?.name).toBe('B');
-    expect(stack.topCard?.name).toBe('A');
-    expect(stack.coverCard?.isFront).toBeFalse();
-  });
-
-  it('shuffle keeps a fully face-down pile face-down', () => {
-    const stack = stackWithCards('A', 'B', 'C');
     stack.faceDownAll();
-    stack.shuffle();
-    expect(stack.topCard?.isFront).toBeFalse();
-    expect(stack.cards.every(card => !card.isFront)).toBeTrue();
-  });
-
-  it('shuffle keeps a partially covered pile showing back', () => {
-    const stack = stackWithCards('A', 'B', 'C');
-    stack.faceDown();
-    stack.shuffle();
-    expect(stack.coverCard?.isFront).toBeFalse();
-    expect(stack.topCard?.isFront).toBeFalse();
-  });
-
-  it('shuffle does not flip a face-up pile', () => {
-    const stack = stackWithCards('A', 'B');
-    stack.shuffle();
-    expect(stack.topCard?.isFront).toBeTrue();
-  });
-
-  it('draws K first from A~K pile after F flip (cover only)', () => {
-    const stack = CardStack.create('deck');
-    for (const name of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']) {
-      stack.putOnBottom(Card.create(name, '', ''));
-    }
-    expect(stack.coverCard?.name).toBe('A');
-    stack.faceDown();
-    expect(stack.coverCard?.isFront).toBeFalse();
-    expect(stack.topCard?.name).toBe('K');
-    expect(stack.drawCard()?.name).toBe('K');
-  });
-
-  it('putOnTop adds to the drawable top of a face-down pile', () => {
-    const stack = stackWithCards('A', 'B');
-    stack.faceDown();
     const extra = Card.create('C', '', '');
+    expect(extra.isFront).toBeTrue();
     stack.putOnTop(extra);
     expect(stack.topCard?.name).toBe('C');
-    expect(stack.coverCard?.name).toBe('A');
+    expect(stack.topCard?.isFront).toBeTrue();
+    expect(stack.cards[1]?.name).toBe('A');
+  });
+
+  it('putOnBottom appends without forcing face', () => {
+    const stack = stackWithCards('A');
+    stack.faceDown();
+    const extra = Card.create('B', '', '');
+    stack.putOnBottom(extra);
+    expect(stack.cards.map(c => c.name)).toEqual(['A', 'B']);
+    expect(stack.cards[1]?.isFront).toBeTrue();
+  });
+
+  it('inverse reverses order and flips every card', () => {
+    const stack = stackWithCards('A', 'B', 'C');
+    stack.cards[1].faceDown();
+    stack.inverse();
+    expect(stack.cards.map(c => c.name)).toEqual(['C', 'B', 'A']);
+    expect(stack.cards.map(c => c.isFront)).toEqual([false, true, false]);
+  });
+
+  it('draws cover in order after inverse', () => {
+    const stack = stackWithCards('A', 'B', 'C');
+    stack.faceDownAll();
+    stack.inverse();
+    expect(stack.drawCard()?.name).toBe('C');
+    expect(stack.drawCard()?.isFront).toBeTrue();
+    expect(stack.drawCard()?.name).toBe('A');
+  });
+
+  it('shuffle preserves faces and zeros rotate', () => {
+    const stack = stackWithCards('A', 'B', 'C');
+    stack.cards[0].faceDown();
+    stack.cards[1].rotate = 180;
+    const faces = stack.cards.map(c => c.isFront);
+    stack.shuffle();
+    expect(stack.cards.every(c => c.rotate === 0)).toBeTrue();
+    expect(stack.cards.map(c => c.isFront).sort()).toEqual([...faces].sort());
   });
 
   it('destroys the stack when the last card is drawn', () => {

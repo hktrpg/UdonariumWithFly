@@ -5,6 +5,7 @@ import { ObjectPreviewService } from 'service/object-preview.service';
 
 export {
   canRevealCardCaption,
+  canOpenCardDetail,
   cardCaptionName,
   cardCaptionRubiedText,
 } from 'service/card-caption-text';

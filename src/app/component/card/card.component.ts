@@ -53,6 +53,7 @@ import { ModalService } from 'service/modal.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import {
   CardHoverCaptionController,
+  canOpenCardDetail,
   cardCaptionName,
   cardCaptionRubiedText,
   publishCardCaptionOverlay,
@@ -425,6 +426,10 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     if (this.GuestMode() || event.button !== 0 || !this.card) return;
     if (this.card.location.name !== 'table') return;
     event.stopPropagation();
+    if (this.isLocked) {
+      this.onInputStart(event);
+      return;
+    }
     this.resetQuickDragState();
     this.suppressCardMovable = true;
     this.changeDetector.detectChanges();
@@ -504,7 +509,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   };
 
   private startQuickCardDrag(event: PointerEvent) {
-    if (!this.card) {
+    if (!this.card || this.isLocked) {
       this.resetQuickDragState();
       return;
     }
@@ -523,7 +528,11 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private finishQuickCardDrag(clientX: number, clientY: number) {
     const card = this.card;
-    if (!card) return;
+    if (!card || this.isLocked) {
+      this.removeQuickDragGhost();
+      this.quickDragging = false;
+      return;
+    }
 
     const overHand = HandRailComponent.isDropTargetAt(clientX, clientY);
     const stackId = !overHand ? findCardStackIdAtPoint(clientX, clientY) : null;
@@ -988,7 +997,11 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       disabled: this.isLocked
     });
     actions.push(ContextMenuSeparator);
-    actions.push({ name: this.i18n.t('card.menu.16'), action: () => { this.showDetail(this.card); } });
+    actions.push({
+      name: this.i18n.t('card.menu.16'),
+      action: () => { this.showDetail(this.card); },
+      disabled: !canOpenCardDetail(this.card),
+    });
 
     if (this.isVisible && this.card.getUrls().length > 0) {
       actions.push({
@@ -1057,6 +1070,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   private showDetail(gameObject: Card) {
     if (this.GuestMode()) return;
+    if (!canOpenCardDetail(gameObject)) return;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let title = this.i18n.t('card.panelTitle');
     if (gameObject.name.length) title += ' - ' + (this.isVisible ? gameObject.name : this.i18n.t('card.back'));

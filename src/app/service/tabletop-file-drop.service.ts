@@ -509,6 +509,7 @@ export class TabletopFileDropService {
       const name = this.baseName(file.name) || this.i18n.t('action.cardName');
       stack.putOnBottom(Card.create(name, image.identifier, backId));
     }
+    stack.faceDownAll();
     return true;
   }
 

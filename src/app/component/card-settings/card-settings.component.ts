@@ -40,10 +40,12 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get cardName(): string {
-    return this.card?.name ?? '';
+    if (!this.card) return '';
+    if (!this.isVisible) return this.i18n.t('card.back');
+    return this.card.name ?? '';
   }
   set cardName(value: string) {
-    if (!this.card || this.GuestMode()) return;
+    if (!this.card || this.GuestMode() || !this.isVisible) return;
     const el = this.card.commonDataElement?.getFirstElementByName('name');
     if (el) el.value = value;
   }
@@ -78,6 +80,7 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   openImage(name: 'front' | 'back') {
     if (!this.card || this.GuestMode()) return;
+    if (name === 'front' && !this.isVisible) return;
     const current = this.card.imageDataElement?.getFirstElementByName(name)?.value + '' || '';
     this.modalService.open<string>(FileSelecterComponent, {
       isAllowedEmpty: false,

@@ -72,7 +72,7 @@ export const en_obj: I18nDictionary = {
   'stack.menu.8': '☐ Locked',
   'stack.menu.9': 'Draw 1 card',
   'stack.menu.10': 'Draw',
-  'stack.menu.11': 'Flip card',
+  'stack.menu.11': 'Flip deck',
   'stack.menu.12': 'Flip card',
   'stack.menu.13': 'Flip all face-up',
   'stack.menu.14': 'Flip all face-down',

@@ -74,7 +74,7 @@ export const ja_obj: I18nDictionary = {
   'stack.menu.8': '☐ 固定',
   'stack.menu.9': '1枚引く',
   'stack.menu.10': 'カードを引く',
-  'stack.menu.11': 'カードを裏返す',
+  'stack.menu.11': '山札を裏返す',
   'stack.menu.12': 'カードを裏返す',
   'stack.menu.13': 'すべて表向き',
   'stack.menu.14': 'すべて裏向き',

@@ -311,6 +311,8 @@ export class TabletopActionService {
       //let card = Card.create('卡牌', url, back);
       cardStack.putOnBottom(card);
     }
+    // Real deck: start face-down so draws keep backs until F (full turn-over).
+    cardStack.faceDownAll();
     reconcileLayerStack();
     return cardStack;
   }

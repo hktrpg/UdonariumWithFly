@@ -1,7 +1,7 @@
 <div class="settings-ui dense object-settings card-settings" *ngIf="card; else emptyBlock" appFitPanel [fitMinHeight]="220">
   <section class="card card-dense">
     <div class="image-grid">
-      <div class="image-slot">
+      <div class="image-slot" *ngIf="isVisible">
         <span class="image-label">{{ 'sheet.changeFrontImage' | i18n }}</span>
         <button type="button" class="image-frame" [class.image-frame-empty]="!card.frontImage?.url"
           (click)="openImage('front')" [disabled]="GuestMode()">

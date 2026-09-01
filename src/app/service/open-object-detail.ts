@@ -20,6 +20,7 @@ import { RangeSettingsComponent } from 'component/range-settings/range-settings.
 import { TerrainSettingsComponent } from 'component/terrain-settings/terrain-settings.component';
 
 import { I18nService } from 'service/i18n.service';
+import { canOpenCardDetail } from 'service/card-caption-text';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -40,6 +41,7 @@ export function openObjectDetailById(
   const ptr = pointerDeviceService.pointers[0] || { x: 200, y: 160 };
 
   if (obj instanceof Card) {
+    if (!canOpenCardDetail(obj)) return false;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: obj.identifier, className: obj.aliasName });
     let title = i18n.t('card.panelTitle');
     if (obj.name.length) title += ' - ' + (obj.isVisible ? obj.name : i18n.t('card.back'));

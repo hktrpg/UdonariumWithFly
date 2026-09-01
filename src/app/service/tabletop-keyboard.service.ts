@@ -372,7 +372,7 @@ export class TabletopKeyboardService {
       return;
     }
 
-    // F: flip hovered card / stack cover. Hover required (not box-select).
+    // F: flip hovered card, or turn over hovered deck (inverse). Hover required (not box-select).
     if (code === 'KeyF' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
       const hovered = this.hoverCardOrStackTargets();
@@ -1619,10 +1619,9 @@ export class TabletopKeyboardService {
       }
 
       if (object instanceof CardStack) {
-        const cover = object.coverCard;
-        if (!cover) continue;
-        if (cover.isFront) object.faceDown();
-        else object.faceUp();
+        if (object.isEmpty) continue;
+        object.inverse();
+        EventSystem.call('INVERSE_CARD_STACK', { identifier: object.identifier });
         flippedCard = true;
         continue;
       }

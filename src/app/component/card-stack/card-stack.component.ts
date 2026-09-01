@@ -477,6 +477,10 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   onStackPointerDown(event: PointerEvent) {
     if (this.GuestMode() || event.button !== 0) return;
     event.stopPropagation();
+    if (this.isLocked) {
+      this.onInputStart(event);
+      return;
+    }
     this.resetQuickDragState();
     // Suppress movable immediately so the companion mousedown cannot start a stack drag.
     this.suppressStackMovable = true;
@@ -562,6 +566,10 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   };
 
   private startQuickCardDrag(event: PointerEvent) {
+    if (this.isLocked) {
+      this.resetQuickDragState();
+      return;
+    }
     const top = this.cardStack?.topCard;
     if (!top) {
       this.resetQuickDragState();
@@ -582,6 +590,12 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   private finishQuickCardDrag(clientX: number, clientY: number) {
+    if (this.isLocked) {
+      this.removeQuickDragGhost();
+      this.quickDragging = false;
+      this.quickDragPeekId = '';
+      return;
+    }
     if (!this.quickDragPeekId || this.cardStack.topCard?.identifier !== this.quickDragPeekId) {
       this.removeQuickDragGhost();
       this.quickDragging = false;
@@ -599,23 +613,24 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
     if (dropTarget === 'hand' || dropTarget === 'table' || dropTarget === 'card' || dropTarget === 'stack') {
       const card = this.cardStack.drawCard();
-      if (!card) return;
-      if (dropTarget === 'hand') {
-        HandRailComponent.acceptQuickDragCard(card);
-      } else if (dropTarget === 'stack') {
-        const target = ObjectStore.instance.get(otherStackId!) as CardStack;
-        if (target instanceof CardStack) {
-          target.putOnTop(card);
-          SoundEffect.play(PresetSound.cardPut);
+      if (card) {
+        if (dropTarget === 'hand') {
+          HandRailComponent.acceptQuickDragCard(card);
+        } else if (dropTarget === 'stack') {
+          const target = ObjectStore.instance.get(otherStackId!) as CardStack;
+          if (target instanceof CardStack) {
+            target.putOnTop(card);
+            SoundEffect.play(PresetSound.cardPut);
+          } else {
+            this.placeQuickDragOnTable(card, clientX, clientY);
+          }
+        } else if (dropTarget === 'card') {
+          const target = ObjectStore.instance.get(cardId!) as Card;
+          if (target instanceof Card) this.mergeDrawnCardOntoCard(card, target);
+          else this.placeQuickDragOnTable(card, clientX, clientY);
         } else {
           this.placeQuickDragOnTable(card, clientX, clientY);
         }
-      } else if (dropTarget === 'card') {
-        const target = ObjectStore.instance.get(cardId!) as Card;
-        if (target instanceof Card) this.mergeDrawnCardOntoCard(card, target);
-        else this.placeQuickDragOnTable(card, clientX, clientY);
-      } else {
-        this.placeQuickDragOnTable(card, clientX, clientY);
       }
     }
     // Dropped on same stack or outside valid zones: peek only — stack unchanged.
@@ -692,12 +707,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
       ghost.style.borderRadius = '6px';
     }
     const img = document.createElement('img');
-    const cover = this.cardStack.coverCard;
-    const pileFaceDown = !!(cover && !cover.isFront);
-    const visible = pileFaceDown
-      ? cover.backImage
-      : (topCard.isFront ? topCard.frontImage : topCard.backImage);
-    const ghostRotate = pileFaceDown ? cover.rotate : topCard.rotate;
+    const visible = topCard.isFront ? topCard.frontImage : topCard.backImage;
+    const ghostRotate = topCard.rotate;
     img.src = visible?.url || '';
     img.alt = '';
     img.draggable = false;
@@ -882,6 +893,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   /** Draw top card into the local player's hand library. */
   private drawCardToHand(): Card {
+    if (this.isLocked) return null;
     const card = this.cardStack.drawCard();
     if (card) {
       card.moveToHand(Network.peer.userId);
@@ -908,7 +920,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   /** Round-robin deal: each recipient gets `n` cards into their hand. */
   private dealCardsPerPlayer(n: number) {
-    if (n < 1 || this.GuestMode()) return;
+    if (n < 1 || this.GuestMode() || this.isLocked) return;
     const recipients = this.dealRecipients();
     if (recipients.length < 1) return;
 
@@ -1108,8 +1120,8 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
             }));
           }
         },
-        default: this.cards.length > 0,
-        disabled: this.cards.length == 0
+        default: this.cards.length > 0 && !this.isLocked,
+        disabled: this.cards.length == 0 || this.isLocked
       },
       {
         name: this.i18n.t('stack.menu.10'), action: null,
@@ -1117,6 +1129,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
           return {
             name: this.i18n.t('stack.nCards', { count: n }),
             action: () => {
+              if (this.isLocked) return;
               let count = 0;
               for (let i = 0; i < n; i++) {
                 const card = this.drawCardToHand();
@@ -1133,7 +1146,7 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
             }
           };
         }),
-        disabled: this.cards.length == 0
+        disabled: this.cards.length == 0 || this.isLocked
       },
       {
         name: this.i18n.t('stack.menu.deal'), action: null,
@@ -1143,23 +1156,14 @@ export class CardStackComponent implements OnChanges, AfterViewInit, OnDestroy {
             action: () => this.dealCardsPerPlayer(n),
           };
         }),
-        disabled: this.cards.length == 0
+        disabled: this.cards.length == 0 || this.isLocked
       },
       ContextMenuSeparator,
       {
         name: this.i18n.t('stack.menu.11'), action: () => {
-          const cover = this.cardStack.coverCard;
-          if (!cover) return;
-          if (cover.isFront) {
-            this.cardStack.faceDown();
-          } else {
-            this.chatMessageService.sendOperationLog(this.i18n.t('stack.revealedTop', {
-              stack: this.stackDisplayName(),
-              card: cover.name == '' ? this.i18n.t('card.unnamed') : cover.name
-            }));
-            this.cardStack.faceUp();
-          }
+          this.cardStack.inverse();
           SoundEffect.play(PresetSound.cardDraw);
+          EventSystem.call('INVERSE_CARD_STACK', { identifier: this.cardStack.identifier });
         },
         disabled: this.cards.length == 0,
         hotkey: 'F',

@@ -74,7 +74,7 @@ export const zhCN_obj: I18nDictionary = {
   'stack.menu.8': '☐ 固定',
   'stack.menu.9': '抽 1 张卡牌',
   'stack.menu.10': '抽卡',
-  'stack.menu.11': '翻转卡牌',
+  'stack.menu.11': '翻转牌堆',
   'stack.menu.12': '翻转卡牌',
   'stack.menu.13': '全部翻成正面',
   'stack.menu.14': '全部翻成背面',
