@@ -1598,7 +1598,7 @@ export class TabletopKeyboardService {
     return changed;
   }
 
-  /** Flip cards / coin faces; roll multi-face dice. */
+  /** Flip card / turn over deck / coin faces; roll multi-face dice. */
   private flipSelection(): boolean {
     return this.flipObjects(this.shortcutTargets());
   }

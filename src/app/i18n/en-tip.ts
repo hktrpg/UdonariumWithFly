@@ -26,7 +26,7 @@ export const en_tip: I18nDictionary = {
   'tip.menu.inventory.title': 'Inventory',
   'tip.menu.inventory.body': 'Characters: on table / common / personal / trash. Bound to the viewed map; multi-select place; Ctrl+drag = temporary copy.',
   'tip.menu.notes.title': 'Notes',
-  'tip.menu.notes.body': 'Shared notes: text, image, video, PDF. Hover a note then press Ctrl to preview; flip, hide, click actions, show to players.',
+  'tip.menu.notes.body': 'Shared notes: text, image, video, PDF. Hover a note (or other object) then Ctrl／⌘ for Object Image Preview; flip, hide, click actions, show to players.',
   'tip.menu.settings.title': 'Settings',
   'tip.menu.settings.body': 'Local options: grid, snap, sounds, auto-open chat, one menu window, rearrange panels, stands, ZIP, folder backup (change / disconnect), language, tutorial.',
   'tip.menu.more.title': 'More',

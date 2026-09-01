@@ -26,7 +26,7 @@ export const zhCN_tip: I18nDictionary = {
   'tip.menu.inventory.title': '仓库',
   'tip.menu.inventory.body': '角色库：桌面／公用／私人／回收区。依目前地图绑定；可多选放置；Ctrl＋拖曳＝暂存复本。',
   'tip.menu.notes.title': '笔记',
-  'tip.menu.notes.body': '笔记仓库：文字／图片／视频／PDF。可翻面、隐藏、点击动作、出示给玩家。',
+  'tip.menu.notes.body': '笔记仓库：文字／图片／视频／PDF。鼠标移到笔记（或其他物件）上再按 Ctrl／⌘ 可开大图预览；可翻面、隐藏、点击动作、出示给玩家。',
   'tip.menu.settings.title': '设定',
   'tip.menu.settings.body': '本机选项：格线、吸附、提示音、聊天自动打开、菜单单窗口、重排面板、Stand、ZIP、文件夹备份（更改／断开）、语言、教学。',
   'tip.menu.more.title': '更多',

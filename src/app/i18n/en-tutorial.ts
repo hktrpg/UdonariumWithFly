@@ -23,9 +23,9 @@ Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
 <Objects> Left-drag = move
 　　　　Drag rotate handle = turn
 　　　　Right-click = menu
-　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…)
+　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…; face-down cards blocked for players)
 　　　　Character “Next image” = right-click “Switch to next image”
-　　　　Flip cards / draw / roll dice = right-click menu
+　　　　Cards／decks: right-click draw to hand・deal; F = flip card / turn over deck; dice = right-click or F
 <Path move> After selecting a token: Ctrl+left-click = add waypoint (release Ctrl — path stays)
 　　　　Left-click new position = final stop and go
 　　　　Space = go with current waypoints
@@ -36,9 +36,9 @@ Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
 　　　　Left-drag empty = box select
 　　　　Shift+drag = additive box
 　　　　Click empty / Esc = clear
-<Hover preview> Pause on an object = preview card
-　　　　Pin (top-left) = keep open (closes on delete/trash)
-　　　　Unpinned leave = fade out ~0.5s
+<Preview> Characters etc. = hover overview (pin; fades ~0.5s after leave)
+　　　　Cards／decks = hover name→text
+　　　　Ctrl／⌘+hover = Object Image Preview (zoom／pin; double-click opens detail)
 Drag images or music into the browser to import.`,
   'tutorial.keyboard': `<Keyboard (with selection)> WASD / arrows = move (diagonals OK)
 　　　　Shift+WASD = face direction
@@ -235,6 +235,12 @@ Upgraded to 1.13.2`,
 ・Note inventory matches character warehouse: five tabs (table／shared／personal／other maps／graveyard), drag to map／tabs
 ・Click selected note again to collapse; delete goes to graveyard; PDF etc. draggable to tabs
 ・Clue links (red strings) update live while dragging linked objects; default scenario text no longer duplicates`,
+  'changelog.2026sepStability': `2026/08/24–31 Stability・connection・lighting・chat
+・Map **darkness** separated from **ambient**; day/night presets and night map rim sealing improved
+・Join probe／weak ICE: slow links less likely false-timeout; mesh diag includes room media usage
+・PDF: worker loaded via blob (bad MIME workaround); stop render-retry storms freezing Chrome
+・Role passwords kept on identity switch; clearer lobby join UI
+・Join／reopen: do not clear existing chat tabs; refuse peer re-create of lobby MainTab／SubTab; lobby-sample DELETE no longer pushback`,
   'changelog.2026handcard': `2026/09/01 Hand library・decks・object preview
 ・Bottom **hand rail**: straight tuck (top peek), expand on hover; drag to reorder／play; play face-up or face-down
 ・Deck menu: **Draw 1／Draw N** into your hand; **Deal** N each (round-robin)
