@@ -64,7 +64,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Path move | Select one token → Ctrl+left waypoints (draft stays after release) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels |
 | Selection UX | Click / box select; Shift+click/drag multi-select; double-click details; selection highlight |
 | Ping | Long-press map for a marker; Shift+long-press for a warning |
-| Table lighting & vision | Darkness / FoW, lights, walls, vision ranges; claim vision character |
+| Table lighting & vision | Darkness separate from ambient / FoW, lights, walls, vision ranges; claim vision character |
 | Scene tools | GM light / wall / draw / text tools; optional per-tool player permissions |
 | Menu visibility perms | GM can hide player menus; **default on**: images / music / toolbox / inventory / notes; **default off**: table / scene preset / scenario text; connection / chat / combat / settings / disconnect always visible |
 | Load room data perms | Load ZIP / folder restore **GM-only by default** (can enable for players) |
