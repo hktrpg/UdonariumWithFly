@@ -31,6 +31,15 @@
       <div *ngIf="!isFront && ownerIsOnline && 0 < ownerName?.length" class="name-tag is-nowrap has-length-limit is-pointer-events-none is-black-background is-3d" [ngStyle]="{'background-color': ownerColor, 'transform': 'translateY(' + (isHand ? 'calc(' + -backImageClientHeight / 2 + 'px - 75%)' : '-50%') + ') translateX(-50%) translateX(' + size * gridSize / 2 +'px)'}">
         <span class="is-3d" style="display: inline-block" [ngClass]="{'is-inverse': isInverse}"><b>{{ownerName}}</b></span>
       </div>
+      <!-- Flat markers on the card face (not used for cards inside a stack). -->
+      <div *ngIf="statusEntries.length" class="card-status-bar" [style.width.px]="size * gridSize">
+        <span class="status-icons-row">
+          <span *ngFor="let s of statusEntries" class="status-badge" [title]="statusName(s.id)"
+            (contextmenu)="onStatusBadgeContextMenu($event, s.id)">
+            <i class="material-icons status-icon">{{ statusIcon(s.id) }}</i>
+          </span>
+        </span>
+      </div>
       <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
     </div>
   </div>
