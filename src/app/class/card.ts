@@ -17,6 +17,8 @@ export class Card extends TabletopObject {
   @SyncVar() state: CardState = CardState.FRONT;
   @SyncVar() rotate: number = 0;
   @SyncVar() owner: string = '';
+  /** Nickname stamped at moveToHand — survives PeerCursor purge after disconnect. */
+  @SyncVar() ownerLabel: string = '';
   @SyncVar() zindex: number = 0;
   @SyncVar() isLocked: boolean = false;
   @SyncVar() handOrder: number = 0;
@@ -57,7 +59,15 @@ export class Card extends TabletopObject {
   set color(color: string) { this.setCommonValue('color', color); }
 
   get ownerName(): string {
-    return PeerCursor.findByUserId(this.owner)?.name || '';
+    return PeerCursor.findByUserId(this.owner)?.name || this.ownerLabel || this.owner || '';
+  }
+
+  static resolveOwnerLabel(userId: string): string {
+    if (!userId) return '';
+    const live = PeerCursor.findByUserId(userId)?.name;
+    if (live) return live;
+    if (Network.peer?.userId === userId) return PeerCursor.myCursor?.name || '';
+    return '';
   }
 
   get ownerColor(): string {
@@ -75,6 +85,7 @@ export class Card extends TabletopObject {
     if (!userId) return;
     this.mutateAppearance(() => { this.state = CardState.BACK; });
     this.owner = userId;
+    this.ownerLabel = Card.resolveOwnerLabel(userId);
     const peersHand = ObjectStore.instance.getObjects(Card)
       .filter(c => c !== this && c.location.name === 'hand' && c.owner === userId);
     this.handOrder = peersHand.length < 1
@@ -101,11 +112,13 @@ export class Card extends TabletopObject {
   faceUp() {
     this.mutateAppearance(() => { this.state = CardState.FRONT; });
     this.owner = '';
+    this.ownerLabel = '';
   }
 
   faceDown() {
     this.mutateAppearance(() => { this.state = CardState.BACK; });
     this.owner = '';
+    this.ownerLabel = '';
   }
 
   toTopmost() {
