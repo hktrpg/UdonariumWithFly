@@ -46,7 +46,7 @@ Drag images or music into the browser to import.`,
 　　　　Shift+Q/E = ±15°
 　　　　R = reset all angles (facing / tilt) to 0°
 　　　　PageUp/PageDown = altitude ±1 (Shift = ±0.5)
-　　　　F = flip card/coin or roll dice
+　　　　F = flip card / turn over deck / coin or roll dice
 　　　　L = lock/unlock
 　　　　H = hide/reveal selected characters (GM only)
 　　　　T = gather selected objects to mouse position
@@ -235,6 +235,14 @@ Upgraded to 1.13.2`,
 ・Note inventory matches character warehouse: five tabs (table／shared／personal／other maps／graveyard), drag to map／tabs
 ・Click selected note again to collapse; delete goes to graveyard; PDF etc. draggable to tabs
 ・Clue links (red strings) update live while dragging linked objects; default scenario text no longer duplicates`,
+  'changelog.2026handcard': `2026/09/01 Hand library・decks・object preview
+・Bottom **hand rail**: straight tuck (top peek), expand on hover; drag to reorder／play; play face-up or face-down
+・Deck menu: **Draw 1／Draw N** into your hand; **Deal** N each (round-robin)
+・**Real deck**: always draw／place from the cover; keep each card’s face; **F** turns the whole deck over (reverse + flip all); shuffle does not force faces
+・New poker／dropped decks start face-down; **Lock** blocks moving the stack／card and blocks draw／deal
+・Hover **Card Caption**: name first, text after ~0.5s (beside the painted card); face-down cards don’t open detail for players (no spoilers)
+・**Object Image Preview**: Ctrl／⌘＋hover for zoom／pin (multi-pin); double-click preview opens the detail sheet
+・Desktop panels open near viewport center; context menus stay cursor-anchored`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

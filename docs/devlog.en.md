@@ -241,3 +241,12 @@ Folder backup can hydrate from media/ without blocking peer downloads.
 Note inventory: five tabs and drag-drop; red-string drag updates live; default scenario no longer double-loads.
 
 ---
+
+Udonarium Development Diary 32
+Hand library・real decks・object preview (2026/09/01)
+Straight-tuck hand (hover expand; play face-up/down); draw/deal into hands
+Always draw from cover keeping faces; F turns whole deck; lock blocks move/draw
+Hover Caption (name→text); Ctrl／⌘ Object Image Preview (pin, dblclick detail)
+Face-down cards: no player detail; caption anchors beside the painted card
+
+---

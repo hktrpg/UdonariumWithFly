@@ -46,7 +46,7 @@ Patreon：https://www.patreon.com/HKTRPG
 　　　　Shift＋Q／E＝±15°
 　　　　R＝重置全部角度（面向／傾角）至 0°
 　　　　PageUp／PageDown＝高度 ±1（Shift＝±0.5）
-　　　　F＝翻面（卡／硬幣）或擲骰
+　　　　F＝單卡翻面／牌堆整疊翻轉／硬幣或擲骰
 　　　　L＝鎖定／解鎖
 　　　　H＝顯隱選取角色（僅 GM）
 　　　　T＝集中已選物件到滑鼠位置
@@ -235,6 +235,14 @@ Patreon：https://www.patreon.com/HKTRPG
 ・筆記倉庫對齊角色倉庫：五分頁（桌面／共用／個人／其他地圖／墳場）、拖放到地圖／分頁
 ・再點已選筆記可收合；刪除進墳場；PDF 等可拖到分頁
 ・紅繩（線索連結）拖曳連線物件時即時更新；預設劇本文字不再重複載入`,
+  'changelog.2026handcard': `2026/09/01 手牌庫・牌堆・物件預覽
+・底部**手牌庫**：直排 tuck（露出頂部）、hover 展開；可拖曳重排／打出；打出時可選正面／背面
+・牌堆選單：**抽 1／抽 N** 進自己手牌；**派牌**每人 N 張（輪流）
+・**真實牌堆**：永遠從封面抽／放，保留每張朝向；**F**＝整疊翻轉（順序反轉＋全翻面）；洗牌不強制翻面
+・新建撲克／拖檔建牌堆預設蓋牌；**鎖定**後不可拖動牌堆／單卡，也不可抽牌或派牌
+・Hover **Card Caption**：先顯示名稱，約 0.5 秒後顯示 text（錨在畫面咭旁）；反面對玩家不開詳情（防劇透）
+・**Object Image Preview**：Ctrl／⌘＋懸停開大圖（縮放／釘選；可多釘）；雙擊預覽可開詳情面板
+・桌面面板預設開在視窗中央略偏上；右鍵選單仍貼游標`,
   'changelog.links': `本站：https://z01.hktrpg.com
 教學：https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord：https://support.hktrpg.com

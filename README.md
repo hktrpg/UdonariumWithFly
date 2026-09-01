@@ -59,6 +59,7 @@ Recommended browser: desktop Google Chrome (HTTPS required).
 | Object import／export | Settings panels: Import / Export ZIP; characters also Download as JSON (CCFOLIA; Ctrl+V paste) |
 | Context-menu cleanup | Frequent actions on L1; Appearance/FX and Token settings nested; empty-map Add object; redundant Create copy removed |
 | Hover overview pin | Hover token shows preview; pin keeps it open; fades out ~0.5s after leave; closes on delete/trash |
+| Hand library・real decks | Bottom straight-tuck hand (hover expand; play face-up/down); draw/deal into hands; always draw from cover keeping faces; F turns whole deck; lock blocks move/draw; hover name→text; Ctrl／⌘ object image preview (pin, double-click detail); face-down detail blocked for players |
 | Undo / redo | Local stack: move / rotate / delete / cut-paste / layer / path move; scene create / delete / nudge. Guests blocked; ignored in text fields (browser handles text undo) |
 | Path move | Select one token → Ctrl+left waypoints (draft stays after release) → left-click destination or Space to go; right-click undoes last waypoint; Esc cancels |
 | Selection UX | Click / box select; Shift+click/drag multi-select; double-click details; selection highlight |
