@@ -4,6 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { Card } from '@udonarium/card';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { Network } from '@udonarium/core/system';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import * as localForage from 'localforage';
@@ -78,7 +79,7 @@ export class HandService {
 
   /** Whose hand the rail should display (GM peek or self). */
   get viewUserId(): string {
-    if (PeerCursor.myCursor?.isGMMode && this.gmPeekUserId) {
+    if (GmCardPeek.active && this.gmPeekUserId) {
       return this.gmPeekUserId;
     }
     return Network.peer.userId;

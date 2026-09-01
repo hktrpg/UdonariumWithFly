@@ -82,6 +82,7 @@ import { LoggingInputDirective } from './directive/logging-input.directive';
 import { TeachingTipDirective } from 'directive/teaching-tip.directive';
 import { ConfirmationComponent } from './component/confirmation/confirmation.component';
 import { DropCreateChooserComponent } from './component/drop-create-chooser/drop-create-chooser.component';
+import { CardSheetImportComponent } from './component/card-sheet-import/card-sheet-import.component';
 import { FolderBackupListComponent } from './component/folder-backup-list/folder-backup-list.component';
 import { RangeComponent } from './component/range/range.component';
 import { SceneToolsComponent } from './component/scene-tools/scene-tools.component';
@@ -183,6 +184,7 @@ import '@udonarium/table-fx/table-timer';
     LoggingInputDirective,
     ConfirmationComponent,
     DropCreateChooserComponent,
+    CardSheetImportComponent,
     FolderBackupListComponent,
     RangeComponent,
     SceneToolsComponent,

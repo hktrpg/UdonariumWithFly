@@ -1,0 +1,37 @@
+:host {
+  display: block;
+}
+
+.card-sheet-import {
+  padding: 2px;
+  min-width: 280px;
+}
+
+.card-sheet-import .head-icon {
+  font-size: 16px;
+  vertical-align: -3px;
+  margin-right: 4px;
+  color: #6b5640;
+}
+
+.card-sheet-import .card-head h3 {
+  display: flex;
+  align-items: center;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5c4630;
+}
+
+.card-sheet-import .hint {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  color: #7a6a58;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -27,6 +27,8 @@ import { RangeArea } from '@udonarium/range';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
 import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
+import { canRevealCardCaption } from 'service/card-caption-text';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 
 @Component({
     selector: 'game-character-sheet',
@@ -127,6 +129,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
           this.updatePanelTitle();
         }
       })
+      .on('CHANGE_GM_CARD_PEEK', () => this.updatePanelTitle())
       .on('LOCALE_CHANGED', () => this.updatePanelTitle());
   }
 
@@ -535,11 +538,15 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   get isVisible(): boolean {
     if (!this.tabletopObject) return false;
+    // Cards: respect personal GM card-peek preference (not raw isGMMode).
+    if (this.tabletopObject instanceof Card) return canRevealCardCaption(this.tabletopObject);
     if (PeerCursor.myCursor && PeerCursor.myCursor.isGMMode) return true;
-    if (this.tabletopObject instanceof Card) return this.tabletopObject.isFront || this.tabletopObject.isHand;
     if (this.tabletopObject instanceof DiceSymbol) return this.tabletopObject['isVisible'];
     return true;
   }
+
+  /** Personal GM card-face peek preference (when joined as GM). */
+  get gmCardPeek(): boolean { return GmCardPeek.active; }
 
   get isBlackPaint(): boolean {
     if (this.tabletopObject instanceof GameCharacter) return this.tabletopObject.isBlackPaint;

@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import {
+  cardSheetSliceErrorI18nKey,
+  sliceCardSheet,
+} from '@udonarium/card-sheet-slice';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { IMAGE_SOURCE_MAX_BYTES } from '@udonarium/core/file-storage/image-normalize';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
@@ -23,6 +27,7 @@ import {
 } from '@udonarium/terrain-model/model-terrain-import';
 import { MODEL_MAX_FILE_BYTES } from '@udonarium/terrain-model/mesh-ir';
 import { expandModelDropFiles, isBlendFile, isZipFile, packagePathOf } from '@udonarium/terrain-model/model-package-files';
+import { CardSheetImportComponent, CardSheetImportResult } from 'component/card-sheet-import/card-sheet-import.component';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { DropCreateChooserComponent, DropCreateChoice } from 'component/drop-create-chooser/drop-create-chooser.component';
 import { footprintDebug } from '@udonarium/terrain-model/footprint-debug';
@@ -43,7 +48,7 @@ const MAX_MODEL = MODEL_MAX_FILE_BYTES;
 
 type DropKind = NoteFileKind | 'model' | 'model-sidecar' | 'audio';
 type DropChoice =
-  | 'token' | 'note' | 'card' | 'stack' | 'terrain' | 'terrainBake' | 'mask' | 'coin' | 'library'
+  | 'token' | 'note' | 'card' | 'stack' | 'cardSheet' | 'terrain' | 'terrainBake' | 'mask' | 'coin' | 'library'
   | 'tableMap' | 'tableBackground' | 'jukebox';
 
 const CLIPBOARD_EXT: Record<string, string> = {
@@ -243,6 +248,12 @@ export class TabletopFileDropService {
         icon: 'style',
         hint: this.i18n.t('dropCreate.hint.card'),
       });
+      choices.push({
+        id: 'cardSheet',
+        label: this.i18n.t('dropCreate.cardSheet'),
+        icon: 'grid_on',
+        hint: this.i18n.t('dropCreate.hint.cardSheet'),
+      });
       if (imageCount >= 2) {
         choices.push({
           id: 'stack',
@@ -329,6 +340,8 @@ export class TabletopFileDropService {
         return this.createCards(images, position);
       case 'stack':
         return this.createCardStack(images, position);
+      case 'cardSheet':
+        return this.createCardStackFromSheet(images, position);
       case 'terrain':
         return this.createTerrain(images, position);
       case 'terrainBake':
@@ -496,9 +509,13 @@ export class TabletopFileDropService {
     return true;
   }
 
-  private async createCardStack(files: File[], position: PointerCoordinate): Promise<boolean> {
+  private async createCardStack(
+    files: File[],
+    position: PointerCoordinate,
+    backId?: string,
+  ): Promise<boolean> {
     if (!files.length) return false;
-    const backId = this.ensureDefaultCardBack();
+    const resolvedBackId = backId ?? this.ensureDefaultCardBack();
     const stack = CardStack.create(this.i18n.t('dropCreate.stackName'));
     stack.location.x = position.x - 25;
     stack.location.y = position.y - 25;
@@ -507,10 +524,46 @@ export class TabletopFileDropService {
     for (const file of files) {
       const image = await ImageStorage.instance.addAsync(file);
       const name = this.baseName(file.name) || this.i18n.t('action.cardName');
-      stack.putOnBottom(Card.create(name, image.identifier, backId));
+      stack.putOnBottom(Card.create(name, image.identifier, resolvedBackId));
     }
     stack.faceDownAll();
     return true;
+  }
+
+  /** TTS Custom Deck face sheet → CardStack; optional 2nd image = shared back. */
+  private async createCardStackFromSheet(files: File[], position: PointerCoordinate): Promise<boolean> {
+    if (!files.length) return false;
+    const params = await this.modalService.open<CardSheetImportResult | false>(CardSheetImportComponent, {
+      panelWidth: '360px',
+    });
+    if (!params) return false;
+
+    let faceFiles: File[];
+    try {
+      faceFiles = await sliceCardSheet(files[0], {
+        cols: params.cols,
+        rows: params.rows,
+        numCards: params.numCards,
+        baseName: this.baseName(files[0].name) || 'card',
+      });
+    } catch (err) {
+      void this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('cardSheet.errorTitle'),
+        text: this.i18n.t(cardSheetSliceErrorI18nKey(err)),
+        type: ConfirmationType.OK,
+        okLabel: this.i18n.t('common.ok'),
+      });
+      return false;
+    }
+    if (!faceFiles.length) return false;
+
+    let backId = this.ensureDefaultCardBack();
+    if (files[1]) {
+      const back = await ImageStorage.instance.addAsync(files[1]);
+      backId = back.identifier;
+    }
+
+    return this.createCardStack(faceFiles, position, backId);
   }
 
   private async createTerrain(files: File[], position: PointerCoordinate): Promise<boolean> {

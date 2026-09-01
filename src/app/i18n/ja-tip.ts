@@ -28,7 +28,7 @@ export const ja_tip: I18nDictionary = {
   'tip.menu.notes.title': 'メモ',
   'tip.menu.notes.body': 'メモ倉庫：テキスト／画像／動画／PDF。メモ（や他オブジェクト）上で Ctrl／⌘＝大画像プレビュー；裏返し、非表示、クリック動作、プレイヤー提示に対応。',
   'tip.menu.settings.title': '設定',
-  'tip.menu.settings.body': 'ローカル設定：グリッド、スナップ、音、チャット自動表示、メニュー単一窓、パネル再配置、スタンド、ZIP、フォルダバックアップ（変更／切断）、言語、チュートリアル。',
+  'tip.menu.settings.body': 'ローカル設定：音、チャット自動表示、メニュー単一窓、パネル再配置、スタンド、ZIP、フォルダバックアップ（変更／切断）、言語、チュートリアル。',
   'tip.menu.more.title': 'その他',
   'tip.menu.more.body': 'プレイ：ツール箱・メモ・編集へ。編集：テーブル／画像／音楽／メモが主列。',
   'tip.menu.mode.edit.title': '編集モード',
@@ -98,7 +98,7 @@ export const ja_tip: I18nDictionary = {
   'tour.step.notes.title': 'メモ',
   'tour.step.notes.body': 'メモ倉庫：テーブル／共有／個人／ゴミ箱。\n\n「メモ」をクリックして開いてください。',
   'tour.step.settings.title': '設定',
-  'tour.step.settings.body': '設定* はローカルのみ：グリッド、スナップ、音、スタンド、言語、ガイド再開。\n\n「設定」をクリックしてメニューを開いてください。',
+  'tour.step.settings.body': '設定* はローカルのみ：音、スタンド、言語、ガイド再開。\n\n「設定」をクリックしてメニューを開いてください。',
 
   'tour.step.tableChapter.title': '第3章：テーブル操作',
   'tour.step.tableChapter.body': '視点操作のあと、右クリックでオブジェクト追加を練習します。\n（この章に入ると卓上面板をいったん閉じます。）',
