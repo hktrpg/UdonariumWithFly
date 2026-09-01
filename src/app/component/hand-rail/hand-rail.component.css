@@ -461,7 +461,9 @@
   width: 100%;
   max-width: min(98vw, 960px);
   overflow-x: auto;
-  overflow-y: visible;
+  /* Clip tall card layout so hover only covers the peek (card tops). */
+  overflow-y: hidden;
+  max-height: 40px;
   /* Reserve scrollbar gutter so hover never shifts cards sideways. */
   padding: 4px 0 0;
   box-sizing: border-box;
@@ -472,6 +474,13 @@
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   cursor: grab;
+  transition: max-height 140ms ease;
+}
+
+.hand-rail:hover .hand-rail-scroll,
+.hand-rail.is-chrome-forced .hand-rail-scroll {
+  max-height: 170px;
+  overflow-y: visible;
 }
 
 .hand-rail-scroll.is-panning {
@@ -495,12 +504,21 @@
   align-items: flex-end;
   width: max-content;
   min-width: 100%;
-  /* Visible peek = top 20% of 150px card = 30px */
-  min-height: 32px;
+  /* Visible peek = top ~20% of 150px card ≈ 30px (+ padding). */
+  height: 36px;
+  min-height: 36px;
   padding: 6px 0 0;
   box-sizing: border-box;
   gap: 0;
   font-size: 0; /* kill inline whitespace gaps */
+  overflow: visible;
+  transition: height 140ms ease, min-height 140ms ease;
+}
+
+.hand-rail:hover .hand-row,
+.hand-rail.is-chrome-forced .hand-row {
+  height: 156px;
+  min-height: 156px;
 }
 
 .hand-card-slot {
