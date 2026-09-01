@@ -20,6 +20,8 @@ export class Card extends TabletopObject {
   @SyncVar() zindex: number = 0;
   @SyncVar() isLocked: boolean = false;
   @SyncVar() handOrder: number = 0;
+  /** Session markers as JSON CardStatusEntry[]; not shown on card stacks. */
+  @SyncVar() statusesJson: string = '[]';
 
   get isVisibleOnTable(): boolean {
     return super.isVisibleOnTable && (!this.parentIsAssigned || this.parentIsDestroyed);

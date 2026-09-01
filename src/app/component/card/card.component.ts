@@ -14,6 +14,16 @@ import {
 } from '@angular/core';
 import { Card, CardState } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
+import {
+  CARD_STATUS_DEFS,
+  CardStatusEntry,
+  CardStatusId,
+  getCardStatusDef,
+  hasCardStatus,
+  parseCardStatusesJson,
+  setCardStatusFlag,
+  stringifyCardStatuses,
+} from '@udonarium/table-fx/card-status';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
@@ -169,6 +179,12 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
 
   get isLocked(): boolean { return this.card ? this.card.isLocked : false; }
   set isLocked(isLocked: boolean) { if (this.card) { this.card.mutateAppearance(() => { this.card.isLocked = isLocked; }); } }
+
+  get statusEntries(): CardStatusEntry[] {
+    return this.card ? parseCardStatusesJson(this.card.statusesJson) : [];
+  }
+  statusIcon(id: string): string { return getCardStatusDef(id)?.icon || 'info'; }
+  statusName(id: string): string { return this.i18n.t(`card.status.${id}`); }
 
   get cardMovableDisabled(): boolean { return this.isLocked || this.suppressCardMovable; }
   get isQuickDragging(): boolean { return this.quickDragging; }
@@ -425,6 +441,12 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   onCardPointerDown(event: PointerEvent) {
     if (this.GuestMode() || event.button !== 0 || !this.card) return;
     if (this.card.location.name !== 'table') return;
+    // Rotate handles share this host; do not start move / quick-drag while rotating.
+    const target = event.target as Element | null;
+    if (target?.closest?.('.rotate-grab')) {
+      event.stopPropagation();
+      return;
+    }
     event.stopPropagation();
     if (this.isLocked) {
       this.onInputStart(event);
@@ -908,6 +930,44 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
     return actions;
   }
 
+  /** Right-click a status badge to clear it without opening the card menu. */
+  onStatusBadgeContextMenu(e: Event, id: CardStatusId) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (this.GuestMode() || !this.card) return;
+    this.setStatus(id, false);
+  }
+
+  private makeStatusMenu(): ContextMenuAction {
+    const labelOf = (id: CardStatusId) => {
+      const mark = hasCardStatus(this.card?.statusesJson || '[]', id) ? '☑' : '☐';
+      return `${mark} ${this.i18n.t(`card.status.${id}`)}`;
+    };
+    return {
+      name: this.i18n.t('card.status'),
+      action: null,
+      subActions: CARD_STATUS_DEFS.map(def => ({
+        name: labelOf(def.id),
+        action: () => this.toggleStatus(def.id),
+        nameUpdate: () => labelOf(def.id),
+        checkBox: 'check' as const,
+      })),
+    };
+  }
+
+  private toggleStatus(id: CardStatusId) {
+    if (!this.card) return;
+    const enabled = !hasCardStatus(this.card.statusesJson, id);
+    this.setStatus(id, enabled);
+  }
+
+  private setStatus(id: CardStatusId, enabled: boolean) {
+    if (!this.card) return;
+    const next = setCardStatusFlag(parseCardStatusesJson(this.card.statusesJson), id, enabled);
+    this.card.statusesJson = stringifyCardStatuses(next);
+    this.changeDetector.markForCheck();
+  }
+
   private makeContextMenu(): ContextMenuAction[] {
     let actions: ContextMenuAction[] = [];
     actions.push(contextMenuToggleCheck({
@@ -920,6 +980,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       off: this.i18n.t('card.menu.7'),
       hotkey: 'L',
     }));
+    actions.push(ContextMenuSeparator);
+    actions.push(this.makeStatusMenu());
     actions.push(ContextMenuSeparator);
     actions.push(!this.isVisible || this.isHand
       ? {
@@ -961,7 +1023,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         this.turnRight();
       },
       materialIcon: 'turn_right',
-      hotkey: 'R',
+      hotkey: 'E',
       disabled: this.isLocked
     }, 
     {
@@ -969,7 +1031,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         this.turnLeft();
       },
       materialIcon: 'turn_left',
-      hotkey: 'Shift+R',
+      hotkey: 'Q',
       disabled: this.isLocked
     });
     if (this.card.isVisible) {
