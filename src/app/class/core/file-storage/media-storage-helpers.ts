@@ -1,5 +1,6 @@
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
+import { isUrlBackedMediaIdentifier } from './media-identifier';
 import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 /** Shared A/P/V catalog row (no image thumbBytes). */
@@ -78,6 +79,23 @@ export function getFromHash<T>(
   identifier: string,
 ): T | null {
   return hash[identifier] || null;
+}
+
+/**
+ * Lookup by id; if missing and id is a path/HTTP asset, create + store locally.
+ * COMPLETE-only catalogs never advertise URL assets to joiners — hydrate on read.
+ */
+export function getOrHydrateUrlBacked<T>(options: {
+  hash: { [identifier: string]: T };
+  identifier: string;
+  createUrlBacked: (identifier: string) => T;
+  store: (file: T) => T;
+}): T | null {
+  if (!options.identifier) return null;
+  const existing = options.hash[options.identifier];
+  if (existing) return existing;
+  if (!isUrlBackedMediaIdentifier(options.identifier)) return null;
+  return options.store(options.createUrlBacked(options.identifier));
 }
 
 /** Advertise COMPLETE blob assets only (never URL / in-progress). */

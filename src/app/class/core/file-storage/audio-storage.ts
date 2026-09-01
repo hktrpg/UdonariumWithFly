@@ -4,7 +4,7 @@ import {
   addPackedByContentHash,
   buildCompleteBlobCatalog,
   deleteMediaFromHash,
-  getFromHash,
+  getOrHydrateUrlBacked,
   insertOrUpdateMediaFile,
   LazyCatalogSynchronizer,
   MediaCatalogItem,
@@ -108,7 +108,12 @@ export class AudioStorage {
   }
 
   get(identifier: string): AudioFile {
-    return getFromHash(this.hash, identifier);
+    return getOrHydrateUrlBacked({
+      hash: this.hash,
+      identifier,
+      createUrlBacked: id => AudioFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {

@@ -2,6 +2,7 @@ import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
 import { catalogByteSize } from './file-transfer-scheduler';
 import { ImageContext, ImageFile, ImageState } from './image-file';
+import { getOrHydrateUrlBacked } from './media-storage-helpers';
 import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
 export type CatalogItem = {
@@ -109,9 +110,12 @@ export class ImageStorage {
   }
 
   get(identifier: string): ImageFile {
-    let image: ImageFile = this.imageHash[identifier];
-    if (image) return image;
-    return null;
+    return getOrHydrateUrlBacked({
+      hash: this.imageHash,
+      identifier,
+      createUrlBacked: id => ImageFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {
