@@ -89,10 +89,10 @@ export function buildPayloadFromNote(note: TextNote, nameFallback = ''): ObjectP
   return buildPayloadFromNoteHandout(handout, note.identifier, nameFallback);
 }
 
-/** Front if isFront || isHand || isGMMode, else back. */
+/** Front if isFront || isHand || GM card peek, else back. */
 export function resolveCardPreviewImageUrl(card: Card): string {
   if (!card) return '';
-  const showFront = card.isFront || card.isHand || card.isGMMode;
+  const showFront = canRevealCardCaption(card);
   const file = showFront ? card.frontImage : card.backImage;
   return file?.url || '';
 }
@@ -101,7 +101,7 @@ export function buildCardPreviewPayload(card: Card, titleFallback = ''): ObjectP
   if (!card) return null;
   const imageUrl = resolveCardPreviewImageUrl(card);
   if (!imageUrl) return null;
-  const title = card.isFront || card.isHand || card.isGMMode
+  const title = canRevealCardCaption(card)
     ? (card.name || titleFallback)
     : titleFallback;
   const payload = buildImagePayload(card.identifier, title || '', imageUrl);
@@ -120,7 +120,7 @@ export function buildCardStackPreviewPayload(stack: CardStack, titleFallback = '
   if (!cover) return null;
   const cardPayload = buildCardPreviewPayload(cover, stack.name || titleFallback);
   if (!cardPayload) return null;
-  const showFront = cover.isFront || cover.isHand || cover.isGMMode;
+  const showFront = canRevealCardCaption(cover);
   return {
     ...cardPayload,
     id: stack.identifier,

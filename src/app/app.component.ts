@@ -24,6 +24,7 @@ import { DiceBot } from '@udonarium/dice-bot';
 import { Jukebox } from '@udonarium/Jukebox';
 import { AudioLibrary } from '@udonarium/audio-library';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import {
@@ -529,6 +530,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         ChatWindowComponent.skipEmptyDialogQuotes = on;
         setSkipEmptyDialogQuotes(on);
       });
+      GmCardPeek.loadFromStorage();
       PanelService.loadGeometryFromStorage();
       PanelService.loadSingleNonChatFromStorage();
       ChatWindowComponent.loadGeometryFromStorage();
@@ -2152,23 +2154,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       // View / panels
       ...this.buildAlwaysAvailableViewActions(),
       ContextMenuSeparator,
-      // Grid
-      contextMenuToggleCheck({
-        get: () => TableSelecter.instance.gridShow,
-        set: (v) => {
-          TableSelecter.instance.gridShow = v;
-          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext());
-        },
-        on: `☑${this.i18n.t('menu.settings.showGrid')}`,
-        off: `☐${this.i18n.t('menu.settings.showGrid')}`,
-      }),
-      contextMenuToggleCheck({
-        get: () => TableSelecter.instance.gridSnap,
-        set: (v) => { TableSelecter.instance.gridSnap = v; },
-        on: `☑${this.i18n.t('menu.settings.gridSnap')}`,
-        off: `☐${this.i18n.t('menu.settings.gridSnap')}`,
-      }),
-      ContextMenuSeparator,
       // Chat
       contextMenuToggleCheck({
         get: () => ChatWindowComponent.isNoticeOn,
@@ -2193,6 +2178,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setSkipEmptyDialogQuotes(v); },
         on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => GmCardPeek.enabled,
+        set: (v) => { GmCardPeek.setEnabled(v); },
+        on: `☑${this.i18n.t('menu.settings.gmCardPeek')}`,
+        off: `☐${this.i18n.t('menu.settings.gmCardPeek')}`,
       }),
       ContextMenuSeparator,
       // Desktop UI (music / resource floats are forced off on mobile)

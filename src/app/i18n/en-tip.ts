@@ -28,7 +28,7 @@ export const en_tip: I18nDictionary = {
   'tip.menu.notes.title': 'Notes',
   'tip.menu.notes.body': 'Shared notes: text, image, video, PDF. Hover a note (or other object) then Ctrl／⌘ for Object Image Preview; flip, hide, click actions, show to players.',
   'tip.menu.settings.title': 'Settings',
-  'tip.menu.settings.body': 'Local options: grid, snap, sounds, auto-open chat, one menu window, rearrange panels, stands, ZIP, folder backup (change / disconnect), language, tutorial.',
+  'tip.menu.settings.body': 'Local options: sounds, auto-open chat, one menu window, rearrange panels, stands, ZIP, folder backup (change / disconnect), language, tutorial.',
   'tip.menu.more.title': 'More',
   'tip.menu.more.body': 'Play: toolbox, notes, enter Edit. Edit: table/images/music/notes on the primary bar.',
   'tip.menu.mode.edit.title': 'Edit mode',
@@ -98,7 +98,7 @@ export const en_tip: I18nDictionary = {
   'tour.step.notes.title': 'Notes',
   'tour.step.notes.body': 'Notes warehouse: table / common / personal / trash.\n\nClick Notes to open the warehouse.',
   'tour.step.settings.title': 'Settings',
-  'tour.step.settings.body': 'Settings (*) are local-only: grid, snap, sounds, stands, language, and replay tutorial.\n\nClick Settings to open the local options menu.',
+  'tour.step.settings.body': 'Settings (*) are local-only: sounds, stands, language, and replay tutorial.\n\nClick Settings to open the local options menu.',
 
   'tour.step.tableChapter.title': 'Chapter 3: Table controls',
   'tour.step.tableChapter.body': 'Practice view controls, then right-click to add objects.\n(Open panels are closed when this chapter starts so the table stays clear.)',

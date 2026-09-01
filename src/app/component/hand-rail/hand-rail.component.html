@@ -34,7 +34,7 @@
         </span>
       </label>
 
-      <label *ngIf="isGm && !collapsed" class="hand-gm-peek" (click)="$event.stopPropagation()">
+      <label *ngIf="showGmHandPeek && !collapsed" class="hand-gm-peek" (click)="$event.stopPropagation()">
         <select [ngModel]="gmPeekUserId" (ngModelChange)="onGmPeekChange($event)">
           <option [ngValue]="''">{{ 'hand.myHand' | i18n }}</option>
           <option *ngFor="let peer of peersWithHands" [ngValue]="peer.userId">{{ peer.name }}</option>

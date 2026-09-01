@@ -1,10 +1,11 @@
 import { Card } from '@udonarium/card';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 
 /** True when the viewer may see the card's real name / effect text. */
 export function canRevealCardCaption(card: Card | null | undefined): boolean {
   if (!card) return false;
-  return !!(card.isFront || card.isHand || card.isGMMode);
+  return !!(card.isFront || card.isHand || GmCardPeek.active);
 }
 
 /** Same gate as caption — face-down table cards must not open detail (spoilers). */

@@ -28,7 +28,7 @@ export const zhTW_tip: I18nDictionary = {
   'tip.menu.notes.title': '筆記',
   'tip.menu.notes.body': '筆記倉庫：文字（Markdown）／圖片／影片／PDF。滑鼠移到筆記（或其他物件）上再按 Ctrl／⌘ 可開大圖預覽；可翻面、隱藏、點擊動作、出示給玩家。',
   'tip.menu.settings.title': '設定',
-  'tip.menu.settings.body': '本機選項：格線、吸附、提示音、聊天自動開啟、選單單視窗、重排面板、Stand、ZIP、資料夾備份（更改／斷開）、語系、教學。',
+  'tip.menu.settings.body': '本機選項：提示音、聊天自動開啟、選單單視窗、重排面板、Stand、ZIP、資料夾備份（更改／斷開）、語系、教學。',
   'tip.menu.more.title': '更多',
   'tip.menu.more.body': '遊玩：工具箱、筆記、進入編輯。編輯：地圖／圖庫／音樂／筆記在主列。',
   'tip.menu.mode.edit.title': '編輯模式',
@@ -98,7 +98,7 @@ export const zhTW_tip: I18nDictionary = {
   'tour.step.notes.title': '筆記',
   'tour.step.notes.body': '「筆記」倉庫管理共用筆記：桌面／公用／私人／回收區。\n\n請點「筆記」打開筆記倉庫。',
   'tour.step.settings.title': '設定',
-  'tour.step.settings.body': '「設定*」僅影響本機：格線顯示、吸附、提示音、Stand 顯示、語系，以及重新教學。\n\n請點「設定」打開本機選項選單。',
+  'tour.step.settings.body': '「設定*」僅影響本機：提示音、Stand 顯示、語系，以及重新教學。\n\n請點「設定」打開本機選項選單。',
 
   'tour.step.tableChapter.title': '第三章：地圖操作',
   'tour.step.tableChapter.body': '接下來練習桌面視角與新增物件。\n（進入本章時會先清空桌面視窗，方便操作地圖。）\n先平移與滾輪操作，再右鍵新增。',

@@ -15,6 +15,7 @@ import { CardStack } from '@udonarium/card-stack';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import {
   findCardIdAtPoint,
@@ -108,12 +109,14 @@ export class HandRailComponent implements OnInit, OnDestroy {
   }
   get collapsed(): boolean { return this.handService.collapsed; }
   get isGm(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+  /** GM hand-rail peek of other players (respects personal card-peek preference). */
+  get showGmHandPeek(): boolean { return GmCardPeek.active; }
   get viewUserId(): string { return this.handService.viewUserId; }
   get gmPeekUserId(): string { return this.handService.gmPeekUserId; }
   get playFaceUp(): boolean { return this.handService.playFaceUp; }
   get isViewingOwnHand(): boolean { return this.viewUserId === Network.peer.userId; }
   get isPeekingOther(): boolean {
-    return this.isGm && !!this.gmPeekUserId && this.gmPeekUserId !== Network.peer.userId;
+    return GmCardPeek.active && !!this.gmPeekUserId && this.gmPeekUserId !== Network.peer.userId;
   }
   /** Drag/reorder/drop into own hand — disabled while GM peeks another player. */
   get canEditOwnHand(): boolean { return !this.isGuest && this.isViewingOwnHand; }
@@ -256,6 +259,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
       })
       .on('CARD_STACK_DECREASED', () => this.scheduleViewRefresh())
       .on('HAND_RAIL_SYNC', () => this.ngZone.run(() => this.requestViewUpdate(true)))
+      .on('CHANGE_GM_MODE', () => this.ngZone.run(() => this.requestViewUpdate(true)))
+      .on('CHANGE_GM_CARD_PEEK', () => this.ngZone.run(() => this.requestViewUpdate(true)))
       .on('HAND_RAIL_DROP_PREVIEW', event => {
         const nextOffer = this.canEditOwnHand && !!event.data?.active;
         const nextHover = this.canEditOwnHand && !!event.data?.hover;

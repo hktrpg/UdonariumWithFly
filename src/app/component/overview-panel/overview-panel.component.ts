@@ -29,6 +29,7 @@ import { Card, CardState } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { RangeArea } from '@udonarium/range';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
 
 @Component({
@@ -102,6 +103,9 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   readonly CardStateFront = CardState.FRONT;
   readonly CardStateBack = CardState.BACK;
 
+  /** Personal GM card-face peek (table translucent / spoilers). */
+  get gmCardPeek(): boolean { return GmCardPeek.active; }
+
   gridSize = 50;
   naturalWidth = 0;
   naturalHeight = 0;
@@ -136,7 +140,7 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
         if (this.cardState === this.CardStateFront) return this.tabletopObject.frontImage ? this.tabletopObject.frontImage.url : '';
         if (this.cardState === this.CardStateBack) return this.tabletopObject.backImage ? this.tabletopObject.backImage.url : '';
       }
-      if (this.tabletopObject.isGMMode) return this.tabletopObject.frontImage ? this.tabletopObject.frontImage.url : '';
+      if (GmCardPeek.active) return this.tabletopObject.frontImage ? this.tabletopObject.frontImage.url : '';
     }
     if (this.tabletopObject instanceof CharacterToken) {
       return body?.imageFile?.url || this.tabletopObject.imageFile?.url || '';
@@ -318,6 +322,9 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
         this.changeDetector.markForCheck();
       })
       .on('UPDATE_FILE_RESOURE', () => {
+        this.changeDetector.markForCheck();
+      })
+      .on('CHANGE_GM_CARD_PEEK', () => {
         this.changeDetector.markForCheck();
       });
   }

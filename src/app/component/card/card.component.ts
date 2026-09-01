@@ -20,6 +20,7 @@ import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
@@ -152,7 +153,8 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   get ownerName(): string { return this.card.ownerName; }
   get ownerColor(): string { return this.card.ownerColor; }
 
-  get isGMMode(): boolean { return this.card.isGMMode; }
+  /** Table face-through overlay: own hand or GM with peek preference. */
+  get showGmCardPeek(): boolean { return GmCardPeek.active; }
 
   get imageFile(): ImageFile { return this.imageService.getSkeletonOr(this.card.imageFile); }
   get frontImage(): ImageFile { return this.imageService.getSkeletonOr(this.card.frontImage); }
@@ -287,6 +289,9 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         this.changeDetector.markForCheck();
       })
       .on('CHANGE_GM_MODE', event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('CHANGE_GM_CARD_PEEK', event => {
         this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.card?.identifier}`, event => {

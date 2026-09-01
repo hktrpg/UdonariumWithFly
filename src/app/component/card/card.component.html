@@ -10,7 +10,7 @@
       <img #cardImage [@inverse]="state" *ngIf="imageFile" (load)="onImageLoad()" class="card-image is-3d chrome-smooth-image-trick" [src]="(isFront ? frontImage.url : backImage.url) | safe: 'resourceUrl'">
       <div [style.opacity]="!isFront ? 0.8 : 1.0" [style.transform]="!isFront ? 'scale(0.9)' : ''" class="is-3d is-pointer-events-none" style="position: absolute"
         [style.top.px]="textDivTopPixcel" [style.width.px]="size * gridSize" [style.height]="textDivHeightCss">
-        <img #translucentImage *ngIf="!isFront && (isHand || isGMMode) && frontImage" @flipOpen (load)="onImageLoad()" 
+        <img #translucentImage *ngIf="!isFront && (isHand || showGmCardPeek) && frontImage" @flipOpen (load)="onImageLoad()" 
           class="card-image is-3d chrome-smooth-image-trick" [src]="frontImage.url | safe: 'resourceUrl'">
       </div>
       <ng-container *ngIf="!isIconHidden">
