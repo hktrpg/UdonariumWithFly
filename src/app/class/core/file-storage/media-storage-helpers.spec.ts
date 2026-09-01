@@ -3,6 +3,7 @@ import {
   buildCompleteBlobCatalog,
   deleteMediaFromHash,
   getFromHash,
+  getOrHydrateUrlBacked,
   insertOrUpdateMediaFile,
   LazyCatalogSynchronizer,
   MEDIA_LAZY_SYNC_MIN_MS,
@@ -98,5 +99,58 @@ describe('media-storage-helpers', () => {
     expect(destroyed).toEqual(['x']);
     expect(getFromHash(hash, 'x')).toBeNull();
     expect(deleteMediaFromHash(hash, 'x')).toBe(false);
+  });
+
+  it('getOrHydrateUrlBacked stores path assets and ignores content hashes', () => {
+    const hash: { [id: string]: { id: string } } = {};
+    const stored: string[] = [];
+    const pathId = './assets/sounds/tm2/tm2_pon002.wav';
+    const blobId = 'a'.repeat(64);
+
+    const hydrated = getOrHydrateUrlBacked({
+      hash,
+      identifier: pathId,
+      createUrlBacked: id => ({ id }),
+      store: file => {
+        stored.push(file.id);
+        hash[file.id] = file;
+        return file;
+      },
+    });
+    expect(hydrated?.id).toBe(pathId);
+    expect(stored).toEqual([pathId]);
+    expect(hash[pathId]).toBe(hydrated);
+
+    // Second get hits the hash — no re-store.
+    const again = getOrHydrateUrlBacked({
+      hash,
+      identifier: pathId,
+      createUrlBacked: id => ({ id }),
+      store: file => {
+        stored.push(file.id);
+        hash[file.id] = file;
+        return file;
+      },
+    });
+    expect(again).toBe(hydrated);
+    expect(stored).toEqual([pathId]);
+
+    expect(getOrHydrateUrlBacked({
+      hash,
+      identifier: blobId,
+      createUrlBacked: id => ({ id }),
+      store: file => {
+        stored.push(file.id);
+        return file;
+      },
+    })).toBeNull();
+    expect(stored).toEqual([pathId]);
+
+    expect(getOrHydrateUrlBacked({
+      hash,
+      identifier: '',
+      createUrlBacked: id => ({ id }),
+      store: file => file,
+    })).toBeNull();
   });
 });

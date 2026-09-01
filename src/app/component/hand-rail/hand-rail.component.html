@@ -15,11 +15,47 @@
     [class.has-cards]="cards.length > 0"
     [class.is-drop-target]="isDropHover"
     [class.is-read-only]="isPeekingOther"
-    [class.is-chrome-forced]="isDraggingCard || isDropHover || isDropOffer">
+    [class.is-chrome-forced]="isDraggingCard || isDropHover || isDropOffer || orphanImportOpen">
     <div class="hand-rail-hover-zone">
     <div class="hand-rail-chrome" [class.is-drop-target]="isDropHover && collapsed">
       <span class="hand-rail-title">{{ 'hand.title' | i18n }}</span>
       <span class="hand-rail-count">{{ cards.length }}</span>
+
+      <div class="hand-orphan-import" *ngIf="offlineHandPiles.length > 0"
+        [class.is-open]="orphanImportOpen"
+        (click)="$event.stopPropagation()">
+        <button type="button" class="hand-orphan-import-btn"
+          [attr.title]="'hand.orphanImportHint' | i18n"
+          [attr.aria-expanded]="orphanImportOpen"
+          (click)="toggleOrphanImport($event)">
+          <i class="material-icons" aria-hidden="true">move_to_inbox</i>
+          <span class="hand-orphan-import-badge">{{ offlineHandPiles.length }}</span>
+        </button>
+        <div class="hand-orphan-import-panel" *ngIf="orphanImportOpen" role="dialog"
+          [attr.aria-label]="'hand.orphanImportTitle' | i18n">
+          <div class="hand-orphan-import-head">
+            <span>{{ 'hand.orphanImportTitle' | i18n }}</span>
+            <button type="button" class="hand-orphan-import-close"
+              [attr.title]="'hand.orphanImportClose' | i18n"
+              (click)="closeOrphanImport($event)">
+              <i class="material-icons" aria-hidden="true">close</i>
+            </button>
+          </div>
+          <ul class="hand-orphan-import-list">
+            <li *ngFor="let pile of offlineHandPiles" class="hand-orphan-import-row">
+              <div class="hand-orphan-import-meta">
+                <span class="hand-orphan-import-name">{{ pile.name }}</span>
+                <span class="hand-orphan-import-id">({{ shortUserId(pile.userId) }})</span>
+                <span class="hand-orphan-import-count">{{ 'hand.orphanImportCount' | i18n:{ count: pile.count } }}</span>
+              </div>
+              <button type="button" class="hand-orphan-import-confirm"
+                (click)="onClaimOfflineHand(pile, $event)">
+                {{ 'hand.orphanImportConfirm' | i18n }}
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
 
       <label *ngIf="canEditOwnHand" class="hand-play-face" (click)="$event.stopPropagation()"
         [attr.title]="(playFaceUp ? 'hand.playFaceUpHint' : 'hand.playFaceDownHint') | i18n">
@@ -71,6 +107,7 @@
             </div>
           </div>
         </div>
+        <p class="hand-empty" *ngIf="cards.length < 1 && !isPeekingOther">{{ 'hand.empty' | i18n }}</p>
       </div>
 
       <p class="hand-peek-hint" *ngIf="isPeekingOther">{{ 'hand.peekReadOnly' | i18n }}</p>

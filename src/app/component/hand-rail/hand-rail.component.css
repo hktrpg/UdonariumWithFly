@@ -174,7 +174,7 @@
   box-sizing: border-box;
   transition: opacity 160ms ease, border-color 160ms ease;
   max-height: 56px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .hand-rail-title {
@@ -212,6 +212,181 @@
 .hand-viewing {
   opacity: 0.75;
   font-size: 11px;
+}
+
+.hand-orphan-import {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.hand-orphan-import-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 80, 10, 0.45);
+  color: rgba(255, 243, 210, 0.95);
+  cursor: pointer;
+}
+
+.hand-orphan-import-btn .material-icons {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hand-orphan-import.is-open .hand-orphan-import-btn,
+.hand-orphan-import-btn:hover {
+  border-color: rgba(251, 191, 36, 0.9);
+  background: rgba(160, 100, 12, 0.6);
+}
+
+.hand-orphan-import-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff8eb;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+.hand-orphan-import-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  width: min(72vw, 280px);
+  max-height: min(40vh, 240px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 22, 30, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.hand-orphan-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hand-orphan-import-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hand-orphan-import-close .material-icons {
+  font-size: 16px;
+}
+
+.hand-orphan-import-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+}
+
+.hand-orphan-import-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.hand-orphan-import-row + .hand-orphan-import-row {
+  margin-top: 4px;
+}
+
+.hand-orphan-import-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hand-orphan-import-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.hand-orphan-import-name {
+  font-weight: 700;
+}
+
+.hand-orphan-import-id {
+  opacity: 0.65;
+  font-weight: 500;
+}
+
+.hand-orphan-import-count {
+  width: 100%;
+  opacity: 0.8;
+  font-size: 11px;
+}
+
+.hand-orphan-import-confirm {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  background: rgba(30, 80, 120, 0.55);
+  color: #e8f6ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hand-orphan-import-confirm:hover {
+  border-color: rgba(125, 211, 252, 0.95);
+  background: rgba(40, 110, 160, 0.7);
+}
+
+.hand-empty {
+  margin: 0;
+  padding: 10px 12px 14px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(226, 242, 255, 0.72);
+  pointer-events: none;
+}
+
+.hand-rail:not(.has-cards) {
+  min-height: 48px;
 }
 
 .hand-rail-drop-zone {
@@ -252,6 +427,14 @@
   .hand-rail.is-collapsed:not(:hover):not(.is-chrome-forced) {
     min-height: 28px;
   }
+
+  .hand-rail:not(.has-cards):not(:hover):not(.is-chrome-forced) {
+    min-height: 48px;
+  }
+
+  .hand-rail:not(:hover):not(.is-chrome-forced) .hand-empty {
+    opacity: 0;
+  }
 }
 
 .hand-rail-scroll,
@@ -278,7 +461,9 @@
   width: 100%;
   max-width: min(98vw, 960px);
   overflow-x: auto;
-  overflow-y: visible;
+  /* Clip tall card layout so hover only covers the peek (card tops). */
+  overflow-y: hidden;
+  max-height: 40px;
   /* Reserve scrollbar gutter so hover never shifts cards sideways. */
   padding: 4px 0 0;
   box-sizing: border-box;
@@ -289,6 +474,13 @@
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   cursor: grab;
+  transition: max-height 140ms ease;
+}
+
+.hand-rail:hover .hand-rail-scroll,
+.hand-rail.is-chrome-forced .hand-rail-scroll {
+  max-height: 170px;
+  overflow-y: visible;
 }
 
 .hand-rail-scroll.is-panning {
@@ -312,12 +504,21 @@
   align-items: flex-end;
   width: max-content;
   min-width: 100%;
-  /* Visible peek = top 20% of 150px card = 30px */
-  min-height: 32px;
+  /* Visible peek = top ~20% of 150px card ≈ 30px (+ padding). */
+  height: 36px;
+  min-height: 36px;
   padding: 6px 0 0;
   box-sizing: border-box;
   gap: 0;
   font-size: 0; /* kill inline whitespace gaps */
+  overflow: visible;
+  transition: height 140ms ease, min-height 140ms ease;
+}
+
+.hand-rail:hover .hand-row,
+.hand-rail.is-chrome-forced .hand-row {
+  height: 156px;
+  min-height: 156px;
 }
 
 .hand-card-slot {

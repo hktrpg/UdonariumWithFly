@@ -7,7 +7,7 @@
   <!-- Front face. Hand rail (singleFace) always shows front so the owner sees A–K. -->
   <div class="image" [ngClass]="{'downside': !singleFace && card && !card.isFront}">
     <div class="image" [ngClass]="{'reverse': card && card.rotate == 180}" style="position: relative" [@reverseCard]="card.rotate">
-      <img #cardImage [src]="card?.frontImage?.url | safe: 'resourceUrl'" (load)="onCardImageLoad()" style="position: absolute" draggable="false">
+      <img #cardImage [src]="frontImage.url | safe: 'resourceUrl'" (load)="onCardImageLoad()" style="position: absolute" draggable="false">
       <div *ngIf="showFaceText" class="text" style="z-index: 5; position: absolute"
         [style.width.px]="imageAreaRect.width" [style.height.px]="imageAreaRect.height" [style.left.px]="imageAreaRect.left" [style.top.px]="imageAreaRect.top"
         [style.transform]="textTransformScale">
@@ -20,7 +20,7 @@
   <!-- Back face: inventory dual-face layout only. -->
   <div class="image" *ngIf="!singleFace" style="position: relative">
     <div class="image" [ngClass]="{'downside': card && card.isFront}">
-      <img [src]="card?.backImage?.url | safe: 'resourceUrl'" style="position: absolute" [ngClass]="{'reverse': card && card.rotate == 180}" [@reverseCard]="card.rotate" draggable="false">
+      <img [src]="backImage.url | safe: 'resourceUrl'" style="position: absolute" [ngClass]="{'reverse': card && card.rotate == 180}" [@reverseCard]="card.rotate" draggable="false">
       <i *ngIf="card && !card.isFront" class="indicate-text">{{ 'card.faceDownBadge' | i18n }}</i>
     </div>
   </div>

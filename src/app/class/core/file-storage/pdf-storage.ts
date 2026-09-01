@@ -3,7 +3,7 @@ import {
   addPackedByContentHash,
   buildCompleteBlobCatalog,
   deleteMediaFromHash,
-  getFromHash,
+  getOrHydrateUrlBacked,
   insertOrUpdateMediaFile,
   LazyCatalogSynchronizer,
   MediaCatalogItem,
@@ -91,7 +91,12 @@ export class PdfStorage {
   }
 
   get(identifier: string): PdfFile {
-    return getFromHash(this.hash, identifier);
+    return getOrHydrateUrlBacked({
+      hash: this.hash,
+      identifier,
+      createUrlBacked: id => PdfFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {

@@ -35,7 +35,7 @@ import {
 import { ChatMessageService } from 'service/chat-message.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
-import { HandService } from 'service/hand.service';
+import { HandService, HandPileInfo } from 'service/hand.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { buildCardPreviewPayload } from 'service/object-preview-payload';
@@ -62,6 +62,9 @@ export class HandRailComponent implements OnInit, OnDestroy {
   /** Cached — refreshed in syncFromModel(). */
   displayCards: Card[] = [];
   peersWithHands: { userId: string; name: string }[] = [];
+  offlineHandPiles: HandPileInfo[] = [];
+  /** Import-offline-hand popover open. */
+  orphanImportOpen = false;
   hudVisible = false;
   dropBandVisible = false;
   private handListSignature = '';
@@ -143,10 +146,10 @@ export class HandRailComponent implements OnInit, OnDestroy {
   private computeHudVisible(cardCount: number): boolean {
     if (this.isGuest) return false;
     if (this.isMobileLayout && this.mobileLayout.isEdit) return false;
-    // Always show while GM-peeking so empty peek cannot hide the rail forever
-    // (stored peek in normal browser vs empty private profile).
-    if (this.isPeekingOther) return true;
-    return cardCount > 0;
+    // Empty + drag-to-hand: show only the dashed drop band (rail + band stacks poorly).
+    if (cardCount < 1 && this.isDropOffer) return false;
+    // Otherwise always show so empty hands still raise on bottom hover.
+    return true;
   }
 
   private computeDropBandVisible(cardCount: number): boolean {
@@ -170,10 +173,13 @@ export class HandRailComponent implements OnInit, OnDestroy {
         this.handService.setGmPeekUserId('');
       }
     }
+    this.tryAutoClaimOrphanHands();
     const cards = this.handService.cardsInHand();
-    const signature = cards.map(card =>
-      `${card.identifier}:${card.handOrder}:${card.state}:${card.rotate}`,
-    ).join('|');
+    const signature = cards.map(card => {
+      const front = String(card.imageDataElement?.getFirstElementByName('front')?.value ?? '');
+      const back = String(card.imageDataElement?.getFirstElementByName('back')?.value ?? '');
+      return `${card.identifier}:${card.handOrder}:${card.state}:${card.rotate}:${front}:${back}`;
+    }).join('|');
     let changed = false;
     if (signature !== this.handListSignature) {
       this.handListSignature = signature;
@@ -199,13 +205,86 @@ export class HandRailComponent implements OnInit, OnDestroy {
         changed = true;
       }
     }
+    const nextOrphans = this.handService.offlineHandPiles();
+    const orphanSig = nextOrphans.map(p => `${p.userId}:${p.count}:${p.name}`).join('|');
+    const prevOrphanSig = this.offlineHandPiles.map(p => `${p.userId}:${p.count}:${p.name}`).join('|');
+    if (orphanSig !== prevOrphanSig) {
+      this.offlineHandPiles = nextOrphans;
+      if (this.offlineHandPiles.length < 1) this.orphanImportOpen = false;
+      changed = true;
+    }
     return changed;
+  }
+
+  private tryAutoClaimOrphanHands() {
+    if (this.isGuest) return;
+    const myName = HandService.normalizeNickname(PeerCursor.myCursor?.name || '');
+    if (!myName) return;
+    const claimed = this.handService.autoClaimMatchingNickname();
+    if (claimed.length < 1) return;
+    const names = claimed.map(p => p.name).join(', ');
+    this.chatMessageService.sendOperationLog(
+      this.i18n.t('hand.autoClaimed', { name: names }),
+    );
+  }
+
+  shortUserId(userId: string): string {
+    return this.handService.shortUserId(userId);
+  }
+
+  toggleOrphanImport(event?: Event) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    if (this.offlineHandPiles.length < 1) {
+      this.orphanImportOpen = false;
+      return;
+    }
+    this.orphanImportOpen = !this.orphanImportOpen;
+    this.changeDetector.markForCheck();
+  }
+
+  closeOrphanImport(event?: Event) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    if (!this.orphanImportOpen) return;
+    this.orphanImportOpen = false;
+    this.changeDetector.markForCheck();
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  onDocumentPointerDownCloseImport(event: PointerEvent) {
+    if (!this.orphanImportOpen) return;
+    const root = (event.target as HTMLElement | null)?.closest?.('.hand-orphan-import');
+    if (root) return;
+    this.orphanImportOpen = false;
+    this.changeDetector.markForCheck();
+  }
+
+  onClaimOfflineHand(pile: HandPileInfo, event?: Event) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    if (this.isGuest) return;
+    const n = this.handService.mergeHandIntoSelf(pile.userId);
+    if (n < 1) return;
+    this.chatMessageService.sendOperationLog(
+      this.i18n.t('hand.claimedFrom', { name: pile.name || pile.userId, count: n }),
+    );
+    SoundEffect.play(PresetSound.cardPut);
+    if (this.handService.offlineHandPiles().length < 1) this.orphanImportOpen = false;
+    this.requestViewUpdate(true);
   }
 
   private refreshDropBandVisible(): boolean {
     const next = this.computeDropBandVisible(this.displayCards.length);
     if (next === this.dropBandVisible) return false;
     this.dropBandVisible = next;
+    return true;
+  }
+
+  private refreshHudVisible(): boolean {
+    const next = this.computeHudVisible(this.displayCards.length);
+    if (next === this.hudVisible) return false;
+    this.hudVisible = next;
     return true;
   }
 
@@ -222,7 +301,9 @@ export class HandRailComponent implements OnInit, OnDestroy {
     if (!offerChanged && !hoverChanged) return false;
     this.isDropOffer = nextOffer;
     this.isDropHover = nextHover;
-    return this.refreshDropBandVisible() || offerChanged || hoverChanged;
+    const hudChanged = this.refreshHudVisible();
+    const bandChanged = this.refreshDropBandVisible();
+    return hudChanged || bandChanged || offerChanged || hoverChanged;
   }
 
   constructor(
@@ -254,9 +335,13 @@ export class HandRailComponent implements OnInit, OnDestroy {
       .on(`UPDATE_GAME_OBJECT/aliasName/${Card.aliasName}`, event => {
         if (this.isHandRelevantCardEvent(event.data)) this.scheduleViewRefresh();
       })
+      .on(`UPDATE_GAME_OBJECT/aliasName/${PeerCursor.aliasName}`, () => this.scheduleViewRefresh())
       .on('DELETE_GAME_OBJECT', event => {
         if (this.isHandRelevantCardDelete(event.data)) this.scheduleViewRefresh();
+        if (event.data?.aliasName === PeerCursor.aliasName) this.scheduleViewRefresh();
       })
+      .on('DISCONNECT_PEER', () => this.scheduleViewRefresh())
+      .on('OPEN_OTHER_PEER', () => this.scheduleViewRefresh())
       .on('CARD_STACK_DECREASED', () => this.scheduleViewRefresh())
       .on('HAND_RAIL_SYNC', () => this.ngZone.run(() => this.requestViewUpdate(true)))
       .on('CHANGE_GM_MODE', () => this.ngZone.run(() => this.requestViewUpdate(true)))
@@ -597,6 +682,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.isDropOffer = true;
     this.isDropHover = nextHover;
     this.reorderHoverIndex = nextReorder;
+    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.changeDetector.markForCheck();
   };
@@ -632,6 +718,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.dragCard = card;
     this.dragPointerId = event.pointerId;
     this.isDropOffer = true;
+    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.createDragGhost(card, event.clientX, event.clientY);
     (event.currentTarget as HTMLElement)?.setPointerCapture?.(event.pointerId);
@@ -644,6 +731,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.isDropOffer = false;
     this.isDropHover = false;
     this.reorderHoverIndex = -1;
+    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.removeDragGhost();
     setCardMergePreview(null);
@@ -824,9 +912,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
     if (!data || data.aliasName !== Card.aliasName || !data.identifier) return false;
     if (this.handListSignature.includes(data.identifier)) return true;
     const card = ObjectStore.instance.get<Card>(data.identifier);
-    if (!card?.isInHand) return false;
-    if (card.owner === this.viewUserId) return true;
-    return this.isGm;
+    // Any hand pile (incl. other owners) drives orphan chips + nickname auto-claim.
+    return !!card?.isInHand;
   }
 
   private isHandRelevantCardDelete(data: {

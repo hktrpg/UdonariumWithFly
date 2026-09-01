@@ -3,7 +3,7 @@ import {
   addPackedByContentHash,
   buildCompleteBlobCatalog,
   deleteMediaFromHash,
-  getFromHash,
+  getOrHydrateUrlBacked,
   insertOrUpdateMediaFile,
   LazyCatalogSynchronizer,
   MediaCatalogItem,
@@ -91,7 +91,12 @@ export class VideoStorage {
   }
 
   get(identifier: string): VideoFile {
-    return getFromHash(this.hash, identifier);
+    return getOrHydrateUrlBacked({
+      hash: this.hash,
+      identifier,
+      createUrlBacked: id => VideoFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {
