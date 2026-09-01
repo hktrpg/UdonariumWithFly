@@ -441,6 +441,12 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
   onCardPointerDown(event: PointerEvent) {
     if (this.GuestMode() || event.button !== 0 || !this.card) return;
     if (this.card.location.name !== 'table') return;
+    // Rotate handles share this host; do not start move / quick-drag while rotating.
+    const target = event.target as Element | null;
+    if (target?.closest?.('.rotate-grab')) {
+      event.stopPropagation();
+      return;
+    }
     event.stopPropagation();
     if (this.isLocked) {
       this.onInputStart(event);
@@ -1017,7 +1023,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         this.turnRight();
       },
       materialIcon: 'turn_right',
-      hotkey: 'R',
+      hotkey: 'E',
       disabled: this.isLocked
     }, 
     {
@@ -1025,7 +1031,7 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
         this.turnLeft();
       },
       materialIcon: 'turn_left',
-      hotkey: 'Shift+R',
+      hotkey: 'Q',
       disabled: this.isLocked
     });
     if (this.card.isVisible) {
