@@ -38,7 +38,11 @@ describe('null-length safety (room-load templates)', () => {
 
     const card = makeCard('c1');
     card.owner = 'missing-peer';
-    expect(card.ownerName).toBe('');
+    // Card intentionally falls back to ownerLabel / owner id for offline hands
+    // when PeerCursor is not in the store (see resolveOwnerLabel / hand import).
+    expect(card.ownerName).toBe('missing-peer');
+    expect(card.hasOwner).toBeTrue();
+    expect(() => card.ownerName.length).not.toThrow();
     (card as any).owner = null;
     expect(card.hasOwner).toBeFalse();
 
