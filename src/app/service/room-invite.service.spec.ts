@@ -22,10 +22,11 @@ describe('RoomInviteService role passwords', () => {
     expect(RoomAuth.getSessionRolePassword('user')).toBe('userpw');
   });
 
-  it('falls back to RoomAuth session when in-service map is cleared', () => {
+  it('falls back to RoomAuth session when in-service map is empty but session remains', () => {
     RoomAuth.rememberSession('user', 'session-user', 'mesh');
     RoomAuth.rememberSession('gm', 'session-gm', 'mesh');
-    service.clearRolePasswords();
+    // Simulate map-only loss (not clearRolePasswords, which also wipes session).
+    (service as any).rolePasswords = {};
     expect(service.getRolePassword('user')).toBe('session-user');
     expect(service.getRolePassword('gm')).toBe('session-gm');
   });
@@ -62,6 +63,14 @@ describe('RoomInviteService role passwords', () => {
     service.setRolePasswords({ gm: 'gmpw', user: 'userpw', guest: '' });
     service.setRolePasswords({ gm: 'gmpw', user: '', guest: '' });
     expect(service.getRolePassword('gm')).toBe('gmpw');
+    expect(service.getRolePassword('user')).toBe('');
+    expect(RoomAuth.getSessionRolePassword('user')).toBe('');
+  });
+
+  it('clearRolePasswords drops map and session so a prior room cannot leak secrets', () => {
+    service.setRolePasswords({ gm: 'gmpw', user: 'userpw', guest: 'guestpw' });
+    service.clearRolePasswords();
+    expect(service.getRolePassword('gm')).toBe('');
     expect(service.getRolePassword('user')).toBe('');
     expect(RoomAuth.getSessionRolePassword('user')).toBe('');
   });

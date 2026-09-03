@@ -1378,17 +1378,41 @@ export class FolderBackupService implements OnDestroy {
       guestPassword: String(capture.guestPassword || ''),
     };
 
-    if (PeerCursor.myCursor?.isGMMode) {
-      return {
-        ...allow,
-        secrets: await FolderBackupCrypto.encrypt(next),
-      };
-    }
-
     const existingMeta = await this.readExistingMeta(roomId);
     const existingPasswords = existingMeta
       ? await this.secretPasswordsFromMeta(existingMeta)
       : null;
+    const roomName = Network.peer?.roomName || '';
+
+    if (PeerCursor.myCursor?.isGMMode) {
+      // Intentional clears rekey the room so roleNeedsPassword becomes false.
+      // If memory was wiped but the gate still requires a password, keep prior secrets.
+      const merged = existingPasswords
+        ? {
+            gmPassword: next.gmPassword
+              || (RoomAuth.roleNeedsPassword(roomName, 'gm') ? existingPasswords.gmPassword : ''),
+            userPassword: next.userPassword
+              || (allow.allowUser && RoomAuth.roleNeedsPassword(roomName, 'user')
+                ? existingPasswords.userPassword : ''),
+            guestPassword: next.guestPassword
+              || (allow.allowGuest && RoomAuth.roleNeedsPassword(roomName, 'guest')
+                ? existingPasswords.guestPassword : ''),
+          }
+        : next;
+      if (!existingPasswords && existingMeta?.secrets) {
+        const missingNeeded =
+          (!merged.gmPassword && RoomAuth.roleNeedsPassword(roomName, 'gm'))
+          || (allow.allowUser && !merged.userPassword && RoomAuth.roleNeedsPassword(roomName, 'user'))
+          || (allow.allowGuest && !merged.guestPassword && RoomAuth.roleNeedsPassword(roomName, 'guest'));
+        if (missingNeeded) {
+          return { ...allow, secrets: existingMeta.secrets };
+        }
+      }
+      return {
+        ...allow,
+        secrets: await FolderBackupCrypto.encrypt(merged),
+      };
+    }
 
     if (existingPasswords) {
       const merged = {

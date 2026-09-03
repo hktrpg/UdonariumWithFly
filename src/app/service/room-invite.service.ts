@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-import { Network } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
@@ -28,8 +28,20 @@ export type RoomInviteJoinResult =
 @Injectable({ providedIn: 'root' })
 export class RoomInviteService {
   private rolePasswords: Partial<Record<RoomRole, string>> = {};
+  private networkHooked = false;
+
+  /** Drop stale role secrets when we are not in a room (leave / lobby reopen). */
+  private ensureNetworkHook() {
+    if (this.networkHooked) return;
+    this.networkHooked = true;
+    EventSystem.register(this)
+      .on('OPEN_NETWORK', () => {
+        if (!Network.peer?.isRoom) this.clearRolePasswords();
+      });
+  }
 
   setRolePasswords(passwords: { gm?: string; user?: string; guest?: string }) {
+    this.ensureNetworkHook();
     if (passwords.gm != null) this.rolePasswords.gm = passwords.gm;
     if (passwords.user != null) this.rolePasswords.user = passwords.user;
     if (passwords.guest != null) this.rolePasswords.guest = passwords.guest;
@@ -41,17 +53,23 @@ export class RoomInviteService {
   }
 
   setRolePassword(role: RoomRole, password: string) {
+    this.ensureNetworkHook();
     this.rolePasswords[role] = password || '';
     RoomAuth.rememberSession(role, password || '');
   }
 
   getRolePassword(role: RoomRole): string {
+    this.ensureNetworkHook();
     // Prefer in-service map; fall back to RoomAuth session (survives map clears / races).
     return this.rolePasswords[role] || RoomAuth.getSessionRolePassword(role) || '';
   }
 
   clearRolePasswords() {
     this.rolePasswords = {};
+    // Also drop session role secrets so getRolePassword fallback cannot revive a prior room.
+    for (const role of ['gm', 'user', 'guest'] as RoomRole[]) {
+      RoomAuth.rememberSession(role, '');
+    }
   }
 
   buildInviteUrl(role: RoomRole, password?: string): string {
