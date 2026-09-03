@@ -341,19 +341,23 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     if (elements.length > 0) {
       currentImageIdentifires = elements.map(element => element.value + '');
     }
+    // Capture slot before async modal; currntImageIndex can change while picker is open.
+    const targetIndex = this.tabletopObject.currntImageIndex;
+    const targetElement = this.tabletopObject.imageElement;
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty, currentImageIdentifires: currentImageIdentifires }).then(value => {
       if (!this.tabletopObject || !this.tabletopObject.imageDataElement || !value) return;
       if (value == 'null') {
         // 刪除
-        if (this.tabletopObject.imageElement && this.tabletopObject.imageFiles.length == 1) {
+        const els = this.tabletopObject.imageDataElement.getElementsByName('imageIdentifier');
+        if (targetElement && els.length == 1) {
           // 為相容性保留一個
-          this.tabletopObject.imageElement.value = value;
-          this.tabletopObject.imageElement.currentValue = value;
+          targetElement.value = value;
+          targetElement.currentValue = value;
         } else {
-          this.deleteImage(this.tabletopObject.currntImageIndex);
+          this.deleteImage(targetIndex);
         }
-      } else if (this.tabletopObject.imageElement) {
-        this.tabletopObject.imageElement.value = value;
+      } else if (targetElement?.parent) {
+        targetElement.value = value;
       }
     });
   }

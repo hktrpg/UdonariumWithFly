@@ -200,7 +200,8 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current ? [current] : []
     }).then(value => {
-      if (value == null) return;
+      // Cancel resolves false; Empty selection is the string 'null'.
+      if (!value) return;
       this.note.setFrontImage(value);
       if (this.note.contentMode === 'auto' || this.note.contentMode === 'text') {
         this.note.contentMode = 'image';
@@ -216,7 +217,7 @@ export class NoteSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current ? [current] : []
     }).then(value => {
-      if (value == null) return;
+      if (!value) return;
       this.note.setBackImage(value);
       this.changeDetector.markForCheck();
     });

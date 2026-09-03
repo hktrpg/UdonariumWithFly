@@ -268,17 +268,21 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     if (!this.character || this.GuestMode()) return;
     const elements = this.character.imageDataElement?.getElementsByName('imageIdentifier') || [];
     const currentImageIdentifires = elements.map(el => el.value + '');
+    // Capture slot before async modal; currntImageIndex can change while picker is open.
+    const targetIndex = this.character.currntImageIndex;
+    const targetElement = this.character.imageElement;
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty, currentImageIdentifires }).then(value => {
       if (!this.character?.imageDataElement || !value) return;
       if (value === 'null') {
-        if (this.character.imageElement && this.character.imageFiles.length === 1) {
-          this.character.imageElement.value = value;
-          this.character.imageElement.currentValue = value;
+        const els = this.character.imageDataElement.getElementsByName('imageIdentifier');
+        if (targetElement && els.length === 1) {
+          targetElement.value = value;
+          targetElement.currentValue = value;
         } else {
-          this.deleteImage(this.character.currntImageIndex);
+          this.deleteImage(targetIndex);
         }
-      } else if (this.character.imageElement) {
-        this.character.imageElement.value = value;
+      } else if (targetElement?.parent) {
+        targetElement.value = value;
       }
       this.changeDetector.markForCheck();
     });

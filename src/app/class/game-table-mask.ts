@@ -141,6 +141,7 @@ export class GameTableMask extends TabletopObject {
   }
 
   setImage(identifier: string) {
+    if (typeof identifier !== 'string') return;
     const element = this.getElement('imageIdentifier', this.imageDataElement);
     if (element) element.value = identifier || '';
   }
