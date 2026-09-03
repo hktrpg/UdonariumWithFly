@@ -136,6 +136,8 @@ export interface FolderFlushOptions {
 interface RoomSnapshot {
   roomId: string;
   displayName: string;
+  /** Encoded peer roomName (auth gates) — needed for leave flush after lobby reopen. */
+  roomName: string;
   auth?: RoomBackupAuthSettings;
 }
 
@@ -1264,7 +1266,11 @@ export class FolderBackupService implements OnDestroy {
           secrets?: FolderBackupSecretsBlob;
         } | undefined;
         if (snapshot.auth) {
-          metaAuth = await this.resolveMetaAuthForWrite(snapshot.roomId, snapshot.auth);
+          metaAuth = await this.resolveMetaAuthForWrite(
+            snapshot.roomId,
+            snapshot.auth,
+            snapshot.roomName || '',
+          );
         }
         // Freeze previous latest into recent/calendar slots BEFORE overwriting latest.
         // (Post-write promote stamped slots with the new latestAt and prune/list hid them.)
@@ -1336,6 +1342,7 @@ export class FolderBackupService implements OnDestroy {
     this.lastRoomSnapshot = {
       roomId: peer.roomId,
       displayName: RoomAuth.displayRoomName(peer.roomName || peer.roomId) || peer.roomId,
+      roomName: peer.roomName || '',
       auth: this.captureAuthSettings(peer.roomName || ''),
     };
   }
@@ -1362,7 +1369,8 @@ export class FolderBackupService implements OnDestroy {
    */
   private async resolveMetaAuthForWrite(
     roomId: string,
-    capture: RoomBackupAuthSettings
+    capture: RoomBackupAuthSettings,
+    roomNameHint: string = '',
   ): Promise<{
     allowUser: boolean;
     allowGuest: boolean;
@@ -1382,7 +1390,9 @@ export class FolderBackupService implements OnDestroy {
     const existingPasswords = existingMeta
       ? await this.secretPasswordsFromMeta(existingMeta)
       : null;
-    const roomName = Network.peer?.roomName || '';
+    // Prefer snapshot roomName: leave flush runs after lobby reopen when Network.peer
+    // no longer carries the room auth gates.
+    const roomName = roomNameHint || Network.peer?.roomName || '';
 
     if (PeerCursor.myCursor?.isGMMode) {
       // Intentional clears rekey the room so roleNeedsPassword becomes false.
