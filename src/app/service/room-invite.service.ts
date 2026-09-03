@@ -46,7 +46,8 @@ export class RoomInviteService {
   }
 
   getRolePassword(role: RoomRole): string {
-    return this.rolePasswords[role] || '';
+    // Prefer in-service map; fall back to RoomAuth session (survives map clears / races).
+    return this.rolePasswords[role] || RoomAuth.getSessionRolePassword(role) || '';
   }
 
   clearRolePasswords() {

@@ -925,6 +925,16 @@ export class FolderBackupService implements OnDestroy {
     };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(displayName, roomId, roles);
     const userId = Network.peer.userId;
+    const gmPassword = auth.gmPassword || '';
+    const userPassword = auth.allowUser ? (auth.userPassword || '') : '';
+    const guestPassword = auth.allowGuest ? (auth.guestPassword || '') : '';
+    // Persist before Network.open so OPEN_NETWORK snapshot listeners see role secrets.
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
+    this.roomInvite.setRolePasswords({
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
+    });
     folderBackupDebug('openRoomAsGm', {
       roomId,
       displayName,
@@ -949,11 +959,11 @@ export class FolderBackupService implements OnDestroy {
           Room.clearLocalTabletopForJoin();
           PeerCursor.myCursor.peerId = Network.peerId;
           RoomAuth.applyIdentity('gm', roomId);
-          RoomAuth.rememberSession('gm', String(roles.gm || ''), meshPassword);
+          RoomAuth.rememberSession('gm', gmPassword, meshPassword);
           this.roomInvite.setRolePasswords({
-            gm: auth.gmPassword || '',
-            user: auth.allowUser ? (auth.userPassword || '') : '',
-            guest: auth.allowGuest ? (auth.guestPassword || '') : '',
+            gm: gmPassword,
+            user: userPassword,
+            guest: guestPassword,
           });
           folderBackupDebug('OPEN_NETWORK', {
             peerRoomId: Network.peer?.roomId || '',

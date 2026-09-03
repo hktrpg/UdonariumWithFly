@@ -33,7 +33,9 @@
           maxlength="12"
           name="gmPassword"
           [placeholder]="'room.passwordPlaceholder' | i18n"
-          autocomplete="new-password"
+          autocomplete="off"
+          data-1p-ignore
+          data-lpignore="true"
         />
       </label>
     </div>
@@ -52,7 +54,9 @@
           maxlength="12"
           name="userPassword"
           [placeholder]="'room.passwordPlaceholder' | i18n"
-          autocomplete="new-password"
+          autocomplete="off"
+          data-1p-ignore
+          data-lpignore="true"
         />
       </label>
       <p class="role-off-hint" *ngIf="!allowUser">{{ 'room.roleDisabledHint' | i18n:{ role: ('peer.role.user' | i18n) } }}</p>
@@ -72,7 +76,9 @@
           maxlength="12"
           name="guestPassword"
           [placeholder]="'room.passwordPlaceholder' | i18n"
-          autocomplete="new-password"
+          autocomplete="off"
+          data-1p-ignore
+          data-lpignore="true"
         />
       </label>
       <p class="role-off-hint" *ngIf="!allowGuest">{{ 'room.roleDisabledHint' | i18n:{ role: ('peer.role.guest' | i18n) } }}</p>

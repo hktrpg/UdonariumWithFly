@@ -23,6 +23,7 @@
     "src/app/service/save-xml-remap.spec.ts",
     "src/app/service/card-caption-text.spec.ts",
     "src/app/service/hand.service.spec.ts",
+    "src/app/service/room-invite.service.spec.ts",
     "src/app/component/card-stack/card-stack-gesture.spec.ts",
     "src/app/service/timer.service.spec.ts",
     "src/app/service/table-lighting.service.spec.ts",

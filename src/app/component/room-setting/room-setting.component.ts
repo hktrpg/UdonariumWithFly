@@ -191,6 +191,19 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     const roles = this.buildRoleAuthInputs();
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
+    // Capture before Network.open: browsers may clear type=password fields after submit,
+    // and OPEN_NETWORK listeners (e.g. folder-backup snapshot) can run before this modal's
+    // callback — so persist role secrets synchronously, not only in the open handler.
+    const gmPassword = this.gmPassword || '';
+    const userPassword = this.allowUser ? (this.userPassword || '') : '';
+    const guestPassword = this.allowGuest ? (this.guestPassword || '') : '';
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
+    this.roomInvite.setRolePasswords({
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
+    });
+
     if (!suppressBusy) this.connectionBusy.show('peer.creatingRoom');
     const afterCreate = this.modalService.option?.afterCreate;
     this.createRoomKey = { createRoom: true };
@@ -202,11 +215,11 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
         this.clearCreateRoomWait();
         PeerCursor.myCursor.peerId = Network.peerId;
         RoomAuth.applyIdentity('gm', roomId);
-        RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
+        RoomAuth.rememberSession('gm', gmPassword, meshPassword);
         this.roomInvite.setRolePasswords({
-          gm: this.gmPassword,
-          user: this.allowUser ? this.userPassword : '',
-          guest: this.allowGuest ? this.guestPassword : '',
+          gm: gmPassword,
+          user: userPassword,
+          guest: guestPassword,
         });
         if (!suppressBusy) this.connectionBusy.hide();
         this.modalService.resolve(true);
@@ -243,6 +256,10 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     this.isSaving = true;
     this.help = '';
     const roomId = Network.peer.roomId;
+    // Snapshot form values before any await / rekey (password fields can be cleared by the browser).
+    const gmPassword = this.gmPassword || '';
+    const userPassword = this.allowUser ? (this.userPassword || '') : '';
+    const guestPassword = this.allowGuest ? (this.guestPassword || '') : '';
     const roles = this.buildRoleAuthInputs();
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
@@ -250,11 +267,11 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     const authUnchanged = encodedName === Network.peer.roomName && meshPassword === currentMesh;
 
     this.roomInvite.setRolePasswords({
-      gm: this.gmPassword,
-      user: this.allowUser ? this.userPassword : '',
-      guest: this.allowGuest ? this.guestPassword : '',
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
     });
-    RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
 
     if (authUnchanged) {
       RoomAuth.applyIdentity('gm', roomId);
