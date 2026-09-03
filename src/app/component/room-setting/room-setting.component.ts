@@ -188,15 +188,22 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     if (this.connectionBusy.busy && !suppressBusy) return;
     const userId = Network.peer.userId;
     const roomId = this.resolveCreateRoomId();
-    const roles = this.buildRoleAuthInputs();
+
+    // Capture at submit before encode/open: browsers may clear type=password fields,
+    // and OPEN_NETWORK listeners (e.g. folder-backup snapshot) can run before this
+    // modal's callback — persist captured consts, never re-read the form later.
+    const allowUser = this.allowUser;
+    const allowGuest = this.allowGuest;
+    const gmPassword = this.gmPassword || '';
+    const userPassword = allowUser ? (this.userPassword || '') : '';
+    const guestPassword = allowGuest ? (this.guestPassword || '') : '';
+    const roles: { gm: RoleAuthInput; user: RoleAuthInput; guest: RoleAuthInput } = {
+      gm: gmPassword,
+      user: allowUser ? userPassword : { mode: 'disabled' },
+      guest: allowGuest ? guestPassword : { mode: 'disabled' },
+    };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
-    // Capture before Network.open: browsers may clear type=password fields after submit,
-    // and OPEN_NETWORK listeners (e.g. folder-backup snapshot) can run before this modal's
-    // callback — so persist role secrets synchronously, not only in the open handler.
-    const gmPassword = this.gmPassword || '';
-    const userPassword = this.allowUser ? (this.userPassword || '') : '';
-    const guestPassword = this.allowGuest ? (this.guestPassword || '') : '';
     RoomAuth.rememberSession('gm', gmPassword, meshPassword);
     this.roomInvite.setRolePasswords({
       gm: gmPassword,
@@ -256,11 +263,17 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     this.isSaving = true;
     this.help = '';
     const roomId = Network.peer.roomId;
-    // Snapshot form values before any await / rekey (password fields can be cleared by the browser).
+    // Snapshot before encode/await — password inputs may be cleared on submit.
+    const allowUser = this.allowUser;
+    const allowGuest = this.allowGuest;
     const gmPassword = this.gmPassword || '';
-    const userPassword = this.allowUser ? (this.userPassword || '') : '';
-    const guestPassword = this.allowGuest ? (this.guestPassword || '') : '';
-    const roles = this.buildRoleAuthInputs();
+    const userPassword = allowUser ? (this.userPassword || '') : '';
+    const guestPassword = allowGuest ? (this.guestPassword || '') : '';
+    const roles: { gm: RoleAuthInput; user: RoleAuthInput; guest: RoleAuthInput } = {
+      gm: gmPassword,
+      user: allowUser ? userPassword : { mode: 'disabled' },
+      guest: allowGuest ? guestPassword : { mode: 'disabled' },
+    };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
     const currentMesh = Network.peer.meshPassword || Network.peer.channelPassword || '';

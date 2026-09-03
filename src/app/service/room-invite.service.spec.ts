@@ -30,43 +30,39 @@ describe('RoomInviteService role passwords', () => {
     expect(service.getRolePassword('gm')).toBe('session-gm');
   });
 
-  it('keeps user password when form fields are wiped after capture (OPEN_NETWORK race)', () => {
-    // Mirrors createRoom: capture consts, then a late callback must not re-read empty form fields.
-    const gmPassword = 'gm-secret';
-    const userPassword = 'player-secret';
-    const guestPassword = '';
+  it('keeps player password when create captures consts before a wiped form read', () => {
+    // createRoom must capture locals at submit, then persist those — never re-read form later.
+    const captured = {
+      gm: 'gm-secret',
+      user: 'player-secret',
+      guest: '',
+    };
+    // Browser wiped the bound fields after submit.
+    const form = { gm: '', user: '', guest: '' };
 
-    RoomAuth.rememberSession('gm', gmPassword, 'mesh-x');
+    RoomAuth.rememberSession('gm', captured.gm, 'mesh-x');
+    service.setRolePasswords(captured);
+
+    // Bug: OPEN_NETWORK re-reads form → player secret lost, GM often still filled by PM.
     service.setRolePasswords({
-      gm: gmPassword,
-      user: userPassword,
-      guest: guestPassword,
+      gm: form.gm || captured.gm, // accidental partial survival
+      user: form.user,            // wiped
+      guest: form.guest,
     });
+    expect(service.getRolePassword('user')).toBe('');
 
-    // Simulate browser clearing password inputs after submit / before OPEN_NETWORK.
-    const formGm = '';
-    const formUser = '';
-    void formGm;
-    void formUser;
-
-    // OPEN_NETWORK handler must re-apply captured consts, not live form values.
-    RoomAuth.rememberSession('gm', gmPassword, 'mesh-x');
-    service.setRolePasswords({
-      gm: gmPassword,
-      user: userPassword,
-      guest: guestPassword,
-    });
-
+    // Fix: always re-apply the captured consts (ignore wiped form).
+    service.setRolePasswords(captured);
     expect(service.getRolePassword('gm')).toBe('gm-secret');
     expect(service.getRolePassword('user')).toBe('player-secret');
     expect(RoomAuth.getSessionRolePassword('user')).toBe('player-secret');
   });
 
-  it('regression: reading empty form after open would drop only non-GM if GM was re-saved alone', () => {
+  it('empty setRolePasswords write clears session (callers must capture before wipe)', () => {
     service.setRolePasswords({ gm: 'gmpw', user: 'userpw', guest: '' });
-    // Bug pattern: callback re-reads cleared form and only remembers GM from a partial write.
     service.setRolePasswords({ gm: 'gmpw', user: '', guest: '' });
     expect(service.getRolePassword('gm')).toBe('gmpw');
     expect(service.getRolePassword('user')).toBe('');
+    expect(RoomAuth.getSessionRolePassword('user')).toBe('');
   });
 });
