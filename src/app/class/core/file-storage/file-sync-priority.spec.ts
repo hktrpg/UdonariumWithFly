@@ -1,4 +1,6 @@
+import { GameTable } from '@udonarium/game-table';
 import { Jukebox } from '@udonarium/Jukebox';
+import { TableSelecter } from '@udonarium/table-selecter';
 
 import { ObjectStore } from '../synchronize-object/object-store';
 
@@ -23,35 +25,59 @@ describe('fileSyncPriority', () => {
     clearPlayingMusicCache();
     ObjectStore.instance.get(JUKEBOX_OBJECT_ID)?.destroy();
     ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
-    ImageStorage.instance.delete('img-thumb');
-    ImageStorage.instance.delete('img-full');
+    for (const id of ['img-thumb', 'img-full', 'map-thumb', 'map-full', 'map-active-img', 'map-other-img']) {
+      ImageStorage.instance.delete(id);
+    }
+    for (const table of [...ObjectStore.instance.getObjects(GameTable)]) {
+      table.destroy();
+    }
   });
 
-  it('ranks thumbnails → playing BGM → full images → audio/pdf by size', () => {
-    const thumb = ImageFile.createEmpty('img-thumb');
-    ImageStorage.instance.add(thumb);
+  it('ranks map thumbs → other thumbs → playing BGM → map full → other full → audio/pdf by size', () => {
+    const table = new GameTable('map-prio');
+    table.initialize();
+    table.imageIdentifier = 'map-thumb';
+    table.backgroundImageIdentifier = 'map-full';
 
-    const full = ImageFile.createEmpty('img-full');
+    const mapThumb = ImageFile.createEmpty('map-thumb');
+    ImageStorage.instance.add(mapThumb);
+
+    const otherThumb = ImageFile.createEmpty('img-thumb');
+    ImageStorage.instance.add(otherThumb);
+
     const thumbBlob = new Blob([new Uint8Array(4)], { type: 'image/png' });
-    (full as any).context.thumbnail = { blob: thumbBlob, type: 'image/png', url: '' };
-    (full as any).context.blob = null;
-    ImageStorage.instance.add(full);
+    const mapFull = ImageFile.createEmpty('map-full');
+    (mapFull as any).context.thumbnail = { blob: thumbBlob, type: 'image/png', url: '' };
+    (mapFull as any).context.blob = null;
+    ImageStorage.instance.add(mapFull);
 
-    expect(thumb.state).toBe(ImageState.NULL);
-    expect(full.state).toBe(ImageState.THUMBNAIL);
+    const otherFull = ImageFile.createEmpty('img-full');
+    (otherFull as any).context.thumbnail = { blob: thumbBlob, type: 'image/png', url: '' };
+    (otherFull as any).context.blob = null;
+    ImageStorage.instance.add(otherFull);
 
+    primePlayingMusicCache();
+
+    expect(mapThumb.state).toBe(ImageState.NULL);
+    expect(otherThumb.state).toBe(ImageState.NULL);
+    expect(mapFull.state).toBe(ImageState.THUMBNAIL);
+    expect(otherFull.state).toBe(ImageState.THUMBNAIL);
+
+    expect(fileSyncPriorityTier('image', 'map-thumb')).toBe(FileSyncPriorityTier.IMAGE_MAP_THUMB);
     expect(fileSyncPriorityTier('image', 'img-thumb')).toBe(FileSyncPriorityTier.IMAGE_THUMB);
+    expect(fileSyncPriorityTier('image', 'map-full')).toBe(FileSyncPriorityTier.IMAGE_MAP_FULL);
     expect(fileSyncPriorityTier('image', 'img-full')).toBe(FileSyncPriorityTier.IMAGE_FULL);
     expect(fileSyncPriorityTier('pdf', 'rules')).toBe(FileSyncPriorityTier.DEFAULT);
     expect(fileSyncPriorityTier('audio', 'idle')).toBe(FileSyncPriorityTier.DEFAULT);
 
-    expect(compareFileSyncPriority('image', 'img-thumb', 4_000, 'image', 'img-full', 500_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('image', 'map-thumb', 4_000, 'image', 'img-thumb', 1_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('image', 'img-thumb', 4_000, 'image', 'map-full', 500_000)).toBeLessThan(0);
+    expect(compareFileSyncPriority('image', 'map-full', 500_000, 'image', 'img-full', 1_000)).toBeLessThan(0);
     expect(compareFileSyncPriority('image', 'img-full', 500_000, 'audio', 'idle', 1_000)).toBeLessThan(0);
-    // Same DEFAULT tier: smaller pdf before larger idle audio.
     expect(compareFileSyncPriority('pdf', 'rules', 1_000, 'audio', 'idle', 8_000_000)).toBeLessThan(0);
   });
 
-  it('keeps playing BGM after thumbnails and before full images / pdf', () => {
+  it('keeps playing BGM after thumbs and before full images / pdf', () => {
     ObjectStore.instance.clearDeleted(JUKEBOX_OBJECT_ID);
     const jukebox = new Jukebox(JUKEBOX_OBJECT_ID);
     jukebox.initialize();
@@ -96,5 +122,28 @@ describe('fileSyncPriority', () => {
     expect(compareFileSyncPriority('audio', 'bgm-playing', 8_000_000, 'pdf', 'rules', 1_000)).toBeLessThan(0);
 
     jukebox.destroy();
+  });
+
+  it('prefers the active/view table map over other maps in the same tier', () => {
+    const active = new GameTable('map-active');
+    active.initialize();
+    active.imageIdentifier = 'map-active-img';
+    const other = new GameTable('map-other');
+    other.initialize();
+    other.imageIdentifier = 'map-other-img';
+
+    TableSelecter.instance.viewTableIdentifier = active.identifier;
+    TableSelecter.instance.viewedTableIdentifier = active.identifier;
+
+    ImageStorage.instance.add(ImageFile.createEmpty('map-active-img'));
+    ImageStorage.instance.add(ImageFile.createEmpty('map-other-img'));
+    primePlayingMusicCache();
+
+    expect(fileSyncPriorityTier('image', 'map-active-img')).toBe(FileSyncPriorityTier.IMAGE_MAP_THUMB);
+    expect(fileSyncPriorityTier('image', 'map-other-img')).toBe(FileSyncPriorityTier.IMAGE_MAP_THUMB);
+    expect(compareFileSyncPriority(
+      'image', 'map-active-img', 900_000,
+      'image', 'map-other-img', 1_000,
+    )).toBeLessThan(0);
   });
 });
