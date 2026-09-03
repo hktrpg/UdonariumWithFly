@@ -136,6 +136,8 @@ export interface FolderFlushOptions {
 interface RoomSnapshot {
   roomId: string;
   displayName: string;
+  /** Encoded peer roomName (auth gates) — needed for leave flush after lobby reopen. */
+  roomName: string;
   auth?: RoomBackupAuthSettings;
 }
 
@@ -925,6 +927,16 @@ export class FolderBackupService implements OnDestroy {
     };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(displayName, roomId, roles);
     const userId = Network.peer.userId;
+    const gmPassword = auth.gmPassword || '';
+    const userPassword = auth.allowUser ? (auth.userPassword || '') : '';
+    const guestPassword = auth.allowGuest ? (auth.guestPassword || '') : '';
+    // Persist before Network.open so OPEN_NETWORK snapshot listeners see role secrets.
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
+    this.roomInvite.setRolePasswords({
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
+    });
     folderBackupDebug('openRoomAsGm', {
       roomId,
       displayName,
@@ -949,11 +961,11 @@ export class FolderBackupService implements OnDestroy {
           Room.clearLocalTabletopForJoin();
           PeerCursor.myCursor.peerId = Network.peerId;
           RoomAuth.applyIdentity('gm', roomId);
-          RoomAuth.rememberSession('gm', String(roles.gm || ''), meshPassword);
+          RoomAuth.rememberSession('gm', gmPassword, meshPassword);
           this.roomInvite.setRolePasswords({
-            gm: auth.gmPassword || '',
-            user: auth.allowUser ? (auth.userPassword || '') : '',
-            guest: auth.allowGuest ? (auth.guestPassword || '') : '',
+            gm: gmPassword,
+            user: userPassword,
+            guest: guestPassword,
           });
           folderBackupDebug('OPEN_NETWORK', {
             peerRoomId: Network.peer?.roomId || '',
@@ -1254,7 +1266,11 @@ export class FolderBackupService implements OnDestroy {
           secrets?: FolderBackupSecretsBlob;
         } | undefined;
         if (snapshot.auth) {
-          metaAuth = await this.resolveMetaAuthForWrite(snapshot.roomId, snapshot.auth);
+          metaAuth = await this.resolveMetaAuthForWrite(
+            snapshot.roomId,
+            snapshot.auth,
+            snapshot.roomName || '',
+          );
         }
         // Freeze previous latest into recent/calendar slots BEFORE overwriting latest.
         // (Post-write promote stamped slots with the new latestAt and prune/list hid them.)
@@ -1326,6 +1342,7 @@ export class FolderBackupService implements OnDestroy {
     this.lastRoomSnapshot = {
       roomId: peer.roomId,
       displayName: RoomAuth.displayRoomName(peer.roomName || peer.roomId) || peer.roomId,
+      roomName: peer.roomName || '',
       auth: this.captureAuthSettings(peer.roomName || ''),
     };
   }
@@ -1352,7 +1369,8 @@ export class FolderBackupService implements OnDestroy {
    */
   private async resolveMetaAuthForWrite(
     roomId: string,
-    capture: RoomBackupAuthSettings
+    capture: RoomBackupAuthSettings,
+    roomNameHint: string = '',
   ): Promise<{
     allowUser: boolean;
     allowGuest: boolean;
@@ -1368,17 +1386,43 @@ export class FolderBackupService implements OnDestroy {
       guestPassword: String(capture.guestPassword || ''),
     };
 
-    if (PeerCursor.myCursor?.isGMMode) {
-      return {
-        ...allow,
-        secrets: await FolderBackupCrypto.encrypt(next),
-      };
-    }
-
     const existingMeta = await this.readExistingMeta(roomId);
     const existingPasswords = existingMeta
       ? await this.secretPasswordsFromMeta(existingMeta)
       : null;
+    // Prefer snapshot roomName: leave flush runs after lobby reopen when Network.peer
+    // no longer carries the room auth gates.
+    const roomName = roomNameHint || Network.peer?.roomName || '';
+
+    if (PeerCursor.myCursor?.isGMMode) {
+      // Intentional clears rekey the room so roleNeedsPassword becomes false.
+      // If memory was wiped but the gate still requires a password, keep prior secrets.
+      const merged = existingPasswords
+        ? {
+            gmPassword: next.gmPassword
+              || (RoomAuth.roleNeedsPassword(roomName, 'gm') ? existingPasswords.gmPassword : ''),
+            userPassword: next.userPassword
+              || (allow.allowUser && RoomAuth.roleNeedsPassword(roomName, 'user')
+                ? existingPasswords.userPassword : ''),
+            guestPassword: next.guestPassword
+              || (allow.allowGuest && RoomAuth.roleNeedsPassword(roomName, 'guest')
+                ? existingPasswords.guestPassword : ''),
+          }
+        : next;
+      if (!existingPasswords && existingMeta?.secrets) {
+        const missingNeeded =
+          (!merged.gmPassword && RoomAuth.roleNeedsPassword(roomName, 'gm'))
+          || (allow.allowUser && !merged.userPassword && RoomAuth.roleNeedsPassword(roomName, 'user'))
+          || (allow.allowGuest && !merged.guestPassword && RoomAuth.roleNeedsPassword(roomName, 'guest'));
+        if (missingNeeded) {
+          return { ...allow, secrets: existingMeta.secrets };
+        }
+      }
+      return {
+        ...allow,
+        secrets: await FolderBackupCrypto.encrypt(merged),
+      };
+    }
 
     if (existingPasswords) {
       const merged = {

@@ -188,8 +188,28 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     if (this.connectionBusy.busy && !suppressBusy) return;
     const userId = Network.peer.userId;
     const roomId = this.resolveCreateRoomId();
-    const roles = this.buildRoleAuthInputs();
+
+    // Capture at submit before encode/open: browsers may clear type=password fields,
+    // and OPEN_NETWORK listeners (e.g. folder-backup snapshot) can run before this
+    // modal's callback — persist captured consts, never re-read the form later.
+    const allowUser = this.allowUser;
+    const allowGuest = this.allowGuest;
+    const gmPassword = this.gmPassword || '';
+    const userPassword = allowUser ? (this.userPassword || '') : '';
+    const guestPassword = allowGuest ? (this.guestPassword || '') : '';
+    const roles: { gm: RoleAuthInput; user: RoleAuthInput; guest: RoleAuthInput } = {
+      gm: gmPassword,
+      user: allowUser ? userPassword : { mode: 'disabled' },
+      guest: allowGuest ? guestPassword : { mode: 'disabled' },
+    };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
+
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
+    this.roomInvite.setRolePasswords({
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
+    });
 
     if (!suppressBusy) this.connectionBusy.show('peer.creatingRoom');
     const afterCreate = this.modalService.option?.afterCreate;
@@ -202,11 +222,11 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
         this.clearCreateRoomWait();
         PeerCursor.myCursor.peerId = Network.peerId;
         RoomAuth.applyIdentity('gm', roomId);
-        RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
+        RoomAuth.rememberSession('gm', gmPassword, meshPassword);
         this.roomInvite.setRolePasswords({
-          gm: this.gmPassword,
-          user: this.allowUser ? this.userPassword : '',
-          guest: this.allowGuest ? this.guestPassword : '',
+          gm: gmPassword,
+          user: userPassword,
+          guest: guestPassword,
         });
         if (!suppressBusy) this.connectionBusy.hide();
         this.modalService.resolve(true);
@@ -243,18 +263,28 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
     this.isSaving = true;
     this.help = '';
     const roomId = Network.peer.roomId;
-    const roles = this.buildRoleAuthInputs();
+    // Snapshot before encode/await — password inputs may be cleared on submit.
+    const allowUser = this.allowUser;
+    const allowGuest = this.allowGuest;
+    const gmPassword = this.gmPassword || '';
+    const userPassword = allowUser ? (this.userPassword || '') : '';
+    const guestPassword = allowGuest ? (this.guestPassword || '') : '';
+    const roles: { gm: RoleAuthInput; user: RoleAuthInput; guest: RoleAuthInput } = {
+      gm: gmPassword,
+      user: allowUser ? userPassword : { mode: 'disabled' },
+      guest: allowGuest ? guestPassword : { mode: 'disabled' },
+    };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(this.roomName, roomId, roles);
 
     const currentMesh = Network.peer.meshPassword || Network.peer.channelPassword || '';
     const authUnchanged = encodedName === Network.peer.roomName && meshPassword === currentMesh;
 
     this.roomInvite.setRolePasswords({
-      gm: this.gmPassword,
-      user: this.allowUser ? this.userPassword : '',
-      guest: this.allowGuest ? this.guestPassword : '',
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
     });
-    RoomAuth.rememberSession('gm', this.gmPassword, meshPassword);
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
 
     if (authUnchanged) {
       RoomAuth.applyIdentity('gm', roomId);

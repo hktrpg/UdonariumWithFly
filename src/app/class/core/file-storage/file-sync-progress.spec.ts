@@ -45,11 +45,12 @@ describe('FileSyncProgress', () => {
 
     const snap = FileSyncProgress.snapshot(20);
     expect(snap.active).toBeTrue();
-    expect(snap.percentLoaded).toBeGreaterThanOrEqual(0);
+    // Thumbnail already local → progress must leave 0% immediately.
+    expect(snap.percentLoaded).toBeGreaterThan(0);
     expect(snap.percentLoaded).toBeLessThan(100);
   });
 
-  it('starts at 0% and grows while chunks arrive', () => {
+  it('starts above 0% with local thumbnail and grows while chunks arrive', () => {
     const image = ImageFile.createEmpty('img-1');
     const thumbBlob = new Blob([new Uint8Array(100)], { type: 'image/png' });
     image.apply({
@@ -66,7 +67,7 @@ describe('FileSyncProgress', () => {
     FileSyncProgress.noteChunkProgress('img-1', 0, 9);
     const start = FileSyncProgress.snapshot(20);
     expect(start.active).toBeTrue();
-    expect(start.percentLoaded).toBeGreaterThanOrEqual(0);
+    expect(start.percentLoaded).toBeGreaterThan(0);
     expect(start.percentLoaded).toBeLessThan(50);
 
     FileSyncProgress.noteChunkProgress('img-1', 8, 9);
@@ -139,5 +140,16 @@ describe('FileSyncProgress', () => {
     const snap = FileSyncProgress.snapshot(20);
     expect(snap.active).toBeFalse();
     expect(snap.percentLoaded).toBe(0);
+  });
+
+  it('credits pending queue so percent is not stuck at 0 before transfer starts', () => {
+    const image = ImageFile.createEmpty('img-pending');
+    images.push(image);
+    (FileReceiveScheduler.isTransferPending as jasmine.Spy).and.returnValue(true);
+
+    const snap = FileSyncProgress.snapshot(20);
+    expect(snap.active).toBeTrue();
+    expect(snap.percentLoaded).toBeGreaterThan(0);
+    expect(snap.percentLoaded).toBeLessThan(100);
   });
 });

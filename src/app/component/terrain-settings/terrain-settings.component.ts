@@ -212,7 +212,8 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current && current !== 'null' ? [current] : []
     }).then(value => {
-      if (!this.terrain || value == null) return;
+      // Cancel resolves false; Empty selection is the string 'null'.
+      if (!this.terrain || !value) return;
       this.terrain.setFaceImage(name, value);
       this.changeDetector.markForCheck();
     });

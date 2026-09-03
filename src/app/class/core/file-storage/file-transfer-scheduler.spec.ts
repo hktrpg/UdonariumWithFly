@@ -76,7 +76,8 @@ describe('FileReceiveScheduler', () => {
     const rows = log.calls.mostRecent().args[1] as Array<{ tier: string; id: string }>;
     expect(rows[0].tier).toBe('IMAGE_THUMB');
     expect(rows.map(r => r.id)).toEqual(['i1', 'a1']);
-    expect(FileSyncPriorityTier.IMAGE_THUMB).toBe(0);
+    expect(FileSyncPriorityTier.IMAGE_MAP_THUMB).toBe(0);
+    expect(FileSyncPriorityTier.IMAGE_THUMB).toBe(1);
 
     log.calls.reset();
     FileReceiveScheduler.schedule();

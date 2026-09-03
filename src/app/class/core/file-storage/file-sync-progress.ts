@@ -146,11 +146,33 @@ export class FileSyncProgress {
       }
       if (FileReceiveScheduler.isTransferActive(kind, identifier)) {
         inFlight += 0.02;
+        continue;
       }
+      if (FileReceiveScheduler.isTransferPending(kind, identifier)) {
+        // Queued but not started yet — avoid a long stuck-at-0% gap after join.
+        inFlight += 0.01;
+        continue;
+      }
+      inFlight += FileSyncProgress.partialLocalCredit(kind, identifier);
     }
     inFlight = Math.min(inFlight, incompleteCount);
 
     return Math.max(0, Math.min(1, (FileSyncProgress.completedFileCount + inFlight) / total));
+  }
+
+  /**
+   * Credit already-usable local state (e.g. image thumbnail on screen while full
+   * blob is still downloading). Without this, visible thumbs still report 0%.
+   */
+  private static partialLocalCredit(kind: FileResourceKind, identifier: string): number {
+    if (kind !== 'image') return 0;
+    // Prefer `images` (same source as collectIncompleteKeys) so progress matches
+    // what the bar is counting — including test doubles that only mock `images`.
+    const image = ImageStorage.instance.images.find(i => i.identifier === identifier)
+      ?? ImageStorage.instance.get(identifier);
+    if (!image) return 0;
+    if (image.state >= ImageState.THUMBNAIL) return 0.35;
+    return 0;
   }
 
   private static collectIncompleteKeys(): Set<string> {

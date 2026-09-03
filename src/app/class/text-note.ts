@@ -224,6 +224,7 @@ export class TextNote extends TabletopObject {
   }
 
   setFrontImage(imageIdentifier: string) {
+    if (typeof imageIdentifier !== 'string') return;
     let element = this.getElement('front', this.imageDataElement);
     if (!element && this.imageDataElement) {
       element = this.getElement('imageIdentifier', this.imageDataElement);
@@ -239,6 +240,7 @@ export class TextNote extends TabletopObject {
   }
 
   setBackImage(imageIdentifier: string) {
+    if (typeof imageIdentifier !== 'string') return;
     let element = this.getElement('back', this.imageDataElement);
     if (!element && this.imageDataElement) {
       element = DataElement.create('back', '', { type: 'image' }, 'back_' + this.identifier);

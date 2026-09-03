@@ -583,24 +583,40 @@ export class SaveDataService {
       includeAudio,
       slots,
     };
+    let existingSecrets: unknown;
+    let existingAllowUser: boolean | undefined;
+    let existingAllowGuest: boolean | undefined;
     try {
       const existingMetaFile = await (await roomDir.getFileHandle(ROOM_META_FILE)).getFile();
       const existing = JSON.parse(await existingMetaFile.text()) as {
         slots?: typeof slots;
         firstSavedAt?: string;
+        secrets?: unknown;
+        allowUser?: boolean;
+        allowGuest?: boolean;
       };
       if (existing?.slots) {
         slots = { ...existing.slots, latest: savedAt };
         roomMeta.slots = slots;
       }
       roomMeta.firstSavedAt = existing?.firstSavedAt || savedAt;
+      existingSecrets = existing?.secrets;
+      if (typeof existing?.allowUser === 'boolean') existingAllowUser = existing.allowUser;
+      if (typeof existing?.allowGuest === 'boolean') existingAllowGuest = existing.allowGuest;
     } catch {
       roomMeta.firstSavedAt = savedAt;
     }
     if (auth) {
       roomMeta.allowUser = !!auth.allowUser;
       roomMeta.allowGuest = !!auth.allowGuest;
+      // Only replace secrets when the caller supplies a blob. Omitting secrets must not
+      // wipe disk (leave flush / partial auth can pass allow flags alone).
       if (auth.secrets) roomMeta.secrets = auth.secrets;
+      else if (existingSecrets) roomMeta.secrets = existingSecrets;
+    } else {
+      if (typeof existingAllowUser === 'boolean') roomMeta.allowUser = existingAllowUser;
+      if (typeof existingAllowGuest === 'boolean') roomMeta.allowGuest = existingAllowGuest;
+      if (existingSecrets) roomMeta.secrets = existingSecrets;
     }
     await archiver.writeBlobToDirectory(
       roomDir,

@@ -282,6 +282,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (RoomAuth.roleNeedsPassword(roomName, role)) {
       password = this.roomInvite.getRolePassword(role);
+      // Stale secrets from a previous room must not be embedded in invites.
+      if (password && !RoomAuth.verify(roomId, roomName, role, password)) {
+        password = '';
+      }
       if (!password) {
         const entered = await this.modalService.open<string>(RolePasswordPromptComponent, {
           roomId,
