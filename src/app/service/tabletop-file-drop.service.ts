@@ -534,7 +534,8 @@ export class TabletopFileDropService {
   private async createCardStackFromSheet(files: File[], position: PointerCoordinate): Promise<boolean> {
     if (!files.length) return false;
     const params = await this.modalService.open<CardSheetImportResult | false>(CardSheetImportComponent, {
-      panelWidth: '360px',
+      panelWidth: '400px',
+      previewFile: files[0],
     });
     if (!params) return false;
 

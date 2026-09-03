@@ -199,6 +199,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private pdfRenderSeq = 0;
   /** Once per pdf id: grow paper height to the rendered page (+ title/nav) so the billboard bottom matches. */
   private pdfHeightFittedKey = '';
+  /** Once per front-image id: grow paper height to the image aspect so tall art does not sink past the table. */
+  private imageHeightFittedKey = '';
   private resizeStartW = 1;
   /** True if this note was already selected when the current pointer-down began. */
   private selectedOnPointerDown = false;
@@ -280,6 +282,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       this.needsPdfRender = false;
       this.renderPdf();
     }
+    this.tryFitCachedImage();
     this.bindResizeHandle();
   }
 
@@ -855,6 +858,43 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     if (sizeChanged) {
       this.lastPdfKey = '';
       this.needsPdfRender = true;
+    }
+  }
+
+  /** Image load — grow paper once so tall images do not overflow past the table origin. */
+  onNoteImageLoad(e: Event) {
+    const img = e?.target as HTMLImageElement | null;
+    if (!img) return;
+    this.fitPaperToImage(img);
+  }
+
+  /** Cached images may skip (load); still fit once when the bitmap is already complete. */
+  private tryFitCachedImage() {
+    if (!this.isImageContent) return;
+    const id = this.imageFile?.identifier || '';
+    if (!id || this.imageHeightFittedKey === id) return;
+    const img = this.elementRef.nativeElement?.querySelector?.('.note-image') as HTMLImageElement | null;
+    if (img?.complete && img.naturalWidth > 0) this.fitPaperToImage(img);
+  }
+
+  /**
+   * One-time paper fit for image notes (same bottom-anchor rule as PDF):
+   * Grow height to the image aspect (+ title) so art stays inside the billboard.
+   */
+  private fitPaperToImage(img: HTMLImageElement) {
+    if (!this.isImageContent && !this.showBackFace) return;
+    const id = this.imageFile?.identifier || '';
+    if (!id || this.imageHeightFittedKey === id) return;
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    this.imageHeightFittedKey = id;
+    if (this.textNote?.isSizeLocked) return;
+
+    const titlePx = (this.isShowTitle && (this.title || '').length) ? 28 : 0;
+    const pagePx = (img.naturalHeight / Math.max(1, img.naturalWidth)) * (this.width * this.gridSize);
+    const need = Math.max(1, Math.round(((pagePx + titlePx) / this.gridSize) * 2) / 2);
+    if (need > this.height + 0.05) {
+      this.textNote.height = need;
+      this.changeDetector.markForCheck();
     }
   }
 }

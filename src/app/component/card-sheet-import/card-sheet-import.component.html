@@ -8,6 +8,25 @@
     </header>
     <p class="hint">{{ 'cardSheet.help' | i18n }}</p>
 
+    <div *ngIf="previewSafeUrl" class="sheet-preview" aria-hidden="true">
+      <div class="sheet-preview-frame">
+        <img class="sheet-preview-img" [src]="previewSafeUrl" draggable="false" alt="" />
+        <div
+          class="sheet-grid"
+          [style.gridTemplateColumns]="'repeat(' + safeCols + ', 1fr)'"
+          [style.gridTemplateRows]="'repeat(' + safeRows + ', 1fr)'"
+        >
+          <div
+            *ngFor="let i of slotIndexes"
+            class="sheet-cell"
+            [class.is-used]="i < safeNumCards"
+            [class.is-skipped]="i >= safeNumCards"
+          ></div>
+        </div>
+      </div>
+      <p class="sheet-preview-caption">{{ 'cardSheet.previewHint' | i18n }}</p>
+    </div>
+
     <div class="field-row">
       <label class="field">
         <span>{{ 'cardSheet.width' | i18n }}</span>

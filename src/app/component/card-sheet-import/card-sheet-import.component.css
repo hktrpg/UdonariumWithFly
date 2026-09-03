@@ -30,6 +30,56 @@
   color: #7a6a58;
 }
 
+.sheet-preview {
+  margin: 0 0 10px;
+}
+
+.sheet-preview-frame {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  border: 1px solid rgba(90, 70, 40, 0.35);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #2a241c;
+}
+
+.sheet-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  vertical-align: top;
+  user-select: none;
+  pointer-events: none;
+}
+
+.sheet-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  pointer-events: none;
+}
+
+.sheet-cell {
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 220, 80, 0.75);
+}
+
+.sheet-cell.is-skipped {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(160, 160, 160, 0.45);
+}
+
+.sheet-preview-caption {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: #8a7a68;
+}
+
 .footer-actions {
   display: flex;
   align-items: center;

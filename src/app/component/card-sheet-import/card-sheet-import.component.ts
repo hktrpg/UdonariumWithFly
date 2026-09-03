@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { EventSystem } from '@udonarium/core/system';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
@@ -20,6 +21,9 @@ export class CardSheetImportComponent implements OnInit, OnDestroy {
   cols = 10;
   rows = 7;
   numCards = 70;
+  /** Object URL of the face sheet for the live grid preview (revoked on destroy). */
+  previewUrl = '';
+  previewSafeUrl: SafeResourceUrl | null = null;
   /** When true, keep numCards synced to cols*rows until the user edits it. */
   private numCardsAuto = true;
 
@@ -27,10 +31,18 @@ export class CardSheetImportComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private i18n: I18nService,
+    private sanitizer: DomSanitizer,
   ) {
     const opt = modalService.option || {};
     if (opt.cols != null) this.cols = Number(opt.cols) || this.cols;
     if (opt.rows != null) this.rows = Number(opt.rows) || this.rows;
+    if (opt.previewFile instanceof Blob) {
+      this.previewUrl = URL.createObjectURL(opt.previewFile);
+      this.previewSafeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.previewUrl);
+    } else if (typeof opt.previewUrl === 'string' && opt.previewUrl) {
+      this.previewUrl = '';
+      this.previewSafeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(opt.previewUrl);
+    }
     if (opt.numCards != null) {
       this.numCards = Number(opt.numCards) || this.numCards;
       this.numCardsAuto = false;
@@ -43,6 +55,25 @@ export class CardSheetImportComponent implements OnInit, OnDestroy {
     const c = Math.max(1, Math.floor(Number(this.cols)) || 1);
     const r = Math.max(1, Math.floor(Number(this.rows)) || 1);
     return c * r;
+  }
+
+  get safeCols(): number {
+    return Math.max(1, Math.min(40, Math.floor(Number(this.cols)) || 1));
+  }
+
+  get safeRows(): number {
+    return Math.max(1, Math.min(40, Math.floor(Number(this.rows)) || 1));
+  }
+
+  get safeNumCards(): number {
+    const max = this.safeCols * this.safeRows;
+    return Math.max(1, Math.min(max, Math.floor(Number(this.numCards)) || 1));
+  }
+
+  /** Indices 0..cols*rows-1 for the grid overlay cells. */
+  get slotIndexes(): number[] {
+    const n = this.safeCols * this.safeRows;
+    return Array.from({ length: n }, (_, i) => i);
   }
 
   get canConfirm(): boolean {
@@ -59,6 +90,10 @@ export class CardSheetImportComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+    if (this.previewUrl) {
+      URL.revokeObjectURL(this.previewUrl);
+      this.previewUrl = '';
+    }
   }
 
   onGridChange() {

@@ -31,6 +31,19 @@
   overflow: hidden;
 }
 
+/* Image: keep art inside the paper box so the billboard bottom stays on the table. */
+.note-face-body:has(> .image-wrap) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.note-face-body:has(> .image-wrap) > .image-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .note-video {
   width: 100%;
   max-height: 100%;
@@ -42,6 +55,7 @@
 .note-image {
   width: 100%;
   height: auto;
+  max-height: 100%;
   display: block;
   object-fit: contain;
   pointer-events: none;
