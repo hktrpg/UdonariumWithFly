@@ -825,7 +825,9 @@ export class HandRailComponent implements OnInit, OnDestroy {
           SoundEffect.play(PresetSound.cardPut);
           return;
         }
-        break;
+        // Hit a stack but refused (locked / missing): keep in hand — do not fall through to table.
+        card.moveToHand(Network.peer.userId);
+        return;
       }
       case 'card': {
         const target = ObjectStore.instance.get(cardId!) as Card;
@@ -833,17 +835,15 @@ export class HandRailComponent implements OnInit, OnDestroy {
           this.mergeHandCardOntoCard(card, target);
           return;
         }
-        break;
+        card.moveToHand(Network.peer.userId);
+        return;
       }
       case 'table':
         this.dropCardOnTable(card, clientX, clientY);
         return;
       default:
         card.moveToHand(Network.peer.userId);
-        return;
     }
-    if (this.isOverTable(clientX, clientY)) this.dropCardOnTable(card, clientX, clientY);
-    else card.moveToHand(Network.peer.userId);
   }
 
   private mergeHandCardOntoCard(dropped: Card, target: Card) {

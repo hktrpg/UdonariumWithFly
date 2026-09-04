@@ -1,3 +1,6 @@
+import { Card } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 
 export const CARD_STACK_HOLD_MS = 550;
@@ -19,15 +22,47 @@ export function setCardMergePreview(targetId: string | null) {
   });
 }
 
-/** Stack under pointer wins; otherwise a free card (skips excluded ids). */
+/** Unlocked table stack — valid merge / put-on-top target. */
+export function isMergeableStackId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const stack = ObjectStore.instance.get(id);
+  return stack instanceof CardStack && !stack.isLocked;
+}
+
+/** Unlocked free table card — valid merge-into-new-stack target. */
+export function isMergeableCardId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const card = ObjectStore.instance.get(id);
+  return card instanceof Card
+    && !card.isLocked
+    && !card.parent
+    && card.location.name === 'table';
+}
+
+/**
+ * Prefer stack over card. A non-mergeable stack under the pointer blocks the card
+ * underneath (no false highlight on either).
+ */
+export function chooseMergePreviewId(
+  stackId: string | null,
+  cardId: string | null,
+): string | null {
+  if (stackId) return isMergeableStackId(stackId) ? stackId : null;
+  if (cardId) return isMergeableCardId(cardId) ? cardId : null;
+  return null;
+}
+
+/** Stack under pointer wins; otherwise a free card (skips excluded ids + locked/invalid). */
 export function findMergeTargetIdAtPoint(
   clientX: number,
   clientY: number,
   excludeStackId?: string,
   excludeCardId?: string,
 ): string | null {
-  return findCardStackIdAtPoint(clientX, clientY, excludeStackId)
-    || findCardIdAtPoint(clientX, clientY, excludeCardId);
+  return chooseMergePreviewId(
+    findCardStackIdAtPoint(clientX, clientY, excludeStackId),
+    findCardIdAtPoint(clientX, clientY, excludeCardId),
+  );
 }
 
 export function isQuickDragMove(dx: number, dy: number): boolean {

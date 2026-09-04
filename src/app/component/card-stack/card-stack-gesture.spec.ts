@@ -1,15 +1,19 @@
 import {
   CARD_STACK_HOLD_MS,
   CARD_STACK_QUICK_DRAG_PX,
-  findMergeTargetIdAtPoint,
+  chooseMergePreviewId,
   HAND_RAIL_DROP_BAND_PX,
   holdProgressAt,
   isInHandDropBand,
+  isMergeableCardId,
+  isMergeableStackId,
   isQuickDragMove,
   resolveQuickDragDrop,
-  setCardMergePreview,
   shouldHoldHaptic,
 } from './card-stack-gesture';
+import { Card } from '@udonarium/card';
+import { CardStack } from '@udonarium/card-stack';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 
 describe('card-stack-gesture', () => {
   it('uses 550ms hold and 8px quick-drag threshold', () => {
@@ -47,10 +51,59 @@ describe('card-stack-gesture', () => {
     expect(resolveQuickDragDrop(false, false, false, false)).toBe('cancel');
   });
 
-  it('prefers stack over card for merge preview hit-test helpers', () => {
-    // findMergeTargetIdAtPoint delegates to DOM hit-tests; ensure exports stay wired.
-    expect(typeof findMergeTargetIdAtPoint).toBe('function');
-    expect(typeof setCardMergePreview).toBe('function');
+  describe('merge preview target selection', () => {
+    let getSpy: jasmine.Spy;
+
+    function stubStack(isLocked: boolean): CardStack {
+      const stack = Object.create(CardStack.prototype) as CardStack;
+      stack.isLocked = isLocked;
+      return stack;
+    }
+
+    function stubCard(opts: { isLocked: boolean; locationName: string; parent?: unknown }): Card {
+      const card = Object.create(Card.prototype) as Card;
+      card.isLocked = opts.isLocked;
+      card.location = { name: opts.locationName } as Card['location'];
+      Object.defineProperty(card, 'parent', {
+        configurable: true,
+        get: () => opts.parent ?? null,
+      });
+      return card;
+    }
+
+    beforeEach(() => {
+      getSpy = spyOn(ObjectStore.instance, 'get');
+    });
+
+    it('prefers an unlocked stack over a card', () => {
+      const stack = stubStack(false);
+      const card = stubCard({ isLocked: false, locationName: 'table' });
+      getSpy.and.callFake((id: string) => (id === 'stack-1' ? stack : id === 'card-1' ? card : null));
+
+      expect(chooseMergePreviewId('stack-1', 'card-1')).toBe('stack-1');
+      expect(isMergeableStackId('stack-1')).toBe(true);
+      expect(isMergeableCardId('card-1')).toBe(true);
+    });
+
+    it('suppresses preview when the stack under the pointer is locked', () => {
+      const stack = stubStack(true);
+      const card = stubCard({ isLocked: false, locationName: 'table' });
+      getSpy.and.callFake((id: string) => (id === 'stack-1' ? stack : id === 'card-1' ? card : null));
+
+      expect(chooseMergePreviewId('stack-1', 'card-1')).toBeNull();
+      expect(isMergeableStackId('stack-1')).toBe(false);
+    });
+
+    it('skips locked or non-table free cards', () => {
+      const locked = stubCard({ isLocked: true, locationName: 'table' });
+      const handCard = stubCard({ isLocked: false, locationName: 'hand' });
+      getSpy.and.callFake((id: string) => (id === 'locked' ? locked : id === 'hand' ? handCard : null));
+
+      expect(chooseMergePreviewId(null, 'locked')).toBeNull();
+      expect(chooseMergePreviewId(null, 'hand')).toBeNull();
+      expect(isMergeableCardId('locked')).toBe(false);
+      expect(isMergeableCardId('hand')).toBe(false);
+    });
   });
 
   it('detects the bottom hand drop band', () => {
