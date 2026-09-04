@@ -3,11 +3,12 @@ import lzbase62 from 'lzbase62';
 
 import { CryptoUtil } from '../util/crypto-util';
 import { MutablePeerSessionState, PeerSessionGrade, PeerSessionState } from './peer-session-state';
+import { ROOM_AUTH_MARKER_V3, roomNameHasMeshLock } from '@udonarium/room-mesh-lock';
 
 const Base62 = base('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ');
 const roomIdPattern = /^(\w{6})(\w{3})(\w*)-(\w*)/i;
 /** packRoomName flags: '2'=V3 display||blob, '0'=base62(utf8), '1'=lzbase62, bare=legacy lz. */
-const V3_MARKER = '\u2060C';
+const V3_MARKER = ROOM_AUTH_MARKER_V3;
 
 export interface IPeerContext {
   readonly peerId: string;
@@ -38,7 +39,15 @@ export class PeerContext implements IPeerContext {
   digestUserId: string = '';
   digestPassword: string = '';
   isOpen: boolean = false;
-  session: MutablePeerSessionState = { grade: PeerSessionGrade.UNSPECIFIED, ping: 0, health: 0, speed: 0, description: '' };
+  session: MutablePeerSessionState = {
+    grade: PeerSessionGrade.UNSPECIFIED,
+    ping: 0,
+    health: 0,
+    speed: 0,
+    bitrateInstantBps: 0,
+    bitrateBps: 0,
+    description: '',
+  };
 
   get isRoom(): boolean { return 0 < this.roomId.length; }
   get hasPassword(): boolean { return 0 < this.password.length + this.digestPassword.length; }
@@ -150,34 +159,6 @@ export class PeerContext implements IPeerContext {
 
     return k;
   }
-}
-
-/** V3 mesh lock: seals after role gates (optional legacy 'M' prefix). */
-function roomNameHasMeshLock(roomName: string): boolean {
-  if (!roomName) return false;
-  const i = roomName.indexOf(V3_MARKER);
-  if (i < 0) return false;
-  if (roomName.indexOf('M', i + 1) >= 0) return true; // legacy
-  const blob = roomName.slice(i + V3_MARKER.length);
-  const digestLen = 2;
-  let pos = 0;
-  let passwordCount = 0;
-  for (let g = 0; g < 3; g++) {
-    if (pos >= blob.length) return false;
-    const f = blob.charAt(pos);
-    if (f === '*' || f === '0') {
-      pos += 1;
-      continue;
-    }
-    if (f === '1') {
-      pos += 1 + digestLen;
-      passwordCount++;
-      continue;
-    }
-    return false;
-  }
-  const leftover = blob.length - pos;
-  return passwordCount > 0 && leftover === passwordCount * 4;
 }
 
 function isV3RoomName(roomName: string): boolean {

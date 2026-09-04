@@ -45,6 +45,8 @@ Behavior checklist for porting onto `hktrpg-main` (latest WithFly). Source of tr
 | Save-room folder flyout | Hover Load room → Change folder / Disconnect folder | `peer-menu.component.*` | Hover load shows flyout; change rebinds; disconnect unbinds |
 | Esc close frontmost | Esc: context menu → modal → clear drafts/selection (priority over panels) → frontmost closable panel | `tabletop-keyboard.service.ts`, `panel.service.ts` `closeFrontmostPanel`, `ModalService.dismissTop` | Box-select tokens with a panel open → Esc clears selection first; Esc again closes the panel |
 | Mobile HUD / tips | Icon-grid nav/sheets + snap sizing; map HUD／toolbox exclusivity; hover tips desktop-only | `app.component`, context-menu, teaching-tip / overview | Mobile: toolbox collapses HUD; no sticky hover tips; sheets snap |
+| Hand library・real decks | Straight-tuck hand rail (hover expand; play face-up/down); stack draw/deal to hands; always draw from cover keeping faces; F turns whole deck; lock blocks move/draw; hover caption name→text; Ctrl／⌘ Object Image Preview (pin, dblclick detail); face-down detail blocked for players | `hand-rail`, `card-stack`, `card-stack.ts`, `object-preview*`, `card-caption*` | Draw/deal into hand; F inverts deck; locked stack cannot quick-draw; face-down card cannot open settings as player |
+| Darkness vs ambient | Map darkness SyncVar separate from ambient; day/night presets; night rim sealed | `game-table`, table lighting | Night map no bright rim; ambient slider independent of darkness |
 
 ## Port decisions
 

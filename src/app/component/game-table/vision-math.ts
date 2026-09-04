@@ -14,6 +14,12 @@ export interface VisionLightActor {
   dimLightGrid: number;
 }
 
+/** Optional precomputed walls (same tick) so FoW skips rebuilding footprints per token. */
+export type VisionWallSets = {
+  vision: WallPolyline[];
+  light: WallPolyline[];
+};
+
 /** Foundry-style: GI on unless darkness meets/exceeds optional threshold. */
 export function isGlobalIlluminationActive(table: GameTable): boolean {
   if (!table?.globalIlluminationEnabled) return false;
@@ -63,12 +69,14 @@ function charCenter(ch: VisionLightActor, grid: number): { x: number; y: number 
   };
 }
 
-function visionAndLightWalls(
+export function visionAndLightWalls(
   table: GameTable,
   masks?: GameTableMask[],
   terrains?: Terrain[],
-): { vision: WallPolyline[]; light: WallPolyline[] } {
-  const fp = collectFootprintWalls(table, masks || table?.masks || [], terrains || table?.terrains || []);
+  footprintWalls?: WallPolyline[],
+): VisionWallSets {
+  const fp = footprintWalls
+    ?? collectFootprintWalls(table, masks || table?.masks || [], terrains || table?.terrains || []);
   return {
     vision: [...(table.walls || []).filter(w => w.blocksVision), ...fp],
     light: [...(table.walls || []).filter(w => w.blocksLight), ...fp],
@@ -84,12 +92,14 @@ export function isPointRevealedToViewer(
   lightCharacters: VisionLightActor[],
   masks?: GameTableMask[],
   terrains?: Terrain[],
+  wallSets?: VisionWallSets,
 ): boolean {
   if (!table?.visionEnabled) return true;
   if (!visionCharacters?.length) return false;
 
   const grid = table.gridSize || 50;
-  const { vision: wallsVision, light: wallsLight } = visionAndLightWalls(table, masks, terrains);
+  const { vision: wallsVision, light: wallsLight } =
+    wallSets || visionAndLightWalls(table, masks, terrains);
   const gi = isGlobalIlluminationActive(table);
   const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
 
@@ -134,10 +144,13 @@ export function isCharacterRevealedToViewer(
   viewerUserId: string,
   masks?: GameTableMask[],
   terrains?: Terrain[],
+  wallSets?: VisionWallSets,
 ): boolean {
   if (!table?.visionEnabled) return true;
   if (target.providesVisionTo?.(viewerUserId)) return true;
   const grid = table.gridSize || 50;
   const c = charCenter(target, grid);
-  return isPointRevealedToViewer(c.x, c.y, table, visionCharacters, lightCharacters, masks, terrains);
+  return isPointRevealedToViewer(
+    c.x, c.y, table, visionCharacters, lightCharacters, masks, terrains, wallSets,
+  );
 }

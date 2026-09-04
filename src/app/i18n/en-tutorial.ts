@@ -23,9 +23,9 @@ Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
 <Objects> Left-drag = move
 　　　　Drag rotate handle = turn
 　　　　Right-click = menu
-　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…)
+　　　　Double-click = details (character / card / deck / dice / terrain / note / mask / range…; face-down cards blocked for players)
 　　　　Character “Next image” = right-click “Switch to next image”
-　　　　Flip cards / draw / roll dice = right-click menu
+　　　　Cards／decks: right-click draw to hand・deal; F = flip card / turn over deck; dice = right-click or F
 <Path move> After selecting a token: Ctrl+left-click = add waypoint (release Ctrl — path stays)
 　　　　Left-click new position = final stop and go
 　　　　Space = go with current waypoints
@@ -36,9 +36,9 @@ Full guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學`,
 　　　　Left-drag empty = box select
 　　　　Shift+drag = additive box
 　　　　Click empty / Esc = clear
-<Hover preview> Pause on an object = preview card
-　　　　Pin (top-left) = keep open (closes on delete/trash)
-　　　　Unpinned leave = fade out ~0.5s
+<Preview> Characters etc. = hover overview (pin; fades ~0.5s after leave)
+　　　　Cards／decks = hover name→text
+　　　　Ctrl／⌘+hover = Object Image Preview (zoom／pin; double-click opens detail)
 Drag images or music into the browser to import.`,
   'tutorial.keyboard': `<Keyboard (with selection)> WASD / arrows = move (diagonals OK)
 　　　　Shift+WASD = face direction
@@ -46,7 +46,7 @@ Drag images or music into the browser to import.`,
 　　　　Shift+Q/E = ±15°
 　　　　R = reset all angles (facing / tilt) to 0°
 　　　　PageUp/PageDown = altitude ±1 (Shift = ±0.5)
-　　　　F = flip card/coin or roll dice
+　　　　F = flip card / turn over deck / coin or roll dice
 　　　　L = lock/unlock
 　　　　H = hide/reveal selected characters (GM only)
 　　　　T = gather selected objects to mouse position
@@ -102,6 +102,8 @@ Drag images or music into the browser to import.`,
 　　　　Status icons = stay on the nameplate (incl. Dead); Dead syncs both ways with combat Defeated
 　　　　Image effects = right-click grayscale / sepia / Matrix rain / silhouette / flip / contrast…
 　　　　Base rings = right-click “Ring”
+<Terrain・3D> Drop STL／OBJ／glTF／FBX or ZIP = bake six-face textured terrain; L-shapes can Shift-multi-select into a bake group
+　　　　Slope degrees, per-face textures, neon signs; settings can lock aspect ratio
 <Map masks> Alt+double-click = configured actions (multi-select): chat/dice, music, cut-in, note handout, switch map, apply preset, appearance A/B, token FX
 　　　　Token FX can auto-apply while standing (restore on leave); manual apply is not undone by leaving
 <Scene tools> GM only (menu); select / light / wall / rect / ellipse / polygon / freehand / text
@@ -206,6 +208,47 @@ Upgraded to 1.13.2`,
 ・Removed redundant Create copy (use Ctrl+C/V; characters still have Advanced copy for temp Token / numbering)
 ・Paste as temporary Token and Ctrl+Shift+V only when clipboard has a character/Token (no longer shown for dice etc.)
 ・Object panels use Import / Export (ZIP); characters also Download as JSON (CCFOLIA; copies to system clipboard)`,
+  'changelog.2026terrain': `2026/08/17 Terrain・3D models
+・Drop STL／OBJ／glTF／FBX (or a ZIP with models) = bake into six-face textured terrain
+・L-shapes etc. become bake groups: Shift multi-select to form/clear; move・scale・export as a group
+・Terrain slopes, per-face textures, neon sign glow; corner scale and aspect lock
+・Small-token name tags stay on one line; ZIP load restores image tags and spoiler-hide`,
+  'changelog.2026net': `2026/08/20–21 Connection・invites
+・Keep the local tabletop until a live peer + map data arrives
+・Hide unreachable ghost rooms from the list (do not kick players already in a room back to lobby)
+・Network timeout／connect errors do not hide the room (retry from lobby); join also meshes current SkyWay members
+・Join timeout starts at OPEN_NETWORK; soft connect fails remesh-retry (fewer first-join misses)
+・Room open no longer blocks on lobby Find; boot warms SkyWay／backend so Your ID appears sooner
+・Auto remesh after disconnect; token／backend errors prefer reopening the room — no silent mid-game lobby drop
+・Invite links: freeze UI for valid or corrupt tokens; damaged links show “invalid or damaged”
+・Second-tab joins less often show blank TOKEN／images (settle + delayed remount)`,
+  'changelog.2026mesh2': `2026/08/22–23 Connection・mesh・PWA
+・Fewer mesh reconnect storms on weak LTE; mid-session drops keep remeshing
+・Lobby join failures keep the room online for retry; Connecting／Offline states are clearer
+・Fatal disconnects schedule auto reopen; quieter SkyWay signaling; republish after publication races
+・Room password rekey no longer duplicates SkyWay members; relay／subscribe survive weak networks better
+・PWA: ngsw hashes aligned with HKTRPG build; update icon even when SW install fails; peer menu no longer scroll-jumps`,
+  'changelog.2026filesnote': `2026/08/22–23 File sync・note inventory
+・Connection panel **FILES** progress stays 0→100% until assets are complete (no idle flicker)
+・Transfer scheduler: concurrent kinds; **images first**, then **currently playing BGM**, then by size within tier
+・With folder backup bound, **media/** hydrate runs in parallel with peer downloads; timed-out slots auto-release
+・Note inventory matches character warehouse: five tabs (table／shared／personal／other maps／graveyard), drag to map／tabs
+・Click selected note again to collapse; delete goes to graveyard; PDF etc. draggable to tabs
+・Clue links (red strings) update live while dragging linked objects; default scenario text no longer duplicates`,
+  'changelog.2026sepStability': `2026/08/24–31 Stability・connection・lighting・chat
+・Map **darkness** separated from **ambient**; day/night presets and night map rim sealing improved
+・Join probe／weak ICE: slow links less likely false-timeout; mesh diag includes room media usage
+・PDF: worker loaded via blob (bad MIME workaround); stop render-retry storms freezing Chrome
+・Role passwords kept on identity switch; clearer lobby join UI
+・Join／reopen: do not clear existing chat tabs; refuse peer re-create of lobby MainTab／SubTab; lobby-sample DELETE no longer pushback`,
+  'changelog.2026handcard': `2026/09/01 Hand library・decks・object preview
+・Bottom **hand rail**: straight tuck (top peek), expand on hover; drag to reorder／play; play face-up or face-down
+・Deck menu: **Draw 1／Draw N** into your hand; **Deal** N each (round-robin)
+・**Real deck**: always draw／place from the cover; keep each card’s face; **F** turns the whole deck over (reverse + flip all); shuffle does not force faces
+・New poker／dropped decks start face-down; **Lock** blocks moving the stack／card and blocks draw／deal
+・Hover **Card Caption**: name first, text after ~0.5s (beside the painted card); face-down cards don’t open detail for players (no spoilers)
+・**Object Image Preview**: Ctrl／⌘＋hover for zoom／pin (multi-pin); double-click preview opens the detail sheet
+・Desktop panels open near viewport center; context menus stay cursor-anchored`,
   'changelog.links': `Site: https://z01.hktrpg.com
 Guide: https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學
 Discord: https://support.hktrpg.com

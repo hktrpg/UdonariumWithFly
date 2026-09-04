@@ -15,6 +15,7 @@ export const zhCN: I18nDictionary = {
   'menu.music': '播放音乐',
   'menu.toolbox': '工具箱',
   'menu.combat': '战斗轮',
+  'menu.timer': '计时器',
   'menu.sceneTools': '场景工具',
   'menu.scenePreset': '预设场面',
   'menu.scenarioText': '剧本文字',

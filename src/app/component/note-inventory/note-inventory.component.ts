@@ -2,22 +2,22 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostListener, On
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
 import { NOTE_FILE_ACCEPT } from '@udonarium/note-file-kind';
 
-import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.component';
+import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
 import { I18nService } from 'service/i18n.service';
+import { ModalService } from 'service/modal.service';
 import { NoteImportService } from 'service/note-import.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
-
-type NoteFilterId = 'all' | 'table' | 'other';
 
 @Component({
   selector: 'note-inventory',
@@ -27,17 +27,22 @@ type NoteFilterId = 'all' | 'table' | 'other';
   standalone: false
 })
 export class NoteInventoryComponent implements OnInit, OnDestroy {
-  selectFilter: NoteFilterId = 'all';
+  inventoryTypes: string[] = ['all', 'table', 'common', Network.peerId, 'graveyard'];
+  private _selectTab = 'all';
+  get selectTab(): string { return this._selectTab; }
+  set selectTab(selectTab: string) {
+    this._selectTab = selectTab;
+    this.selectedIdentifier = '';
+    this.expandedId = '';
+  }
+
   selectedIdentifier: string = '';
   expandedId: string = '';
   isDragOver = false;
-  get isGM(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+  dropTargetTab = '';
+  private noteDragBlocked = false;
 
-  readonly filters: { id: NoteFilterId, label: string }[] = [
-    { id: 'all', label: '' },
-    { id: 'table', label: '' },
-    { id: 'other', label: '' },
-  ];
+  get isGM(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
 
   private textNoteCache = new TabletopCache<TextNote>(() => ObjectStore.instance.getObjects(TextNote));
   get textNotes(): TextNote[] { return this.textNoteCache.objects; }
@@ -52,6 +57,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService,
     private noteImport: NoteImportService,
+    private modalService: ModalService,
     private i18n: I18nService,
   ) { }
 
@@ -60,11 +66,11 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    Promise.resolve().then(() => this.refreshLabels());
+    Promise.resolve().then(() => this.refreshPanelTitle());
     EventSystem.register(this)
-      .on('SELECT_TABLETOP_OBJECT', -1000, event => {
-        let object = ObjectStore.instance.get(event.data.identifier);
-        if ((object instanceof TabletopObject) || (object instanceof PeerCursor) || object instanceof ObjectNode) {
+      .on('SELECT_TABLETOP_OBJECT', event => {
+        const object = ObjectStore.instance.get(event.data.identifier);
+        if (object instanceof TextNote) {
           this.selectedIdentifier = event.data.identifier;
           this.changeDetector.markForCheck();
         }
@@ -73,8 +79,15 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
       .on('UPDATE_INVENTORY', () => this.refresh())
       .on('UPDATE_GAME_OBJECT', () => this.refresh())
       .on('DISCONNECT_PEER', () => this.changeDetector.markForCheck())
+      .on('OPEN_NETWORK', () => {
+        this.inventoryTypes = ['all', 'table', 'common', Network.peerId, 'graveyard'];
+        if (!this.inventoryTypes.includes(this.selectTab)) {
+          this.selectTab = 'all';
+        }
+        this.changeDetector.markForCheck();
+      })
       .on('LOCALE_CHANGED', () => {
-        this.refreshLabels();
+        this.refreshPanelTitle();
         this.changeDetector.markForCheck();
       });
   }
@@ -93,34 +106,51 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     this.changeDetector.markForCheck();
   }
 
+  getTabTitle(inventoryType: string): string {
+    switch (inventoryType) {
+      case 'all':
+        return this.i18n.t('inv.tab.all');
+      case 'table':
+        return this.i18n.t('inv.tab.table');
+      case Network.peerId:
+        return this.i18n.t('inv.tab.personal');
+      case 'graveyard':
+        return this.i18n.t('inv.tab.graveyard');
+      default:
+        return this.i18n.t('inv.tab.common');
+    }
+  }
+
   /** Hide other players' self-only notes (owner + GM can see — same as tokens). */
   private visibleNotes(notes: TextNote[]): TextNote[] {
     const gm = this.isGM;
     return (notes || []).filter(n => n?.canSeeSelfOnly || gm);
   }
 
-  filteredNotes(): TextNote[] {
+  getNotes(inventoryType: string): TextNote[] {
     const notes = this.visibleNotes(this.textNotes);
-    switch (this.selectFilter) {
+    switch (inventoryType) {
       case 'table':
         return notes.filter(n => n.location?.name === 'table');
-      case 'other':
-        return notes.filter(n => n.location?.name !== 'table');
+      case Network.peerId:
+        return notes.filter(n => n.location?.name === Network.peerId);
+      case 'graveyard':
+        return notes.filter(n => n.location?.name === 'graveyard');
+      case 'common':
+        return notes.filter(n => n.location?.name === 'common');
       default:
         return notes;
     }
   }
 
-  countByFilter(filterId: NoteFilterId): number {
-    const notes = this.visibleNotes(this.textNotes);
-    switch (filterId) {
-      case 'table':
-        return notes.filter(n => n.location?.name === 'table').length;
-      case 'other':
-        return notes.filter(n => n.location?.name !== 'table').length;
-      default:
-        return notes.length;
-    }
+  getLocationLabel(note: TextNote): string {
+    if (note.isVisibleOnTable) return this.i18n.t('note.location.table');
+    const loc = note.location?.name || '';
+    if (loc === 'graveyard') return this.i18n.t('note.location.graveyard');
+    if (loc === 'common') return this.i18n.t('note.location.common');
+    if (loc === Network.peerId) return this.i18n.t('note.location.personal');
+    if (loc === 'table') return this.i18n.t('note.location.otherMap');
+    return loc || '-';
   }
 
   settotable(gameObject: TextNote) {
@@ -142,12 +172,57 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
   }
 
   selectNote(note: TextNote) {
+    if (this.selectedIdentifier === note.identifier) {
+      this.selectedIdentifier = '';
+      if (this.expandedId === note.identifier) {
+        this.expandedId = '';
+      }
+      this.changeDetector.markForCheck();
+      return;
+    }
+    this.ensureNoteSelected(note);
+  }
+
+  private ensureNoteSelected(note: TextNote) {
     this.selectedIdentifier = note.identifier;
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: note.identifier, className: note.aliasName });
+    this.changeDetector.markForCheck();
+  }
+
+  focusNote(note: TextNote, e: Event) {
+    if (!(e.target instanceof HTMLElement)) return;
+    if (new Set(['input', 'button']).has(e.target.tagName.toLowerCase())) return;
+    if (!note.isVisibleOnTable) return;
+    EventSystem.trigger('FOCUS_TABLETOP_OBJECT', {
+      x: note.location.x + note.width * 50 / 2,
+      y: note.location.y + note.height * 50 / 2,
+      z: note.posZ + (note.altitude > 0 ? note.altitude * 50 : 0),
+    });
   }
 
   toggleExpand(note: TextNote) {
     this.expandedId = this.expandedId === note.identifier ? '' : note.identifier;
+    this.changeDetector.markForCheck();
+  }
+
+  cleanGraveyard() {
+    if (this.GuestMode()) return;
+    const tabTitle = this.getTabTitle(this.selectTab);
+    const notes = this.getNotes(this.selectTab);
+    this.modalService.open(ConfirmationComponent, {
+      title: this.i18n.t('note.emptyGraveyardTitle'),
+      text: this.i18n.t('note.emptyGraveyardText'),
+      helpHtml: this.i18n.t('note.emptyGraveyardHelp', { tab: StringUtil.escapeHtml(tabTitle), count: notes.length }),
+      type: ConfirmationType.OK_CANCEL,
+      materialIcon: 'delete_forever',
+      action: () => {
+        for (const note of notes) {
+          note.destroy();
+        }
+        SoundEffect.play(PresetSound.sweep);
+        this.refresh();
+      }
+    });
   }
 
   onContextMenu(event: Event, gameObject: TextNote) {
@@ -158,7 +233,7 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
 
-    this.selectNote(gameObject);
+    this.ensureNoteSelected(gameObject);
 
     const target = event.target as HTMLElement;
     let position;
@@ -176,6 +251,11 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     const onCurrentMap = gameObject.isVisibleOnTable;
     const onOtherMap = this.isOnOtherTable(gameObject);
     const actions: ContextMenuAction[] = [
+      onCurrentMap ? {
+        name: this.i18n.t('char.findOnTable'),
+        action: () => this.focusNote(gameObject, event),
+        default: true,
+      } : null,
       {
         name: this.i18n.t(onOtherMap ? 'inv.placeOnCurrentMap' : 'note.moveToTable'),
         action: () => {
@@ -219,7 +299,12 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
       {
         name: this.i18n.t('note.moveToGraveyard'),
         action: () => {
-          gameObject.setLocation('graveyard');
+          if (gameObject.location?.name === 'table') {
+            gameObject.leaveCurrentTable('graveyard');
+          } else {
+            gameObject.setLocation('graveyard');
+          }
+          SoundEffect.play(PresetSound.sweep);
           this.refresh();
         },
         disabled: location === 'graveyard'
@@ -245,15 +330,26 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
         }
       },
       ContextMenuSeparator,
-      {
-        name: this.i18n.t('note.delete'),
+      location === 'graveyard' ? {
+        name: this.i18n.t('char.deleteForever'),
         action: () => {
           gameObject.destroy();
           SoundEffect.play(PresetSound.sweep);
           this.refresh();
         }
+      } : {
+        name: this.i18n.t('char.deleteToGraveyard'),
+        action: () => {
+          if (gameObject.location?.name === 'table') {
+            gameObject.leaveCurrentTable('graveyard');
+          } else {
+            gameObject.setLocation('graveyard');
+          }
+          SoundEffect.play(PresetSound.sweep);
+          this.refresh();
+        }
       },
-    ];
+    ].filter((a): a is ContextMenuAction => !!a);
 
     this.contextMenuService.open(position, actions, this.showgameObject(gameObject));
   }
@@ -278,6 +374,121 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     if (!files?.length) return;
     await this.noteImport.importFiles(files, { addToTable: true });
     this.refresh();
+  }
+
+  onNoteDragGestureStart(e: Event) {
+    this.noteDragBlocked = this.isNoteUiControl(e.target);
+    if (this.noteDragBlocked && e.type === 'dragstart') {
+      e.preventDefault();
+    }
+  }
+
+  onNoteDragStart(e: DragEvent, note: TextNote) {
+    if (this.GuestMode() || this.noteDragBlocked) return;
+    e.stopPropagation();
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    const payload = note.identifier;
+    e.dataTransfer.setData(TextNote.INVENTORY_DRAG_MIME, payload);
+    e.dataTransfer.setData('text/plain', `udonarium-note:${payload}`);
+  }
+
+  onNoteDragEnd() {
+    this.noteDragBlocked = false;
+    this.dropTargetTab = '';
+    this.changeDetector.markForCheck();
+  }
+
+  onTabDragOver(e: DragEvent, inventoryType: string) {
+    if (inventoryType === 'all') return;
+    if (!this.readNoteDragIds(e).length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (this.dropTargetTab !== inventoryType) {
+      this.dropTargetTab = inventoryType;
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  onTabDragLeave(e: DragEvent, inventoryType: string) {
+    const related = e.relatedTarget as Node | null;
+    const current = e.currentTarget as Node | null;
+    if (related && current && current.contains(related)) return;
+    if (this.dropTargetTab === inventoryType) {
+      this.dropTargetTab = '';
+      this.changeDetector.markForCheck();
+    }
+  }
+
+  onTabDrop(e: DragEvent, inventoryType: string) {
+    const ids = this.readNoteDragIds(e);
+    this.dropTargetTab = '';
+    if (!ids.length || ids[0] === '__pending__') return;
+    if (inventoryType === 'all') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (this.GuestMode()) return;
+    let moved = 0;
+    for (const id of ids) {
+      const note = ObjectStore.instance.get(id);
+      if (!(note instanceof TextNote)) continue;
+      if (note.location?.name === inventoryType) {
+        if (inventoryType === 'table' && this.isOnOtherTable(note)) {
+          // fall through — place on current map
+        } else {
+          continue;
+        }
+      }
+      this.moveNoteToLocation(note, inventoryType);
+      moved++;
+    }
+    if (moved > 0 && this.selectTab !== inventoryType) {
+      this.selectTab = inventoryType;
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  private moveNoteToLocation(note: TextNote, location: string) {
+    if (location === 'table') {
+      if (note.location?.name === 'table' && !note.isVisibleOnTable) {
+        note.moveToTableOnly();
+      } else if (!note.isVisibleOnTable) {
+        note.addToTable();
+      }
+    } else if (location === 'graveyard') {
+      if (note.location?.name === 'table') {
+        note.leaveCurrentTable('graveyard');
+      } else {
+        note.setLocation('graveyard');
+      }
+    } else {
+      note.setLocation(location);
+    }
+    SoundEffect.play(location === 'graveyard' ? PresetSound.sweep : PresetSound.piecePut);
+    EventSystem.call('UPDATE_INVENTORY', true);
+    this.refresh();
+  }
+
+  private readNoteDragIds(e: DragEvent): string[] {
+    if (!e.dataTransfer) return [];
+    const typed = e.dataTransfer.getData(TextNote.INVENTORY_DRAG_MIME);
+    if (typed) return [typed];
+    if (e.type === 'dragover') {
+      const types = Array.from(e.dataTransfer.types || []);
+      if (types.includes(TextNote.INVENTORY_DRAG_MIME) || types.includes('text/plain')) {
+        return ['__pending__'];
+      }
+      return [];
+    }
+    const plain = e.dataTransfer.getData('text/plain') || '';
+    const m = /^udonarium-note:(.+)$/.exec(plain);
+    return m?.[1] ? [m[1]] : [];
+  }
+
+  private isNoteUiControl(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest('input, button, select, textarea, a, label, note-settings');
   }
 
   pickImport() {
@@ -335,11 +546,8 @@ export class NoteInventoryComponent implements OnInit, OnDestroy {
     return gameObject ? gameObject.identifier : index;
   }
 
-  private refreshLabels() {
+  private refreshPanelTitle() {
     this.panelService.title = this.i18n.t('note.title');
-    this.filters[0].label = this.i18n.t('note.filter.all');
-    this.filters[1].label = this.i18n.t('note.filter.table');
-    this.filters[2].label = this.i18n.t('note.filter.other');
   }
 }
 

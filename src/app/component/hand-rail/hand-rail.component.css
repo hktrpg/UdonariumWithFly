@@ -1,0 +1,664 @@
+:host {
+  pointer-events: none;
+  overflow: visible;
+}
+
+.hand-rail-root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.hand-rail-root.is-mobile {
+  z-index: 12600;
+}
+
+.hand-rail-drop-band {
+  /* Stay on the canvas bottom edge — never stacked above the hand rail. */
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+  width: min(98vw, 960px);
+  height: 168px;
+  margin: 0;
+  border: 2px dashed rgba(125, 211, 252, 0.55);
+  border-radius: 16px 16px 0 0;
+  background: rgba(12, 18, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(226, 242, 255, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: inset 0 0 40px rgba(80, 170, 255, 0.12);
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.hand-rail-drop-band.is-hover {
+  border-color: rgba(125, 211, 252, 0.95);
+  background: rgba(20, 40, 64, 0.72);
+  box-shadow: 0 0 0 2px rgba(80, 170, 255, 0.35), inset 0 0 48px rgba(80, 170, 255, 0.2);
+}
+
+.hand-rail-drop-band-label {
+  pointer-events: none;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.hand-rail {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  /* Always full rail width — do not shrink with card count. */
+  width: min(98vw, 960px);
+  max-width: min(98vw, 960px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible;
+}
+
+.hand-rail-hover-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.hand-play-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.hand-play-face:hover {
+  background: rgba(0, 0, 0, 0.42);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+.hand-play-face-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.hand-play-face-track {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex: 0 0 auto;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.hand-play-face-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f4f7fb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.hand-play-face-input:checked + .hand-play-face-track {
+  background: rgba(56, 189, 248, 0.45);
+  border-color: rgba(125, 211, 252, 0.7);
+}
+
+.hand-play-face-input:checked + .hand-play-face-track .hand-play-face-thumb {
+  transform: translateX(16px);
+  background: #e0f2fe;
+}
+
+.hand-play-face-input:focus-visible + .hand-play-face-track {
+  outline: 2px solid rgba(125, 211, 252, 0.85);
+  outline-offset: 2px;
+}
+
+.hand-play-face-label {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hand-gm-peek {
+  margin-left: 0;
+}
+
+.hand-rail-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 10px 10px 0 0;
+  /* Light chrome only — card HUD itself stays fully transparent. */
+  background: rgba(20, 20, 24, 0.45);
+  color: #f2f2f2;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: opacity 160ms ease, border-color 160ms ease;
+  max-height: 56px;
+  overflow: visible;
+}
+
+.hand-rail-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.hand-rail-count {
+  min-width: 1.5em;
+  text-align: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hand-gm-peek select {
+  max-width: 9rem;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  /* No native chevron (V). */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 2px 8px;
+  background-image: none;
+}
+
+.hand-gm-peek select::-ms-expand {
+  display: none;
+}
+
+.hand-viewing {
+  opacity: 0.75;
+  font-size: 11px;
+}
+
+.hand-orphan-import {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.hand-orphan-import-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 80, 10, 0.45);
+  color: rgba(255, 243, 210, 0.95);
+  cursor: pointer;
+}
+
+.hand-orphan-import-btn .material-icons {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hand-orphan-import.is-open .hand-orphan-import-btn,
+.hand-orphan-import-btn:hover {
+  border-color: rgba(251, 191, 36, 0.9);
+  background: rgba(160, 100, 12, 0.6);
+}
+
+.hand-orphan-import-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff8eb;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+.hand-orphan-import-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  width: min(72vw, 280px);
+  max-height: min(40vh, 240px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 22, 30, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.hand-orphan-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hand-orphan-import-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hand-orphan-import-close .material-icons {
+  font-size: 16px;
+}
+
+.hand-orphan-import-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+}
+
+.hand-orphan-import-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.hand-orphan-import-row + .hand-orphan-import-row {
+  margin-top: 4px;
+}
+
+.hand-orphan-import-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hand-orphan-import-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.hand-orphan-import-name {
+  font-weight: 700;
+}
+
+.hand-orphan-import-id {
+  opacity: 0.65;
+  font-weight: 500;
+}
+
+.hand-orphan-import-count {
+  width: 100%;
+  opacity: 0.8;
+  font-size: 11px;
+}
+
+.hand-orphan-import-confirm {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  background: rgba(30, 80, 120, 0.55);
+  color: #e8f6ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hand-orphan-import-confirm:hover {
+  border-color: rgba(125, 211, 252, 0.95);
+  background: rgba(40, 110, 160, 0.7);
+}
+
+.hand-empty {
+  margin: 0;
+  padding: 10px 12px 14px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(226, 242, 255, 0.72);
+  pointer-events: none;
+}
+
+.hand-rail:not(.has-cards) {
+  min-height: 48px;
+}
+
+.hand-rail-drop-zone {
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  /* Card HUD always fully transparent — no panel behind cards. */
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* Stealth chrome: title bar only; card area stays transparent always. */
+@media (hover: hover) and (pointer: fine) {
+  /* Title bar floats above cards so reveal never shifts the row. */
+  .hand-rail:not(.is-chrome-forced) .hand-rail-chrome {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    z-index: 2;
+    width: auto;
+  }
+
+  .hand-rail:not(:hover):not(.is-chrome-forced) .hand-rail-chrome {
+    opacity: 0;
+    pointer-events: none;
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .hand-rail:not(:hover):not(.is-chrome-forced) .hand-peek-hint {
+    opacity: 0;
+  }
+
+  .hand-rail.is-collapsed:not(:hover):not(.is-chrome-forced) {
+    min-height: 28px;
+  }
+
+  .hand-rail:not(.has-cards):not(:hover):not(.is-chrome-forced) {
+    min-height: 48px;
+  }
+
+  .hand-rail:not(:hover):not(.is-chrome-forced) .hand-empty {
+    opacity: 0;
+  }
+}
+
+.hand-rail-scroll,
+.hand-row,
+.hand-card-slot,
+.hand-card-slot card-list-image {
+  opacity: 1;
+  visibility: visible;
+}
+
+.hand-rail.is-drop-target .hand-rail-drop-zone,
+.hand-rail-drop-zone.is-drop-target {
+  /* Keep HUD transparent; only a light outline while dropping. */
+  outline: 2px solid rgba(125, 211, 252, 0.75);
+  outline-offset: 2px;
+}
+
+.hand-rail-chrome.is-drop-target {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 1px;
+}
+
+.hand-rail-scroll {
+  width: 100%;
+  max-width: min(98vw, 960px);
+  overflow-x: auto;
+  /* Clip tall card layout so hover only covers the peek (card tops). */
+  overflow-y: hidden;
+  max-height: 40px;
+  /* Reserve scrollbar gutter so hover never shifts cards sideways. */
+  padding: 4px 0 0;
+  box-sizing: border-box;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  transition: max-height 140ms ease;
+}
+
+.hand-rail:hover .hand-rail-scroll,
+.hand-rail.is-chrome-forced .hand-rail-scroll {
+  max-height: 170px;
+  overflow-y: visible;
+}
+
+.hand-rail-scroll.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.hand-rail-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.hand-rail-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.hand-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  width: max-content;
+  min-width: 100%;
+  /* Visible peek = top ~20% of 150px card ≈ 30px (+ padding). */
+  height: 36px;
+  min-height: 36px;
+  padding: 6px 0 0;
+  box-sizing: border-box;
+  gap: 0;
+  font-size: 0; /* kill inline whitespace gaps */
+  overflow: visible;
+  transition: height 140ms ease, min-height 140ms ease;
+}
+
+.hand-rail:hover .hand-row,
+.hand-rail.is-chrome-forced .hand-row {
+  height: 156px;
+  min-height: 156px;
+}
+
+.hand-card-slot {
+  position: relative;
+  width: 108px;
+  height: 150px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 108px;
+  transform-origin: bottom center;
+  /* Tuck: only top ~20% peeks — vertical only. */
+  transform: translate3d(0, 80%, 0);
+  transition: transform 140ms ease;
+  cursor: grab;
+  overflow: hidden;
+  border-radius: 0;
+  filter: none;
+  box-shadow: none;
+  will-change: transform;
+  --hand-card-w: 108px;
+  --hand-card-h: 150px;
+}
+
+/* Hovering the hand rail raises every card together. */
+.hand-rail:hover .hand-card-slot,
+.hand-rail.is-chrome-forced .hand-card-slot {
+  transform: translate3d(0, 0, 0);
+  overflow: visible; /* captions above when raised */
+}
+
+.hand-card-slot:active {
+  cursor: grabbing;
+}
+
+.hand-card-slot.is-reorder-target {
+  outline: 2px solid rgba(125, 211, 252, 0.9);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.hand-rail.is-read-only .hand-card-slot {
+  cursor: default;
+  pointer-events: none;
+}
+
+.hand-card-caption {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 96px;
+  max-width: min(240px, 70vw);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(12, 16, 24, 0.92);
+  color: #f2f2f2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  text-align: center;
+}
+
+.hand-card-caption-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hand-card-caption-text {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.92;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hand-peek-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  opacity: 0.75;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.hand-card-slot card-list-image {
+  display: block;
+  width: 108px;
+  height: 150px;
+  filter: none;
+  box-shadow: none;
+  line-height: 0;
+}
+
+/* Fill the slot edge-to-edge — object-fit:contain leaves side gaps on many card assets. */
+:host ::ng-deep .hand-card-slot .image-box,
+:host ::ng-deep .hand-card-slot .image,
+:host ::ng-deep .hand-card-slot img {
+  display: block !important;
+  width: 108px !important;
+  height: 150px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+:host ::ng-deep .hand-card-slot img {
+  object-fit: fill !important;
+  left: 0 !important;
+  top: 0 !important;
+}
+
+.hand-rail.is-collapsed:not(.has-cards) .hand-rail-drop-zone {
+  display: none;
+}
+
+:host ::ng-deep .hand-rail-drag-ghost,
+.hand-rail-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 108px;
+  height: 150px;
+  z-index: 100000;
+  pointer-events: none;
+  filter: none;
+  box-shadow: none;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.hand-rail-drag-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.hand-rail-drag-ghost.is-locked-quick-drag {
+  outline: 2px dashed rgba(251, 191, 36, 0.95);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

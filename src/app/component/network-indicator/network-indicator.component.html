@@ -1,4 +1,4 @@
-<div class="sk-cube-grid">
+<div class="sk-cube-grid" *ngIf="!fileSyncMode">
   <div class="sk-cube sk-cube1"></div>
   <div class="sk-cube sk-cube2"></div>
   <div class="sk-cube sk-cube3"></div>
@@ -9,4 +9,19 @@
   <div class="sk-cube sk-cube8"></div>
   <div class="sk-cube sk-cube9"></div>
   <div class="sk-title">{{ 'net.syncing' | i18n }}</div>
+</div>
+
+<div class="sk-file-sync" *ngIf="fileSyncMode">
+  <div class="sk-file-head">
+    <span class="sk-file-label">{{ 'net.syncing' | i18n }}</span>
+    <span class="sk-file-kind">{{ 'net.syncingFiles' | i18n }}</span>
+    <span class="sk-file-pct">{{ percentLoaded }}%</span>
+  </div>
+  <div class="sk-file-bar" role="progressbar" [attr.aria-valuenow]="percentLoaded" aria-valuemin="0" aria-valuemax="100">
+    <span
+      class="sk-file-seg"
+      *ngFor="let filled of filledSegments; let i = index"
+      [class.filled]="filled"
+    >|</span>
+  </div>
 </div>

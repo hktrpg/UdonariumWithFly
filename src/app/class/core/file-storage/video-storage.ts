@@ -1,8 +1,16 @@
 import { EventSystem } from '../system';
-import { ResettableTimeout } from '../system/util/resettable-timeout';
+import {
+  addPackedByContentHash,
+  buildCompleteBlobCatalog,
+  deleteMediaFromHash,
+  getOrHydrateUrlBacked,
+  insertOrUpdateMediaFile,
+  LazyCatalogSynchronizer,
+  MediaCatalogItem,
+} from './media-storage-helpers';
 import { VideoFile, VideoFileContext, VideoState } from './video-file';
 
-export type VideoCatalogItem = { readonly identifier: string, readonly state: number };
+export type VideoCatalogItem = MediaCatalogItem;
 
 export class VideoStorage {
   private static _instance: VideoStorage;
@@ -11,7 +19,9 @@ export class VideoStorage {
     return VideoStorage._instance;
   }
 
-  private lazyTimer: ResettableTimeout;
+  private readonly catalogSync = new LazyCatalogSynchronizer(peer => {
+    EventSystem.call('SYNCHRONIZE_VIDEO_LIST', this.getCatalog(), peer);
+  });
   private hash: { [identifier: string]: VideoFile } = {};
 
   get videos(): VideoFile[] {
@@ -26,6 +36,17 @@ export class VideoStorage {
   async addAsync(arg: any, displayName?: string): Promise<VideoFile> {
     const video = await VideoFile.createAsync(arg, displayName);
     return this._add(video);
+  }
+
+  async addPackedAsync(file: File): Promise<VideoFile> {
+    return addPackedByContentHash({
+      file,
+      completeState: VideoState.COMPLETE,
+      get: id => this.get(id),
+      addAsync: f => this.addAsync(f),
+      createPacked: (f, hash) => VideoFile.createPackedAsync(f, hash),
+      store: video => this._add(video),
+    });
   }
 
   add(url: string): VideoFile
@@ -45,10 +66,13 @@ export class VideoStorage {
   }
 
   private _add(video: VideoFile): VideoFile {
-    if (VideoState.COMPLETE <= video.state) this.lazySynchronize(100);
-    if (this.update(video)) return this.hash[video.identifier];
-    this.hash[video.identifier] = video;
-    return video;
+    return insertOrUpdateMediaFile({
+      hash: this.hash,
+      file: video,
+      completeState: VideoState.COMPLETE,
+      lazySynchronize: ms => this.lazySynchronize(ms),
+      tryUpdate: file => this.update(file),
+    });
   }
 
   private update(video: VideoFile): boolean
@@ -63,34 +87,27 @@ export class VideoStorage {
   }
 
   delete(identifier: string): boolean {
-    const video = this.hash[identifier];
-    if (!video) return false;
-    video.destroy();
-    delete this.hash[identifier];
-    return true;
+    return deleteMediaFromHash(this.hash, identifier);
   }
 
   get(identifier: string): VideoFile {
-    return this.hash[identifier] || null;
+    return getOrHydrateUrlBacked({
+      hash: this.hash,
+      identifier,
+      createUrlBacked: id => VideoFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {
-    if (this.lazyTimer) this.lazyTimer.stop();
-    EventSystem.call('SYNCHRONIZE_VIDEO_LIST', this.getCatalog(), peer);
+    this.catalogSync.synchronize(peer);
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    this.catalogSync.lazySynchronize(ms, peer);
   }
 
   getCatalog(): VideoCatalogItem[] {
-    const catalog: VideoCatalogItem[] = [];
-    for (const video of this.videos) {
-      if (VideoState.COMPLETE <= video.state) {
-        catalog.push({ identifier: video.identifier, state: video.state });
-      }
-    }
-    return catalog;
+    return buildCompleteBlobCatalog(this.videos, VideoState.COMPLETE);
   }
 }

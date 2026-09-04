@@ -15,6 +15,7 @@ import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
@@ -38,6 +39,9 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { xor } from 'lodash';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'game-table-mask',
@@ -295,6 +299,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   movableOption: MovableOption = {};
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
   
   private _currentimageFile: ImageFile;
   private _currentImageFileUrl: string = '';
@@ -328,8 +333,15 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
     private modalService: ModalService,
     private coordinateService: CoordinateService,
     private chatMessageService: ChatMessageService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.gameTableMask?.identifier,
+      () => buildTabletopImagePreviewPayload(this.gameTableMask),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -357,10 +369,8 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
         this.changeDetector.markForCheck();
       })
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.gameTableMask?.identifier}`, event => {
         this.changeDetector.markForCheck();
@@ -388,12 +398,23 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     GameTableMaskComponent.altPassThroughMasks.delete(this);
     GameTableMaskComponent.refreshAltPassThroughDocListener();
     this.input.destroy();
     EventSystem.unregister(this);
     clearTimeout(this._scratchingTimerId);
     if (this._currentImageFileUrl) URL.revokeObjectURL(this._currentImageFileUrl);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -914,6 +935,7 @@ export class GameTableMaskComponent implements OnChanges, OnDestroy, AfterViewIn
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     e.preventDefault();
     const me = e as MouseEvent;

@@ -27,6 +27,8 @@ import { RangeArea } from '@udonarium/range';
 import { ChatMessageService } from 'service/chat-message.service';
 import { I18nService } from 'service/i18n.service';
 import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
+import { canRevealCardCaption } from 'service/card-caption-text';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 
 @Component({
     selector: 'game-character-sheet',
@@ -127,6 +129,7 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
           this.updatePanelTitle();
         }
       })
+      .on('CHANGE_GM_CARD_PEEK', () => this.updatePanelTitle())
       .on('LOCALE_CHANGED', () => this.updatePanelTitle());
   }
 
@@ -338,19 +341,23 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     if (elements.length > 0) {
       currentImageIdentifires = elements.map(element => element.value + '');
     }
+    // Capture slot before async modal; currntImageIndex can change while picker is open.
+    const targetIndex = this.tabletopObject.currntImageIndex;
+    const targetElement = this.tabletopObject.imageElement;
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty, currentImageIdentifires: currentImageIdentifires }).then(value => {
       if (!this.tabletopObject || !this.tabletopObject.imageDataElement || !value) return;
       if (value == 'null') {
         // 刪除
-        if (this.tabletopObject.imageElement && this.tabletopObject.imageFiles.length == 1) {
+        const els = this.tabletopObject.imageDataElement.getElementsByName('imageIdentifier');
+        if (targetElement && els.length == 1) {
           // 為相容性保留一個
-          this.tabletopObject.imageElement.value = value;
-          this.tabletopObject.imageElement.currentValue = value;
+          targetElement.value = value;
+          targetElement.currentValue = value;
         } else {
-          this.deleteImage(this.tabletopObject.currntImageIndex);
+          this.deleteImage(targetIndex);
         }
-      } else if (this.tabletopObject.imageElement) {
-        this.tabletopObject.imageElement.value = value;
+      } else if (targetElement?.parent) {
+        targetElement.value = value;
       }
     });
   }
@@ -535,11 +542,15 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   get isVisible(): boolean {
     if (!this.tabletopObject) return false;
+    // Cards: respect personal GM card-peek preference (not raw isGMMode).
+    if (this.tabletopObject instanceof Card) return canRevealCardCaption(this.tabletopObject);
     if (PeerCursor.myCursor && PeerCursor.myCursor.isGMMode) return true;
-    if (this.tabletopObject instanceof Card) return this.tabletopObject.isFront || this.tabletopObject.isHand;
     if (this.tabletopObject instanceof DiceSymbol) return this.tabletopObject['isVisible'];
     return true;
   }
+
+  /** Personal GM card-face peek preference (when joined as GM). */
+  get gmCardPeek(): boolean { return GmCardPeek.active; }
 
   get isBlackPaint(): boolean {
     if (this.tabletopObject instanceof GameCharacter) return this.tabletopObject.isBlackPaint;

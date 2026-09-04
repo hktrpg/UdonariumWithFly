@@ -51,6 +51,11 @@ export class TabletopActionService {
     return Network.GuestMode();
   }
 
+  /** Hotkey T: merge cards/stacks into a deck when possible, else congregate. */
+  congregateOrMergeSelection(position?: PointerCoordinate): boolean {
+    return this.keyboard.congregateOrMergeSelection(position);
+  }
+
   /** Right-click: select the target when it was not already in the selection. */
   ensureObjectSelected(object: TabletopObject): void {
     this.keyboard.ensureObjectSelected(object);
@@ -306,6 +311,8 @@ export class TabletopActionService {
       //let card = Card.create('卡牌', url, back);
       cardStack.putOnBottom(card);
     }
+    // Real deck: start face-down so draws keep backs until F (full turn-over).
+    cardStack.faceDownAll();
     reconcileLayerStack();
     return cardStack;
   }

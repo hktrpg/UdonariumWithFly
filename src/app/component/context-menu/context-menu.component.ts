@@ -274,7 +274,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     panel.style.height = '';
     panel.style.maxHeight = '';
 
-    // Nudge away from the cursor so the menu does not cover the target token.
+    // Nudge away from the cursor so the menu does not cover the target / icon.
     const OFFSET_X = 20;
     const OFFSET_Y = 4;
     panel.style.left = (this.contextMenuService.position.x + OFFSET_X) + 'px';

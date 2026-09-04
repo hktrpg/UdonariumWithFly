@@ -38,6 +38,8 @@ export class MusicHudComponent implements OnInit, OnDestroy {
   private progressTimer: ReturnType<typeof setInterval> | null = null;
   private positionedDefault = false;
   private mobileSub: { unsubscribe: () => void } | null = null;
+  /** Cached jukebox / library snapshot — skip markForCheck when unrelated objects update. */
+  private hudSignature = '';
 
   /** Collapsed bar outer height (compact chrome). */
   private static readonly BAR_HEIGHT = 44;
@@ -95,7 +97,7 @@ export class MusicHudComponent implements OnInit, OnDestroy {
       }
     });
     EventSystem.register(this)
-      .on('UPDATE_GAME_OBJECT', () => this.lazyNgZoneUpdate())
+      .on('UPDATE_GAME_OBJECT/identifier/Jukebox', () => this.lazyNgZoneUpdate())
       .on('UPDATE_AUDIO_RESOURE', () => this.lazyNgZoneUpdate())
       .on('FILE_LOADED', () => this.lazyNgZoneUpdate());
     this.progressTimer = setInterval(() => {
@@ -182,12 +184,28 @@ export class MusicHudComponent implements OnInit, OnDestroy {
       this.openAudioPicker(index, event);
       return;
     }
-    if (track.isPlaying) {
-      jb.stopTrack(index);
-    } else {
-      const loop = AudioLibrary.instance.effectivePlayLoop(track.audioIdentifier);
-      jb.playTrack(index, track.audioIdentifier, loop);
-    }
+    jb.toggleTrackPlayback(index);
+  }
+
+  /** Playing or paused — keep scrubber / highlight while paused. */
+  isTrackActive(index: number): boolean {
+    return !!this.jukebox?.tracks[index]?.isPlaying;
+  }
+
+  isPaused(index: number): boolean {
+    const t = this.jukebox?.tracks[index];
+    return !!(t?.isPlaying && t?.isPaused);
+  }
+
+  playButtonIcon(index: number): string {
+    return this.isPlaying(index) ? 'pause' : 'play_arrow';
+  }
+
+  playButtonTitle(index: number): string {
+    if (!this.hasAudio(index)) return this.i18n.t('musicHud.pickAudio');
+    if (this.isPlaying(index)) return this.i18n.t('jukebox.pause');
+    if (this.isPaused(index)) return this.i18n.t('jukebox.resume');
+    return this.i18n.t('jukebox.play');
   }
 
   onNameClick(index: number, event: MouseEvent) {
@@ -375,7 +393,23 @@ export class MusicHudComponent implements OnInit, OnDestroy {
     if (this.lazyUpdateTimer !== null) return;
     this.lazyUpdateTimer = setTimeout(() => {
       this.lazyUpdateTimer = null;
+      if (!this.visible) return;
+      const signature = this.buildHudSignature();
+      if (signature === this.hudSignature) return;
+      this.hudSignature = signature;
       this.changeDetector.markForCheck();
     }, 80);
+  }
+
+  /** Stable snapshot of jukebox slots + audio library ids shown in the HUD. */
+  private buildHudSignature(): string {
+    const jb = this.jukebox;
+    const slots = jb
+      ? jb.tracks.slice(0, this.slotCount).map(t =>
+          `${t.audioIdentifier}\0${t.isPlaying}\0${t.isPaused}\0${t.currentTime}\0${t.label}`,
+        ).join('\0')
+      : '';
+    const library = this.libraryAudios.map(a => a.identifier).join('\0');
+    return `${slots}::${library}`;
   }
 }

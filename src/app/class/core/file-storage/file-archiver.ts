@@ -14,7 +14,9 @@ import { MimeType } from './mime-type';
 import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
+import { isMediaFileName, mediaHashFromName } from 'service/folder-backup-layout';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 
 type MetaData = { percent: number, currentFile: string };
@@ -32,12 +34,17 @@ export class FileArchiver {
   /** Chrome often rejects move(); remember and skip after first NotAllowedError. */
   private static moveUnsupported = false;
 
+  /** Public audio import cap (jukebox drop / FileArchiver). */
+  static readonly MAX_AUDIO_BYTES = 20 * MEGA_BYTE;
+
   /** Source accept cap; stored size is enforced by normalizeImageBlob (≤2MB). */
   private maxImageSize = IMAGE_SOURCE_MAX_BYTES;
-  private maxAudioeSize = 20 * MEGA_BYTE;
+  private maxAudioeSize = FileArchiver.MAX_AUDIO_BYTES;
   private maxPdfSize = 20 * MEGA_BYTE;
   private maxVideoSize = 50 * MEGA_BYTE;
   private loadDepth = 0;
+  /** Oversized audio rejected during the current outermost load batch. */
+  private pendingAudioRejects: { name: string; reason: 'tooLarge' }[] = [];
 
   private callbackOnDragEnter;
   private callbackOnDragOver;
@@ -98,7 +105,10 @@ export class FileArchiver {
     let loadFiles: File[] = files instanceof FileList ? toArrayOfFileList(files) : files;
 
     this.loadDepth++;
-    if (this.loadDepth === 1) this.loadHadZip = false;
+    if (this.loadDepth === 1) {
+      this.loadHadZip = false;
+      this.pendingAudioRejects = [];
+    }
     const nameService = AudioImportNameService.instance;
     nameService?.beginBatch();
     try {
@@ -109,23 +119,37 @@ export class FileArchiver {
         await this.handleVideo(file);
         await this.handleAudioUrlManifest(file);
         await this.handleText(file);
-        if (await this.handleZip(file)) this.loadHadZip = true;
+        if (await this.handleZip(file)) {
+          this.loadHadZip = true;
+          // Before XML restore remount finishes: keep gate until ARCHIVE sync ends.
+          TabletopLoadSettle.markExpectArchive();
+        }
         EventSystem.trigger('FILE_LOADED', { file: file });
       }
     } finally {
       nameService?.endBatch();
       this.loadDepth--;
-      // Only after a ZIP batch: audio/image drops must not remount table tokens.
-      if (this.loadDepth === 0 && this.loadHadZip) {
-        poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
-          fileCount: loadFiles.length,
-          names: loadFiles.map(f => f.name).slice(0, 20),
-        });
-        folderBackupDebug('FileArchiver ARCHIVE_LOAD_COMPLETE', {
-          fileCount: loadFiles.length,
-          names: loadFiles.map(f => f.name).slice(0, 30),
-        });
-        EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
+      if (this.loadDepth === 0) {
+        if (this.pendingAudioRejects.length) {
+          EventSystem.trigger('AUDIO_IMPORT_REJECTED', {
+            rejects: this.pendingAudioRejects.slice(),
+            maxBytes: this.maxAudioeSize,
+          });
+          this.pendingAudioRejects = [];
+        }
+        // Only after a ZIP batch: audio/image drops must not remount table tokens.
+        if (this.loadHadZip) {
+          TabletopLoadSettle.markExpectArchive();
+          poseDebug('FileArchiver ARCHIVE_LOAD_COMPLETE firing', {
+            fileCount: loadFiles.length,
+            names: loadFiles.map(f => f.name).slice(0, 20),
+          });
+          folderBackupDebug('FileArchiver ARCHIVE_LOAD_COMPLETE', {
+            fileCount: loadFiles.length,
+            names: loadFiles.map(f => f.name).slice(0, 30),
+          });
+          EventSystem.trigger('ARCHIVE_LOAD_COMPLETE', null);
+        }
       }
     }
   }
@@ -157,6 +181,14 @@ export class FileArchiver {
     }
   }
 
+  /** Import one media blob from folder backup media/ (reuses ZIP restore handlers). */
+  async importMediaFile(file: File): Promise<void> {
+    await this.handleImage(file);
+    await this.handleAudio(file);
+    await this.handlePdf(file);
+    await this.handleVideo(file);
+  }
+
   private async handleImage(file: File) {
     if (file.type.indexOf('image/') < 0) return;
     if (this.maxImageSize < file.size) {
@@ -164,7 +196,11 @@ export class FileArchiver {
       return;
     }
     try {
-      await ImageStorage.instance.addAsync(file);
+      if (isMediaFileName(file.name)) {
+        await ImageStorage.instance.addPackedAsync(file);
+      } else {
+        await ImageStorage.instance.addAsync(file);
+      }
     } catch (e) {
       console.warn(`Image import failed (normalize/store). -> ${file.name}`, e);
     }
@@ -179,6 +215,7 @@ export class FileArchiver {
     if (!FileArchiver.isAudioFile(file)) return;
     if (this.maxAudioeSize < file.size) {
       console.warn(`File size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      this.pendingAudioRejects.push({ name: file.name, reason: 'tooLarge' });
       return;
     }
     // Room ZIP / folder media are "<sha256>.ext". Display names + folders live in
@@ -203,7 +240,9 @@ export class FileArchiver {
       const ab = await file.arrayBuffer();
       importFile = new File([ab], base.replace(/\.mpeg$/i, '.mp3'), { type: 'audio/mpeg' });
     }
-    const created = await AudioFile.createAsync(importFile, restorePacked ? undefined : displayName);
+    const created = restorePacked
+      ? await AudioFile.createPackedAsync(importFile, mediaHashFromName(importFile.name))
+      : await AudioFile.createAsync(importFile, displayName);
     const existed = !!AudioStorage.instance.get(created.identifier);
     const audio = AudioStorage.instance.add(created);
     if (!audio) return;
@@ -225,7 +264,11 @@ export class FileArchiver {
       console.warn(`PDF size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    await PdfStorage.instance.addAsync(file);
+    if (isMediaFileName(file.name)) {
+      await PdfStorage.instance.addPackedAsync(file);
+    } else {
+      await PdfStorage.instance.addAsync(file);
+    }
   }
 
   private async handleVideo(file: File) {
@@ -238,7 +281,11 @@ export class FileArchiver {
       console.warn(`Video size limit exceeded. -> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       return;
     }
-    await VideoStorage.instance.addAsync(file);
+    if (isMediaFileName(file.name)) {
+      await VideoStorage.instance.addPackedAsync(file);
+    } else {
+      await VideoStorage.instance.addAsync(file);
+    }
   }
 
   private async handleText(file: File): Promise<void> {

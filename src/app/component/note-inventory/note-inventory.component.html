@@ -1,12 +1,17 @@
 <div class="settings-ui dense note-inventory" *ngIf="!GuestMode(); else guestBlock"
   [class.is-dragover]="isDragOver"
   (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
-  <section class="card sticky-toolbar">
+  <form class="is-sticky-top card tab-card">
     <div class="toolbar">
       <div class="inv-tabs">
-        <label *ngFor="let filter of filters" class="inv-tab" [class.is-active]="selectFilter === filter.id">
-          <input name="note-filter" type="radio" [value]="filter.id" [(ngModel)]="selectFilter">
-          <span>{{filter.label}} ({{countByFilter(filter.id)}})</span>
+        <label *ngFor="let inventoryType of inventoryTypes" class="inv-tab"
+          [class.is-active]="selectTab === inventoryType"
+          [class.is-drop-target]="dropTargetTab === inventoryType"
+          (dragover)="onTabDragOver($event, inventoryType)"
+          (dragleave)="onTabDragLeave($event, inventoryType)"
+          (drop)="onTabDrop($event, inventoryType)">
+          <input name="note-tab" type="radio" [value]="inventoryType" [(ngModel)]="selectTab">
+          <span>{{getTabTitle(inventoryType)}} ({{getNotes(inventoryType).length}})</span>
         </label>
       </div>
       <button type="button" class="btn btn-sm" [title]="'note.importFile' | i18n" (click)="pickImport()">
@@ -16,18 +21,31 @@
         <i class="material-icons">refresh</i>
       </button>
     </div>
-    <p class="drop-hint">{{ 'note.dropHint' | i18n }}</p>
-  </section>
+    <p class="drop-hint">{{ 'note.dropHint' | i18n }} {{ 'note.dragHint' | i18n }}</p>
+  </form>
+
+  <p class="empty-hint" *ngIf="getNotes(selectTab).length < 1">
+    <b>{{getTabTitle(selectTab)}}</b>{{ 'inv.emptySuffix' | i18n }}
+  </p>
 
   <section
     class="card note-card"
-    *ngFor="let gameObject of filteredNotes(); trackBy: trackByGameObject"
+    *ngFor="let gameObject of getNotes(selectTab); trackBy: trackByGameObject"
     [class.is-selected]="selectedIdentifier === gameObject.identifier"
+    [class.is-other-table]="isOnOtherTable(gameObject)"
+    [class.is-draggable]="!GuestMode()"
+    [attr.draggable]="!GuestMode() ? 'true' : null"
     (click)="selectNote(gameObject)"
+    (dblclick)="focusNote(gameObject, $event)"
+    (pointerdown)="onNoteDragGestureStart($event)"
+    (mousedown)="onNoteDragGestureStart($event)"
+    (dragstart)="onNoteDragStart($event, gameObject)"
+    (dragend)="onNoteDragEnd()"
     (contextmenu)="onContextMenu($event, gameObject)"
   >
     <div class="note-head">
       <strong class="note-title">{{showgameObject(gameObject)}}</strong>
+      <span class="location-badge">{{getLocationLabel(gameObject)}}</span>
       <span class="actions-spacer">
         <button *ngIf="selectedIdentifier === gameObject.identifier" type="button" class="btn btn-sm" [title]="'note.menu' | i18n"
           (click)="onContextMenu($event, gameObject); $event.stopPropagation()">
@@ -65,7 +83,11 @@
     ></note-settings>
   </section>
 
-  <p class="empty-hint" *ngIf="filteredNotes().length < 1">{{ 'note.empty' | i18n }}</p>
+  <div class="actions" *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
+    <button type="button" class="btn btn-danger" (click)="cleanGraveyard()" [disabled]="getNotes(selectTab).length < 1">
+      {{ 'inv.emptyGraveyard' | i18n }}
+    </button>
+  </div>
 </div>
 <ng-template #guestBlock>
   <div class="settings-ui empty-hint">{{ 'note.guestUnavailable' | i18n }}</div>

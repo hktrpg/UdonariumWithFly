@@ -67,7 +67,7 @@
               type="button"
               class="thumb-frame"
               (click)="openBgImageModal()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableBackgroundImage)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
@@ -98,7 +98,7 @@
               type="button"
               class="thumb-frame"
               (click)="openDistanceViewImageModal()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableDistanceviewImage)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
@@ -129,7 +129,7 @@
               type="button"
               class="thumb-frame"
               (click)="openDistanceViewImageModal2()"
-              [disabled]="!isEditable || tableGridType == -1"
+              [disabled]="!isEditable"
             >
               <span *ngIf="getHidden(tableDistanceviewImage2)" class="image-badge">
                 <i class="material-icons" [class]="isShowHideImages ? 'red-eye': 'grow'">
@@ -267,8 +267,8 @@
         </div>
         <div class="slider-row slim">
           <span class="slider-label">{{ 'table.ambientLight' | i18n }}</span>
-          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableGlobalIllumination" [disabled]="!isEditable">
-          <span class="val">{{ tableGlobalIllumination | number:'1.0-2' }}</span>
+          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="tableAmbientDimSlider" [disabled]="!isEditable">
+          <span class="val">{{ tableAmbientDimSlider | number:'1.0-2' }}</span>
         </div>
         <div class="compact-row wrap" style="gap:10px;align-items:center">
           <label class="check" [title]="'table.globalIlluminationHint' | i18n">

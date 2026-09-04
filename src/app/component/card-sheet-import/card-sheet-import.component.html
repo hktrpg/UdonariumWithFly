@@ -1,0 +1,60 @@
+<div class="settings-ui dense card-sheet-import">
+  <section class="card">
+    <header class="card-head">
+      <h3>
+        <i class="material-icons head-icon" aria-hidden="true">grid_on</i>
+        {{ 'cardSheet.title' | i18n }}
+      </h3>
+    </header>
+    <p class="hint">{{ 'cardSheet.help' | i18n }}</p>
+
+    <div class="field-row">
+      <label class="field">
+        <span>{{ 'cardSheet.width' | i18n }}</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="cols"
+          (ngModelChange)="onGridChange()"
+          (keydown.enter)="confirm()"
+        />
+      </label>
+      <label class="field">
+        <span>{{ 'cardSheet.height' | i18n }}</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="rows"
+          (ngModelChange)="onGridChange()"
+          (keydown.enter)="confirm()"
+        />
+      </label>
+    </div>
+
+    <label class="field">
+      <span>{{ 'cardSheet.numCards' | i18n }}</span>
+      <input
+        type="number"
+        min="1"
+        [max]="maxSlots"
+        step="1"
+        [(ngModel)]="numCards"
+        (ngModelChange)="onNumCardsEdit()"
+        (keydown.enter)="confirm()"
+      />
+    </label>
+    <p class="hint">{{ 'cardSheet.numCardsHint' | i18n:{ max: maxSlots } }}</p>
+  </section>
+
+  <section class="card footer-actions actions tight">
+    <button type="button" class="btn" (click)="cancel()">
+      {{ 'common.cancel' | i18n }}
+    </button>
+    <span class="actions-spacer"></span>
+    <button type="button" class="btn btn-primary" (click)="confirm()" [disabled]="!canConfirm">
+      <i class="material-icons" aria-hidden="true">content_cut</i>{{ 'cardSheet.ok' | i18n }}
+    </button>
+  </section>
+</div>

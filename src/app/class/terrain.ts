@@ -344,6 +344,7 @@ export class Terrain extends TabletopObject {
   }
 
   setFaceImage(face: TerrainFaceName, imageIdentifier: string): void {
+    if (typeof imageIdentifier !== 'string') return;
     this.ensureFaceImageElements();
     let el = this.imageDataElement?.getFirstElementByName(face);
     if (!el && this.imageDataElement) {

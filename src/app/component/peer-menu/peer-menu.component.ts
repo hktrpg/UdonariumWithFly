@@ -1,13 +1,15 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { copyMeshDiagToClipboard } from '@udonarium/core/system/network/net-debug';
 import { IPeerContext, PeerContext } from '@udonarium/core/system/network/peer-context';
-import { PeerSessionGrade } from '@udonarium/core/system/network/peer-session-state';
+import { formatBitrate, formatPing } from '@udonarium/core/system/network/peer-session-format';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { GuestSession } from '@udonarium/guest-session';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { RoomAuth } from '@udonarium/room-auth';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { LobbyComponent } from 'component/lobby/lobby.component';
@@ -53,6 +55,12 @@ import * as localForage from 'localforage';
 export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   targetUserId: string = '';
   networkService = Network
+
+  get isYourIdReconnecting(): boolean {
+    return this.networkService.isOpening
+      || RoomConnectHelper.isNetworkReconnecting()
+      || RoomConnectHelper.isRekeyInFlight;
+  }
   gameRoomService = ObjectStore.instance;
 
   isCopied = false;
@@ -60,6 +68,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   isPasswordCopied = false;
   isPasswordOpen = false;
   isRoomInfoCopied = false;
+  isMeshDiagCopied = false;
   inviteCopiedRole: RoomRole = null;
   isDownloadingZip = false;
   downloadZipPercent = 0;
@@ -70,6 +79,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   private _timeOutId2: NodeJS.Timeout;
   private _timeOutId3: NodeJS.Timeout;
   private _timeOutId4: NodeJS.Timeout;
+  private _timeOutIdMeshDiag: NodeJS.Timeout;
   private _timeOutIdInvite: NodeJS.Timeout;
 
   private interval: NodeJS.Timeout = null;
@@ -156,6 +166,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(
     private ngZone: NgZone,
+    private changeDetector: ChangeDetectorRef,
     private modalService: ModalService,
     private panelService: PanelService,
     private chatMessageService: ChatMessageService,
@@ -171,6 +182,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     return Network.GuestMode();
   }
 
+  trackPeerById(_: number, peer: IPeerContext): string {
+    return peer?.peerId || '';
+  }
+
   onLocaleChange(locale: AppLocale) {
     this.i18n.setLocale(locale);
     this.refreshPanelTitle();
@@ -180,20 +195,21 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     e?.preventDefault();
     e?.stopPropagation();
     if (!this.appUpdate.isUpdateReady) return;
+    const failed = this.appUpdate.installFailed;
     const result = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('update.title'),
-      text: this.i18n.t('update.text'),
+      text: this.i18n.t(failed ? 'update.failedText' : 'update.text'),
       // update.help contains HTML; Confirmation uses helpHtml + safe pipe.
-      helpHtml: this.i18n.t('update.help'),
+      helpHtml: this.i18n.t(failed ? 'update.failedHelp' : 'update.help'),
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'system_update',
-      okLabel: this.i18n.t('update.restart'),
+      okLabel: this.i18n.t(failed ? 'update.hardReload' : 'update.restart'),
     });
     if (result === false || result == null) return;
     if (this.folderBackup.isReady) {
       await this.folderBackup.flush({ timeoutMs: 60000 });
     }
-    document.location.reload();
+    await this.appUpdate.applyPendingUpdate();
   }
 
   private refreshPanelTitle() {
@@ -212,21 +228,27 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('OPEN_NETWORK', event => {
         this.ngZone.run(() => this.syncPeerHealthPoll());
       })
+      .on('NETWORK_ERROR', () => this.ngZone.run(() => {
+        this.changeDetector.detectChanges();
+        this.syncPeerHealthPoll();
+      }))
       .on('CONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('DISCONNECT_PEER', () => this.ngZone.run(() => this.syncPeerHealthPoll()))
       .on('LOCALE_CHANGED', () => this.ngZone.run(() => this.refreshPanelTitle()))
-      .on('APP_UPDATE_READY', () => this.ngZone.run(() => this.syncPeerHealthPoll()));
+      .on('APP_UPDATE_READY', () => this.ngZone.run(() => this.changeDetector.detectChanges()));
     this.syncPeerHealthPoll();
   }
 
-  /** Peer health/ping stats need a 1s CD tick only while peers are present. */
+  /** Peer health/ping stats need a 1s CD tick while peers are present or reconnect is pending. */
   private syncPeerHealthPoll() {
-    const need = (this.networkService.peers?.length || 0) > 0;
+    const need = (this.networkService.peers?.length || 0) > 0
+      || this.isYourIdReconnecting
+      || (!this.networkService.isOpen && !!Network.getLastRoomSession()?.roomId);
     if (need) {
       if (this.interval) return;
       this.ngZone.runOutsideAngular(() => {
         this.interval = setInterval(() => {
-          this.ngZone.run(() => { });
+          this.ngZone.run(() => this.changeDetector.detectChanges());
         }, 1000);
       });
     } else if (this.interval) {
@@ -260,6 +282,10 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (RoomAuth.roleNeedsPassword(roomName, role)) {
       password = this.roomInvite.getRolePassword(role);
+      // Stale secrets from a previous room must not be embedded in invites.
+      if (password && !RoomAuth.verify(roomId, roomName, role, password)) {
+        password = '';
+      }
       if (!password) {
         const entered = await this.modalService.open<string>(RolePasswordPromptComponent, {
           roomId,
@@ -376,16 +402,6 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     void this.folderBackup.ensureBound();
   }
 
-  changeFolderBackup() {
-    if (this.GuestMode()) return;
-    void this.folderBackup.bindFolder();
-  }
-
-  unbindFolderBackup() {
-    if (this.GuestMode()) return;
-    void this.folderBackup.unbindFolder();
-  }
-
   async saveFolderBackup() {
     if (this.GuestMode() || !this.networkService.peer?.isRoom) return;
     if (!(await this.folderBackup.ensureBound())) return;
@@ -418,8 +434,12 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  stringFromSessionGrade(grade: PeerSessionGrade): string {
-    return PeerSessionGrade[grade] ?? PeerSessionGrade[PeerSessionGrade.UNSPECIFIED];
+  formatBitrate(bps: number): string {
+    return formatBitrate(bps);
+  }
+
+  formatPing(ms: number): string {
+    return formatPing(ms);
   }
 
   candidateLabel(description: string): string {
@@ -486,6 +506,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isCopied = false;
       }, 1000);
     }
+  }
+
+  async copyMeshDiag() {
+    if (!this.isAbleClipboardCopy()) return;
+    const ok = await copyMeshDiagToClipboard();
+    if (!ok) return;
+    this.isMeshDiagCopied = true;
+    clearTimeout(this._timeOutIdMeshDiag);
+    this._timeOutIdMeshDiag = setTimeout(() => {
+      this.isMeshDiagCopied = false;
+    }, 2000);
   }
 
   copyRoomName() {
@@ -603,10 +634,17 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
             await this.folderBackup.flush({ timeoutMs: 60000 });
           }
           RoomAuth.applyIdentity(result.role, peer.roomId || Network.peer?.roomId || '');
-          this.roomInvite.setRolePassword(result.role, result.password || '');
+          // Coalesce before any write: setRolePassword('') would wipe session first,
+          // making the later getSessionRolePassword fallback useless.
+          const rolePw = RoomAuth.coalesceRolePassword(
+            result.role,
+            result.password,
+            this.roomInvite.getRolePassword(result.role),
+          );
+          this.roomInvite.setRolePassword(result.role, rolePw);
           RoomAuth.rememberSession(
             result.role,
-            result.password || RoomAuth.getSessionRolePassword(result.role),
+            rolePw,
             RoomAuth.getSessionMeshPassword() || Network.peer?.password || undefined,
           );
           // Clear legacy hold state.

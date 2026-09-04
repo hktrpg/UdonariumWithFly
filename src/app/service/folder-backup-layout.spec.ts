@@ -1,10 +1,13 @@
 import {
   STATE_FILE_NAMES,
+  collectReferencedMediaHashes,
   computeStateFingerprint,
+  isContentHashIdentifier,
   isMediaFileName,
   mediaHashFromName,
   sha256Hex,
   shouldSkipStateZipWrite,
+  unionManifestMedia,
 } from './folder-backup-layout';
 
 describe('folder-backup-layout', () => {
@@ -27,6 +30,14 @@ describe('folder-backup-layout', () => {
   it('mediaHashFromName strips extension', () => {
     const hash = 'b'.repeat(64);
     expect(mediaHashFromName(`${hash}.jpg`)).toBe(hash);
+  });
+
+  it('isContentHashIdentifier accepts 64-char hex only', () => {
+    const hash = 'c'.repeat(64);
+    expect(isContentHashIdentifier(hash)).toBeTrue();
+    expect(isContentHashIdentifier(hash.toUpperCase())).toBeTrue();
+    expect(isContentHashIdentifier('https://example.com/x.png')).toBeFalse();
+    expect(isContentHashIdentifier(hash.slice(0, 63))).toBeFalse();
   });
 
   it('sha256Hex is stable for the same payload (fingerprint skip input)', async () => {
@@ -60,5 +71,33 @@ describe('folder-backup-layout', () => {
     expect(shouldSkipStateZipWrite('abc', 'xyz')).toBeFalse();
     expect(shouldSkipStateZipWrite('abc', '')).toBeFalse();
     expect(shouldSkipStateZipWrite('', '')).toBeFalse();
+  });
+
+  it('unionManifestMedia keeps previous hashes when next save packs fewer blobs', () => {
+    const card = '5'.repeat(64);
+    const table = 'a'.repeat(64);
+    const pdf = 'e'.repeat(64);
+    const previous = [
+      { hash: card, name: `${card}.png` },
+      { hash: table, name: `${table}.jpg` },
+      { hash: pdf, name: `${pdf}.pdf` },
+    ];
+    const next = [
+      { hash: table, name: `${table}.jpg` },
+    ];
+    const union = unionManifestMedia(previous, next);
+    expect(union.map(e => e.hash).sort()).toEqual([card, pdf, table].sort());
+    expect(union.find(e => e.hash === pdf)?.name).toBe(`${pdf}.pdf`);
+  });
+
+  it('collectReferencedMediaHashes finds pdf and card image ids in room XML', () => {
+    const card = 'c'.repeat(64);
+    const pdf = 'd'.repeat(64);
+    const xml = `
+      <card imageIdentifier="${card}" />
+      <text-note pdfIdentifier="${pdf}" contentMode="pdf" />
+      <data type="image">${card}</data>
+    `;
+    expect(collectReferencedMediaHashes(xml).sort()).toEqual([card, pdf].sort());
   });
 });

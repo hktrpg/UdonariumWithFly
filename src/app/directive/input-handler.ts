@@ -111,6 +111,21 @@ export class InputHandler {
     if (!this.option.always) this.removeEventListeners();
   }
 
+  /**
+   * Begin a grab without a real mousedown/touchstart (e.g. after a hold delay).
+   * Subsequent mousemove/touchmove on document drive the drag until mouseup/touchend.
+   */
+  forceStart(pageX: number, pageY: number) {
+    this.clearLastPointerTimer.stop();
+    this.primaryPointer = { x: pageX, y: pageY, z: 0, identifier: MOUSE_IDENTIFIER };
+    this.firstPointer = this.primaryPointer;
+    this.lastStartPointers = [this.primaryPointer];
+    this._isGrabbing = true;
+    this._isDragging = false;
+    this._isPointerMoved = false;
+    this.addEventListeners();
+  }
+
   private onMouse(e: MouseEvent) {
     let mosuePointer: PointerData = { x: e.pageX, y: e.pageY, z: 0, identifier: MOUSE_IDENTIFIER };
     if (this.isSyntheticEvent(e)) {

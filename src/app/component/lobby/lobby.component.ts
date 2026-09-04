@@ -53,12 +53,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
   static centeredPanelOption(extra: PanelOption = {}): PanelOption {
     const width = extra.width ?? LobbyComponent.DEFAULT_WIDTH;
     const height = extra.height ?? LobbyComponent.DEFAULT_HEIGHT;
+    const pos = PanelService.viewportCenterPosition(width, height);
     return {
       ...extra,
       width,
       height,
-      left: extra.left ?? Math.max(0, Math.round((window.innerWidth - width) / 2)),
-      top: extra.top ?? Math.max(0, Math.round((window.innerHeight - height) / 2)),
+      left: extra.left ?? pos.left,
+      top: extra.top ?? pos.top,
       tourPanelId: extra.tourPanelId ?? 'menu.lobby',
     };
   }
@@ -135,23 +136,31 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.scheduleAutoRefresh();
       return;
     }
-    this.isReloading = true;
-    if (!silent || this.rooms.length < 1) {
-      this.help = this.i18n.t('lobby.helpSearching');
+    this.ngZone.run(() => { this.isReloading = true; });
+    try {
+      // Manual / empty: force Find. Silent auto-refresh with rooms: use cache TTL.
+      const force = !silent || this.rooms.length < 1;
+      // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
+      let rooms = await Network.listAllRooms(force);
+      if (rooms.length < 1 && !silent) {
+        await new Promise<void>(resolve => setTimeout(resolve, 600));
+        rooms = await Network.listAllRooms(true);
+      }
+      if (this.destroyed) return;
+      this.ngZone.run(() => {
+        this.rooms = RoomConnectHelper.filterLobbyRooms(rooms);
+        if (this.rooms.length < 1) {
+          this.help = this.i18n.t('lobby.helpEmpty');
+        }
+        this.scheduleAutoRefresh();
+      });
+    } catch (err) {
+      console.warn('Lobby room list failed', err);
+    } finally {
+      if (!this.destroyed) {
+        this.ngZone.run(() => { this.isReloading = false; });
+      }
     }
-    // SkyWay awaits may resume outside NgZone; apply results inside so the table updates.
-    let rooms = await Network.listAllRooms(true);
-    if (rooms.length < 1 && !silent) {
-      await new Promise<void>(resolve => setTimeout(resolve, 600));
-      rooms = await Network.listAllRooms(true);
-    }
-    if (this.destroyed) return;
-    this.ngZone.run(() => {
-      this.rooms = rooms;
-      this.help = this.i18n.t('lobby.helpEmpty');
-      this.isReloading = false;
-      this.scheduleAutoRefresh();
-    });
   }
 
   private scheduleAutoRefresh() {
@@ -210,13 +219,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
     });
     if (!result) return;
 
+    const rolePw = RoomAuth.coalesceRolePassword(result.role, result.password);
     const meshPassword = RoomAuth.resolveMeshPassword(
-      room.id, room.name, result.role, result.password || RoomAuth.getSessionRolePassword(result.role));
+      room.id, room.name, result.role, rolePw);
     // Mesh is channel-only; peerIds have empty password digests.
     const targetPeers = room.filterByPassword('');
     if (targetPeers.length < 1) return;
 
-    const rolePw = result.password || RoomAuth.getSessionRolePassword(result.role);
     RoomAuth.applyIdentity(result.role, room.id);
     RoomAuth.rememberSession(result.role, rolePw, meshPassword);
     this.roomInvite.setRolePassword(result.role, rolePw);
@@ -250,17 +259,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.destroyed) return;
-    this.help = this.i18n.t('lobby.helpStaleRoom');
+    const failKey = RoomConnectHelper.joinFailMessageKey(RoomConnectHelper.lastJoinFailReason);
+    this.help = this.i18n.t(`${failKey}.help`);
     const popup = this.modalService.open(ConfirmationComponent, {
-      title: this.i18n.t('lobby.staleRoom.title'),
-      text: this.i18n.t('lobby.staleRoom.text'),
-      help: this.i18n.t('lobby.helpStaleRoom'),
+      title: this.i18n.t(`${failKey}.title`),
+      text: this.i18n.t(`${failKey}.text`),
+      help: this.i18n.t(`${failKey}.help`),
       type: ConfirmationType.OK,
       materialIcon: 'link_off',
     });
     void this.reload(true);
     await popup;
-    if (!this.destroyed) this.help = this.i18n.t('lobby.helpStaleRoom');
+    if (!this.destroyed) this.help = this.i18n.t(`${failKey}.help`);
   }
 
   async showRoomSetting() {
@@ -287,9 +297,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   private refreshHelp() {
-    if (this.isReloading) {
-      this.help = this.i18n.t('lobby.helpSearching');
-    } else if (this.rooms.length < 1) {
+    if (this.rooms.length < 1) {
       this.help = this.i18n.t('lobby.helpEmpty');
     } else {
       this.help = this.i18n.t('lobby.helpInitial');

@@ -111,7 +111,8 @@ export class DiceSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current && current !== 'null' ? [current] : []
     }).then(value => {
-      if (!this.dice || value == null) return;
+      // Cancel resolves false; Empty selection is the string 'null'.
+      if (!this.dice || !value) return;
       const el = this.dice.imageDataElement?.getFirstElementByName(face);
       if (el) el.value = value;
       this.dice.mutateAppearance(() => { this.dice.face = face; });

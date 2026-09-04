@@ -1,5 +1,10 @@
 /* Room-join-specific; shared UI lives in ../shared/settings-ui.css */
 
+.current-role-hint {
+  margin: 0 0 8px;
+  color: #5c4630;
+}
+
 .roles {
   display: flex;
   flex-direction: column;
@@ -10,22 +15,39 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid #d2c2ab;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fffdf8;
   cursor: pointer;
   color: #3a2f24;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.role:hover:not(.disabled) {
+  border-color: #b89a72;
+  box-shadow: 0 1px 0 rgba(92, 70, 48, 0.06);
 }
 
 .role.active {
   border-color: #5c4630;
   background: linear-gradient(180deg, #fffaf2 0%, #efe0c8 100%);
+  box-shadow: inset 0 0 0 1px rgba(92, 70, 48, 0.12);
+}
+
+.role.current {
+  background: #f6f1e8;
+  border-style: dashed;
 }
 
 .role.disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+.role.current.disabled {
+  opacity: 0.85;
 }
 
 .role .label {
@@ -40,8 +62,45 @@
   font-size: 12px;
 }
 
-.role .lock,
-.role .open {
+.role .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
   font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.role .badge .material-icons {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.role .badge.lock {
   color: #7a6a58;
+  background: #f3ebe0;
+  border: 1px solid #d2c2ab;
+  padding: 2px 5px;
+}
+
+.role .badge.open {
+  color: #5a6a58;
+  background: #eef3ea;
+  border: 1px solid #b7c7b0;
+}
+
+.role .badge.bypass {
+  color: #3d5a4c;
+  background: #e8f1ec;
+  border: 1px solid #9bb5a8;
+}
+
+.role .badge.current {
+  color: #8a4a16;
+  background: #fff0e0;
+  border: 1px solid #d4a56a;
 }

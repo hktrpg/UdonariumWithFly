@@ -10,6 +10,7 @@ import {
   Output
 } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
 import { GridType } from '@udonarium/game-table';
 import { isHexGrid, snapToHexCell } from '@udonarium/hex-grid';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -28,6 +29,7 @@ import { UndoService } from 'service/undo.service';
 
 import { InputHandler } from './input-handler';
 import { MovableSelectionSynchronizer } from './movable-selection-synchronizer';
+import { shouldClearSelectionOnRemotePoseUpdate } from './movable-pose-sync-policy';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 
@@ -74,6 +76,10 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
   @Input('movable.disable') isDisable: boolean = false;
   @Input('movable.interact') isInteract: boolean = true;
+  /** True while this piece follows another token's multi-drag (not the primary grab). */
+  isDragFollower = false;
+  /** True while WASD/arrow keyboard nudge is in progress (no SyncVar flush until release). */
+  isKeyboardNudge = false;
   @Output('movable.onstart') onstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondragstart') ondragstart: EventEmitter<PointerEvent> = new EventEmitter();
   @Output('movable.ondrag') ondrag: EventEmitter<PointerEvent> = new EventEmitter();
@@ -150,15 +156,15 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     EventSystem.register(this)
       .on(`UPDATE_GAME_OBJECT/identifier/${this.tabletopObject?.identifier}`, event => {
-        if ((event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) || !this.shouldTransition(this.tabletopObject)) return;
+        if (event.isSendFromSelf && (this.input.isGrabbing || this.state !== SelectionState.NONE)) return;
+        // Keep local drag pose (primary grab or multi-drag follower); flush wins on pointer up (LWW).
+        if (!event.isSendFromSelf && (this.input.isGrabbing || this.isDragFollower)) return;
+        if (!this.shouldTransition(this.tabletopObject)) return;
         this.batchService.add(() => {
-          if (this.input.isGrabbing) {
-            UndoService.instance?.discardTransformGesture();
-            this.cancel();
-          } else {
-            this.setAnimatedTransition(true);
+          this.setAnimatedTransition(true);
+          if (shouldClearSelectionOnRemotePoseUpdate()) {
+            this.state = SelectionState.NONE;
           }
-          this.state = SelectionState.NONE;
           this.stopTransition();
           this.setPosition(this.tabletopObject);
         }, this);
@@ -192,11 +198,33 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   cancel() {
+    this.synchronizer.abortMove();
     this.input.cancel();
     this.setPointerEvents(true);
     this.setAnimatedTransition(true);
     this.setCollidableLayer(false);
     if (this.tabletopService.tableSelecter.viewTable) this.tabletopService.tableSelecter.viewTable.gridHeight = 0;
+  }
+
+  /**
+   * Start dragging after an external hold gesture (card-stack 1s hold).
+   * Works for mouse and touch because InputHandler then listens on document move/end.
+   */
+  startDeferredDrag(pointer: { pageX: number; pageY: number; clientX: number; clientY: number }) {
+    if (Network.GuestMode() || this.isDisable) return;
+    this.input.cancel();
+    this.input.forceStart(pointer.pageX, pointer.pageY);
+    const synthetic = {
+      button: 0,
+      buttons: 1,
+      ctrlKey: false,
+      shiftKey: false,
+      pageX: pointer.pageX,
+      pageY: pointer.pageY,
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+    } as MouseEvent;
+    this.onInputStart(synthetic);
   }
 
   dispose() {
@@ -288,7 +316,19 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     pointer3d.x -= this.width / 2;
     pointer3d.y -= this.height / 2;
 
-    const nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    let nextZ = this.resolveDragPosZ(element, pointer3d.z, hitStack);
+    // Analytic terrain / card-stack tops (deck thickness is CSS-only, not in pick Z).
+    // Only characters / tokens ride decks — cards and card-stacks must merge instead of climb.
+    const alias = this.tabletopObject?.aliasName;
+    const allowDeckRide = alias === 'character' || alias === 'character-token';
+    const blockedByPeer = this.hitStackHasNonRidePeer(hitStack) || this.isHitOnNonRidePeer(element);
+    if (allowDeckRide && !blockedByPeer) {
+      const rideZ = MovableSelectionSynchronizer.sampleRidePosZ(
+        pointer3d.x + this.width / 2,
+        pointer3d.y + this.height / 2,
+      );
+      if (rideZ != null) nextZ = Math.max(nextZ, rideZ);
+    }
     if (this.posX === pointer3d.x && this.posY === pointer3d.y && this.posZ === nextZ) return;
 
     if (!this.input.isDragging) this.ondragstart.emit(e as PointerEvent);
@@ -317,6 +357,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     this.posZ = nextZ;
 
     this.synchronizer.updateMove(delta);
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onInputEnd(e: MouseEvent | TouchEvent) {
@@ -342,8 +385,13 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     this.synchronizer.finishMove(delta);
 
+    this.flushDragPosesToTable();
+
     this.cancel();
     this.onend.emit(e as PointerEvent);
+    if (this.tabletopObject?.identifier) {
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { identifier: this.tabletopObject.identifier });
+    }
   }
 
   onContextMenu(e: MouseEvent | TouchEvent) {
@@ -431,7 +479,29 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
+  /** Live tabletop pose while dragging (before placements flush on pointer up). */
+  static livePoseFor(objectId: string): { x: number; y: number; posZ: number } | null {
+    if (!objectId) return null;
+    for (const set of MovableDirective.layerMap.values()) {
+      for (const movable of set) {
+        const obj = movable.tabletopObject;
+        if (!obj || obj.identifier !== objectId) continue;
+        if (movable.input?.isGrabbing || movable.input?.isDragging || movable.isDragFollower || movable.isKeyboardNudge) {
+          return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
+        }
+        const pose = obj.getPoseForView();
+        if (pose.x !== movable.posX || pose.y !== movable.posY || pose.posZ !== movable.posZ) {
+          return { x: movable.posX, y: movable.posY, posZ: movable.posZ };
+        }
+      }
+    }
+    return null;
+  }
+
   private setUpdateBatching() {
+    this.updateTransformCss();
+    // Network sync only on pointer up / keyboard-nudge end — mid-gesture used to flood the mesh.
+    if (this.input.isGrabbing || this.isDragFollower || this.isKeyboardNudge) return;
     if (!this.isUpdateBatching && this.tabletopObject) {
       this.isUpdateBatching = true;
       // Pin the map id at queue time — resolveViewTableIdentifier() at flush can be a different map.
@@ -453,7 +523,17 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
         this.isUpdateBatching = false;
       }, this);
     }
-    this.updateTransformCss();
+  }
+
+  /** Commit drag poses to SyncVars once (primary + multi-select / magnetic group). */
+  private flushDragPosesToTable() {
+    const movables = this.synchronizer.sessionMovables;
+    for (const movable of movables) {
+      if (movable.tabletopObject?.identifier) {
+        ObjectSynchronizer.instance.markPoseGraceReleased(movable.tabletopObject.identifier);
+      }
+      movable.flushPoseToTable();
+    }
   }
 
   /** Write directive pose into tablePlacements for the given (or current) view. */
@@ -694,12 +774,15 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
    */
   private isHitOnColideLayer(hit: HTMLElement): boolean {
     if (!hit || !this.colideLayers?.length) return false;
+    const noCharacterRide = !!this.tabletopObject?.isNotRide
+      || !!TableSelecter.instance?.viewTable?.is2DMode;
     for (const layerName of this.colideLayers) {
       const layer = MovableDirective.layerMap.get(layerName);
       if (!layer) continue;
       for (const movable of layer) {
         if (movable === this) continue;
-        if (layerName === 'character' && (this.tabletopObject?.isNotRide || !!TableSelecter.instance?.viewTable?.is2DMode)) continue;
+        // ☐ Can stack on other characters: never climb onto character / character-token.
+        if (noCharacterRide && (layerName === 'character' || layerName === 'character-token')) continue;
         const root = movable.nativeElement;
         if (!root) continue;
         if (root === hit || root.contains(hit)) return true;
@@ -729,10 +812,31 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
    */
   private hitStackHasNonRidePeer(hitStack?: Element[]): boolean {
     if (!hitStack?.length) return false;
+    const blockCharacters = !!this.tabletopObject?.isNotRide
+      || !!TableSelecter.instance?.viewTable?.is2DMode;
     for (const el of hitStack) {
       if (!(el instanceof HTMLElement)) continue;
       if (this.nativeElement === el || this.nativeElement.contains(el)) continue;
       if (this.isHitOnNonRidePeer(el)) return true;
+      // ☐ Stack on characters: other tokens must block climb even when PE-none
+      // (elementsFromPoint still lists them; without this we adopt terrain Z behind).
+      if (blockCharacters && this.isHitOnCharacterPeer(el)) return true;
+    }
+    return false;
+  }
+
+  /** True when hit is under another character / character-token movable. */
+  private isHitOnCharacterPeer(hit: HTMLElement): boolean {
+    if (!hit) return false;
+    for (const layerName of ['character', 'character-token'] as const) {
+      const layer = MovableDirective.layerMap.get(layerName);
+      if (!layer) continue;
+      for (const movable of layer) {
+        if (movable === this) continue;
+        const root = movable.nativeElement;
+        if (!root) continue;
+        if (root === hit || root.contains(hit)) return true;
+      }
     }
     return false;
   }
@@ -765,11 +869,14 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   private setCollidableLayer(isCollidable: boolean) {
     // todo
+    const dragAlias = this.tabletopObject?.aliasName;
+    // Cards / stacks must stay hittable while dragging another card/stack so
+    // merge-preview (blue outline) can find them via elementsFromPoint.
+    const keepCardPeers = dragAlias === 'card' || dragAlias === 'card-stack';
     let isEnable = isCollidable;
     for (let layerName of MovableDirective.layerMap.keys()) {
       if (this.colideLayers.includes(layerName)) {
-        //isEnable = this.input.isGrabbing ? isCollidable : true;
-        if (layerName == 'character') {
+        if (layerName === 'character' || layerName === 'character-token') {
           const canRide = !this.tabletopObject.isNotRide && !TableSelecter.instance?.viewTable?.is2DMode;
           isEnable = this.input.isGrabbing ? isCollidable && canRide : true;
         } else {
@@ -777,6 +884,9 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
         }
       } else {
         isEnable = !isCollidable;
+        if (keepCardPeers && (layerName === 'card' || layerName === 'card-stack')) {
+          isEnable = true;
+        }
       }
       MovableDirective.layerMap.get(layerName).forEach(movable => {
         if (movable === this || (movable.input?.isGrabbing)) return;

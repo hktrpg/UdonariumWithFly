@@ -1,0 +1,8 @@
+<div *ngIf="state as s" class="card-caption-overlay is-pointer-events-none"
+  [class.is-flip-x]="s.flipX"
+  [style.left.px]="s.x"
+  [style.top.px]="s.y">
+  <div *ngIf="s.showName" class="card-caption-overlay-name">{{ s.name }}</div>
+  <div *ngIf="s.showText && s.textHtml" class="card-caption-overlay-text"
+    [innerHTML]="s.textHtml | safe: 'html'"></div>
+</div>

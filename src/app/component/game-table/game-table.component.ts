@@ -19,10 +19,12 @@ import { RangeArea } from '@udonarium/range';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableDrawing } from '@udonarium/table-fx/table-drawing';
 import { TableLight } from '@udonarium/table-fx/table-light';
+import { darknessOverlayAlpha, darknessOverlayRgb, surroundingsDimAlpha } from '@udonarium/table-fx/day-night-atmosphere';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { notePinAnchorPx, pinAnchorPx, stringBeamStyle3d, stringPathD, tokenCenterAnchorPx, tokenVisualHeightPx } from '@udonarium/table-fx/push-pin.util';
 import { TableWall } from '@udonarium/table-fx/table-wall';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 import { Stackable } from '@udonarium/tabletop-object-util';
@@ -45,6 +47,7 @@ import { TabletopService } from 'service/tabletop.service';
 import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
+import { TableLightingService } from 'service/table-lighting.service';
 import { folderBackupDebug, folderBackupWarn, approxCssScale, summarizeCharPlacements, TokenDomProbe, TokenHideReason } from 'service/folder-backup-debug';
 import { MovableDirective } from 'directive/movable.directive';
 import { GridLineRender } from './grid-line-render';
@@ -53,7 +56,7 @@ import { TableMouseGesture, TableMouseGestureEvent } from './table-mouse-gesture
 import { TablePickGesture } from './table-pick-gesture';
 import { TableTouchGesture } from './table-touch-gesture';
 import { collectFootprintWalls } from './footprint-walls';
-import { isCharacterRevealedToViewer } from './vision-math';
+import { isCharacterRevealedToViewer, visionAndLightWalls } from './vision-math';
 import { WeatherRender } from './weather-render';
 
 /** Formal touch interaction mode (mobile gesture state machine). */
@@ -100,6 +103,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private lightingRender: LightingRender = null;
   private weatherRender: WeatherRender = null;
   private fxTimer: any = null;
+  /** Skip lighting/FoW redraw when darkness/lights/tokens/walls are unchanged. */
+  private lastFxSig = '';
+  /** rAF coalesce for live shadows while dragging/rotating. */
+  private liveShadowRaf = 0;
+  private _desktopLayerPieces: Stackable[] = [];
+  private _desktopLayerSig = '';
+  private readonly layerZIndexStyles = new Map<number, { 'z-index': number }>();
   private pingHoldTimer: any = null;
   private pingHoldOrigin: { x: number; y: number } = null;
   private pingHoldLast: { x: number; y: number } = null;
@@ -122,6 +132,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   private sceneMarqueeCurrent: { x: number; y: number } = null;
   /** True once drag exceeds threshold — commit as box select instead of click. */
   private sceneMarqueeActive = false;
+  /** Pointer-drag reposition for a light (select / light mode). */
+  private lightDrag: {
+    light: TableLight;
+    fromX: number;
+    fromY: number;
+    grabOffsetX: number;
+    grabOffsetY: number;
+  } | null = null;
+  /** Light under cursor while select/light tools are active (visual hover). */
+  hoveredLightId: string | null = null;
+  private static readonly LIGHT_HIT_RADIUS = 20;
   /** Path gesture candidate: Ctrl+click adds a waypoint; plain click starts move. */
   private pathClickOrigin: { clientX: number; clientY: number; x: number; y: number; mode: 'add' | 'go' } = null;
 
@@ -404,7 +425,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       ...this.cardStacks,
       ...chars,
     ];
-    return pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
+    // Same paint order; skip sort+alloc when membership unchanged.
+    let sig = `${this.isGMMode ? 1 : 0}|${pieces.length}`;
+    for (let i = 0; i < pieces.length; i++) sig += `|${pieces[i].identifier}`;
+    if (sig === this._desktopLayerSig) return this._desktopLayerPieces;
+    pieces.sort((a, b) => a.identifier.localeCompare(b.identifier));
+    this._desktopLayerSig = sig;
+    this._desktopLayerPieces = pieces;
+    return pieces;
   }
 
   /**
@@ -414,7 +442,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
    * translateZ(4px) can sit above clueStringsZ (photo < yarn < pin).
    */
   layerHostStyle(zindex: number): { [key: string]: number } {
-    return { 'z-index': zindex };
+    let style = this.layerZIndexStyles.get(zindex);
+    if (!style) {
+      style = { 'z-index': zindex };
+      this.layerZIndexStyles.set(zindex, style);
+    }
+    return style;
   }
 
   private setCanvasHighlightActive(active: boolean) {
@@ -630,10 +663,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   isLayerMask(piece: Stackable): piece is GameTableMask { return piece instanceof GameTableMask; }
 
   trackByLayerPiece = (_index: number, piece: Stackable) => {
-    if (piece instanceof CharacterToken || piece instanceof GameCharacter) {
-      return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
-    }
-    return piece.identifier;
+    // Include pieceRenderEpoch for ALL peers so cross-room syncId recycle remounts cards/notes/masks too.
+    return `${this.pieceRenderEpoch}:${this.characterViewEpoch}:${piece.identifier}`;
   };
 
   /** Foundry-style Alt hold outlines (screen AABB). */
@@ -670,8 +701,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if ((obj instanceof GameCharacter || obj instanceof CharacterToken) && !is2D) {
       const foot = (obj.size || 1) * gridSize;
       const pose = obj.getPoseForView();
+      const live = MovableDirective.livePoseFor(obj.identifier);
+      const px = live?.x ?? pose.x;
+      const py = live?.y ?? pose.y;
+      const pz = live?.posZ ?? pose.posZ;
       return tokenCenterAnchorPx(
-        { ...obj, location: { x: pose.x, y: pose.y }, posZ: pose.posZ, rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0 },
+        { ...obj, location: { x: px, y: py }, posZ: pz, rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0 },
         foot,
         tokenVisualHeightPx(obj, gridSize),
         gridSize,
@@ -700,6 +735,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Pin math must use the viewed-map pose, not possibly-stale location SyncVar. */
   private pinHostFromView(obj: GameCharacter | CharacterToken | TextNote) {
     const pose = obj.getPoseForView();
+    const live = MovableDirective.livePoseFor(obj.identifier);
+    const x = live?.x ?? pose.x;
+    const y = live?.y ?? pose.y;
+    const posZ = live?.posZ ?? pose.posZ;
     const tokenFrame = (obj instanceof GameCharacter || obj instanceof CharacterToken)
       ? (obj.tokenFrame || 'none')
       : 'none';
@@ -710,9 +749,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       pushPinLeft: obj.pushPinLeft,
       pushPinTop: obj.pushPinTop,
       tokenFrame,
-      location: { x: pose.x, y: pose.y },
+      location: { x, y },
       rotate: (typeof pose.rotate === 'number' ? pose.rotate : obj.rotate) || 0,
-      posZ: pose.posZ,
+      posZ,
     };
   }
 
@@ -831,6 +870,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private tokenPath: TokenPathMoveService,
     private i18n: I18nService,
     private mobileLayout: MobileLayoutService,
+    private tableLighting: TableLightingService,
   ) { }
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
@@ -854,6 +894,38 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!userId) return false;
     return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
   }
+
+  /** Parallax surroundings follow ambient light unless the player has token vision. */
+  get shouldDimBackgroundImage(): boolean {
+    const table = this.currentTable;
+    if (!table) return false;
+    if (!table.visionEnabled || this.isGMMode) return true;
+    const userId = Network.peer?.userId;
+    if (!userId) return true;
+    return !ObjectStore.instance.getObjects(CharacterToken).some(t => t.providesVisionTo(userId));
+  }
+
+  get backgroundDarknessOverlayAlpha(): number {
+    if (!this.shouldDimBackgroundImage) return 0;
+    const table = this.currentTable;
+    if (!table) return 0;
+    return surroundingsDimAlpha(table.globalIllumination ?? 1);
+  }
+
+  get backgroundDarknessOverlayColor(): string {
+    const alpha = this.backgroundDarknessOverlayAlpha;
+    if (alpha <= 0) return 'transparent';
+    return `rgba(8, 6, 4, ${alpha})`;
+  }
+
+  /** Underlay so map plane AA edges match the darkness veil (not a bright rim). */
+  get tableSurfaceUnderlayColor(): string {
+    const table = this.currentTable;
+    if (!table) return 'transparent';
+    const alpha = darknessOverlayAlpha(table.darkness ?? 0);
+    if (alpha <= 0.001) return 'transparent';
+    return darknessOverlayRgb(table.darkness ?? 0);
+  }
   get pathPointsAttr(): string {
     const pts: string[] = [];
     if (this.tokenPath.origin) {
@@ -870,6 +942,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       .on('SELECT_GAME_TABLE', -10, event => {
         // After TabletopService refreshes object caches for the new viewed table.
         const id = event.data?.identifier || '';
+        const fromRoomLoad = !!event.data?._fromRoomLoad;
         const viewed = this.tableSelecter.viewedTableIdentifier || '';
         const cache = this.characters || [];
         const dualInCache = cache.filter(c => (c.placementTableIds || []).length > 1);
@@ -878,6 +951,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           viewed,
           fromSelecter: !!event.data?._fromSelecter,
           fromCatalog: !!event.data?._fromCatalog,
+          fromRoomLoad,
           charEpochBefore: this.characterViewEpoch,
           pieceEpoch: this.pieceRenderEpoch,
           cacheCount: cache.length,
@@ -886,87 +960,70 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
           cacheNames: cache.map(c => c.name || '?'),
         });
         this.ngZone.run(() => queueMicrotask(() => {
-          // Remount dual-map survivors (same cache membership → same trackBy otherwise).
-          // Suppress bounce: remount while visibility:hidden aborts bounceInOut at scale(0).
-          GameCharacterComponent.suppressEnterBounce = true;
-          const epochBefore = this.characterViewEpoch;
-          this.characterViewEpoch++;
-          GameCharacterComponent.resetMountLogBudget(16);
-          const viewed = this.tableSelecter.viewedTableIdentifier || id;
-          const placeSnap = summarizeCharPlacements(
-            ObjectStore.instance.getObjects(GameCharacter),
-            '',
-            viewed,
-          );
-          folderBackupDebug('game-table map remount chars', {
-            id,
-            charEpoch: `${epochBefore}→${this.characterViewEpoch}`,
-            dualInCache: dualInCache.map(c =>
-              `${c.name}|${c.identifier.slice(0, 8)}|maps=${(c.placementTableIds || []).map(m => m.slice(0, 12)).join('+')}|` +
-              `live=${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}|load=${!!c.isLoaded}`
-            ),
-            placeSnap,
-            mountBudget: 16,
-          });
+          // Room-load identity remount is owned by ROOM_PIECES_REPLACED — do not
+          // also bump characterViewEpoch (dual-path flash). User map-switch still remounts once.
+          if (!fromRoomLoad) {
+            TabletopLoadSettle.suppressBriefly(120);
+            GameCharacterComponent.resetMountLogBudget(16);
+            const epochBefore = this.characterViewEpoch;
+            this.characterViewEpoch++;
+            folderBackupDebug('game-table map remount chars', {
+              id,
+              charEpoch: `${epochBefore}→${this.characterViewEpoch}`,
+              dualInCache: dualInCache.map(c =>
+                `${c.name}|${c.identifier.slice(0, 8)}|maps=${(c.placementTableIds || []).map(m => m.slice(0, 12)).join('+')}|` +
+                `live=${c.location?.x | 0},${c.location?.y | 0},${c.posZ | 0}|load=${!!c.isLoaded}`
+              ),
+              placeSnap: summarizeCharPlacements(
+                ObjectStore.instance.getObjects(GameCharacter),
+                '',
+                this.tableSelecter.viewedTableIdentifier || id,
+              ),
+              mountBudget: 16,
+            });
+          }
           this.applyViewedTable();
           MovableDirective.syncAllPosesFromObjects();
           this.changeDetector.detectChanges();
           queueMicrotask(() => {
             MovableDirective.syncAllPosesFromObjects();
             this.changeDetector.detectChanges();
-            GameCharacterComponent.suppressEnterBounce = false;
           });
-          // Immediate DOM count (before bounce finishes).
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +0ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 0);
-          // Map-switch is the control that often "fixes" invisible tokens — capture DOM after it.
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +150ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 150);
-          setTimeout(() => this.logTokenVisibilityDiag('game-table after map SELECT +600ms', {
-            tableId: id,
-            charEpoch: this.characterViewEpoch,
-          }), 600);
         }));
       })
       .on('ARCHIVE_LOAD_COMPLETE', () => {
-        // ZIP load replaces tables but keeps this component's in-memory cameras.
-        // Stale pan/tilt (or a singular CSS matrix during hydrate) makes tokens look
-        // "wrong" until the user switches maps — which re-runs applyViewedTable.
-        folderBackupDebug('game-table ARCHIVE_LOAD_COMPLETE → refreshAfterRoomArchiveLoad');
-        this.ngZone.run(() => this.refreshAfterRoomArchiveLoad());
+        // ZIP path: identity remount already done in ROOM_PIECES during XML restore.
+        // Sync-only here — never pieceRenderEpoch++ (avoids dual remount vs restore).
+        folderBackupDebug('game-table ARCHIVE_LOAD_COMPLETE → archiveSyncAfterLoad');
+        this.ngZone.run(() => this.archiveSyncAfterLoad());
       })
       .on('ROOM_PIECES_REPLACED', () => {
-        // fly_data.xml finished before images; remount so recycled syncId views are not kept.
+        // Sole identity remount owner for ZIP restore + mesh settle.
         this.ngZone.run(() => {
           folderBackupDebug('game-table ROOM_PIECES_REPLACED', {
             epochBefore: this.pieceRenderEpoch,
             cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
             viewId: this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier || '',
           });
-          GameCharacterComponent.suppressEnterBounce = true;
+          TabletopLoadSettle.begin();
           GameCharacterComponent.resetMountLogBudget(20);
           this.pieceRenderEpoch++;
-          // Room A→B reuses table syncIds; drop A's camera before applyViewedTable.
           this.tableViewById.clear();
           this.cameraTableId = '';
           this._last2DMode = null;
           this.visionRevealedIds = new Set();
           this.changeDetector.detectChanges();
           MovableDirective.syncAllPosesFromObjects();
-          // Defer FoW/camera refresh until after *ngFor remounts piece components.
           queueMicrotask(() => {
             this.applyViewedTable();
-            this.logTokenVisibilityDiag('game-table ROOM_PIECES microtask');
-          });
-          setTimeout(() => {
-            this.applyViewedTable();
+            for (const c of this.characters || []) {
+              if (c && !c.isLoaded) c.isLoaded = true;
+            }
             MovableDirective.syncAllPosesFromObjects();
-            this.logTokenVisibilityDiag('game-table ROOM_PIECES +200ms');
-          }, 200);
+            this.changeDetector.detectChanges();
+            this.logTokenVisibilityDiag('game-table ROOM_PIECES microtask');
+            TabletopLoadSettle.noteIdentityRemountDone(220);
+          });
         });
       })
       .on('UPDATE_GAME_OBJECT', event => {
@@ -978,6 +1035,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         this.sync2DModeCamera();
         this.refreshFx();
         this.ensureFxTimer();
+      })
+      .on('TABLETOP_DRAG_MOVE', () => {
+        if (this.clueLinks.length) this.scheduleClueYarnRefresh();
+        this.scheduleLiveShadowRefresh();
       })
       .on('TABLE_PING', event => {
         this.ngZone.run(() => this.spawnPing(event.data));
@@ -1149,7 +1210,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // During folder-backup settle, ignore any leftover per-table camera from the prior room
     // (table ids like "gameTable" are often reused across rooms).
-    const saved = GameCharacterComponent.suppressEnterBounce
+    const saved = TabletopLoadSettle.busy
       ? undefined
       : this.tableViewById.get(table.identifier);
     if (saved) {
@@ -1215,11 +1276,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.applyCameraForTable(this.currentTable);
     this.coordinateService.tabletopOriginElement = this.gameObjects.nativeElement;
     this.lightingRender = new LightingRender(this.fxCanvas.nativeElement);
-    this.weatherRender = new WeatherRender([
-      this.weatherCanvasLow.nativeElement,
-      this.weatherCanvasMid.nativeElement,
-      this.weatherCanvasHigh.nativeElement,
-    ]);
+    this.weatherRender = new WeatherRender(
+      [
+        this.weatherCanvasLow.nativeElement,
+        this.weatherCanvasMid.nativeElement,
+        this.weatherCanvasHigh.nativeElement,
+      ],
+      fn => this.ngZone.runOutsideAngular(fn),
+    );
     this.refreshFx();
     this.ensureFxTimer();
     if (this.showDebugPose) {
@@ -1240,6 +1304,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.touchLayoutSub?.unsubscribe();
     this.touchLayoutSub = null;
     this.stopFxTimer();
+    this.cancelLiveShadowRefresh();
     if (this.debugPoseTimer) clearInterval(this.debugPoseTimer);
     if (this.weatherRender) this.weatherRender.destroy();
     if (this.lightingRender) this.lightingRender.release();
@@ -1982,14 +2047,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sceneTools.isLightSelected(l);
   }
 
+  isLightHovered(l: TableLight): boolean {
+    return !!l && this.hoveredLightId === l.identifier;
+  }
+
   /** Darkness / vision need a tick while tokens move; pings need arrow follow. Weather has its own RAF. */
   private needsPeriodicFx(): boolean {
     const table = this.currentTable;
     if (!table) return this.pings.length > 0;
-    const darkness = Math.max(0, Math.min(1, table.darkness ?? 0));
-    const globalLight = Math.max(0, Math.min(1, table.globalIllumination ?? 1));
-    const baseAlpha = darkness * (1 - globalLight * 0.35);
-    return baseAlpha > 0.001 || !!table.visionEnabled || this.pings.length > 0;
+    const mapDark = darknessOverlayAlpha(table.darkness ?? 0);
+    const surroundDim = surroundingsDimAlpha(table.globalIllumination ?? 1);
+    return mapDark > 0.001 || surroundDim > 0.001 || !!table.visionEnabled || this.pings.length > 0
+      || (table.lights?.length ?? 0) > 0;
   }
 
   private ensureFxTimer() {
@@ -2009,21 +2078,55 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.fxTimer = null;
   }
 
+  /** Recompute decorative token shadows every animation frame while a piece is dragged/rotated. */
+  private scheduleLiveShadowRefresh() {
+    if (this.liveShadowRaf) return;
+    this.liveShadowRaf = requestAnimationFrame(() => {
+      this.liveShadowRaf = 0;
+      this.refreshTokenShadowsLive();
+    });
+  }
+
+  private cancelLiveShadowRefresh() {
+    if (!this.liveShadowRaf) return;
+    cancelAnimationFrame(this.liveShadowRaf);
+    this.liveShadowRaf = 0;
+  }
+
+  private refreshTokenShadowsLive() {
+    if (!this.currentTable) return;
+    const onTable = this.characters.filter(c => c.location?.name === 'table');
+    this.tableLighting.updateTokenShadows(this.currentTable, onTable);
+    this.ngZone.run(() => {
+      EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
+    });
+  }
+
   private refreshFx() {
     if (!this.lightingRender || !this.currentTable) return;
     const onTable = this.characters.filter(c => c.location?.name === 'table');
     const userId = Network.peer?.userId || '';
     const visionChars = onTable.filter(c => c.providesVisionTo(userId));
-    this.lightingRender.render(
-      this.currentTable,
-      visionChars,
-      onTable,
-      this.collectLightOccluders(),
-      this.isGMMode,
-      collectFootprintWalls(this.currentTable, this.tableMasks, this.terrains),
-    );
+    const footprintWalls = collectFootprintWalls(this.currentTable, this.tableMasks, this.terrains);
+    const wallSets = visionAndLightWalls(this.currentTable, this.tableMasks, this.terrains, footprintWalls);
+    const occluders = this.collectLightOccluders();
+    const fxSig = this.buildFxSignature(onTable, visionChars, footprintWalls, occluders);
+    let revealedChanged = false;
+    if (fxSig !== this.lastFxSig) {
+      this.lastFxSig = fxSig;
+      this.lightingRender.render(
+        this.currentTable,
+        visionChars,
+        onTable,
+        occluders,
+        this.isGMMode,
+        footprintWalls,
+      );
+      this.tableLighting.updateTokenShadows(this.currentTable, onTable);
+      EventSystem.trigger('TABLE_TOKEN_SHADOWS_UPDATED', {});
+      revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId, wallSets);
+    }
     this.weatherRender?.sync(this.currentTable);
-    const revealedChanged = this.refreshVisionRevealed(onTable, visionChars, userId);
     let needMark = revealedChanged;
     if (this.pings.length > 0) {
       const prev = this.offscreenArrows;
@@ -2038,11 +2141,63 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  /** Pose/light/wall fingerprint — identical input ⇒ identical lighting/FoW pixels. */
+  private buildFxSignature(
+    onTable: CharacterToken[],
+    visionChars: CharacterToken[],
+    footprintWalls: { points: { x: number; y: number }[] }[],
+    occluders: LightOccluder[],
+  ): string {
+    const n = (v: number) => String(v ?? 0);
+    const pts = (points: { x: number; y: number }[]) =>
+      (points || []).map(p => `${n(p.x)},${n(p.y)}`).join(';');
+    const table = this.currentTable;
+    const parts: string[] = [
+      table.identifier,
+      n(table.darkness ?? 0),
+      n(table.globalIllumination ?? 1),
+      table.globalIlluminationEnabled ? '1' : '0',
+      String(table.globalIlluminationThreshold ?? ''),
+      table.visionEnabled ? '1' : '0',
+      this.isGMMode ? '1' : '0',
+      String(table.width),
+      String(table.height),
+      String(table.gridSize),
+    ];
+    for (const light of table.lights || []) {
+      parts.push(
+        `L:${light.identifier}:${n(light.x)}:${n(light.y)}:${n(light.brightRadius)}:${n(light.dimRadius)}:${light.color}:${n(light.intensity ?? 0)}`,
+      );
+    }
+    for (const wall of table.walls || []) {
+      parts.push(
+        `W:${wall.identifier}:${wall.blocksLight ? 1 : 0}:${wall.blocksVision ? 1 : 0}:${pts(wall.points)}`,
+      );
+    }
+    for (const fp of footprintWalls) {
+      parts.push(`F:${pts(fp.points)}`);
+    }
+    for (const o of occluders) {
+      parts.push(`O:${o.id}:${pts(o.points)}`);
+    }
+    for (const ch of onTable) {
+      const live = MovableDirective.livePoseFor(ch.identifier);
+      const x = live?.x ?? ch.location?.x;
+      const y = live?.y ?? ch.location?.y;
+      parts.push(
+        `T:${ch.identifier}:${n(x)}:${n(y)}:${n(ch.size)}:${n(ch.visionRangeGrid)}:${n(ch.brightLightGrid)}:${n(ch.dimLightGrid)}`,
+      );
+    }
+    for (const ch of visionChars) parts.push(`V:${ch.identifier}`);
+    return parts.join('|');
+  }
+
   /** Update which tokens players may see under FoW; returns true if the set changed. */
   private refreshVisionRevealed(
     onTable: CharacterToken[],
     visionChars: CharacterToken[],
     userId: string,
+    wallSets?: ReturnType<typeof visionAndLightWalls>,
   ): boolean {
     const next = new Set<string>();
     const table = this.currentTable;
@@ -2054,7 +2209,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     for (const ch of onTable) {
       if (!ch) continue;
-      if (isCharacterRevealedToViewer(ch, table, visionChars, onTable, userId, this.tableMasks, this.terrains)) {
+      if (isCharacterRevealedToViewer(
+        ch, table, visionChars, onTable, userId, this.tableMasks, this.terrains, wallSets,
+      )) {
         next.add(ch.identifier);
       }
     }
@@ -2120,7 +2277,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       charCache: (this.characters || []).length,
       epoch: this.pieceRenderEpoch,
       charEpoch: this.characterViewEpoch,
-      suppressBounce: GameCharacterComponent.suppressEnterBounce,
+      suppressBounce: TabletopLoadSettle.skipEnterAnimation,
+      settleBusy: TabletopLoadSettle.busy,
       dualCache: (this.characters || [])
         .filter(c => (c.placementTableIds || []).length > 1)
         .map(c => c.name || c.identifier.slice(0, 8)),
@@ -2134,6 +2292,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       table.isShowNumber,
     );
     this.applyCameraForTable(table);
+    this.lastFxSig = '';
+    this._desktopLayerSig = '';
     this.refreshFx();
     this.ensureFxTimer();
     this.removeFocus();
@@ -2143,85 +2303,40 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * After room ZIP finishes: remount piece views, reset cameras, re-apply grid,
-   * then sync Movable once layout has settled.
-   *
-   * Enter bounce is suppressed until settle — display/FoW races previously aborted
-   * bounceInOut at scale(0); dual-map tokens never remounted on scene switch.
+   * After room ZIP assets finish: pose/hydrate sync only.
+   * Identity remount already happened via ROOM_PIECES_REPLACED during XML restore —
+   * bumping pieceRenderEpoch again here caused the multi-flash dual path.
    */
-  private refreshAfterRoomArchiveLoad() {
-    folderBackupDebug('game-table refreshAfterRoomArchiveLoad');
-    GameCharacterComponent.suppressEnterBounce = true;
-    GameCharacterComponent.resetMountLogBudget(24);
-    this.pieceRenderEpoch++;
-    this.tableViewById.clear();
-    this.cameraTableId = '';
-    this._last2DMode = null;
-    // Force FoW reveal set to rebuild on next refreshFx.
-    this.visionRevealedIds = new Set();
+  private archiveSyncAfterLoad() {
+    folderBackupDebug('game-table archiveSyncAfterLoad');
+    TabletopLoadSettle.markExpectArchive();
 
-    const countMovables = () => {
-      let n = 0;
-      for (const set of MovableDirective.layerMap.values()) n += set.size;
-      return n;
-    };
-
-    const refresh = (label: string, remount = false) => {
-      if (remount) this.pieceRenderEpoch++;
+    const sync = (label: string) => {
       this.applyViewedTable();
       MovableDirective.syncAllPosesFromObjects();
       for (const c of this.characters || []) {
         if (c && !c.isLoaded) c.isLoaded = true;
       }
       this.changeDetector.detectChanges();
-      this.logTokenVisibilityDiag(`game-table refresh (${label})`, {
-        remount,
+      this.logTokenVisibilityDiag(`game-table archive sync (${label})`, {
         epoch: this.pieceRenderEpoch,
-        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+        settleBusy: TabletopLoadSettle.busy,
       });
     };
 
-    // Force *ngFor to see the new trackBy epoch immediately.
-    this.changeDetector.detectChanges();
-
-    queueMicrotask(() => refresh('microtask'));
+    queueMicrotask(() => sync('microtask'));
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => refresh('raf2'));
-    });
-    setTimeout(() => refresh('100ms'), 100);
-    setTimeout(() => {
-      // Remount after Movable usually exists — same effect as a real map switch.
-      refresh('350ms+epoch', true);
-      const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier;
-      if (viewId) {
-        EventSystem.trigger('VIEW_GAME_TABLE', { identifier: viewId });
-        MovableDirective.syncAllPosesFromObjects();
-        this.changeDetector.detectChanges();
-        folderBackupDebug('game-table VIEW_GAME_TABLE bounce', { viewId, movableCount: countMovables() });
-      }
-    }, 350);
-    setTimeout(() => refresh('700ms', true), 700);
-    setTimeout(() => {
-      refresh('1200ms', true);
-      // Remount while bounce is still suppressed — same as map switch, without
-      // replaying enter animation on brand-new hosts (which can leave tokens invisible).
-      this.pieceRenderEpoch++;
-      MovableDirective.syncAllPosesFromObjects();
-      this.changeDetector.detectChanges();
-      queueMicrotask(() => {
-        MovableDirective.syncAllPosesFromObjects();
-        this.changeDetector.detectChanges();
-        GameCharacterComponent.suppressEnterBounce = false;
-        this.logTokenVisibilityDiag('game-table archive settle done', {
-          movableCount: countMovables(),
-          suppressBounce: false,
-          epoch: this.pieceRenderEpoch,
-        });
+      requestAnimationFrame(() => {
+        sync('raf2');
+        const viewId = this.tableSelecter.viewedTableIdentifier || this.tableSelecter.viewTableIdentifier;
+        if (viewId) {
+          EventSystem.trigger('VIEW_GAME_TABLE', { identifier: viewId });
+          MovableDirective.syncAllPosesFromObjects();
+          this.changeDetector.detectChanges();
+        }
+        TabletopLoadSettle.afterArchiveSettle(220);
       });
-    }, 1200);
-    // Extra late probe — images / FoW may still settle after busy overlay hides.
-    setTimeout(() => this.logTokenVisibilityDiag('game-table +2s probe'), 2000);
-    setTimeout(() => this.logTokenVisibilityDiag('game-table +3.5s probe'), 3500);
+    });
   }
 
   /** Full per-token visibility diagnosis (data + DOM). Filter console: FolderBackup */
@@ -2267,7 +2382,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         isGM: this.isGMMode,
         epoch: this.pieceRenderEpoch,
         charEpoch: this.characterViewEpoch,
-        suppressBounce: GameCharacterComponent.suppressEnterBounce,
+        suppressBounce: TabletopLoadSettle.skipEnterAnimation,
+      settleBusy: TabletopLoadSettle.busy,
         cam: `${this.viewPotisonX|0},${this.viewPotisonY|0},${this.viewPotisonZ|0}`,
         camRot: `${this.viewRotateX|0},${this.viewRotateY|0},${this.viewRotateZ|0}`,
         cacheCount: cacheChars.length,
@@ -2424,45 +2540,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     return out;
   }
 
-  /** Token bodies that cast soft light shadows (masks/terrains are real walls via footprintWalls). */
+  /**
+   * Extra light occluders beyond walls / mask·terrain footprints.
+   * Token size×size rectangles used to cast umbra quads from lamps; that reads as a
+   * dark “grid tile” under every piece (often 1 cell or half a cell). Real blockers
+   * stay on walls + footprintWalls — do not reintroduce square token occluders here.
+   */
   private collectLightOccluders(): LightOccluder[] {
-    const table = this.currentTable;
-    if (!table) return [];
-    const grid = table.gridSize || 50;
-    const out: LightOccluder[] = [];
-
-    for (const ch of this.characters) {
-      if (ch.location?.name !== 'table') continue;
-      const s = Math.max(grid * 0.35, (ch.size || 1) * grid);
-      out.push({ id: ch.identifier, points: this.rectOccluder(ch.location.x, ch.location.y, s, s) });
-    }
-    return out;
-  }
-
-  private rectOccluder(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    rotateDeg: number = 0,
-  ): { x: number; y: number }[] {
-    const corners = [
-      { x: x, y: y },
-      { x: x + w, y: y },
-      { x: x + w, y: y + h },
-      { x: x, y: y + h },
-    ];
-    if (!rotateDeg) return corners;
-    const rad = rotateDeg * Math.PI / 180;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    return corners.map(p => {
-      const dx = p.x - cx;
-      const dy = p.y - cy;
-      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
-    });
+    return [];
   }
 
   @HostListener('pointerdown', ['$event'])
@@ -2517,15 +2602,17 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (!this.canUseSceneTools) return;
 
-    // Scene select: drag a marquee to multi-select; short click hits one object.
+    // Scene select: drag a hovered/hit light, else marquee / click-select.
     if (this.sceneTools.isSceneSelectMode) {
       if (!this.canModifyScene) return;
       e.preventDefault();
       e.stopPropagation();
       this.selectionService.clear();
       this.clearSceneMarquee();
+      this.clearLightDrag();
       this.pickGesture?.cancel();
       const tablePos = this.tablePosFromClient(e.pageX, e.pageY);
+      if (this.tryBeginLightDrag(tablePos.x, tablePos.y)) return;
       this.sceneMarqueeStart = { x: tablePos.x, y: tablePos.y };
       this.sceneMarqueeCurrent = { x: tablePos.x, y: tablePos.y };
       this.sceneMarqueeActive = false;
@@ -2535,14 +2622,23 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Idle scene tools: do not intercept tabletop interaction.
     if (!this.sceneTools.isBlockingPick) return;
-    if (!this.canCreateCurrentMode) return;
 
     if (this.sceneTools.mode === 'light') {
+      if (!this.canModifyScene && !this.canCreateCurrentMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectionService.clear();
+      this.pickGesture?.cancel();
+      // Prefer dragging an existing light under the cursor over placing a new one.
+      if (this.canModifyScene && this.tryBeginLightDrag(pos.x, pos.y)) return;
+      if (!this.canCreateCurrentMode) return;
       this.drawDragStart = { x: pos.x, y: pos.y };
       this.drawDragCurrent = { x: pos.x, y: pos.y };
       this.scheduleDrawDraftRefresh();
       return;
     }
+
+    if (!this.canCreateCurrentMode) return;
     if (this.sceneTools.mode === 'wall') {
       this.sceneTools.wallDraftPoints.push({ x: pos.x, y: pos.y });
       // Double-click finishes wall (also available via panel button / right-click).
@@ -2600,12 +2696,21 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         if (dx * dx + dy * dy > GameTableComponent.PING_MOVE_THRESHOLD_SQ) this.clearPingHold();
       }
     }
+    this.updateLightHoverFromEvent(e);
+    if (this.lightDrag) {
+      this.updateLightDragFromEvent(e);
+      return;
+    }
     this.updateSceneMarqueeFromEvent(e);
     this.updateDrawDraftFromPointer();
   }
 
   @HostListener('document:pointermove', ['$event'])
   onDocumentPointerMove(e: PointerEvent) {
+    if (this.lightDrag) {
+      this.updateLightDragFromEvent(e);
+      return;
+    }
     if (this.sceneMarqueeStart) {
       this.updateSceneMarqueeFromEvent(e);
       return;
@@ -2619,6 +2724,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.activePointerIds.delete(e.pointerId);
     this.clearPingHold();
     if (this.finishPathClick(e)) return;
+    if (this.lightDrag) {
+      this.commitLightDrag();
+      return;
+    }
     if (this.sceneMarqueeStart) {
       this.commitSceneMarquee();
       return;
@@ -2630,6 +2739,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   onPointerCancel(e: PointerEvent) {
     this.activePointerIds.delete(e.pointerId);
     this.clearPingHold();
+    if (this.lightDrag) this.commitLightDrag();
   }
 
   @HostListener('document:pointerup', ['$event'])
@@ -2637,6 +2747,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.activePointerIds.delete(e.pointerId);
     if (this.finishPathClick(e)) {
       this.clearPingHold();
+      return;
+    }
+    if (this.lightDrag) {
+      this.clearPingHold();
+      this.commitLightDrag();
       return;
     }
     if (this.sceneMarqueeStart) {
@@ -2683,6 +2798,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       return;
     }
+    if (this.readInventoryNoteDragIds(e).length) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      return;
+    }
     if (this.tabletopFileDrop.hasFileDrag(e) && !GuestSession.isGuest && !Network.GuestMode()) {
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -2694,6 +2814,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const ids = this.readInventoryCharacterDragIds(e);
     if (ids.length) {
       this.onInventoryCharacterDrop(e, ids);
+      return;
+    }
+    const noteIds = this.readInventoryNoteDragIds(e);
+    if (noteIds.length) {
+      this.onInventoryNoteDrop(e, noteIds);
       return;
     }
     // Prefer files[] on drop — some browsers clear types/items while files remain.
@@ -2766,6 +2891,48 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  private onInventoryNoteDrop(e: DragEvent, ids: string[]) {
+    if (!ids.length || ids[0] === '__pending__') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (GuestSession.isGuest || Network.GuestMode()) return;
+
+    const pos = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: e.clientX, y: e.clientY, z: 0 },
+      this.gameObjects?.nativeElement || this.coordinateService.tabletopOriginElement
+    );
+    const grid = this.currentTable?.gridSize || 50;
+    let placed = 0;
+    let firstPlaced: TextNote | null = null;
+
+    for (let i = 0; i < ids.length; i++) {
+      const note = ObjectStore.instance.get(ids[i]);
+      if (!(note instanceof TextNote)) continue;
+      if (!note.canSeeSelfOnly && !this.isGMMode) continue;
+
+      const col = i % 5;
+      const row = Math.floor(i / 5);
+      const x = pos.x - (note.width * grid) / 2 + col * grid;
+      const y = pos.y - (note.height * grid) / 2 + row * grid;
+
+      note.addToTable(undefined, { x, y, posZ: note.posZ });
+      if (!firstPlaced) firstPlaced = note;
+      placed++;
+    }
+
+    if (placed > 0) {
+      if (firstPlaced) {
+        EventSystem.trigger('SELECT_TABLETOP_OBJECT', {
+          identifier: firstPlaced.identifier,
+          className: firstPlaced.aliasName,
+          highlighting: true,
+        });
+      }
+      SoundEffect.play(PresetSound.piecePut);
+      EventSystem.call('UPDATE_INVENTORY', true);
+    }
+  }
+
   private readInventoryTempCopy(e: DragEvent): boolean {
     if (!e.dataTransfer) return false;
     if (e.dataTransfer.getData(GameCharacter.INVENTORY_TEMP_COPY_MIME)) return true;
@@ -2788,6 +2955,20 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     const plain = e.dataTransfer.getData('text/plain') || '';
     const m = /^udonarium-character:(.+)$/.exec(plain);
     return m ? this.parseInventoryDragPayload(m[1]) : [];
+  }
+
+  private readInventoryNoteDragIds(e: DragEvent): string[] {
+    if (!e.dataTransfer) return [];
+    const typed = e.dataTransfer.getData(TextNote.INVENTORY_DRAG_MIME);
+    if (typed) return [typed];
+    if (e.type === 'dragover') {
+      const types = Array.from(e.dataTransfer.types || []);
+      if (types.includes(TextNote.INVENTORY_DRAG_MIME)) return ['__pending__'];
+      return [];
+    }
+    const plain = e.dataTransfer.getData('text/plain') || '';
+    const m = /^udonarium-note:(.+)$/.exec(plain);
+    return m?.[1] ? [m[1]] : [];
   }
 
   private parseInventoryDragPayload(payload: string): string[] {
@@ -3035,6 +3216,89 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.scheduleDrawDraftRefresh();
   }
 
+  private tryBeginLightDrag(x: number, y: number): boolean {
+    if (!SceneToolPermission.instance.canModifyKind('light')) return false;
+    const light = this.findLightAt(x, y);
+    if (!light) return false;
+    this.sceneTools.selectLight(light);
+    this.hoveredLightId = light.identifier;
+    this.lightDrag = {
+      light,
+      fromX: light.x,
+      fromY: light.y,
+      grabOffsetX: x - light.x,
+      grabOffsetY: y - light.y,
+    };
+    this.clearSceneMarquee();
+    this.clearDrawDragState();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+    return true;
+  }
+
+  private findLightAt(x: number, y: number): TableLight | null {
+    const r = GameTableComponent.LIGHT_HIT_RADIUS;
+    const rSq = r * r;
+    for (let i = this.lights.length - 1; i >= 0; i--) {
+      const l = this.lights[i];
+      const dx = l.x - x;
+      const dy = l.y - y;
+      if (dx * dx + dy * dy <= rSq) return l;
+    }
+    return null;
+  }
+
+  private hitLight(light: TableLight, x: number, y: number): boolean {
+    const r = GameTableComponent.LIGHT_HIT_RADIUS;
+    const dx = light.x - x;
+    const dy = light.y - y;
+    return dx * dx + dy * dy <= r * r;
+  }
+
+  private updateLightHoverFromEvent(e: PointerEvent) {
+    const mode = this.sceneTools.mode;
+    if (!this.showSceneEditOverlay || (mode !== 'select' && mode !== 'light') || this.lightDrag) {
+      if (this.hoveredLightId) {
+        this.hoveredLightId = null;
+        this.changeDetector.detectChanges();
+      }
+      return;
+    }
+    if (!SceneToolPermission.instance.canModifyKind('light')) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    const hit = this.findLightAt(pos.x, pos.y);
+    const nextId = hit?.identifier || null;
+    if (nextId === this.hoveredLightId) return;
+    this.hoveredLightId = nextId;
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private updateLightDragFromEvent(e: PointerEvent) {
+    if (!this.lightDrag) return;
+    const pos = this.tablePosFromClient(e.pageX, e.pageY);
+    const light = this.lightDrag.light;
+    light.x = pos.x - this.lightDrag.grabOffsetX;
+    light.y = pos.y - this.lightDrag.grabOffsetY;
+    this.refreshFx();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private commitLightDrag() {
+    const drag = this.lightDrag;
+    this.lightDrag = null;
+    if (!drag) return;
+    this.sceneTools.recordLightMove(drag.light, drag.fromX, drag.fromY, drag.light.x, drag.light.y);
+    this.refreshFx();
+    this.scheduleDrawDraftRefresh();
+    this.changeDetector.detectChanges();
+  }
+
+  private clearLightDrag() {
+    this.lightDrag = null;
+  }
+
   /** Hit-test scene objects under cursor (select mode). */
   private trySelectSceneObject(x: number, y: number): boolean {
     const pad = 12;
@@ -3052,8 +3316,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (perm.canModifyKind('light')) {
       for (let i = this.lights.length - 1; i >= 0; i--) {
         const l = this.lights[i];
-        const dx = l.x - x, dy = l.y - y;
-        if (dx * dx + dy * dy <= 16 * 16) {
+        if (this.hitLight(l, x, y)) {
           this.sceneTools.selectLight(l);
           return true;
         }

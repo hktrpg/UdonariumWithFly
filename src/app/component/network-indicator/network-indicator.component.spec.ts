@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
+import { CommonModule } from '@angular/common';
 
 import { NetworkIndicatorComponent } from './network-indicator.component';
+import { I18nPipe } from 'pipe/i18n.pipe';
 
 describe('NetworkIndicatorComponent', () => {
   let component: NetworkIndicatorComponent;
@@ -8,7 +10,8 @@ describe('NetworkIndicatorComponent', () => {
 
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
-      declarations: [ NetworkIndicatorComponent ]
+      imports: [CommonModule],
+      declarations: [ NetworkIndicatorComponent, I18nPipe ]
     })
     .compileComponents();
   }));

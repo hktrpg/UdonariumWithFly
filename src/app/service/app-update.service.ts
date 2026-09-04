@@ -1,74 +1,134 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { EventSystem } from '@udonarium/core/system';
-import { I18nService } from './i18n.service';
 
 /**
- * Tracks PWA updates: activate quietly when ready; UI shows a hint.
- * New build is used on the next manual reload / restart (no forced reload).
+ * Tracks PWA updates: activate quietly when ready; UI shows an Angular modal
+ * (no browser Notification / alert). New build applies on reload after user confirms.
+ *
+ * index.html is excluded from ngsw integrity (Cloudflare may rewrite HTML). Install
+ * failures are uncommon; on failure we still clear SW caches before reload.
  */
 @Injectable({ providedIn: 'root' })
-export class AppUpdateService {
-  /** True after a new SW version is downloaded and activated for the next load. */
+export class AppUpdateService implements OnDestroy {
+  /** True when a newer build is available (activated, or install failed — still prompt reload). */
   isUpdateReady = false;
+  /** True when ngsw could not install (e.g. hashed asset mismatch). */
+  installFailed = false;
+
   private started = false;
+  private updatePromptPending = false;
+  private checkTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly CHECK_INTERVAL_MS = 30 * 60 * 1000;
+  private onVisibility = () => {
+    if (document.visibilityState === 'visible') void this.checkNow();
+  };
 
   constructor(
     private swUpdate: SwUpdate,
     private ngZone: NgZone,
-    private i18n: I18nService,
   ) { }
 
   start() {
     if (this.started || !this.swUpdate.isEnabled) return;
     this.started = true;
 
-    let notification: Notification;
     this.swUpdate.versionUpdates.subscribe(event => {
       switch (event.type) {
         case 'VERSION_DETECTED':
           console.log(`Downloading new app version: ${event.version.hash}`);
-          Notification.requestPermission().then((permission) => {
-            if (permission === 'granted') {
-              notification = new Notification('Udonarium with Fly', {
-                body: this.i18n.t('update.downloading'),
-                icon: 'hktrpg-icon.png'
-              });
-              notification.addEventListener('click', e => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (notification) {
-                  notification.close();
-                  notification = null;
-                }
-                return false;
-              });
-            }
-          });
           break;
         case 'VERSION_READY':
           console.log(`Current app version: ${(event as VersionReadyEvent).currentVersion.hash}`);
           console.log(`New app version ready for use: ${(event as VersionReadyEvent).latestVersion.hash}`);
           void this.swUpdate.activateUpdate().then(() => {
-            if (notification) {
-              notification.close();
-              notification = null;
-            }
-            this.ngZone.run(() => {
-              this.isUpdateReady = true;
-              EventSystem.trigger('APP_UPDATE_READY', null);
-              console.log('New app version activated; will apply on next reload / restart.');
-            });
+            this.markReady(false);
+            console.log('New app version activated; will apply on next reload / restart.');
+          }).catch(err => {
+            console.warn('Service worker activateUpdate failed', err);
+            this.markReady(true);
           });
           break;
         case 'VERSION_INSTALLATION_FAILED':
-          console.log(`Failed to install app version '${event.version.hash}': ${event.error}`);
+          console.warn(`Failed to install app version '${event.version.hash}': ${event.error}`);
+          this.markReady(true);
           break;
       }
     });
 
-    void this.swUpdate.checkForUpdate().catch(err => {
+    void this.checkNow();
+    this.ngZone.runOutsideAngular(() => {
+      this.checkTimer = setInterval(() => void this.checkNow(), this.CHECK_INTERVAL_MS);
+    });
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
+
+  ngOnDestroy() {
+    if (this.checkTimer != null) {
+      clearInterval(this.checkTimer);
+      this.checkTimer = null;
+    }
+    document.removeEventListener('visibilitychange', this.onVisibility);
+  }
+
+  /**
+   * One-shot for auto popup: true only once per ready cycle.
+   * Manual peer-menu click does not need this.
+   */
+  takeUpdatePrompt(): boolean {
+    if (!this.isUpdateReady || !this.updatePromptPending) return false;
+    this.updatePromptPending = false;
+    return true;
+  }
+
+  /**
+   * Apply pending update. On install failure, unregister SW and drop ngsw caches
+   * so the next load is not stuck on a broken waiting worker.
+   */
+  async applyPendingUpdate(): Promise<void> {
+    if (this.installFailed) {
+      await this.clearBrokenServiceWorker();
+    }
+    document.location.reload();
+  }
+
+  /** Unregister SWs and delete ngsw Cache Storage entries (best-effort). */
+  async clearBrokenServiceWorker(): Promise<void> {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(reg => reg.unregister()));
+      }
+      if (typeof caches !== 'undefined') {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter(k => k.includes('ngsw')).map(k => caches.delete(k)),
+        );
+      }
+    } catch (err) {
+      console.warn('Failed to clear service worker before reload', err);
+    }
+  }
+
+  private checkNow(): Promise<boolean> {
+    if (!this.swUpdate.isEnabled) return Promise.resolve(false);
+    return this.swUpdate.checkForUpdate().catch(err => {
       console.warn('Service worker update check failed', err);
+      return false;
+    });
+  }
+
+  private markReady(failed: boolean) {
+    this.ngZone.run(() => {
+      const firstReady = !this.isUpdateReady;
+      // Success must clear a prior fail so applyPendingUpdate does not wipe a good SW.
+      this.installFailed = failed;
+      this.isUpdateReady = true;
+      // Only arm auto-popup once per ready cycle.
+      if (firstReady) {
+        this.updatePromptPending = true;
+        EventSystem.trigger('APP_UPDATE_READY', null);
+      }
     });
   }
 }

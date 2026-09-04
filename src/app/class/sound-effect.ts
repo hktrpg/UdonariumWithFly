@@ -6,6 +6,7 @@ import { SyncObject } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem, Network } from './core/system';
+import { TableSelecter } from './table-selecter';
 
 export class PresetSound {
   static dicePick: string = '';
@@ -30,15 +31,43 @@ export class PresetSound {
   static ping: string = '';
 }
 
+/** Network / local SOUND_EFFECT payload. Legacy peers may still send a bare string. */
+export type SoundEffectEvent = string | {
+  identifier: string;
+  /** When set, only clients viewing this table play (token move, ping, tabletop SE). */
+  tableId?: string;
+};
+
+/** Pure gate used by SoundEffect listener + unit tests. */
+export function shouldPlaySoundEffectForView(
+  data: SoundEffectEvent | null | undefined,
+  viewedTableId: string,
+): boolean {
+  if (data == null) return false;
+  if (typeof data === 'string') return !!data;
+  if (!data.identifier) return false;
+  if (!data.tableId) return true;
+  return data.tableId === viewedTableId;
+}
+
+function soundEffectIdentifier(data: SoundEffectEvent): string {
+  return typeof data === 'string' ? data : (data?.identifier || '');
+}
+
 @SyncObject('sound-effect')
 export class SoundEffect extends GameObject {
   // GameObject Lifecycle
   onStoreAdded() {
     super.onStoreAdded();
     EventSystem.register(this)
-      .on<string>('SOUND_EFFECT', event => {
+      .on<SoundEffectEvent>('SOUND_EFFECT', event => {
         // Playback only — each peer honors its own chat/jukebox SE mute.
-        AudioPlayer.playSoundEffect(AudioStorage.instance.get(event.data));
+        // Map-scoped events stay on the viewed table (multi-map rooms).
+        const viewed = TableSelecter.instance.viewedTableIdentifier
+          || TableSelecter.instance.viewTableIdentifier
+          || '';
+        if (!shouldPlaySoundEffectForView(event.data, viewed)) return;
+        AudioPlayer.playSoundEffect(AudioStorage.instance.get(soundEffectIdentifier(event.data)));
       })
       .on<string>('SOUND_BOARD', event => {
         AudioPlayer.playSoundboard(AudioStorage.instance.get(event.data));
@@ -50,9 +79,9 @@ export class SoundEffect extends GameObject {
         let chatMessage = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
         if (!chatMessage || !chatMessage.isSendFromSelf || chatMessage.isEmptyDice) return;
         if (Math.random() < 0.5) {
-          SoundEffect.play(PresetSound.diceRoll1);
+          SoundEffect.playRoom(PresetSound.diceRoll1);
         } else {
-          SoundEffect.play(PresetSound.diceRoll2);
+          SoundEffect.playRoom(PresetSound.diceRoll2);
         }
       });
   }
@@ -69,6 +98,10 @@ export class SoundEffect extends GameObject {
     SoundEffect.play(arg);
   }
 
+  /**
+   * Broadcast to peers viewing the same table (token move, put, ping, tabletop SE).
+   * Never gated by local mute (mute is playback-only per peer).
+   */
   static play(identifier: string)
   static play(audio: AudioFile)
   static play(arg: any) {
@@ -78,17 +111,49 @@ export class SoundEffect extends GameObject {
     } else {
       identifier = arg.identifier;
     }
-    SoundEffect._play(identifier);
+    SoundEffect._play(identifier, false);
   }
 
-  /** Broadcast to room. Never gated by local mute (mute is playback-only per peer). */
-  private static _play(identifier: string) {
+  /**
+   * Broadcast to the whole room (chat dice rolls, etc.).
+   * Prefer {@link play} for map-local tabletop sounds.
+   */
+  static playRoom(identifier: string)
+  static playRoom(audio: AudioFile)
+  static playRoom(arg: any) {
+    let identifier = '';
+    if (typeof arg === 'string') {
+      identifier = arg;
+    } else {
+      identifier = arg?.identifier;
+    }
+    SoundEffect._play(identifier, true);
+  }
+
+  private static _play(identifier: string, roomWide: boolean) {
     if (!identifier) return;
+    if (!roomWide) {
+      const tableId = TableSelecter.instance.viewedTableIdentifier
+        || TableSelecter.instance.viewTableIdentifier
+        || '';
+      // No viewed map yet — local only (do not fall back to room-wide).
+      if (!tableId) {
+        SoundEffect._playLocal(identifier);
+        return;
+      }
+      const payload: SoundEffectEvent = { identifier, tableId };
+      EventSystem.trigger('SOUND_EFFECT', payload);
+      for (const peerId of Network.peerIds) {
+        EventSystem.call('SOUND_EFFECT', payload, peerId);
+      }
+      return;
+    }
+    const payload: SoundEffectEvent = { identifier };
     // Play immediately under the user gesture. Network.send broadcasts are
     // echoed back asynchronously via setZeroTimeout and can miss autoplay unlock.
-    EventSystem.trigger('SOUND_EFFECT', identifier);
+    EventSystem.trigger('SOUND_EFFECT', payload);
     for (const peerId of Network.peerIds) {
-      EventSystem.call('SOUND_EFFECT', identifier, peerId);
+      EventSystem.call('SOUND_EFFECT', payload, peerId);
     }
   }
 
@@ -107,7 +172,7 @@ export class SoundEffect extends GameObject {
   /** This client only. Still respects local SE mute on playback. */
   private static _playLocal(identifier: string) {
     if (!identifier) return;
-    EventSystem.trigger('SOUND_EFFECT', identifier);
+    EventSystem.trigger('SOUND_EFFECT', { identifier });
   }
 
   /** Soundboard pad — separate local channel from system SE. Room-synced. */

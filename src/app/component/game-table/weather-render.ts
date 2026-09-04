@@ -24,6 +24,8 @@ interface WeatherLayer {
   index: number;
   depth: number;
   particles: Particle[];
+  /** Cached 2d context — canvas buffer reset clears it; refresh after resize/release. */
+  ctx: CanvasRenderingContext2D | null;
 }
 
 type MotionMode = 'fall' | 'drift' | 'blow' | 'rise' | 'sky';
@@ -117,14 +119,21 @@ export class WeatherRender {
   private frame = 0;
   /** Stable lightning polyline while a flash is active. */
   private bolt: { x: number; y: number }[] = [];
+  /**
+   * Schedule RAF outside Angular's zone when provided (same pixels; no CD from rAF).
+   * Caller typically passes `fn => ngZone.runOutsideAngular(fn)`.
+   */
+  private scheduleOutside: ((fn: () => void) => void) | null = null;
 
-  constructor(canvases: HTMLCanvasElement[]) {
+  constructor(canvases: HTMLCanvasElement[], scheduleOutside?: (fn: () => void) => void) {
     const depths = [0.45, 0.8, 1.2];
+    this.scheduleOutside = scheduleOutside || null;
     this.layers = canvases.map((canvas, index) => ({
       canvas,
       index,
       depth: depths[Math.min(index, depths.length - 1)],
       particles: [],
+      ctx: null,
     }));
   }
 
@@ -133,12 +142,16 @@ export class WeatherRender {
       this.running = true;
       // Paint immediately so enable does not flash an empty oversized canvas for one frame.
       this.tick();
-      const loop = () => {
-        if (!this.running) return;
-        this.tick();
+      const startLoop = () => {
+        const loop = () => {
+          if (!this.running) return;
+          this.tick();
+          this.rafId = requestAnimationFrame(loop);
+        };
         this.rafId = requestAnimationFrame(loop);
       };
-      this.rafId = requestAnimationFrame(loop);
+      if (this.scheduleOutside) this.scheduleOutside(startLoop);
+      else startLoop();
     } else if (!enabled && (this.running || this.lastW > 0 || this.lastH > 0)) {
       this.running = false;
       cancelAnimationFrame(this.rafId);
@@ -151,6 +164,7 @@ export class WeatherRender {
       this.lastIntensity = -1;
       for (const layer of this.layers) {
         layer.particles = [];
+        layer.ctx = null;
         // Release GPU/CPU backing store while weather is off.
         if (layer.canvas.width !== 0) layer.canvas.width = 0;
         if (layer.canvas.height !== 0) layer.canvas.height = 0;
@@ -173,8 +187,14 @@ export class WeatherRender {
     const width = tableW + pad * 2;
     const height = tableH + pad * 2;
     for (const layer of this.layers) {
-      if (layer.canvas.width !== width) layer.canvas.width = width;
-      if (layer.canvas.height !== height) layer.canvas.height = height;
+      if (layer.canvas.width !== width) {
+        layer.canvas.width = width;
+        layer.ctx = null;
+      }
+      if (layer.canvas.height !== height) {
+        layer.canvas.height = height;
+        layer.ctx = null;
+      }
     }
 
     if (type !== this.lastType || intensity !== this.lastIntensity || width !== this.lastW || height !== this.lastH) {
@@ -340,7 +360,7 @@ export class WeatherRender {
     this.updateFlash(type, intensity, width, height);
 
     for (const layer of this.layers) {
-      const ctx = layer.canvas.getContext('2d');
+      const ctx = layer.ctx || (layer.ctx = layer.canvas.getContext('2d'));
       if (!ctx) continue;
       ctx.clearRect(0, 0, width, height);
       const { depth, index } = layer;

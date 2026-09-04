@@ -5,11 +5,15 @@ import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { classifyNoteFile } from '@udonarium/note-file-kind';
+import { a4HeightForWidth } from '@udonarium/table-fx/push-pin.util';
+import { TableSelecter } from '@udonarium/table-selecter';
 import { TextNote } from '@udonarium/text-note';
 
 import { PointerCoordinate } from 'service/pointer-device.service';
 
 const MEGA = 1024 * 1024;
+/** Tabletop PDF paper width in grids — small enough to place, large enough to read mid-zoom. */
+const PDF_NOTE_DEFAULT_WIDTH = 10;
 
 @Injectable({ providedIn: 'root' })
 export class NoteImportService {
@@ -20,9 +24,11 @@ export class NoteImportService {
     const list = Array.from(files || []);
     const created: TextNote[] = [];
     let placed = 0;
+    const flatOnTable = !!TableSelecter.instance.viewTable?.is2DMode;
     for (const file of list) {
       const note = await this.importOne(file);
       if (!note) continue;
+      if (flatOnTable) note.isUpright = false;
       if (options?.addToTable !== false) {
         if (options?.position) {
           const col = placed % 5;
@@ -50,7 +56,8 @@ export class NoteImportService {
     if (kind === 'pdf') {
       if (file.size > 20 * MEGA) return null;
       const pdf = await PdfStorage.instance.addAsync(file);
-      const note = TextNote.create(name, '', 14, 4, 5);
+      const w = PDF_NOTE_DEFAULT_WIDTH;
+      const note = TextNote.create(name, '', 14, w, a4HeightForWidth(w));
       note.setPdf(pdf.identifier);
       return note;
     }

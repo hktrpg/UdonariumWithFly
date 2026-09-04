@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-import { Network } from '@udonarium/core/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { IRoomInfo } from '@udonarium/core/system/network/room-info';
 import { RoomAuth, RoomRole } from '@udonarium/room-auth';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
@@ -18,6 +18,8 @@ export interface RoomInvitePayload {
 export type RoomInviteJoinResult =
   | 'ok'
   | 'notFound'
+  | 'joinDataTimeout'
+  | 'joinNetworkTimeout'
   | 'badPassword'
   | 'roleUnavailable'
   | 'alreadyInRoom'
@@ -26,8 +28,20 @@ export type RoomInviteJoinResult =
 @Injectable({ providedIn: 'root' })
 export class RoomInviteService {
   private rolePasswords: Partial<Record<RoomRole, string>> = {};
+  private networkHooked = false;
+
+  /** Drop stale role secrets when we are not in a room (leave / lobby reopen). */
+  private ensureNetworkHook() {
+    if (this.networkHooked) return;
+    this.networkHooked = true;
+    EventSystem.register(this)
+      .on('OPEN_NETWORK', () => {
+        if (!Network.peer?.isRoom) this.clearRolePasswords();
+      });
+  }
 
   setRolePasswords(passwords: { gm?: string; user?: string; guest?: string }) {
+    this.ensureNetworkHook();
     if (passwords.gm != null) this.rolePasswords.gm = passwords.gm;
     if (passwords.user != null) this.rolePasswords.user = passwords.user;
     if (passwords.guest != null) this.rolePasswords.guest = passwords.guest;
@@ -39,16 +53,23 @@ export class RoomInviteService {
   }
 
   setRolePassword(role: RoomRole, password: string) {
+    this.ensureNetworkHook();
     this.rolePasswords[role] = password || '';
     RoomAuth.rememberSession(role, password || '');
   }
 
   getRolePassword(role: RoomRole): string {
-    return this.rolePasswords[role] || '';
+    this.ensureNetworkHook();
+    // Prefer in-service map; fall back to RoomAuth session (survives map clears / races).
+    return this.rolePasswords[role] || RoomAuth.getSessionRolePassword(role) || '';
   }
 
   clearRolePasswords() {
     this.rolePasswords = {};
+    // Also drop session role secrets so getRolePassword fallback cannot revive a prior room.
+    for (const role of ['gm', 'user', 'guest'] as RoomRole[]) {
+      RoomAuth.rememberSession(role, '');
+    }
   }
 
   buildInviteUrl(role: RoomRole, password?: string): string {
@@ -64,6 +85,15 @@ export class RoomInviteService {
     const url = new URL(window.location.href);
     url.searchParams.set('invite', this.encodeToken(payload));
     return url.toString();
+  }
+
+  /** True when URL has an invite query (even if the token is truncated / corrupt). */
+  hasInviteInLocation(): boolean {
+    try {
+      return new URLSearchParams(window.location.search).has('invite');
+    } catch {
+      return false;
+    }
   }
 
   parseInviteFromLocation(): RoomInvitePayload | null {
@@ -107,7 +137,7 @@ export class RoomInviteService {
     let room: IRoomInfo = null;
 
     for (let i = 0; i < retries; i++) {
-      const rooms = await Network.listAllRooms();
+      const rooms = await Network.listAllRooms(true);
       room = rooms.find(r => r.id === payload.id && r.name === payload.n) || null;
       if (room && room.peers.length > 0) break;
       room = null;
@@ -131,7 +161,11 @@ export class RoomInviteService {
     this.setRolePassword(payload.r, payload.p || '');
     RoomAuth.rememberSession(payload.r, payload.p || '', skywayPassword);
     const ok = await RoomConnectHelper.openAndConnect(room, skywayPassword, targetPeers);
-    return ok ? 'ok' : 'notFound';
+    if (ok) return 'ok';
+    const key = RoomConnectHelper.joinFailMessageKey(RoomConnectHelper.lastJoinFailReason);
+    if (key === 'lobby.joinDataTimeout') return 'joinDataTimeout';
+    if (key === 'lobby.joinNetworkTimeout') return 'joinNetworkTimeout';
+    return 'notFound';
   }
 
   encodeToken(payload: RoomInvitePayload): string {

@@ -5,11 +5,13 @@ import { AudioPlayer, VolumeType } from '@udonarium/core/file-storage/audio-play
 import { AudioSharingSystem } from '@udonarium/core/file-storage/audio-sharing-system';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
+import { formatJukeboxImportRejectLines, JukeboxImportReject } from '@udonarium/core/file-storage/jukebox-import-files';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { PdfSharingSystem } from '@udonarium/core/file-storage/pdf-sharing-system';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoSharingSystem } from '@udonarium/core/file-storage/video-sharing-system';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
+import { RoomFileSyncWatchdog } from '@udonarium/core/file-storage/room-file-sync-watchdog';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory';
@@ -22,9 +24,16 @@ import { DiceBot } from '@udonarium/dice-bot';
 import { Jukebox } from '@udonarium/Jukebox';
 import { AudioLibrary } from '@udonarium/audio-library';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
-import { FilterType, WeatherType } from '@udonarium/game-table';
+import {
+  animateDayNightAtmosphere,
+  isDayAtmosphere,
+  isDuskAtmosphere,
+  isNightAtmosphere,
+} from '@udonarium/table-fx/day-night-atmosphere';
+import { WeatherType } from '@udonarium/game-table';
 import { WEATHER_LABEL_KEY, WEATHER_MENU_ORDER } from 'component/game-table/weather-render';
 
 import { ChatWindowComponent } from 'component/chat-window/chat-window.component';
@@ -62,6 +71,7 @@ import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
 import { DiceRollTableSettingComponent } from 'component/dice-roll-table-setting/dice-roll-table-setting.component';
 import { CutInSettingComponent } from 'component/cut-in-setting/cut-in-setting.component';
 import { CombatTrackerComponent } from 'component/combat-tracker/combat-tracker.component';
+import { TableTimerPanelComponent } from 'component/table-timer-panel/table-timer-panel.component';
 import { SceneToolsComponent } from 'component/scene-tools/scene-tools.component';
 import { ScenePresetComponent } from 'component/scene-preset/scene-preset.component';
 import { ScenarioTextComponent } from 'component/scenario-text/scenario-text.component';
@@ -71,10 +81,12 @@ import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { ScenarioTextList } from '@udonarium/scenario-text-list';
 import { AuraNameConfig } from '@udonarium/table-fx/aura-name-config';
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
+import { TableTimerList } from '@udonarium/table-fx/table-timer';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 
 import { ImageTag } from '@udonarium/image-tag';
 import { CutInService } from 'service/cut-in.service';
+import { TimerService } from 'service/timer.service';
 import { CutIn } from '@udonarium/cut-in';
 import { CutInList } from '@udonarium/cut-in-list';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -83,8 +95,13 @@ import { RoomSettingComponent } from 'component/room-setting/room-setting.compon
 import * as localForage from 'localforage';
 import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import { RoomConnectHelper } from '@udonarium/room-connect-helper';
+import {
+  isDuplicateMemberErrorType,
+  shouldSuppressConfigErrorModal,
+  skyWayRecoveryGate,
+} from '@udonarium/core/system/network/skyway2023/skyway-recovery-policy';
 import { RoomAuth } from '@udonarium/room-auth';
-import { RoomInviteService } from 'service/room-invite.service';
+import { RoomInviteService, RoomInviteJoinResult } from 'service/room-invite.service';
 import { FolderBackupService } from 'service/folder-backup.service';
 import { AppUpdateService } from 'service/app-update.service';
 import { GuidedTourService } from 'service/guided-tour.service';
@@ -94,6 +111,7 @@ import { WeatherSeService } from 'service/weather-se.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
 import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
+import { MAIN_MENU_ITEMS, MainMenuItemDef, tourIdForMenuComponent } from './config/main-menu.def';
 
 interface MobileNavItemDef {
   tourId: string;
@@ -106,6 +124,8 @@ interface MobileNavItemDef {
   /** When true, hide unless canShowMenu(tourId). */
   gated?: boolean;
   chatBadge?: boolean;
+  /** Show system_update badge when a PWA build is ready. */
+  updateBadge?: boolean;
 }
 
 @Component({
@@ -135,34 +155,69 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('modalLayer', { read: ViewContainerRef, static: true }) modalLayerViewContainerRef: ViewContainerRef;
   private immediateUpdateTimer: NodeJS.Timeout = null;
   private lazyUpdateTimer: NodeJS.Timeout = null;
+  tableDropHighlight = false;
+  private static readonly MENU_RAIL_HORIZONTAL_KEY = 'udonarium.menu-rail.horizontal';
   private openPanelCount: number = 0;
   isSaveing: boolean = false;
   progresPercent: number = 0;
 
   isHorizontal = false;
   isLoggedin = false;
+  /** CONNECT_PEER during join must not opelog onto lobby SubTab; flush after JOIN_PROBE_FINISHED. */
+  private pendingRoomConnectLog = false;
   isMobileLayout = false;
   isTabletLandscape = false;
   isMobileEdit = false;
   private inviteHandled = false;
   private lobbyAutoOpened = false;
   private isRefreshPromptOpen = false;
+  private isUpdatePromptOpen = false;
   private mobileSub: Subscription = null;
 
   /** Bottom / rail items — Play vs Edit is a filter, not duplicated markup. */
-  private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = [
-    { tourId: 'menu.connection', icon: 'people', labelKey: 'menu.connection', tipKey: 'tip.menu.connection', mode: 'play', action: 'open', component: 'PeerMenuComponent' },
-    { tourId: 'menu.chat', icon: 'speaker_notes', labelKey: 'menu.chat', tipKey: 'tip.menu.chat', mode: 'play', action: 'open', component: 'ChatWindowComponent', chatBadge: true },
-    { tourId: 'menu.combat', icon: 'sports_mma', labelKey: 'menu.combat', tipKey: 'tip.menu.combat', mode: 'play', action: 'open', component: 'CombatTrackerComponent' },
-    { tourId: 'menu.inventory', icon: 'folder_shared', labelKey: 'menu.inventory', tipKey: 'tip.menu.inventory', mode: 'play', action: 'open', component: 'GameObjectInventoryComponent', gated: true },
-    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'play', action: 'open', component: 'NoteInventoryComponent', gated: true },
-    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'play', action: 'more' },
-    { tourId: 'menu.table', icon: 'layers', labelKey: 'menu.table', tipKey: 'tip.menu.table', mode: 'edit', action: 'open', component: 'GameTableSettingComponent', gated: true },
-    { tourId: 'menu.images', icon: 'photo_library', labelKey: 'menu.images', tipKey: 'tip.menu.images', mode: 'edit', action: 'open', component: 'FileStorageComponent', gated: true },
-    { tourId: 'menu.music', icon: 'queue_music', labelKey: 'menu.music', tipKey: 'tip.menu.music', mode: 'edit', action: 'open', component: 'JukeboxComponent', gated: true },
-    { tourId: 'menu.notes', icon: 'note', labelKey: 'menu.notes', tipKey: 'tip.menu.notes', mode: 'edit', action: 'open', component: 'NoteInventoryComponent', gated: true },
-    { tourId: 'menu.more', icon: 'more_horiz', labelKey: 'menu.more', tipKey: 'tip.menu.more', mode: 'edit', action: 'more' },
-  ];
+  private static buildMobileNavDefs(): MobileNavItemDef[] {
+    const items: MobileNavItemDef[] = [];
+    for (const def of MAIN_MENU_ITEMS) {
+      if (!def.showOnMobile || def.tourId === 'menu.more') continue;
+      const base = {
+        tourId: def.tourId,
+        icon: def.icon,
+        labelKey: def.labelKey,
+        tipKey: def.tipKey || def.labelKey,
+        action: (def.kind === 'contextMenu' ? 'more' : 'open') as 'open' | 'more',
+        component: def.component,
+        gated: def.gated,
+        chatBadge: def.badge === 'chat',
+        updateBadge: def.badge === 'update',
+      };
+      if (def.showOnMobile === 'play' || def.showOnMobile === 'both') {
+        items.push({ ...base, mode: 'play' });
+      }
+      if (def.showOnMobile === 'edit' || def.showOnMobile === 'both') {
+        items.push({ ...base, mode: 'edit' });
+      }
+    }
+    const more = MAIN_MENU_ITEMS.find(d => d.tourId === 'menu.more')!;
+    items.push({
+      tourId: more.tourId,
+      icon: more.icon,
+      labelKey: more.labelKey,
+      tipKey: more.tipKey || more.labelKey,
+      mode: 'play',
+      action: 'more',
+    });
+    items.push({
+      tourId: more.tourId,
+      icon: more.icon,
+      labelKey: more.labelKey,
+      tipKey: more.tipKey || more.labelKey,
+      mode: 'edit',
+      action: 'more',
+    });
+    return items;
+  }
+
+  private static readonly MOBILE_NAV_DEFS: MobileNavItemDef[] = AppComponent.buildMobileNavDefs();
 
   /** Visible mobile nav for current Play/Edit (+ guest forces Play). */
   get mobileNavItems(): MobileNavItemDef[] {
@@ -172,6 +227,40 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (item.gated && !this.canShowMenu(item.tourId)) return false;
       return true;
     });
+  }
+
+  /** Desktop slim icon rail (excludes More overflow). */
+  get desktopMenuItems(): MainMenuItemDef[] {
+    return MAIN_MENU_ITEMS.filter(item => {
+      if (item.tourId === 'menu.more') return false;
+      if (item.gated && !this.canShowMenu(item.tourId)) return false;
+      if (item.tourId === 'menu.timer' && this.GuestMode()) return false;
+      return true;
+    });
+  }
+
+  onDesktopMenuClick(item: MainMenuItemDef, event: Event) {
+    this.guidedTour.notifyMenuClick(item.tourId);
+    switch (item.kind) {
+      case 'open':
+        if (item.component) this.open(item.component);
+        break;
+      case 'toggle':
+        if (item.component) this.openOrToggle(item.component);
+        break;
+      case 'contextMenu':
+        if (item.contextMenu === 'toolbox') this.toolBox(event);
+        else if (item.contextMenu === 'settings') this.standSetteings(event);
+        break;
+      case 'logout':
+        this.logout();
+        break;
+    }
+  }
+
+  isDesktopNavActive(item: MainMenuItemDef): boolean {
+    if (item.kind === 'contextMenu') return this.navContextMenuActive;
+    return this.navActiveTourIds.has(item.tourId);
   }
 
   onMobileNavClick(item: MobileNavItemDef, event: Event) {
@@ -204,12 +293,76 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
    */
   showChatUnreadBadge = false;
   chatUnreadBadgeLabel = '0';
+  /** Cached so APP_UPDATE_READY can refresh the menu badge without NG0100. */
+  showAppUpdateBadge = false;
+  /** Cached nav active flags — do not read PanelService / context menu live in template. */
+  navActiveTourIds = new Set<string>();
+  navContextMenuActive = false;
 
-  private syncChatUnreadBadge() {
-    const n = ChatTabList.instance.unreadLength;
-    this.showChatUnreadBadge = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
-    this.chatUnreadBadgeLabel = n > 99 ? '99+' : String(n);
+  private syncNavActiveState(): boolean {
+    const next = new Set<string>();
+    for (const item of MAIN_MENU_ITEMS) {
+      if (item.tourId && PanelService.isTourPanelOpen(item.tourId)) {
+        next.add(item.tourId);
+      }
+    }
+    for (const item of AppComponent.MOBILE_NAV_DEFS) {
+      if (item.tourId && PanelService.isTourPanelOpen(item.tourId)) {
+        next.add(item.tourId);
+      }
+    }
+    if (PanelService.isTourPanelOpen('menu.lobby')) {
+      next.add('menu.lobby');
+    }
+    const contextActive = this.contextMenuService.isShow;
+    if (this.navContextMenuActive === contextActive && AppComponent.tourIdSetsEqual(next, this.navActiveTourIds)) {
+      return false;
+    }
+    this.navContextMenuActive = contextActive;
+    this.navActiveTourIds = next;
+    return true;
   }
+
+  private static tourIdSetsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) return false;
+    for (const id of a) {
+      if (!b.has(id)) return false;
+    }
+    return true;
+  }
+
+  private syncMenuChromeState(): boolean {
+    const badgeChanged = this.syncChatUnreadBadge();
+    const navChanged = this.syncNavActiveState();
+    return badgeChanged || navChanged;
+  }
+
+  /** Defer menu chrome sync to the next macrotask so dev-mode CD stays stable. */
+  private deferSyncMenuChromeState() {
+    setTimeout(() => {
+      this.syncMenuChromeState();
+    }, 0);
+  }
+
+  private syncChatUnreadBadge(): boolean {
+    const n = ChatTabList.instance.unreadLength;
+    const nextShow = n > 0 && !PanelService.isTourPanelOpen('menu.chat');
+    const nextLabel = n > 99 ? '99+' : String(n);
+    if (this.showChatUnreadBadge === nextShow && this.chatUnreadBadgeLabel === nextLabel) {
+      return false;
+    }
+    this.showChatUnreadBadge = nextShow;
+    this.chatUnreadBadgeLabel = nextLabel;
+    return true;
+  }
+
+  private syncAppUpdateBadge() {
+    this.showAppUpdateBadge = this.appUpdate.isUpdateReady;
+  }
+
+  /** Non-focusing toast for body-level audio import rejects (5s). */
+  audioRejectToastLines: string[] = [];
+  private audioRejectToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
@@ -239,7 +392,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   constructor(
-    private appUpdate: AppUpdateService,
+    public appUpdate: AppUpdateService,
     private modalService: ModalService,
     private panelService: PanelService,
     private pointerDeviceService: PointerDeviceService,
@@ -250,6 +403,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private standImageService: StandImageService,
     private cutInService: CutInService,
+    public timerService: TimerService,
     private i18n: I18nService,
     private roomInvite: RoomInviteService,
     private folderBackup: FolderBackupService,
@@ -259,7 +413,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private maskTokenFx: MaskTokenFxService,
     private weatherSe: WeatherSeService,
     _audioImportName: AudioImportNameService,
-    _connectionBusy: ConnectionBusyService,
+    private connectionBusy: ConnectionBusyService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -276,6 +430,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       PdfStorage.instance;
       VideoSharingSystem.instance.initialize();
       VideoStorage.instance;
+      RoomFileSyncWatchdog.instance.initialize();
       ObjectFactory.instance;
       ObjectSerializer.instance;
       ObjectStore.instance;
@@ -306,10 +461,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     CutInList.instance.initialize();
     ScenePresetList.instance.initialize();
     ScenarioTextList.instance.initialize();
-    const sampleScenario = ScenarioTextList.instance.addItem(this.i18n.t('sample.scenarioText'));
-    sampleScenario.body = this.i18n.t('sample.scenarioTextBody');
+    ScenarioTextList.instance.ensureSample(
+      this.i18n.t('sample.scenarioText'),
+      this.i18n.t('sample.scenarioTextBody'),
+    );
     AuraNameConfig.instance;
     CombatTracker.instance;
+    TableTimerList.instance;
     SceneToolPermission.instance;
 
     let sampleDiceRollTable = new DiceRollTable('SampleDiceRollTable');
@@ -372,6 +530,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         ChatWindowComponent.skipEmptyDialogQuotes = on;
         setSkipEmptyDialogQuotes(on);
       });
+      GmCardPeek.loadFromStorage();
       PanelService.loadGeometryFromStorage();
       PanelService.loadSingleNonChatFromStorage();
       ChatWindowComponent.loadGeometryFromStorage();
@@ -436,6 +595,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       .on('LOCALE_CHANGED', () => {
         // Tab labels use ChatTabList.localizedName() (local display only — do not SyncVar-write).
         this.ngZone.run(() => this.lazyNgZoneUpdate(false));
+      })
+      .on('AUDIO_IMPORT_REJECTED', event => {
+        const rejects = (event.data?.rejects || []) as JukeboxImportReject[];
+        if (!rejects.length) return;
+        this.ngZone.run(() => this.showAudioRejectToast(rejects));
+      })
+      .on('TABLE_DROP_PREVIEW', event => {
+        this.ngZone.run(() => {
+          this.tableDropHighlight = !!event.data?.active;
+        });
       })
       .on<AppConfig>('LOAD_CONFIG', event => {
         if (event.data.dice && event.data.dice.url) {
@@ -528,6 +697,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         PeerCursor.myCursor.peerId = Network.peer.peerId;
         PeerCursor.myCursor.userId = Network.peer.userId;
         this.isLoggedin = false;
+        this.pendingRoomConnectLog = false;
         if (Network.peer?.isRoom) {
           // Survive fatal close() which wipes peer to ??? — needed for room reopen.
           Network.rememberRoomSession({
@@ -536,12 +706,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             roomName: Network.peer.roomName,
             meshPassword: Network.peer.channelPassword || RoomAuth.getSessionMeshPassword() || '',
           });
+          RoomConnectHelper.markRoomSessionRemembered();
+          RoomConnectHelper.startMeshKeepalive();
           // Create / resume: dismiss lobby. Probe join keeps it until a live peer is confirmed.
           if (!RoomConnectHelper.joinInProgress) {
             this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
           }
         } else {
-          Network.clearLastRoomSession();
+          RoomConnectHelper.stopMeshKeepalive();
+          // Do not clear lastRoomSession during auto-reopen / join probe races —
+          // a transient lobby peer would otherwise erase the room credentials mid-game.
+          if (!RoomConnectHelper.isReopenInFlight && !RoomConnectHelper.joinInProgress) {
+            Network.clearLastRoomSession();
+          }
           if (!this.inviteHandled) {
             this.inviteHandled = true;
             this.ngZone.run(async () => {
@@ -554,15 +731,18 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       })
       .on('ROOM_REKEY', event => {
-        // GM changed room auth; reopen into the new encoded roomName.
+        // GM applies via room-setting save — ignore network copy (avoids double Network.open).
         if (event.isSendFromSelf) return;
+        if (PeerCursor.myCursor?.isGMMode) return;
         const roomId = event.data?.roomId;
         const roomName = event.data?.roomName;
         if (!roomId || !roomName) return;
         if (!Network.peer?.isRoom || Network.peer.roomId !== roomId) return;
         if (Network.peer.roomName === roomName) return;
+        const meshPassword = String(event.data?.meshPassword || '');
         this.ngZone.run(() => {
-          RoomConnectHelper.rekeyRoom(roomId, roomName).catch(e => console.warn('ROOM_REKEY failed', e));
+          RoomConnectHelper.rekeyRoom(roomId, roomName, meshPassword)
+            .catch(e => console.warn('ROOM_REKEY failed', e));
         });
       })
       .on('KICK_PEER', event => {
@@ -584,7 +764,47 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           if (quietErrorTypes.includes(errorType)) return;
           this.isLoggedin = false;
 
+          // Prefer room reopen (incl. token refresh) over kicking to lobby / stuck offline.
+          // Join probe owns NETWORK_ERROR while active and briefly after fail (abandon race).
+          if (RoomConnectHelper.isJoinOwningNetworkError) return;
+
+          if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) {
+            if (!RoomConnectHelper.shouldAttemptReopenNow()) {
+              // Recovery already owned (reopen / jitter / join) — no modal spam.
+              if (shouldSuppressConfigErrorModal(errorType, {
+                reopenResult: 'busy',
+                retryPending: RoomConnectHelper.isReopenRetryPending(),
+                coolingDown: skyWayRecoveryGate.isCoolingDown(),
+              }) || RoomConnectHelper.isNetworkReconnecting()) {
+                return;
+              }
+              if (!configErrorTypes.includes(errorType)) return;
+            } else {
+              const result = RoomConnectHelper.reopenLastRoomOrLobby(errorType);
+              if (result === 'started') return;
+              if (result === 'busy') {
+                console.warn('RoomConnectHelper reopen busy; showing error UI if config-related');
+                if (shouldSuppressConfigErrorModal(errorType, {
+                  reopenResult: 'busy',
+                  retryPending: RoomConnectHelper.isReopenRetryPending(),
+                  coolingDown: skyWayRecoveryGate.isCoolingDown(),
+                })) return;
+                if (!configErrorTypes.includes(errorType)) return;
+              } else if (result === 'no-session') {
+                await this.modalService.open(TextViewComponent, {
+                  title: this.i18n.t('net.errorTitle'),
+                  text: this.i18n.t('net.reconnectSessionLost'),
+                });
+                return;
+              }
+            }
+          }
+
           if (configErrorTypes.includes(errorType)) {
+            if (shouldSuppressConfigErrorModal(errorType, {
+              retryPending: RoomConnectHelper.isReopenRetryPending(),
+              coolingDown: skyWayRecoveryGate.isCoolingDown(),
+            })) return;
             await this.modalService.open(TextViewComponent, { title: this.i18n.t('net.errorTitle'), text: errorMessage });
             await this.modalService.open(TextViewComponent, {
               title: this.i18n.t('net.errorTitle'),
@@ -593,9 +813,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
 
-          // Transient drops (cable / SkyWay internal): auto-reopen without blocking modals.
-          if (RoomConnectHelper.isRecoverableNetworkError(errorType)) {
-            RoomConnectHelper.reopenLastRoomOrLobby();
+          // Ghost same-name: suppress fatal only while auto-recovery still owns the outage.
+          // After DUPLICATE_MEMBER_REOPEN_MAX_ATTEMPTS, surface a give-up message.
+          if (isDuplicateMemberErrorType(errorType)) {
+            if (RoomConnectHelper.shouldAttemptRoomReopen(errorType)) return;
+            await this.modalService.open(TextViewComponent, {
+              title: this.i18n.t('net.errorTitle'),
+              text: this.i18n.t('skyway.already-same-name-member-exist-give-up'),
+            });
             return;
           }
 
@@ -609,16 +834,33 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatMessageService.calibrateTimeOffset();
           if (!this.isLoggedin) {
             this.isLoggedin = true;
-            chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
+            if (RoomConnectHelper.joinInProgress) {
+              // Lobby SubTab still present — defer until join clears samples + applies host chat.
+              this.pendingRoomConnectLog = true;
+            } else {
+              chatMessageService.sendOperationLog(this.isRoom ? this.i18n.t('net.connectedRoom', { name: Network.peer.roomName }) : this.i18n.t('net.connectedPeer'));
+            }
           }
         }
+        if (Network.peer?.isRoom) RoomConnectHelper.noteOpenPeerPresence();
         this.lazyNgZoneUpdate(event.isSendFromSelf);
+      })
+      .on('JOIN_PROBE_FINISHED', event => {
+        if (!this.pendingRoomConnectLog) return;
+        this.pendingRoomConnectLog = false;
+        if (!event.data?.ok) return;
+        chatMessageService.sendOperationLog(
+          this.isRoom
+            ? this.i18n.t('net.connectedRoom', { name: Network.peer?.roomName || '' })
+            : this.i18n.t('net.connectedPeer'),
+        );
       })
       .on('DISCONNECT_PEER', event => {
         this.lazyNgZoneUpdate(event.isSendFromSelf);
         // Do not clear isLoggedin here. Any peer DataConnection close used to reset it,
         // which re-logged "connected to room" on the next reconnect (spam in chat).
         // Reset happens on OPEN_NETWORK / NETWORK_ERROR instead.
+        if (Network.peer?.isRoom) RoomConnectHelper.scheduleMeshHeal(true);
       })
       .on('MESSAGE_NORTIFICATION', event => {
         //console.log(event)
@@ -664,6 +906,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .on('MESSAGE_ADDED', () => {
         this.lazyNgZoneUpdate(true);
+      })
+      .on('APP_UPDATE_READY', () => {
+        this.ngZone.run(() => {
+          this.syncAppUpdateBadge();
+          void this.promptAppUpdateIfPending();
+        });
       })
       .on('CHAT_PANEL_CHANGED', () => {
         this.lazyNgZoneUpdate(true);
@@ -750,6 +998,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ngZone.run(() => this.promptRefreshDownload());
   };
 
+  /** Sleep/wake: full room reopen when mesh is dead after a long hide. */
+  private readonly onDocumentVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      RoomConnectHelper.onDocumentHidden();
+      return;
+    }
+    this.ngZone.run(() => RoomConnectHelper.onDocumentVisible());
+  };
+
+  private readonly onWindowPageShow = (event: PageTransitionEvent) => {
+    if (!event.persisted) return;
+    this.ngZone.run(() => RoomConnectHelper.onDocumentVisible({ persisted: true }));
+  };
+
   private promptRefreshDownload() {
     if (this.isRefreshPromptOpen || this.GuestMode() || !this.isRoom) return;
     this.isRefreshPromptOpen = true;
@@ -832,17 +1094,30 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async tryConsumeInvite() {
+    if (!this.roomInvite.hasInviteInLocation()) return;
+
     const payload = this.roomInvite.parseInviteFromLocation();
-    if (!payload) return;
     this.roomInvite.clearInviteFromLocation();
 
-    // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
-    for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+    // Freeze UI for every invite URL (valid or corrupt) — then success or error modal.
+    if (!this.connectionBusy.busy) this.connectionBusy.show('invite.joining');
+    let result: RoomInviteJoinResult = 'invalid';
+    try {
+      // Modal host is wired in ngAfterViewInit; wait briefly if network opens first.
+      for (let i = 0; i < 40 && !ModalService.defaultParentViewContainerRef; i++) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      // Keep overlay visible briefly so corrupt links still feel like a join attempt.
+      if (!payload) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        result = 'invalid';
+      } else {
+        result = await this.roomInvite.joinFromInvite(payload);
+        if (result === 'ok') return;
+      }
+    } finally {
+      this.connectionBusy.hide();
     }
-
-    const result = await this.roomInvite.joinFromInvite(payload);
-    if (result === 'ok') return;
 
     const errorKey = `invite.error.${result}`;
     await this.modalService.open(ConfirmationComponent, {
@@ -854,10 +1129,21 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    localForage.getItem<boolean>(AppComponent.MENU_RAIL_HORIZONTAL_KEY).then(v => {
+      if (typeof v === 'boolean') {
+        this.ngZone.run(() => { this.isHorizontal = v; });
+      }
+    });
     this.maskTokenFx.start();
+    // Invite deep-link: freeze UI immediately (before SkyWay open / lobby), including corrupt tokens.
+    if (this.roomInvite.hasInviteInLocation()) {
+      this.connectionBusy.show('invite.joining');
+    }
     window.addEventListener('beforeunload', AppComponent.beforeUnloadProc);
     window.addEventListener('keydown', this.onWindowKeydown, true);
-    this.syncChatUnreadBadge();
+    document.addEventListener('visibilitychange', this.onDocumentVisibilityChange);
+    window.addEventListener('pageshow', this.onWindowPageShow);
+    this.syncMenuChromeState();
     this.isMobileLayout = this.mobileLayout.isMobile;
     this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
     this.isMobileEdit = this.mobileLayout.isMobile && this.mobileLayout.isEdit;
@@ -894,22 +1180,59 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       const active = s.phase === 'welcome' || s.phase === 'running';
       if (active && !tourWasActive) {
         // Keep the tour unobstructed: no cold-start lobby over welcome / steps.
-        this.ngZone.run(() => PanelService.closePanelsByTourId('menu.lobby'));
+        this.ngZone.run(() => {
+          PanelService.closePanelsByTourId('menu.lobby');
+          this.deferSyncMenuChromeState();
+        });
       }
       if (tourWasActive && !active) {
-        this.ngZone.run(() => this.openDefaultPanels());
+        this.ngZone.run(() => {
+          this.openDefaultPanels();
+        });
       }
       tourWasActive = active;
     });
     
-    // PWA: download in background, activate for next reload; peer-menu shows an icon (no auto-reload).
+    // PWA: download in background; Angular modal prompts reload when ready (no browser Notification).
     this.appUpdate.start();
+    this.syncAppUpdateBadge();
+  }
+
+  /** Auto popup when a new SW build is ready (one-shot via takeUpdatePrompt). */
+  private async promptAppUpdateIfPending() {
+    if (this.isUpdatePromptOpen) return;
+    if (!this.appUpdate.takeUpdatePrompt()) return;
+    this.isUpdatePromptOpen = true;
+    try {
+      const failed = this.appUpdate.installFailed;
+      const result = await this.modalService.open(ConfirmationComponent, {
+        title: this.i18n.t('update.title'),
+        text: this.i18n.t(failed ? 'update.failedText' : 'update.text'),
+        helpHtml: this.i18n.t(failed ? 'update.failedHelp' : 'update.help'),
+        type: ConfirmationType.OK_CANCEL,
+        materialIcon: 'system_update',
+        okLabel: this.i18n.t(failed ? 'update.hardReload' : 'update.restart'),
+      });
+      if (result === false || result == null) return;
+      if (this.folderBackup.isReady) {
+        await this.folderBackup.flush({ timeoutMs: 60000 });
+      }
+      await this.appUpdate.applyPendingUpdate();
+    } finally {
+      this.isUpdatePromptOpen = false;
+    }
   }
 
   ngOnDestroy() {
     EventSystem.unregister(this);
     if (this.noticeIntervalTimer) clearTimeout(this.noticeIntervalTimer);
+    if (this.audioRejectToastTimer != null) {
+      clearTimeout(this.audioRejectToastTimer);
+      this.audioRejectToastTimer = null;
+    }
     window.removeEventListener('keydown', this.onWindowKeydown, true);
+    document.removeEventListener('visibilitychange', this.onDocumentVisibilityChange);
+    window.removeEventListener('pageshow', this.onWindowPageShow);
     this.mobileSub?.unsubscribe();
   }
 
@@ -979,6 +1302,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         option = { width: 520, height: 480, left: 100, title: this.i18n.t('combat.title') };
         if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
         break;
+      case 'TableTimerPanelComponent':
+        component = TableTimerPanelComponent;
+        option = { width: 520, height: 520, left: 100, title: this.i18n.t('timer.panelTitle') };
+        if (this.mobileLayout.isMobile && this.mobileLayout.isPlay) option.mobileSheet = 'half';
+        break;
       case 'SceneToolsComponent':
         if (!SceneToolPermission.instance.canOpenPanel) return;
         component = SceneToolsComponent;
@@ -1045,6 +1373,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (componentName === 'ChatWindowComponent') {
         EventSystem.trigger('CHAT_PANEL_CHANGED', null);
       }
+      this.deferSyncMenuChromeState();
     }
   }
 
@@ -1068,7 +1397,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Network.isOpen && !Network.peer?.isRoom) {
       this.openLobbyIfNeeded();
     }
-    this.syncChatUnreadBadge();
+    this.deferSyncMenuChromeState();
   }
 
   /** Show lobby once on cold start when not already in a room / invite join. */
@@ -1077,7 +1406,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.guidedTour.isActive) return;
     if (!PanelService.defaultParentViewContainerRef) return;
     if (!Network.isOpen || Network.peer?.isRoom) return;
-    if (this.roomInvite.parseInviteFromLocation()) return;
+    if (this.roomInvite.hasInviteInLocation()) return;
+    // Invite join still running (URL already cleared) — do not flash lobby under overlay.
+    if (this.connectionBusy.busy) return;
     this.lobbyAutoOpened = true;
     // Normal UI panel (not modal): no overlay / focus trap; map stays usable.
     PanelService.closePanelsByTourId('menu.lobby');
@@ -1087,28 +1418,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private tourIdForComponent(componentName: string): string | null {
-    switch (componentName) {
-      case 'PeerMenuComponent': return 'menu.connection';
-      case 'ChatWindowComponent': return 'menu.chat';
-      case 'GameTableSettingComponent': return 'menu.table';
-      case 'FileStorageComponent': return 'menu.images';
-      case 'JukeboxComponent': return 'menu.music';
-      case 'CombatTrackerComponent': return 'menu.combat';
-      case 'SceneToolsComponent': return 'menu.sceneTools';
-      case 'ScenePresetComponent': return 'menu.scenePreset';
-      case 'ScenarioTextComponent': return 'menu.scenarioText';
-      case 'GameObjectInventoryComponent': return 'menu.inventory';
-      case 'NoteInventoryComponent': return 'menu.notes';
-      case 'DiceRollTableSettingComponent': return 'menu.diceTable';
-      case 'CutInSettingComponent': return 'menu.cutIn';
-      default: return null;
-    }
+    return tourIdForMenuComponent(componentName);
   }
 
   isNavActive(tourId: string): boolean {
     if (!this.isMobileLayout) return false;
-    if (tourId === 'menu.more') return this.contextMenuService.isShow;
-    return PanelService.isTourPanelOpen(tourId);
+    if (tourId === 'menu.more') return this.navContextMenuActive;
+    return this.navActiveTourIds.has(tourId);
   }
 
   /**
@@ -1132,6 +1448,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       } else {
         PanelService.bringTourPanelToFront(tourId);
       }
+      this.deferSyncMenuChromeState();
       return;
     }
     this.open(componentName);
@@ -1201,7 +1518,27 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     input.value = '';
   }
 
+  /** Body / menu file drops: non-modal notice when audio is over the size cap. */
+  private showAudioRejectToast(rejects: JukeboxImportReject[]) {
+    const maxMb = Math.round(FileArchiver.MAX_AUDIO_BYTES / (1024 * 1024));
+    this.audioRejectToastLines = formatJukeboxImportRejectLines(
+      rejects,
+      (key, params) => this.i18n.t(key, params),
+      maxMb,
+    );
+    if (this.audioRejectToastTimer != null) clearTimeout(this.audioRejectToastTimer);
+    this.audioRejectToastTimer = setTimeout(() => {
+      this.ngZone.run(() => {
+        this.audioRejectToastLines = [];
+        this.audioRejectToastTimer = null;
+      });
+    }, 5000);
+  }
+
   private lazyNgZoneUpdate(isImmediate: boolean) {
+    const flush = () => {
+      this.syncMenuChromeState();
+    };
     if (isImmediate) {
       if (this.immediateUpdateTimer !== null) return;
       this.immediateUpdateTimer = setTimeout(() => {
@@ -1210,9 +1547,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.lazyUpdateTimer);
           this.lazyUpdateTimer = null;
         }
-        // Sync before CD so template bindings stay stable within the check.
-        this.syncChatUnreadBadge();
-        this.ngZone.run(() => { });
+        flush();
       }, 0);
     } else {
       if (this.lazyUpdateTimer !== null) return;
@@ -1222,8 +1557,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           clearTimeout(this.immediateUpdateTimer);
           this.immediateUpdateTimer = null;
         }
-        this.syncChatUnreadBadge();
-        this.ngZone.run(() => { });
+        flush();
       }, 100);
     }
   }
@@ -1233,6 +1567,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.canShowMenu('menu.toolbox')) return;
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1247,6 +1582,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           y: window.pageYOffset + clientRect.top + (this.isHorizontal ? button.clientHeight * 0.9 : 0)
         };
     this.openToolboxAt(position);
+    this.deferSyncMenuChromeState();
   }
 
   /** Mobile primary-nav "More" — mode-aware secondary actions; tap again to collapse. */
@@ -1256,6 +1592,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Second tap on More closes the action sheet (outside-click ignores this button).
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1295,6 +1632,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.canShowMenu('menu.scenarioText')) {
         menu.push({ name: this.i18n.t('menu.scenarioText'), materialIcon: 'menu_book', action: () => this.openOrToggle('ScenarioTextComponent') });
       }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.timer'), materialIcon: 'timer', action: () => this.openOrToggle('TableTimerPanelComponent') });
+      }
     } else {
       if (!this.GuestMode()) {
         menu.push({
@@ -1315,6 +1655,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.canShowMenu('menu.sceneTools')) {
         menu.push({ name: this.i18n.t('menu.sceneTools'), materialIcon: 'architecture', action: () => this.openOrToggle('SceneToolsComponent') });
       }
+      if (!this.GuestMode()) {
+        menu.push({ name: this.i18n.t('menu.timer'), materialIcon: 'timer', action: () => this.openOrToggle('TableTimerPanelComponent') });
+      }
     }
     pushSep();
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
@@ -1327,6 +1670,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     menu.push({ name: this.i18n.t('menu.disconnect'), materialIcon: 'logout', action: () => this.logout() });
     this.contextMenuService.open(position, menu, this.i18n.t('menu.more'));
+    this.deferSyncMenuChromeState();
   }
 
   private openToolboxAt(
@@ -1404,6 +1748,13 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       menu.push({ name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') });
     }
     menu.push(ContextMenuSeparator);
+    if (!this.GuestMode()) {
+      menu.push({
+        name: this.i18n.t('menu.timer'),
+        materialIcon: 'timer',
+        action: () => this.openOrToggle('TableTimerPanelComponent'),
+      });
+    }
     Array.prototype.push.apply(menu, this.buildAlwaysAvailableViewActions());
     menu.push({ name: this.i18n.t('menu.diceOpen'), materialIcon: 'all_out', action: () => this.diceAllOpne() });
     if (!compact) {
@@ -1443,6 +1794,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       subActions: [
         { name: this.i18n.t('toolbox.cutInSettings'), materialIcon: 'movie_creation', action: () => this.open('CutInSettingComponent') },
         { name: this.i18n.t('toolbox.diceTableSettings'), materialIcon: 'table_rows', action: () => this.open('DiceRollTableSettingComponent') },
+        ...(!this.GuestMode() ? [{
+          name: this.i18n.t('menu.timer'),
+          materialIcon: 'timer',
+          action: () => this.openOrToggle('TableTimerPanelComponent'),
+        }] : []),
       ]
     });
     menu.push({
@@ -1578,6 +1934,34 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  /**
+   * Personal settings: change / disconnect folder (was hover-flyout on Load Room).
+   * Two-level menu under 個人設定.
+   */
+  private makeFolderBackupSettingsMenu(): ContextMenuAction {
+    const unsupported = this.folderBackup.status === 'unsupported';
+    const unbound = this.folderBackup.status === 'unbound';
+    return {
+      name: this.i18n.t('menu.folderBackup'),
+      materialIcon: 'folder',
+      disabled: unsupported || this.GuestMode(),
+      subActions: [
+        {
+          name: this.i18n.t('menu.folderBackup.changeFolder'),
+          materialIcon: 'create_new_folder',
+          disabled: unsupported || this.GuestMode(),
+          action: () => { void this.folderBackup.bindFolder(); },
+        },
+        {
+          name: this.i18n.t('menu.folderBackup.disconnectFolder'),
+          materialIcon: 'link_off',
+          disabled: unsupported || unbound || this.GuestMode(),
+          action: () => { void this.folderBackup.unbindFolder(); },
+        },
+      ],
+    };
+  }
+
   private makeWeatherToolboxMenu() {
     const markType = (type: WeatherType) => {
       const cur = TableSelecter.instance.viewTable?.weatherType || 'none';
@@ -1645,27 +2029,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private makeDayNightToolboxMenu() {
-    const DAY_TARGET = 0;
-    const DUSK_TARGET = 0.4;
-    const NIGHT_TARGET = 0.85;
-    const animateDarkness = (target: number) => {
-      const table = TableSelecter.instance.viewTable;
-      if (!table) return;
-      table.backgroundFilterType = target >= 0.5 ? FilterType.BLACK : FilterType.NONE;
-      const start = table.darkness ?? 0;
-      const t0 = performance.now();
-      const dur = 800;
-      const step = (now: number) => {
-        const p = Math.min(1, (now - t0) / dur);
-        table.darkness = p < 1 ? start + (target - start) * p : target;
-        if (p < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    };
     const darkness = () => TableSelecter.instance.viewTable?.darkness ?? 0;
-    const isDay = () => darkness() < 0.2;
-    const isDusk = () => darkness() >= 0.2 && darkness() < 0.5;
-    const isNight = () => darkness() >= 0.5;
+    const isDay = () => isDayAtmosphere(darkness());
+    const isDusk = () => isDuskAtmosphere(darkness());
+    const isNight = () => isNightAtmosphere(darkness());
     return {
       name: this.i18n.t('table.dayNight'),
       materialIcon: 'brightness_6',
@@ -1673,19 +2040,28 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           name: `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
           nameUpdate: () => `${isDay() ? '◉' : '○'} ${this.i18n.t('table.day')}`,
-          action: () => animateDarkness(DAY_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'day');
+          },
           checkBox: 'radio' as const,
         },
         {
           name: `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
           nameUpdate: () => `${isDusk() ? '◉' : '○'} ${this.i18n.t('table.dusk')}`,
-          action: () => animateDarkness(DUSK_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'dusk');
+          },
           checkBox: 'radio' as const,
         },
         {
           name: `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
           nameUpdate: () => `${isNight() ? '◉' : '○'} ${this.i18n.t('table.night')}`,
-          action: () => animateDarkness(NIGHT_TARGET),
+          action: () => {
+            const table = TableSelecter.instance.viewTable;
+            if (table) animateDayNightAtmosphere(table, 'night');
+          },
           checkBox: 'radio' as const,
         },
       ],
@@ -1748,6 +2124,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Nav toggle: second tap closes. Nested opens (More → Settings) use openSettingsAt.
     if (this.contextMenuService.isShow) {
       this.contextMenuService.close();
+      this.deferSyncMenuChromeState();
       return;
     }
     const button = <HTMLElement>event.target;
@@ -1768,6 +2145,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private openSettingsAt(position: { x: number; y: number }) {
     this.guidedTour.notifyMenuClick('menu.settings');
     this.contextMenuService.open(position, this.buildSettingsMenuActions(), this.i18n.t('menu.settings'));
+    this.deferSyncMenuChromeState();
   }
 
   /** Settings actions — shared by nav open and More drill-down. */
@@ -1775,23 +2153,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     return [
       // View / panels
       ...this.buildAlwaysAvailableViewActions(),
-      ContextMenuSeparator,
-      // Grid
-      contextMenuToggleCheck({
-        get: () => TableSelecter.instance.gridShow,
-        set: (v) => {
-          TableSelecter.instance.gridShow = v;
-          EventSystem.trigger('UPDATE_GAME_OBJECT', TableSelecter.instance.toContext());
-        },
-        on: `☑${this.i18n.t('menu.settings.showGrid')}`,
-        off: `☐${this.i18n.t('menu.settings.showGrid')}`,
-      }),
-      contextMenuToggleCheck({
-        get: () => TableSelecter.instance.gridSnap,
-        set: (v) => { TableSelecter.instance.gridSnap = v; },
-        on: `☑${this.i18n.t('menu.settings.gridSnap')}`,
-        off: `☐${this.i18n.t('menu.settings.gridSnap')}`,
-      }),
       ContextMenuSeparator,
       // Chat
       contextMenuToggleCheck({
@@ -1818,6 +2179,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
       }),
+      contextMenuToggleCheck({
+        get: () => GmCardPeek.enabled,
+        set: (v) => { GmCardPeek.setEnabled(v); },
+        on: `☑${this.i18n.t('menu.settings.gmCardPeek')}`,
+        off: `☐${this.i18n.t('menu.settings.gmCardPeek')}`,
+      }),
       ContextMenuSeparator,
       // Desktop UI (music / resource floats are forced off on mobile)
       ...(this.mobileLayout.isMobile ? [] : [
@@ -1832,6 +2199,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
           set: (v) => MusicHudComponent.setVisible(v),
           on: `☑${this.i18n.t('menu.settings.musicHud')}`,
           off: `☐${this.i18n.t('menu.settings.musicHud')}`,
+        }),
+        contextMenuToggleCheck({
+          get: () => this.isHorizontal,
+          set: (v) => this.setMenuRailHorizontal(v),
+          on: `☑${this.i18n.t('menu.settings.horizontalMenu')}`,
+          off: `☐${this.i18n.t('menu.settings.horizontalMenu')}`,
         }),
       ]),
       ContextMenuSeparator,
@@ -1857,6 +2230,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         on: `☑${this.i18n.t('menu.settings.includeAudioInSave')}`,
         off: `☐${this.i18n.t('menu.settings.includeAudioInSave')}`,
       }),
+      this.makeFolderBackupSettingsMenu(),
       ...(this.mobileLayout.isMobile ? [] : [
         contextMenuToggleCheck({
           get: () => PanelService.singleNonChatWindow,
@@ -2009,8 +2383,14 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     throw new Error('Method not implemented.');
   }
 
-  rotateChange(isHorizontal) {
+  rotateChange(isHorizontal: boolean) {
+    this.setMenuRailHorizontal(isHorizontal);
+  }
+
+  private setMenuRailHorizontal(isHorizontal: boolean) {
     this.isHorizontal = isHorizontal;
+    localForage.setItem(AppComponent.MENU_RAIL_HORIZONTAL_KEY, isHorizontal).catch(() => {});
+    this.ngZone.run(() => this.lazyNgZoneUpdate(false));
   }
 
   closeImagePreview() {

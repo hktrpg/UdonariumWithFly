@@ -13,12 +13,18 @@ import {
 import { CryptoUtil } from '../../util/crypto-util';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { SkyWayBackend } from './skyway-backend';
-import { installSkyWayQuietLogger } from './skyway-log';
+import { installSkyWayQuietLogger, isAlreadySameNameMemberExist } from './skyway-log';
+import {
+  DUPLICATE_MEMBER_JOIN_ATTEMPTS,
+  duplicateMemberRetryDelayMs,
+  nextRefreshDelayMs,
+  skyWayRecoveryGate,
+} from './skyway-recovery-policy';
 import { translate } from 'i18n';
 
 export class SkyWayFacade {
-  /** Ghost lobby listings expire faster; too low causes false disconnects on slow links. */
-  private static readonly MEMBER_KEEPALIVE_SEC = 10;
+  /** Lobby/room membership keepalive — shorter interval helps on high-latency mobile links. */
+  private static readonly MEMBER_KEEPALIVE_SEC = 15;
   url = '';
   context: SkyWayContext;
   private lobby: Channel;
@@ -31,12 +37,21 @@ export class SkyWayFacade {
   peer: PeerContext = PeerContext.parse('???');
   get isOpen(): boolean { return this.peer.isOpen };
   private isDestroyed = false;
+  private lobbyJoinTimer: ReturnType<typeof setTimeout> | null = null;
+  private lobbyJoinBackoffMs = 5000;
+  private roomRestoreInFlight = false;
+  private tokenRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private tokenRefreshAttempt = 0;
+  private tokenRefreshGeneration = 0;
 
   onOpen: (peer: IPeerContext) => void;
   onClose: (peer: IPeerContext) => void;
   onFatalError: (peer: IPeerContext, errorType: string, errorMessage: string, errorObject: any) => void;
   onSubscribed: (peer: IPeerContext, subscription: Subscription) => void;
   onRoomRestore: (peer: IPeerContext) => void;
+  onMemberLeft: (peerId: string) => void;
+  /** Fired after a mid-session auth token refresh succeeds — remesh all room members. */
+  onTokenRefreshed: () => void;
 
   async open(peer: IPeerContext) {
     if (this.isOpen) await this.close();
@@ -49,11 +64,11 @@ export class SkyWayFacade {
 
       await this.createContext();
       await this.joinRoom();
-      await this.joinLobby();
-
+      // Room channel (+ data stream) is enough for mesh / Your ID. Lobby Find storms
+      // only power listAllRooms — do not block OPEN_NETWORK on them.
       this.peer.isOpen = true;
-
       if (this.onOpen) this.onOpen(this.peer);
+      void this.ensureLobbyJoined();
     } catch (err) {
       console.error(err);
       const fatal = this.formatFatalError(err);
@@ -61,8 +76,44 @@ export class SkyWayFacade {
     }
   }
 
+  /**
+   * Lobby membership drives listAllRooms only — room mesh does not depend on it.
+   * Failures are retried in the background; never tear down an open room session.
+   */
+  private async ensureLobbyJoined() {
+    if (this.isDestroyed || !this.peer.isRoom) return;
+    try {
+      await this.joinLobby();
+      this.lobbyJoinBackoffMs = 5000;
+    } catch (err) {
+      console.warn('skyWay joinLobby failed; room mesh continues, will retry lobby', err);
+      this.scheduleLobbyJoinRetry();
+    }
+  }
+
+  private scheduleLobbyJoinRetry() {
+    if (this.isDestroyed || !this.peer.isOpen || !this.peer.isRoom) return;
+    if (this.lobbyJoinTimer != null) clearTimeout(this.lobbyJoinTimer);
+    const delayMs = this.lobbyJoinBackoffMs;
+    this.lobbyJoinTimer = setTimeout(() => {
+      this.lobbyJoinTimer = null;
+      void this.ensureLobbyJoined();
+    }, delayMs);
+    this.lobbyJoinBackoffMs = Math.min(this.lobbyJoinBackoffMs * 2, 60000);
+  }
+
+  private clearLobbyJoinRetry() {
+    if (this.lobbyJoinTimer != null) {
+      clearTimeout(this.lobbyJoinTimer);
+      this.lobbyJoinTimer = null;
+    }
+    this.lobbyJoinBackoffMs = 5000;
+  }
+
   async close() {
     try {
+      this.clearLobbyJoinRetry();
+      this.clearTokenRefresh();
       this.peer = PeerContext.parse('???');
       this.isDestroyed = true;
 
@@ -95,31 +146,24 @@ export class SkyWayFacade {
 
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
     if (authToken.length < 1) {
+      skyWayRecoveryGate.noteFailure('token-api');
       let message = translate('skyway.backendUnavailable', { url: backend.url });
-      if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
-      return;
+      const err = new Error(message);
+      err.name = 'server-error';
+      throw err;
     }
 
     let context = await SkyWayContext.Create(authToken);
     context.onTokenUpdateReminder.add(async () => {
       console.log(`skyWay onTokenUpdateReminder ${new Date().toISOString()}`);
-      let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
-      if (authToken.length < 1) {
-        let message = translate('skyway.backendUnavailableShort', { url: backend.url });
-        if (this.onFatalError) this.onFatalError(this.peer, 'server-error', message, new Error(message));
-        return;
-      }
-      context.updateAuthToken(authToken);
+      this.clearTokenRefreshTimersOnly();
+      this.tokenRefreshAttempt = 0;
+      await this.refreshAuthToken(context, backend, channelName, true);
     });
 
     context.onTokenExpired.add(() => {
       console.error('skyWay onTokenExpired');
-      if (this.isOpen) {
-        this.close();
-        if (this.onClose) this.onClose(this.peer);
-      }
-      let message = translate('skyway.tokenExpired');
-      if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
+      void this.handleTokenExpired(context, backend, channelName);
     });
 
     context.onFatalError.add(err => {
@@ -129,10 +173,106 @@ export class SkyWayFacade {
         if (this.onClose) this.onClose(this.peer);
       }
       const fatal = this.formatFatalError(err);
+      if (/rtc-?api/i.test(fatal.type)) {
+        skyWayRecoveryGate.noteFailure('rtc-api');
+      }
       if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
     });
 
     this.context = context;
+  }
+
+  private clearTokenRefresh() {
+    this.clearTokenRefreshTimersOnly();
+    this.tokenRefreshGeneration++;
+    this.tokenRefreshAttempt = 0;
+  }
+
+  /** Clear pending retry without bumping generation (mid-session reminder restart). */
+  private clearTokenRefreshTimersOnly() {
+    if (this.tokenRefreshTimer != null) {
+      clearTimeout(this.tokenRefreshTimer);
+      this.tokenRefreshTimer = null;
+    }
+  }
+
+  private async refreshAuthToken(
+    context: SkyWayContext,
+    backend: SkyWayBackend,
+    channelName: string,
+    scheduleRetry: boolean,
+  ): Promise<boolean> {
+    if (this.isDestroyed || !context || context.disposed) return false;
+    const gen = this.tokenRefreshGeneration;
+    const authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
+    if (gen !== this.tokenRefreshGeneration || this.isDestroyed) return false;
+    if (authToken.length < 1) {
+      skyWayRecoveryGate.noteFailure('token-api');
+      const message = translate('skyway.backendUnavailableShort', { url: backend.url });
+      console.warn(`token-refresh: attempt ${this.tokenRefreshAttempt} failed: ${message}`);
+      if (scheduleRetry && !this.isDestroyed) {
+        this.clearTokenRefreshTimersOnly();
+        const delay = nextRefreshDelayMs(this.tokenRefreshAttempt);
+        this.tokenRefreshAttempt++;
+        console.warn(`token-refresh: retry in ${delay}ms`);
+        this.tokenRefreshTimer = setTimeout(() => {
+          this.tokenRefreshTimer = null;
+          void this.refreshAuthToken(context, backend, channelName, true);
+        }, delay);
+      }
+      return false;
+    }
+    try {
+      context.updateAuthToken(authToken);
+      this.tokenRefreshAttempt = 0;
+      this.clearTokenRefreshTimersOnly();
+      skyWayRecoveryGate.noteSuccess();
+      console.log('token-refresh: success');
+      this.notifyTokenRefreshed();
+      return true;
+    } catch (e) {
+      console.warn('token-refresh: updateAuthToken failed', e);
+      if (scheduleRetry && !this.isDestroyed) {
+        this.clearTokenRefreshTimersOnly();
+        const delay = nextRefreshDelayMs(this.tokenRefreshAttempt);
+        this.tokenRefreshAttempt++;
+        this.tokenRefreshTimer = setTimeout(() => {
+          this.tokenRefreshTimer = null;
+          void this.refreshAuthToken(context, backend, channelName, true);
+        }, delay);
+      }
+      return false;
+    }
+  }
+
+  private notifyTokenRefreshed() {
+    if (this.onTokenRefreshed) this.onTokenRefreshed();
+  }
+
+  private async handleTokenExpired(
+    context: SkyWayContext,
+    backend: SkyWayBackend,
+    channelName: string,
+  ) {
+    this.clearTokenRefresh();
+    // Best-effort final refresh with a short timeout — do not hang close().
+    const final = Promise.race([
+      this.refreshAuthToken(context, backend, channelName, false),
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 2500)),
+    ]);
+    const ok = await final;
+    if (ok && !this.isDestroyed) {
+      console.log('token-refresh: recovered after expiry reminder race');
+      this.notifyTokenRefreshed();
+      return;
+    }
+    if (this.isOpen) {
+      this.close();
+      if (this.onClose) this.onClose(this.peer);
+    }
+    const message = translate('skyway.tokenExpired');
+    skyWayRecoveryGate.noteFailure('token-expired');
+    if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
   }
 
   private async joinLobby() {
@@ -173,30 +313,35 @@ export class SkyWayFacade {
   }
 
   private async joinLobbyPerson() {
-    await this.leaveLobbyPerson();
-    if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
+    const maxAttempts = DUPLICATE_MEMBER_JOIN_ATTEMPTS;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.leaveLobbyPerson();
+      if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
 
-    let lobbyPerson = await this.lobby.join({
-      name: this.peer.peerId,
-      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
-    });
+      try {
+        const lobbyPerson = await this.lobby.join({
+          name: this.peer.peerId,
+          keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
+        });
 
-    lobbyPerson.onFatalError.add(async err => {
-      console.error('lobbyPerson onFatalError', err);
-      // Lobby membership is what listAllPeers uses — try rejoin without tearing down the room.
-      if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
-        try {
-          await this.joinLobby();
-          return;
-        } catch (rejoinErr) {
-          console.error('lobbyPerson rejoin failed', rejoinErr);
-        }
+        lobbyPerson.onFatalError.add(err => {
+          console.warn('lobbyPerson onFatalError; retrying lobby in background', err);
+          if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+            this.scheduleLobbyJoinRetry();
+          }
+        });
+
+        this.lobbyPerson = lobbyPerson;
+        return;
+      } catch (err) {
+        if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
+        const delayMs = duplicateMemberRetryDelayMs(attempt);
+        console.warn(`skyWay joinLobbyPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        await this.leaveLobbyChannel();
+        await this.joinLobbyChannel();
       }
-      const fatal = this.formatFatalError(err);
-      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
-    });
-
-    this.lobbyPerson = lobbyPerson;
+    }
   }
 
   private async joinRoom() {
@@ -220,29 +365,77 @@ export class SkyWayFacade {
       if (this.onRoomRestore) this.onRoomRestore(this.peer);
     });
 
+    room.onMemberLeft.add(event => {
+      const peerId = event.member?.name;
+      if (peerId && peerId !== this.peer.peerId && this.onMemberLeft) {
+        this.onMemberLeft(peerId);
+      }
+    });
+
     this.room = room;
   }
 
   private async joinRoomPerson() {
-    await this.leaveRoomPerson();
-    if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
+    const maxAttempts = DUPLICATE_MEMBER_JOIN_ATTEMPTS;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.leaveRoomPerson();
+      if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
 
-    let roomPerson = await this.room.join({
-      name: this.peer.peerId,
-      keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
-    });
+      try {
+        const roomPerson = await this.room.join({
+          name: this.peer.peerId,
+          keepaliveIntervalSec: SkyWayFacade.MEMBER_KEEPALIVE_SEC,
+        });
 
-    roomPerson.onFatalError.add(err => {
-      console.error('roomPerson onFatalError', err);
-      if (this.isOpen) {
-        this.close();
-        if (this.onClose) this.onClose(this.peer);
+        roomPerson.onFatalError.add(err => {
+          console.warn('roomPerson onFatalError; attempting room restore', err);
+          if (this.isOpen && this.peer.isRoom && !this.isDestroyed) {
+            void this.restoreRoomMembership().catch(() => {
+              if (!this.isOpen) return;
+              this.close();
+              if (this.onClose) this.onClose(this.peer);
+              const fatal = this.formatFatalError(err);
+              if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
+            });
+            return;
+          }
+          if (this.isOpen) {
+            this.close();
+            if (this.onClose) this.onClose(this.peer);
+          }
+          const fatal = this.formatFatalError(err);
+          if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
+        });
+
+        this.roomPerson = roomPerson;
+        return;
+      } catch (err) {
+        if (!isAlreadySameNameMemberExist(err) || attempt >= maxAttempts - 1) throw err;
+        const delayMs = duplicateMemberRetryDelayMs(attempt);
+        console.warn(`skyWay joinRoomPerson duplicate member name; retry ${attempt + 1}/${maxAttempts} in ${delayMs}ms`);
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        await this.leaveRoomChannel();
+        await this.joinRoomChannel();
       }
-      const fatal = this.formatFatalError(err);
-      if (this.onFatalError) this.onFatalError(this.peer, fatal.type, fatal.message, err);
-    });
+    }
+  }
 
-    this.roomPerson = roomPerson;
+  /** Rejoin room member + republish data stream after transient channel errors. */
+  private async restoreRoomMembership() {
+    if (this.isDestroyed || !this.peer.isRoom) return;
+    if (this.roomRestoreInFlight) {
+      setTimeout(() => void this.restoreRoomMembership(), 3000);
+      return;
+    }
+    this.roomRestoreInFlight = true;
+    try {
+      await this.closeRoomDataStream();
+      await this.joinRoomPerson();
+      await this.createRoomDataStream();
+      if (this.onRoomRestore) this.onRoomRestore(this.peer);
+    } finally {
+      this.roomRestoreInFlight = false;
+    }
   }
 
   private async createRoomDataStream() {

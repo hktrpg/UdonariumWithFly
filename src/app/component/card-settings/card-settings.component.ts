@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges
 
 import { Card } from '@udonarium/card';
 import { EventSystem, Network } from '@udonarium/core/system';
-import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { SaveDataService } from 'service/save-data.service';
+import { canRevealCardCaption } from 'service/card-caption-text';
 
 @Component({
   selector: 'card-settings',
@@ -34,16 +34,16 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
   GuestMode() { return Network.GuestMode(); }
 
   get isVisible(): boolean {
-    if (!this.card) return false;
-    if (PeerCursor.myCursor?.isGMMode) return true;
-    return this.card.isFront || this.card.isHand;
+    return canRevealCardCaption(this.card);
   }
 
   get cardName(): string {
-    return this.card?.name ?? '';
+    if (!this.card) return '';
+    if (!this.isVisible) return this.i18n.t('card.back');
+    return this.card.name ?? '';
   }
   set cardName(value: string) {
-    if (!this.card || this.GuestMode()) return;
+    if (!this.card || this.GuestMode() || !this.isVisible) return;
     const el = this.card.commonDataElement?.getFirstElementByName('name');
     if (el) el.value = value;
   }
@@ -60,6 +60,10 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
         }
       })
       .on('UPDATE_FILE_RESOURE', () => this.changeDetector.markForCheck())
+      .on('CHANGE_GM_CARD_PEEK', () => {
+        this.refreshTitle();
+        this.changeDetector.markForCheck();
+      })
       .on('LOCALE_CHANGED', () => this.refreshTitle());
     this.card?.complement();
     this.refreshTitle();
@@ -78,6 +82,7 @@ export class CardSettingsComponent implements OnInit, OnChanges, OnDestroy {
 
   openImage(name: 'front' | 'back') {
     if (!this.card || this.GuestMode()) return;
+    if (name === 'front' && !this.isVisible) return;
     const current = this.card.imageDataElement?.getFirstElementByName(name)?.value + '' || '';
     this.modalService.open<string>(FileSelecterComponent, {
       isAllowedEmpty: false,

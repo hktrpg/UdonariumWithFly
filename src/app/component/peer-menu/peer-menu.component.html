@@ -1,4 +1,5 @@
-<div class="settings-ui dense peer-menu" appFitPanel [fitMinHeight]="320" [fitMaxHeight]="560">
+<!-- fitMaxHeight 0 = viewport cap (not a short 560px ceiling that clips the peer list). -->
+<div class="settings-ui dense peer-menu" appFitPanel [fitMinHeight]="320" [fitMaxHeight]="0">
   <section class="card card-dense">
     <div class="lang-row">
       <label class="lang-label">{{ 'peer.language' | i18n }}</label>
@@ -43,7 +44,9 @@
         </button>
         <span [@fadeInOut]="isCopied" class="copied" [style.color]="myPeerColor">{{ isCopied ? ('peer.copied' | i18n) : '' }}</span>
       </ng-container>
-      <ng-template #offlineBlock><b>{{ 'peer.offline' | i18n }}</b></ng-template>
+      <ng-template #offlineBlock>
+        <b>{{ (isYourIdReconnecting ? 'peer.connecting' : 'peer.offline') | i18n }}</b>
+      </ng-template>
     </div>
 
     <ng-container *ngIf="networkService.peer.isRoom">
@@ -60,7 +63,6 @@
           <span [@fadeInOut]="isRoomNameCopied" class="copied" [style.color]="myPeerColor">{{ isRoomNameCopied ? ('peer.copied' | i18n) : '' }}</span>
         </ng-container>
       </div>
-      <p class="hint" *ngIf="isRoleAuthRoom">{{ 'peer.roleAuthHint' | i18n }}</p>
       <div *ngIf="isRoleAuthRoom" class="invite-block">
         <div class="invite-label">{{ 'peer.copyInvite.title' | i18n }}</div>
         <div class="invite-row actions">
@@ -136,24 +138,13 @@
         [disabled]="folderBackup.status === 'writing'">
         <i class="material-icons">save</i>{{ 'menu.folderBackup.saveRoom' | i18n }}
       </button>
-      <div class="save-folder-wrap" *ngIf="folderBackup.canLoadFromFolder">
-        <button type="button" class="btn btn-sm" (click)="loadFolderBackup()"
-          [disabled]="!canLoadRoom"
-          [title]="canLoadRoom ? ('menu.folderBackup.loadRoom' | i18n) : ('peer.loadData.gmOnly' | i18n)">
-          <i class="material-icons">folder_open</i>
-          {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
-        </button>
-        <div class="save-folder-flyout" role="menu">
-          <button type="button" role="menuitem" (click)="changeFolderBackup()">
-            <i class="material-icons" aria-hidden="true">create_new_folder</i>
-            {{ 'menu.folderBackup.changeFolder' | i18n }}
-          </button>
-          <button type="button" role="menuitem" (click)="unbindFolderBackup()">
-            <i class="material-icons" aria-hidden="true">link_off</i>
-            {{ 'menu.folderBackup.disconnectFolder' | i18n }}
-          </button>
-        </div>
-      </div>
+      <button type="button" class="btn btn-sm" *ngIf="folderBackup.canLoadFromFolder"
+        (click)="loadFolderBackup()"
+        [disabled]="!canLoadRoom"
+        [title]="canLoadRoom ? null : ('peer.loadData.gmOnly' | i18n)">
+        <i class="material-icons">folder_open</i>
+        {{ 'menu.folderBackup.loadRoom' | i18n }}<ng-container *ngIf="!canLoadRoom">（{{ 'peer.loadData.gmOnly' | i18n }}）</ng-container>
+      </button>
       <span class="folder-status" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
         {{ folderBackup.status === 'writing'
           ? ('menu.folderBackup.status.writing' | i18n)
@@ -165,9 +156,6 @@
           : ('menu.folderBackup.status.needAuth' | i18n) }}
         <ng-container *ngIf="folderBackup.lastError"> — {{ folderBackup.lastError }}</ng-container>
       </span>
-      <p class="hint folder-auto-hint" *ngIf="folderBackup.isReady || folderBackup.status === 'writing'">
-        {{ 'menu.folderBackup.autoStoreHint' | i18n }}
-      </p>
     </div>
     <div class="connect-actions actions">
       <ng-container *ngIf="!networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">
@@ -177,7 +165,7 @@
       <button type="button" class="btn btn-sm btn-primary" (click)="showLobby()" [disabled]="!networkService.isOpen">
         <i class="material-icons">meeting_room</i>{{ 'peer.lobby' | i18n }}
       </button>
-      <button type="button" class="btn btn-sm" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
+      <button type="button" class="btn btn-sm" *ngIf="!networkService.peer.isRoom" (click)="showCreateRoom()" [disabled]="!networkService.isOpen">
         <i class="material-icons">room_preferences</i>{{ 'lobby.createRoom' | i18n }}
       </button>
       <button type="button" class="btn btn-sm" *ngIf="isGMMode && networkService.peer.isRoom && isRoleAuthRoom" (click)="editRoomPasswords()">
@@ -192,6 +180,9 @@
     <ng-container *ngIf="networkService.peer.isRoom && canUsePrivateSession && !isGMMode && !isGMHold">
       <p class="hint">{{ 'peer.helpNoPrivateInRoom' | i18n }}</p>
     </ng-container>
+    <p class="hint" *ngIf="networkService.peer.isRoom && networkService.peers.length < 1 && isYourIdReconnecting">
+      {{ 'room.rekeyPeerListHint' | i18n }}
+    </p>
   </section>
 
   <section class="card card-dense" *ngIf="networkService.peers.length">
@@ -209,7 +200,7 @@
       <i class="material-icons health health-red">sentiment_very_dissatisfied</i>
       <span class="health"> {{ 'peer.healthBad' | i18n }}）</span>
     </p>
-    <div class="peer-info" *ngFor="let peer of networkService.peers">
+    <div class="peer-info" *ngFor="let peer of networkService.peers; trackBy: trackPeerById">
       <span *ngIf="!peer.isOpen">{{ 'peer.connecting' | i18n }}</span>
       <span class="peer-row">
         <span [ngClass]="{'is-gm-mode': findPeerIsGMMode(peer.peerId)}">
@@ -229,23 +220,31 @@
         </button>
       </span>
       <div class="session-info" [style.border-left-color]="findPeerColor(peer.peerId)">
-        <span>{{ 'peer.sessionStatus' | i18n }}
-          {{ 'peer.grade' | i18n }}:{{ stringFromSessionGrade(peer.session.grade) }} ({{ candidateLabel(peer.session.description) }})
-          {{ 'peer.health' | i18n }}:{{ (peer.session.health * 100).toFixed(0) }}%
-          {{ 'peer.speed' | i18n }}:{{ (peer.session.speed * 100).toFixed(0) }}%
-          {{ 'peer.ping' | i18n:{ n: peer.session.ping.toFixed(1) } }}</span>
+        <div class="session-metrics" *ngIf="peer.isOpen">
+          <span class="metric">{{ 'peer.ping' | i18n:{ n: formatPing(peer.session.ping) } }}</span>
+          <span class="metric">{{ 'peer.speed' | i18n:{ rate: formatBitrate(peer.session.bitrateInstantBps) } }}</span>
+          <span class="metric">{{ 'peer.maxSpeed' | i18n:{ rate: formatBitrate(peer.session.bitrateBps) } }}</span>
+          <span class="metric">{{ 'peer.path' | i18n:{ path: candidateLabel(peer.session.description) } }}</span>
+        </div>
+        <span class="metric metric-muted" *ngIf="!peer.isOpen">{{ 'peer.connecting' | i18n }}</span>
       </div>
     </div>
   </section>
 
   <div class="app-version">
+    <button type="button" class="mesh-diag-icon" *ngIf="isAbleClipboardCopy()"
+      (click)="copyMeshDiag()" [disabled]="isMeshDiagCopied"
+      [attr.title]="(isMeshDiagCopied ? 'peer.copyMeshDiag.copied' : 'peer.copyMeshDiag.title') | i18n"
+      [attr.aria-label]="'peer.copyMeshDiag' | i18n">
+      <i class="material-icons">bug_report</i>
+    </button>
     <span>{{ 'peer.version' | i18n:{ version: appVersionDisplay } }}</span>
     <i *ngIf="appUpdate.isUpdateReady" class="material-icons app-update-icon"
       role="button" tabindex="0"
       (click)="confirmApplyUpdate($event)"
       (keydown.enter)="confirmApplyUpdate($event)"
       (keydown.space)="confirmApplyUpdate($event)"
-      [attr.title]="'update.readyHint' | i18n"
-      [attr.aria-label]="'update.readyHint' | i18n">system_update</i>
+      [attr.title]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n"
+      [attr.aria-label]="(appUpdate.installFailed ? 'update.failedHint' : 'update.readyHint') | i18n">system_update</i>
   </div>
 </div>

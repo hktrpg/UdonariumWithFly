@@ -20,10 +20,19 @@ export interface PeerSessionState {
   readonly health: number;
   /**
    * Speed score in `[0.0, 1.0]`. Higher is faster.
+   * Kept for compatibility; UI prefers bitrate fields.
    */
   readonly speed: number;
   /**
-   * Optional description of the connection.
+   * Instantaneous link throughput (bytes/sec, in+out) for UI「速度」.
+   */
+  readonly bitrateInstantBps: number;
+  /**
+   * Stable session-peak throughput (bytes/sec) for UI「最高」.
+   */
+  readonly bitrateBps: number;
+  /**
+   * Optional description of the connection (ICE candidate type).
    */
   readonly description: string;
 }
@@ -33,5 +42,7 @@ export interface MutablePeerSessionState extends PeerSessionState {
   ping: number;
   health: number;
   speed: number;
+  bitrateInstantBps: number;
+  bitrateBps: number;
   description: string;
 }

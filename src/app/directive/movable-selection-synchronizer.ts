@@ -1,4 +1,8 @@
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { CardStack } from '@udonarium/card-stack';
+import { CharacterToken } from '@udonarium/character-token';
+import { EventSystem } from '@udonarium/core/system';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -16,19 +20,67 @@ import { MovableDirective } from './movable.directive';
 
 export class MovableSelectionSynchronizer {
   private static readonly objectMap: Map<TabletopObject, Set<MovableDirective>> = new Map();
-  /** Tracks whether the last sync placed this token on a terrain floor. */
+  /** Tracks whether the last sync placed this token on a terrain / card-stack floor. */
   private static readonly floorRideActive = new WeakMap<object, boolean>();
-  /** Last terrain floor Z we wrote while riding — used so leave-to-0 does not wipe stacks. */
+  /** Last floor Z we wrote while riding — used so leave-to-0 does not wipe stacks. */
   private static readonly floorRidePosZ = new WeakMap<object, number>();
   private static readonly FLOOR_Z_EPS = 0.05;
+  private static cardStackRideHooksInstalled = false;
+
+  /** Register once: keep tokens on card-stack tops when deck height changes. */
+  static ensureCardStackRideHooks() {
+    if (MovableSelectionSynchronizer.cardStackRideHooksInstalled) return;
+    MovableSelectionSynchronizer.cardStackRideHooksInstalled = true;
+    EventSystem.register(MovableSelectionSynchronizer)
+      .on('CARD_STACK_DECREASED', () => MovableSelectionSynchronizer.resyncAllTokenFloors())
+      .on(`UPDATE_GAME_OBJECT/aliasName/${CardStack.aliasName}`, () => {
+        MovableSelectionSynchronizer.resyncAllTokenFloors();
+      });
+  }
+
+  /** Re-sample every table character/token (cheap; only writes when Z changes). */
+  static resyncAllTokenFloors() {
+    if (TableSelecter.instance?.viewTable?.is2DMode) return;
+    for (const ch of ObjectStore.instance.getObjects(GameCharacter)) {
+      if (ch.location?.name === 'table') MovableSelectionSynchronizer.syncTerrainFloor(ch);
+    }
+    for (const tok of ObjectStore.instance.getObjects(CharacterToken)) {
+      if (tok.location?.name === 'table') MovableSelectionSynchronizer.syncTerrainFloor(tok);
+    }
+  }
 
   /**
-   * Keep character/token feet on Terrain.floorHitAt while nudging / pathing.
+   * Analytic ride Z at a world XY — max of terrain floor and card-stack top.
+   * Used while dragging and after snap so tokens sit on deck thickness.
+   */
+  static sampleRidePosZ(worldX: number, worldY: number, gridSize: number = 50): number | null {
+    MovableSelectionSynchronizer.ensureCardStackRideHooks();
+    const table = TableSelecter.instance?.viewTable;
+    if (!table || table.is2DMode) return null;
+
+    let best: number | null = null;
+    const terrains = table.terrains;
+    if (terrains?.length) {
+      const hit = Terrain.floorHitAt(terrains, worldX, worldY, gridSize);
+      if (hit) best = hit.posZ;
+    }
+    const stacks = ObjectStore.instance.getObjects(CardStack)
+      .filter(s => s.location?.name === 'table');
+    const stackHit = CardStack.surfaceHitAt(stacks, worldX, worldY, gridSize);
+    if (stackHit) {
+      best = best == null ? stackHit.posZ : Math.max(best, stackHit.posZ);
+    }
+    return best;
+  }
+
+  /**
+   * Keep character/token feet on terrain / card-stack tops while nudging / pathing / drop.
    * No new SyncVars; only adjusts posZ when over an interactable floor.
    * Leaving a floor drops to 0 only when posZ still matches the last ride Z
    * (character-stack / manual lifts that diverged are left alone).
    */
   static syncTerrainFloor(target: MovableDirective | TabletopObject): void {
+    MovableSelectionSynchronizer.ensureCardStackRideHooks();
     const asMovable = target as MovableDirective;
     const isMovable = !!asMovable && typeof asMovable.posX === 'number' && !!asMovable.tabletopObject
       && asMovable.nativeElement != null;
@@ -46,19 +98,6 @@ export class MovableSelectionSynchronizer {
       else object.posZ = z;
     };
 
-    const terrains = TableSelecter.instance?.viewTable?.terrains;
-    if (!terrains?.length) {
-      // Map switch / empty table: drop ride tracking only — do not force posZ.
-      MovableSelectionSynchronizer.floorRideActive.delete(key);
-      MovableSelectionSynchronizer.floorRidePosZ.delete(key);
-      return;
-    }
-    // Fast path: no interactable floors and not currently riding → skip O(n) sample.
-    if (!MovableSelectionSynchronizer.floorRideActive.get(key)
-      && !terrains.some(t => t?.hasFloor && t.isInteract && t.location?.name === 'table')) {
-      return;
-    }
-
     let cx: number;
     let cy: number;
     if (isMovable) {
@@ -73,11 +112,11 @@ export class MovableSelectionSynchronizer {
       cy = object.location.y + half;
     }
 
-    const hit = Terrain.floorHitAt(terrains, cx, cy, 50);
-    if (hit) {
+    const rideZ = MovableSelectionSynchronizer.sampleRidePosZ(cx, cy, 50);
+    if (rideZ != null) {
       MovableSelectionSynchronizer.floorRideActive.set(key, true);
-      MovableSelectionSynchronizer.floorRidePosZ.set(key, hit.posZ);
-      writeZ(hit.posZ);
+      MovableSelectionSynchronizer.floorRidePosZ.set(key, rideZ);
+      writeZ(rideZ);
       return;
     }
     if (!MovableSelectionSynchronizer.floorRideActive.get(key)) return;
@@ -105,6 +144,16 @@ export class MovableSelectionSynchronizer {
     return selected;
   }
 
+  /**
+   * Primary + drag followers for the active multi-drag session.
+   * Stable across mid-drag selection clears (peer sync / disable races).
+   */
+  get sessionMovables(): Set<MovableDirective> {
+    const set = new Set<MovableDirective>(this.dragFollowers);
+    if (this.movable) set.add(this.movable);
+    return set;
+  }
+
   private callbackOnPickStart = this.onPickStart.bind(this);
   private callbackOnPickObject = this.onPickObject.bind(this);
   private callbackOnPickRegion = this.onPickRegion.bind(this);
@@ -116,6 +165,9 @@ export class MovableSelectionSynchronizer {
   private latestRectPoints: IPoint2D[] = [];
   /** Movables participating in the current drag (includes absorbed MAGNETIC). */
   private undoTargets: Set<MovableDirective> = new Set();
+  /** Secondaries snapped at prepareMove — moved even if selection drops mid-drag. */
+  private dragFollowers: Set<MovableDirective> = new Set();
+  private dragSessionActive = false;
 
   constructor(
     private movable: MovableDirective,
@@ -224,20 +276,57 @@ export class MovableSelectionSynchronizer {
   prepareMove() {
     this.beginUndoCapture();
     this.absorbBakeGroupIntoSelection();
+    this.clearDragFollowers();
+    this.dragSessionActive = this.movable.state !== SelectionState.NONE;
 
-    if (!this.shouldSynchronize()) return;
+    if (!this.dragSessionActive) return;
 
     for (let movable of this.selectedMovables) {
       if (movable === this.movable) continue;
       if (movable.isDisable) {
         movable.state = SelectionState.NONE;
       } else {
-        movable.state = SelectionState.SELECTED;
-        movable.setPointerEvents(false);
-        movable.setAnimatedTransition(false);
+        this.attachDragFollower(movable);
         this.trackUndoTarget(movable);
       }
     }
+  }
+
+  /**
+   * Cancel mid-drag without flush — restore follower PE/flags.
+   * Also ends a completed session after flush (onInputEnd → cancel).
+   * Called from MovableDirective.cancel() (context menu, destroy, etc.).
+   */
+  abortMove() {
+    if (!this.dragSessionActive && this.dragFollowers.size < 1) return;
+    const midDragAbort = this.undoTargets.size > 0;
+    for (const movable of this.dragFollowers) {
+      movable.isDragFollower = false;
+      movable.setPointerEvents(true);
+      movable.setAnimatedTransition(true);
+      movable.width = movable.height = -1;
+    }
+    this.clearDragFollowers();
+    this.dragSessionActive = false;
+    if (midDragAbort) {
+      this.undoTargets.clear();
+      UndoService.instance?.discardTransformGesture();
+    }
+  }
+
+  private attachDragFollower(movable: MovableDirective) {
+    movable.state = SelectionState.SELECTED;
+    movable.setPointerEvents(false);
+    movable.setAnimatedTransition(false);
+    movable.isDragFollower = true;
+    this.dragFollowers.add(movable);
+  }
+
+  private clearDragFollowers() {
+    for (const movable of this.dragFollowers) {
+      movable.isDragFollower = false;
+    }
+    this.dragFollowers.clear();
   }
 
   /** Multi-box model parts share bakeGroupId — select siblings so they drag as one. */
@@ -266,7 +355,7 @@ export class MovableSelectionSynchronizer {
   }
 
   updateMove(delta: PointerCoordinate) {
-    if (!this.shouldSynchronize()) {
+    if (!this.dragSessionActive) {
       if (this.movable.isPointerMoved) this.selection.clear();
       return;
     }
@@ -279,9 +368,8 @@ export class MovableSelectionSynchronizer {
             if (movable.width < 0) movable.width = movable.nativeElement.clientWidth;
             if (movable.height < 0) movable.height = movable.nativeElement.clientHeight;
             if (this.isProximity(movable)) {
+              this.attachDragFollower(movable);
               movable.state = SelectionState.MAGNETIC;
-              movable.setPointerEvents(false);
-              movable.setAnimatedTransition(false);
               this.trackUndoTarget(movable);
               //movable.ondragstart.emit(e as PointerEvent);
             }
@@ -290,7 +378,7 @@ export class MovableSelectionSynchronizer {
       }
     }
 
-    for (let movable of this.selectedMovables) {
+    for (let movable of this.dragFollowers) {
       if (movable === this.movable) continue;
       movable.posX += delta.x;
       movable.posY += delta.y;
@@ -307,21 +395,21 @@ export class MovableSelectionSynchronizer {
   }
 
   finishMove(delta: PointerCoordinate) {
-    if (!this.shouldSynchronize()) {
+    if (!this.dragSessionActive) {
       // Do not clear here: a plain click may end with no sync window while
       // click-to-select already registered the object on input start.
       this.commitUndoCapture();
       return;
     }
 
-    for (let movable of this.selectedMovables) {
+    for (let movable of this.dragFollowers) {
       if (movable === this.movable) continue;
       movable.posX += delta.x;
       movable.posY += delta.y;
       movable.posZ += delta.z;
     }
 
-    let movables = Array.from(this.selectedMovables).sort((a, b) => {
+    let movables = Array.from(this.dragFollowers).sort((a, b) => {
       let zindexA = (a.tabletopObject as Stackable).zindex;
       let zindexB = (b.tabletopObject as Stackable).zindex;
       if (zindexA == null || zindexB == null) return 0;
@@ -363,6 +451,7 @@ export class MovableSelectionSynchronizer {
     } else {
       this.refreshState();
     }
+    // Keep dragFollowers until abortMove (after flushDragPosesToTable).
   }
 
   private beginUndoCapture() {
@@ -397,14 +486,12 @@ export class MovableSelectionSynchronizer {
     undo.commitTransformGesture(after, 'move');
   }
 
-  private shouldSynchronize(): boolean {
-    let isSynchronize = this.movable.state !== SelectionState.NONE;
-    return isSynchronize;
-  }
-
   private refreshState() {
-    for (let movable of this.selectedMovables) {
-      movable.state = SelectionState.SELECTED;
+    // Restore PE on session followers (may have been dropped from live selection mid-drag).
+    for (let movable of this.sessionMovables) {
+      if (movable.state !== SelectionState.MAGNETIC) {
+        movable.state = SelectionState.SELECTED;
+      }
       if (movable === this.movable) continue;
       movable.setPointerEvents(true);
       movable.setAnimatedTransition(true);
@@ -500,17 +587,64 @@ export class MovableSelectionSynchronizer {
         let rad = MathUtil.radians(angle);
         movable.posX = center.x + distance * Math.sin(rad) - (movable.width / 2);
         movable.posY = center.y + distance * Math.cos(rad) - (movable.height / 2);
-        movable.posZ = center.z;
+        // settle_floor: never adopt pointer pick Z; sample terrain/stack under new XY.
+        MovableSelectionSynchronizer.syncTerrainFloor(movable);
       }
     }
   }
 
-  static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
-    if (dx === 0 && dy === 0) return false;
+  /** @internal test helper — register a movable into the static object map. */
+  static __testRegister(object: TabletopObject, movable: MovableDirective) {
+    let movableSet = MovableSelectionSynchronizer.objectMap.get(object) ?? new Set();
+    movableSet.add(movable);
+    MovableSelectionSynchronizer.objectMap.set(object, movableSet);
+  }
+
+  /** @internal test helper — clear static object map entries for targets. */
+  static __testUnregister(object: TabletopObject) {
+    MovableSelectionSynchronizer.objectMap.delete(object);
+  }
+
+  /** Pose for undo: prefer live movable when present. */
+  private static poseForUndo(object: TabletopObject): TransformPose {
+    const movables = MovableSelectionSynchronizer.objectMap.get(object);
+    if (movables) {
+      for (const movable of movables) {
+        if (!movable.isDisable) return poseFromMovable(movable);
+      }
+    }
+    return poseFromObject(object);
+  }
+
+  private static keyboardNudgeBefore: Map<string, TransformPose> | null = null;
+
+  /** Start a WASD/arrow session: live pose only, flush on {@link finishKeyboardNudge}. */
+  static beginKeyboardNudge(targets: TabletopObject[]): void {
+    if (MovableSelectionSynchronizer.keyboardNudgeBefore) return;
     const before = new Map<string, TransformPose>();
     for (const object of targets) {
       if (MovableSelectionSynchronizer.isLocked(object)) continue;
-      before.set(object.identifier, poseFromObject(object));
+      before.set(object.identifier, MovableSelectionSynchronizer.poseForUndo(object));
+      const movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (!movables) continue;
+      for (const movable of movables) {
+        if (movable.isDisable) continue;
+        movable.setAnimatedTransition(false);
+        movable.isKeyboardNudge = true;
+      }
+    }
+    MovableSelectionSynchronizer.keyboardNudgeBefore = before;
+  }
+
+  static nudge(targets: TabletopObject[], dx: number, dy: number): boolean {
+    if (dx === 0 && dy === 0) return false;
+    const session = MovableSelectionSynchronizer.keyboardNudgeBefore;
+    const before = session ?? new Map<string, TransformPose>();
+    if (!session) {
+      for (const object of targets) {
+        if (MovableSelectionSynchronizer.isLocked(object)) continue;
+        before.set(object.identifier, MovableSelectionSynchronizer.poseForUndo(object));
+      }
     }
     let moved = false;
     for (let object of targets) {
@@ -526,6 +660,8 @@ export class MovableSelectionSynchronizer {
       }
       for (let movable of movables) {
         if (movable.isDisable) continue;
+        // Match pointer-drag: no CSS slide — live shadows track pos every frame.
+        movable.setAnimatedTransition(false);
         movable.posX += dx;
         movable.posY += dy;
         MovableSelectionSynchronizer.syncTerrainFloor(movable);
@@ -533,14 +669,42 @@ export class MovableSelectionSynchronizer {
       }
     }
     if (moved) {
+      if (!session) {
+        const after = new Map<string, TransformPose>();
+        for (const id of before.keys()) {
+          const object = targets.find(t => t.identifier === id);
+          if (object) after.set(id, MovableSelectionSynchronizer.poseForUndo(object));
+        }
+        UndoService.instance?.recordTransform('nudge', before, after, 'nudge');
+      }
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge' });
+    }
+    return moved;
+  }
+
+  /** After continuous WASD: optional grid snap + flush SyncVars, then shadow refresh. */
+  static finishKeyboardNudge(targets: TabletopObject[], gridSnap: boolean): void {
+    for (const object of targets) {
+      const movables = MovableSelectionSynchronizer.objectMap.get(object);
+      if (!movables) continue;
+      for (const movable of movables) {
+        if (movable.isDisable) continue;
+        if (gridSnap) movable.snapToGrid();
+        movable.isKeyboardNudge = false;
+        movable.flushPoseToTable();
+      }
+    }
+    const before = MovableSelectionSynchronizer.keyboardNudgeBefore;
+    MovableSelectionSynchronizer.keyboardNudgeBefore = null;
+    if (before?.size) {
       const after = new Map<string, TransformPose>();
       for (const id of before.keys()) {
-        const object = targets.find(t => t.identifier === id);
-        if (object) after.set(id, poseFromObject(object));
+        const object = targets.find(t => t.identifier === id) ?? ObjectStore.instance.get(id) as TabletopObject;
+        if (object) after.set(id, MovableSelectionSynchronizer.poseForUndo(object));
       }
       UndoService.instance?.recordTransform('nudge', before, after, 'nudge');
     }
-    return moved;
+    EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-end' });
   }
 
   /** Move object centers to (x, y) with optional CSS transition duration. */

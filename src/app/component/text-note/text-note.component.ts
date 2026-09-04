@@ -13,11 +13,13 @@ import {
   ViewChild
 } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
-import { renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
+import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
+import { rbCornerResizeSize, rotateTableDeltaToLocal } from '@udonarium/tabletop-corner-resize';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { noteMarkdownToHtml } from '@udonarium/note-markdown';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -30,7 +32,7 @@ import { buildNoteHandoutPayload } from 'component/note-handout/note-handout.com
 import { NoteSettingsComponent } from 'component/note-settings/note-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { InputHandler } from 'directive/input-handler';
-import { MovableOption } from 'directive/movable.directive';
+import { MovableDirective, MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { PAPER_STYLES, pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
@@ -40,6 +42,9 @@ import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildPayloadFromNote } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 
@@ -54,6 +59,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   @ViewChild('textArea') textAreaElementRef: ElementRef<HTMLTextAreaElement>;
   @ViewChild('pdfCanvas') pdfCanvasRef: ElementRef<HTMLCanvasElement>;
   @ViewChild('resizeGrab') resizeGrabRef: ElementRef<HTMLElement>;
+  @ViewChild(MovableDirective) private movableDir: MovableDirective;
 
   @Input() textNote: TextNote = null;
   @Input() is3D: boolean = false;
@@ -190,10 +196,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   private dragStarted = false;
   private needsPdfRender = false;
   private lastPdfKey = '';
-  private selfPreviewOpen = false;
-  private isHovering = false;
-  /** Last known MouseEvent.buttons — ignore Ctrl-press while drag-rotating the table. */
-  private pointerButtons = 0;
+  private pdfRenderSeq = 0;
+  /** Once per pdf id: grow paper height to the rendered page (+ title/nav) so the billboard bottom matches. */
+  private pdfHeightFittedKey = '';
   private resizeStartW = 1;
   /** True if this note was already selected when the current pointer-down began. */
   private selectedOnPointerDown = false;
@@ -204,6 +209,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const rotate = Math.abs(this.viewRotateZ + this.rotate) % 360;
     return 90 < rotate && rotate < 270;
   }
+
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   constructor(
     private ngZone: NgZone,
@@ -217,8 +224,15 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     private tabletopActionService: TabletopActionService,
     private characterFxMenu: CharacterFxMenuService,
     private coordinateService: CoordinateService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.textNote?.identifier,
+      () => buildPayloadFromNote(this.textNote, this.i18n.t('note.untitled')),
+    );
+  }
 
   GuestMode() { return Network.GuestMode(); }
 
@@ -236,10 +250,8 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       .on('UPDATE_VIDEO_RESOURE', () => this.changeDetector.markForCheck())
       .on('SYNCHRONIZE_VIDEO_LIST', () => this.changeDetector.markForCheck())
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.textNote?.identifier}`, () => this.changeDetector.markForCheck())
       .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck());
@@ -272,7 +284,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   ngOnDestroy() {
-    this.closeSelfPreview();
+    this.previewHover.onDestroy();
     EventSystem.unregister(this);
     this.input?.destroy();
     this.resizeInput?.destroy();
@@ -293,40 +305,64 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     this.ngZone.runOutsideAngular(() => {
       this.resizeInput = new InputHandler(el);
       this.resizeInput.onStart = (ev) => this.onResizeStart(ev);
-      this.resizeInput.onMove = () => this.onResizeMove();
+      this.resizeInput.onMove = (ev) => this.onResizeMove(ev);
       this.resizeInput.onEnd = () => this.onResizeEnd();
     });
   }
 
+  /** PDF / image / video keep page aspect; text notes stay free-form. */
+  get keepsResizeAspect(): boolean {
+    return this.isPdfContent || this.isImageContent || this.isVideoContent;
+  }
+
+  get resizeHintKey(): string {
+    return this.keepsResizeAspect ? 'note.resizeHintAspect' : 'note.resizeHint';
+  }
+
   private onResizeStart(ev: MouseEvent | TouchEvent) {
     ev?.stopPropagation?.();
+    if (ev?.cancelable) ev.preventDefault();
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) {
       this.resizeInput?.cancel();
       return;
     }
-    const table = this.coordinateService.calcTabletopLocalCoordinate();
-    this.resizeStartTable = { x: table.x, y: table.y };
+    // Same as terrain: stop parent movable so corner drag scales instead of moving.
+    this.input?.cancel();
+    this.movableDir?.cancel();
+    // Always map via tabletop origin — targetElement under the grab is 3D-transformed
+    // and flips deltas once the pointer leaves the handle (looks like "both ways shrink").
+    this.resizeStartTable = this.tablePointer();
     this.resizeStartW = this.width;
     this.resizeStartH = this.height;
   }
 
-  private onResizeMove() {
+  private tablePointer(): { x: number; y: number } {
+    const p = this.pointerDeviceService.pointers[0] || { x: 0, y: 0 };
+    const table = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: p.x, y: p.y, z: 0 },
+      this.coordinateService.tabletopOriginElement
+    );
+    return { x: table.x, y: table.y };
+  }
+
+  private onResizeMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || this.textNote?.isSizeLocked) return;
-    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const cur = this.tablePointer();
     const dx = cur.x - this.resizeStartTable.x;
     const dy = cur.y - this.resizeStartTable.y;
-    const rad = (-(this.rotate || 0) * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const localDx = dx * cos - dy * sin;
-    // Flat notes tip so paper height grows with table +Y; flip if upright billboard.
-    const localDy = this.isUpright ? -(dx * sin + dy * cos) : (dx * sin + dy * cos);
-    let w = MathUtil.clampMin(this.resizeStartW + localDx / this.gridSize);
-    let h = MathUtil.clampMin(this.resizeStartH + localDy / this.gridSize);
-    w = Math.min(40, Math.max(1, Math.round(w * 2) / 2));
-    h = Math.min(40, Math.max(1, Math.round(h * 2) / 2));
+    const { localDx, localDy } = rotateTableDeltaToLocal(dx, dy, this.rotate || 0);
+    const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
+    const { width: w, height: h } = rbCornerResizeSize({
+      startW: this.resizeStartW,
+      startH: this.resizeStartH,
+      localDxPx: localDx,
+      // Match terrain table +Y → depth/height; do not invert for upright (that made
+      // horizontal drags pick a shrinking height axis under aspect lock).
+      localDyPx: localDy,
+      gridSize: this.gridSize,
+      lockAspect: this.keepsResizeAspect && !freeAspect,
+    });
     this.ngZone.run(() => {
-      // Free width/height — no aspect lock for A4 / sticky.
       this.textNote.width = w;
       this.textNote.height = h;
       this.changeDetector.markForCheck();
@@ -351,52 +387,18 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     }
   }
 
-  @HostListener('mouseenter', ['$event'])
-  onMouseEnter(e: MouseEvent) {
-    this.isHovering = true;
-    this.pointerButtons = e.buttons;
-    // Preview opens only when Ctrl is pressed while already hovering (not Ctrl+sweep).
-  }
-
-  @HostListener('mousemove', ['$event'])
-  onMouseMove(e: MouseEvent) {
-    this.isHovering = true;
-    this.pointerButtons = e.buttons;
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
   }
 
   @HostListener('mouseleave')
   onMouseLeave() {
-    this.isHovering = false;
-    // Keep Ctrl preview until Ctrl is released (mouse leave alone does not close).
-  }
-
-  @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(e: MouseEvent) {
-    this.pointerButtons = e.buttons;
-  }
-
-  @HostListener('window:keydown', ['$event'])
-  onWindowKeyDown(e: KeyboardEvent) {
-    if (e.key !== 'Control' && e.key !== 'Meta') return;
-    if (e.repeat) return;
-    this.tryOpenSelfPreviewFromCtrl();
-  }
-
-  @HostListener('window:keyup', ['$event'])
-  onWindowKeyUp(e: KeyboardEvent) {
-    if (e.key !== 'Control' && e.key !== 'Meta') return;
-    this.closeSelfPreview();
-  }
-
-  @HostListener('window:blur')
-  onWindowBlur() {
-    this.pointerButtons = 0;
-    this.closeSelfPreview();
+    this.previewHover.onLeave();
   }
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
-    this.pointerButtons = e?.buttons ?? this.pointerButtons;
     this.selectedOnPointerDown = this.isSelected;
     if (this.GuestMode()) return;
     if (e.ctrlKey || e.metaKey) return;
@@ -728,6 +730,7 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.textNote);
   }
@@ -780,35 +783,10 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     if (peerId === PeerCursor.myCursor?.peerId) EventSystem.trigger('SHOW_NOTE_HANDOUT', data);
   }
 
-  /** Hover the note first, then press Ctrl/Meta to open; stays until Ctrl release. */
-  private tryOpenSelfPreviewFromCtrl() {
-    if (!this.isHovering) return;
-    // Ctrl+right-drag rotates the view — ignore Ctrl while any button is held.
-    if (this.pointerButtons !== 0 || this.pointerDeviceService.isDragging) return;
-    this.openSelfPreview();
-  }
-
-  private openSelfPreview() {
-    if (!this.textNote) return;
-    const data = this.handoutPayload();
-    data.preview = true;
-    if (!data.imageUrl && !data.pdfIdentifier && !data.videoUrl && !data.videoIdentifier && !data.text) {
-      data.text = this.textNote.title || this.i18n.t('note.untitled');
-    }
-    if (this.selfPreviewOpen) return;
-    this.selfPreviewOpen = true;
-    this.ngZone.run(() => EventSystem.trigger('SHOW_NOTE_HANDOUT', data));
-  }
-
-  private closeSelfPreview() {
-    if (!this.selfPreviewOpen) return;
-    this.selfPreviewOpen = false;
-    EventSystem.trigger('HIDE_NOTE_HANDOUT', { noteIdentifier: this.textNote?.identifier });
-  }
-
   private queuePdfRender() {
     if (!this.isPdfContent) return;
-    const key = `${this.textNote.pdfIdentifier}:${this.textNote.pdfPage}`;
+    // ":hi" = sharp tabletop render tier (forces one re-render after quality bump).
+    const key = pdfPageRenderKey(this.textNote.pdfIdentifier, this.textNote.pdfPage);
     if (key !== this.lastPdfKey) this.needsPdfRender = true;
   }
 
@@ -816,15 +794,67 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
     const canvas = this.pdfCanvasRef?.nativeElement;
     const pdf = PdfStorage.instance.get(this.textNote.pdfIdentifier);
     if (!canvas || !pdf?.url) return;
+    const seq = ++this.pdfRenderSeq;
+    const wantPage = this.textNote.pdfPage;
+    const id = this.textNote.pdfIdentifier;
+    const attemptKey = pdfPageRenderKey(id, wantPage);
     try {
-      const maxW = Math.max(120, this.width * this.gridSize);
-      const result = await renderPdfPage(canvas, pdf.url, this.textNote.pdfPage, this.textNote.pdfIdentifier, maxW);
-      this.lastPdfKey = `${this.textNote.pdfIdentifier}:${result.page}`;
+      // Display width on the table is small (e.g. 4×50=200); render much sharper so text stays
+      // readable in 3D view — CSS then scales the bitmap down into the paper box.
+      const displayW = Math.max(120, this.width * this.gridSize);
+      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+      const maxW = Math.min(1600, Math.round(displayW * Math.max(3, dpr * 2.5)));
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
+      // Ignore stale / superseded renders (rapid page flips).
+      if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
+      this.lastPdfKey = pdfPageRenderKey(this.textNote.pdfIdentifier, result.page);
       if (this.textNote.pdfPageCount !== result.pageCount) this.textNote.pdfPageCount = result.pageCount;
       if (this.textNote.pdfPage !== result.page) this.textNote.pdfPage = result.page;
+      this.fitPaperToPdfCanvas(canvas);
       this.changeDetector.markForCheck();
     } catch (err) {
+      if (seq !== this.pdfRenderSeq) return;
+      // Stop sync/CD cycles from retrying the same page forever (Chrome tab freeze).
+      this.lastPdfKey = attemptKey;
       console.warn('text-note PDF render failed', err);
+    }
+  }
+
+  /**
+   * One-time paper fit for PDF notes:
+   * - Grow width to a mid-zoom readable size (old imports were ~4 grids / unreadable far away).
+   * - Grow height to the page aspect so the canvas does not sink past the table origin.
+   */
+  private fitPaperToPdfCanvas(canvas: HTMLCanvasElement) {
+    const id = this.textNote?.pdfIdentifier || '';
+    if (!id || this.pdfHeightFittedKey === id) return;
+    if (!canvas.width || !canvas.height) return;
+    this.pdfHeightFittedKey = id;
+    if (this.textNote.isSizeLocked) return;
+
+    /** ~500px — readable without camera glued to the note; user can still shrink after. */
+    const minReadableWidth = 10;
+    let sizeChanged = false;
+    // Old PDF imports used ~4×5; bump those once so mid-zoom text is usable.
+    // Notes the user already sized (≥5) are left alone.
+    if (this.width <= 4.5) {
+      this.textNote.width = minReadableWidth;
+      sizeChanged = true;
+    }
+
+    const titlePx = (this.isShowTitle && (this.title || '').length) ? 28 : 0;
+    const navPx = 36;
+    const pagePx = (canvas.height / Math.max(1, canvas.width)) * (this.width * this.gridSize);
+    const need = Math.max(1, Math.round(((pagePx + titlePx + navPx) / this.gridSize) * 2) / 2);
+    if (need > this.height + 0.05) {
+      this.textNote.height = need;
+      sizeChanged = true;
+    }
+
+    // Re-render at the new display width so sharpness matches the larger paper.
+    if (sizeChanged) {
+      this.lastPdfKey = '';
+      this.needsPdfRender = true;
     }
   }
 }

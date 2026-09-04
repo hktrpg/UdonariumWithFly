@@ -284,8 +284,23 @@ export class SceneToolService {
       const after = this.captureSceneNudgeState(perm);
       this.recordSceneNudge(before, after);
       this.notifyTableUpdate();
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-scene' });
     }
     return moved;
+  }
+
+  /** Undoable light reposition after pointer drag. */
+  recordLightMove(light: TableLight, fromX: number, fromY: number, toX: number, toY: number) {
+    if (!light || (fromX === toX && fromY === toY)) return;
+    if (GuestSession.isGuest || Network.GuestMode()) return;
+    const before = new Map<string, SceneNudgeSnap>([
+      [light.identifier, { kind: 'light', x: fromX, y: fromY }],
+    ]);
+    const after = new Map<string, SceneNudgeSnap>([
+      [light.identifier, { kind: 'light', x: toX, y: toY }],
+    ]);
+    this.recordSceneNudge(before, after);
+    this.notifyTableUpdate();
   }
 
   private captureSceneNudgeState(perm: SceneToolPermission): Map<string, SceneNudgeSnap> {

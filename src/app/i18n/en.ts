@@ -15,6 +15,7 @@ export const en: I18nDictionary = {
   'menu.music': 'Music',
   'menu.toolbox': 'Toolbox',
   'menu.combat': 'Combat',
+  'menu.timer': 'Timers',
   'menu.sceneTools': 'Scene Tools',
   'menu.scenePreset': 'Preset Scenes',
   'menu.scenarioText': 'Scenario Text',

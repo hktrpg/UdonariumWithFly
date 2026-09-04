@@ -42,7 +42,7 @@
       </div>
       <div class="scene-menu-bridge" *ngIf="isMenuOpen(table)" aria-hidden="true"></div>
       <div class="scene-chip-menu" *ngIf="isMenuOpen(table)" role="menu">
-        <button type="button" role="menuitem" *ngIf="isGM" (mousedown)="viewTable(table, $event)">
+        <button type="button" role="menuitem" *ngIf="isGM && !isActive(table)" (mousedown)="viewTable(table, $event)">
           {{ 'table.activate' | i18n }}
         </button>
         <button type="button" role="menuitem" *ngIf="isGM" (mousedown)="summonAll(table, $event)">

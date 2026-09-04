@@ -59,6 +59,8 @@ export class TabletopObject extends ObjectNode {
   /** Clone from「建立暫存副本」/ CTRL+drag; delete destroys (no graveyard). */
   @SyncVar() isTemporaryCopy: boolean = false;
 
+  get isInHand(): boolean { return this.location.name === 'hand'; }
+
   get isVisibleOnTable(): boolean {
     if (this.location.name !== 'table') return false;
     const viewId = TabletopObject.resolveViewTableIdentifier();
@@ -764,6 +766,13 @@ export class TabletopObject extends ObjectNode {
     let pos1 = { x: this.location.x, y: this.location.y, z: this.posZ };
     let pos2 = { x: other.location.x, y: other.location.y, z: other.posZ };
     return MathUtil.sqrMagnitude(pos1, pos2);
+  }
+
+  /** XY-only distance for card / stack merge (ignore ride height). */
+  calcSqrDistanceXY(other: TabletopObject): number {
+    const dx = (this.location?.x || 0) - (other?.location?.x || 0);
+    const dy = (this.location?.y || 0) - (other?.location?.y || 0);
+    return dx * dx + dy * dy;
   }
 
   protected createDataElements() {

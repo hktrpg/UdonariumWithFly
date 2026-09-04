@@ -16,6 +16,8 @@ export class ChatTab extends ObjectNode implements InnerXml {
   @SyncVar() isPrivate: boolean = false;
   @SyncVar() memberUserIds: string = '';
   @SyncVar() creatorUserId: string = '';
+  /** Kept in room data but hidden from chat UI until unarchived. */
+  @SyncVar() isArchived: boolean = false;
   get chatMessages(): ChatMessage[] { return <ChatMessage[]>this.children; }
 
   private _unreadLength: number = 0;
@@ -37,6 +39,7 @@ export class ChatTab extends ObjectNode implements InnerXml {
   }
 
   canView(userId: string = Network.peer?.userId, isGM: boolean = !!PeerCursor.myCursor?.isGMMode): boolean {
+    if (this.isArchived) return false;
     if (!this.isPrivate) return true;
     if (isGM) return true;
     return this.isMember(userId);

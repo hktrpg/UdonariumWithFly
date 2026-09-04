@@ -22,6 +22,7 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { LAYER_PEER_MOVABLE_Z_PX, layerPeerMovableTransform } from '@udonarium/tabletop-object-util';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { RangeSettingsComponent } from 'component/range-settings/range-settings.component';
@@ -46,6 +47,9 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'range',
@@ -403,6 +407,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   math = Math;
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   get isInverse(): boolean {
     const rotate = Math.abs(this.viewRotateZ + this.rotateDeg) % 360;
@@ -421,8 +426,15 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
     private selectionService: TabletopSelectionService,
     private tabletopService: TabletopService,
     private modalService: ModalService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.range?.identifier,
+      () => buildTabletopImagePreviewPayload(this.range),
+    );
+  }
 
   ngOnChanges() {
     EventSystem.unregister(this);
@@ -468,10 +480,8 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
       .on('UPDATE_FILE_RESOURE', -1000, event => {
         this.changeDetector.markForCheck();
       }).on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       });
     this.movableOption = {
       tabletopObject: this.range,
@@ -496,8 +506,19 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.input.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -723,6 +744,7 @@ export class RangeComponent implements OnChanges, OnDestroy, AfterViewInit {
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.range);
   }

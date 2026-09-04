@@ -527,6 +527,20 @@ describe('TabletopObject placements / migrate / repair', () => {
     expect(updatedIds).not.toContain(tWidth.identifier);
   });
 
+  it('mutateAppearance persists rotate into tablePlacements for the current view', () => {
+    makeTable('tableA');
+    viewTables('tableA');
+
+    const ch = makeCharacter('char_rotate_flush');
+    ch.addToTable('tableA', { x: 0, y: 0, posZ: 0, rotate: 0 }, false);
+    ch.hydratePoseForView('tableA');
+
+    ch.mutateAppearance(() => { ch.rotate = 45; });
+
+    expect(ch.rotate).toBe(45);
+    expect(ch.getPoseForTable('tableA')!.rotate).toBe(45);
+  });
+
   it('reprojectForLocalView restores local map rotate after remote SyncVar overwrite', () => {
     makeTable('tableA');
     makeTable('tableB');

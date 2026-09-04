@@ -1,0 +1,151 @@
+:host {
+  pointer-events: none;
+}
+
+.timer-compact-hud {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 50;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  border-radius: 12px;
+  border: 1px solid var(--udon-chrome-border, #555);
+  background: rgba(24, 24, 28, 0.94);
+  color: #f5f5f5;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  user-select: none;
+  overflow: hidden;
+}
+
+.timer-compact-hud-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  touch-action: none;
+}
+
+.timer-compact-hud-chrome:active {
+  cursor: grabbing;
+}
+
+.timer-compact-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.timer-compact-hud-btns {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.win-btn {
+  width: 20px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(245, 245, 245, 0.75);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Consolas, "Segoe UI Symbol", monospace;
+}
+
+.win-btn.is-close:hover {
+  background: rgba(248, 113, 113, 0.85);
+  color: #fff;
+}
+
+.timer-compact-hud-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.timer-compact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.timer-compact-row:first-child {
+  border-top: none;
+}
+
+.timer-compact-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.timer-compact-label {
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timer-compact-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.timer-compact-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.timer-btn {
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--udon-chrome-border, #555);
+  border-radius: 8px;
+  background: #333;
+  color: #ddd;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer-btn .material-icons {
+  font-size: 16px;
+}
+
+.timer-compact-row.is-running .timer-compact-time {
+  color: #7dd3fc;
+}
+
+.timer-compact-row.is-finished .timer-compact-time {
+  color: #fca5a5;
+}
+
+.timer-compact-row.is-flashing {
+  animation: timer-compact-flash 0.8s ease-in-out infinite;
+}
+
+@keyframes timer-compact-flash {
+  0%, 100% {
+    background: rgba(248, 113, 113, 0.08);
+  }
+  50% {
+    background: rgba(248, 113, 113, 0.22);
+  }
+}

@@ -34,24 +34,27 @@ npm run cloudflare-workers:deploy
 
 Note the Worker URL, e.g. `https://udonarium-backend.<account>.workers.dev/`.
 
-## 2. Frontend production config
+## 2. Frontend production build (PWA / Service Worker)
 
-Before `ng build`, set gitignored `src/assets/config.yaml`:
+### Cloudflare-compatible PWA
 
-```yaml
-backend:
-  mode: skyway2023
-  url: https://YOUR-WORKER.workers.dev/
-```
+Cloudflare (Bot Fight / JS detections, Rocket Loader, HTML minify, etc.) may **inject or rewrite `index.html`**. Angular’s Service Worker compares SHA-1 hashes; a rewritten document always fails install (`VERSION_INSTALLATION_FAILED`).
 
-Then:
+This project **does not put `index.html` in the ngsw hash table**. Navigations load the document from the network (CF injection is fine). JS/CSS/images stay integrity-checked as usual.
+
+Still avoid CDN transforms on **hashed assets** (`.js` / `.css`): Auto Minify for JS/CSS can break those hashes.
+
+### Build (z01 `/hktrpg-main/`)
 
 ```text
 cd E:\github\UdonariumWithFly
-npx ng build --configuration=production
+# set gitignored src/assets/config.yaml backend.url first
+npm run build:hktrpg-main
 ```
 
-Upload `dist/udonarium/` (or project dist folder) to your HTTPS host.
+This runs `ng build --base-href /hktrpg-main/`, refreshes ngsw hashes (and strips any `index.html` hash), then verifies the manifest.
+
+Upload **the whole** `dist/udonarium/` folder (do not hand-edit hashed files on the server after upload).
 
 ## 3. Local develop (unchanged)
 

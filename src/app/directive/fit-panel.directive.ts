@@ -31,10 +31,10 @@ export class FitPanelDirective implements AfterViewInit, OnDestroy {
     this.refit();
     if (typeof MutationObserver !== 'undefined') {
       this.mo = new MutationObserver(() => this.debounceRefit());
+      // childList only: characterData (ping/health text) must not refit — that jumps scroll to top.
       this.mo.observe(this.hostRef.nativeElement, {
         childList: true,
         subtree: true,
-        characterData: true,
       });
     }
   }

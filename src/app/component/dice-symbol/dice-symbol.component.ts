@@ -19,6 +19,8 @@ import { MathUtil } from '@udonarium/core/system/util/math-util';
 import { DiceSymbol } from '@udonarium/dice-symbol';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { DiceSettingsComponent } from 'component/dice-settings/dice-settings.component';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
@@ -34,6 +36,9 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { ChatMessageService } from 'service/chat-message.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTabletopImagePreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 
 @Component({
     selector: 'dice-symbol',
@@ -116,6 +121,7 @@ import { TabletopActionService } from 'service/tabletop-action.service';
     standalone: false
 })
 export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy {
+  get skipEnterBounce(): boolean { return TabletopLoadSettle.skipEnterAnimation; }
   @Input() diceSymbol: DiceSymbol = null;
   @Input() is3D: boolean = false;
 
@@ -172,6 +178,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   rotableOption: RotableOption = {};
 
   private interactGesture: ObjectInteractGesture = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   viewRotateX = 50;
   viewRotateZ = 10;
@@ -201,8 +208,15 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
     private modalService: ModalService,
     private chatMessageService: ChatMessageService,
     private tabletopActionService: TabletopActionService,
-    private i18n: I18nService
-  ) { }
+    private i18n: I18nService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.diceSymbol?.identifier,
+      () => buildTabletopImagePreviewPayload(this.diceSymbol),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -238,11 +252,9 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
         }
       })
       .on<object>('TABLE_VIEW_ROTATE', event => {
-        this.ngZone.run(() => {
-          this.viewRotateX = event.data['x'];
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateX = event.data['x'];
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_GAME_OBJECT/identifier/${this.diceSymbol?.identifier}`, event => {
         this.changeDetector.markForCheck();
@@ -292,8 +304,19 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.interactGesture.destroy();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -312,6 +335,7 @@ export class DiceSymbolComponent implements OnChanges, AfterViewInit, OnDestroy 
   }
 
   onDoubleClick(e?: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e?.stopPropagation();
     this.showDetail(this.diceSymbol);
   }

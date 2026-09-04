@@ -5,6 +5,24 @@ import { BufferSharingTask } from './buffer-sharing-task';
 import { FileReaderUtil } from './file-reader-util';
 import { ImageContext, ImageFile, ImageState } from './image-file';
 import { CatalogItem, ImageStorage } from './image-storage';
+import { FileReceiveScheduler } from './file-transfer-scheduler';
+import { finishMediaReceiveTask } from './receive-task-finish';
+import { deferRequestIfPeerNotOpen } from './defer-request-if-peer-not-open';
+import { StartTransmissionDeclineGate } from './start-transmission-decline';
+import {
+  hasActiveMediaTasks,
+  isSendTaskLimitReached,
+  mediaSendTaskKey,
+  meshCandidatePeerIds,
+} from './media-sharing-helpers';
+import {
+  collectMissingDownloadRequests,
+  ensureRoomMissingDownloads,
+  buildMissingDownloadHooks,
+  MissingDownloadHooks,
+  queueMissingDownloads,
+} from './missing-download-pipeline';
+import { repackTransferredBlob } from './single-file-media-transfer';
 import { MimeType } from './mime-type';
 
 export class ImageSharingSystem {
@@ -16,8 +34,11 @@ export class ImageSharingSystem {
 
   private sendTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
   private receiveTaskMap: Map<string, BufferSharingTask<ImageContext[]>> = new Map();
-  private maxSendTask: number = 2;
-  private maxReceiveTask: number = 4;
+  private readonly startDeclineGate = new StartTransmissionDeclineGate();
+  /** Peer declined our outbound transfer — pause resend (peerId:imageId). */
+  private declinedSendKeys = new Map<string, number>();
+  private static readonly SEND_DECLINE_COOLDOWN_MS = 45_000;
+  private static readonly SEND_DECLINE_RETRY_MS = 20_000;
 
   private constructor() {
   }
@@ -26,8 +47,10 @@ export class ImageSharingSystem {
     EventSystem.register(this)
       .on('CONNECT_PEER', 1, event => {
         if (!event.isSendFromSelf) return;
+        netDebug('image sync on CONNECT_PEER', event.data.peerId.slice(0, 16));
         netDebug('CONNECT_PEER ImageStorageService !!!', event.data.peerId);
-        ImageStorage.instance.synchronize();
+        this.clearDeclinedForPeer(event.data.peerId);
+        ImageStorage.instance.synchronize(event.data.peerId);
       })
       .on('XML_LOADED', event => {
         convertUrlImage(event.data.xmlElement);
@@ -37,28 +60,18 @@ export class ImageSharingSystem {
         netDebug('SYNCHRONIZE_FILE_LIST ImageStorageService ' + event.sendFrom);
 
         let otherCatalog: CatalogItem[] = event.data;
-        let request: CatalogItem[] = [];
-
-        for (let item of otherCatalog) {
-          let image: ImageFile = ImageStorage.instance.get(item.identifier);
-          if (image === null) {
-            image = ImageFile.createEmpty(item.identifier);
-            ImageStorage.instance.add(image);
-          }
-          if (image.state < ImageState.COMPLETE && !this.receiveTaskMap.has(item.identifier)) {
-            request.push({ identifier: item.identifier, state: image.state });
-          }
-        }
+        const hooks = this.missingDownloadHooks();
+        const request = collectMissingDownloadRequests(otherCatalog, hooks);
 
         // Handle edge cases such as Peer disconnect
-        if (request.length < 1 && !this.hasActiveTask() && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
+        if (request.length < 1 && !hasActiveMediaTasks(this.sendTaskMap.size, this.receiveTaskMap.size) && otherCatalog.length < ImageStorage.instance.getCatalog().length) {
           ImageStorage.instance.synchronize(event.sendFrom);
         }
 
-        if (request.length < 1 || this.isLimitReceiveTask()) {
+        if (request.length < 1) {
           return;
         }
-        this.request(request, event.sendFrom);
+        queueMissingDownloads(request, event.sendFrom, otherCatalog, hooks);
       })
       .on('REQUEST_FILE_RESOURE', async event => {
         if (event.isSendFromSelf) return;
@@ -68,22 +81,32 @@ export class ImageSharingSystem {
 
         for (let item of request) {
           let image: ImageFile = ImageStorage.instance.get(item.identifier);
-          if (image && item.state < image.state)
+          if (image && item.state < image.state
+            && !this.isSendDeclined(event.data.receiver, item.identifier)) {
             randomRequest.push({ identifier: item.identifier, state: item.state });
+          }
         }
 
-        if (this.isLimitSendTask() === false && 0 < randomRequest.length && !this.existsSendTask(event.data.receiver)) {
-          // 送信
-          let updateImages: ImageContext[] = this.makeSendUpdateImages(randomRequest);
-          netDebug('REQUEST_FILE_RESOURE ImageStorageService Send!!! ' + event.data.receiver + ' -> ' + updateImages.length);
-          this.startSendTask(updateImages, event.data.receiver);
+        if (!isSendTaskLimitReached(this.sendTaskMap.size) && 0 < randomRequest.length) {
+          const sorted = FileReceiveScheduler.sortByNextReceiveBytes(
+            'image',
+            randomRequest,
+            item => item.state
+          );
+          const batch = this.makeSendUpdateImages(sorted, 256 * 1024);
+          if (batch.length) {
+            netDebug('REQUEST_FILE_RESOURE send ' + event.data.receiver + ' -> ' + batch.length);
+            this.startSendTask(batch, event.data.receiver);
+          }
         } else {
-          // 中継
-          let candidatePeers: string[] = event.data.candidatePeers;
-          let index = candidatePeers.indexOf(Network.peerId);
-          if (-1 < index) candidatePeers.splice(index, 1);
+          // 中継 — prefer open peers, fall back when hub reconnects
+          const openSet = new Set(Network.peerIds);
+          const candidatePeers: string[] = event.data.candidatePeers
+            .filter((id: string) => id && id !== Network.peerId)
+            .sort((a, b) => (openSet.has(a) ? 0 : 1) - (openSet.has(b) ? 0 : 1));
 
           for (let peerId of candidatePeers) {
+            if (!openSet.has(peerId)) continue;
             netDebug('REQUEST_FILE_RESOURE ImageStorageService Relay!!! ' + peerId + ' -> ' + event.data.identifiers);
             EventSystem.call(event, peerId);
             return;
@@ -95,8 +118,13 @@ export class ImageSharingSystem {
         let updateImages: ImageContext[] = event.data.updateImages;
         netDebug('UPDATE_FILE_RESOURE ImageStorageService ' + event.sendFrom + ' -> ', updateImages);
         for (let context of updateImages) {
-          if (context.blob) context.blob = new Blob([context.blob], { type: context.type });
-          if (context.thumbnail.blob) context.thumbnail.blob = new Blob([context.thumbnail.blob], { type: context.thumbnail.type });
+          if (context.blob) context.blob = repackTransferredBlob(context.blob, context.type) as Blob;
+          if (context.thumbnail?.blob) {
+            context.thumbnail.blob = repackTransferredBlob(
+              context.thumbnail.blob,
+              context.thumbnail.type,
+            ) as Blob;
+          }
           ImageStorage.instance.add(context);
         }
       })
@@ -104,12 +132,15 @@ export class ImageSharingSystem {
         netDebug('START_FILE_TRANSMISSION ' + event.data.taskIdentifier);
         let identifier = event.data.taskIdentifier;
         let image: ImageFile = ImageStorage.instance.get(identifier);
-        if (this.receiveTaskMap.has(identifier) || (image && ImageState.COMPLETE <= image.state)) {
-          console.warn('CANCEL_TASK_ ' + identifier);
-          EventSystem.call('CANCEL_TASK_' + identifier, null, event.sendFrom);
-        } else {
-          this.startReceiveTask(identifier);
+        if (this.receiveTaskMap.has(identifier)) {
+          return;
         }
+        if (image && ImageState.COMPLETE <= image.state) {
+          netDebug('START_FILE_TRANSMISSION decline (already complete)', identifier);
+          this.startDeclineGate.cancelRedundantStart(event.sendFrom, identifier);
+          return;
+        }
+        this.startReceiveTask(identifier, event.sendFrom);
       });
   }
 
@@ -119,8 +150,19 @@ export class ImageSharingSystem {
 
   private async startSendTask(updateImages: ImageContext[], sendTo: string) {
     let identifier = updateImages.length === 1 ? updateImages[0].identifier : UUID.generateUuid();
+    if (updateImages.length === 1 && this.isSendDeclined(sendTo, identifier)) {
+      netDebug('startSendTask skipped (peer declined)', sendTo, identifier);
+      return;
+    }
+    const taskKey = mediaSendTaskKey(sendTo, identifier);
+    const prev = this.sendTaskMap.get(taskKey);
+    if (prev) {
+      netDebug('startSendTask skipped (already sending)', sendTo, identifier);
+      return;
+    }
+
     let task = BufferSharingTask.createSendTask<ImageContext[]>(identifier, sendTo);
-    this.sendTaskMap.set(task.identifier, task);
+    this.sendTaskMap.set(taskKey, task);
     EventSystem.call('START_FILE_TRANSMISSION', { taskIdentifier: identifier }, sendTo);
 
     /* hotfix issue #1 */
@@ -133,67 +175,127 @@ export class ImageSharingSystem {
     }
     /* */
 
+    task.oncancel = (canceled) => {
+      this.removeSendTask(taskKey);
+      // Peer CANCEL_TASK = decline. DISCONNECT / local cancel must not poison declinedSendKeys.
+      if (!canceled.didCancelFromPeer) return;
+      this.declinedSendKeys.set(taskKey, performance.now());
+      const retryTo = canceled.sendTo;
+      setTimeout(() => {
+        this.declinedSendKeys.delete(taskKey);
+        if (retryTo) ImageStorage.instance.lazySynchronize(1500, retryTo);
+      }, ImageSharingSystem.SEND_DECLINE_RETRY_MS);
+    };
+
     task.onfinish = (task, data) => {
-      this.stopSendTask(task.identifier);
-      ImageStorage.instance.synchronize();
+      this.removeSendTask(taskKey);
+      if (task.didCompleteSuccessfully && task.sendTo) {
+        ImageStorage.instance.lazySynchronize(800, task.sendTo);
+      }
     }
 
     task.start(updateImages);
   }
 
-  private startReceiveTask(identifier: string) {
-    let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier);
+  private startReceiveTask(identifier: string, fromPeerId?: string) {
+    FileReceiveScheduler.markReceiveStart('image', identifier);
+    let task = BufferSharingTask.createReceiveTask<ImageContext[]>(identifier, fromPeerId);
     this.receiveTaskMap.set(identifier, task);
     task.onfinish = (task, data) => {
-      this.stopReceiveTask(task.identifier);
-      if (data) EventSystem.trigger('UPDATE_FILE_RESOURE', { identifier: task.identifier, updateImages: data });
-      ImageStorage.instance.synchronize();
+      finishMediaReceiveTask('image', task, data, {
+        stopReceiveTask: id => this.stopReceiveTask(id),
+        onSuccess: updateImages => EventSystem.trigger('UPDATE_FILE_RESOURE', {
+          identifier: task.identifier,
+          updateImages,
+        }),
+        lazySynchronize: ms => ImageStorage.instance.lazySynchronize(ms),
+        successLazyMs: 1000,
+      });
     }
 
     task.start();
     netDebug('startReceiveTask => ', this.receiveTaskMap.size);
   }
 
-  private stopSendTask(identifier: string) {
-    let task = this.sendTaskMap.get(identifier);
+  private stopSendTask(sendKey: string) {
+    let task = this.sendTaskMap.get(sendKey);
     if (task) { task.cancel(); }
-    this.sendTaskMap.delete(identifier);
+    this.removeSendTask(sendKey);
 
     netDebug('stopSendTask => ', this.sendTaskMap.size);
+  }
+
+  private removeSendTask(sendKey: string) {
+    this.sendTaskMap.delete(sendKey);
+  }
+
+  private isSendDeclined(sendTo: string, identifier: string): boolean {
+    const key = mediaSendTaskKey(sendTo, identifier);
+    const last = this.declinedSendKeys.get(key);
+    return last != null && performance.now() - last < ImageSharingSystem.SEND_DECLINE_COOLDOWN_MS;
   }
 
   private stopReceiveTask(identifier: string) {
     let task = this.receiveTaskMap.get(identifier);
     if (task) { task.cancel(); }
     this.receiveTaskMap.delete(identifier);
+    FileReceiveScheduler.markReceiveEnd('image', identifier);
 
     netDebug('stopReceiveTask => ', this.receiveTaskMap.size);
   }
 
+  private missingDownloadHooks(): MissingDownloadHooks {
+    return buildMissingDownloadHooks({
+      kind: 'image',
+      completeState: ImageState.COMPLETE,
+      nullState: ImageState.NULL,
+      urlState: ImageState.URL,
+      isReceiving: id => this.receiveTaskMap.has(id),
+      get: id => ImageStorage.instance.get(id),
+      addEmpty: id => { ImageStorage.instance.add(ImageFile.createEmpty(id)); },
+      addUrlBacked: id => { ImageStorage.instance.add(ImageFile.create(id)); },
+      requestOne: (identifier, localState, peerId) => {
+        this.request([{ identifier, state: localState }], peerId);
+      },
+    });
+  }
+
+  private clearDeclinedForPeer(peerId: string) {
+    if (!peerId) return;
+    const prefix = `${peerId}:`;
+    for (const key of this.declinedSendKeys.keys()) {
+      if (key.startsWith(prefix)) this.declinedSendKeys.delete(key);
+    }
+  }
+
+  ensureRoomDownloads(catalogsByPeer: Map<string, CatalogItem[]>) {
+    const hooks = this.missingDownloadHooks();
+    ensureRoomMissingDownloads(catalogsByPeer, hooks);
+  }
+
   private request(request: CatalogItem[], peerId: string) {
+    const identifier = request[0]?.identifier;
+    if (deferRequestIfPeerNotOpen('image', peerId, identifier, (ms, peer) => {
+      ImageStorage.instance.lazySynchronize(ms, peer);
+    })) {
+      return;
+    }
     netDebug('requestFile() ' + peerId);
-    let peerIds = Network.peerIds;
-    EventSystem.call('REQUEST_FILE_RESOURE', { identifiers: request, receiver: Network.peerId, candidatePeers: peerIds }, peerId);
+    EventSystem.call('REQUEST_FILE_RESOURE', {
+      identifiers: request,
+      receiver: Network.peerId,
+      candidatePeers: meshCandidatePeerIds()
+    }, peerId);
   }
 
   private makeSendUpdateImages(catalog: CatalogItem[], maxSize: number = 1024 * 1024 * 0.5): ImageContext[] {
     let updateImages: ImageContext[] = [];
     let byteSize: number = 0;
 
-    // Fisher-Yates
-    for (let i = catalog.length - 1; 0 <= i; i--) {
-      let rand = Math.floor(Math.random() * (i + 1));
-      [catalog[i], catalog[rand]] = [catalog[rand], catalog[i]];
-    }
+    const sorted = FileReceiveScheduler.sortByNextReceiveBytes('image', catalog, item => item.state);
 
-    catalog.sort((a, b) => {
-      if (a.state < b.state) return -1;
-      if (a.state > b.state) return 1;
-      return 0;
-    });
-
-    for (let i = 0; i < catalog.length; i++) {
-      let item: { identifier: string, state: number } = catalog[i];
+    for (let i = 0; i < sorted.length; i++) {
+      let item: { identifier: string, state: number } = sorted[i];
       let image: ImageFile = ImageStorage.instance.get(item.identifier);
 
       let context: ImageContext = {
@@ -226,25 +328,6 @@ export class ImageSharingSystem {
       if (maxSize < byteSize) break;
     }
     return updateImages;
-  }
-
-  private hasActiveTask(): boolean {
-    return 0 < this.sendTaskMap.size || 0 < this.receiveTaskMap.size;
-  }
-
-  private isLimitSendTask(): boolean {
-    return this.maxSendTask <= this.sendTaskMap.size;
-  }
-
-  private isLimitReceiveTask(): boolean {
-    return this.maxReceiveTask <= this.receiveTaskMap.size;
-  }
-
-  private existsSendTask(peerId: string): boolean {
-    for (let task of this.sendTaskMap.values()) {
-      if (task && task.sendTo === peerId) return true;
-    }
-    return false;
   }
 }
 

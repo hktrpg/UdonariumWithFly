@@ -17,6 +17,7 @@ import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { SlopeDirection, Terrain, TerrainNeonType, TerrainViewState, TERRAIN_NEON_DEFAULT_COLOR, TERRAIN_SIZE_MIN } from '@udonarium/terrain';
 import { TableSelecter } from '@udonarium/table-selecter';
@@ -35,6 +36,9 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { TerrainBakeCropService, TERRAIN_BAKE_CROP_PREVIEW } from 'service/terrain-bake-crop.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildTerrainPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { emptyInsets, faceCropBackgroundStyle, parseBakeCropState } from '@udonarium/terrain-model/bake-crop';
 import {
   assembleBakeGroupAt,
@@ -262,6 +266,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   slopeDirectionState = SlopeDirection;
 
   private input: InputHandler = null;
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
   private scaleInputs: InputHandler[] = [];
   private scaleBoundEls: Array<HTMLElement | null> = [null, null];
   private scaleCorner: 'lt' | 'rb' = 'rb';
@@ -290,7 +295,14 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     private coordinateService: CoordinateService,
     private i18n: I18nService,
     private bakeCrop: TerrainBakeCropService,
-  ) { }
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.terrain?.identifier,
+      () => buildTerrainPreviewPayload(this.terrain),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -315,10 +327,8 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
         this.changeDetector.markForCheck();
       })
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on(`UPDATE_SELECTION/identifier/${this.terrain?.identifier}`, event => {
         this.changeDetector.markForCheck();
@@ -349,6 +359,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.input?.destroy();
     this.destroyScaleInputs();
     EventSystem.unregister(this);
@@ -356,6 +367,16 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
       if (entry.url?.startsWith('blob:')) URL.revokeObjectURL(entry.url);
     }
     this._faceCache.clear();
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   private destroyScaleInputs() {
@@ -410,8 +431,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     this.input?.cancel();
     this.movableDir?.cancel();
     this.scaleCorner = corner;
-    const table = this.coordinateService.calcTabletopLocalCoordinate();
-    this.scaleStartTable = { x: table.x, y: table.y };
+    this.scaleStartTable = this.tablePointer();
     const parts = bakeGroupPartsOf(this.terrain);
     this.scaleStartBounds = bakeGroupBoundsPx(parts);
     this.scaleStartSnapshots = parts.map(t => ({
@@ -424,11 +444,20 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     }));
   }
 
+  private tablePointer(): { x: number; y: number } {
+    const p = this.pointerDeviceService.pointers[0] || { x: 0, y: 0 };
+    const table = this.coordinateService.calcTabletopLocalCoordinate(
+      { x: p.x, y: p.y, z: 0 },
+      this.coordinateService.tabletopOriginElement
+    );
+    return { x: table.x, y: table.y };
+  }
+
   private onScaleMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || !this.scaleStartSnapshots.length) return;
     const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
     const lockAspect = !!this.terrain.lockAspectRatio && !freeAspect;
-    const cur = this.coordinateService.calcTabletopLocalCoordinate();
+    const cur = this.tablePointer();
     const dx = cur.x - this.scaleStartTable.x;
     const dy = cur.y - this.scaleStartTable.y;
     const b = this.scaleStartBounds;
@@ -823,6 +852,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.terrain);
   }

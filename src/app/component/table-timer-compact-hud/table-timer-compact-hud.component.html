@@ -1,0 +1,34 @@
+<div class="timer-compact-hud" *ngIf="timers.length" [style.left.px]="left" [style.top.px]="top">
+  <div class="timer-compact-hud-chrome" (pointerdown)="startDrag($event)">
+    <span class="timer-compact-hud-title">{{ 'timer.compactHudTitle' | i18n }}</span>
+    <div class="timer-compact-hud-btns" (pointerdown)="$event.stopPropagation()">
+      <button type="button" class="win-btn is-close" (click)="hideAll($event)"
+        [attr.title]="'timer.display.hidden' | i18n">×</button>
+    </div>
+  </div>
+  <div class="timer-compact-hud-list">
+    <div class="timer-compact-row"
+      *ngFor="let timer of timers"
+      [class.is-running]="isRunning(timer)"
+      [class.is-finished]="isFinished(timer)"
+      [class.is-flashing]="isFlashing(timer)"
+      (click)="expandTimer(timer, $event)">
+      <span class="timer-compact-label">{{ displayLabel(timer) }}</span>
+      <span class="timer-compact-time">{{ displayTime(timer) }}</span>
+      <div class="timer-compact-actions" *ngIf="!isGuest" (pointerdown)="$event.stopPropagation()">
+        <button type="button" class="timer-btn" (click)="toggleRun(timer, $event)"
+          [attr.title]="isRunning(timer) ? ('timer.pause' | i18n) : ('timer.start' | i18n)">
+          <i class="material-icons">{{ isRunning(timer) ? 'pause' : 'play_arrow' }}</i>
+        </button>
+        <button type="button" class="timer-btn" (click)="stopTimer(timer, $event)"
+          [attr.title]="'timer.stop' | i18n">
+          <i class="material-icons">stop</i>
+        </button>
+        <button type="button" class="timer-btn" (click)="expandTimer(timer, $event)"
+          [attr.title]="'timer.display.full' | i18n">
+          <i class="material-icons">open_in_full</i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

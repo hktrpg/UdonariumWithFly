@@ -1,4 +1,5 @@
 import { GameCharacter } from '@udonarium/game-character';
+import { EventSystem } from '@udonarium/core/system';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import {
@@ -14,7 +15,7 @@ import { RotableDirective } from './rotable.directive';
 export class RotableSelectionSynchronizer {
   private static readonly rotablesMap: Map<TabletopObject, Set<RotableDirective>> = new Map();
 
-  private get selectedRotables(): Set<RotableDirective> {
+  get selectedRotables(): Set<RotableDirective> {
     let selected: Set<RotableDirective> = new Set();
     for (let object of this.selection.objects) {
       RotableSelectionSynchronizer.rotablesMap.get(object)?.forEach(r => selected.add(r));
@@ -375,6 +376,7 @@ export class RotableSelectionSynchronizer {
         if (object) after.set(id, poseFromObjectAngles(object));
       }
       UndoService.instance?.recordTransform(property, before, after, property);
+      EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'rotate' });
     }
     return rotated;
   }

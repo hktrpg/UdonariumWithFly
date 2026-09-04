@@ -628,7 +628,7 @@ export class Jukebox extends GameObject implements InnerXml {
     this.setSoundboardSlot(index, '', '');
   }
 
-  /** Toggle play/stop for a track that already has an assigned audio (HUD). */
+  /** Toggle play/pause/resume for a track that already has an assigned audio (HUD). */
   toggleTrackPlayback(index: number) {
     if (index < 0 || index >= JUKEBOX_TRACK_COUNT) return;
     const track = this.tracks[index];

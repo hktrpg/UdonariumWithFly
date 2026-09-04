@@ -18,20 +18,46 @@
   pointer-events: none;
 }
 
+/* Keep chrome interactive in preview so content can be dragged (map stays clickable outside). */
 .handout-backdrop.is-preview .handout-chrome {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-.preview-badge {
-  display: inline-block;
-  margin-right: 8px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: rgba(255, 214, 140, 0.95);
-  color: #3a2f24;
-  font-size: 11px;
-  font-weight: 700;
-  vertical-align: middle;
+.handout-backdrop.is-preview .handout-actions {
+  pointer-events: auto;
+}
+
+.handout-content-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: min(96vw, 1200px);
+  max-height: calc(94vh - 48px);
+  overflow: hidden;
+  transform-origin: center center;
+  transition: transform 60ms linear;
+}
+
+.handout-content-stage.is-preview-stage {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.handout-content-stage.is-preview-stage.is-dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.preview-zoom-label {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .handout-chrome {
@@ -40,6 +66,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .handout-bar {
@@ -104,6 +132,21 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   background: #1a1a1a;
   cursor: pointer;
+}
+
+.handout-content-stage .handout-image,
+.handout-content-stage .handout-pdf,
+.handout-content-stage .handout-video,
+.handout-content-stage .handout-text {
+  max-width: 100%;
+  max-height: calc(94vh - 48px);
+}
+
+.handout-image.is-preview-media,
+.handout-pdf.is-preview-media,
+.handout-text.is-preview-media {
+  cursor: inherit;
+  pointer-events: none;
 }
 
 .handout-video {

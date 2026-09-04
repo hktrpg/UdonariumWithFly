@@ -2,9 +2,12 @@
 <img style="visibility: hidden; pointer-events: none; position: absolute" [src]="backgroundImageUrl2 | safe: 'resourceUrl'" (load)="isBackgroundImageLoaded2 = true">
 <div class="background-image is-pointer-events-none" [ngClass]="[(backgroundFilterType ? 'is-filter' : ''), (isStealthMode && !isGMMode ? 'is-hide-in' : ''), backgroundFilterType]"
 [style.background-image]="backgroundImageCss | safe: 'style'"></div>
+<div *ngIf="backgroundDarknessOverlayAlpha > 0" class="background-darkness-overlay is-pointer-events-none"
+  [style.background-color]="backgroundDarknessOverlayColor"></div>
 <div class="component is-fill is-perspective" [ngClass]="{'is-grabbing': isPointerDragging}" #root>
   <div class="component-content is-fill is-3d" #gameTable>
-    <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'" #gameObjects>
+    <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'"
+      [style.background-color]="tableSurfaceUnderlayColor" #gameObjects>
       <canvas class="grid-canvas is-fill is-pointer-events-none" #gridCanvas [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.1) + 'px)', 'clip': clipCss}"></canvas>
       <svg class="drawings-layer is-fill is-pointer-events-none" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.2) + 'px)'}">
@@ -95,15 +98,17 @@
           <text-note *ngIf="piece.text != null && piece.text.trim() != ''" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [textNote]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></text-note>
           <text-note *ngIf="piece.text == null || piece.text.trim() === ''" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [textNote]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></text-note>
         </ng-container>
-        <card-stack *ngIf="isLayerCardStack(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [cardStack]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card-stack>
-        <card *ngIf="isLayerCard(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [card]="piece" [appTooltip]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card>
+        <card-stack *ngIf="isLayerCardStack(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [cardStack]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card-stack>
+        <card *ngIf="isLayerCard(piece)" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-stack-id]="piece.identifier" [card]="piece" [ngStyle]="layerHostStyle(piece.zindex)"></card>
         <game-character *ngIf="isLayerCharacter(piece) && piece.character" class="is-3d layer-peer-host" [class.layer-flat-2d]="isTable2DMode" [attr.data-fb-id]="piece.identifier" [attr.data-fb-name]="piece.name" [attr.data-stack-id]="piece.identifier" [style.visibility]="piece.isLoaded && isTokenRevealedByVision(piece) ? 'visible' : 'hidden'" [ngStyle]="layerHostStyle(piece.zindex)" [characterToken]="piece" [gameCharacter]="piece.character" [appTooltip]="piece"></game-character>
       </ng-container>
       <range class="is-3d" *ngFor="let range of ranges; trackBy: trackByGameObject" [range]="range" [attr.data-stack-id]="range.identifier" [appTooltip]="range"></range>
       <dice-symbol class="is-3d" *ngFor="let diceSymbol of diceSymbols; trackBy: trackByGameObject" [attr.data-stack-id]="diceSymbol.identifier" [diceSymbol]="diceSymbol" [appTooltip]="diceSymbol"></dice-symbol>
       <peer-cursor *ngFor="let cursor of peerCursors; trackBy: trackByGameObject" class="is-3d" [cursor]="cursor" [style.display]="isCursorHidIn(cursor) && !isGMMode ? 'none' : ''"></peer-cursor>
+      <!-- Keep lighting coplanar with the map (not gridHeight+N): elevated veil
+           leaves a bright map rim at low camera angles. -->
       <canvas class="fx-canvas is-fill is-pointer-events-none" #fxCanvas
-        [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 2) + 'px)', 'clip': clipCss}"></canvas>
+        [ngStyle]="{'transform': 'translateZ(0.22px)', 'clip': clipCss}"></canvas>
       <div class="weather-stack is-pointer-events-none is-3d" aria-hidden="true"
         [style.width.px]="weatherPixelWidth"
         [style.height.px]="weatherPixelHeight"
@@ -137,7 +142,9 @@
         </div>
       </div>
       <div *ngIf="showSceneEditOverlay" class="edit-markers is-pointer-events-none" [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 1.5) + 'px)'}">
-        <div *ngFor="let light of lights" class="light-marker" [class.selected]="isLightSelected(light)"
+        <div *ngFor="let light of lights" class="light-marker"
+          [class.selected]="isLightSelected(light)"
+          [class.hovered]="isLightHovered(light)"
           [style.left.px]="light.x - 8" [style.top.px]="light.y - 8" title="{{ light.name }}"></div>
       </div>
       <div *ngIf="!isTable2DMode" class="clue-strings-3d is-pointer-events-none is-3d">

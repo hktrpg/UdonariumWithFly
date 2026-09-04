@@ -17,6 +17,9 @@ export type TextNoteContentKind = 'text' | 'image' | 'video' | 'pdf';
 
 @SyncObject('text-note')
 export class TextNote extends TabletopObject {
+  /** HTML5 DnD type for dragging inventory notes onto the table. */
+  static readonly INVENTORY_DRAG_MIME = 'application/x-udonarium-note-inventory';
+
   @SyncVar() rotate: number = 0;
   @SyncVar() zindex: number = 0;
   @SyncVar() password: string = '';
@@ -221,6 +224,7 @@ export class TextNote extends TabletopObject {
   }
 
   setFrontImage(imageIdentifier: string) {
+    if (typeof imageIdentifier !== 'string') return;
     let element = this.getElement('front', this.imageDataElement);
     if (!element && this.imageDataElement) {
       element = this.getElement('imageIdentifier', this.imageDataElement);
@@ -236,6 +240,7 @@ export class TextNote extends TabletopObject {
   }
 
   setBackImage(imageIdentifier: string) {
+    if (typeof imageIdentifier !== 'string') return;
     let element = this.getElement('back', this.imageDataElement);
     if (!element && this.imageDataElement) {
       element = DataElement.create('back', '', { type: 'image' }, 'back_' + this.identifier);

@@ -1,12 +1,22 @@
 :host {
+  display: none;
+  box-sizing: border-box;
+}
+
+:host.sync-visible {
   display: block;
+}
+
+:host.sync-visible.file-sync {
+  width: 132px;
+  min-height: 30px;
 }
 
 .sk-cube-grid {
   font-size: 8px;
   color: #444;
   height: 100%;
-  width: 100%;
+  width: 30px;
   background-color: rgba(247, 247, 247, 0.6);
 }
 
@@ -17,4 +27,56 @@
 .sk-title {
   padding: 2px 0;
   background-color: rgba(247, 247, 247, 0.6);
+}
+
+.sk-file-sync {
+  font-size: 8px;
+  line-height: 1.1;
+  color: #444;
+  background-color: rgba(247, 247, 247, 0.88);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 2px 4px 3px;
+  box-sizing: border-box;
+}
+
+.sk-file-head {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.sk-file-label {
+  font-weight: 600;
+}
+
+.sk-file-kind {
+  color: #666;
+  letter-spacing: 0.02em;
+}
+
+.sk-file-pct {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+
+.sk-file-bar {
+  display: flex;
+  gap: 1px;
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  user-select: none;
+}
+
+.sk-file-seg {
+  color: #c8c8c8;
+}
+
+.sk-file-seg.filled {
+  color: #555;
+  font-weight: 700;
 }

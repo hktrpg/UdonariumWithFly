@@ -99,8 +99,9 @@ export function assembleBakeGroupAt(terrains: Terrain[], center: PointerCoordina
     })),
   });
 
+  // Keep each part's own height — do not adopt pointer pick Z (T congregate settle_floor).
   for (const p of locals) {
-    commitTerrainPose(p.terrain, originX + p.lx, originY + p.ly, center.z, { restoreSize: true });
+    commitTerrainPose(p.terrain, originX + p.lx, originY + p.ly, p.terrain.posZ || 0, { restoreSize: true });
   }
 
   footprintDebug('assembleBakeGroupAt after', {
@@ -402,7 +403,8 @@ export function uniformScaleFromCornerDrag(
     ref = fallbackStart;
     startDist = Math.hypot(ref.x - anchor.x, ref.y - anchor.y);
   }
-  // No usable ref (near-anchor start without geom fallback, or fallback also ≈anchor).
+  // Without a usable reference (no/near-anchor fallback), keep scale at 1
+  // instead of dividing by a tiny startDist and exploding.
   if (startDist < minStartDist) return 1;
   const curDist = Math.hypot(cur.x - anchor.x, cur.y - anchor.y);
   return Math.max(0.05, curDist / startDist);

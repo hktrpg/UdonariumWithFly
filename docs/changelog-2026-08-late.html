@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>Udonarium @ HKTRPG — 2026/08/22–23 更新</title>
+  <style>
+    body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+    ul { padding-left: 1.25rem; }
+    li { margin: 0.35rem 0; }
+    .meta { color: #555; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Udonarium 烏冬 @ HKTRPG — 近期更新</h1>
+  <p class="meta">2026/08/22–23（hktrpg-main）</p>
+
+  <h2>連線・mesh・PWA</h2>
+  <ul>
+    <li>弱網／LTE 上減少 mesh 重連風暴；局中斷線會持續 remesh 重試。</li>
+    <li>大廳入房失敗時保持房間在線，可重試；Connecting／Offline 狀態較準確。</li>
+    <li>致命斷線後排程自動重開房；SkyWay 訊號雜訊降噪、publication 競態後重新發布。</li>
+    <li>房間密碼重設不會重複 SkyWay 成員；relay／subscribe 在弱網較易存活。</li>
+    <li>PWA：ngsw 雜湊與 HKTRPG 建置對齊；SW 安裝失敗也顯示更新圖示；連線面板捲動不再跳位。</li>
+  </ul>
+
+  <h2>檔案同步・筆記倉庫</h2>
+  <ul>
+    <li>連線面板 <strong>FILES</strong> 進度：入房至檔案齊全前保持 0→100%，不再 idle 閃爍。</li>
+    <li>檔案傳輸排程：多類型並行；<strong>圖片優先</strong>，其次<strong>正在播放的 BGM</strong>，同層再按大小。</li>
+    <li>綁定資料夾備份時，入房先從 <code>media/</code> hydrate，不阻塞 peer 下載；逾時 slot 自動釋放。</li>
+    <li>筆記倉庫對齊角色倉庫：五分頁（桌面／共用／個人／其他地圖／墳場）、拖放到地圖／分頁。</li>
+    <li>再點已選筆記可收合；刪除進墳場；PDF 等可拖到分頁。</li>
+    <li>紅繩（線索連結）拖曳連線物件時即時更新；預設劇本文字不再重複載入。</li>
+  </ul>
+
+  <p class="meta">站內：聊天分頁「更新日誌」卡片 · 教學：<a href="https://wiki.hktrpg.com/TRPG/Udonarium烏冬教學">Wiki</a> · <a href="https://z01.hktrpg.com/">z01.hktrpg.com</a></p>
+</body>
+</html>

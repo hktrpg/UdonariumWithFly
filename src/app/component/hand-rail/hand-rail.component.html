@@ -1,0 +1,117 @@
+<div class="hand-rail-root" *ngIf="!isGuest"
+  [class.is-mobile]="isMobileLayout"
+  [style.bottom.px]="railBottomPx">
+
+  <div class="hand-rail-drop-band"
+    *ngIf="showDropBand"
+    [class.is-hover]="isDropHover"
+    data-tour-id="hand.rail">
+    <span class="hand-rail-drop-band-label">{{ 'hand.dropHint' | i18n }}</span>
+  </div>
+
+  <div class="hand-rail" *ngIf="showHud"
+    data-tour-id="hand.rail"
+    [class.is-collapsed]="collapsed"
+    [class.has-cards]="cards.length > 0"
+    [class.is-drop-target]="isDropHover"
+    [class.is-read-only]="isPeekingOther"
+    [class.is-chrome-forced]="isDraggingCard || isDropHover || isDropOffer || orphanImportOpen">
+    <div class="hand-rail-hover-zone">
+    <div class="hand-rail-chrome" [class.is-drop-target]="isDropHover && collapsed">
+      <span class="hand-rail-title">{{ 'hand.title' | i18n }}</span>
+      <span class="hand-rail-count">{{ cards.length }}</span>
+
+      <div class="hand-orphan-import" *ngIf="offlineHandPiles.length > 0"
+        [class.is-open]="orphanImportOpen"
+        (click)="$event.stopPropagation()">
+        <button type="button" class="hand-orphan-import-btn"
+          [attr.title]="'hand.orphanImportHint' | i18n"
+          [attr.aria-expanded]="orphanImportOpen"
+          (click)="toggleOrphanImport($event)">
+          <i class="material-icons" aria-hidden="true">move_to_inbox</i>
+          <span class="hand-orphan-import-badge">{{ offlineHandPiles.length }}</span>
+        </button>
+        <div class="hand-orphan-import-panel" *ngIf="orphanImportOpen" role="dialog"
+          [attr.aria-label]="'hand.orphanImportTitle' | i18n">
+          <div class="hand-orphan-import-head">
+            <span>{{ 'hand.orphanImportTitle' | i18n }}</span>
+            <button type="button" class="hand-orphan-import-close"
+              [attr.title]="'hand.orphanImportClose' | i18n"
+              (click)="closeOrphanImport($event)">
+              <i class="material-icons" aria-hidden="true">close</i>
+            </button>
+          </div>
+          <ul class="hand-orphan-import-list">
+            <li *ngFor="let pile of offlineHandPiles" class="hand-orphan-import-row">
+              <div class="hand-orphan-import-meta">
+                <span class="hand-orphan-import-name">{{ pile.name }}</span>
+                <span class="hand-orphan-import-id">({{ shortUserId(pile.userId) }})</span>
+                <span class="hand-orphan-import-count">{{ 'hand.orphanImportCount' | i18n:{ count: pile.count } }}</span>
+              </div>
+              <button type="button" class="hand-orphan-import-confirm"
+                (click)="onClaimOfflineHand(pile, $event)">
+                {{ 'hand.orphanImportConfirm' | i18n }}
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <label *ngIf="canEditOwnHand" class="hand-play-face" (click)="$event.stopPropagation()"
+        [attr.title]="(playFaceUp ? 'hand.playFaceUpHint' : 'hand.playFaceDownHint') | i18n">
+        <input type="checkbox" class="hand-play-face-input"
+          [checked]="playFaceUp"
+          (change)="onPlayFaceChange($event)" />
+        <span class="hand-play-face-track" aria-hidden="true">
+          <span class="hand-play-face-thumb"></span>
+        </span>
+        <span class="hand-play-face-label">
+          {{ (playFaceUp ? 'hand.playFaceUp' : 'hand.playFaceDown') | i18n }}
+        </span>
+      </label>
+
+      <label *ngIf="showGmHandPeek && !collapsed" class="hand-gm-peek" (click)="$event.stopPropagation()">
+        <select [ngModel]="gmPeekUserId" (ngModelChange)="onGmPeekChange($event)">
+          <option [ngValue]="''">{{ 'hand.myHand' | i18n }}</option>
+          <option *ngFor="let peer of peersWithHands" [ngValue]="peer.userId">{{ peer.name }}</option>
+        </select>
+      </label>
+
+      <span class="hand-viewing" *ngIf="isPeekingOther && viewOwnerName && !collapsed">
+        {{ 'hand.viewing' | i18n:{ name: viewOwnerName } }}
+      </span>
+    </div>
+
+    <div #dropZone class="hand-rail-drop-zone" *ngIf="showCardRow"
+      (dragover)="onRailDragOver($event)"
+      (dragleave)="onRailDragLeave($event)"
+      (drop)="onRailDrop($event)">
+      <div #scrollViewport class="hand-rail-scroll"
+        [class.is-panning]="isPanningScroll"
+        (pointerdown)="onScrollPanDown($event)">
+        <div class="hand-row" *ngIf="cards.length > 0">
+          <div class="hand-card-slot"
+            *ngFor="let card of cards; let i = index"
+            [style.zIndex]="i + 1"
+            [class.is-reorder-target]="reorderHoverIndex === i && isDraggingCard"
+            (pointerdown)="onCardPointerDown($event, card)"
+            (contextmenu)="onCardContextMenu($event, card)"
+            (mouseenter)="onCardMouseEnter(card)"
+            (mouseleave)="onCardMouseLeave(card)">
+            <card-list-image [card]="card" [enableTooltip]="false" [singleFace]="true" [showFaceText]="false"></card-list-image>
+            <div *ngIf="captionCardId === card.identifier && captionVisible"
+              class="hand-card-caption is-pointer-events-none">
+              <div *ngIf="captionShowName" class="hand-card-caption-name">{{ captionNameFor(card) }}</div>
+              <div *ngIf="captionShowText" class="hand-card-caption-text"
+                [innerHTML]="captionTextHtmlFor(card) | safe: 'html'"></div>
+            </div>
+          </div>
+        </div>
+        <p class="hand-empty" *ngIf="cards.length < 1 && !isPeekingOther">{{ 'hand.empty' | i18n }}</p>
+      </div>
+
+      <p class="hand-peek-hint" *ngIf="isPeekingOther">{{ 'hand.peekReadOnly' | i18n }}</p>
+    </div>
+    </div>
+  </div>
+</div>

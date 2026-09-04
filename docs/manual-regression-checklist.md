@@ -10,5 +10,7 @@ Use after risky changes to multi-map, ClueLink, or room save/load.
 6. **Join room** — Entering a mesh room must not push lobby sample tables over the host house (clearLocal + claim authority).
 7. **GM preview map** — View another scene locally without changing room active for peers.
 8. **Scene preset keep-tokens** — Apply with keep-tokens: visible characters re-stamp; extras prune.
+9. **Table timers** — Two browsers: create timer, start/pause sync, drag on canvas, cycle display mode, count-up at target, on-zero sound/chat; guest cannot create; non-creator cannot delete.
+10. **Hand rail** — Straight tuck row (top peek; hover expand); play face-up/down from chrome; HUD hidden until you have cards; quick-drag shows a dashed bottom drop band only when collapsed or hand empty; drop into expanded hand rail / return to stack / table; hold ~0.55s to move whole stack (**blocked when locked**); horizontal scroll cabinet; GM peek read-only; KeyR shuffle when all selected are card stacks; deck menu draw/deal into hands; **F** turns whole deck over; face-down cards: players cannot open detail; Ctrl／⌘ Object Image Preview (pin; double-click opens sheet).
 
 Unit coverage: `npm run test:ci` (Karma). Optional E2E: `npm run e2e:smoke` (also in CI `playwright-smoke` job).

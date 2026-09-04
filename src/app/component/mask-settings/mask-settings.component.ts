@@ -340,7 +340,8 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current ? [current] : []
     }).then(value => {
-      if (value == null) return;
+      // Cancel resolves false; Empty selection is the string 'null'.
+      if (!value) return;
       this.mask.setImage(value);
       this.changeDetector.markForCheck();
     });
@@ -353,7 +354,7 @@ export class MaskSettingsComponent implements OnInit, OnChanges, OnDestroy {
       isAllowedEmpty: true,
       currentImageIdentifires: current ? [current] : []
     }).then(value => {
-      if (value == null) return;
+      if (!value) return;
       this.patchAlt({ imageIdentifier: value || '' });
     });
   }

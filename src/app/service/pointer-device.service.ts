@@ -38,10 +38,10 @@ export class PointerDeviceService {
   get isDragging(): boolean { return this._isDragging; }
   set isDragging(isDragging: boolean) {
     if (isDragging === this._isDragging) return;
-    this.ngZone.run(() => {
-      this._isDragging = isDragging;
-      document.body.dispatchEvent(new CustomEvent('draggingstate', { detail: isDragging, bubbles: true }));
-    });
+    this._isDragging = isDragging;
+    // Callers (table input handlers) already run inside NgZone; ngZone.run here retriggers CD
+    // during pointer-end and contributes to NG0103 loops.
+    document.body.dispatchEvent(new CustomEvent('draggingstate', { detail: isDragging, bubbles: true }));
   }
 
   isTablePickGesture = false;

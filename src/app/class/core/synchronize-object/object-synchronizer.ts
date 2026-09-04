@@ -1,5 +1,6 @@
 import { EventSystem, Network } from '../system';
 import { netDebug } from '../system/network/net-debug';
+import { ChatTabList } from '../../chat-tab-list';
 import { GameObject, ObjectContext } from './game-object';
 import { markForChanged } from './object-event-extension';
 import { ObjectFactory } from './object-factory';
@@ -26,8 +27,27 @@ export class ObjectSynchronizer {
   private pendingInboundUpdates: { context: ObjectContext; sendFrom: string }[] = [];
   /** Join probe: pull host catalogs/requests while still holding inbound apply. */
   private joinFetch = false;
+  /** Ignore stale inbound pose updates shortly after local drag release (prevents one-frame snap-back). */
+  private poseGraceUntil = new Map<ObjectIdentifier, number>();
+  static readonly POSE_GRACE_MS = 900;
 
   private constructor() { }
+
+  /** Call after committing a drag pose so in-flight peer updates do not overwrite it. */
+  markPoseGraceReleased(identifier: ObjectIdentifier) {
+    if (!identifier) return;
+    this.poseGraceUntil.set(identifier, performance.now() + ObjectSynchronizer.POSE_GRACE_MS);
+  }
+
+  private isPoseGraceActive(identifier: ObjectIdentifier): boolean {
+    const until = this.poseGraceUntil.get(identifier);
+    if (!until) return false;
+    if (performance.now() >= until) {
+      this.poseGraceUntil.delete(identifier);
+      return false;
+    }
+    return true;
+  }
 
   initialize() {
     this.destroy();
@@ -35,6 +55,7 @@ export class ObjectSynchronizer {
       .on('CONNECT_PEER', 2, event => {
         if (!event.isSendFromSelf) return;
         netDebug('CONNECT_PEER GameRoomService !!!', event.data.peerId);
+        this.scrubStaleHolders();
         if (this.peerSyncHold > 0) {
           this.pendingCatalogPeers.add(event.data.peerId);
           return;
@@ -44,6 +65,7 @@ export class ObjectSynchronizer {
       .on('DISCONNECT_PEER', event => {
         this.removePeerMap(event.data.peerId);
         this.pendingCatalogPeers.delete(event.data.peerId);
+        this.scrubHolderPeer(event.data.peerId);
       })
       .on<CatalogItem[]>('SYNCHRONIZE_GAME_OBJECT', event => {
         if (event.isSendFromSelf) return;
@@ -134,11 +156,16 @@ export class ObjectSynchronizer {
     this.pendingInboundCatalogs = [];
     this.pendingInboundUpdates = [];
     this.joinFetch = false;
+    this.poseGraceUntil.clear();
   }
 
   private applyInboundUpdate(context: ObjectContext, sendFrom: string, isSendFromSelf: boolean) {
     let object: GameObject = ObjectStore.instance.get(context.identifier);
     if (object) {
+      if (!isSendFromSelf && this.isPoseGraceActive(context.identifier)) {
+        const inVer = context.majorVersion + context.minorVersion;
+        if (inVer <= object.version + 0.0001) return;
+      }
       let updateObject = isSendFromSelf ? object : this.updateObject(object, context);
       if (updateObject) {
         markForChanged(updateObject, sendFrom);
@@ -157,6 +184,10 @@ export class ObjectSynchronizer {
     if (!Array.isArray(catalog) || catalog.length < 1) return;
     netDebug('SYNCHRONIZE_GAME_OBJECT ' + sendFrom);
     for (let item of catalog) {
+      // Do not request (or push DELETE for) lobby sample tabs we lack — refuse recreate only.
+      if (ChatTabList.isLobbySampleTabId(item.identifier) && !ObjectStore.instance.get(item.identifier)) {
+        continue;
+      }
       if (ObjectStore.instance.isDeleted(item.identifier) && !this.joinFetch) {
         EventSystem.call('DELETE_GAME_OBJECT', { aliasName: '', identifier: item.identifier }, sendFrom);
       } else {
@@ -177,6 +208,12 @@ export class ObjectSynchronizer {
   }
 
   private createObject(context: ObjectContext): GameObject {
+    // Lobby MainTab/SubTab use fixed syncIds. If this page does not already have them,
+    // do not create from peer catalog/UPDATE — that re-injects empty sample tabs into rooms.
+    if (context?.aliasName === 'chat-tab' && ChatTabList.isLobbySampleTabId(context.identifier)) {
+      console.warn('[ObjectSynchronizer] refuse peer create of lobby sample chat tab', context.identifier);
+      return null;
+    }
     let newObject: GameObject = ObjectFactory.instance.create(context.aliasName, context.identifier);
     if (!newObject) {
       console.warn(context.aliasName + ' is Unknown...?', context);
@@ -225,6 +262,34 @@ export class ObjectSynchronizer {
     this.peerMap.delete(targetPeerId);
   }
 
+  /** Remove catalog holders that are no longer in the mesh (re-key / lobby ghosts). */
+  private scrubStaleHolders() {
+    const mesh = new Set(Network.peerIds);
+    mesh.add(Network.peerId);
+    for (const peerId of this.peerMap.keys()) {
+      if (!mesh.has(peerId)) this.removePeerMap(peerId);
+    }
+    for (const [identifier, request] of this.requestMap) {
+      request.holderIds = request.holderIds.filter(id => mesh.has(id));
+      if (request.holderIds.length < 1) {
+        this.requestMap.delete(identifier);
+      }
+    }
+  }
+
+  /** Drop stale holder after peer disconnect / re-key (old peerId in catalog). */
+  private scrubHolderPeer(peerId: PeerId) {
+    if (!peerId) return;
+    for (const [identifier, request] of this.requestMap) {
+      const idx = request.holderIds.indexOf(peerId);
+      if (idx < 0) continue;
+      request.holderIds.splice(idx, 1);
+      if (request.holderIds.length < 1) {
+        this.requestMap.delete(identifier);
+      }
+    }
+  }
+
   private synchronize() {
     let isContinue = true;
     while (0 < this.requestMap.size && this.tasks.length < 32 && isContinue) {
@@ -263,14 +328,20 @@ export class ObjectSynchronizer {
   }
 
   private makeRequestList(targetPeerId: PeerId, maxRequest: number = 32): SynchronizeRequest[] {
-    let requests: SynchronizeRequest[] = [];
+    const entries = [...this.requestMap.entries()].filter(([, request]) =>
+      request.holderIds.includes(targetPeerId));
+    if (this.joinFetch) {
+      entries.sort(([idA], [idB]) => joinFetchRequestRank(idA) - joinFetchRequestRank(idB));
+    }
 
-    for (let [identifier, request] of this.requestMap) {
+    const requests: SynchronizeRequest[] = [];
+    for (const [identifier, request] of entries) {
       if (maxRequest <= requests.length) break;
-      if (!request.holderIds.includes(targetPeerId)) continue;
 
-      let gameObject = ObjectStore.instance.get(request.identifier);
-      if (!gameObject || gameObject.version < request.version || this.joinFetch) requests.push(request);
+      const gameObject = ObjectStore.instance.get(identifier);
+      if (!gameObject || gameObject.version < request.version || this.joinFetch) {
+        requests.push(request);
+      }
 
       this.requestMap.delete(identifier);
     }
@@ -280,7 +351,9 @@ export class ObjectSynchronizer {
   private getTargetPeerId(): PeerId {
     let min = 9999;
     let selectPeerId: PeerId = '';
-    let peers = Network.peers;
+    const openIds = new Set(Network.peerIds);
+
+    let peers = Network.peers.filter(p => openIds.has(p.peerId));
 
     for (let i = peers.length - 1; 0 <= i; i--) {
       let rand = Math.floor(Math.random() * (i + 1));
@@ -302,4 +375,16 @@ export class ObjectSynchronizer {
 function inboundApplyRank(aliasName: string): number {
   if (aliasName === 'data' || aliasName === 'node') return 0;
   return 1;
+}
+
+/**
+ * During joinFetch, pull game-table before the rest of the catalog so the join
+ * probe can confirm before bulk object/file sync saturates the DataChannel.
+ */
+function joinFetchRequestRank(identifier: string): number {
+  const obj = ObjectStore.instance.get(identifier);
+  const alias = obj?.aliasName || '';
+  if (alias === 'game-table') return 0;
+  if (alias === 'table-selecter') return 1;
+  return 2;
 }

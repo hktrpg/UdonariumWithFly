@@ -68,6 +68,19 @@ export class VideoFile {
     }
   }
 
+  static async createPackedAsync(file: File, forcedIdentifier: string): Promise<VideoFile> {
+    const id = (forcedIdentifier || '').toLowerCase();
+    const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(file);
+    const video = new VideoFile();
+    video.context.identifier = id;
+    video.context.name = id;
+    const mime = file.type || 'video/mp4';
+    video.context.blob = new Blob([arrayBuffer], { type: mime });
+    video.context.type = video.context.blob.type;
+    video.context.url = window.URL.createObjectURL(video.context.blob);
+    return video;
+  }
+
   private static async _createAsync(blob: Blob, name?: string): Promise<VideoFile> {
     const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(blob);
     const video = new VideoFile();

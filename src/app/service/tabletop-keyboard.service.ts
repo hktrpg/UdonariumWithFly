@@ -32,13 +32,16 @@ import { RotableSelectionSynchronizer } from 'directive/rotable-selection-synchr
 
 import { CoordinateService } from './coordinate.service';
 import { ContextMenuService } from './context-menu.service';
+import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import { PanelService } from './panel.service';
+import { PointerDeviceService, PointerCoordinate } from './pointer-device.service';
 import { SceneToolService } from './scene-tool.service';
 import { filesFromDataTransfer, TabletopFileDropService } from './tabletop-file-drop.service';
 import { SelectionState, TabletopSelectionService } from './tabletop-selection.service';
 import { TokenPathMoveService } from './token-path-move.service';
 import { DeleteEntry, UndoService } from './undo.service';
+import { findCardOrStackIdAtPoint } from 'component/card-stack/card-stack-gesture';
 
 const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
@@ -68,6 +71,20 @@ export class TabletopKeyboardService {
   private altHeld = false;
   /** Last pointer context for Ctrl+A (inventory vs map vs other panels). */
   private interactionContext: 'inventory' | 'map' | 'other' = 'map';
+  /** rAF id while WASD/arrows are held — continuous move + live shadows (like drag). */
+  private moveLoopRaf = 0;
+  private moveLoopLastTs = 0;
+  /** rAF id while finishing a short tap to the next grid cell. */
+  private tapGlideRaf = 0;
+  private moveSessionStartMs = 0;
+  private moveSessionStartPos = new Map<string, { x: number; y: number }>();
+  private moveSessionLastDir: { dx: number; dy: number } | null = null;
+  /** Guard against keyup + rAF both finishing the same session. */
+  private moveReleaseHandled = true;
+  private static readonly MOVE_CELLS_PER_SEC = 5.5;
+  /** Short press → glide the remainder of one grid cell (drag-like). */
+  private static readonly TAP_COMPLETE_MS = 280;
+  private static readonly TAP_GLIDE_MS = 150;
 
   private readonly onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
   private readonly onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
@@ -79,24 +96,52 @@ export class TabletopKeyboardService {
     this.wheelAcc = 0;
     this.altHeld = false;
     this.selectionService.setCanvasHighlight(false);
+    this.cancelTapGlide();
+    this.stopContinuousMoveLoop(true);
   };
 
   constructor(
     private selectionService: TabletopSelectionService,
     private coordinateService: CoordinateService,
+    private pointerDevice: PointerDeviceService,
     private sceneTools: SceneToolService,
     private undoService: UndoService,
     private tokenPath: TokenPathMoveService,
     private contextMenu: ContextMenuService,
     private tabletopFileDrop: TabletopFileDropService,
+    private i18n: I18nService,
     private ngZone: NgZone,
   ) { }
 
   /**
-   * Keyboard listeners are registered outside NgZone (game-table init) so WASD
-   * does not thrash CD. Template-bound state (z-index, mask order, flip…) must
-   * re-enter the zone or the view never updates.
+   * Objects that receive tabletop shortcuts.
+   * Explicit selection wins; otherwise the card / card-stack under the pointer (hover).
    */
+  private shortcutTargets(): TabletopObject[] {
+    if (this.selectionService.size > 0) return this.selectionService.objects;
+    const hovered = this.resolveHoveredCardOrStack();
+    return hovered ? [hovered] : [];
+  }
+
+  /** F / R: only the card or stack under the pointer — never box-selection alone. */
+  private hoverCardOrStackTargets(): TabletopObject[] {
+    const hovered = this.resolveHoveredCardOrStack();
+    return hovered ? [hovered] : [];
+  }
+
+  /** Card or stack under the current pointer (page → client for hit-test). */
+  private resolveHoveredCardOrStack(): Card | CardStack | null {
+    const ptr = this.pointerDevice.pointers[0];
+    if (!ptr) return null;
+    const clientX = ptr.x - (window.scrollX || window.pageXOffset || 0);
+    const clientY = ptr.y - (window.scrollY || window.pageYOffset || 0);
+    const id = findCardOrStackIdAtPoint(clientX, clientY);
+    if (!id) return null;
+    const obj = ObjectStore.instance.get(id);
+    if (obj instanceof CardStack || obj instanceof Card) return obj;
+    return null;
+  }
+
   private runInAngular<T>(fn: () => T): T {
     return NgZone.isInAngularZone() ? fn() : this.ngZone.run(fn);
   }
@@ -129,6 +174,12 @@ export class TabletopKeyboardService {
     this.pressed.clear();
     this.altHeld = false;
     this.selectionService.setCanvasHighlight(false);
+    this.cancelTapGlide();
+    if (this.moveLoopRaf) {
+      cancelAnimationFrame(this.moveLoopRaf);
+      this.moveLoopRaf = 0;
+    }
+    this.finishContinuousMove();
     this.listening = false;
   }
 
@@ -276,20 +327,36 @@ export class TabletopKeyboardService {
     // Q/E: rotate selection (±45°; Shift = ±15°). Empty selection → view yaw in TableMouseGesture.
     if ((code === 'KeyQ' || code === 'KeyE') && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      const targets = this.shortcutTargets();
+      if (targets.length < 1) return;
       const step = e.shiftKey ? 15 : 45;
       const delta = code === 'KeyQ' ? -step : step;
-      if (RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta)) {
+      if (RotableSelectionSynchronizer.rotateBy(targets, delta)) {
         this.consume(e);
       }
       return;
     }
 
-    // R: reset facing + tilt (roll) to 0°.
+    // R: shuffle hovered stack, else reset facing on hovered card. Hover required (not box-select).
     if (code === 'KeyR' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
-      if (RotableSelectionSynchronizer.resetAngles(this.selectionService.objects)) {
+      const objects = this.hoverCardOrStackTargets();
+      if (objects.length < 1) return;
+      if (objects.every(o => o instanceof CardStack)) {
+        let shuffled = false;
+        for (const object of objects) {
+          if (!(object instanceof CardStack) || object.isLocked || object.isEmpty) continue;
+          object.shuffle();
+          EventSystem.call('SHUFFLE_CARD_STACK', { identifier: object.identifier });
+          shuffled = true;
+        }
+        if (shuffled) {
+          SoundEffect.play(PresetSound.cardShuffle);
+          this.consume(e);
+        }
+        return;
+      }
+      if (RotableSelectionSynchronizer.resetAngles(objects)) {
         this.consume(e);
       }
       return;
@@ -298,25 +365,26 @@ export class TabletopKeyboardService {
     // PageUp / PageDown: nudge altitude (±1; Shift = ±0.5).
     if ((code === 'PageUp' || code === 'PageDown') && !mod && !this.altHeld) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       const step = e.shiftKey ? 0.5 : 1;
       const delta = code === 'PageUp' ? step : -step;
       if (this.runInAngular(() => this.nudgeAltitude(delta))) this.consume(e);
       return;
     }
 
-    // F: flip cards / coin faces; roll multi-face dice.
+    // F: flip hovered card, or turn over hovered deck (inverse). Hover required (not box-select).
     if (code === 'KeyF' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
-      if (this.runInAngular(() => this.flipSelection())) this.consume(e);
+      const hovered = this.hoverCardOrStackTargets();
+      if (hovered.length < 1) return;
+      if (this.runInAngular(() => this.flipObjects(hovered))) this.consume(e);
       return;
     }
 
     // H: GM hide / reveal selected characters.
     if (code === 'KeyH' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.runInAngular(() => this.toggleHideSelection())) this.consume(e);
       return;
     }
@@ -324,7 +392,7 @@ export class TabletopKeyboardService {
     // L: lock / unlock selected objects.
     if (code === 'KeyL' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.runInAngular(() => this.toggleLockSelection())) this.consume(e);
       return;
     }
@@ -332,46 +400,38 @@ export class TabletopKeyboardService {
     // T: congregate selected tokens to the current mouse / pointer position on the table.
     if (code === 'KeyT' && !mod && !this.altHeld && !e.shiftKey) {
       if (this.sceneTools.selectionCount > 0) return;
-      if (this.selectionService.size < 1) return;
+      if (this.shortcutTargets().length < 1) return;
       if (this.congregateSelectionToPointer()) this.consume(e);
       return;
     }
 
     if (!MOVE_CODES.has(code) || mod || this.altHeld) return;
 
-    // Scene-tool selection: WASD / arrows nudge drawings, lights, walls.
+    // Scene-tool selection: continuous WASD / arrows (live shadows while lights move).
     if (this.sceneTools.selectionCount > 0) {
       if (e.shiftKey) return;
-      const sceneDelta = this.moveDeltaFromPressed();
-      if (!sceneDelta) return;
-      const sceneGrid = TableSelecter.instance.viewTable?.gridSize ?? 50;
-      if (this.sceneTools.nudgeSelection(sceneDelta.dx * sceneGrid, sceneDelta.dy * sceneGrid)) {
-        // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
-        if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
-        this.consume(e);
-      }
+      if (!this.moveDeltaFromPressed()) return;
+      this.beginOrContinueMoveSession([]);
+      this.consume(e);
       return;
     }
 
-    if (this.selectionService.size < 1) return;
+    const moveTargets = this.shortcutTargets();
+    if (moveTargets.length < 1) return;
 
     if (e.shiftKey) {
       const angle = this.facingAngleFromPressed();
       if (angle == null) return;
-      if (RotableSelectionSynchronizer.face(this.selectionService.objects, angle)) {
+      if (RotableSelectionSynchronizer.face(moveTargets, angle)) {
         this.consume(e);
       }
       return;
     }
 
-    const delta = this.moveDeltaFromPressed();
-    if (!delta) return;
-    const gridSize = TableSelecter.instance.viewTable?.gridSize ?? 50;
-    if (MovableSelectionSynchronizer.nudge(this.selectionService.objects, delta.dx * gridSize, delta.dy * gridSize)) {
-      // Local only: chat SE mute is per-client; do not broadcast WASD/nudge SE to peers.
-      if (!e.repeat) SoundEffect.playLocal(PresetSound.piecePut);
-      this.consume(e);
-    }
+    if (!this.moveDeltaFromPressed()) return;
+    // Drag-like: continuous rAF from the first frame (no instant grid teleport).
+    this.beginOrContinueMoveSession(moveTargets);
+    this.consume(e);
   }
 
   private handleKeyUp(e: KeyboardEvent) {
@@ -386,6 +446,9 @@ export class TabletopKeyboardService {
       this.runInAngular(() => this.selectionService.setCanvasHighlight(false));
     }
     this.pressed.delete(e.code);
+    if (MOVE_CODES.has(e.code) && !this.moveDeltaFromPressed()) {
+      this.stopContinuousMoveLoop(true);
+    }
   }
 
   private handleWheel(e: WheelEvent) {
@@ -403,7 +466,8 @@ export class TabletopKeyboardService {
     const isAltShift = alt && e.shiftKey && !e.ctrlKey && !e.metaKey;
     const stepDeg = isCtrlShift ? 45 : (isAltOnly || isAltShift) ? 3 : null;
     if (stepDeg == null) return;
-    if (this.selectionService.size < 1) return;
+    const wheelTargets = this.shortcutTargets();
+    if (wheelTargets.length < 1) return;
 
     // Prefer the dominant axis (Shift may still contribute deltaX while Ctrl is held).
     const scroll = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -425,9 +489,9 @@ export class TabletopKeyboardService {
     const delta = dir * stepDeg;
 
     if (isAltShift) {
-      RotableSelectionSynchronizer.rollBy(this.selectionService.objects, delta);
+      RotableSelectionSynchronizer.rollBy(wheelTargets, delta);
     } else {
-      RotableSelectionSynchronizer.rotateBy(this.selectionService.objects, delta);
+      RotableSelectionSynchronizer.rotateBy(wheelTargets, delta);
     }
   }
 
@@ -573,6 +637,201 @@ export class TabletopKeyboardService {
     return { dx, dy };
   }
 
+  private beginOrContinueMoveSession(moveTargets: TabletopObject[]) {
+    this.cancelTapGlide();
+    const delta = this.moveDeltaFromPressed();
+    if (delta) this.moveSessionLastDir = delta;
+    if (!this.moveLoopRaf) {
+      this.moveReleaseHandled = false;
+      this.moveSessionStartMs = performance.now();
+      this.moveSessionStartPos.clear();
+      const targets = moveTargets.length
+        ? moveTargets
+        : (this.sceneTools.selectionCount > 0 ? [] : this.shortcutTargets());
+      if (targets.length) {
+        MovableSelectionSynchronizer.beginKeyboardNudge(targets);
+        for (const object of targets) {
+          const pos = this.livePosOf(object);
+          if (pos) this.moveSessionStartPos.set(object.identifier, pos);
+        }
+      }
+    }
+    this.ensureContinuousMoveLoop();
+  }
+
+  private livePosOf(object: TabletopObject): { x: number; y: number } | null {
+    const live = MovableDirective.livePoseFor(object.identifier);
+    if (live) return { x: live.x, y: live.y };
+    const pose = object.getPoseForView?.() ?? object.location;
+    if (!pose) return null;
+    return { x: pose.x, y: pose.y };
+  }
+
+  /** While WASD/arrows held: move every frame and refresh shadows (pointer-drag parity). */
+  private ensureContinuousMoveLoop() {
+    if (this.moveLoopRaf) return;
+    this.moveLoopLastTs = performance.now();
+    this.ngZone.runOutsideAngular(() => {
+      const tick = (now: number) => {
+        if (!this.moveDeltaFromPressed()) {
+          this.moveLoopRaf = 0;
+          this.onMoveKeysReleased();
+          return;
+        }
+        const dt = Math.min(0.05, Math.max(0, (now - this.moveLoopLastTs) / 1000));
+        this.moveLoopLastTs = now;
+        this.runInAngular(() => this.applyContinuousMove(dt));
+        this.moveLoopRaf = requestAnimationFrame(tick);
+      };
+      this.moveLoopRaf = requestAnimationFrame(tick);
+    });
+  }
+
+  private stopContinuousMoveLoop(finish: boolean) {
+    if (this.moveLoopRaf) {
+      cancelAnimationFrame(this.moveLoopRaf);
+      this.moveLoopRaf = 0;
+    }
+    if (finish) this.onMoveKeysReleased();
+  }
+
+  private applyContinuousMove(dt: number) {
+    if (dt <= 0) return;
+    const delta = this.moveDeltaFromPressed();
+    if (!delta) return;
+    this.moveSessionLastDir = delta;
+    const grid = TableSelecter.instance.viewTable?.gridSize ?? 50;
+    const len = Math.hypot(delta.dx, delta.dy) || 1;
+    const speed = grid * TabletopKeyboardService.MOVE_CELLS_PER_SEC;
+    const dx = (delta.dx / len) * speed * dt;
+    const dy = (delta.dy / len) * speed * dt;
+
+    if (this.sceneTools.selectionCount > 0) {
+      this.sceneTools.nudgeSelection(dx, dy);
+      return;
+    }
+    const moveTargets = this.shortcutTargets();
+    if (moveTargets.length < 1) return;
+    MovableSelectionSynchronizer.nudge(moveTargets, dx, dy);
+  }
+
+  /** Key released: short tap glides to one cell; longer hold snaps/flushes like drag end. */
+  private onMoveKeysReleased() {
+    if (this.moveReleaseHandled || this.tapGlideRaf) return;
+    if (this.sceneTools.selectionCount > 0) {
+      this.finishContinuousMove();
+      return;
+    }
+    const targets = this.shortcutTargets();
+    const dir = this.moveSessionLastDir;
+    const grid = TableSelecter.instance.viewTable?.gridSize ?? 50;
+    const elapsed = performance.now() - this.moveSessionStartMs;
+    if (targets.length && dir && elapsed <= TabletopKeyboardService.TAP_COMPLETE_MS
+      && this.shouldCompleteTapCell(targets, dir, grid)) {
+      this.startTapGlide(targets, dir, grid);
+      return;
+    }
+    this.finishContinuousMove();
+  }
+
+  private shouldCompleteTapCell(
+    targets: TabletopObject[],
+    dir: { dx: number; dy: number },
+    grid: number,
+  ): boolean {
+    const len = Math.hypot(dir.dx, dir.dy) || 1;
+    const need = grid * 0.45;
+    for (const object of targets) {
+      const start = this.moveSessionStartPos.get(object.identifier);
+      const now = this.livePosOf(object);
+      if (!start || !now) continue;
+      const along = ((now.x - start.x) * dir.dx + (now.y - start.y) * dir.dy) / len;
+      if (along < need) return true;
+    }
+    return false;
+  }
+
+  private startTapGlide(
+    targets: TabletopObject[],
+    dir: { dx: number; dy: number },
+    grid: number,
+  ) {
+    this.cancelTapGlide();
+    MovableSelectionSynchronizer.beginKeyboardNudge(targets);
+    const len = Math.hypot(dir.dx, dir.dy) || 1;
+    const nx = dir.dx / len;
+    const ny = dir.dy / len;
+    const from = new Map<string, { x: number; y: number }>();
+    const to = new Map<string, { x: number; y: number }>();
+    for (const object of targets) {
+      const start = this.moveSessionStartPos.get(object.identifier) ?? this.livePosOf(object);
+      const cur = this.livePosOf(object);
+      if (!start || !cur) continue;
+      from.set(object.identifier, cur);
+      to.set(object.identifier, {
+        x: start.x + nx * grid,
+        y: start.y + ny * grid,
+      });
+    }
+    if (to.size < 1) {
+      this.finishContinuousMove();
+      return;
+    }
+    const duration = TabletopKeyboardService.TAP_GLIDE_MS;
+    const t0 = performance.now();
+    this.ngZone.runOutsideAngular(() => {
+      const tick = (now: number) => {
+        const u = Math.min(1, (now - t0) / duration);
+        const ease = u * (2 - u);
+        this.runInAngular(() => {
+          for (const object of targets) {
+            const a = from.get(object.identifier);
+            const b = to.get(object.identifier);
+            if (!a || !b) continue;
+            const x = a.x + (b.x - a.x) * ease;
+            const y = a.y + (b.y - a.y) * ease;
+            this.setObjectLivePos(object, x, y);
+          }
+          EventSystem.trigger('TABLETOP_DRAG_MOVE', { source: 'nudge-glide' });
+        });
+        if (u < 1) {
+          this.tapGlideRaf = requestAnimationFrame(tick);
+        } else {
+          this.tapGlideRaf = 0;
+          SoundEffect.playLocal(PresetSound.piecePut);
+          this.finishContinuousMove();
+        }
+      };
+      this.tapGlideRaf = requestAnimationFrame(tick);
+    });
+  }
+
+  private setObjectLivePos(object: TabletopObject, x: number, y: number) {
+    const cur = this.livePosOf(object);
+    if (!cur) return;
+    MovableSelectionSynchronizer.nudge([object], x - cur.x, y - cur.y);
+  }
+
+  private cancelTapGlide() {
+    if (!this.tapGlideRaf) return;
+    cancelAnimationFrame(this.tapGlideRaf);
+    this.tapGlideRaf = 0;
+  }
+
+  /** Snap + flush after hold/glide ends so SyncVars match the final visual pose. */
+  private finishContinuousMove() {
+    this.cancelTapGlide();
+    this.moveReleaseHandled = true;
+    this.runInAngular(() => {
+      MovableSelectionSynchronizer.finishKeyboardNudge(
+        this.shortcutTargets(),
+        TableSelecter.instance.gridSnap,
+      );
+    });
+    this.moveSessionStartPos.clear();
+    this.moveSessionLastDir = null;
+  }
+
   private facingAngleFromPressed(): number | null {
     const delta = this.moveDeltaFromPressed();
     if (!delta) return null;
@@ -582,13 +841,14 @@ export class TabletopKeyboardService {
   }
 
   private changeLayerOrder(toFront: boolean): boolean {
-    if (this.selectionService.size < 1) return false;
-    const before = this.snapshotZindexes(this.selectionService.objects);
-    const beforeOrder = this.snapshotChildOrders(this.selectionService.objects);
+    const targets = this.shortcutTargets();
+    if (targets.length < 1) return false;
+    const before = this.snapshotZindexes(targets);
+    const beforeOrder = this.snapshotChildOrders(targets);
     let changed = false;
     // Process back→front when bringing forward (and reverse when sending back) so
     // multi-select keeps relative order while moving as a group.
-    const objects = this.selectionService.objects.slice().sort((a, b) => {
+    const objects = targets.slice().sort((a, b) => {
       const za = 'zindex' in a ? (a as Stackable).zindex : 0;
       const zb = 'zindex' in b ? (b as Stackable).zindex : 0;
       return toFront ? za - zb : zb - za;
@@ -599,8 +859,8 @@ export class TabletopKeyboardService {
       if (did) changed = true;
     }
     if (changed) {
-      const after = this.snapshotZindexes(this.selectionService.objects);
-      const afterOrder = this.snapshotChildOrders(this.selectionService.objects);
+      const after = this.snapshotZindexes(targets);
+      const afterOrder = this.snapshotChildOrders(targets);
       this.undoService.recordLayerChange(before, after, beforeOrder, afterOrder, 'layer');
       // Stackable toTopmost/toBackmost already emit TABLETOP_LAYER_CHANGED via util.
       // Re-firing here doubles detectChanges and makes every token flash on [ ].
@@ -720,8 +980,8 @@ export class TabletopKeyboardService {
       this.clipboardSourceIds = objs.map(object => object.identifier);
       return this.clipboardXml.length > 0;
     }
-    if (this.selectionService.size < 1) return false;
-    const objs = this.selectionService.objects;
+    const objs = this.shortcutTargets();
+    if (objs.length < 1) return false;
     this.clipboardXml = objs.map(object => object.toXml());
     this.clipboardSourceIds = objs.map(object => object.identifier);
     return this.clipboardXml.length > 0;
@@ -767,12 +1027,81 @@ export class TabletopKeyboardService {
     this.selectionService.add(object);
   }
 
-  private congregateSelectionToPointer(): boolean {
+  /**
+   * Hotkey T / context menu: if selection is only cards + stacks (≥2 pieces),
+   * merge into one deck at `position`; otherwise congregate to that point.
+   */
+  congregateOrMergeSelection(position?: PointerCoordinate): boolean {
+    return this.runInAngular(() => this.congregateOrMergeSelectionInner(position));
+  }
+
+  private congregateOrMergeSelectionInner(position?: PointerCoordinate): boolean {
     if (Network.GuestMode()) return false;
-    if (this.selectionService.size < 1) return false;
-    const pointer = this.coordinateService.calcTabletopLocalCoordinate();
-    this.selectionService.congregate(pointer);
+    const targets = this.selectionService.size > 0
+      ? this.selectionService.objects
+      : this.shortcutTargets();
+    if (targets.length < 1) return false;
+    const pointer = position ?? this.coordinateService.calcTabletopLocalCoordinate();
+    if (this.tryMergeCardsAndStacks(targets, pointer)) return true;
+    MovableSelectionSynchronizer.congregate(pointer, targets);
     SoundEffect.play(PresetSound.piecePut);
+    return true;
+  }
+
+  private congregateSelectionToPointer(): boolean {
+    return this.congregateOrMergeSelectionInner();
+  }
+
+  /**
+   * Merge free cards + card stacks into one deck. Returns true when merged.
+   * Requires every target to be a Card or CardStack and at least two pieces.
+   */
+  private tryMergeCardsAndStacks(targets: TabletopObject[], position: PointerCoordinate): boolean {
+    if (targets.length < 2) return false;
+    const pieces: Array<Card | CardStack> = [];
+    for (const obj of targets) {
+      if (obj instanceof Card || obj instanceof CardStack) pieces.push(obj);
+      else return false;
+    }
+
+    const freeCards = pieces.filter((p): p is Card => p instanceof Card && !p.parent);
+    const stacks = pieces.filter((p): p is CardStack => p instanceof CardStack);
+    if (freeCards.length + stacks.length < 2) return false;
+
+    let totalCards = freeCards.length;
+    for (const s of stacks) totalCards += s.cards.length;
+    if (totalCards < 2) return false;
+
+    const deck = CardStack.create(this.i18n.t('card.deckDefault'));
+    deck.location.x = position.x - 25;
+    deck.location.y = position.y - 25;
+    deck.posZ = position.z;
+    deck.location.name = 'table';
+    const viewId = TabletopObject.resolveViewTableIdentifier() || '';
+    if (viewId) deck.tableIdentifier = viewId;
+    deck.setLocation('table');
+
+    const ordered = [...freeCards, ...stacks].sort((a, b) => {
+      const za = 'zindex' in a ? (a as Card | CardStack).zindex : 0;
+      const zb = 'zindex' in b ? (b as Card | CardStack).zindex : 0;
+      return za - zb;
+    });
+
+    for (const piece of ordered) {
+      if (piece instanceof Card) {
+        deck.putOnBottom(piece);
+        continue;
+      }
+      const drawn = piece.drawCardAll();
+      for (const card of drawn) deck.putOnBottom(card);
+      piece.setLocation('');
+      piece.destroy();
+    }
+
+    deck.raiseInTier();
+    this.selectionService.clear();
+    this.selectionService.add(deck);
+    SoundEffect.play(PresetSound.cardPut);
     return true;
   }
 
@@ -1152,9 +1481,9 @@ export class TabletopKeyboardService {
 
   private deleteSelection(): boolean {
     if (Network.GuestMode()) return false;
-    if (this.selectionService.size < 1) return false;
+    const targets = [...this.shortcutTargets()];
+    if (targets.length < 1) return false;
 
-    const targets = [...this.selectionService.objects];
     const entries: DeleteEntry[] = [];
     let deleted = false;
 
@@ -1187,6 +1516,33 @@ export class TabletopKeyboardService {
           object.leaveCurrentTable('graveyard');
         } else {
           object.setLocation('graveyard');
+        }
+        this.selectionService.remove(object);
+        deleted = true;
+        continue;
+      }
+
+      if (object instanceof TextNote) {
+        if (object.location.name === 'graveyard') {
+          entries.push({
+            kind: 'destroy',
+            xml: object.toXml(),
+            parentId: (object as ObjectNode).parentId || TableSelecter.instance.viewTable?.identifier || '',
+            liveId: object.identifier,
+          });
+          object.destroy();
+        } else {
+          entries.push({
+            kind: 'graveyard',
+            id: object.identifier,
+            fromLocation: object.location.name,
+            fromTableIdentifier: object.tableIdentifier || TabletopObject.resolveViewTableIdentifier() || '',
+          });
+          if (object.location.name === 'table') {
+            object.leaveCurrentTable('graveyard');
+          } else {
+            object.setLocation('graveyard');
+          }
         }
         this.selectionService.remove(object);
         deleted = true;
@@ -1230,7 +1586,7 @@ export class TabletopKeyboardService {
     if (delta === 0) return false;
     if (TableSelecter.instance?.viewTable?.is2DMode) return false;
     let changed = false;
-    for (const object of this.selectionService.objects) {
+    for (const object of this.shortcutTargets()) {
       if (this.isLocked(object)) continue;
       if (!object.isHaveAltitude) continue;
       const next = Math.min(ALTITUDE_MAX, Math.max(ALTITUDE_MIN, object.altitude + delta));
@@ -1242,13 +1598,17 @@ export class TabletopKeyboardService {
     return changed;
   }
 
-  /** Flip cards / coin faces; roll multi-face dice. */
+  /** Flip card / turn over deck / coin faces; roll multi-face dice. */
   private flipSelection(): boolean {
+    return this.flipObjects(this.shortcutTargets());
+  }
+
+  private flipObjects(objects: TabletopObject[]): boolean {
     let flippedCard = false;
     let rolledCoin = false;
     let rolledDice = false;
 
-    for (const object of this.selectionService.objects) {
+    for (const object of objects) {
       if (this.isLocked(object)) continue;
 
       if (object instanceof Card) {
@@ -1259,10 +1619,9 @@ export class TabletopKeyboardService {
       }
 
       if (object instanceof CardStack) {
-        const top = object.topCard;
-        if (!top) continue;
-        if (top.isFront) object.faceDown();
-        else object.faceUp();
+        if (object.isEmpty) continue;
+        object.inverse();
+        EventSystem.call('INVERSE_CARD_STACK', { identifier: object.identifier });
         flippedCard = true;
         continue;
       }
@@ -1292,7 +1651,7 @@ export class TabletopKeyboardService {
   /** GM only: hide / reveal selected tokens (owner stealth on Token when present). */
   private toggleHideSelection(): boolean {
     if (!PeerCursor.myCursor?.isGMMode) return false;
-    const hosts = this.selectionService.objects.filter(
+    const hosts = this.shortcutTargets().filter(
       (o): o is GameCharacter | CharacterToken =>
         o instanceof GameCharacter || o instanceof CharacterToken
     );
@@ -1324,7 +1683,7 @@ export class TabletopKeyboardService {
   /** Toggle lock on selected objects that support isLocked / isLock. */
   private toggleLockSelection(): boolean {
     const lockable: TabletopObject[] = [];
-    for (const object of this.selectionService.objects) {
+    for (const object of this.shortcutTargets()) {
       if (object instanceof GameCharacter) continue; // soft player-owner lock only
       if ('isLocked' in object || 'isLock' in object) lockable.push(object);
     }

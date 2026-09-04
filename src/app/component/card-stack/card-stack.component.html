@@ -1,15 +1,25 @@
-<div class="component is-3d is-pointer-events-none" [ngClass]="{'is-empty': isEmpty}"
+<div class="component is-3d is-pointer-events-none" [ngClass]="{'is-empty': isEmpty, 'is-merge-target': isMergeTarget}"
   [style.width.px]="size * gridSize"
-  appMovable [movable.option]="movableOption" [movable.disable]="isLocked" (movable.ondragstart)="onMove()" (movable.ondragend)="onMoved()">
+  appMovable [movable.option]="movableOption" [movable.disable]="stackMovableDisabled"
+  (movable.ondragstart)="onMove()" (movable.ondrag)="onDragging($event)" (movable.onend)="onMoved($event)">
   <div class="component-content is-pointer-events-auto is-3d" [ngClass]="{'is-grab': !isLocked}" (dblclick)="onDoubleClick($event)"
-    appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.ondragend)="onMoved()">
-    <div *ngIf="topCard && imageFile" class="is-3d" @bounceInOut (@shuffle.start)="animationShuffleStarted($event)" (@shuffle.done)="animationShuffleDone($event)"
+    (pointerdown)="onStackPointerDown($event)"
+      appRotable [rotable.option]="rotableOption" [rotable.disable]="isLocked" (rotable.ondragstart)="onMove()" (rotable.onend)="onMoved()">
+    <div *ngIf="coverCard && imageFile" class="stack-volume is-3d"
+      [class.has-thickness]="hasStackThickness"
+      [style.--stack-h.px]="stackHeightPx"
+      [@bounceInOut]="'in'" [@.disabled]="skipEnterBounce" (@shuffle.start)="animationShuffleStarted($event)" (@shuffle.done)="animationShuffleDone($event)"
       [@shuffle]="animeState">
-      <div *ngIf="topCard.isFront" class="text is-3d" style="width: 100%; height: 100%"
-        [ngStyle]="{'transform': 'rotateZ(' + topCard.rotate +'deg)'}">
-        <div class="is-3d" [style.font-size.px]="topCard.fontsize + 9" [style.color]="topCard.color" [style.text-shadow]="textShadowCss(topCard.color)" [innerHTML]="rubiedText | safe: 'html'"></div>
+      <div class="stack-contact-shadow" *ngIf="hasStackThickness" aria-hidden="true"></div>
+      <!-- Bottom + middle card faces (same art as cover); top is the interactive layer. -->
+      <div class="stack-layer is-3d" *ngFor="let z of stackUnderlayZs; let i = index"
+        aria-hidden="true"
+        [style.transform]="'translateZ(' + z + 'px) translate(' + (i * 0.2) + 'px, ' + (i * 0.2) + 'px)'">
+        <img class="card-image chrome-smooth-image-trick" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false">
       </div>
-      <img class="card-image chrome-smooth-image-trick" [ngStyle]="{'transform': 'rotateZ(' + topCard.rotate +'deg)'}" [src]="imageFile.url | safe: 'resourceUrl'">
+      <div class="stack-top is-3d" [style.transform]="stackTopTransform">
+        <img class="card-image chrome-smooth-image-trick" [ngStyle]="{'transform': 'rotateZ(' + coverCard.rotate +'deg)'}" [src]="imageFile.url | safe: 'resourceUrl'">
+      </div>
     </div>
     <ng-container *ngIf="!isIconHidden">
       <div class="rotate-grab of-left-top is-3d">
@@ -30,6 +40,15 @@
     </div>
     <div *ngIf="hasOwner" class="name-tag has-length-limit is-nowrap is-black-background is-3d" style="z-index: 10; color: whitesmoke" [ngStyle]="{'background-color': ownerColor,'transform': 'translateY(50%) translateX(-50%) translateX(' + size * gridSize / 2 +'px) rotateZ(' + (isInverse ? 180 : 0) + 'deg)'}">
       <span [ngClass]="{'is-inverse': isInverse}">{{ 'stack.checking' | i18n:{ name: ownerName } }}</span>
+    </div>
+    <div *ngIf="holdProgress > 0 && holdProgress < 1" class="hold-progress-ring is-pointer-events-none"
+      [style.transform]="holdRingTransform">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="hold-ring-track" cx="24" cy="24" r="22" fill="none" />
+        <circle class="hold-ring-progress" cx="24" cy="24" r="22" fill="none"
+          [attr.stroke-dasharray]="holdRingCircumference"
+          [attr.stroke-dashoffset]="holdRingDashOffset" />
+      </svg>
     </div>
     <div *ngIf="isSelected" class="selected-highlight" [ngClass]="{'is-magnetic': isMagnetic}"></div>
   </div>

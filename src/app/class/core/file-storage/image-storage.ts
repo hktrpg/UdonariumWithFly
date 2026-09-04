@@ -1,8 +1,16 @@
 import { EventSystem } from '../system';
 import { ResettableTimeout } from '../system/util/resettable-timeout';
+import { catalogByteSize } from './file-transfer-scheduler';
 import { ImageContext, ImageFile, ImageState } from './image-file';
+import { getOrHydrateUrlBacked } from './media-storage-helpers';
+import { isContentHashIdentifier, mediaHashFromName } from 'service/folder-backup-layout';
 
-export type CatalogItem = { readonly identifier: string, readonly state: number };
+export type CatalogItem = {
+  readonly identifier: string;
+  readonly state: number;
+  readonly byteSize?: number;
+  readonly thumbBytes?: number;
+};
 
 export class ImageStorage {
   private static _instance: ImageStorage
@@ -40,6 +48,16 @@ export class ImageStorage {
     return this._add(image);
   }
 
+  /** Restore `<sha256>.ext` from ZIP / folder media under the filename hash. */
+  async addPackedAsync(file: File): Promise<ImageFile> {
+    const hash = mediaHashFromName(file.name);
+    if (!isContentHashIdentifier(hash)) return this.addAsync(file);
+    const existing = this.get(hash);
+    if (existing && existing.state >= ImageState.COMPLETE) return existing;
+    const image = await ImageFile.createPackedAsync(file, hash);
+    return this._add(image);
+  }
+
   add(url: string): ImageFile
   add(image: ImageFile): ImageFile
   add(context: ImageContext): ImageFile
@@ -57,7 +75,8 @@ export class ImageStorage {
   }
 
   private _add(image: ImageFile): ImageFile {
-    if (ImageState.COMPLETE <= image.state) this.lazySynchronize(100);
+    // URL assets (./assets/...) are not P2P-synced; only blob-complete entries.
+    if (image.state === ImageState.COMPLETE) this.lazySynchronize(100);
     if (this.update(image)) return this.imageHash[image.identifier];
     this.imageHash[image.identifier] = image;
     return image;
@@ -91,9 +110,12 @@ export class ImageStorage {
   }
 
   get(identifier: string): ImageFile {
-    let image: ImageFile = this.imageHash[identifier];
-    if (image) return image;
-    return null;
+    return getOrHydrateUrlBacked({
+      hash: this.imageHash,
+      identifier,
+      createUrlBacked: id => ImageFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {
@@ -102,15 +124,22 @@ export class ImageStorage {
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    const delay = Math.max(ms, 1500);
+    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), delay);
+    this.lazyTimer.reset(delay);
   }
 
   getCatalog(): CatalogItem[] {
     let catalog: CatalogItem[] = [];
     for (let image of this.images) {
-      if (ImageState.COMPLETE <= image.state) {
-        catalog.push({ identifier: image.identifier, state: image.state });
+      // Exclude ImageState.URL (1000): COMPLETE <= URL would advertise path/HTTP assets for P2P.
+      if (image.state === ImageState.COMPLETE) {
+        catalog.push({
+          identifier: image.identifier,
+          state: image.state,
+          thumbBytes: catalogByteSize(image.thumbnail?.blob),
+          byteSize: catalogByteSize(image.blob, catalogByteSize(image.thumbnail?.blob)),
+        });
       }
     }
     return catalog;

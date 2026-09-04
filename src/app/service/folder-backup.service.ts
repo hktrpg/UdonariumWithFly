@@ -8,8 +8,10 @@ import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { Room } from '@udonarium/room';
 import { RoleAuthInput, RoomAuth } from '@udonarium/room-auth';
+import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { captureMapPreviewDataUrl } from '@udonarium/scene-preset-preview';
 import { TableSelecter } from '@udonarium/table-selecter';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
@@ -20,6 +22,7 @@ import { I18nService } from './i18n.service';
 import { ModalService } from './modal.service';
 import { FolderBackupCrypto, FolderBackupSecretsBlob } from './folder-backup-crypto';
 import { folderBackupDebug } from './folder-backup-debug';
+import { FolderMediaHydrator } from './folder-media-hydrator';
 import { shouldPersistLeaveFlush } from './folder-backup-persist';
 import {
   FOLDER_BACKUP_FORMAT_VERSION,
@@ -40,12 +43,16 @@ import {
   SNAP_30D_MS,
   SNAP_DIRS,
   STATE_ZIP_FILE,
+  collectReferencedMediaHashes,
   dataUrlToJpegBlob,
+  isMediaFileName,
+  mediaHashFromName,
 } from './folder-backup-layout';
 import { RoomInviteService } from './room-invite.service';
 import { SaveDataService } from './save-data.service';
 import { ConnectionBusyService } from './connection-busy.service';
 import { PanelService } from './panel.service';
+import { BlobReader, BlobWriter, ZipReader } from '@zip.js/zip.js';
 
 export type FolderBackupStatus = 'unsupported' | 'unbound' | 'needAuth' | 'ready' | 'writing' | 'error';
 
@@ -129,6 +136,8 @@ export interface FolderFlushOptions {
 interface RoomSnapshot {
   roomId: string;
   displayName: string;
+  /** Encoded peer roomName (auth gates) — needed for leave flush after lobby reopen. */
+  roomName: string;
   auth?: RoomBackupAuthSettings;
 }
 
@@ -266,6 +275,7 @@ export class FolderBackupService implements OnDestroy {
       this.listening = true;
       this.captureRoomSnapshot();
     }
+    FolderMediaHydrator.instance.beginHydrateRoomReferencedMedia();
   }
 
   private settlePeerSyncAfterLoad(loadOk: boolean, trust: boolean) {
@@ -357,6 +367,7 @@ export class FolderBackupService implements OnDestroy {
       await localForage.setItem(FolderBackupService.STORAGE_KEY, handle);
       this.lastError = '';
       this.setStatus('ready');
+      FolderMediaHydrator.invalidateIndex();
       void this.onNetworkOpen();
       return true;
     } catch (e) {
@@ -378,6 +389,7 @@ export class FolderBackupService implements OnDestroy {
       }
       this.lastError = '';
       this.setStatus('ready');
+      FolderMediaHydrator.invalidateIndex();
       void this.onNetworkOpen();
       return true;
     } catch (e) {
@@ -404,6 +416,7 @@ export class FolderBackupService implements OnDestroy {
       console.warn(e);
     }
     this.setStatus(this.isSupported ? 'unbound' : 'unsupported');
+    FolderMediaHydrator.invalidateIndex();
   }
 
   markDirty() {
@@ -564,6 +577,11 @@ export class FolderBackupService implements OnDestroy {
         new File([file], zipName, { type: 'application/zip' }),
       ]);
       folderBackupDebug('loadRoomBackup FileArchiver.load done (legacy)');
+      try {
+        await FolderMediaHydrator.instance.hydrateRoomReferencedMedia();
+      } catch (e) {
+        console.warn('FolderBackup post-load media hydrate failed (legacy)', e);
+      }
       return;
     }
 
@@ -577,6 +595,11 @@ export class FolderBackupService implements OnDestroy {
     });
     await FileArchiver.instance.load(files);
     folderBackupDebug('loadRoomBackup FileArchiver.load done (v2)');
+    try {
+      await FolderMediaHydrator.instance.hydrateRoomReferencedMedia();
+    } catch (e) {
+      console.warn('FolderBackup post-load media hydrate failed', e);
+    }
   }
 
   /** Blocks UI while reading media + state and letting piece views remount. */
@@ -585,11 +608,33 @@ export class FolderBackupService implements OnDestroy {
     busy?.show('folderBackup.loadingRoom');
     try {
       await this.loadRoomBackup(selection);
-      // Keep overlay up while hydrate / Movable / *ngFor remount settle.
-      await new Promise<void>(resolve => setTimeout(resolve, 700));
+      await this.waitForTabletopLoadSettle();
     } finally {
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
+  }
+
+  /**
+   * Align busy overlay with TabletopLoadSettle (not a fixed 700ms).
+   * Connection reopen ownership is unrelated — this only waits for bounce/remount gate.
+   */
+  private waitForTabletopLoadSettle(timeoutMs = 2500): Promise<void> {
+    if (!TabletopLoadSettle.busy) {
+      return new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return new Promise(resolve => {
+      const key = { folderBackupSettleWait: true };
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        EventSystem.unregister(key);
+        resolve();
+      };
+      EventSystem.register(key).on('TABLETOP_LOAD_SETTLE_DONE', () => finish());
+      setTimeout(finish, timeoutMs);
+    });
   }
 
   async deleteRoomBackup(backup: RoomBackupInfo): Promise<boolean> {
@@ -790,16 +835,8 @@ export class FolderBackupService implements OnDestroy {
       this.logTokenVisibility('before-load');
       await this.loadRoomBackup(selected);
       this.logTokenVisibility('after-load-0ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 300));
-      this.logTokenVisibility('after-load-300ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 400));
-      this.logTokenVisibility('after-load-700ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-      this.logTokenVisibility('after-load-1200ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 800));
-      this.logTokenVisibility('after-load-2000ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 1500));
-      this.logTokenVisibility('after-load-3500ms');
+      await this.waitForTabletopLoadSettle();
+      this.logTokenVisibility('after-settle');
       folderBackupDebug('resumeOrLoad done', {
         roomId: Network.peer?.roomId || '',
         roomName: RoomAuth.displayRoomName(Network.peer?.roomName || ''),
@@ -810,6 +847,7 @@ export class FolderBackupService implements OnDestroy {
       console.warn('FolderBackup resume/load failed', e);
       folderBackupDebug('resumeOrLoad error', { error: String((e as Error)?.message || e) });
       this.lastError = String((e as Error)?.message || e);
+      TabletopLoadSettle.forceRelease();
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.folderBackup.loadFailed.title'),
         text: this.i18n.t('menu.folderBackup.loadFailed.text'),
@@ -823,6 +861,7 @@ export class FolderBackupService implements OnDestroy {
       const trust = loadOk || (!openedNewRoom && !!Network.peer?.isRoom);
       this.settlePeerSyncAfterLoad(loadOk, trust);
       if (!trust && openedNewRoom && Network.peer?.isRoom) Network.open();
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
   }
@@ -843,20 +882,15 @@ export class FolderBackupService implements OnDestroy {
       this.logTokenVisibility('before-load');
       await this.loadRoomBackup(selected);
       this.logTokenVisibility('after-load-0ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 700));
-      this.logTokenVisibility('after-load-700ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-      this.logTokenVisibility('after-load-1200ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 800));
-      this.logTokenVisibility('after-load-2000ms');
-      await new Promise<void>(resolve => setTimeout(resolve, 1500));
-      this.logTokenVisibility('after-load-3500ms');
+      await this.waitForTabletopLoadSettle();
+      this.logTokenVisibility('after-settle');
       this.closeLobbyWindows();
       loadOk = true;
     } catch (e) {
       console.warn('FolderBackup load failed', e);
       folderBackupDebug('load error', { error: String((e as Error)?.message || e) });
       this.lastError = String((e as Error)?.message || e);
+      TabletopLoadSettle.forceRelease();
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('menu.folderBackup.loadFailed.title'),
         text: this.i18n.t('menu.folderBackup.loadFailed.text'),
@@ -870,6 +904,7 @@ export class FolderBackupService implements OnDestroy {
         loadOk,
         !!(loadOk && Network.peer?.isRoom && !Network.GuestMode()),
       );
+      TabletopLoadSettle.forceRelease();
       busy?.hide();
     }
   }
@@ -892,6 +927,16 @@ export class FolderBackupService implements OnDestroy {
     };
     const { roomName: encodedName, meshPassword } = RoomAuth.encode(displayName, roomId, roles);
     const userId = Network.peer.userId;
+    const gmPassword = auth.gmPassword || '';
+    const userPassword = auth.allowUser ? (auth.userPassword || '') : '';
+    const guestPassword = auth.allowGuest ? (auth.guestPassword || '') : '';
+    // Persist before Network.open so OPEN_NETWORK snapshot listeners see role secrets.
+    RoomAuth.rememberSession('gm', gmPassword, meshPassword);
+    this.roomInvite.setRolePasswords({
+      gm: gmPassword,
+      user: userPassword,
+      guest: guestPassword,
+    });
     folderBackupDebug('openRoomAsGm', {
       roomId,
       displayName,
@@ -904,21 +949,23 @@ export class FolderBackupService implements OnDestroy {
       const key = { folderResume: true };
       const timer = setTimeout(() => {
         EventSystem.unregister(key);
+        RoomConnectHelper.endBackupRoomOpen();
         reject(new Error('Room open timeout'));
       }, 30000);
       EventSystem.register(key)
         .on('OPEN_NETWORK', () => {
           clearTimeout(timer);
           EventSystem.unregister(key);
+          RoomConnectHelper.endBackupRoomOpen();
           // Drop lobby samples before any catalog can go out (holdPeerSync is already on).
           Room.clearLocalTabletopForJoin();
           PeerCursor.myCursor.peerId = Network.peerId;
           RoomAuth.applyIdentity('gm', roomId);
-          RoomAuth.rememberSession('gm', String(roles.gm || ''), meshPassword);
+          RoomAuth.rememberSession('gm', gmPassword, meshPassword);
           this.roomInvite.setRolePasswords({
-            gm: auth.gmPassword || '',
-            user: auth.allowUser ? (auth.userPassword || '') : '',
-            guest: auth.allowGuest ? (auth.guestPassword || '') : '',
+            gm: gmPassword,
+            user: userPassword,
+            guest: guestPassword,
           });
           folderBackupDebug('OPEN_NETWORK', {
             peerRoomId: Network.peer?.roomId || '',
@@ -929,8 +976,10 @@ export class FolderBackupService implements OnDestroy {
         .on('NETWORK_ERROR', () => {
           clearTimeout(timer);
           EventSystem.unregister(key);
+          RoomConnectHelper.endBackupRoomOpen();
           reject(new Error('Room open network error'));
         });
+      RoomConnectHelper.beginBackupRoomOpen();
       Network.open(userId, roomId, encodedName, meshPassword);
     });
   }
@@ -1067,8 +1116,23 @@ export class FolderBackupService implements OnDestroy {
       this.contentTrusted = true;
       this.listening = !Network.GuestMode();
       if (!this.listening) this.clearTimers();
+      if (this.isReady && !this.joinQuarantine) {
+        FolderMediaHydrator.instance.warmIndex();
+      }
     }
     await this.runPendingLoadAfterOpen();
+  }
+
+  /** Shared media/ directory when folder backup is readable. */
+  async getMediaDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+    if (!this.isReady || !this.dirHandle || Network.GuestMode()) return null;
+    const perm = await this.queryPermission(this.dirHandle);
+    if (perm !== 'granted') return null;
+    try {
+      return await this.dirHandle.getDirectoryHandle(MEDIA_DIR);
+    } catch {
+      return null;
+    }
   }
 
   private async handleLeaveRoom() {
@@ -1202,7 +1266,11 @@ export class FolderBackupService implements OnDestroy {
           secrets?: FolderBackupSecretsBlob;
         } | undefined;
         if (snapshot.auth) {
-          metaAuth = await this.resolveMetaAuthForWrite(snapshot.roomId, snapshot.auth);
+          metaAuth = await this.resolveMetaAuthForWrite(
+            snapshot.roomId,
+            snapshot.auth,
+            snapshot.roomName || '',
+          );
         }
         // Freeze previous latest into recent/calendar slots BEFORE overwriting latest.
         // (Post-write promote stamped slots with the new latestAt and prune/list hid them.)
@@ -1227,6 +1295,7 @@ export class FolderBackupService implements OnDestroy {
         this.lastError = '';
         this.activeRoomId = snapshot.roomId;
         this.setStatus('ready');
+        FolderMediaHydrator.invalidateIndex();
       } catch (e) {
         console.warn('FolderBackup write failed', e);
         this.lastError = String((e as Error)?.message || e);
@@ -1273,6 +1342,7 @@ export class FolderBackupService implements OnDestroy {
     this.lastRoomSnapshot = {
       roomId: peer.roomId,
       displayName: RoomAuth.displayRoomName(peer.roomName || peer.roomId) || peer.roomId,
+      roomName: peer.roomName || '',
       auth: this.captureAuthSettings(peer.roomName || ''),
     };
   }
@@ -1299,7 +1369,8 @@ export class FolderBackupService implements OnDestroy {
    */
   private async resolveMetaAuthForWrite(
     roomId: string,
-    capture: RoomBackupAuthSettings
+    capture: RoomBackupAuthSettings,
+    roomNameHint: string = '',
   ): Promise<{
     allowUser: boolean;
     allowGuest: boolean;
@@ -1315,17 +1386,43 @@ export class FolderBackupService implements OnDestroy {
       guestPassword: String(capture.guestPassword || ''),
     };
 
-    if (PeerCursor.myCursor?.isGMMode) {
-      return {
-        ...allow,
-        secrets: await FolderBackupCrypto.encrypt(next),
-      };
-    }
-
     const existingMeta = await this.readExistingMeta(roomId);
     const existingPasswords = existingMeta
       ? await this.secretPasswordsFromMeta(existingMeta)
       : null;
+    // Prefer snapshot roomName: leave flush runs after lobby reopen when Network.peer
+    // no longer carries the room auth gates.
+    const roomName = roomNameHint || Network.peer?.roomName || '';
+
+    if (PeerCursor.myCursor?.isGMMode) {
+      // Intentional clears rekey the room so roleNeedsPassword becomes false.
+      // If memory was wiped but the gate still requires a password, keep prior secrets.
+      const merged = existingPasswords
+        ? {
+            gmPassword: next.gmPassword
+              || (RoomAuth.roleNeedsPassword(roomName, 'gm') ? existingPasswords.gmPassword : ''),
+            userPassword: next.userPassword
+              || (allow.allowUser && RoomAuth.roleNeedsPassword(roomName, 'user')
+                ? existingPasswords.userPassword : ''),
+            guestPassword: next.guestPassword
+              || (allow.allowGuest && RoomAuth.roleNeedsPassword(roomName, 'guest')
+                ? existingPasswords.guestPassword : ''),
+          }
+        : next;
+      if (!existingPasswords && existingMeta?.secrets) {
+        const missingNeeded =
+          (!merged.gmPassword && RoomAuth.roleNeedsPassword(roomName, 'gm'))
+          || (allow.allowUser && !merged.userPassword && RoomAuth.roleNeedsPassword(roomName, 'user'))
+          || (allow.allowGuest && !merged.guestPassword && RoomAuth.roleNeedsPassword(roomName, 'guest'));
+        if (missingNeeded) {
+          return { ...allow, secrets: existingMeta.secrets };
+        }
+      }
+      return {
+        ...allow,
+        secrets: await FolderBackupCrypto.encrypt(merged),
+      };
+    }
 
     if (existingPasswords) {
       const merged = {
@@ -1671,6 +1768,40 @@ export class FolderBackupService implements OnDestroy {
       throw new Error('Backup manifest missing media list');
     }
 
+    // Also pull media/ blobs referenced by state XML but dropped from a shrunk manifest.
+    try {
+      const stateZipFile = loadFiles.find(f => /\.zip$/i.test(f.name));
+      if (stateZipFile) {
+        const zipReader = new ZipReader(new BlobReader(stateZipFile));
+        const entries = await zipReader.getEntries();
+        const texts: string[] = [];
+        for (const entry of entries || []) {
+          if (!/\.(xml|json)$/i.test(entry.filename || '')) continue;
+          try {
+            const blob = await entry.getData(new BlobWriter());
+            texts.push(await blob.text());
+          } catch { /* skip entry */ }
+        }
+        await zipReader.close();
+        const needed = collectReferencedMediaHashes(...texts);
+        const indexed = new Map<string, string>();
+        try {
+          for await (const [name, handle] of mediaDir.entries()) {
+            if (handle.kind !== 'file' || !isMediaFileName(name)) continue;
+            const hash = mediaHashFromName(name);
+            if (!indexed.has(hash)) indexed.set(hash, name);
+          }
+        } catch { /* ignore */ }
+        for (const hash of needed) {
+          if ([...mediaNames].some(n => mediaHashFromName(n) === hash)) continue;
+          const name = indexed.get(hash);
+          if (name) mediaNames.add(name);
+        }
+      }
+    } catch (e) {
+      console.warn('FolderBackup: expand media from state refs failed', e);
+    }
+
     const missing: string[] = [];
     for (const name of mediaNames) {
       try {
@@ -1684,7 +1815,11 @@ export class FolderBackupService implements OnDestroy {
       }
     }
     if (missing.length) {
-      throw new Error(`Missing media files: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}`);
+      console.warn(
+        `FolderBackup: ${missing.length} media file(s) listed but missing on disk`,
+        missing.slice(0, 8),
+      );
+      // Do not hard-fail: room XML can still load; hydrator / peers may fill gaps.
     }
     return loadFiles;
   }

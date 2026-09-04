@@ -52,7 +52,6 @@
               "lodash",
               "msgpack-lite",
               "pako",
-              "skyway-js",
               "vkbeautify"
             ],
             "main": "src/main.ts"
@@ -125,6 +124,7 @@
               "src/testing/**/*.ts",
               "src/app/class/**/*.spec.ts",
               "src/app/service/default-room/**/*.spec.ts",
+              "src/app/service/app-update.service.spec.ts",
               "src/app/service/folder-backup-layout.spec.ts",
               "src/app/service/save-snapshot.flush.spec.ts",
               "src/app/service/save-xml-remap.spec.ts"

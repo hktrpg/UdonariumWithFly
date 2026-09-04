@@ -21,13 +21,15 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { CharacterSettingsComponent } from 'component/character-settings/character-settings.component';
 import { MovableOption } from 'directive/movable.directive';
-import { RotableOption } from 'directive/rotable.directive';
+import { RotableDirective, RotableOption } from 'directive/rotable.directive';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService, contextMenuToggleCheck } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
+import { shouldIgnoreTabletopDoubleClick } from '@udonarium/tabletop-interact';
 import { ModalService } from 'service/modal.service';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
@@ -41,9 +43,18 @@ import { CharacterStatusId, getStatusDef } from '@udonarium/table-fx/character-s
 import { CombatTracker } from '@udonarium/table-fx/combat-tracker';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
 import { pushPinAssetUrl } from '@udonarium/table-fx/push-pin.util';
+import {
+  TableLightingService,
+  directionalShadowStretch,
+  rotateTableOffset,
+  TokenShadowCast,
+} from 'service/table-lighting.service';
 import { I18nService } from 'service/i18n.service';
 import { folderBackupDebug } from 'service/folder-backup-debug';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { bindObjectPreviewHover } from 'service/object-preview-hover';
+import { buildCharacterTokenPreviewPayload } from 'service/object-preview-payload';
+import { ObjectPreviewService } from 'service/object-preview.service';
 import { nameTagShouldWrap, NAME_TAG_WRAP_WIDTH_PX } from './name-tag-width';
 
 @Component({
@@ -109,10 +120,8 @@ import { nameTagShouldWrap, NAME_TAG_WRAP_WIDTH_PX } from './name-tag-width';
 })
 export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestroy {
   /**
-   * Room ZIP remounts tokens while FoW/camera may still hide hosts. bounceInOut starts at
-   * scale(0); if aborted mid-flight (esp. former display:none), tokens stay invisible even
-   * after data is fine — and dual-map placements never remount on scene switch. Suppress
-   * enter bounce during archive settle so tokens appear at scale(1).
+   * @deprecated Prefer TabletopLoadSettle.skipEnterAnimation for load/join.
+   * Kept for brief map-switch suppress via TabletopLoadSettle.suppressBriefly.
    */
   static suppressEnterBounce = false;
   /** Coalesce out-of-zone AFTER_VIEW_TABLE_CHANGE into one NgZone kick (avoid N×tick). */
@@ -145,7 +154,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     }) || this.gameCharacter;
   }
 
-  get skipEnterBounce(): boolean { return GameCharacterComponent.suppressEnterBounce; }
+  get skipEnterBounce(): boolean {
+    return TabletopLoadSettle.skipEnterAnimation || GameCharacterComponent.suppressEnterBounce;
+  }
 
   get name(): string {
     if (this.characterToken?.displayNameOverride) return this.characterToken.displayNameOverride;
@@ -527,8 +538,8 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
       const charAry = Array.from(text.replace(/[\|｜]([^\|｜\s]+?)《.+?》/g, '$1'));
       this.chatIntervalId = setInterval(() => {
         let c = charAry[count];
-        let isMulti = c.length > 1;
         if (c) {
+            const isMulti = c.length > 1;
             if (!isOpenRuby && carrentRuby && countLength >= carrentRuby.start) {
                 tmpText += '<ruby>';
                 isOpenRuby = true;
@@ -628,18 +639,14 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   get characterShadowImageHeight(): number {
-    // Follow token image height (size / height), then shrink with altitude.
     return this.characterImageHeight * this.shadowAltitudeFactor;
   }
 
   get characterShadowImageWidth(): number {
-    // Follow token image width (size / height), then shrink with altitude.
     return this.characterImageWidth * this.shadowAltitudeFactor;
   }
 
   get characterShadowOffset(): number {
-    // With Fly: pin near pedestal with *0.99 so the flattened silhouette falls
-    // behind the upright art — not centered on the token base.
     let offset = 0;
     if (0.2 < this.height && this.height <= 0.3) {
       offset = 0.09;
@@ -653,15 +660,75 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
 
   get shadowOpacity(): number {
     const base = (this.isHollow ? 0.5 : 0.7) * (this.isHideIn ? 0.85 : 1);
-    return base * Math.max(0.3, 1 / (1 + Math.max(0, this.altitude) * 0.35));
+    const altitudeFactor = Math.max(0.3, 1 / (1 + Math.max(0, this.altitude) * 0.35));
+    return Math.min(1, base * altitudeFactor);
+  }
+
+  shadowOpacityFor(strength: number): number {
+    return Math.min(1, this.shadowOpacity * (0.55 + 0.45 * Math.max(0, strength)));
+  }
+
+  get shadowImageTransform(): string | null {
+    return this.isInverse ? 'scale(-1, 1)' : null;
+  }
+
+  get shadowTranslateX(): number {
+    return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
+  }
+
+  private shadowLocalDir(dirX: number, dirY: number): { dx: number; dy: number } {
+    const id = this.shadowLookupId;
+    const live = id ? RotableDirective.liveRotateFor(id, 'rotate') : null;
+    return rotateTableOffset(dirX, dirY, live ?? this.rotate);
+  }
+
+  /** Translate only — floor squash is inside directionalShadowStretch for light casts. */
+  shadowFeetLightOuterTransform(): string {
+    return `translateX(${this.shadowTranslateX}px) translateY(${this.characterShadowOffset}px)`;
+  }
+
+  shadowFeetOuterTransform(): string {
+    return `translateX(${this.shadowTranslateX}px) translateY(${this.characterShadowOffset}px) scale(1, 0.66)`;
+  }
+
+  /**
+   * Align silhouette away from the strongest light (feet pinned).
+   * Map cast dir is converted into token-local space so token yaw is respected.
+   */
+  shadowCastInnerTransform(cast: TokenShadowCast): string {
+    const local = this.shadowLocalDir(cast.dirX, cast.dirY);
+    const altitudeBoost = 1 + Math.max(0, this.altitude) * 0.2;
+    return directionalShadowStretch(local.dx, local.dy, cast.stretch * altitudeBoost);
+  }
+
+  defaultShadowInnerTransform(): string {
+    return `rotateZ(${this.roll}deg)`;
   }
 
   get shadowBlurPx(): number {
     return 1 + Math.max(0, this.altitude) * 0.6;
   }
 
-  get shadowTranslateX(): number {
-    return (this.gridSize * this.size - this.characterShadowImageWidth) / 2;
+  private get shadowLookupId(): string | null {
+    return this.tablePiece?.identifier ?? this.gameCharacter?.identifier ?? null;
+  }
+
+  get lightShadowCasts() {
+    const id = this.shadowLookupId;
+    if (!id) return [];
+    return this.tableLighting.getShadowsForCharacter(id);
+  }
+
+  get useLightShadows(): boolean {
+    return this.lightShadowCasts.length > 0;
+  }
+
+  get showDefaultTokenShadow(): boolean {
+    return !this.useLightShadows;
+  }
+
+  trackLightShadowCast(index: number, cast: TokenShadowCast): string {
+    return `${index}:${cast.dirX.toFixed(3)}:${cast.dirY.toFixed(3)}:${cast.stretch.toFixed(3)}`;
   }
 
   get chatBubbleAltitude(): number {
@@ -727,6 +794,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   movableOption: MovableOption = {};
   rotableOption: RotableOption = {};
   rollOption: RotableOption = {};
+  private previewHover: ReturnType<typeof bindObjectPreviewHover>;
 
   constructor(
     private contextMenuService: ContextMenuService,
@@ -739,7 +807,15 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     private characterFxMenu: CharacterFxMenuService,
     private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
-  ) { }
+    private tableLighting: TableLightingService,
+    private objectPreview: ObjectPreviewService,
+  ) {
+    this.previewHover = bindObjectPreviewHover(
+      this.objectPreview,
+      () => this.characterToken?.identifier,
+      () => buildCharacterTokenPreviewPayload(this.characterToken),
+    );
+  }
 
   GuestMode() {
     return Network.GuestMode();
@@ -859,6 +935,9 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
           this.changeDetector.markForCheck();
         }
       })
+      .on('TABLE_TOKEN_SHADOWS_UPDATED', () => {
+        this.changeDetector.markForCheck();
+      })
       .on('AFTER_VIEW_TABLE_CHANGE', () => {
         // Dual-map hosts may not remount; force CD so 2D↔3D upright / frame update.
         this.enforce2DRollZero();
@@ -897,11 +976,10 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
         this.changeDetector.markForCheck();
       })
       .on<object>('TABLE_VIEW_ROTATE', -1000, event => {
-        this.ngZone.run(() => {
-          this.viewRotateX = event.data['x'];
-          this.viewRotateZ = event.data['z'];
-          this.changeDetector.markForCheck();
-        });
+        // Already inside setTransform's ngZone.run — nested run was redundant.
+        this.viewRotateX = event.data['x'];
+        this.viewRotateZ = event.data['z'];
+        this.changeDetector.markForCheck();
       })
       .on<object>('SELECT_TABLETOP_OBJECT', -1000, event => {
         // 暫且如此
@@ -947,7 +1025,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
     this.movableOption = {
       tabletopObject: this.tablePiece,
       transformCssOffset: layerPeerMovableTransform(),
-      colideLayers: ['terrain', 'text-note', 'character', 'character-token']
+      colideLayers: ['terrain', 'text-note', 'character', 'character-token', 'card-stack']
     };
     this.rotableOption = {
       tabletopObject: this.tablePiece
@@ -1032,9 +1110,20 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   ngOnDestroy() {
+    this.previewHover.onDestroy();
     this.logUnmount();
     this.clearChatDialogLocal();
     EventSystem.unregister(this);
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter() {
+    this.previewHover.onEnter();
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave() {
+    this.previewHover.onLeave();
   }
 
   @HostListener('dragstart', ['$event'])
@@ -1626,6 +1715,7 @@ export class GameCharacterComponent implements OnChanges, AfterViewInit, OnDestr
   }
 
   onDoubleClick(e: Event) {
+    if (shouldIgnoreTabletopDoubleClick(e)) return;
     e.stopPropagation();
     this.showDetail(this.gameCharacter);
   }

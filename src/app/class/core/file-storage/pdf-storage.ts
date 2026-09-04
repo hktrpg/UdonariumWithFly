@@ -1,8 +1,16 @@
 import { EventSystem } from '../system';
-import { ResettableTimeout } from '../system/util/resettable-timeout';
+import {
+  addPackedByContentHash,
+  buildCompleteBlobCatalog,
+  deleteMediaFromHash,
+  getOrHydrateUrlBacked,
+  insertOrUpdateMediaFile,
+  LazyCatalogSynchronizer,
+  MediaCatalogItem,
+} from './media-storage-helpers';
 import { PdfFile, PdfFileContext, PdfState } from './pdf-file';
 
-export type PdfCatalogItem = { readonly identifier: string, readonly state: number };
+export type PdfCatalogItem = MediaCatalogItem;
 
 export class PdfStorage {
   private static _instance: PdfStorage;
@@ -11,7 +19,9 @@ export class PdfStorage {
     return PdfStorage._instance;
   }
 
-  private lazyTimer: ResettableTimeout;
+  private readonly catalogSync = new LazyCatalogSynchronizer(peer => {
+    EventSystem.call('SYNCHRONIZE_PDF_LIST', this.getCatalog(), peer);
+  });
   private hash: { [identifier: string]: PdfFile } = {};
 
   get pdfs(): PdfFile[] {
@@ -26,6 +36,17 @@ export class PdfStorage {
   async addAsync(arg: any, displayName?: string): Promise<PdfFile> {
     const pdf = await PdfFile.createAsync(arg, displayName);
     return this._add(pdf);
+  }
+
+  async addPackedAsync(file: File): Promise<PdfFile> {
+    return addPackedByContentHash({
+      file,
+      completeState: PdfState.COMPLETE,
+      get: id => this.get(id),
+      addAsync: f => this.addAsync(f),
+      createPacked: (f, hash) => PdfFile.createPackedAsync(f, hash),
+      store: pdf => this._add(pdf),
+    });
   }
 
   add(url: string): PdfFile
@@ -45,10 +66,13 @@ export class PdfStorage {
   }
 
   private _add(pdf: PdfFile): PdfFile {
-    if (PdfState.COMPLETE <= pdf.state) this.lazySynchronize(100);
-    if (this.update(pdf)) return this.hash[pdf.identifier];
-    this.hash[pdf.identifier] = pdf;
-    return pdf;
+    return insertOrUpdateMediaFile({
+      hash: this.hash,
+      file: pdf,
+      completeState: PdfState.COMPLETE,
+      lazySynchronize: ms => this.lazySynchronize(ms),
+      tryUpdate: file => this.update(file),
+    });
   }
 
   private update(pdf: PdfFile): boolean
@@ -63,34 +87,27 @@ export class PdfStorage {
   }
 
   delete(identifier: string): boolean {
-    const pdf = this.hash[identifier];
-    if (!pdf) return false;
-    pdf.destroy();
-    delete this.hash[identifier];
-    return true;
+    return deleteMediaFromHash(this.hash, identifier);
   }
 
   get(identifier: string): PdfFile {
-    return this.hash[identifier] || null;
+    return getOrHydrateUrlBacked({
+      hash: this.hash,
+      identifier,
+      createUrlBacked: id => PdfFile.create(id),
+      store: file => this._add(file),
+    });
   }
 
   synchronize(peer?: string) {
-    if (this.lazyTimer) this.lazyTimer.stop();
-    EventSystem.call('SYNCHRONIZE_PDF_LIST', this.getCatalog(), peer);
+    this.catalogSync.synchronize(peer);
   }
 
   lazySynchronize(ms: number, peer?: string) {
-    if (this.lazyTimer == null) this.lazyTimer = new ResettableTimeout(() => this.synchronize(peer), ms);
-    this.lazyTimer.reset(ms);
+    this.catalogSync.lazySynchronize(ms, peer);
   }
 
   getCatalog(): PdfCatalogItem[] {
-    const catalog: PdfCatalogItem[] = [];
-    for (const pdf of this.pdfs) {
-      if (PdfState.COMPLETE <= pdf.state) {
-        catalog.push({ identifier: pdf.identifier, state: pdf.state });
-      }
-    }
-    return catalog;
+    return buildCompleteBlobCatalog(this.pdfs, PdfState.COMPLETE);
   }
 }
