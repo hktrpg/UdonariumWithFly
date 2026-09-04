@@ -3,15 +3,24 @@
     <header class="card-head">
       <h3>
         <i class="material-icons head-icon" aria-hidden="true">grid_on</i>
-        {{ 'cardSheet.title' | i18n }}
+        {{ (isPdf ? 'cardSheet.titlePdf' : 'cardSheet.title') | i18n }}
       </h3>
     </header>
-    <p class="hint">{{ 'cardSheet.help' | i18n }}</p>
+    <p class="hint">{{ (isPdf ? 'cardSheet.helpPdf' : 'cardSheet.help') | i18n }}</p>
 
-    <div *ngIf="previewSafeUrl" class="sheet-preview" aria-hidden="true">
+    <div *ngIf="previewLoading" class="sheet-preview-loading">…</div>
+
+    <div *ngIf="previewSafeUrl && !previewLoading" class="sheet-preview" aria-hidden="true">
       <div class="sheet-preview-frame">
-        <img class="sheet-preview-img" [src]="previewSafeUrl" draggable="false" alt="" />
+        <img
+          class="sheet-preview-img"
+          [src]="previewSafeUrl"
+          draggable="false"
+          alt=""
+          (load)="onPreviewImgLoad($event)"
+        />
         <div
+          *ngIf="!useMarkOverlay"
           class="sheet-grid"
           [style.gridTemplateColumns]="'repeat(' + safeCols + ', 1fr)'"
           [style.gridTemplateRows]="'repeat(' + safeRows + ', 1fr)'"
@@ -23,9 +32,45 @@
             [class.is-skipped]="i >= safeNumCards"
           ></div>
         </div>
+        <div *ngIf="useMarkOverlay" class="sheet-mark-overlay">
+          <div
+            *ngFor="let x of markXs"
+            class="sheet-mark-vline"
+            [style.left.%]="x"
+          ></div>
+          <div
+            *ngFor="let y of markYs"
+            class="sheet-mark-hline"
+            [style.top.%]="y"
+          ></div>
+        </div>
       </div>
-      <p class="sheet-preview-caption">{{ 'cardSheet.previewHint' | i18n }}</p>
+      <p class="sheet-preview-caption">
+        {{ 'cardSheet.previewHint' | i18n }}
+        <span *ngIf="autoTrim && detectStatus === 'ok'"> · {{ 'cardSheet.detectOk' | i18n }}</span>
+        <span *ngIf="autoTrim && detectStatus === 'fail'"> · {{ 'cardSheet.detectFail' | i18n }}</span>
+      </p>
     </div>
+
+    <label *ngIf="isPdf" class="field">
+      <span>{{ 'cardSheet.pages' | i18n }}</span>
+      <input
+        type="text"
+        [(ngModel)]="pageRange"
+        [attr.placeholder]="'cardSheet.pagesPlaceholder' | i18n"
+        (keydown.enter)="confirm()"
+      />
+    </label>
+    <p *ngIf="isPdf" class="hint">
+      {{ 'cardSheet.pagesHint' | i18n:{ count: pageCount || '—' } }}
+      <span *ngIf="pageRangeError" class="field-error"> {{ pageRangeError }}</span>
+    </p>
+
+    <label class="field field-check">
+      <input type="checkbox" [(ngModel)]="autoTrim" (ngModelChange)="onAutoTrimChange()" />
+      <span>{{ 'cardSheet.autoTrim' | i18n }}</span>
+    </label>
+    <p class="hint">{{ 'cardSheet.autoTrimHint' | i18n }}</p>
 
     <div class="field-row">
       <label class="field">

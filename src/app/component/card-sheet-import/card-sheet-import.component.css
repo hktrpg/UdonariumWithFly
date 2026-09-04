@@ -80,6 +80,52 @@
   color: #8a7a68;
 }
 
+.sheet-preview-loading {
+  margin: 0 0 10px;
+  text-align: center;
+  color: #8a7a68;
+  font-size: 13px;
+}
+
+.sheet-mark-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sheet-mark-vline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid rgba(255, 60, 60, 0.85);
+}
+
+.sheet-mark-hline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid rgba(255, 60, 60, 0.85);
+}
+
+.field-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.field-check input {
+  width: auto;
+  margin: 0;
+}
+
+.field-error {
+  color: #a33;
+}
+
 .footer-actions {
   display: flex;
   align-items: center;
