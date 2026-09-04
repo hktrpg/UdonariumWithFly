@@ -57,4 +57,5 @@ describe('open3dhk-map-select', () => {
     expect(nextBuildingProbeCount(20, 0, 100)).toBe(12);
     expect(nextBuildingProbeCount(Number.MAX_SAFE_INTEGER, 0, 500)).toBe(12);
   });
+
 });

@@ -25,6 +25,7 @@ import { TableSelecter } from '@udonarium/table-selecter';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { moveToBackmost, moveToTopmost, reconcileLayerStack, Stackable } from '@udonarium/tabletop-object-util';
 import { Terrain } from '@udonarium/terrain';
+import { terrainsInBakeGroup } from '@udonarium/terrain-model/bake-group';
 import { TextNote } from '@udonarium/text-note';
 import { MovableDirective } from 'directive/movable.directive';
 import { MovableSelectionSynchronizer } from 'directive/movable-selection-synchronizer';
@@ -1025,6 +1026,11 @@ export class TabletopKeyboardService {
     if (this.selectionService.state(object) !== SelectionState.NONE) return;
     this.selectionService.clear();
     this.selectionService.add(object);
+    if (object instanceof Terrain && object.bakeGroupId) {
+      for (const sibling of terrainsInBakeGroup(object.bakeGroupId)) {
+        this.selectionService.add(sibling);
+      }
+    }
   }
 
   /**

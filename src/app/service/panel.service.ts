@@ -97,6 +97,11 @@ export class PanelService {
   isAbleFullScreenButton: boolean = true;
   isAbleCloseButton: boolean = true;
   isAbleRotateButton: boolean = false;
+  /**
+   * If set and returns false, `close()` is cancelled (e.g. minimize instead
+   * while a background job is running).
+   */
+  beforeClose: (() => boolean | void) | null = null;
   /** Guided tour panel spotlight id (see PanelOption.tourPanelId). */
   tourPanelId: string = null;
   /** Size persistence key when tourPanelId is absent or per-instance. */
@@ -311,7 +316,7 @@ export class PanelService {
   /** Close all closable desktop UI panels opened via PanelService.open(). */
   static closeAllPanels() {
     for (const panel of Array.from(PanelService.openPanels)) {
-      if (panel.isAbleCloseButton) panel.close();
+      if (panel.isAbleCloseButton) panel.close({ force: true });
     }
   }
 
@@ -451,7 +456,7 @@ export class PanelService {
       const id = PanelService.panelExclusiveId(panel);
       if (!PanelService.isMenuExclusivePanel(id)) continue;
       if (PanelService.areCompatibleMenuPanels(id, openingId)) continue;
-      panel.close();
+      panel.close({ force: true });
     }
   }
 
@@ -590,7 +595,7 @@ export class PanelService {
   static closePanelsByTourId(tourPanelId: string) {
     if (!tourPanelId) return;
     for (const panel of Array.from(PanelService.openPanels)) {
-      if (panel.tourPanelId === tourPanelId) panel.close();
+      if (panel.tourPanelId === tourPanelId) panel.close({ force: true });
     }
   }
 
@@ -861,11 +866,26 @@ export class PanelService {
     return <T>bodyComponentRef.instance;
   }
 
-  close() {
+  close(opts?: { force?: boolean }) {
+    if (!opts?.force && this.beforeClose) {
+      const allow = this.beforeClose();
+      if (allow === false) return;
+    }
     this.cancelFitToContent();
     if (this.panelComponentRef) {
       this.panelComponentRef.destroy();
       this.panelComponentRef = null;
+    }
+  }
+
+  /** Minimize the panel chrome if present (no-op when already minimized). */
+  minimizeIfExpanded() {
+    const instance = this.panelComponentRef?.instance as {
+      isMinimized?: boolean;
+      toggleMinimize?: (e?: Event) => void;
+    } | null;
+    if (instance && !instance.isMinimized && typeof instance.toggleMinimize === 'function') {
+      instance.toggleMinimize();
     }
   }
 

@@ -96,6 +96,7 @@ import { NoteSettingsComponent } from './component/note-settings/note-settings.c
 import { MaskSettingsComponent } from './component/mask-settings/mask-settings.component';
 import { TerrainSettingsComponent } from './component/terrain-settings/terrain-settings.component';
 import { TerrainBakeCropComponent } from './component/terrain-bake-crop/terrain-bake-crop.component';
+import { TableFloorCropComponent } from './component/table-floor-crop/table-floor-crop.component';
 import { CardSettingsComponent } from './component/card-settings/card-settings.component';
 import { CardStackSettingsComponent } from './component/card-stack-settings/card-stack-settings.component';
 import { DiceSettingsComponent } from './component/dice-settings/dice-settings.component';
@@ -111,6 +112,7 @@ import { SceneNavComponent } from './component/scene-nav/scene-nav.component';
 import { CombatTrackerComponent } from './component/combat-tracker/combat-tracker.component';
 import { TableTimerComponent } from './component/table-timer/table-timer.component';
 import { TableTimerCompactHudComponent } from './component/table-timer-compact-hud/table-timer-compact-hud.component';
+import { StreetscapeJobHudComponent } from './component/streetscape-job-hud/streetscape-job-hud.component';
 import { TableTimerPanelComponent } from './component/table-timer-panel/table-timer-panel.component';
 import { TeachingTipComponent } from './component/teaching-tip/teaching-tip.component';
 import { GuidedTourComponent } from './component/guided-tour/guided-tour.component';
@@ -199,6 +201,7 @@ import '@udonarium/table-fx/table-timer';
     MaskSettingsComponent,
     TerrainSettingsComponent,
     TerrainBakeCropComponent,
+    TableFloorCropComponent,
     CardSettingsComponent,
     CardStackSettingsComponent,
     DiceSettingsComponent,
@@ -210,6 +213,7 @@ import '@udonarium/table-fx/table-timer';
     CombatTrackerComponent,
     TableTimerComponent,
     TableTimerCompactHudComponent,
+    StreetscapeJobHudComponent,
     TableTimerPanelComponent,
     CombatAnnounceComponent,
     PauseOverlayComponent,

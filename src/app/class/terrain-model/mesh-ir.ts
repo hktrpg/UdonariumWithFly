@@ -184,8 +184,9 @@ export function gridPerWorldForImport(
 }
 
 /**
- * Prefer surveyed footprint (meters) when the mesh AABB disagrees by ≥2×
- * (typical Open3Dhk unit / axis quirks that otherwise bake pin-sized buildings).
+ * Prefer surveyed footprint (meters) when the mesh AABB is pin-sized /
+ * understated vs survey (Open3Dhk quirks). Enlarge-only — never shrink a
+ * healthy metre mesh because of a bad sizeMeters (JP tall-axis regressions).
  * When `metersPerGridY` is set, depth uses that axis (anisotropic table cells).
  */
 export function gridPerWorldForStreetscape(
@@ -208,7 +209,10 @@ export function gridPerWorldForStreetscape(
   const targetD = d / mpgY;
   const fromSize = 0.5 * (targetW / meshW + targetD / meshD);
   if (!(fromSize > 0) || !Number.isFinite(fromSize)) return fromMm;
-  const ratio = fromSize / Math.max(1e-12, fromMm);
+
   const pinSized = Math.min(meshW, meshD) * fromMm < 1;
-  return (ratio >= 2 || ratio <= 0.5 || pinSized) ? fromSize : fromMm;
+  // Only enlarge (pin / understated bake). Shrinking via understated survey
+  // made HK Open3Dhk buildings clamp to TERRAIN_SIZE_MIN after JP size heuristics.
+  if (pinSized || fromSize >= fromMm * 1.5) return Math.max(fromMm, fromSize);
+  return fromMm;
 }

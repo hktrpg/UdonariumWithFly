@@ -287,9 +287,11 @@
 }
 
 .game-table {
+  position: absolute;
   height: 100%;
   width: 100%;
   overflow: visible;
+  backface-visibility: hidden;
 }
 
 .table-image {
@@ -300,6 +302,18 @@
   background-repeat: no-repeat;
   background-size: 100% 100%;
   overflow: visible;
+}
+
+/* Map photo layer — clip edges here so 3D children keep preserve-3d. */
+.table-floor-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: 0 0;
+  transform: translateZ(0);
 }
 
 .background-image {

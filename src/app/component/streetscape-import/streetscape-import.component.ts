@@ -48,6 +48,8 @@ import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
+import { StreetscapeJobService } from 'service/streetscape-job.service';
+import { TableFloorCropService } from 'service/table-floor-crop.service';
 
 type StreetscapeSuggestItem = {
   label: string;
@@ -63,8 +65,6 @@ type StreetscapeSuggestItem = {
 export class StreetscapeImportComponent implements OnInit, OnDestroy {
   readonly streetscapeCountries = STREETSCAPE_COUNTRIES;
   streetscapeCountry: StreetscapeCountryId = 'hk';
-  streetscapeBusy = false;
-  streetscapeStatus = '';
   streetscapeStreet = '';
   streetscapeStreetSuggestions: StreetscapeSuggestItem[] = [];
   streetscapeAttribution = '';
@@ -90,6 +90,17 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       gmlUrl: string;
     };
   } | null = null;
+
+  get streetscapeBusy(): boolean {
+    return this.job.busy;
+  }
+
+  get streetscapeStatus(): string {
+    return this.job.status;
+  }
+  set streetscapeStatus(value: string) {
+    this.job.setStatus(value || '');
+  }
 
   get streetscapeMaxFeaturesWarn(): boolean {
     const n = Number(this.streetscapeMaxFeatures);
@@ -119,7 +130,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   } | null = null;
   /** Hard cap on models per create/add batch (see OPEN3DHK_MAX_FEATURES_CAP). */
   readonly streetscapeModelCap = OPEN3DHK_MAX_FEATURES_CAP;
-  private streetscapeAbort: AbortController | null = null;
+  private unsubJob: (() => void) | null = null;
   private streetscapeProgressPersistAt = 0;
 
   get viewTable(): GameTable {
@@ -157,6 +168,8 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private i18n: I18nService,
+    private job: StreetscapeJobService,
+    private floorCrop: TableFloorCropService,
   ) {}
 
   GuestMode() {
@@ -167,6 +180,11 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     Promise.resolve().then(() => this.refreshPanelTitle());
     registerBuiltinStreetscapeSources();
     this.restoreStreetscapeUiSession();
+    this.panelService.beforeClose = () => this.onPanelBeforeClose();
+    this.unsubJob = this.job.subscribe(() => this.changeDetector.markForCheck());
+    // Panel is open — progress shows inline; hide bubble until minimized/closed.
+    if (this.job.busy) this.job.hideHudForPanel();
+    else this.job.dismissHud();
     EventSystem.register(this)
       .on('SELECT_GAME_TABLE', () => this.changeDetector.markForCheck())
       .on('CHANGE_GM_MODE', () => this.changeDetector.markForCheck())
@@ -174,9 +192,21 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.abortStreetscapeWork();
+    this.panelService.beforeClose = null;
+    // Do not abort in-flight work — HUD / reopen continues the job.
+    if (this.job.busy) this.job.pinHud();
     this.persistStreetscapeUiSession();
+    this.unsubJob?.();
+    this.unsubJob = null;
     EventSystem.unregister(this);
+  }
+
+  /** Busy close → minimize + HUD (do not destroy / abort). */
+  private onPanelBeforeClose(): boolean {
+    if (!this.job.busy) return true;
+    this.panelService.minimizeIfExpanded();
+    this.job.pinHud();
+    return false;
   }
 
   /** Panel close destroys this component — keep download info for reopen. */
@@ -199,14 +229,19 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   }
 
   private abortStreetscapeWork(): void {
-    this.streetscapeAbort?.abort();
-    this.streetscapeAbort = null;
+    this.job.cancel();
   }
 
   private beginStreetscapeAbort(): AbortSignal {
-    this.abortStreetscapeWork();
-    this.streetscapeAbort = new AbortController();
-    return this.streetscapeAbort.signal;
+    return this.job.begin();
+  }
+
+  private endStreetscapeBusy(finalStatus?: string) {
+    if (!this.job.busy) {
+      if (finalStatus != null) this.job.setStatus(finalStatus);
+      return;
+    }
+    this.job.finish(finalStatus);
   }
 
   private persistStreetscapeUiSession() {
@@ -225,7 +260,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
 
   private restoreStreetscapeUiSession() {
     const s = getStreetscapeUiSession();
-    this.streetscapeStatus = s.status;
+    if (!this.job.busy) this.job.setStatus(s.status);
     this.streetscapeAttribution = s.attribution;
     this.streetscapeStreet = s.street;
     this.streetscapeCountry = normalizeStreetscapeCountry(s.country);
@@ -328,6 +363,8 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         name: hit.cityName || q,
         sheet: file.code,
       }),
+      warn: this.i18n.t('streetscape.maxFeaturesWarn'),
+      warnWhenInputAbove: 10,
       help: this.i18n.t('streetscape.confirmPreviewAddLater'),
       hasInput: true,
       inputLabel: this.i18n.t('streetscape.modelCount'),
@@ -410,13 +447,14 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   async saveStreetscapePack() {
     if (!this.canActivate || !this.streetscapeExport?.files?.length) return;
     const { pack, files, fileName } = this.streetscapeExport;
-    this.streetscapeBusy = true;
+    this.job.begin();
     this.streetscapeStatus = this.i18n.t('streetscape.savingPack');
     this.changeDetector.markForCheck();
     try {
       await downloadStreetscapePack(pack, files, fileName);
-      this.streetscapeStatus = this.i18n.t('streetscape.savedPack');
+      this.endStreetscapeBusy(this.i18n.t('streetscape.savedPack'));
     } catch (err) {
+      this.endStreetscapeBusy('');
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
         text: this.i18n.t(streetscapeErrorI18nKey(err)),
@@ -424,7 +462,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         materialIcon: 'error',
       });
     } finally {
-      this.streetscapeBusy = false;
       this.persistStreetscapeUiSession();
       this.changeDetector.markForCheck();
     }
@@ -450,7 +487,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     if (!ok) return;
 
     const signal = this.beginStreetscapeAbort();
-    this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t('streetscape.busyTextured');
     this.changeDetector.markForCheck();
     try {
@@ -500,15 +536,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       this.streetscapeDeferred = null;
       this.rememberStreetscapeExport(result.pack, result.exportFiles);
       const warn = result.warnings.filter(Boolean).slice(0, 4).join('; ');
-      this.streetscapeStatus = warn
+      this.endStreetscapeBusy(warn
         ? this.i18n.t('streetscape.warnings', { detail: warn })
-        : this.i18n.t('streetscape.doneFacades');
+        : this.i18n.t('streetscape.doneFacades'));
     } catch (err) {
       if (isStreetscapeAbort(err)) {
-        this.streetscapeStatus = '';
+        if (this.job.busy) this.job.fail('');
         return;
       }
-      this.streetscapeStatus = '';
+      this.endStreetscapeBusy('');
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
         text: this.i18n.t(streetscapeErrorI18nKey(err)),
@@ -516,7 +552,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         materialIcon: 'error',
       });
     } finally {
-      this.streetscapeBusy = false;
       this.persistStreetscapeUiSession();
       this.changeDetector.markForCheck();
     }
@@ -535,7 +570,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.streetscapeAddCount = count;
 
     const signal = this.beginStreetscapeAbort();
-    this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t('streetscape.busyAddModels');
     this.changeDetector.markForCheck();
     try {
@@ -599,15 +633,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         };
       }
       const warn = result.warnings.filter(w => w && !w.includes('already on map')).slice(0, 4).join('; ');
-      this.streetscapeStatus = warn
+      this.endStreetscapeBusy(warn
         ? this.i18n.t('streetscape.warnings', { detail: warn })
-        : this.i18n.t('streetscape.doneAddModels', { count: String(newIds.length) });
+        : this.i18n.t('streetscape.doneAddModels', { count: String(newIds.length) }));
     } catch (err) {
       if (isStreetscapeAbort(err)) {
-        this.streetscapeStatus = '';
+        if (this.job.busy) this.job.fail('');
         return;
       }
-      this.streetscapeStatus = '';
+      this.endStreetscapeBusy('');
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
         text: this.i18n.t(streetscapeErrorI18nKey(err)),
@@ -615,7 +649,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         materialIcon: 'error',
       });
     } finally {
-      this.streetscapeBusy = false;
       this.persistStreetscapeUiSession();
       this.changeDetector.markForCheck();
     }
@@ -640,11 +673,10 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     title?: string;
     street?: string;
   }): Promise<number | false> {
-    this.streetscapeBusy = true;
+    const signal = this.beginStreetscapeAbort();
     this.streetscapeStatus = this.i18n.t('streetscape.progressIndex');
     this.changeDetector.markForCheck();
 
-    const signal = this.beginStreetscapeAbort();
     let buildingCount = 0;
     try {
       registerBuiltinStreetscapeSources();
@@ -654,6 +686,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         onProgress: (p) => this.applyStreetscapeSourceProgress(p),
       }));
       if (buildingCount < 1) {
+        this.endStreetscapeBusy('');
         await this.modalService.open(ConfirmationComponent, {
           title: this.i18n.t('streetscape.errorTitle'),
           text: this.i18n.t('streetscape.error.noFeature'),
@@ -663,8 +696,11 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         return false;
       }
     } catch (err) {
-      if (isStreetscapeAbort(err)) return false;
-      this.streetscapeStatus = '';
+      if (isStreetscapeAbort(err)) {
+        if (this.job.busy) this.job.fail('');
+        return false;
+      }
+      this.endStreetscapeBusy('');
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
         text: this.i18n.t(streetscapeErrorI18nKey(err)),
@@ -673,18 +709,13 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       });
       return false;
     } finally {
-      this.streetscapeBusy = false;
-      this.streetscapeStatus = '';
+      if (this.job.busy) this.endStreetscapeBusy('');
       this.changeDetector.markForCheck();
     }
 
     const maxPick = Math.min(buildingCount, this.streetscapeModelCap);
     const remembered = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
     const defaultCount = Math.min(remembered, maxPick);
-    const helpLines = [this.i18n.t('streetscape.confirmPreviewAddLater')];
-    if (defaultCount > StreetscapeImportComponent.MAX_FEATURES_WARN) {
-      helpLines.unshift(this.i18n.t('streetscape.maxFeaturesWarn'));
-    }
 
     const picked = await this.modalService.open(ConfirmationComponent, {
       title: this.i18n.t('streetscape.confirmPreviewTitle'),
@@ -693,7 +724,9 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         name: opts.title || opts.street || opts.sheet,
         total: String(buildingCount),
       }),
-      help: helpLines.join('\n'),
+      warn: this.i18n.t('streetscape.maxFeaturesWarn'),
+      warnWhenInputAbove: 10,
+      help: this.i18n.t('streetscape.confirmPreviewAddLater'),
       hasInput: true,
       inputLabel: this.i18n.t('streetscape.modelCount'),
       inputValue: String(defaultCount),
@@ -813,7 +846,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     } = {},
   ) {
     const signal = this.beginStreetscapeAbort();
-    this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t(
       opts.country === 'jp' ? 'streetscape.busyJapan' : 'streetscape.busy',
     );
@@ -825,6 +857,16 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         query,
         signal,
         onProgress: (p: StreetscapeProgress) => this.applyStreetscapeBakeProgress(p),
+        onAfterFloor: async ({ table }) => {
+          this.streetscapeStatus = this.i18n.t('streetscape.progressFloorCrop');
+          this.persistStreetscapeUiSession();
+          this.changeDetector.markForCheck();
+          // Map is on the table — crop edges with live preview before 3D models.
+          await this.floorCrop.open(table, { allowSkip: true });
+          this.streetscapeStatus = this.i18n.t('streetscape.busyAddModels');
+          this.persistStreetscapeUiSession();
+          this.changeDetector.markForCheck();
+        },
       });
       // generateStreetscape already viewTableLocal's the new table.
       this.streetscapeAttribution = result.attribution;
@@ -877,17 +919,17 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         this.streetscapeDeferred = null;
       }
       const warn = result.warnings.filter(Boolean).slice(0, 4).join('; ');
-      this.streetscapeStatus = warn
+      this.endStreetscapeBusy(warn
         ? this.i18n.t('streetscape.warnings', { detail: warn })
         : (this.streetscapeDeferred
           ? this.i18n.t('streetscape.doneMapOnly')
-          : this.i18n.t('streetscape.done'));
+          : this.i18n.t('streetscape.done')));
     } catch (err) {
       if (isStreetscapeAbort(err)) {
-        this.streetscapeStatus = '';
+        if (this.job.busy) this.job.fail('');
         return;
       }
-      this.streetscapeStatus = '';
+      this.endStreetscapeBusy('');
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
         text: this.i18n.t(streetscapeErrorI18nKey(err)),
@@ -895,7 +937,6 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         materialIcon: 'error',
       });
     } finally {
-      this.streetscapeBusy = false;
       this.persistStreetscapeUiSession();
       this.changeDetector.markForCheck();
     }

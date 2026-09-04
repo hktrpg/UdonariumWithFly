@@ -81,6 +81,15 @@
                 alt=""
               >
             </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-block"
+              style="margin-top:4px"
+              (click)="openFloorCrop()"
+              [disabled]="!isEditable || !tableBackgroundImage.url"
+            >
+              <i class="material-icons">crop</i>{{ 'tableFloorCrop.open' | i18n }}
+            </button>
           </div>
           <div class="thumb">
             <span class="thumb-label">{{ 'table.backgroundFront' | i18n }}</span>

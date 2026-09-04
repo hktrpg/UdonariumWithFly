@@ -71,8 +71,18 @@ describe('open3dhk-sheet-pack', () => {
     const doc = JSON.parse(out.json);
     expect(doc.nodes[0].matrix.slice(12, 15)).toEqual([0, 0, 0]);
     expect(out.sizeMeters?.h).toBeCloseTo(12, 5);
+    expect(out.sizeMeters?.w).toBeCloseTo(10, 5);
+    expect(out.sizeMeters?.d).toBeCloseTo(10, 5);
   });
 
+  it('localizeOpen3dhkGltf keeps long footprint (does not treat length as height)', () => {
+    const src = gltfDoc('B2', 839100, -816900, 'B2.bin', 40);
+    // extent 40 → dx=dy=80, dz=12 — length must stay footprint, not height.
+    const out = localizeOpen3dhkGltf(src);
+    expect(out.sizeMeters?.w).toBeCloseTo(80, 5);
+    expect(out.sizeMeters?.d).toBeCloseTo(80, 5);
+    expect(out.sizeMeters?.h).toBeCloseTo(12, 5);
+  });
   it('selectOpen3dhkBuildings prefers near buildings with soft size bias', () => {
     const members = [
       { id: 'far-big', gltfPath: 'a', binPath: 'a', binBytes: 9e6, worldX: 0, worldZ: 0 },
@@ -129,6 +139,9 @@ describe('open3dhk-sheet-pack', () => {
     expect(load.pack.attribution).toContain('Lands Department');
     expect(load.pack.features.length).toBe(1);
     expect(load.pack.floor.path).toBe('floor.png');
+    // Terrain aerial world window (200×160) — not a tight building-only crop.
+    expect(load.pack.extentMeters.width).toBeCloseTo(200, 5);
+    expect(load.pack.extentMeters.depth).toBeCloseTo(160, 5);
 
     const floor = await load.openFloor();
     expect(floor.size).toBeGreaterThan(50);

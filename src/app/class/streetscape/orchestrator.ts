@@ -59,6 +59,15 @@ export type GenerateStreetscapeOptions = {
   quality?: Partial<StreetscapeQualityV1>;
   signal?: AbortSignal;
   onProgress?: (p: StreetscapeProgress) => void;
+  /**
+   * After aerial/floor is on the table (and view switched), before 3D models.
+   * Use for map edge crop / confirm — models are placed after this resolves.
+   */
+  onAfterFloor?: (ctx: {
+    table: GameTable;
+    pack: StreetscapePackV1;
+    floorBlob: Blob | null;
+  }) => Promise<void>;
   importModel?: StreetscapeImportFn;
   addFloorImage?: (blob: Blob) => Promise<string>;
 };
@@ -333,6 +342,20 @@ export async function generateStreetscapeFromLoad(
       warnings.push(err instanceof Error ? err.message : String(err));
       floorBlob = composeStreetscapeFloor(pack, scale, selected);
       await applyFloorBlob(table, floorBlob, opts.addFloorImage);
+    }
+
+    // Map first — let the host crop / inspect the aerial before 3D models.
+    if (opts.onAfterFloor) {
+      throwIfAborted(opts.signal);
+      await opts.onAfterFloor({ table, pack, floorBlob });
+      throwIfAborted(opts.signal);
+      // Floor crop may replace the table image; refresh tint source from the live table.
+      try {
+        const refreshed = await resolveStreetscapeFloorBlob(table, load, opts.signal);
+        if (refreshed) floorBlob = refreshed;
+      } catch {
+        // Keep prior floorBlob for tint.
+      }
     }
 
     const importModel = opts.importModel || importModelAsTerrain;

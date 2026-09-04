@@ -1,0 +1,67 @@
+<div class="settings-ui dense table-floor-crop">
+  <section class="card">
+    <header class="card-head">
+      <h3>
+        <i class="material-icons head-icon" aria-hidden="true">crop</i>
+        {{ 'tableFloorCrop.title' | i18n }}
+      </h3>
+    </header>
+    <p class="hint">{{ 'tableFloorCrop.hint' | i18n }}</p>
+
+    <div
+      class="preview-viewport"
+      (wheel)="onWheel($event)"
+      [attr.title]="'tableFloorCrop.wheelZoom' | i18n"
+    >
+      <div class="preview-stage" [style.transform]="'scale(' + previewZoom + ')'">
+        <img
+          *ngIf="imageUrl"
+          class="preview-img"
+          [src]="imageUrl | safe: 'resourceUrl'"
+          [style.clip-path]="clipPath"
+          alt=""
+        />
+      </div>
+      <span class="zoom-badge">{{ previewZoom | number:'1.1-1' }}×</span>
+    </div>
+
+    <div class="slider-grid">
+      <label class="field">
+        <span>{{ 'tableFloorCrop.top' | i18n }} {{ pct('top') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('top')" (ngModelChange)="setPct('top', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'tableFloorCrop.bottom' | i18n }} {{ pct('bottom') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('bottom')" (ngModelChange)="setPct('bottom', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'tableFloorCrop.left' | i18n }} {{ pct('left') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('left')" (ngModelChange)="setPct('left', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'tableFloorCrop.right' | i18n }} {{ pct('right') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('right')" (ngModelChange)="setPct('right', $event)" />
+      </label>
+    </div>
+  </section>
+
+  <section class="card footer-actions actions tight">
+    <button type="button" class="btn" (click)="reset()">
+      <i class="material-icons" aria-hidden="true">restart_alt</i>{{ 'tableFloorCrop.reset' | i18n }}
+    </button>
+    <button *ngIf="allowSkip" type="button" class="btn" (click)="skip()">
+      {{ 'tableFloorCrop.skip' | i18n }}
+    </button>
+    <span class="actions-spacer"></span>
+    <button type="button" class="btn" (click)="cancel()">
+      {{ 'tableFloorCrop.cancel' | i18n }}
+    </button>
+    <button type="button" class="btn btn-primary" (click)="apply()" [disabled]="applying">
+      <i class="material-icons" aria-hidden="true">check</i>{{ 'tableFloorCrop.apply' | i18n }}
+    </button>
+  </section>
+</div>

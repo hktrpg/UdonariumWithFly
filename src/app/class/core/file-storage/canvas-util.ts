@@ -11,8 +11,9 @@ export namespace CanvasUtil {
   export function resize(canvas: HTMLCanvasElement, width: number, height: number, resize_canvas?: boolean) {
     let width_source = canvas.width;
     let height_source = canvas.height;
-    width = Math.round(width);
-    height = Math.round(height);
+    width = Math.max(1, Math.round(width));
+    height = Math.max(1, Math.round(height));
+    if (width_source < 1 || height_source < 1) return;
 
     let ratio_w = width_source / width;
     let ratio_h = height_source / height;

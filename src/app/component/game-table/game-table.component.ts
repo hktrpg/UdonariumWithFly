@@ -48,6 +48,8 @@ import { TokenPathMoveService } from 'service/token-path-move.service';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { TableLightingService } from 'service/table-lighting.service';
+import { TableFloorCropService, TABLE_FLOOR_CROP_PREVIEW } from 'service/table-floor-crop.service';
+import { floorCropClipPath, readTableFloorCrop } from '@udonarium/table-floor-crop';
 import { folderBackupDebug, folderBackupWarn, approxCssScale, summarizeCharPlacements, TokenDomProbe, TokenHideReason } from 'service/folder-backup-debug';
 import { MovableDirective } from 'directive/movable.directive';
 import { GridLineRender } from './grid-line-render';
@@ -841,6 +843,14 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get tableImageUrl(): string { return this.tableImageUrls[0]; }
   get backgroundImageUrl(): string { return this.tableImageUrls[1]; }
   get backgroundImageUrl2(): string { return this.tableImageUrls[2]; }
+
+  /** Live editor insets override stored %; clip-path avoids stretch distortion. */
+  get floorCropClipCss(): string {
+    const id = this.currentTable?.identifier;
+    const live = this.floorCrop.livePreviewFor(id);
+    const insets = live || readTableFloorCrop(this.currentTable);
+    return floorCropClipPath(insets);
+  }
   
   private _currentBackgroundImageCss = '';
   get backgroundImageCss(): string {
@@ -871,6 +881,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private i18n: I18nService,
     private mobileLayout: MobileLayoutService,
     private tableLighting: TableLightingService,
+    private floorCrop: TableFloorCropService,
   ) { }
 
   get pathWaypoints() { return this.tokenPath.waypoints; }
@@ -1100,6 +1111,9 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         if (!transformZ) return;
         this.removeFocus();
         this.setTransform(0, 0, transformZ, 0, 0, 0);
+      })
+      .on(TABLE_FLOOR_CROP_PREVIEW, () => {
+        this.changeDetector.markForCheck();
       })
       .on('FOCUS_TABLETOP_OBJECT', event => {
         setTimeout(() => {
@@ -1521,9 +1535,12 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
       transformX = (lx * cosYaw - forwardY * sinYaw) * scale;
       transformY = (lx * sinYaw + forwardY * cosYaw) * scale;
       transformZ = forwardZ * scale;
-      // Keep zoom band usable while walking in depth.
-      if (750 < transformZ + this.viewPotisonZ) transformZ += 750 - (transformZ + this.viewPotisonZ);
-      if (transformZ + this.viewPotisonZ < -750) transformZ += -750 - (transformZ + this.viewPotisonZ);
+      // Soft edge only: stop leaving ±750 from inside. Never snap back when the
+      // user already wheel-zoomed past the band (large streetscape / terrain maps).
+      const z0 = this.viewPotisonZ;
+      const z1 = z0 + transformZ;
+      if (z0 <= 750 && z1 > 750) transformZ = 750 - z0;
+      else if (z0 >= -750 && z1 < -750) transformZ = -750 - z0;
     } else {
       transformX *= scale;
       transformY *= scale;

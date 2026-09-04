@@ -21,6 +21,7 @@
       </div>
     </div>
 
+    <p class="warn" *ngIf="showWarn">{{ warn }}</p>
     <p class="hint" *ngIf="help && !helpHtml && !helpSections.length">{{ help }}</p>
     <div class="hint" *ngIf="helpHtml" [innerHTML]="helpHtml | safe: 'html'"></div>
 

@@ -239,9 +239,11 @@ export class MovableDirective implements AfterViewInit, OnChanges, OnDestroy {
     const isPrimaryClick = !(e instanceof MouseEvent) || (e.button === 0 && !e.ctrlKey && !e.shiftKey);
 
     // Click-to-select before disable/guest drag cancel, so a single click still selects.
+    // Locked bake-group parts skip prepareMove — absorb siblings here so L / Delete / etc. hit the whole group.
     if (isPrimaryClick && !Network.GuestMode() && this.tabletopObject && this.state === SelectionState.NONE) {
       this.selectionService.clear();
       this.state = SelectionState.SELECTED;
+      this.synchronizer.absorbBakeGroupIntoSelection();
     }
 
     if (Network.GuestMode() || this.isDisable || (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.shiftKey))) {

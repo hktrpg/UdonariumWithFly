@@ -141,6 +141,7 @@ export async function packLoadFromOpen3dhkSheetFiles(
     minZ = opts.reuseWorldExtent.minZ;
     maxZ = opts.reuseWorldExtent.maxZ;
   } else if (terrain && filterBuildingsOnTerrain(members, terrainBox).length) {
+    // Same world window as the LandsD aerial — buildings stay proportional to rooftops.
     minX = terrain.minX;
     maxX = terrain.maxX;
     minZ = terrain.minZ;
@@ -458,34 +459,55 @@ function localXzExtentFromGltf(doc: Record<string, unknown>): {
   return { minX: -100, maxX: 100, minY: -100, maxY: 100 };
 }
 
+/**
+ * LandsD Individualised glTF: after Y↔Z axis matrix, local X=east, Y=north/south
+ * footprint, Z=up height. Do not use "tallest axis = height" — long HK blocks
+ * would treat length as height and understate footprint (→ pin-sized on table).
+ * Only mesh POSITION accessors (skip NORMAL / other VEC3).
+ */
 function sizeFromGltfAccessors(doc: Record<string, unknown>): { w: number; d: number; h: number } | undefined {
   const accessors = Array.isArray(doc.accessors) ? doc.accessors as Record<string, unknown>[] : [];
+  const positionIndices = new Set<number>();
+  const meshes = Array.isArray(doc.meshes) ? doc.meshes as Record<string, unknown>[] : [];
+  for (const mesh of meshes) {
+    const primitives = Array.isArray(mesh.primitives) ? mesh.primitives as Record<string, unknown>[] : [];
+    for (const prim of primitives) {
+      const attrs = prim.attributes && typeof prim.attributes === 'object'
+        ? prim.attributes as Record<string, unknown>
+        : null;
+      const pos = attrs ? Number(attrs.POSITION) : NaN;
+      if (Number.isInteger(pos) && pos >= 0) positionIndices.add(pos);
+    }
+  }
   let best: { w: number; d: number; h: number } | undefined;
   let bestFootprint = 0;
-  for (const acc of accessors) {
-    if (acc.type !== 'VEC3' || !Array.isArray(acc.min) || !Array.isArray(acc.max)) continue;
+  const consider = (acc: Record<string, unknown>) => {
+    if (acc.type !== 'VEC3' || !Array.isArray(acc.min) || !Array.isArray(acc.max)) return;
     const min = acc.min.map(Number);
     const max = acc.max.map(Number);
-    if (min.length < 3 || max.length < 3) continue;
-    if (![...min, ...max].every(Number.isFinite)) continue;
+    if (min.length < 3 || max.length < 3) return;
+    if (![...min, ...max].every(Number.isFinite)) return;
     const dx = Math.abs(max[0] - min[0]);
     const dy = Math.abs(max[1] - min[1]);
     const dz = Math.abs(max[2] - min[2]);
-    const sorted = [dx, dy, dz].sort((a, b) => b - a);
-    const [big, mid, small] = sorted;
-    const footprint = big + mid;
-    if (footprint < 1) continue;
-    if (footprint <= bestFootprint) continue;
+    // Skip empty accessors; keep sub-metre bounds (pin-mesh corrector needs them).
+    if (dx + dy + dz < 1e-3) return;
+    const footprint = dx * dy;
+    if (footprint <= bestFootprint) return;
     bestFootprint = footprint;
-    // Tall axis (e.g. glTF Z-up height) vs flat footprint on the other two.
-    const h = big > mid * 1.15 ? big : small;
-    const w = big > mid * 1.15 ? mid : big;
-    const d = big > mid * 1.15 ? small : mid;
     best = {
-      w: Math.max(1, w),
-      d: Math.max(1, d),
-      h: Math.max(1, h),
+      w: Math.max(1e-3, dx),
+      d: Math.max(1e-3, dy),
+      h: Math.max(1e-3, dz),
     };
+  };
+  if (positionIndices.size) {
+    for (const i of positionIndices) {
+      const acc = accessors[i];
+      if (acc) consider(acc);
+    }
+  } else {
+    for (const acc of accessors) consider(acc);
   }
   return best;
 }

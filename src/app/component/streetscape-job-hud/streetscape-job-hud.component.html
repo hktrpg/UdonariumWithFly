@@ -1,0 +1,45 @@
+<div
+  class="streetscape-job-hud"
+  *ngIf="visible"
+  [style.left.px]="left"
+  [style.top.px]="top"
+  [class.is-running]="isRunning"
+  [class.is-done]="isDone"
+  [class.is-error]="isError"
+>
+  <div class="hud-chrome" (pointerdown)="startDrag($event)">
+    <button
+      type="button"
+      class="hud-drag"
+      [attr.title]="'streetscape.jobHudMove' | i18n"
+      [attr.aria-label]="'streetscape.jobHudMove' | i18n"
+    >
+      <i class="material-icons">drag_indicator</i>
+    </button>
+    <button type="button" class="hud-main" (pointerdown)="$event.stopPropagation()" (click)="openPanel($event)">
+      <i class="material-icons hud-icon">{{ isRunning ? 'map' : (isError ? 'error' : 'check_circle') }}</i>
+      <span class="hud-title">{{ 'streetscape.jobHudTitle' | i18n }}</span>
+      <span class="hud-status">{{ statusText }}</span>
+    </button>
+    <button
+      *ngIf="isRunning"
+      type="button"
+      class="hud-action"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="cancel($event)"
+      [attr.title]="'streetscape.jobHudCancel' | i18n"
+    >
+      <i class="material-icons">close</i>
+    </button>
+    <button
+      *ngIf="!isRunning"
+      type="button"
+      class="hud-action"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="dismiss($event)"
+      [attr.title]="'streetscape.jobHudDismiss' | i18n"
+    >
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+</div>

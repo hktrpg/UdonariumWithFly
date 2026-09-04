@@ -149,15 +149,29 @@ function handleOpen3dhkRelay(req, res) {
   tryOpen3dhkUpstream(req, res, pathname, 0);
 }
 
+function abortOpen3dhkClient(res) {
+  if (res.writableEnded) return;
+  try {
+    res.destroy();
+  } catch {
+    /* ignore */
+  }
+}
+
 function tryOpen3dhkUpstream(req, res, pathname, index) {
   const upstream = OPEN3DHK_UPSTREAMS[index];
   if (!upstream) {
     if (!res.headersSent) {
       res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('all open3dhk upstreams failed');
+    } else {
+      abortOpen3dhkClient(res);
     }
     return;
   }
+
+  // Client already has a body in flight — cannot switch hosts or rewrite headers.
+  if (res.headersSent || res.writableEnded) return;
 
   const query = upstream.withKey ? `?key=${OPEN3DHK_API_KEY}` : '';
   const upstreamPath = `${OPEN3DHK_UPSTREAM_PREFIX}${pathname}${query}`;
@@ -169,6 +183,7 @@ function tryOpen3dhkUpstream(req, res, pathname, index) {
   };
   if (req.headers.range) headers.Range = req.headers.range;
 
+  let committed = false;
   const upReq = https.request(
     {
       hostname: upstream.host,
@@ -177,6 +192,11 @@ function tryOpen3dhkUpstream(req, res, pathname, index) {
       headers,
     },
     (up) => {
+      if (res.headersSent || res.writableEnded) {
+        up.resume();
+        return;
+      }
+
       const status = up.statusCode || 502;
       const retryable = status === 502 || status === 503 || status === 504;
       if (retryable && index + 1 < OPEN3DHK_UPSTREAMS.length) {
@@ -210,24 +230,50 @@ function tryOpen3dhkUpstream(req, res, pathname, index) {
       if (up.headers['content-range']) outHeaders['Content-Range'] = up.headers['content-range'];
       if (up.headers['accept-ranges']) outHeaders['Accept-Ranges'] = up.headers['accept-ranges'];
       else outHeaders['Accept-Ranges'] = 'bytes';
-      res.writeHead(status, outHeaders);
+
+      committed = true;
+      try {
+        res.writeHead(status, outHeaders);
+      } catch (err) {
+        console.error('[open3dhk-relay] writeHead failed', upstream.label, err);
+        up.resume();
+        abortOpen3dhkClient(res);
+        return;
+      }
       if (req.method === 'HEAD') {
         up.resume();
         res.end();
         return;
       }
+      up.on('error', (err) => {
+        console.error('[open3dhk-relay] stream', upstream.label, err);
+        abortOpen3dhkClient(res);
+      });
+      res.on('close', () => {
+        if (!up.destroyed) up.destroy();
+      });
       up.pipe(res);
     },
   );
   upReq.on('error', (err) => {
     console.error('[open3dhk-relay]', upstream.label, err);
+    // Mid-stream reset after headers: never retry (would ERR_HTTP_HEADERS_SENT).
+    if (committed || res.headersSent) {
+      abortOpen3dhkClient(res);
+      return;
+    }
     if (index + 1 < OPEN3DHK_UPSTREAMS.length) {
       const delayMs = 150 * (index + 1);
       setTimeout(() => tryOpen3dhkUpstream(req, res, pathname, index + 1), delayMs);
       return;
     }
-    if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('upstream error');
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('upstream error');
+    }
+  });
+  req.on('aborted', () => {
+    if (!upReq.destroyed) upReq.destroy();
   });
   upReq.end();
 }

@@ -6,8 +6,14 @@
   [style.background-color]="backgroundDarknessOverlayColor"></div>
 <div class="component is-fill is-perspective" [ngClass]="{'is-grabbing': isPointerDragging}" #root>
   <div class="component-content is-fill is-3d" #gameTable>
-    <div id="app-game-table" class="game-table table-image is-3d" [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'"
-      [style.background-color]="tableSurfaceUnderlayColor" #gameObjects>
+    <div id="app-game-table" class="game-table is-3d"
+      [style.background-color]="tableSurfaceUnderlayColor"
+      #gameObjects>
+      <!-- Floor bitmap only: clip-path here must NOT wrap 3D terrains (flattens preserve-3d). -->
+      <div class="table-floor-image is-pointer-events-none"
+        [style.background-image]="'url(' + tableImageUrl + ')' | safe: 'style'"
+        [style.clip-path]="floorCropClipCss"
+        aria-hidden="true"></div>
       <canvas class="grid-canvas is-fill is-pointer-events-none" #gridCanvas [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.1) + 'px)', 'clip': clipCss}"></canvas>
       <svg class="drawings-layer is-fill is-pointer-events-none" [attr.width]="tablePixelWidth" [attr.height]="tablePixelHeight"
         [ngStyle]="{'transform': 'translateZ(' + (gridHeight + 0.2) + 'px)'}">

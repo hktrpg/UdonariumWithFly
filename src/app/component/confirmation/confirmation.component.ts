@@ -16,6 +16,13 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
   text: string = '';
   help: string = '';
   helpHtml: string = '';
+  /** Red warning line (shown above gray help). */
+  warn: string = '';
+  /**
+   * When set with hasInput, show `warn` only while Number(inputValue) exceeds this.
+   * Omit to always show `warn` when non-empty.
+   */
+  warnWhenInputAbove: number | null = null;
   /** Structured help blocks (title / chips / body) for richer confirmations. */
   helpSections: { title?: string; body?: string; chips?: { label: string; tone?: string }[] }[] = [];
   materialIcon: string = '';
@@ -53,6 +60,13 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
     this.text = modalService.option.text ? modalService.option.text : '';
     this.help = modalService.option.help ? modalService.option.help : '';
     this.helpHtml = modalService.option.helpHtml ? modalService.option.helpHtml : '';
+    this.warn = modalService.option.warn ? String(modalService.option.warn) : '';
+    this.warnWhenInputAbove = modalService.option.warnWhenInputAbove != null
+      ? Number(modalService.option.warnWhenInputAbove)
+      : null;
+    if (this.warnWhenInputAbove != null && !Number.isFinite(this.warnWhenInputAbove)) {
+      this.warnWhenInputAbove = null;
+    }
     this.helpSections = Array.isArray(modalService.option.helpSections) ? modalService.option.helpSections : [];
     this.materialIcon = modalService.option.materialIcon ? modalService.option.materialIcon : '';
     this.okLabel = modalService.option.okLabel ? modalService.option.okLabel : '';
@@ -106,6 +120,14 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
       titleBar += `〈${this.subTitle}〉`;
     }
     this.modalService.title = this.panelService.title = titleBar;
+  }
+
+  /** True when warn text should be visible (optionally gated on input count). */
+  get showWarn(): boolean {
+    if (!this.warn) return false;
+    if (this.warnWhenInputAbove == null || !this.hasInput) return true;
+    const n = Number(this.inputValue);
+    return Number.isFinite(n) && n > this.warnWhenInputAbove;
   }
 
   ok() {

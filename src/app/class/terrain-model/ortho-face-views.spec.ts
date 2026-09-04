@@ -106,6 +106,15 @@ describe('gridPerWorldForStreetscape', () => {
     const g = gridPerWorldForStreetscape(aabb, 1, { w: 12, d: 10, h: 20 }, 1);
     expect(0.05 * g).toBeGreaterThan(5);
   });
+
+  it('does not shrink a healthy metre mesh when sizeMeters understates footprint', () => {
+    // Understated survey (JP tall-axis style) must not crush HK metre glTF.
+    const aabb = { min: [0, 0, 0] as [number, number, number], max: [30, 40, 12] as [number, number, number] };
+    const fromMm = 1 / 2;
+    const g = gridPerWorldForStreetscape(aabb, 2, { w: 1, d: 1, h: 30 }, 2);
+    expect(g).toBeCloseTo(fromMm, 5);
+    expect(30 * g).toBeGreaterThan(10);
+  });
 });
 
 describe('model package caps', () => {

@@ -66,6 +66,11 @@ export class GameTable extends ObjectNode {
   @SyncVar() mapAttribution: string = '';
   /** Map-face credit kind; `landsd-open3dhk` shows LandsD logo + copyright. */
   @SyncVar() mapCredit: string = '';
+  /**
+   * Display-only floor edge trim: JSON `{ top, right, bottom, left }` percentages.
+   * Empty = no crop. Does not rewrite the floor image.
+   */
+  @SyncVar() floorCropJson: string = '';
 
   gridHeight: number = 0;
   gridClipRect: {top: number, right: number, bottom: number, left: number} = null;

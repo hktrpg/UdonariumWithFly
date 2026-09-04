@@ -264,6 +264,7 @@ export class MovableSelectionSynchronizer {
     let isOverlap = checkOverlapSAT(rectA, rectB);
     if (isOverlap) {
       this.movable.state = SelectionState.SELECTED;
+      this.absorbBakeGroupIntoSelection();
     }
   }
 
@@ -329,8 +330,8 @@ export class MovableSelectionSynchronizer {
     this.dragFollowers.clear();
   }
 
-  /** Multi-box model parts share bakeGroupId — select siblings so they drag as one. */
-  private absorbBakeGroupIntoSelection() {
+  /** Multi-box model parts share bakeGroupId — select siblings so they drag / shortcut as one. */
+  absorbBakeGroupIntoSelection() {
     const obj = this.movable.tabletopObject;
     if (!(obj instanceof Terrain) || !obj.bakeGroupId) return;
     if (this.movable.state === SelectionState.NONE) return;

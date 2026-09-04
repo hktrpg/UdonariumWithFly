@@ -7,11 +7,11 @@ import { ScenePresetList } from '@udonarium/scene-preset-list';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
-import { StreetscapeImportComponent } from 'component/streetscape-import/streetscape-import.component';
 import { I18nService } from 'service/i18n.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
+import { openOrRestoreStreetscapeImportPanel } from 'service/streetscape-panel';
 
 @Component({
   selector: 'scene-nav',
@@ -216,18 +216,11 @@ export class SceneNavComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     if (!this.isGM) return;
-    PanelService.closePanelsByTourId('panel.streetscape-import');
-    let option = {
-      width: 360,
-      height: 520,
-      left: 100,
-      title: this.i18n.t('streetscape.title'),
-      tourPanelId: 'panel.streetscape-import',
-      mobileReplace: true,
-      mobileSheet: 'half' as const,
-    };
-    option = this.mobileLayout.adaptPanelOption(option);
-    this.panelService.open(StreetscapeImportComponent, option);
+    openOrRestoreStreetscapeImportPanel({
+      panelService: this.panelService,
+      i18n: this.i18n,
+      mobileLayout: this.mobileLayout,
+    });
   }
 
   openMapSettings(table: GameTable, event: Event) {
