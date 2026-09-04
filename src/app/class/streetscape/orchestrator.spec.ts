@@ -123,7 +123,7 @@ describe('resolveStreetscapeFloorBlob', () => {
     });
 
     expect(resolved).toBe(floorImage.blob);
-    expect(resolved!.size).toBeGreaterThan(512);
+    expect(resolved!.size).toBeGreaterThan(100);
     table.destroy();
   });
 });

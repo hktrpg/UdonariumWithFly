@@ -20,15 +20,19 @@ import { sampleBlobRgbAtUv } from './floor-tint';
 import { StreetscapeFeatureV1, StreetscapePackV1, StreetscapeQualityV1 } from './pack-schema';
 import { featureCenterTablePx, featureDistanceToOrigin, streetscapeScaleFromPack } from './placement';
 import { applyStreetscapeMapCredit } from './map-credit';
-
-/** Real aerial floors are large; Open3Dhk building-only packs ship a 1×1 placeholder. */
-const MIN_FLOOR_BYTES_FOR_TINT = 512;
 import { packCatalogSource } from './catalog-source';
 import { open3dhkSource } from './open3dhk-source';
 import { plateauSource } from './plateau-source';
 import { packFileSource } from './pack-file-source';
 import { getStreetscapeSource, registerStreetscapeSource, resolveStreetscapeSource } from './registry';
 import { StreetscapePackLoad, StreetscapeQuery, throwIfAborted } from './source';
+
+/**
+ * Real aerial floors are large; Open3Dhk building-only packs ship a 1×1 PNG
+ * placeholder (~70 bytes). Keep this above that, but below small solid test /
+ * composed floors (a flat 64×64 PNG is often only ~200–300 bytes).
+ */
+const MIN_FLOOR_BYTES_FOR_TINT = 100;
 
 export type StreetscapeImportFn = (
   files: File[],
