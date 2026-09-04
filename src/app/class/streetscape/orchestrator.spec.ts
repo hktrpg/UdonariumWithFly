@@ -96,6 +96,14 @@ describe('generateStreetscapeFromLoad', () => {
 });
 
 describe('resolveStreetscapeFloorBlob', () => {
+  const addedImageIds: string[] = [];
+
+  afterEach(() => {
+    for (const id of addedImageIds.splice(0)) {
+      ImageStorage.instance.delete(id);
+    }
+  });
+
   async function makeSolidPng(w: number, h: number): Promise<Blob> {
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -113,6 +121,7 @@ describe('resolveStreetscapeFloorBlob', () => {
     const table = new GameTable();
     table.initialize();
     const floorImage = await ImageStorage.instance.addAsync(await makeSolidPng(64, 64));
+    addedImageIds.push(floorImage.identifier);
     table.imageIdentifier = floorImage.identifier;
 
     const tiny = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' });
@@ -129,6 +138,14 @@ describe('resolveStreetscapeFloorBlob', () => {
 });
 
 describe('appendStreetscapeModelsToTable', () => {
+  const addedImageIds: string[] = [];
+
+  afterEach(() => {
+    for (const id of addedImageIds.splice(0)) {
+      ImageStorage.instance.delete(id);
+    }
+  });
+
   async function makeSolidPng(w: number, h: number, rgb: [number, number, number]): Promise<Blob> {
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -149,6 +166,7 @@ describe('appendStreetscapeModelsToTable', () => {
 
     const floorBlob = await makeSolidPng(64, 64, [180, 170, 160]);
     const floorImage = await ImageStorage.instance.addAsync(floorBlob);
+    addedImageIds.push(floorImage.identifier);
     table.imageIdentifier = floorImage.identifier;
 
     const appendPack: StreetscapePackV1 = {
