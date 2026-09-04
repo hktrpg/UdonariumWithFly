@@ -28,6 +28,15 @@ export type StreetscapePackV1 = {
   floor: { path: string };
   features: StreetscapeFeatureV1[];
   quality?: Partial<StreetscapeQualityV1>;
+  /**
+   * Open3Dhk live-download hint so「另存街景包」→ re-import can still
+   * download textured facades for the same sheet / building ids.
+   */
+  open3dhk?: {
+    sheet: string;
+    format?: 'GLTF' | 'GLTF0';
+    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
+  };
 };
 
 const QUALITY_SORT = new Set(['distanceToOrigin', 'manifestOrder']);
@@ -54,6 +63,7 @@ export function parseStreetscapePackV1(raw: unknown): StreetscapePackV1 {
   const features = o.features.map(parseFeature);
   const axis = o.axis === 'z-up' ? 'z-up' : 'y-up';
   const quality = parseQualityPartial(o.quality);
+  const open3dhk = parseOpen3dhkMeta(o.open3dhk);
   return {
     version: 1,
     id,
@@ -66,7 +76,30 @@ export function parseStreetscapePackV1(raw: unknown): StreetscapePackV1 {
     floor,
     features,
     ...(quality ? { quality } : {}),
+    ...(open3dhk ? { open3dhk } : {}),
   };
+}
+
+function parseOpen3dhkMeta(raw: unknown): StreetscapePackV1['open3dhk'] | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const sheet = asNonEmptyString(o.sheet);
+  const extent = asWorldExtent(o.worldExtent);
+  if (!sheet || !extent) return undefined;
+  const format = o.format === 'GLTF' || o.format === 'GLTF0' ? o.format : undefined;
+  return { sheet, worldExtent: extent, ...(format ? { format } : {}) };
+}
+
+function asWorldExtent(v: unknown): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const minX = typeof o.minX === 'number' && Number.isFinite(o.minX) ? o.minX : null;
+  const maxX = typeof o.maxX === 'number' && Number.isFinite(o.maxX) ? o.maxX : null;
+  const minZ = typeof o.minZ === 'number' && Number.isFinite(o.minZ) ? o.minZ : null;
+  const maxZ = typeof o.maxZ === 'number' && Number.isFinite(o.maxZ) ? o.maxZ : null;
+  if (minX == null || maxX == null || minZ == null || maxZ == null) return null;
+  if (!(maxX > minX) || !(maxZ > minZ)) return null;
+  return { minX, maxX, minZ, maxZ };
 }
 
 function parseFeature(raw: unknown): StreetscapeFeatureV1 {

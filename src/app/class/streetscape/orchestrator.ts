@@ -177,11 +177,13 @@ async function appendStreetscapeFeaturesToTable(
           bakeSize: quality.bakeMaxEdgePx,
           mmPerGrid: scale.mmPerGrid,
           metersPerGrid: scale.metersPerGrid,
+          metersPerGridY: scale.metersPerGridY,
           sizeMeters: feature.sizeMeters,
           parentTable: table,
           yawDeg: feature.yawDeg,
           colorTint,
           locked: true,
+          lockAspectRatio: true,
         });
         terrains.push(...result.terrains);
         warnings.push(...(result.warnings || []));
@@ -210,11 +212,13 @@ async function appendStreetscapeFeaturesToTable(
         bakeSize: quality.bakeMaxEdgePx,
         mmPerGrid: scale.mmPerGrid,
         metersPerGrid: scale.metersPerGrid,
+        metersPerGridY: scale.metersPerGridY,
         sizeMeters: feature.sizeMeters,
         parentTable: table,
         yawDeg: feature.yawDeg,
         colorTint,
         locked: true,
+        lockAspectRatio: true,
       });
       terrains.push(...result.terrains);
       warnings.push(...(result.warnings || []));
@@ -357,11 +361,13 @@ export async function generateStreetscapeFromLoad(
           bakeSize: quality.bakeMaxEdgePx,
           mmPerGrid: scale.mmPerGrid,
           metersPerGrid: scale.metersPerGrid,
+          metersPerGridY: scale.metersPerGridY,
           sizeMeters: feature.sizeMeters,
           parentTable: table,
           yawDeg: feature.yawDeg,
           colorTint,
           locked: true,
+          lockAspectRatio: true,
         });
         terrains.push(...result.terrains);
         warnings.push(...(result.warnings || []));

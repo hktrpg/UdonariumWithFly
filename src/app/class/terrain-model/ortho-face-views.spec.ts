@@ -100,6 +100,12 @@ describe('gridPerWorldForStreetscape', () => {
     const g = gridPerWorldForStreetscape(aabb, 2.5, { w: 20, d: 20 }, 2.5);
     expect(g).toBeCloseTo(1 / 2.5, 5);
   });
+
+  it('corrects pin-sized mesh even when ratio is between 0.5 and 2', () => {
+    const aabb = { min: [0, 0, 0] as [number, number, number], max: [0.05, 0.08, 0.05] as [number, number, number] };
+    const g = gridPerWorldForStreetscape(aabb, 1, { w: 12, d: 10, h: 20 }, 1);
+    expect(0.05 * g).toBeGreaterThan(5);
+  });
 });
 
 describe('model package caps', () => {

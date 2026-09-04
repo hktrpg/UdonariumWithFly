@@ -47,3 +47,7 @@ package-lock.json
 .angular/cache/
 /.agents
 skills-lock.json
+
+# Local scratch / probe dumps
+tmp-*.png
+tmp-*.jpg

@@ -1,3 +1,5 @@
+export type PlateauLatLon = { lat: number; lon: number };
+
 export type PlateauBuildingFootprint = {
   id: string;
   /** Metres. */
@@ -7,6 +9,8 @@ export type PlateauBuildingFootprint = {
   maxLat: number;
   minLon: number;
   maxLon: number;
+  /** Exterior ring (lat/lon), closed or open. */
+  ring: PlateauLatLon[];
 };
 
 export type PlateauGmlEnvelope = {
@@ -16,7 +20,7 @@ export type PlateauGmlEnvelope = {
   maxLon: number;
 };
 
-/** Parse PLATEAU Building CityGML (lod0RoofEdge + measuredHeight). */
+/** Parse PLATEAU Building CityGML (lod0RoofEdge / lod0FootPrint + measuredHeight). */
 export function parsePlateauBuildingsFromGml(text: string): {
   envelope: PlateauGmlEnvelope | null;
   buildings: PlateauBuildingFootprint[];
@@ -29,19 +33,21 @@ export function parsePlateauBuildingsFromGml(text: string): {
     const idMatch = /gml:id="([^"]+)"/i.exec(part);
     if (!idMatch) continue;
     const heightMatch = /<bldg:measuredHeight[^>]*>([^<]+)<\/bldg:measuredHeight>/i.exec(part);
-    const height = Math.max(3, Number(heightMatch?.[1]) || 10);
+    const rawH = Number(heightMatch?.[1]);
+    // PLATEAU sentinel -9999 / non-positive → default storey height.
+    const height = (Number.isFinite(rawH) && rawH > 0) ? Math.max(3, rawH) : 10;
     const posMatch = /<bldg:lod0RoofEdge>[\s\S]*?<gml:posList>([^<]+)<\/gml:posList>/i.exec(part)
       || /<bldg:lod0FootPrint>[\s\S]*?<gml:posList>([^<]+)<\/gml:posList>/i.exec(part);
     if (!posMatch) continue;
     const nums = posMatch[1].trim().split(/[\s]+/).map(Number).filter(n => Number.isFinite(n));
     if (nums.length < 6) continue;
-    const lats: number[] = [];
-    const lons: number[] = [];
+    const ring: PlateauLatLon[] = [];
     for (let k = 0; k + 1 < nums.length; k += 3) {
-      lats.push(nums[k]);
-      lons.push(nums[k + 1]);
+      ring.push({ lat: nums[k], lon: nums[k + 1] });
     }
-    if (!lats.length) continue;
+    if (ring.length < 3) continue;
+    const lats = ring.map(p => p.lat);
+    const lons = ring.map(p => p.lon);
     buildings.push({
       id: idMatch[1],
       height,
@@ -49,6 +55,7 @@ export function parsePlateauBuildingsFromGml(text: string): {
       maxLat: Math.max(...lats),
       minLon: Math.min(...lons),
       maxLon: Math.max(...lons),
+      ring,
     });
   }
   return { envelope, buildings };

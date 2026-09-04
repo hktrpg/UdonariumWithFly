@@ -7,11 +7,12 @@ import {
 } from './open3dhk-range-fetch';
 
 describe('clampOpen3dhkMaxFeatures', () => {
-  it('floors to ≥1 with no upper bound (default 4)', () => {
+  it('floors to ≥1 and caps at OPEN3DHK_MAX_FEATURES_CAP (default 4)', () => {
     expect(clampOpen3dhkMaxFeatures(undefined)).toBe(4);
     expect(clampOpen3dhkMaxFeatures(0)).toBe(4);
     expect(clampOpen3dhkMaxFeatures(3)).toBe(3);
     expect(clampOpen3dhkMaxFeatures(99)).toBe(99);
+    expect(clampOpen3dhkMaxFeatures(999)).toBe(100);
   });
 });
 

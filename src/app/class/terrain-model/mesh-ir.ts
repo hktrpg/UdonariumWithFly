@@ -186,25 +186,29 @@ export function gridPerWorldForImport(
 /**
  * Prefer surveyed footprint (meters) when the mesh AABB disagrees by ≥2×
  * (typical Open3Dhk unit / axis quirks that otherwise bake pin-sized buildings).
+ * When `metersPerGridY` is set, depth uses that axis (anisotropic table cells).
  */
 export function gridPerWorldForStreetscape(
   aabb: MeshAabb,
   mmPerGrid: number,
   sizeMeters?: { w: number; d: number; h?: number } | null,
   metersPerGrid?: number,
+  metersPerGridY?: number,
 ): number {
   const fromMm = gridPerWorldForImport(aabb, mmPerGrid, false);
-  const mpg = Number(metersPerGrid);
+  const mpgX = Number(metersPerGrid);
+  const mpgY = Number(metersPerGridY) > 0 ? Number(metersPerGridY) : mpgX;
   const w = Number(sizeMeters?.w);
   const d = Number(sizeMeters?.d);
-  if (!(mpg > 0) || !(w > 0) || !(d > 0)) return fromMm;
+  if (!(mpgX > 0) || !(w > 0) || !(d > 0)) return fromMm;
 
   const meshW = Math.max(1e-9, aabb.max[0] - aabb.min[0]);
   const meshD = Math.max(1e-9, aabb.max[2] - aabb.min[2]);
-  const targetW = w / mpg;
-  const targetD = d / mpg;
+  const targetW = w / mpgX;
+  const targetD = d / mpgY;
   const fromSize = 0.5 * (targetW / meshW + targetD / meshD);
   if (!(fromSize > 0) || !Number.isFinite(fromSize)) return fromMm;
   const ratio = fromSize / Math.max(1e-12, fromMm);
-  return (ratio >= 2 || ratio <= 0.5) ? fromSize : fromMm;
+  const pinSized = Math.min(meshW, meshD) * fromMm < 1;
+  return (ratio >= 2 || ratio <= 0.5 || pinSized) ? fromSize : fromMm;
 }

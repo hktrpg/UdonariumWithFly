@@ -5,7 +5,7 @@ import { GameTable } from '@udonarium/game-table';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { fetchStreetscapeCatalog } from '@udonarium/streetscape/catalog-source';
-import { streetscapeErrorI18nKey } from '@udonarium/streetscape/errors';
+import { isStreetscapeAbort, streetscapeErrorI18nKey } from '@udonarium/streetscape/errors';
 import {
   downloadStreetscapePack,
   streetscapePackDownloadName,
@@ -17,7 +17,7 @@ import {
   registerBuiltinStreetscapeSources,
   StreetscapeProgress,
 } from '@udonarium/streetscape/orchestrator';
-import { estimateOpen3dhkSheetDownload } from '@udonarium/streetscape/open3dhk-source';
+import { countOpen3dhkSheetBuildings, OPEN3DHK_MAX_FEATURES_CAP } from '@udonarium/streetscape/open3dhk-source';
 import { StreetscapePackV1 } from '@udonarium/streetscape/pack-schema';
 import {
   loadPlateauCities,
@@ -109,7 +109,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     maxFeatures: number;
     buildingIds: string[];
     estimatedFacadeBytes: number;
-    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
+    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   } | null = null;
   /** Last successful Open3Dhk/file pack members — save pack. */
   streetscapeExport: {
@@ -117,6 +117,9 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     files: File[];
     fileName: string;
   } | null = null;
+  /** Hard cap on models per create/add batch (see OPEN3DHK_MAX_FEATURES_CAP). */
+  readonly streetscapeModelCap = OPEN3DHK_MAX_FEATURES_CAP;
+  private streetscapeAbort: AbortController | null = null;
   private streetscapeProgressPersistAt = 0;
 
   get viewTable(): GameTable {
@@ -171,6 +174,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.abortStreetscapeWork();
     this.persistStreetscapeUiSession();
     EventSystem.unregister(this);
   }
@@ -185,12 +189,24 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
   }
 
   onStreetscapeCountryChange() {
+    this.abortStreetscapeWork();
     this.streetscapeCountry = normalizeStreetscapeCountry(this.streetscapeCountry);
     this.streetscapeStreetSuggestions = [];
     this.streetscapeActive = null;
     this.streetscapeDeferred = null;
     this.persistStreetscapeUiSession();
     this.changeDetector.markForCheck();
+  }
+
+  private abortStreetscapeWork(): void {
+    this.streetscapeAbort?.abort();
+    this.streetscapeAbort = null;
+  }
+
+  private beginStreetscapeAbort(): AbortSignal {
+    this.abortStreetscapeWork();
+    this.streetscapeAbort = new AbortController();
+    return this.streetscapeAbort.signal;
   }
 
   private persistStreetscapeUiSession() {
@@ -235,6 +251,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
 
   async createStreetscapeFromStreet() {
     if (!this.canActivate || this.streetscapeBusy) return;
+    this.abortStreetscapeWork();
     const q = this.streetscapeStreet.trim();
     if (!q) return;
 
@@ -432,11 +449,34 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     });
     if (!ok) return;
 
+    const signal = this.beginStreetscapeAbort();
     this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t('streetscape.busyTextured');
     this.changeDetector.markForCheck();
     try {
       registerBuiltinStreetscapeSources();
+      let worldExtent = deferred.worldExtent;
+      if (!worldExtent) {
+        // Older saved packs lack open3dhk.worldExtent — probe terrain AABB first.
+        this.streetscapeStatus = this.i18n.t('streetscape.progressIndex');
+        this.changeDetector.detectChanges();
+        const floorQuery: StreetscapeQuery = {
+          type: 'open3dhk',
+          sheet: deferred.sheet,
+          format: 'GLTF0',
+          maxFeatures: 1,
+          useRange: true,
+          rangeMode: 'floorOnly',
+        };
+        const floorLoad = await resolveStreetscapeSource(floorQuery).resolve(floorQuery, signal, (p) => {
+          this.applyStreetscapeSourceProgress(p);
+        });
+        worldExtent = floorLoad.worldExtent || null;
+        if (!worldExtent) throw new Error('STREETSCAPE_NO_FLOOR');
+        deferred.worldExtent = worldExtent;
+      }
+      this.streetscapeStatus = this.i18n.t('streetscape.busyTextured');
+      this.changeDetector.detectChanges();
       const query: StreetscapeQuery = {
         type: 'open3dhk',
         sheet: deferred.sheet,
@@ -446,14 +486,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         useRange: true,
         rangeMode: 'buildings',
         buildingIds: deferred.buildingIds.slice(),
-        reuseWorldExtent: deferred.worldExtent,
+        reuseWorldExtent: worldExtent,
       };
       const source = resolveStreetscapeSource(query);
-      const load = await source.resolve(query, undefined, (p) => {
+      const load = await source.resolve(query, signal, (p) => {
         this.applyStreetscapeSourceProgress(p);
       });
       const result = await appendStreetscapeFacadesToTable(table, load, {
         onProgress: (p) => this.applyStreetscapeBakeProgress(p),
+        signal,
       });
       this.streetscapeAttribution = result.attribution;
       this.streetscapeDeferred = null;
@@ -463,6 +504,10 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         ? this.i18n.t('streetscape.warnings', { detail: warn })
         : this.i18n.t('streetscape.doneFacades');
     } catch (err) {
+      if (isStreetscapeAbort(err)) {
+        this.streetscapeStatus = '';
+        return;
+      }
       this.streetscapeStatus = '';
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
@@ -483,9 +528,13 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     const table = this.viewTable;
     if (!table || table.identifier !== active.tableId) return;
 
-    const count = Math.max(1, Math.floor(Number(this.streetscapeAddCount) || 4));
+    const count = Math.min(
+      this.streetscapeModelCap,
+      Math.max(1, Math.floor(Number(this.streetscapeAddCount) || 4)),
+    );
     this.streetscapeAddCount = count;
 
+    const signal = this.beginStreetscapeAbort();
     this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t('streetscape.busyAddModels');
     this.changeDetector.markForCheck();
@@ -516,11 +565,12 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
           excludeBuildingIds: exclude,
         };
       const source = resolveStreetscapeSource(query);
-      const load = await source.resolve(query, undefined, (p) => {
+      const load = await source.resolve(query, signal, (p) => {
         this.applyStreetscapeSourceProgress(p);
       });
       const result = await appendStreetscapeModelsToTable(table, load, {
         onProgress: (p) => this.applyStreetscapeBakeProgress(p),
+        signal,
       });
       const newIds = (result.pack.features || []).map(f => f.id).filter(Boolean);
       const placed = this.mergePlacedBuildingIds([...exclude, ...newIds]);
@@ -553,6 +603,10 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         ? this.i18n.t('streetscape.warnings', { detail: warn })
         : this.i18n.t('streetscape.doneAddModels', { count: String(newIds.length) });
     } catch (err) {
+      if (isStreetscapeAbort(err)) {
+        this.streetscapeStatus = '';
+        return;
+      }
       this.streetscapeStatus = '';
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
@@ -590,16 +644,15 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     this.streetscapeStatus = this.i18n.t('streetscape.progressIndex');
     this.changeDetector.markForCheck();
 
-    let previewUrl = '';
+    const signal = this.beginStreetscapeAbort();
     let buildingCount = 0;
     try {
       registerBuiltinStreetscapeSources();
-      const est = await estimateOpen3dhkSheetDownload(opts.sheet, {
+      buildingCount = Math.max(0, await countOpen3dhkSheetBuildings(opts.sheet, {
         format: 'GLTF0',
-        maxFeatures: 99999,
+        signal,
         onProgress: (p) => this.applyStreetscapeSourceProgress(p),
-      });
-      buildingCount = Math.max(0, est.buildingCount);
+      }));
       if (buildingCount < 1) {
         await this.modalService.open(ConfirmationComponent, {
           title: this.i18n.t('streetscape.errorTitle'),
@@ -609,21 +662,8 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         });
         return false;
       }
-
-      this.streetscapeStatus = this.i18n.t('streetscape.progressFloor');
-      this.changeDetector.markForCheck();
-      const floorQuery: Extract<StreetscapeQuery, { type: 'open3dhk' }> = {
-        type: 'open3dhk',
-        sheet: opts.sheet,
-        format: 'GLTF0',
-        useRange: true,
-        rangeMode: 'floorOnly',
-      };
-      const source = resolveStreetscapeSource(floorQuery);
-      const load = await source.resolve(floorQuery, undefined, (p) => this.applyStreetscapeSourceProgress(p));
-      const floorBlob = await load.openFloor();
-      previewUrl = URL.createObjectURL(floorBlob);
     } catch (err) {
+      if (isStreetscapeAbort(err)) return false;
       this.streetscapeStatus = '';
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
@@ -638,8 +678,9 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       this.changeDetector.markForCheck();
     }
 
+    const maxPick = Math.min(buildingCount, this.streetscapeModelCap);
     const remembered = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
-    const defaultCount = Math.min(remembered, buildingCount);
+    const defaultCount = Math.min(remembered, maxPick);
     const helpLines = [this.i18n.t('streetscape.confirmPreviewAddLater')];
     if (defaultCount > StreetscapeImportComponent.MAX_FEATURES_WARN) {
       helpLines.unshift(this.i18n.t('streetscape.maxFeaturesWarn'));
@@ -652,23 +693,19 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
         name: opts.title || opts.street || opts.sheet,
         total: String(buildingCount),
       }),
-      helpHtml: previewUrl
-        ? `<img src="${previewUrl}" alt="" style="max-width:100%;max-height:220px;display:block;margin:8px auto;border:1px solid rgba(0,0,0,.15);border-radius:4px;" />`
-        : '',
       help: helpLines.join('\n'),
       hasInput: true,
       inputLabel: this.i18n.t('streetscape.modelCount'),
       inputValue: String(defaultCount),
-      inputPlaceholder: `1–${buildingCount}`,
+      inputPlaceholder: `1–${maxPick}`,
       type: ConfirmationType.OK_CANCEL,
       materialIcon: 'map',
       okLabel: this.i18n.t('streetscape.confirmDownload'),
       cancelLabel: this.i18n.t('streetscape.confirmCancel'),
     });
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     if (!picked) return false;
 
-    const count = Math.max(1, Math.min(buildingCount, Math.floor(Number(picked) || defaultCount)));
+    const count = Math.max(1, Math.min(maxPick, Math.floor(Number(picked) || defaultCount)));
     this.streetscapeMaxFeatures = count;
     this.persistStreetscapeUiSession();
     return count;
@@ -678,7 +715,10 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     base: { sheet?: string; street?: string },
     extra: Partial<Extract<StreetscapeQuery, { type: 'open3dhk' }>> = {},
   ): Extract<StreetscapeQuery, { type: 'open3dhk' }> {
-    const max = Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4));
+    const max = Math.min(
+      this.streetscapeModelCap,
+      Math.max(1, Math.floor(Number(this.streetscapeMaxFeatures) || 4)),
+    );
     this.streetscapeMaxFeatures = max;
     return {
       type: 'open3dhk',
@@ -772,6 +812,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       } | null;
     } = {},
   ) {
+    const signal = this.beginStreetscapeAbort();
     this.streetscapeBusy = true;
     this.streetscapeStatus = this.i18n.t(
       opts.country === 'jp' ? 'streetscape.busyJapan' : 'streetscape.busy',
@@ -782,6 +823,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
     try {
       const result = await generateStreetscape({
         query,
+        signal,
         onProgress: (p: StreetscapeProgress) => this.applyStreetscapeBakeProgress(p),
       });
       // generateStreetscape already viewTableLocal's the new table.
@@ -790,34 +832,46 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       const buildingIds = (result.pack.features || []).map(f => f.id).filter(Boolean);
       const country: StreetscapeCountryId = opts.country
         || (query.type === 'plateau' ? 'jp' : 'hk');
+      const meta = result.pack.open3dhk;
+      const sheetFromId = /^open3dhk-(.+)$/i.exec(result.pack.id || '')?.[1]?.trim() || '';
       const sheet = opts.plateau?.meshCode
         || opts.deferFacades?.sheet
+        || meta?.sheet
         || (query.type === 'open3dhk' ? (query.sheet || '') : '')
-        || (query.type === 'plateau' ? (query.meshCode || '') : '');
-      if (result.worldExtent && sheet) {
+        || (query.type === 'plateau' ? (query.meshCode || '') : '')
+        || sheetFromId;
+      const worldExtent = result.worldExtent || meta?.worldExtent || null;
+      if (worldExtent && sheet) {
         this.streetscapeActive = {
           country,
           tableId: result.table.identifier,
           sheet,
-          title: opts.plateau?.cityName || opts.deferFacades?.title,
+          title: opts.plateau?.cityName || opts.deferFacades?.title || result.pack.title,
           street: opts.plateau?.cityName || opts.deferFacades?.street,
-          worldExtent: result.worldExtent,
+          worldExtent,
           placedBuildingIds: buildingIds.slice(),
           plateau: opts.plateau,
         };
       } else {
         this.streetscapeActive = null;
       }
-      if (country === 'hk' && opts.deferFacades?.sheet && result.worldExtent && buildingIds.length) {
+      const alreadyTextured = meta?.format === 'GLTF'
+        || /GLTF textured/i.test(result.pack.attribution || '');
+      const canDeferFacades = country === 'hk'
+        && !!sheet
+        && buildingIds.length > 0
+        && !alreadyTextured
+        && (!!opts.deferFacades?.sheet || !!meta?.sheet || !!sheetFromId);
+      if (canDeferFacades) {
         this.streetscapeDeferred = {
           tableId: result.table.identifier,
-          sheet: opts.deferFacades.sheet,
-          title: opts.deferFacades.title,
-          street: opts.deferFacades.street,
+          sheet,
+          title: opts.deferFacades?.title || result.pack.title,
+          street: opts.deferFacades?.street,
           maxFeatures: buildingIds.length,
           buildingIds,
           estimatedFacadeBytes: 0,
-          worldExtent: result.worldExtent,
+          worldExtent: worldExtent || null,
         };
       } else {
         this.streetscapeDeferred = null;
@@ -829,6 +883,10 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
           ? this.i18n.t('streetscape.doneMapOnly')
           : this.i18n.t('streetscape.done'));
     } catch (err) {
+      if (isStreetscapeAbort(err)) {
+        this.streetscapeStatus = '';
+        return;
+      }
       this.streetscapeStatus = '';
       await this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('streetscape.errorTitle'),
@@ -868,6 +926,7 @@ export class StreetscapeImportComponent implements OnInit, OnDestroy {
       floor: pack.floor || prev?.pack.floor || { path: 'floor.png' },
       title: pack.title || prev?.pack.title || pack.id,
       attribution: pack.attribution || prev?.pack.attribution || '',
+      open3dhk: pack.open3dhk || prev?.pack.open3dhk,
     };
     this.streetscapeExport = {
       pack: mergedPack,

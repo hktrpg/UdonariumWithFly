@@ -4,8 +4,10 @@ import { expandStreetscapePackFiles } from './pack-file-source';
 import { open3dhkDebug, open3dhkDebugWarn } from './open3dhk-debug';
 import {
   clampOpen3dhkMaxFeatures,
+  countOpen3dhkRangeBuildings,
   estimateOpen3dhkRangeDownload,
   fetchOpen3dhkRangeSubsetFiles,
+  OPEN3DHK_MAX_FEATURES_CAP,
   Open3dhkRangeEstimate,
   Open3dhkRangeMode,
 } from './open3dhk-range-fetch';
@@ -49,6 +51,7 @@ export const OPEN3DHK_FORMAT_UNTEXTURED: Open3dhkZipFormat = 'GLTF0';
 export const OPEN3DHK_LIVE_FORMAT = OPEN3DHK_FORMAT_UNTEXTURED;
 
 export type { Open3dhkRangeEstimate, Open3dhkRangeMode };
+export { OPEN3DHK_MAX_FEATURES_CAP };
 
 export const open3dhkSource: StreetscapeSource = {
   id: 'open3dhk',
@@ -139,6 +142,35 @@ export function matchCatalogStreet(
 
 export function normalizeOpen3dhkFormat(format?: string): Open3dhkZipFormat {
   return normalizeFormat(format);
+}
+
+/** Count building folders from the ZIP central directory (no glTF probing). */
+export async function countOpen3dhkSheetBuildings(
+  sheet: string,
+  opts: {
+    format?: Open3dhkZipFormat;
+    signal?: AbortSignal;
+    onProgress?: (p: StreetscapeSourceProgress) => void;
+  } = {},
+): Promise<number> {
+  const format = normalizeFormat(opts.format);
+  const urls = open3dhkSheetZipFetchUrls(sheet, format);
+  let lastErr: unknown;
+  for (const url of urls) {
+    try {
+      open3dhkDebug('countOpen3dhkSheetBuildings: try', { sheet, format, url });
+      return await countOpen3dhkRangeBuildings({
+        url,
+        signal: opts.signal,
+        onProgress: opts.onProgress,
+      });
+    } catch (err) {
+      open3dhkDebugWarn('countOpen3dhkSheetBuildings: url failed', { url, err });
+      if (isStreetscapeAbort(err)) throw err;
+      lastErr = err;
+    }
+  }
+  throw resolveOpen3dhkFetchError(lastErr);
 }
 
 /** Probe ZIP CD via Range and estimate compressed bytes for ≤N buildings + floor. */

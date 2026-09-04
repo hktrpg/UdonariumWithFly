@@ -30,4 +30,19 @@ describe('parseStreetscapePackV1', () => {
     const pack = parseStreetscapePackV1({ ...valid, features: [] });
     expect(pack.features.length).toBe(0);
   });
+
+  it('keeps open3dhk sheet + worldExtent for re-import facades', () => {
+    const pack = parseStreetscapePackV1({
+      ...valid,
+      id: 'open3dhk-11-NW-19B',
+      open3dhk: {
+        sheet: '11-NW-19B',
+        format: 'GLTF0',
+        worldExtent: { minX: 100, maxX: 200, minZ: -50, maxZ: 50 },
+      },
+    });
+    expect(pack.open3dhk?.sheet).toBe('11-NW-19B');
+    expect(pack.open3dhk?.format).toBe('GLTF0');
+    expect(pack.open3dhk?.worldExtent.maxX).toBe(200);
+  });
 });

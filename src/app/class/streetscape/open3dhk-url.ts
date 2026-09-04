@@ -33,16 +33,17 @@ export function open3dhkSheetZipDirectUrl(
   return `${path}?key=${OPEN3DHK_API_KEY}`;
 }
 
-/** Same-origin proxy first, then official CDN hosts (data11 before download). */
+/** Same-origin proxy first, then official CDN (no-key before key — key= can 502 on mod_qos). */
 export function open3dhkSheetZipFetchUrls(
   sheet: string,
   format: Open3dhkZipFormat,
 ): string[] {
   return [
     open3dhkSheetZipProxyUrl(sheet, format),
+    open3dhkSheetZipDirectUrl(sheet, format, OPEN3DHK_DOWNLOAD_ZIP_BASE, false),
+    open3dhkSheetZipDirectUrl(sheet, format, OPEN3DHK_DATA11_ZIP_BASE, false),
     open3dhkSheetZipDirectUrl(sheet, format, OPEN3DHK_DATA11_ZIP_BASE, true),
     open3dhkSheetZipDirectUrl(sheet, format, OPEN3DHK_DOWNLOAD_ZIP_BASE, true),
-    open3dhkSheetZipDirectUrl(sheet, format, OPEN3DHK_DOWNLOAD_ZIP_BASE, false),
   ];
 }
 

@@ -3,6 +3,7 @@ import {
   selectPlateauBuildings,
   latLonToLocalMeters,
 } from './plateau-gml-parse';
+import { buildingBboxToLocal, envelopeToLocalFrame } from './geo-mercator';
 import { asciiStlBox } from './plateau-pack';
 import { pickPlateauBldgFile } from './plateau-catalog';
 
@@ -39,12 +40,34 @@ describe('parsePlateauBuildingsFromGml', () => {
     expect(buildings.length).toBe(2);
     expect(buildings[0].id).toBe('bldg_a');
     expect(buildings[0].height).toBeCloseTo(12.5, 5);
+    expect(buildings[0].ring.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('treats measuredHeight -9999 as missing', () => {
+    const gml = sample.replace('12.5', '-9999');
+    const { buildings } = parsePlateauBuildingsFromGml(gml);
+    expect(buildings[0].height).toBe(10);
   });
 
   it('selectPlateauBuildings skips excluded ids', () => {
     const { buildings } = parsePlateauBuildingsFromGml(sample);
     const selected = selectPlateauBuildings(buildings, 10, ['bldg_a']);
     expect(selected.map(b => b.id)).toEqual(['bldg_b']);
+  });
+
+  it('places southern building further down the pack Z axis than northern', () => {
+    const { envelope, buildings } = parsePlateauBuildingsFromGml(sample);
+    expect(envelope).toBeTruthy();
+    const frame = envelopeToLocalFrame(envelope!);
+    const a = buildings.find(b => b.id === 'bldg_a')!;
+    const b = buildings.find(b => b.id === 'bldg_b')!;
+    // bldg_a ~35.671, bldg_b ~35.675 → b is north → smaller Z
+    const localA = buildingBboxToLocal(a, frame);
+    const localB = buildingBboxToLocal(b, frame);
+    expect(localB.z).toBeLessThan(localA.z);
+    const vA = (localA.z + localA.d / 2) / frame.depth;
+    const vB = (localB.z + localB.d / 2) / frame.depth;
+    expect(vB).toBeLessThan(vA);
   });
 });
 
@@ -62,6 +85,18 @@ describe('asciiStlBox', () => {
     expect(stl).toContain('solid demo');
     expect(stl).toContain('endsolid');
     expect((stl.match(/facet normal/g) || []).length).toBe(12);
+  });
+
+  it('survives parseStl Z-up→Y-up with height on Y and footprint on XZ', async () => {
+    const { parseStl } = await import('@udonarium/terrain-model/load-stl');
+    const w = 10;
+    const h = 20;
+    const d = 8;
+    const stl = asciiStlBox('demo', w, h, d);
+    const mesh = parseStl(new TextEncoder().encode(stl).buffer);
+    expect(mesh.aabb.max[0] - mesh.aabb.min[0]).toBeCloseTo(w, 5);
+    expect(mesh.aabb.max[1] - mesh.aabb.min[1]).toBeCloseTo(h, 5);
+    expect(mesh.aabb.max[2] - mesh.aabb.min[2]).toBeCloseTo(d, 5);
   });
 });
 

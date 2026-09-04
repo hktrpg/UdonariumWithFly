@@ -34,7 +34,7 @@ export type StreetscapeUiSession = {
     maxFeatures: number;
     buildingIds: string[];
     estimatedFacadeBytes: number;
-    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number };
+    worldExtent: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   } | null;
   exportPack: {
     pack: StreetscapePackV1;
@@ -84,7 +84,9 @@ export function setStreetscapeUiSession(next: StreetscapeUiSession): void {
       ? {
         ...next.deferred,
         buildingIds: (next.deferred.buildingIds || []).slice(),
-        worldExtent: { ...next.deferred.worldExtent },
+        worldExtent: next.deferred.worldExtent
+          ? { ...next.deferred.worldExtent }
+          : null,
       }
       : null,
     exportPack: next.exportPack

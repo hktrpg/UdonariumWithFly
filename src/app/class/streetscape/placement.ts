@@ -4,12 +4,20 @@ import { StreetscapeFeatureV1, StreetscapePackV1 } from './pack-schema';
 export type StreetscapeScale = {
   tableCellsX: number;
   tableCellsY: number;
+  /** Metres per cell on table X (east). Also exposed as metersPerGrid for mesh mm scaling. */
+  metersPerGridX: number;
+  /** Metres per cell on table Y (south). */
+  metersPerGridY: number;
+  /** Alias of metersPerGridX (STL / mmPerGrid path). */
   metersPerGrid: number;
   mmPerGrid: number;
   gridPx: number;
 };
 
-/** Single scale formula: metersPerGrid = extent.width / tableCellsX. */
+/** One table cell covers this many metres (streetscape maps are halved vs 1 m/cell). */
+export const STREETSCAPE_METERS_PER_CELL = 2;
+
+/** Scale: independent metres-per-cell on X and Y so placement matches anisotropic table stretch. */
 export function streetscapeScaleFromPack(
   pack: StreetscapePackV1,
   caps: StreetscapeCapsV1,
@@ -17,16 +25,27 @@ export function streetscapeScaleFromPack(
 ): StreetscapeScale {
   const grid = Math.max(1, gridPx);
   const maxCells = Math.max(1, caps.maxTableCells);
-  const derivedX = Math.max(1, Math.round(pack.extentMeters.width));
-  const derivedY = Math.max(1, Math.round(pack.extentMeters.depth));
+  const metersPerCell = Math.max(1, STREETSCAPE_METERS_PER_CELL);
+  const derivedX = Math.max(1, Math.round(pack.extentMeters.width / metersPerCell));
+  const derivedY = Math.max(1, Math.round(pack.extentMeters.depth / metersPerCell));
   const scale = Math.min(1, maxCells / Math.max(derivedX, derivedY, 1));
   const tableCellsX = Math.max(1, Math.min(maxCells, Math.round(derivedX * scale)));
   const tableCellsY = Math.max(1, Math.min(maxCells, Math.round(derivedY * scale)));
-  const metersPerGrid = pack.extentMeters.width / tableCellsX;
+  const metersPerGridX = pack.extentMeters.width / tableCellsX;
+  const metersPerGridY = pack.extentMeters.depth / tableCellsY;
+  const metersPerGrid = metersPerGridX;
   // importModel treats mesh units as millimetres: grids = units / mmPerGrid.
   // meters = units * metersPerUnit ⇒ mmPerGrid = metersPerGrid / metersPerUnit.
   const mmPerGrid = metersPerGrid / Math.max(1e-9, pack.metersPerUnit);
-  return { tableCellsX, tableCellsY, metersPerGrid, mmPerGrid, gridPx: grid };
+  return {
+    tableCellsX,
+    tableCellsY,
+    metersPerGridX,
+    metersPerGridY,
+    metersPerGrid,
+    mmPerGrid,
+    gridPx: grid,
+  };
 }
 
 /** Feature center in table pixels (positionMeters is min-corner when sizeMeters is set). */
@@ -41,9 +60,11 @@ export function featureCenterTablePx(
     dx += feature.sizeMeters.w / 2;
     dz += feature.sizeMeters.d / 2;
   }
+  const mpgX = scale.metersPerGridX || scale.metersPerGrid;
+  const mpgY = scale.metersPerGridY || scale.metersPerGrid;
   return {
-    x: (dx / scale.metersPerGrid) * scale.gridPx,
-    y: (dz / scale.metersPerGrid) * scale.gridPx,
+    x: (dx / mpgX) * scale.gridPx,
+    y: (dz / mpgY) * scale.gridPx,
   };
 }
 

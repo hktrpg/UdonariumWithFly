@@ -1,7 +1,7 @@
 import { Reader } from '@zip.js/zip.js';
 
 import { open3dhkDebug, open3dhkDebugHeartbeat, open3dhkDebugWarn, isOpen3dhkVerboseDebug } from './open3dhk-debug';
-import { STREETSCAPE_ERRORS, isOpen3dhkUpstreamUnavailable } from './errors';
+import { STREETSCAPE_ERRORS, isOpen3dhkUpstreamUnavailable, isStreetscapeAbort } from './errors';
 import { throwIfAborted } from './source';
 
 /**
@@ -198,6 +198,25 @@ export class Open3dhkHttpRangeReader extends Reader<string> {
 
   private async fetchRange(index: number, length: number): Promise<Uint8Array> {
     const end = index + length - 1;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      throwIfAborted(this.signal);
+      if (attempt > 0) {
+        await sleepMs(150 * attempt);
+      }
+      try {
+        return await this.fetchRangeOnce(index, end, length);
+      } catch (err) {
+        if (isStreetscapeAbort(err)) throw err;
+        lastErr = err;
+        if (!isRetryableRangeError(err) || attempt >= 2) break;
+        open3dhkDebugWarn('range GET: retry', { attempt: attempt + 1, index, end, err });
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+  }
+
+  private async fetchRangeOnce(index: number, end: number, length: number): Promise<Uint8Array> {
     const t0 = now();
     const verbose = isOpen3dhkVerboseDebug();
     if (verbose || length >= 8 * 1024) {
@@ -275,4 +294,15 @@ function now(): number {
 /** LandsD CDN 502/503/504 HTML error pages — fail fast instead of hanging on direct fetch. */
 export function isOpen3dhkUpstreamErrorStatus(status: number): boolean {
   return status === 502 || status === 503 || status === 504;
+}
+
+function isRetryableRangeError(err: unknown): boolean {
+  if (isOpen3dhkUpstreamUnavailable(err)) return true;
+  if (err instanceof TypeError) return true;
+  const code = err && typeof err === 'object' ? (err as { code?: string }).code : '';
+  return code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'EAI_AGAIN';
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

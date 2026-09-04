@@ -37,6 +37,9 @@ export function createPackLoad(pack: StreetscapePackV1, files: File[]): Streetsc
   return {
     pack,
     files: files.slice(),
+    worldExtent: pack.open3dhk?.worldExtent
+      ? { ...pack.open3dhk.worldExtent }
+      : undefined,
     async openFeature(id: string, signal?: AbortSignal): Promise<File[]> {
       throwIfAborted(signal);
       const feature = pack.features.find(f => f.id === id);

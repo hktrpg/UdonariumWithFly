@@ -23,6 +23,13 @@ import {
   Open3dhkBuildingMember,
   selectOpen3dhkBuildings,
 } from './open3dhk-sheet-pack';
+import {
+  getCachedOpen3dhkProbe,
+  loadOpen3dhkCdCached,
+  mergeCachedOpen3dhkProbe,
+  open3dhkSheetCacheKeyFromUrl,
+  setCachedOpen3dhkCd,
+} from './open3dhk-sheet-cache';
 import { StreetscapeSourceProgress, throwIfAborted } from './source';
 
 /** Larger than zip.js default 512 KiB — fewer Range RTTs on multi‑MB JPEG facades. */
@@ -67,6 +74,44 @@ export type Open3dhkRangeEstimate = {
   /** facade + floor when mode is all. */
   totalCompressedBytes: number;
 };
+
+/** Soft UX warn threshold lives in the UI; this is a hard download cap. */
+export const OPEN3DHK_MAX_FEATURES_CAP = 100;
+
+/**
+ * Count building folders from the ZIP central directory only (no glTF body downloads).
+ * Fast enough for the pre-download confirm dialog; total may slightly exceed on-map buildings.
+ */
+export async function countOpen3dhkRangeBuildings(
+  opts: Pick<Open3dhkRangeFetchOpts, 'url' | 'signal' | 'onProgress'>,
+): Promise<number> {
+  throwIfAborted(opts.signal);
+  opts.onProgress?.({ phase: 'download', current: 0, total: 0, message: 'index' });
+
+  const cacheKey = open3dhkSheetCacheKeyFromUrl(opts.url);
+  const cached = await loadOpen3dhkCdCached(cacheKey, async () => {
+    open3dhkDebug('count: open ZIP', opts.url);
+    const { zipReader } = await openProbedZipReader(opts.url, opts.signal);
+    try {
+      const stop = open3dhkDebugHeartbeat('getEntries (count)');
+      open3dhkDebug('count: getEntries start');
+      const entries = await zipReader.getEntries();
+      stop();
+      throwIfAborted(opts.signal);
+      const byPath = indexEntries(entries);
+      const buildings = listBuildingsFromCentralDirectory(byPath);
+      open3dhkDebug('count: result', { buildings: buildings.length });
+      return { buildingCount: buildings.length, buildings };
+    } catch (err) {
+      open3dhkDebugWarn('count: failed', err);
+      if (isStreetscapeAbort(err)) throw err;
+      throw err instanceof Error ? err : new Error(STREETSCAPE_ERRORS.FETCH_FAILED);
+    } finally {
+      await zipReader.close().catch(() => undefined);
+    }
+  });
+  return cached.buildingCount;
+}
 
 /**
  * HTTP Range-read ZIP central directory, peek building glTFs for on-map positions,
@@ -121,6 +166,84 @@ export function estimateFromCentralDirectory(
   return estimateForSelected(byPath, buildings.length, selected);
 }
 
+async function probeBuildingsOnTerrain(
+  cacheKey: string,
+  buildings: Open3dhkBuildingMember[],
+  maxN: number,
+  byPath: Map<string, Entry>,
+  planned: Map<string, Entry>,
+  addPath: (path: string) => void,
+  opts: Pick<Open3dhkRangeFetchOpts, 'url' | 'signal' | 'onProgress'>,
+  rangeReader: Open3dhkHttpRangeReader,
+  bag: Map<string, File>,
+  terrainBox: Open3dhkTerrainBox | null,
+  logPrefix: string,
+): Promise<{ selected: Open3dhkBuildingMember[]; terrainBox: Open3dhkTerrainBox | null }> {
+  const probeHit = getCachedOpen3dhkProbe(cacheKey);
+  let box = terrainBox || probeHit?.terrainBox || null;
+  const buildingById = new Map(buildings.map(b => [b.id.toLowerCase(), b]));
+  const located: Open3dhkBuildingMember[] = [];
+  const probed = new Set<string>();
+
+  for (const m of probeHit?.located || []) {
+    const base = buildingById.get(m.id.toLowerCase());
+    if (!base || probed.has(base.id)) continue;
+    if (!Number.isFinite(m.worldX) || !Number.isFinite(m.worldZ)) continue;
+    probed.add(base.id);
+    located.push({
+      ...base,
+      worldX: m.worldX,
+      worldZ: m.worldZ,
+      sizeMeters: m.sizeMeters,
+    });
+  }
+
+  const ordered = buildings.slice().sort((a, b) => {
+    const da = Math.abs(Math.log1p(a.binBytes) - 14);
+    const db = Math.abs(Math.log1p(b.binBytes) - 14);
+    return da - db || b.binBytes - a.binBytes;
+  });
+  let onMap = filterBuildingsOnTerrain(located, box);
+  while (onMap.length < maxN) {
+    const n = nextBuildingProbeCount(maxN, probed.size, ordered.length);
+    if (n <= 0) break;
+    const batch = ordered.filter(b => !probed.has(b.id)).slice(0, n);
+    for (const b of batch) {
+      probed.add(b.id);
+      addPath(b.gltfPath);
+    }
+    open3dhkDebug(`${logPrefix}: probe glTF batch`, {
+      batch: batch.length,
+      probed: probed.size,
+      onMap: onMap.length,
+      cached: (probeHit?.located.length || 0),
+    });
+    await pullPlanned(planned, byPath, opts, rangeReader, bag, 'probe');
+    for (const b of batch) {
+      const gltf = bag.get(b.gltfPath);
+      if (!gltf) continue;
+      const parsed = localizeOpen3dhkGltf(await gltf.text());
+      located.push({
+        ...b,
+        worldX: parsed.worldX,
+        worldZ: parsed.worldZ,
+        sizeMeters: parsed.sizeMeters,
+      });
+    }
+    onMap = filterBuildingsOnTerrain(located, box);
+  }
+
+  mergeCachedOpen3dhkProbe(cacheKey, box, located);
+  const selected = chooseBuildingsForSheet(located, maxN, box);
+  open3dhkDebug(`${logPrefix}: on-map selection`, {
+    selected: selected.length,
+    onMap: onMap.length,
+    probed: probed.size,
+    ids: selected.map(s => s.id),
+  });
+  return { selected, terrainBox: box };
+}
+
 async function estimateByProbingMapPlacement(
   byPath: Map<string, Entry>,
   maxN: number,
@@ -164,45 +287,24 @@ async function estimateByProbingMapPlacement(
     }
   }
 
-  const ordered = buildings.slice().sort((a, b) => {
-    const da = Math.abs(Math.log1p(a.binBytes) - 14);
-    const db = Math.abs(Math.log1p(b.binBytes) - 14);
-    return da - db || b.binBytes - a.binBytes;
-  });
-  const located: Open3dhkBuildingMember[] = [];
-  const probed = new Set<string>();
-  let onMap = filterBuildingsOnTerrain(located, terrainBox);
-  while (onMap.length < maxN) {
-    const n = nextBuildingProbeCount(maxN, probed.size, ordered.length);
-    if (n <= 0) break;
-    const batch = ordered.filter(b => !probed.has(b.id)).slice(0, n);
-    for (const b of batch) {
-      probed.add(b.id);
-      addPath(b.gltfPath);
-    }
-    open3dhkDebug('estimate: probe glTF batch', { batch: batch.length, probed: probed.size, onMap: onMap.length });
-    await pullPlanned(planned, byPath, opts, rangeReader, bag, 'probe');
-    for (const b of batch) {
-      const gltf = bag.get(b.gltfPath);
-      if (!gltf) continue;
-      const parsed = localizeOpen3dhkGltf(await gltf.text());
-      located.push({
-        ...b,
-        worldX: parsed.worldX,
-        worldZ: parsed.worldZ,
-        sizeMeters: parsed.sizeMeters,
-      });
-    }
-    onMap = filterBuildingsOnTerrain(located, terrainBox);
+  const cacheKey = open3dhkSheetCacheKeyFromUrl(opts.url);
+  if (terrainBox) {
+    mergeCachedOpen3dhkProbe(cacheKey, terrainBox, getCachedOpen3dhkProbe(cacheKey)?.located || []);
   }
 
-  let selected = chooseBuildingsForSheet(located, maxN, terrainBox);
-  open3dhkDebug('estimate: on-map selection', {
-    selected: selected.length,
-    onMap: onMap.length,
-    probed: probed.size,
-    ids: selected.map(s => s.id),
-  });
+  const { selected } = await probeBuildingsOnTerrain(
+    cacheKey,
+    buildings,
+    maxN,
+    byPath,
+    planned,
+    addPath,
+    opts,
+    rangeReader,
+    bag,
+    terrainBox,
+    'estimate',
+  );
   return estimateForSelected(byPath, buildingsAll.length, selected);
 }
 
@@ -249,8 +351,10 @@ export async function fetchOpen3dhkRangeSubsetFiles(
     open3dhkDebug('fetch subset: getEntries done', { count: entries?.length ?? 0 });
     throwIfAborted(opts.signal);
     const byPath = indexEntries(entries);
-
+    const cacheKey = open3dhkSheetCacheKeyFromUrl(opts.url);
     const buildingsAll = listBuildingsFromCentralDirectory(byPath);
+    setCachedOpen3dhkCd(cacheKey, { buildingCount: buildingsAll.length, buildings: buildingsAll });
+
     const buildings = filterOutOpen3dhkBuildingIds(buildingsAll, opts.excludeBuildingIds);
     if (mode !== 'floorOnly' && !buildingsAll.length) {
       throw new Error(STREETSCAPE_ERRORS.NOT_A_PACK);
@@ -326,6 +430,10 @@ export async function fetchOpen3dhkRangeSubsetFiles(
       }
     }
 
+    if (terrainBox) {
+      mergeCachedOpen3dhkProbe(cacheKey, terrainBox, getCachedOpen3dhkProbe(cacheKey)?.located || []);
+    }
+
     let selected: Open3dhkBuildingMember[];
     if (fixedIds) {
       selected = matchOpen3dhkBuildingsByIds(buildingsAll, wantIds, maxN);
@@ -338,55 +446,20 @@ export async function fetchOpen3dhkRangeSubsetFiles(
         ids: selected.map(s => s.id),
       });
     } else {
-      // Probe glTF-only (no textures) until we have maxN buildings overlapping the map.
-      // Prefer mid-size meshes: absolute giants often carry 20–60 JPEG albedos in GLTF.
-      const ordered = buildings.slice().sort((a, b) => {
-        const da = Math.abs(Math.log1p(a.binBytes) - 14);
-        const db = Math.abs(Math.log1p(b.binBytes) - 14);
-        return da - db || b.binBytes - a.binBytes;
-      });
-      const located: Open3dhkBuildingMember[] = [];
-      const probed = new Set<string>();
-      let onMap = filterBuildingsOnTerrain(located, terrainBox);
-
-      while (onMap.length < maxN) {
-        const n = nextBuildingProbeCount(maxN, probed.size, ordered.length);
-        if (n <= 0) break;
-        const batch = ordered.filter(b => !probed.has(b.id)).slice(0, n);
-        for (const b of batch) {
-          probed.add(b.id);
-          addPath(b.gltfPath);
-        }
-        open3dhkDebug('fetch subset: probe glTF batch', {
-          batch: batch.length,
-          probed: probed.size,
-          onMap: onMap.length,
-          maxN,
-          excluded: (opts.excludeBuildingIds || []).length,
-        });
-        await pullPlanned(planned, byPath, opts, rangeReader, bag, 'probe');
-        for (const b of batch) {
-          const gltf = bag.get(b.gltfPath);
-          if (!gltf) continue;
-          const parsed = localizeOpen3dhkGltf(await gltf.text());
-          located.push({
-            ...b,
-            worldX: parsed.worldX,
-            worldZ: parsed.worldZ,
-            sizeMeters: parsed.sizeMeters,
-          });
-        }
-        onMap = filterBuildingsOnTerrain(located, terrainBox);
-      }
-
-      selected = chooseBuildingsForSheet(located, maxN, terrainBox);
-      open3dhkDebug('fetch subset: selected on-map', {
-        selected: selected.length,
-        probed: probed.size,
-        onMap: onMap.length,
-        located: located.length,
-        ids: selected.map(s => s.id),
-      });
+      const { selected: picked } = await probeBuildingsOnTerrain(
+        cacheKey,
+        buildings,
+        maxN,
+        byPath,
+        planned,
+        addPath,
+        opts,
+        rangeReader,
+        bag,
+        terrainBox,
+        'fetch subset',
+      );
+      selected = picked;
     }
 
     if (terrainImagePath) addPath(terrainImagePath);
@@ -589,10 +662,10 @@ function folderCompressedBytes(
   return n;
 }
 
-/** Floor to ≥1; no host upper bound (user/UI choose count). Invalid → 4. */
+/** Floor to ≥1; cap at OPEN3DHK_MAX_FEATURES_CAP. Invalid → 4. */
 function clampMaxFeatures(n?: number): number {
   if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) return 4;
-  return Math.max(1, Math.floor(n));
+  return Math.min(OPEN3DHK_MAX_FEATURES_CAP, Math.max(1, Math.floor(n)));
 }
 
 function indexEntries(entries: Entry[]): Map<string, Entry> {

@@ -10,11 +10,12 @@ const OPEN3DHK_RELAY_PORT = 47822;
 /** Prod key from Open3Dhk mapviewer (`Global.apiKeysProd["2022Q4"]`). */
 const OPEN3DHK_API_KEY = 'ad5940a63bd344c48b0351ef1c7a905e';
 const OPEN3DHK_UPSTREAM_PREFIX = '/api/3d-zip';
-/** Official UI uses data11 + key; download host is the documented template. */
+/** Official UI uses data11 + key; no-key often works when key= returns 502 (mod_qos). */
 const OPEN3DHK_UPSTREAMS = [
+  { host: 'download.map.gov.hk', withKey: false, label: 'download' },
+  { host: 'data11.map.gov.hk', withKey: false, label: 'data11' },
   { host: 'data11.map.gov.hk', withKey: true, label: 'data11+key' },
   { host: 'download.map.gov.hk', withKey: true, label: 'download+key' },
-  { host: 'download.map.gov.hk', withKey: false, label: 'download' },
 ];
 
 function isSafeBasename(name) {
@@ -117,12 +118,22 @@ function isOpen3dhkZipPath(pathname) {
   return /^\/(GLTF|GLTF0)\/[^/]+\.zip$/i.test(pathname);
 }
 
+function isOpen3dhkSheetBasename(name) {
+  return /^\d+-[A-Z]{2}-\d+[A-Z]\.zip$/i.test(name);
+}
+
 function handleOpen3dhkRelay(req, res) {
   const url = new URL(req.url || '/', 'http://127.0.0.1');
   const pathname = decodeURIComponent(url.pathname);
   if (!isOpen3dhkZipPath(pathname)) {
     res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('bad open3dhk path');
+    return;
+  }
+  const sheetFile = pathname.split('/').pop() || '';
+  if (!isOpen3dhkSheetBasename(sheetFile)) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('bad open3dhk sheet id');
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -175,7 +186,8 @@ function tryOpen3dhkUpstream(req, res, pathname, index) {
           next: OPEN3DHK_UPSTREAMS[index + 1].label,
         });
         up.resume();
-        tryOpen3dhkUpstream(req, res, pathname, index + 1);
+        const delayMs = 150 * (index + 1);
+        setTimeout(() => tryOpen3dhkUpstream(req, res, pathname, index + 1), delayMs);
         return;
       }
 
@@ -210,7 +222,8 @@ function tryOpen3dhkUpstream(req, res, pathname, index) {
   upReq.on('error', (err) => {
     console.error('[open3dhk-relay]', upstream.label, err);
     if (index + 1 < OPEN3DHK_UPSTREAMS.length) {
-      tryOpen3dhkUpstream(req, res, pathname, index + 1);
+      const delayMs = 150 * (index + 1);
+      setTimeout(() => tryOpen3dhkUpstream(req, res, pathname, index + 1), delayMs);
       return;
     }
     if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });

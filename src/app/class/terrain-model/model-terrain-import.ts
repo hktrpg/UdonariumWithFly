@@ -66,6 +66,8 @@ export type ImportModelAsTerrainOptions = {
   colorTint?: { r: number; g: number; b: number };
   /** When true, Terrain.isLocked after place (streetscape buildings default locked). */
   locked?: boolean;
+  /** When true, Terrain.lockAspectRatio after place (streetscape buildings default on). */
+  lockAspectRatio?: boolean;
   /**
    * Surveyed footprint in metres. With `metersPerGrid`, corrects bake scale when the
    * mesh AABB disagrees with the streetscape map (Open3Dhk unit quirks).
@@ -73,6 +75,8 @@ export type ImportModelAsTerrainOptions = {
   sizeMeters?: { w: number; d: number; h?: number };
   /** Metres represented by one table grid cell (streetscape scale). */
   metersPerGrid?: number;
+  /** Optional south-axis metres/cell when table stretch is anisotropic. */
+  metersPerGridY?: number;
 };
 
 export type BakeBoxPreviewContext = {
@@ -117,8 +121,14 @@ export async function importModelAsTerrain(
   const baked = await bakeModelBoxes(files, opts.bakeSize, opts.colorTint);
   const mm = opts.mmPerGrid ?? MODEL_MM_PER_GRID_DEFAULT;
   const fitGrid = opts.fitGrid !== false;
-  const gridPerWorld = (!fitGrid && opts.sizeMeters && opts.metersPerGrid)
-    ? gridPerWorldForStreetscape(baked.fullAabb, mm, opts.sizeMeters, opts.metersPerGrid)
+  const gridPerWorld = (!fitGrid && opts.metersPerGrid)
+    ? gridPerWorldForStreetscape(
+      baked.fullAabb,
+      mm,
+      opts.sizeMeters,
+      opts.metersPerGrid,
+      opts.metersPerGridY,
+    )
     : gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
   const fullSx = Math.max(1e-9, baked.fullAabb.max[0] - baked.fullAabb.min[0]);
   const fullSz = Math.max(1e-9, baked.fullAabb.max[2] - baked.fullAabb.min[2]);
@@ -160,11 +170,15 @@ export async function importModelAsTerrain(
       cropNow: false,
       bakeGroupId,
       locked: !!opts.locked,
+      lockAspectRatio: !!opts.lockAspectRatio,
     });
     viewTable.appendChild(terrain);
     // Re-assert after appendChild — some tabletop paths reset lock on place.
-    if (opts.locked) {
-      terrain.mutateAppearance(() => { terrain.isLocked = true; });
+    if (opts.locked || opts.lockAspectRatio) {
+      terrain.mutateAppearance(() => {
+        if (opts.locked) terrain.isLocked = true;
+        if (opts.lockAspectRatio) terrain.lockAspectRatio = true;
+      });
     }
     terrains.push(terrain);
 
@@ -243,6 +257,7 @@ async function createTerrainBox(
     cropNow: boolean;
     bakeGroupId: string;
     locked?: boolean;
+    lockAspectRatio?: boolean;
   },
 ): Promise<Terrain> {
   const sourceIds = await addFaceImages(box.blobs);
@@ -264,6 +279,7 @@ async function createTerrainBox(
     terrain.mirrorWallLeft = false;
     terrain.isInteract = true;
     if (layout.locked) terrain.isLocked = true;
+    if (layout.lockAspectRatio) terrain.lockAspectRatio = true;
   });
 
   const faceOrder: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];

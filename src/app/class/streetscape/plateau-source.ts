@@ -38,10 +38,10 @@ export const plateauSource: StreetscapeSource = {
     const text = await fetchPlateauText(gmlUrl, signal, (loaded, total) => {
       onProgress?.({ phase: 'download', current: loaded, total: total || 0, message: 'fetch' });
     });
-    onProgress?.({ phase: 'unpack', current: 1, total: 2 });
+    onProgress?.({ phase: 'unpack', current: 1, total: 2, message: 'aerial' });
     const parsed = parsePlateauBuildingsFromGml(text);
     if (!parsed.buildings.length) throw new Error(STREETSCAPE_ERRORS.NO_FEATURE);
-    const load = buildPlateauStreetscapePack({
+    const load = await buildPlateauStreetscapePack({
       cityCode: cityCode || 'jp',
       cityName: cityName || meshCode,
       meshCode,
@@ -50,6 +50,7 @@ export const plateauSource: StreetscapeSource = {
       maxFeatures,
       excludeBuildingIds: query.excludeBuildingIds,
       title: query.title || `PLATEAU ${cityName || meshCode}`,
+      signal,
     });
     onProgress?.({ phase: 'unpack', current: 2, total: 2 });
     if (!load.pack.features.length) throw new Error(STREETSCAPE_ERRORS.NO_MORE_MODELS);

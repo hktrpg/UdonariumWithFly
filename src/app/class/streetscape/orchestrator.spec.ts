@@ -57,6 +57,7 @@ describe('generateStreetscapeFromLoad', () => {
         const table = opts?.parentTable as GameTable;
         expect(table).toBeTruthy();
         expect(opts?.locked).toBeTrue();
+        expect(opts?.lockAspectRatio).toBeTrue();
         expect(opts?.fitGrid).toBeFalse();
         expect(opts?.metersPerGrid).toBeGreaterThan(0);
         const t = { name: opts?.name || '', location: { x: position.x, y: position.y } } as Terrain;
@@ -71,7 +72,7 @@ describe('generateStreetscapeFromLoad', () => {
     expect(result.table.mapAttribution).toContain('Open3Dhk');
     expect(placed.map(p => p.name)).toEqual(['a', 'b']);
     const grid = result.table.gridSize || 50;
-    expect((placed[1].x - placed[0].x) / grid).toBeCloseTo(20, 5);
+    expect((placed[1].x - placed[0].x) / grid).toBeCloseTo(10, 5);
     expect(result.warnings.some(w => w.startsWith('bad:'))).toBeTrue();
     expect(result.table.width).toBeGreaterThan(0);
   });

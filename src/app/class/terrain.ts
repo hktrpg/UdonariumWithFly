@@ -68,6 +68,8 @@ export type TerrainFloorHit = {
 @SyncObject('terrain')
 export class Terrain extends TabletopObject {
   @SyncVar() isLocked: boolean = false;
+  /** When true, width / depth / height edits and corner drag keep proportions. */
+  @SyncVar() lockAspectRatio: boolean = false;
   @SyncVar() mode: TerrainViewState = TerrainViewState.ALL;
   @SyncVar() rotate: number = 0;
   @SyncVar() isDropShadow: boolean = true;

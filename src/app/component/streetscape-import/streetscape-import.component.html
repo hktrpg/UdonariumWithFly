@@ -116,9 +116,11 @@
 
   <aside class="map-credit" *ngIf="streetscapeIsJapan" aria-label="Project PLATEAU credit">
     <p class="map-credit-lines">
+      <span>{{ 'streetscape.mapCreditPlateauAerial' | i18n }}</span>
       <span>{{ 'streetscape.mapCreditPlateau' | i18n }}</span>
       <span>{{ 'streetscape.mapCreditPlateauLicense' | i18n }}</span>
       <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener noreferrer">PLATEAU</a>
+      <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>
     </p>
   </aside>
 </div>

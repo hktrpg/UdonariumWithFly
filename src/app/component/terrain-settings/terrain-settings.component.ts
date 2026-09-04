@@ -27,7 +27,11 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
   /** When resizing run length, keep incline degrees and rewrite height. */
   lockSlopeDegrees = true;
   /** When editing width / depth / height, scale the other axes to keep proportions. */
-  lockAspectRatio = false;
+  get lockAspectRatio(): boolean { return !!this.terrain?.lockAspectRatio; }
+  set lockAspectRatio(v: boolean) {
+    if (!this.terrain || this.GuestMode()) return;
+    this.terrain.mutateAppearance(() => { this.terrain.lockAspectRatio = !!v; });
+  }
 
   readonly sizeMin = TERRAIN_SIZE_MIN;
   readonly slopeDegMin = SLOPE_DEG_MIN;
@@ -108,6 +112,7 @@ export class TerrainSettingsComponent implements OnInit, OnChanges, OnDestroy {
     if (changes['terrain'] && this.terrain) {
       this.terrain.complement();
       this.refreshTitle();
+      this.changeDetector.markForCheck();
     }
   }
 

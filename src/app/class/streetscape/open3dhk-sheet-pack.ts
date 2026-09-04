@@ -89,6 +89,11 @@ export async function packLoadFromOpen3dhkSheetFiles(
       floor: { path: 'floor.png' },
       features: [],
       quality: { bakeMaxEdgePx: 512, fitGrid: false, featureSort: 'distanceToOrigin' },
+      open3dhk: {
+        sheet: opts.sheet,
+        format,
+        worldExtent: { minX, maxX, minZ, maxZ },
+      },
     };
     const pack = parseStreetscapePackV1(packRaw);
     const cropped = await cropTerrainAerialToExtent(terrain, minX, maxX, minZ, maxZ);
@@ -186,6 +191,11 @@ export async function packLoadFromOpen3dhkSheetFiles(
     floor: { path: 'floor.png' },
     features,
     quality: { bakeMaxEdgePx: 512, fitGrid: false, featureSort: 'distanceToOrigin' },
+    open3dhk: {
+      sheet: opts.sheet,
+      format,
+      worldExtent: { minX, maxX, minZ, maxZ },
+    },
   };
   const pack = parseStreetscapePackV1(packRaw);
 
@@ -450,6 +460,8 @@ function localXzExtentFromGltf(doc: Record<string, unknown>): {
 
 function sizeFromGltfAccessors(doc: Record<string, unknown>): { w: number; d: number; h: number } | undefined {
   const accessors = Array.isArray(doc.accessors) ? doc.accessors as Record<string, unknown>[] : [];
+  let best: { w: number; d: number; h: number } | undefined;
+  let bestFootprint = 0;
   for (const acc of accessors) {
     if (acc.type !== 'VEC3' || !Array.isArray(acc.min) || !Array.isArray(acc.max)) continue;
     const min = acc.min.map(Number);
@@ -459,11 +471,23 @@ function sizeFromGltfAccessors(doc: Record<string, unknown>): { w: number; d: nu
     const dx = Math.abs(max[0] - min[0]);
     const dy = Math.abs(max[1] - min[1]);
     const dz = Math.abs(max[2] - min[2]);
-    if (dx + dy + dz < 1e-3) continue;
-    // After LandsD axis: footprint ≈ (dx, dy), height ≈ dz.
-    return { w: Math.max(1, dx), d: Math.max(1, dy), h: Math.max(1, dz) };
+    const sorted = [dx, dy, dz].sort((a, b) => b - a);
+    const [big, mid, small] = sorted;
+    const footprint = big + mid;
+    if (footprint < 1) continue;
+    if (footprint <= bestFootprint) continue;
+    bestFootprint = footprint;
+    // Tall axis (e.g. glTF Z-up height) vs flat footprint on the other two.
+    const h = big > mid * 1.15 ? big : small;
+    const w = big > mid * 1.15 ? mid : big;
+    const d = big > mid * 1.15 ? small : mid;
+    best = {
+      w: Math.max(1, w),
+      d: Math.max(1, d),
+      h: Math.max(1, h),
+    };
   }
-  return undefined;
+  return best;
 }
 
 function clamp01(n: number): number {
