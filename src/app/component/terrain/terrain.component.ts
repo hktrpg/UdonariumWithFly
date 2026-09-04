@@ -49,6 +49,7 @@ import {
   scaleBakeGroupFrom,
   terrainsInBakeGroup,
   cornerDragScaleFactors,
+  uniformScaleFromCornerDrag,
 } from '@udonarium/terrain-model/bake-group';
 import { wallLeftCssTransform } from '@udonarium/terrain-wall-transform';
 
@@ -455,6 +456,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
   private onScaleMove(ev?: MouseEvent | TouchEvent) {
     if (this.GuestMode() || this.isLocked || !this.scaleStartSnapshots.length) return;
     const freeAspect = !!(ev && 'shiftKey' in ev && (ev as MouseEvent).shiftKey);
+    const lockAspect = !!this.terrain.lockAspectRatio && !freeAspect;
     const cur = this.tablePointer();
     const dx = cur.x - this.scaleStartTable.x;
     const dy = cur.y - this.scaleStartTable.y;
@@ -472,19 +474,29 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
     }
 
     // Single terrain: free width/depth (classic resize). Bake groups: uniform.
-    ({ scaleX, scaleY } = cornerDragScaleFactors({
-      freeAspect,
-      partCount: this.scaleStartSnapshots.length,
-      corner: this.scaleCorner,
-      w0,
-      d0,
-      dx,
-      dy,
-      anchor,
-      start: this.scaleStartTable,
-      cur,
-      bounds: b,
-    }));
+    // lockAspectRatio: uniform scale unless Shift (same as bake group).
+    if (lockAspect && this.scaleStartSnapshots.length === 1) {
+      const geom =
+        this.scaleCorner === 'rb'
+          ? { x: b.maxX, y: b.maxY }
+          : { x: b.minX, y: b.minY };
+      const scale = uniformScaleFromCornerDrag(anchor, this.scaleStartTable, cur, geom);
+      scaleX = scaleY = scale;
+    } else {
+      ({ scaleX, scaleY } = cornerDragScaleFactors({
+        freeAspect,
+        partCount: this.scaleStartSnapshots.length,
+        corner: this.scaleCorner,
+        w0,
+        d0,
+        dx,
+        dy,
+        anchor,
+        start: this.scaleStartTable,
+        cur,
+        bounds: b,
+      }));
+    }
 
     this.ngZone.run(() => {
       for (const s of this.scaleStartSnapshots) {
@@ -496,7 +508,7 @@ export class TerrainComponent implements OnChanges, OnDestroy, AfterViewInit, Af
         s.terrain.location = { name: 'table', x: s.x, y: s.y };
       }
       const parts = this.scaleStartSnapshots.map(s => s.terrain);
-      scaleBakeGroupFrom(parts, anchor, scaleX, scaleY, { freeAspect });
+      scaleBakeGroupFrom(parts, anchor, scaleX, scaleY, { freeAspect: freeAspect && !lockAspect });
       for (const t of parts) {
         MovableDirective.syncPoseFromUndo(t, t.location.x, t.location.y, t.posZ || 0);
       }

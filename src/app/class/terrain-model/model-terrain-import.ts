@@ -1,4 +1,5 @@
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { GameTable } from '@udonarium/game-table';
 import { ImageTag } from '@udonarium/image-tag';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain, TerrainFaceName, TERRAIN_SIZE_MIN } from '@udonarium/terrain';
@@ -12,7 +13,7 @@ import {
   cropAllFaceBlobs,
   serializeBakeCropState,
 } from './bake-crop';
-import { newBakeGroupId, assembleBakeGroupAt, placeTerrainAt } from './bake-group';
+import { newBakeGroupId, assembleBakeGroupAt, placeTerrainAt, rotateBakeGroupBy } from './bake-group';
 import { footprintBoxSummary, footprintDebug } from './footprint-debug';
 import { splitFootprintFromPositions } from './footprint-split';
 import { parseObjPackage } from './load-obj';
@@ -25,8 +26,8 @@ import {
   MODEL_MAX_FILE_BYTES,
   MODEL_MM_PER_GRID_DEFAULT,
   MODEL_PHOTO_BAKE_SIZE,
-  aabbToGridSize,
-  uniformFitScale,
+  gridPerWorldForImport,
+  gridPerWorldForStreetscape,
 } from './mesh-ir';
 import { isPrimaryModelFile, packagePathOf } from './model-package-files';
 import { BakedFaceBlobs, bakeSixOrthoFaces } from './ortho-bake';
@@ -49,6 +50,33 @@ export type ImportModelAsTerrainOptions = {
    * Skip keeps auto insets; abort stops remaining boxes.
    */
   previewBox?: (ctx: BakeBoxPreviewContext) => Promise<BakeBoxPreviewResult>;
+  /**
+   * When true (default), clamp the model into 2–40 grids.
+   * Streetscape passes false so world distances stay linear.
+   */
+  fitGrid?: boolean;
+  /** Parent map; default is the locally viewed table. */
+  parentTable?: GameTable;
+  /** Yaw in degrees applied after place (single box or bake group). */
+  yawDeg?: number;
+  /**
+   * Multiply / replace glTF material color before photo-bake.
+   * Used for Open3Dhk GLTF0 (official vertex colors are flat gray).
+   */
+  colorTint?: { r: number; g: number; b: number };
+  /** When true, Terrain.isLocked after place (streetscape buildings default locked). */
+  locked?: boolean;
+  /** When true, Terrain.lockAspectRatio after place (streetscape buildings default on). */
+  lockAspectRatio?: boolean;
+  /**
+   * Surveyed footprint in metres. With `metersPerGrid`, corrects bake scale when the
+   * mesh AABB disagrees with the streetscape map (Open3Dhk unit quirks).
+   */
+  sizeMeters?: { w: number; d: number; h?: number };
+  /** Metres represented by one table grid cell (streetscape scale). */
+  metersPerGrid?: number;
+  /** Optional south-axis metres/cell when table stretch is anisotropic. */
+  metersPerGridY?: number;
 };
 
 export type BakeBoxPreviewContext = {
@@ -80,7 +108,7 @@ export async function importModelAsTerrain(
   position: PointerCoordinate,
   opts: ImportModelAsTerrainOptions = {},
 ): Promise<ImportModelAsTerrainResult> {
-  const viewTable = TableSelecter.instance.viewTable;
+  const viewTable = opts.parentTable || TableSelecter.instance.viewTable;
   if (!viewTable) throw new Error('MODEL_NO_TABLE');
   if (!files?.length) throw new Error('MODEL_EMPTY');
 
@@ -90,11 +118,18 @@ export async function importModelAsTerrain(
     }
   }
 
-  const baked = await bakeModelBoxes(files, opts.bakeSize);
+  const baked = await bakeModelBoxes(files, opts.bakeSize, opts.colorTint);
   const mm = opts.mmPerGrid ?? MODEL_MM_PER_GRID_DEFAULT;
-  const raw = aabbToGridSize(baked.fullAabb, mm);
-  const scale = uniformFitScale(raw.width, raw.depth, raw.height);
-  const gridPerWorld = scale / mm;
+  const fitGrid = opts.fitGrid !== false;
+  const gridPerWorld = (!fitGrid && opts.metersPerGrid)
+    ? gridPerWorldForStreetscape(
+      baked.fullAabb,
+      mm,
+      opts.sizeMeters,
+      opts.metersPerGrid,
+      opts.metersPerGridY,
+    )
+    : gridPerWorldForImport(baked.fullAabb, mm, fitGrid);
   const fullSx = Math.max(1e-9, baked.fullAabb.max[0] - baked.fullAabb.min[0]);
   const fullSz = Math.max(1e-9, baked.fullAabb.max[2] - baked.fullAabb.min[2]);
   const fullSy = Math.max(0, baked.fullAabb.max[1] - baked.fullAabb.min[1]);
@@ -113,6 +148,8 @@ export async function importModelAsTerrain(
     modelW: +modelW.toFixed(3),
     modelD: +modelD.toFixed(3),
     height: +height.toFixed(3),
+    sizeMeters: opts.sizeMeters || null,
+    metersPerGrid: opts.metersPerGrid ?? null,
     fullAabb: footprintBoxSummary(baked.fullAabb),
     boxes: baked.boxes.map((b, i) => ({ i, ...footprintBoxSummary(b.aabb, baked.fullAabb) })),
   });
@@ -132,8 +169,17 @@ export async function importModelAsTerrain(
       modelD,
       cropNow: false,
       bakeGroupId,
+      locked: !!opts.locked,
+      lockAspectRatio: !!opts.lockAspectRatio,
     });
     viewTable.appendChild(terrain);
+    // Re-assert after appendChild — some tabletop paths reset lock on place.
+    if (opts.locked || opts.lockAspectRatio) {
+      terrain.mutateAppearance(() => {
+        if (opts.locked) terrain.isLocked = true;
+        if (opts.lockAspectRatio) terrain.lockAspectRatio = true;
+      });
+    }
     terrains.push(terrain);
 
     if (opts.previewBox) {
@@ -159,6 +205,14 @@ export async function importModelAsTerrain(
   // Force modeled footprint layout (bar + wings), never a spaced 一字排.
   if (terrains.length > 1 && bakeGroupId) {
     assembleBakeGroupAt(terrains, position);
+  }
+  const yaw = Number(opts.yawDeg);
+  if (Number.isFinite(yaw) && yaw !== 0) {
+    if (terrains.length > 1 && bakeGroupId) {
+      rotateBakeGroupBy(terrains, yaw);
+    } else {
+      terrains[0].rotate = (terrains[0].rotate || 0) + yaw;
+    }
   }
   footprintDebug('importModelAsTerrain done', {
     n: terrains.length,
@@ -202,6 +256,8 @@ async function createTerrainBox(
     modelD: number;
     cropNow: boolean;
     bakeGroupId: string;
+    locked?: boolean;
+    lockAspectRatio?: boolean;
   },
 ): Promise<Terrain> {
   const sourceIds = await addFaceImages(box.blobs);
@@ -222,6 +278,8 @@ async function createTerrainBox(
     terrain.mirrorWallTop = false;
     terrain.mirrorWallLeft = false;
     terrain.isInteract = true;
+    if (layout.locked) terrain.isLocked = true;
+    if (layout.lockAspectRatio) terrain.lockAspectRatio = true;
   });
 
   const faceOrder: TerrainFaceName[] = ['underside', 'wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
@@ -313,9 +371,10 @@ function isExt(file: File, re: RegExp): boolean {
 async function bakeModelBoxes(
   files: File[],
   bakeSize?: number,
+  colorTint?: { r: number; g: number; b: number },
 ): Promise<{ boxes: BakedBox[]; fullAabb: MeshAabb; warnings: string[] }> {
   if (files.some(f => isExt(f, /\.glb$/i) || isExt(f, /\.gltf$/i) || isExt(f, /\.fbx$/i))) {
-    const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE);
+    const photo = await photoGltfFaces(files, bakeSize ?? MODEL_PHOTO_BAKE_SIZE, { colorTint });
     return {
       boxes: photo.boxes?.length ? photo.boxes : [{ blobs: photo.blobs, aabb: photo.aabb }],
       fullAabb: photo.fullAabb || photo.aabb,

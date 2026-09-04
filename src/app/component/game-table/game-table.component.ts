@@ -50,7 +50,6 @@ import { MobileLayoutService } from 'service/mobile-layout.service';
 import { TableLightingService } from 'service/table-lighting.service';
 import { folderBackupDebug, folderBackupWarn, approxCssScale, summarizeCharPlacements, TokenDomProbe, TokenHideReason } from 'service/folder-backup-debug';
 import { MovableDirective } from 'directive/movable.directive';
-
 import { GridLineRender } from './grid-line-render';
 import { LightOccluder, LightingRender } from './lighting-render';
 import { TableMouseGesture, TableMouseGestureEvent } from './table-mouse-gesture';
@@ -149,6 +148,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get tableSelecter(): TableSelecter { return this.tabletopService.tableSelecter; }
   get currentTable(): GameTable { return this.tabletopService.currentTable; }
+
   get gridHeight(): number { return this.tabletopService.currentTable.gridHeight; }
 
   /**

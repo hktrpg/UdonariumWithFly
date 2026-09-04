@@ -37,9 +37,14 @@ describe('ImageStorage.getCatalog', () => {
     ImageStorage.instance.add(complete);
     expect(complete.state).toBe(ImageState.COMPLETE);
 
-    const catalog = ImageStorage.instance.getCatalog();
-    expect(catalog.map(item => item.identifier)).toEqual([blobId]);
-    expect(catalog.every(item => item.state === ImageState.COMPLETE)).toBe(true);
+    const catalogIds = ImageStorage.instance.getCatalog().map(item => item.identifier);
+    // Assert membership only — other specs may leave COMPLETE blobs in the singleton.
+    expect(catalogIds).toContain(blobId);
+    expect(catalogIds).not.toContain(urlId);
+    expect(
+      ImageStorage.instance.getCatalog().filter(item => item.identifier === blobId)
+        .every(item => item.state === ImageState.COMPLETE),
+    ).toBe(true);
   });
 });
 

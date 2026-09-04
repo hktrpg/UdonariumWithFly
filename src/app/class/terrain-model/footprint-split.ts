@@ -55,6 +55,15 @@ export function splitFootprintFromPositions(
   const filled = new Uint8Array(cols * rows);
   rasterizeXz(positions, aabb, filled, cols, rows);
   closeHoles(filled, cols, rows);
+  // Hollow shells often have 1–2 cell gaps at corners; a second close seals the
+  // ring without bridging real U/L courtyard mouths (those openings are wide).
+  const roughFill = countFilled(filled, cols, { c0: 0, c1: cols, r0: 0, r1: rows }) / Math.max(1, cols * rows);
+  if (roughFill < 0.55) {
+    closeHoles(filled, cols, rows);
+    closeHoles(filled, cols, rows);
+  }
+  // Closed rings → solid footprint; open courtyards stay empty (touch border).
+  fillEnclosedEmpty(filled, cols, rows);
   dropSmallComponents(filled, cols, rows, Math.max(8, Math.floor(cols * rows * 0.008)));
 
   const root = tightRect(filled, cols, rows, 0, cols, 0, rows);
@@ -76,7 +85,36 @@ export function splitFootprintFromPositions(
     }
   }
   const boxes = pruned.map(r => rectToAabb(r, aabb, cols, rows, sy));
-  return boxes.length ? boxes : [cloneAabb(aabb)];
+  if (!boxes.length) return [cloneAabb(aabb)];
+  // Hollow / gappy shells (Open3Dhk) can still guillotine into thin wall strips
+  // whose top face looks like a facade edge — keep the full AABB instead.
+  if (boxesLookLikeWallShards(boxes, aabb)) return [cloneAabb(aabb)];
+  return boxes;
+}
+
+/**
+ * True when split pieces are skinny shards that barely cover the root footprint.
+ * Real L/U wings are chunky enough to keep; Open3Dhk hollow rings that over-split are not.
+ */
+function boxesLookLikeWallShards(boxes: MeshAabb[], root: MeshAabb): boolean {
+  if (boxes.length <= 1) return false;
+  const rootArea = Math.max(
+    1e-9,
+    (root.max[0] - root.min[0]) * (root.max[2] - root.min[2]),
+  );
+  let covered = 0;
+  let skinny = 0;
+  for (const b of boxes) {
+    const dx = Math.max(0, b.max[0] - b.min[0]);
+    const dz = Math.max(0, b.max[2] - b.min[2]);
+    const area = dx * dz;
+    covered += area;
+    const aspect = Math.max(dx, dz) / Math.max(1e-9, Math.min(dx, dz));
+    if (aspect >= 2.2 && area < rootArea * 0.22) skinny++;
+  }
+  if (skinny >= 2 && covered < rootArea * 0.65) return true;
+  if (skinny === boxes.length && covered < rootArea * 0.5) return true;
+  return false;
 }
 
 type GridRect = { c0: number; c1: number; r0: number; r1: number };
@@ -146,6 +184,42 @@ function closeHoles(filled: Uint8Array, cols: number, rows: number): void {
   const dil = new Uint8Array(filled.length);
   dilate(filled, dil, cols, rows);
   erode(dil, filled, cols, rows);
+}
+
+/**
+ * Mark empty cells reachable from the grid border as exterior, then fill the rest.
+ * Closed building shells become solid footprints; U/L courtyards open to the border stay empty.
+ */
+function fillEnclosedEmpty(filled: Uint8Array, cols: number, rows: number): void {
+  const exterior = new Uint8Array(filled.length);
+  const queue = new Int32Array(filled.length);
+  let qh = 0;
+  let qt = 0;
+  const push = (i: number) => {
+    if (exterior[i] || filled[i]) return;
+    exterior[i] = 1;
+    queue[qt++] = i;
+  };
+  for (let c = 0; c < cols; c++) {
+    push(c);
+    push(c + (rows - 1) * cols);
+  }
+  for (let r = 0; r < rows; r++) {
+    push(r * cols);
+    push((cols - 1) + r * cols);
+  }
+  while (qh < qt) {
+    const cur = queue[qh++];
+    const c = cur % cols;
+    const r = (cur / cols) | 0;
+    if (c > 0) push(cur - 1);
+    if (c + 1 < cols) push(cur + 1);
+    if (r > 0) push(cur - cols);
+    if (r + 1 < rows) push(cur + cols);
+  }
+  for (let i = 0; i < filled.length; i++) {
+    if (!filled[i] && !exterior[i]) filled[i] = 1;
+  }
 }
 
 function dilate(src: Uint8Array, dst: Uint8Array, cols: number, rows: number): void {

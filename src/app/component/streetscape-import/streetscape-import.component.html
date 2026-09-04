@@ -1,0 +1,130 @@
+<div class="settings-ui dense streetscape-import" *ngIf="canActivate; else streetscapeDenied" appFitPanel [fitMinHeight]="360" [fitMaxHeight]="640">
+  <label class="streetscape-label" for="streetscape-country">{{ 'streetscape.countryLabel' | i18n }}</label>
+  <select
+    id="streetscape-country"
+    class="streetscape-select"
+    [(ngModel)]="streetscapeCountry"
+    (ngModelChange)="onStreetscapeCountryChange()"
+    [disabled]="streetscapeBusy"
+  >
+    <option *ngFor="let c of streetscapeCountries" [value]="c.id">{{ c.labelKey | i18n }}</option>
+  </select>
+
+  <div class="streetscape-primary-row">
+    <div class="streetscape-field streetscape-field-street">
+      <label class="streetscape-label" for="streetscape-street">{{ 'streetscape.streetLabel' | i18n }}</label>
+      <div class="streetscape-street-wrap">
+        <input
+          id="streetscape-street"
+          class="streetscape-street streetscape-street-primary"
+          type="text"
+          [(ngModel)]="streetscapeStreet"
+          (ngModelChange)="onStreetscapeStreetInput()"
+          [disabled]="streetscapeBusy"
+          [placeholder]="(streetscapeIsJapan ? 'streetscape.streetPlaceholderJp' : 'streetscape.streetPlaceholder') | i18n"
+          autocomplete="off"
+        >
+        <ul class="streetscape-suggest" *ngIf="streetscapeStreetSuggestions.length && !streetscapeBusy">
+          <li *ngFor="let s of streetscapeStreetSuggestions">
+            <button type="button" class="streetscape-suggest-item" (click)="pickStreetscapeSuggestion(s)">
+              <span class="streetscape-suggest-name">{{ s.label }}</span>
+              <span class="streetscape-suggest-code">{{ s.code }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="btn btn-block btn-sm btn-primary"
+    (click)="createStreetscapeFromStreet()"
+    [disabled]="streetscapeBusy || !streetscapeStreet.trim()"
+  >
+    {{ 'streetscape.fromStreet' | i18n }}
+  </button>
+
+  <div class="streetscape-add-row" *ngIf="streetscapeCanAddModels">
+    <button
+      type="button"
+      class="btn btn-sm"
+      (click)="addStreetscapeModels()"
+      [disabled]="streetscapeBusy || streetscapeAddCount < 1"
+    >
+      {{ 'streetscape.addModels' | i18n }}
+    </button>
+    <input
+      class="streetscape-street streetscape-count"
+      type="number"
+      min="1"
+      step="1"
+      [(ngModel)]="streetscapeAddCount"
+      [disabled]="streetscapeBusy"
+      [attr.aria-label]="'streetscape.addModelCount' | i18n"
+    >
+  </div>
+  <p class="streetscape-status streetscape-warn" *ngIf="streetscapeCanAddModels && streetscapeAddCountWarn">
+    {{ 'streetscape.maxFeaturesWarn' | i18n }}
+  </p>
+
+  <button
+    type="button"
+    class="btn btn-block btn-sm"
+    *ngIf="streetscapeCanDeferFacades"
+    (click)="downloadDeferredFacades()"
+    [disabled]="streetscapeBusy"
+  >
+    {{ 'streetscape.downloadFacades' | i18n }}
+  </button>
+  <button
+    type="button"
+    class="btn btn-block btn-sm"
+    *ngIf="streetscapeCanExportPack"
+    (click)="saveStreetscapePack()"
+    [disabled]="streetscapeBusy"
+  >
+    <i class="material-icons">save_alt</i>{{ 'streetscape.savePack' | i18n }}
+  </button>
+
+  <p class="streetscape-status" *ngIf="streetscapeStatus">{{ streetscapeStatus }}</p>
+  <p class="streetscape-status" *ngIf="streetscapeAttribution">{{ 'streetscape.attribution' | i18n:{ name: streetscapeAttribution } }}</p>
+
+  <div class="streetscape-secondary">
+    <button
+      type="button"
+      class="streetscape-pack-link"
+      (click)="streetscapePackInput.click()"
+      [disabled]="streetscapeBusy"
+    >
+      {{ 'streetscape.importPack' | i18n }}
+    </button>
+    <input #streetscapePackInput type="file" accept=".zip,application/zip" hidden (change)="onStreetscapePack($event)">
+  </div>
+
+  <aside class="map-credit" *ngIf="streetscapeShowLandsdCredit" aria-label="Lands Department map credit">
+    <a class="map-credit-logo" href="https://www.landsd.gov.hk/" target="_blank" rel="noopener noreferrer">
+      <img src="assets/streetscape/landsd-wordmark.svg" width="140" height="28" alt="Lands Department 地政總署">
+    </a>
+    <p class="map-credit-lines">
+      <span>{{ 'streetscape.mapCreditAerial' | i18n }}</span>
+      <span>{{ 'streetscape.mapCreditModels' | i18n }}</span>
+      <span>{{ 'streetscape.mapCreditCopyright' | i18n }}</span>
+      <a href="https://3d.map.gov.hk/" target="_blank" rel="noopener noreferrer">Open3Dhk</a>
+    </p>
+  </aside>
+
+  <aside class="map-credit" *ngIf="streetscapeIsJapan" aria-label="Project PLATEAU credit">
+    <p class="map-credit-lines">
+      <span>{{ 'streetscape.mapCreditPlateauAerial' | i18n }}</span>
+      <span>{{ 'streetscape.mapCreditPlateau' | i18n }}</span>
+      <span>{{ 'streetscape.mapCreditPlateauLicense' | i18n }}</span>
+      <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener noreferrer">PLATEAU</a>
+      <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>
+    </p>
+  </aside>
+</div>
+
+<ng-template #streetscapeDenied>
+  <p class="streetscape-status">{{ 'streetscape.gmOnly' | i18n }}</p>
+</ng-template>

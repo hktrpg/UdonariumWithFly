@@ -49,3 +49,7 @@ package-lock.json
 skills-lock.json
 *.log
 /.cursor
+
+# Local scratch / probe dumps
+tmp-*.png
+tmp-*.jpg

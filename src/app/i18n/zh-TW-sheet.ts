@@ -2,7 +2,7 @@ import { I18nDictionary } from './types';
 
 export const zhTW_sheet: I18nDictionary = {
   'sheet.toggleEdit': '切換編輯', 'sheet.changeFrontImage': '變更正面圖片', 'sheet.changeBackImage': '變更背面圖片',
-  'sheet.changeAllBackImages': '變更全部卡片的背面圖片', 'sheet.changeFloorImage': '變更地板圖片', 'sheet.changeWallImage': '變更牆壁圖片',
+  'sheet.changeAllBackImages': '變更全部卡片的背面圖片', 'sheet.changeFloorImage': '變更頂部圖片', 'sheet.changeWallImage': '變更牆壁圖片',
   'sheet.changeDiceImage': '變更骰子點數圖片', 'sheet.imageReplaceDelete': '圖片置換/刪除', 'sheet.imageSet': '圖片設定',
   'sheet.faceIconAdd': '大頭貼 icon新增', 'sheet.faceIconSet': '大頭貼 icon設定', 'sheet.changeImage': '變更圖片',
   'sheet.createCopy': '建立副本', 'sheet.cloneCharacter': '複製角色', 'sheet.download': '匯出', 'sheet.import': '匯入', 'sheet.exportCcfoliaJson': '下載為 JSON', 'sheet.location.table': '桌面', 'sheet.location.common': '公用倉庫',

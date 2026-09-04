@@ -2,6 +2,15 @@
   <button type="button" class="scene-nav-toggle" (click)="collapsed = !collapsed" [attr.title]="collapsed ? ('table.navExpand' | i18n) : ('table.navCollapse' | i18n)">
     <i class="material-icons">{{ collapsed ? 'expand_more' : 'expand_less' }}</i>
   </button>
+  <button
+    type="button"
+    class="scene-nav-toggle"
+    *ngIf="isGM && !collapsed"
+    (click)="openStreetscapeSettings($event)"
+    [attr.title]="'streetscape.importPack' | i18n"
+  >
+    <i class="material-icons">add</i>
+  </button>
   <div class="scene-nav-track" *ngIf="!collapsed">
     <div
       class="scene-chip-wrap"

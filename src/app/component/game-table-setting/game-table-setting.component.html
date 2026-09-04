@@ -3,6 +3,9 @@
     <button type="button" class="btn btn-primary btn-block btn-sm" (click)="createGameTable()">
       <i class="material-icons">add</i>{{ 'table.create' | i18n }}
     </button>
+    <button type="button" class="btn btn-block btn-sm" *ngIf="canActivate" (click)="openStreetscapeImport()">
+      <i class="material-icons">location_city</i>{{ 'streetscape.openPanel' | i18n }}
+    </button>
     <select
       #select
       class="table-list"

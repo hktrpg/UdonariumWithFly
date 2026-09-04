@@ -167,3 +167,48 @@ export function uniformFitScale(width: number, depth: number, height: number): n
   if (height > 1e-9) return fitted.height / height;
   return 1;
 }
+
+/**
+ * World-units → grid-units scale used by terrain import.
+ * When `fitGrid` is false (streetscape), skip the 2–40 clamp so relative distances stay linear.
+ */
+export function gridPerWorldForImport(
+  aabb: MeshAabb,
+  mmPerGrid: number,
+  fitGrid = true,
+): number {
+  const mm = Math.max(1e-6, mmPerGrid);
+  if (!fitGrid) return 1 / mm;
+  const raw = aabbToGridSize(aabb, mm);
+  return uniformFitScale(raw.width, raw.depth, raw.height) / mm;
+}
+
+/**
+ * Prefer surveyed footprint (meters) when the mesh AABB disagrees by ≥2×
+ * (typical Open3Dhk unit / axis quirks that otherwise bake pin-sized buildings).
+ * When `metersPerGridY` is set, depth uses that axis (anisotropic table cells).
+ */
+export function gridPerWorldForStreetscape(
+  aabb: MeshAabb,
+  mmPerGrid: number,
+  sizeMeters?: { w: number; d: number; h?: number } | null,
+  metersPerGrid?: number,
+  metersPerGridY?: number,
+): number {
+  const fromMm = gridPerWorldForImport(aabb, mmPerGrid, false);
+  const mpgX = Number(metersPerGrid);
+  const mpgY = Number(metersPerGridY) > 0 ? Number(metersPerGridY) : mpgX;
+  const w = Number(sizeMeters?.w);
+  const d = Number(sizeMeters?.d);
+  if (!(mpgX > 0) || !(w > 0) || !(d > 0)) return fromMm;
+
+  const meshW = Math.max(1e-9, aabb.max[0] - aabb.min[0]);
+  const meshD = Math.max(1e-9, aabb.max[2] - aabb.min[2]);
+  const targetW = w / mpgX;
+  const targetD = d / mpgY;
+  const fromSize = 0.5 * (targetW / meshW + targetD / meshD);
+  if (!(fromSize > 0) || !Number.isFinite(fromSize)) return fromMm;
+  const ratio = fromSize / Math.max(1e-12, fromMm);
+  const pinSized = Math.min(meshW, meshD) * fromMm < 1;
+  return (ratio >= 2 || ratio <= 0.5 || pinSized) ? fromSize : fromMm;
+}

@@ -21,11 +21,13 @@ import { TextNote } from '@udonarium/text-note';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
 import { animateDayNightAtmosphere } from '@udonarium/table-fx/day-night-atmosphere';
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
+import { StreetscapeImportComponent } from 'component/streetscape-import/streetscape-import.component';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { ImageService } from 'service/image.service';
 import { I18nService } from 'service/i18n.service';
+import { MobileLayoutService } from 'service/mobile-layout.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { WeatherSeService } from 'service/weather-se.service';
@@ -191,6 +193,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
     private chatMessageService: ChatMessageService,
     private i18n: I18nService,
     private weatherSe: WeatherSeService,
+    private mobileLayout: MobileLayoutService,
   ) { }
 
   GuestMode() {
@@ -226,6 +229,22 @@ export class GameTableSettingComponent implements OnInit, OnDestroy {
 
   private refreshPanelTitle() {
     this.modalService.title = this.panelService.title = this.i18n.t('table.title');
+  }
+
+  openStreetscapeImport() {
+    if (!this.canActivate) return;
+    PanelService.closePanelsByTourId('panel.streetscape-import');
+    let option = {
+      width: 360,
+      height: 520,
+      left: 100,
+      title: this.i18n.t('streetscape.title'),
+      tourPanelId: 'panel.streetscape-import',
+      mobileReplace: true,
+      mobileSheet: 'half' as const,
+    };
+    option = this.mobileLayout.adaptPanelOption(option);
+    this.panelService.open(StreetscapeImportComponent, option);
   }
 
   selectGameTable(identifier: string) {

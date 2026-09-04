@@ -39,8 +39,10 @@ const EDGE_DILATE_PX = 2;
 export async function photoGltfFaces(
   files: File[],
   maxSize: number = MODEL_PHOTO_BAKE_SIZE,
+  opts?: { colorTint?: { r: number; g: number; b: number } },
 ): Promise<PhotoGltfFacesResult> {
   const { THREE, scene, dispose } = await loadPhotoScene(files);
+  if (opts?.colorTint) applyColorTintToScene(scene, opts.colorTint);
   let renderer: import('three').WebGLRenderer | undefined;
   try {
     await waitForMaps(scene);
@@ -76,7 +78,10 @@ export async function photoGltfFaces(
     // Split on the full mesh AABB (not a visual probe). Visual tightening
     // clamps verts and turns L/U courtyards into vertical strips (一字排).
     // Multiple boxes are required for L/U — a single AABB leaves a missing corner.
-    const splitAabbs = splitFootprintFromPositions(positions, meshAabb);
+    let splitAabbs = splitFootprintFromPositions(positions, meshAabb);
+    // Hollow textured shells (Open3Dhk) can leave a thin wall ring / shard after
+    // rasterize. Using that shard for the top face paints a facade edge on「地板」.
+    splitAabbs = preferFullAabbIfShards(splitAabbs, meshAabb);
     const fullAabb = meshAabb;
     const refLongEdge = aabbMaxExtent(fullAabb);
     const z0 = splitAabbs.map(b => b.min[2]);
@@ -267,4 +272,72 @@ async function loadPhotoScene(files: File[]): Promise<LoadedGltf> {
     return loadFbxScene(files);
   }
   throw new Error('MODEL_NO_GLTF');
+}
+
+/** If split pieces are skinny shards of the root footprint, drop them or bake the full AABB. */
+export function preferFullAabbIfShards(boxes: MeshAabb[], root: MeshAabb): MeshAabb[] {
+  if (!boxes.length) {
+    return [{ min: [root.min[0], root.min[1], root.min[2]], max: [root.max[0], root.max[1], root.max[2]] }];
+  }
+  const rootArea = Math.max(
+    1e-9,
+    (root.max[0] - root.min[0]) * (root.max[2] - root.min[2]),
+  );
+  const full = (): MeshAabb[] => [{
+    min: [root.min[0], root.min[1], root.min[2]],
+    max: [root.max[0], root.max[1], root.max[2]],
+  }];
+  const isSkinny = (b: MeshAabb): boolean => {
+    const dx = Math.max(0, b.max[0] - b.min[0]);
+    const dz = Math.max(0, b.max[2] - b.min[2]);
+    const area = dx * dz;
+    const aspect = Math.max(dx, dz) / Math.max(1e-9, Math.min(dx, dz));
+    return aspect >= 2.0 && area < rootArea * 0.25;
+  };
+
+  const kept = boxes.filter(b => !isSkinny(b));
+  if (!kept.length) return full();
+  // Only skinny remnants survived the filter → full building AABB.
+  if (kept.length < boxes.length) {
+    let covered = 0;
+    for (const b of kept) {
+      covered += Math.max(0, b.max[0] - b.min[0]) * Math.max(0, b.max[2] - b.min[2]);
+    }
+    // Dropping wall strips left a solid enough core (Open3Dhk hollow shell).
+    if (kept.length === 1 && covered >= rootArea * 0.4) return kept;
+    // Dropping strips shredded an L/U — fall back to one box rather than a holey set.
+    if (covered < rootArea * 0.5) return full();
+    return kept;
+  }
+
+  // Single thin remnant (no non-skinny sibling).
+  if (boxes.length === 1 && isSkinny(boxes[0])) return full();
+  return boxes;
+}
+
+/** Override flat GLTF0 vertex gray with a solid facade tint for photo-bake. */
+export function applyColorTintToScene(
+  scene: import('three').Object3D,
+  tint: { r: number; g: number; b: number },
+): void {
+  const r = clamp01(tint.r);
+  const g = clamp01(tint.g);
+  const b = clamp01(tint.b);
+  scene.traverse((obj: any) => {
+    if (!obj?.isMesh) return;
+    const mats = obj.material
+      ? (Array.isArray(obj.material) ? obj.material : [obj.material])
+      : [];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.vertexColors = false;
+      if (mat.color?.setRGB) mat.color.setRGB(r, g, b);
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0.75;
+  return Math.max(0.05, Math.min(1, n));
 }

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "streets": [
+    {
+      "id": "nathan-11-SW-4B",
+      "title": "彌敦道／尖沙咀（圖幅 11-SW-4B）",
+      "street": "彌敦道",
+      "sheet": "11-SW-4B",
+      "attribution": "Lands Department / Open3Dhk Individualised models (live download)"
+    }
+  ]
+}

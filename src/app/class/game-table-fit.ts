@@ -2,8 +2,10 @@ import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { EventSystem } from '@udonarium/core/system';
 import { GameTable } from '@udonarium/game-table';
 
-const DEFAULT_MIN = 1;
-const DEFAULT_MAX = 100;
+export const GAME_TABLE_SIZE_MIN = 1;
+export const GAME_TABLE_SIZE_MAX = 100;
+const DEFAULT_MIN = GAME_TABLE_SIZE_MIN;
+const DEFAULT_MAX = GAME_TABLE_SIZE_MAX;
 
 /** Load natural pixel size of an ImageFile (url or blob). */
 export function loadImageNaturalSize(image: ImageFile): Promise<{ width: number; height: number } | null> {
