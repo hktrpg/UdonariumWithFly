@@ -57,7 +57,8 @@
 
               <!-- Has back art: swap to back image. No back art: keep front + CSS mirror. -->
               <div *ngIf="showBackFace" class="image-wrap is-3d">
-                <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+                <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'"
+                  draggable="false" (load)="onNoteImageLoad($event)" />
               </div>
               <ng-container *ngIf="!showBackFace" [ngSwitch]="contentKind">
                 <div *ngSwitchCase="'pdf'" class="pdf-wrap is-3d">
@@ -89,7 +90,8 @@
                 </div>
 
                 <div *ngSwitchCase="'image'" class="image-wrap is-3d">
-                  <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'" draggable="false" />
+                  <img *ngIf="imageFile?.url" class="note-image is-3d" [src]="imageFile.url | safe: 'resourceUrl'"
+                    draggable="false" (load)="onNoteImageLoad($event)" />
                 </div>
 
                 <ng-container *ngSwitchDefault>

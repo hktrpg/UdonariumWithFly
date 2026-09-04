@@ -30,6 +30,102 @@
   color: #7a6a58;
 }
 
+.sheet-preview {
+  margin: 0 0 10px;
+}
+
+.sheet-preview-frame {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  border: 1px solid rgba(90, 70, 40, 0.35);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #2a241c;
+}
+
+.sheet-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  vertical-align: top;
+  user-select: none;
+  pointer-events: none;
+}
+
+.sheet-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  pointer-events: none;
+}
+
+.sheet-cell {
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 220, 80, 0.75);
+}
+
+.sheet-cell.is-skipped {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(160, 160, 160, 0.45);
+}
+
+.sheet-preview-caption {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: #8a7a68;
+}
+
+.sheet-preview-loading {
+  margin: 0 0 10px;
+  text-align: center;
+  color: #8a7a68;
+  font-size: 13px;
+}
+
+.sheet-mark-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sheet-mark-vline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid rgba(255, 60, 60, 0.85);
+}
+
+.sheet-mark-hline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid rgba(255, 60, 60, 0.85);
+}
+
+.field-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.field-check input {
+  width: auto;
+  margin: 0;
+}
+
+.field-error {
+  color: #a33;
+}
+
 .footer-actions {
   display: flex;
   align-items: center;

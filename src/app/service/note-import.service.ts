@@ -15,6 +15,37 @@ const MEGA = 1024 * 1024;
 /** Tabletop PDF paper width in grids — small enough to place, large enough to read mid-zoom. */
 const PDF_NOTE_DEFAULT_WIDTH = 10;
 
+/** Natural pixel size for aspect-fit paper sizing (import-time). */
+function probeImageNaturalSize(src: string | Blob): Promise<{ w: number; h: number } | null> {
+  return new Promise(resolve => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    let objectUrl = '';
+    const cleanup = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    img.onload = () => {
+      const w = img.naturalWidth || 0;
+      const h = img.naturalHeight || 0;
+      cleanup();
+      resolve(w > 0 && h > 0 ? { w, h } : null);
+    };
+    img.onerror = () => {
+      cleanup();
+      resolve(null);
+    };
+    if (typeof src === 'string') {
+      img.src = src;
+    } else {
+      objectUrl = URL.createObjectURL(src);
+      img.src = objectUrl;
+    }
+  });
+}
+
 @Injectable({ providedIn: 'root' })
 export class NoteImportService {
   async importFiles(files: FileList | File[], options?: {
@@ -73,7 +104,14 @@ export class NoteImportService {
     if (kind === 'image') {
       if (file.size > IMAGE_SOURCE_MAX_BYTES) return null;
       const image = await ImageStorage.instance.addAsync(file);
-      const note = TextNote.create(name, '', 14, 3, 3);
+      const size = await probeImageNaturalSize(image.url || file);
+      // Default ~4 grids wide; height follows aspect so the billboard bottom stays on the table.
+      let w = 4;
+      let h = 4;
+      if (size && size.w > 0 && size.h > 0) {
+        h = Math.max(1, Math.round((w * size.h / size.w) * 2) / 2);
+      }
+      const note = TextNote.create(name, '', 14, w, h);
       note.setFrontImage(image.identifier);
       note.contentMode = 'image';
       return note;

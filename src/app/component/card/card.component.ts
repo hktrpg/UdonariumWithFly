@@ -514,7 +514,9 @@ export class CardComponent implements OnDestroy, OnChanges, AfterViewInit {
       const overTable = !overHand && !stackId && !cardId && this.isOverTable(event.clientX, event.clientY);
       this.emitHandDropPreview(true, overHand);
       EventSystem.trigger('TABLE_DROP_PREVIEW', { active: overTable });
-      setCardMergePreview(stackId || cardId);
+      setCardMergePreview(overHand
+        ? null
+        : findMergeTargetIdAtPoint(event.clientX, event.clientY, undefined, this.card?.identifier));
     }
   };
 

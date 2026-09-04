@@ -31,6 +31,7 @@ import { CardSheetImportComponent, CardSheetImportResult } from 'component/card-
 import { ConfirmationComponent, ConfirmationType } from 'component/confirmation/confirmation.component';
 import { DropCreateChooserComponent, DropCreateChoice } from 'component/drop-create-chooser/drop-create-chooser.component';
 import { footprintDebug } from '@udonarium/terrain-model/footprint-debug';
+import { renderPdfPagesToPng } from '@udonarium/pdf-card-sheet';
 import { MovableDirective } from 'directive/movable.directive';
 import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
@@ -158,6 +159,7 @@ export class TabletopFileDropService {
       const accepted = this.filterAccepted(expanded, asModelPackage);
       if (!accepted.length) return;
       const images = accepted.filter(f => this.classify(f, asModelPackage) === 'image');
+      const pdfs = accepted.filter(f => this.classify(f, asModelPackage) === 'pdf');
       const notes = accepted.filter(f => this.isNoteCapable(f, asModelPackage));
       const audios = accepted.filter(f => this.classify(f, asModelPackage) === 'audio');
       const modelFiles = asModelPackage ? accepted : [];
@@ -167,6 +169,7 @@ export class TabletopFileDropService {
         audios.length,
         accepted.length,
         modelFiles.length > 0,
+        pdfs.length,
       );
       if (!choices.length) return;
 
@@ -175,6 +178,7 @@ export class TabletopFileDropService {
         imageCount: images.length,
         noteCount: notes.length,
         audioCount: audios.length,
+        pdfCount: pdfs.length,
       });
 
       const result = await this.modalService.open<{ choice: string } | false | null>(DropCreateChooserComponent, {
@@ -197,6 +201,7 @@ export class TabletopFileDropService {
         audios,
         modelFiles,
         position,
+        pdfs,
       );
       if (created) SoundEffect.play(PresetSound.cardPut);
     } finally {
@@ -210,6 +215,7 @@ export class TabletopFileDropService {
     audioCount: number,
     totalCount: number,
     hasModelPackage: boolean,
+    pdfCount = 0,
   ): DropCreateChoice[] {
     const choices: DropCreateChoice[] = [];
     if (hasModelPackage) {
@@ -250,9 +256,9 @@ export class TabletopFileDropService {
       });
       choices.push({
         id: 'cardSheet',
-        label: this.i18n.t('dropCreate.cardSheet'),
+        label: this.i18n.t(pdfCount > 0 ? 'dropCreate.cardSheetPdf' : 'dropCreate.cardSheet'),
         icon: 'grid_on',
-        hint: this.i18n.t('dropCreate.hint.cardSheet'),
+        hint: this.i18n.t(pdfCount > 0 ? 'dropCreate.hint.cardSheetPdf' : 'dropCreate.hint.cardSheet'),
       });
       if (imageCount >= 2) {
         choices.push({
@@ -279,6 +285,14 @@ export class TabletopFileDropService {
         label: this.i18n.t('dropCreate.coin'),
         icon: 'monetization_on',
         hint: this.i18n.t('dropCreate.hint.coin'),
+      });
+    } else if (pdfCount > 0) {
+      // PDF-only drop: PnP sheet → deck (notes still offered below).
+      choices.push({
+        id: 'cardSheet',
+        label: this.i18n.t('dropCreate.cardSheetPdf'),
+        icon: 'grid_on',
+        hint: this.i18n.t('dropCreate.hint.cardSheetPdf'),
       });
     }
     if (noteCount > 0) {
@@ -311,9 +325,12 @@ export class TabletopFileDropService {
 
   private defaultChoice(
     choices: DropCreateChoice[],
-    counts: { hasModel: boolean; imageCount: number; noteCount: number; audioCount: number },
+    counts: { hasModel: boolean; imageCount: number; noteCount: number; audioCount: number; pdfCount?: number },
   ): string {
     if (counts.hasModel && choices.some(c => c.id === 'terrainBake')) return 'terrainBake';
+    if ((counts.pdfCount || 0) > 0 && counts.imageCount === 0 && choices.some(c => c.id === 'cardSheet')) {
+      return 'cardSheet';
+    }
     if (counts.imageCount > 0 && choices.some(c => c.id === 'token')) return 'token';
     if (counts.noteCount > 0 && choices.some(c => c.id === 'note')) return 'note';
     if (counts.audioCount > 0 && choices.some(c => c.id === 'jukebox')) return 'jukebox';
@@ -328,6 +345,7 @@ export class TabletopFileDropService {
     audios: File[],
     modelFiles: File[],
     position: PointerCoordinate,
+    pdfs: File[] = [],
   ): Promise<boolean> {
     switch (choice) {
       case 'token':
@@ -341,7 +359,7 @@ export class TabletopFileDropService {
       case 'stack':
         return this.createCardStack(images, position);
       case 'cardSheet':
-        return this.createCardStackFromSheet(images, position);
+        return this.createCardStackFromSheet(images, pdfs, position);
       case 'terrain':
         return this.createTerrain(images, position);
       case 'terrainBake':
@@ -530,22 +548,40 @@ export class TabletopFileDropService {
     return true;
   }
 
-  /** TTS Custom Deck face sheet → CardStack; optional 2nd image = shared back. */
-  private async createCardStackFromSheet(files: File[], position: PointerCoordinate): Promise<boolean> {
-    if (!files.length) return false;
+  /**
+   * TTS / PnP card sheet → CardStack.
+   * Image sheet: optional 2nd image = shared back.
+   * PDF sheet: pages from modal; optional image beside PDF = shared back.
+   */
+  private async createCardStackFromSheet(
+    images: File[],
+    pdfs: File[],
+    position: PointerCoordinate,
+  ): Promise<boolean> {
+    const pdf = pdfs[0] || null;
+    const sheetImage = !pdf ? images[0] : null;
+    if (!pdf && !sheetImage) return false;
+
     const params = await this.modalService.open<CardSheetImportResult | false>(CardSheetImportComponent, {
-      panelWidth: '360px',
+      panelWidth: '420px',
+      previewFile: pdf || sheetImage,
+      isPdf: !!pdf,
     });
     if (!params) return false;
 
     let faceFiles: File[];
     try {
-      faceFiles = await sliceCardSheet(files[0], {
-        cols: params.cols,
-        rows: params.rows,
-        numCards: params.numCards,
-        baseName: this.baseName(files[0].name) || 'card',
-      });
+      if (pdf) {
+        faceFiles = await this.slicePdfCardSheet(pdf, params);
+      } else {
+        faceFiles = await sliceCardSheet(sheetImage!, {
+          cols: params.cols,
+          rows: params.rows,
+          numCards: params.numCards,
+          autoTrim: params.autoTrim,
+          baseName: this.baseName(sheetImage!.name) || 'card',
+        });
+      }
     } catch (err) {
       void this.modalService.open(ConfirmationComponent, {
         title: this.i18n.t('cardSheet.errorTitle'),
@@ -558,12 +594,40 @@ export class TabletopFileDropService {
     if (!faceFiles.length) return false;
 
     let backId = this.ensureDefaultCardBack();
-    if (files[1]) {
-      const back = await ImageStorage.instance.addAsync(files[1]);
+    const backFile = pdf ? images[0] : images[1];
+    if (backFile) {
+      const back = await ImageStorage.instance.addAsync(backFile);
       backId = back.identifier;
     }
 
     return this.createCardStack(faceFiles, position, backId);
+  }
+
+  private async slicePdfCardSheet(pdf: File, params: CardSheetImportResult): Promise<File[]> {
+    const pages = params.pages?.length ? params.pages : [1];
+    const rendered = await renderPdfPagesToPng(pdf, pages, 2400);
+    const base = this.baseName(pdf.name) || 'card';
+    const all: File[] = [];
+    let index = 1;
+    for (const page of rendered.pages) {
+      const faces = await sliceCardSheet(page.blob, {
+        cols: params.cols,
+        rows: params.rows,
+        numCards: params.numCards,
+        autoTrim: params.autoTrim,
+        baseName: `${base}-p${page.page}`,
+      });
+      for (const face of faces) {
+        const renamed = new File(
+          [face],
+          `${base}-${String(index).padStart(3, '0')}.png`,
+          { type: 'image/png' },
+        );
+        all.push(renamed);
+        index++;
+      }
+    }
+    return all;
   }
 
   private async createTerrain(files: File[], position: PointerCoordinate): Promise<boolean> {

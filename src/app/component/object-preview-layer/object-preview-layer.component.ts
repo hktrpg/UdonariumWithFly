@@ -45,11 +45,22 @@ import { Subscription } from 'rxjs';
 export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterViewChecked {
   private static readonly PREVIEW_ZOOM_MIN = 0.5;
   private static readonly PREVIEW_ZOOM_MAX = 4;
+  private static readonly ASIDE_WIDTH_DEFAULT = 280;
+  private static readonly ASIDE_WIDTH_MIN = 140;
+  private static readonly ASIDE_WIDTH_MAX = 480;
+  /** Floor for preview body / text column when the card art is very short. */
+  private static readonly BODY_MIN_HEIGHT = 160;
 
   @ViewChildren('pdfCanvas') pdfCanvases: QueryList<ElementRef<HTMLCanvasElement>>;
 
   /** Screen positions for pinned floating windows (id → left/top). */
   floatPos = new Map<string, { left: number; top: number }>();
+  /** Per-preview text column width (px). */
+  asideWidth = new Map<string, number>();
+  /** Per-preview text column collapsed. */
+  asideCollapsed = new Map<string, boolean>();
+  /** Measured media height (px) so the text column can match image length. */
+  mediaHeight = new Map<string, number>();
 
   private dragContentId: string | null = null;
   private dragLastX = 0;
@@ -57,6 +68,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
   private windowDragId: string | null = null;
   private windowDragOffX = 0;
   private windowDragOffY = 0;
+  private asideResizeId: string | null = null;
+  private asideResizeStartX = 0;
+  private asideResizeStartW = 0;
   private pointerDownX = 0;
   private pointerDownY = 0;
   private pointerMoved = false;
@@ -68,6 +82,8 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
   private sub: Subscription | null = null;
   private readonly onWindowWheel = (e: WheelEvent) => this.handlePreviewWheel(e);
   private readonly onWindowKeyDown = (e: KeyboardEvent) => this.handlePageKey(e);
+  private readonly onAsideResizeMove = (e: PointerEvent) => this.handleAsideResizeMove(e);
+  private readonly onAsideResizeUp = (e: PointerEvent) => this.handleAsideResizeUp(e);
 
   constructor(
     private objectPreview: ObjectPreviewService,
@@ -124,6 +140,7 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     this.sub?.unsubscribe();
     window.removeEventListener('wheel', this.onWindowWheel, true);
     window.removeEventListener('keydown', this.onWindowKeyDown, true);
+    this.teardownAsideResize();
     EventSystem.unregister(this);
   }
 
@@ -157,6 +174,96 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     };
   }
 
+  isAsideCollapsed(id: string): boolean {
+    return !!this.asideCollapsed.get(id);
+  }
+
+  toggleAside(id: string, e?: Event) {
+    e?.stopPropagation();
+    e?.preventDefault();
+    if (!id) return;
+    this.asideCollapsed.set(id, !this.isAsideCollapsed(id));
+    this.changeDetector.markForCheck();
+  }
+
+  asideStyle(p: ObjectPreviewPayload): { [key: string]: string } {
+    if (this.isAsideCollapsed(p.id)) return {};
+    const w = this.asideWidth.get(p.id) ?? ObjectPreviewLayerComponent.ASIDE_WIDTH_DEFAULT;
+    const h = this.mediaHeight.get(p.id);
+    const style: { [key: string]: string } = { width: `${w}px` };
+    // Match image length when known; otherwise stretch with the body floor.
+    if (h && h > 0) {
+      style.height = `${Math.max(ObjectPreviewLayerComponent.BODY_MIN_HEIGHT, h)}px`;
+    }
+    return style;
+  }
+
+  bodyMinHeight(p: ObjectPreviewPayload): number {
+    const h = this.mediaHeight.get(p.id);
+    if (h && h > 0) return Math.max(ObjectPreviewLayerComponent.BODY_MIN_HEIGHT, h);
+    return ObjectPreviewLayerComponent.BODY_MIN_HEIGHT;
+  }
+
+  onPreviewMediaLoad(p: ObjectPreviewPayload, e: Event) {
+    const el = e.target as HTMLImageElement | HTMLVideoElement | null;
+    if (!el || !p?.id) return;
+    let h = 0;
+    if (el instanceof HTMLVideoElement) {
+      h = el.clientHeight || el.videoHeight || 0;
+    } else {
+      h = el.clientHeight || el.naturalHeight || 0;
+    }
+    if (h <= 0) return;
+    const prev = this.mediaHeight.get(p.id) || 0;
+    if (Math.abs(prev - h) < 1) return;
+    this.mediaHeight.set(p.id, h);
+    this.changeDetector.markForCheck();
+  }
+
+  onAsideResizeStart(p: ObjectPreviewPayload, e: PointerEvent) {
+    if (e.button !== 0 || !p?.id || this.isAsideCollapsed(p.id)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.asideResizeId = p.id;
+    this.asideResizeStartX = e.clientX;
+    this.asideResizeStartW = this.asideWidth.get(p.id) ?? ObjectPreviewLayerComponent.ASIDE_WIDTH_DEFAULT;
+    ObjectPreviewService.previewConsumesPointer = true;
+    window.addEventListener('pointermove', this.onAsideResizeMove, true);
+    window.addEventListener('pointerup', this.onAsideResizeUp, true);
+    window.addEventListener('pointercancel', this.onAsideResizeUp, true);
+  }
+
+  private handleAsideResizeMove(e: PointerEvent) {
+    if (!this.asideResizeId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Dragging the left edge: move left → wider.
+    const dx = this.asideResizeStartX - e.clientX;
+    const next = Math.min(
+      ObjectPreviewLayerComponent.ASIDE_WIDTH_MAX,
+      Math.max(ObjectPreviewLayerComponent.ASIDE_WIDTH_MIN, this.asideResizeStartW + dx),
+    );
+    this.asideWidth.set(this.asideResizeId, next);
+    this.ngZone.run(() => this.changeDetector.markForCheck());
+  }
+
+  private handleAsideResizeUp(e: PointerEvent) {
+    if (!this.asideResizeId) return;
+    e.stopPropagation();
+    this.teardownAsideResize();
+    this.ngZone.run(() => this.changeDetector.markForCheck());
+  }
+
+  private teardownAsideResize() {
+    this.asideResizeId = null;
+    window.removeEventListener('pointermove', this.onAsideResizeMove, true);
+    window.removeEventListener('pointerup', this.onAsideResizeUp, true);
+    window.removeEventListener('pointercancel', this.onAsideResizeUp, true);
+    if (!this.dragContentId && !this.windowDragId) {
+      ObjectPreviewService.previewConsumesPointer = false;
+    }
+  }
+
   pinTransient(e?: Event) {
     e?.stopPropagation();
     e?.preventDefault();
@@ -172,6 +279,9 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     e?.stopPropagation();
     this.objectPreview.closePinned(id);
     this.floatPos.delete(id);
+    this.asideWidth.delete(id);
+    this.asideCollapsed.delete(id);
+    this.mediaHeight.delete(id);
   }
 
   unpin(id: string, e?: Event) {
@@ -497,8 +607,21 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
       }
       i++;
     }
+    const live = new Set<string>([
+      ...(this.transient ? [this.transient.id] : []),
+      ...this.pinned.map(p => p.id),
+    ]);
     for (const id of [...this.floatPos.keys()]) {
-      if (!this.pinned.some(p => p.id === id)) this.floatPos.delete(id);
+      if (!live.has(id)) this.floatPos.delete(id);
+    }
+    for (const id of [...this.asideWidth.keys()]) {
+      if (!live.has(id)) this.asideWidth.delete(id);
+    }
+    for (const id of [...this.asideCollapsed.keys()]) {
+      if (!live.has(id)) this.asideCollapsed.delete(id);
+    }
+    for (const id of [...this.mediaHeight.keys()]) {
+      if (!live.has(id)) this.mediaHeight.delete(id);
     }
   }
 

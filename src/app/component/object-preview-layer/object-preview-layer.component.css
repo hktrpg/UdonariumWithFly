@@ -87,25 +87,69 @@
   flex-direction: row;
   align-items: stretch;
   gap: 12px;
-  min-height: 0;
+  /* Floor so tiny cards still leave a readable text column. */
+  min-height: 160px;
   min-width: 0;
   flex: 1 1 auto;
 }
 
+.preview-body:has(.preview-aside.is-collapsed) {
+  gap: 0;
+}
+
 .preview-aside {
-  flex: 0 0 min(280px, 28vw);
-  max-width: 320px;
+  position: relative;
+  flex: 0 0 auto;
+  width: min(280px, 28vw);
+  max-width: min(480px, 42vw);
+  /* Match image column height; long text scrolls instead of stretching the row. */
+  min-height: 0;
   max-height: calc(96vh - 40px);
-  overflow: auto;
-  padding: 12px 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border-radius: 6px;
   background: rgba(247, 242, 232, 0.96);
   color: #2c2418;
   font: 14px/1.45 Georgia, 'Noto Serif TC', serif;
-  white-space: pre-wrap;
-  word-break: break-word;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
+  transition: width 120ms ease, opacity 120ms ease, margin 120ms ease, padding 120ms ease;
+}
+
+.preview-aside .aside-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-aside .aside-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+
+.preview-aside .aside-resize:hover,
+.preview-aside .aside-resize:active {
+  background: rgba(80, 60, 30, 0.18);
+}
+
+.preview-aside.is-collapsed {
+  width: 0 !important;
+  min-width: 0;
+  max-width: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .preview-chrome.is-float .preview-aside {

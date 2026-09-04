@@ -26,6 +26,12 @@
           [attr.aria-label]="'note.previewResetView' | i18n">
           <i class="material-icons">restart_alt</i>
         </button>
+        <button *ngIf="t.asideHtml" type="button" class="nav-btn" data-no-dblclick
+          (click)="toggleAside(t.id, $event)"
+          [attr.title]="(isAsideCollapsed(t.id) ? 'note.previewExpandAside' : 'note.previewCollapseAside') | i18n"
+          [attr.aria-label]="(isAsideCollapsed(t.id) ? 'note.previewExpandAside' : 'note.previewCollapseAside') | i18n">
+          <i class="material-icons">{{ isAsideCollapsed(t.id) ? 'vertical_split' : 'view_sidebar' }}</i>
+        </button>
         <button type="button" class="nav-btn pin-btn" data-no-dblclick
           (click)="pinTransient($event)"
           [attr.title]="'overview.pin' | i18n"
@@ -38,7 +44,7 @@
         </button>
       </div>
     </div>
-    <div class="preview-body">
+    <div class="preview-body" [style.minHeight.px]="bodyMinHeight(t)">
       <div class="preview-content-stage is-preview-stage"
         [class.is-dragging]="isContentDragging(t)"
         [style.transform]="previewTransform(t)"
@@ -48,10 +54,12 @@
         (pointercancel)="onContentPointerUp(t, $event)"
         (dblclick)="onContentDblClick(t, $event)">
         <img *ngIf="!isPdf(t) && !isVideo(t) && t.imageUrl" class="preview-image is-preview-media"
-          [src]="t.imageUrl | safe: 'resourceUrl'" draggable="false" />
+          [src]="t.imageUrl | safe: 'resourceUrl'" draggable="false"
+          (load)="onPreviewMediaLoad(t, $event)" />
         <video *ngIf="isVideo(t)" class="preview-video is-preview-media"
           [src]="resolvedVideoUrl(t) | safe: 'resourceUrl'"
           controls playsinline
+          (loadedmetadata)="onPreviewMediaLoad(t, $event)"
           (pointerdown)="$event.stopPropagation()"></video>
         <canvas *ngIf="isPdf(t)" #pdfCanvas class="preview-pdf is-preview-media"
           [attr.data-preview-id]="t.id"></canvas>
@@ -59,7 +67,13 @@
           [innerHTML]="textHtml(t) | safe: 'html'"></div>
       </div>
       <aside *ngIf="t.asideHtml" class="preview-aside"
-        [innerHTML]="t.asideHtml | safe: 'html'"></aside>
+        [class.is-collapsed]="isAsideCollapsed(t.id)"
+        [ngStyle]="asideStyle(t)">
+        <div class="aside-resize" data-no-dblclick
+          (pointerdown)="onAsideResizeStart(t, $event)"
+          [attr.title]="'note.previewResizeAside' | i18n"></div>
+        <div class="aside-body" [innerHTML]="t.asideHtml | safe: 'html'"></div>
+      </aside>
     </div>
   </div>
 </div>
@@ -98,6 +112,12 @@
           [attr.aria-label]="'note.previewResetView' | i18n">
           <i class="material-icons">restart_alt</i>
         </button>
+        <button *ngIf="p.asideHtml" type="button" class="nav-btn" data-no-dblclick
+          (click)="toggleAside(p.id, $event)"
+          [attr.title]="(isAsideCollapsed(p.id) ? 'note.previewExpandAside' : 'note.previewCollapseAside') | i18n"
+          [attr.aria-label]="(isAsideCollapsed(p.id) ? 'note.previewExpandAside' : 'note.previewCollapseAside') | i18n">
+          <i class="material-icons">{{ isAsideCollapsed(p.id) ? 'vertical_split' : 'view_sidebar' }}</i>
+        </button>
         <button type="button" class="nav-btn pin-btn is-pinned" data-no-dblclick
           (click)="unpin(p.id, $event)"
           [attr.title]="'overview.unpin' | i18n"
@@ -110,7 +130,7 @@
         </button>
       </div>
     </div>
-    <div class="preview-body">
+    <div class="preview-body" [style.minHeight.px]="bodyMinHeight(p)">
       <div class="preview-content-stage is-preview-stage is-float-stage"
         [class.is-dragging]="isContentDragging(p)"
         [style.transform]="previewTransform(p)"
@@ -120,10 +140,12 @@
         (pointercancel)="onContentPointerUp(p, $event)"
         (dblclick)="onContentDblClick(p, $event)">
         <img *ngIf="!isPdf(p) && !isVideo(p) && p.imageUrl" class="preview-image is-preview-media"
-          [src]="p.imageUrl | safe: 'resourceUrl'" draggable="false" />
+          [src]="p.imageUrl | safe: 'resourceUrl'" draggable="false"
+          (load)="onPreviewMediaLoad(p, $event)" />
         <video *ngIf="isVideo(p)" class="preview-video is-preview-media"
           [src]="resolvedVideoUrl(p) | safe: 'resourceUrl'"
           controls playsinline
+          (loadedmetadata)="onPreviewMediaLoad(p, $event)"
           (pointerdown)="$event.stopPropagation()"></video>
         <canvas *ngIf="isPdf(p)" #pdfCanvas class="preview-pdf is-preview-media"
           [attr.data-preview-id]="p.id"></canvas>
@@ -131,7 +153,13 @@
           [innerHTML]="textHtml(p) | safe: 'html'"></div>
       </div>
       <aside *ngIf="p.asideHtml" class="preview-aside"
-        [innerHTML]="p.asideHtml | safe: 'html'"></aside>
+        [class.is-collapsed]="isAsideCollapsed(p.id)"
+        [ngStyle]="asideStyle(p)">
+        <div class="aside-resize" data-no-dblclick
+          (pointerdown)="onAsideResizeStart(p, $event)"
+          [attr.title]="'note.previewResizeAside' | i18n"></div>
+        <div class="aside-body" [innerHTML]="p.asideHtml | safe: 'html'"></div>
+      </aside>
     </div>
   </div>
 </div>
