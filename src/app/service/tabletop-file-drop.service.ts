@@ -42,7 +42,8 @@ import { TerrainBakeCropService } from 'service/terrain-bake-crop.service';
 
 const MEGA = 1024 * 1024;
 const MAX_IMAGE = IMAGE_SOURCE_MAX_BYTES;
-const MAX_PDF = 20 * MEGA;
+/** Keep PDF source cap aligned with image source (50MB). */
+const MAX_PDF = IMAGE_SOURCE_MAX_BYTES;
 const MAX_VIDEO = 50 * MEGA;
 const MAX_AUDIO = 20 * MEGA;
 const MAX_MODEL = MODEL_MAX_FILE_BYTES;
@@ -256,9 +257,9 @@ export class TabletopFileDropService {
       });
       choices.push({
         id: 'cardSheet',
-        label: this.i18n.t(pdfCount > 0 ? 'dropCreate.cardSheetPdf' : 'dropCreate.cardSheet'),
+        label: this.i18n.t('dropCreate.cardSheet'),
         icon: 'grid_on',
-        hint: this.i18n.t(pdfCount > 0 ? 'dropCreate.hint.cardSheetPdf' : 'dropCreate.hint.cardSheet'),
+        hint: this.i18n.t('dropCreate.hint.cardSheet'),
       });
       if (imageCount >= 2) {
         choices.push({
@@ -287,12 +288,12 @@ export class TabletopFileDropService {
         hint: this.i18n.t('dropCreate.hint.coin'),
       });
     } else if (pdfCount > 0) {
-      // PDF-only drop: PnP sheet → deck (notes still offered below).
+      // PDF-only drop: sheet → deck (notes still offered below).
       choices.push({
         id: 'cardSheet',
-        label: this.i18n.t('dropCreate.cardSheetPdf'),
+        label: this.i18n.t('dropCreate.cardSheet'),
         icon: 'grid_on',
-        hint: this.i18n.t('dropCreate.hint.cardSheetPdf'),
+        hint: this.i18n.t('dropCreate.hint.cardSheet'),
       });
     }
     if (noteCount > 0) {
@@ -549,9 +550,10 @@ export class TabletopFileDropService {
   }
 
   /**
-   * TTS / PnP card sheet → CardStack.
-   * Image sheet: optional 2nd image = shared back.
-   * PDF sheet: pages from modal; optional image beside PDF = shared back.
+   * TTS / PnP card sheet → CardStack (unified PDF + image flow).
+   * PDF: pages from modal; optional image beside PDF = shared back.
+   * Images: each image is a sheet page (multi-page like PDF).
+   * Classic single sheet + optional 2nd image as shared back when only 1–2 images and no PDF.
    */
   private async createCardStackFromSheet(
     images: File[],
@@ -559,13 +561,25 @@ export class TabletopFileDropService {
     position: PointerCoordinate,
   ): Promise<boolean> {
     const pdf = pdfs[0] || null;
-    const sheetImage = !pdf ? images[0] : null;
-    if (!pdf && !sheetImage) return false;
+    if (!pdf && !images.length) return false;
+
+    // PDF + companion image → back. Else: 2 images with no PDF → sheet + back.
+    // 3+ images (no PDF) → each image is a sheet page.
+    let sheetImages = images;
+    let backFile: File | null = null;
+    if (pdf) {
+      backFile = images[0] || null;
+      sheetImages = [];
+    } else if (images.length === 2) {
+      sheetImages = [images[0]];
+      backFile = images[1];
+    }
 
     const params = await this.modalService.open<CardSheetImportResult | false>(CardSheetImportComponent, {
-      panelWidth: '420px',
-      previewFile: pdf || sheetImage,
+      panelWidth: '460px',
+      previewFile: pdf || sheetImages[0] || null,
       isPdf: !!pdf,
+      sheetPages: pdf ? undefined : sheetImages,
     });
     if (!params) return false;
 
@@ -574,13 +588,7 @@ export class TabletopFileDropService {
       if (pdf) {
         faceFiles = await this.slicePdfCardSheet(pdf, params);
       } else {
-        faceFiles = await sliceCardSheet(sheetImage!, {
-          cols: params.cols,
-          rows: params.rows,
-          numCards: params.numCards,
-          autoTrim: params.autoTrim,
-          baseName: this.baseName(sheetImage!.name) || 'card',
-        });
+        faceFiles = await this.sliceImageCardSheets(sheetImages, params);
       }
     } catch (err) {
       void this.modalService.open(ConfirmationComponent, {
@@ -594,13 +602,23 @@ export class TabletopFileDropService {
     if (!faceFiles.length) return false;
 
     let backId = this.ensureDefaultCardBack();
-    const backFile = pdf ? images[0] : images[1];
     if (backFile) {
       const back = await ImageStorage.instance.addAsync(backFile);
       backId = back.identifier;
     }
 
     return this.createCardStack(faceFiles, position, backId);
+  }
+
+  private sliceParamsFromResult(params: CardSheetImportResult, baseName: string) {
+    return {
+      cols: params.cols,
+      rows: params.rows,
+      numCards: params.numCards,
+      autoTrim: params.autoTrim,
+      insets: params.insets,
+      baseName,
+    };
   }
 
   private async slicePdfCardSheet(pdf: File, params: CardSheetImportResult): Promise<File[]> {
@@ -610,13 +628,10 @@ export class TabletopFileDropService {
     const all: File[] = [];
     let index = 1;
     for (const page of rendered.pages) {
-      const faces = await sliceCardSheet(page.blob, {
-        cols: params.cols,
-        rows: params.rows,
-        numCards: params.numCards,
-        autoTrim: params.autoTrim,
-        baseName: `${base}-p${page.page}`,
-      });
+      const faces = await sliceCardSheet(
+        page.blob,
+        this.sliceParamsFromResult(params, `${base}-p${page.page}`),
+      );
       for (const face of faces) {
         const renamed = new File(
           [face],
@@ -624,6 +639,36 @@ export class TabletopFileDropService {
           { type: 'image/png' },
         );
         all.push(renamed);
+        index++;
+      }
+    }
+    return all;
+  }
+
+  private async sliceImageCardSheets(images: File[], params: CardSheetImportResult): Promise<File[]> {
+    if (!images.length) return [];
+    const selected = params.pages?.length
+      ? params.pages
+          .map(p => images[p - 1])
+          .filter((f): f is File => !!f)
+      : images;
+    const sources = selected.length ? selected : [images[0]];
+    const base = this.baseName(sources[0].name) || 'card';
+    const all: File[] = [];
+    let index = 1;
+    for (let i = 0; i < sources.length; i++) {
+      const sheet = sources[i];
+      const pageTag = sources.length > 1 ? `-p${i + 1}` : '';
+      const faces = await sliceCardSheet(
+        sheet,
+        this.sliceParamsFromResult(params, `${base}${pageTag}`),
+      );
+      for (const face of faces) {
+        all.push(new File(
+          [face],
+          `${base}-${String(index).padStart(3, '0')}.png`,
+          { type: 'image/png' },
+        ));
         index++;
       }
     }

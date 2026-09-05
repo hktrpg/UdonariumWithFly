@@ -50,7 +50,7 @@ describe('normalizeImageBlob alpha', () => {
     expect(out.didNormalize).toBeTrue();
     expect(out.blob.size).toBeLessThanOrEqual(IMAGE_STORED_MAX_BYTES);
     const img = await loadImage(out.blob);
-    expect(Math.max(img.naturalWidth, img.naturalHeight)).toBeLessThanOrEqual(2048);
+    expect(Math.max(img.naturalWidth, img.naturalHeight)).toBeLessThanOrEqual(3072);
   });
 });
 

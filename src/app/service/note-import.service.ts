@@ -85,7 +85,7 @@ export class NoteImportService {
     if (!kind) return null;
 
     if (kind === 'pdf') {
-      if (file.size > 20 * MEGA) return null;
+      if (file.size > IMAGE_SOURCE_MAX_BYTES) return null;
       const pdf = await PdfStorage.instance.addAsync(file);
       const w = PDF_NOTE_DEFAULT_WIDTH;
       const note = TextNote.create(name, '', 14, w, a4HeightForWidth(w));

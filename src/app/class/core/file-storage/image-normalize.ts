@@ -1,17 +1,17 @@
 const MEGA = 1024 * 1024;
 
-/** Reject source uploads larger than this before decode. */
-export const IMAGE_SOURCE_MAX_BYTES = 20 * MEGA;
+/** Reject source uploads larger than this before decode (aligned with PDF). */
+export const IMAGE_SOURCE_MAX_BYTES = 50 * MEGA;
 /** Stored / synced image should stay at or under this after normalize. */
-export const IMAGE_STORED_MAX_BYTES = 2 * MEGA;
+export const IMAGE_STORED_MAX_BYTES = 4 * MEGA;
 
 /**
  * Hard reject only for absurd decode sizes (decompression bomb / broken SVG).
  * Typical map scans (e.g. 11100×8100) are allowed and downscaled via drawImage.
  */
 const DECODE_ABSURD_EDGE = 32768;
-const TARGET_MAX_EDGE = 2048;
-const FALLBACK_MAX_EDGE = 1600;
+const TARGET_MAX_EDGE = 3072;
+const FALLBACK_MAX_EDGE = 2048;
 const JPEG_QUALITY = 0.85;
 const JPEG_QUALITY_FALLBACK = 0.75;
 
@@ -22,7 +22,7 @@ export type NormalizeImageResult = {
 
 /**
  * Downscale / re-encode an image for room storage.
- * - Longest edge ≤ 2048 (then ≤ 1600 if still over stored max)
+ * - Longest edge ≤ 3072 (then ≤ 2048 if still over stored max)
  * - Oversized sources (beyond old 8k guard) are still accepted and scaled down
  * - PNG kept when alpha present; otherwise JPEG
  * - GIF: first frame only

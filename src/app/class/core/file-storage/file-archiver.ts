@@ -40,7 +40,8 @@ export class FileArchiver {
   /** Source accept cap; stored size is enforced by normalizeImageBlob (≤2MB). */
   private maxImageSize = IMAGE_SOURCE_MAX_BYTES;
   private maxAudioeSize = FileArchiver.MAX_AUDIO_BYTES;
-  private maxPdfSize = 20 * MEGA_BYTE;
+  /** Aligned with IMAGE_SOURCE_MAX_BYTES (50MB). */
+  private maxPdfSize = IMAGE_SOURCE_MAX_BYTES;
   private maxVideoSize = 50 * MEGA_BYTE;
   private loadDepth = 0;
   /** Oversized audio rejected during the current outermost load batch. */

@@ -1,6 +1,17 @@
 /** TTS Custom Deck sheet → individual card face files (left-to-right, top-to-bottom). */
 
-import { CropMarkGrid, cropMarkCells, detectCropMarkGrid } from './card-sheet-trim';
+import {
+  CropMarkGrid,
+  contentRectFromInsets,
+  cropMarkCells,
+  detectSheetGrid,
+  detectSoftMargins,
+} from './card-sheet-trim';
+import {
+  FloorCropInsets,
+  clampFloorCropInsets,
+  emptyFloorCropInsets,
+} from './table-floor-crop';
 
 export type CardSheetSliceParams = {
   cols: number;
@@ -9,11 +20,12 @@ export type CardSheetSliceParams = {
   /** Base name for output files (no extension). Default: sheet */
   baseName?: string;
   /**
-   * When true, detect crop / trim marks and slice on those lines
-   * (removes bleed outside marks, shared edges, and outer crop ticks).
-   * Falls back to equal cols×rows if detection fails.
+   * When true, detect crop / trim marks (or gutters) and slice on those lines
+   * inside the content rect. Falls back to equal cols×rows if detection fails.
    */
   autoTrim?: boolean;
+  /** Outer edge trim percentages (map-style). Applied before grid slice. */
+  insets?: FloorCropInsets;
 };
 
 export type CardSheetSliceErrorCode =
@@ -35,7 +47,7 @@ export class CardSheetSliceError extends Error {
 /**
  * Slice a TTS-style card sheet into one PNG File per card.
  * Card index i (0-based): row = floor(i / cols), col = i % cols.
- * With `autoTrim`, prefer crop-mark grid when detected.
+ * With `autoTrim`, prefer crop-mark / gutter grid when detected.
  */
 export async function sliceCardSheet(
   source: Blob,
@@ -45,6 +57,7 @@ export async function sliceCardSheet(
   const rows = Math.floor(Number(params.rows));
   const numCards = Math.floor(Number(params.numCards));
   const maxSlots = cols * rows;
+  const insets = clampFloorCropInsets(params.insets || emptyFloorCropInsets());
 
   if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols < 1 || rows < 1) {
     throw new CardSheetSliceError('invalid_params', 'cols and rows must be >= 1');
@@ -66,31 +79,42 @@ export async function sliceCardSheet(
     throw new CardSheetSliceError('empty_cell', 'Sheet has no pixels');
   }
 
+  // Manual % trim always defines the content window (even when autoTrim finds marks).
+  const content = contentRectFromInsets(sheetW, sheetH, insets);
   let cells: { x: number; y: number; w: number; h: number }[] | null = null;
   if (params.autoTrim) {
-    const grid = readCropMarksFromImage(img, sheetW, sheetH);
-    if (grid) {
-      const detected = cropMarkCells(grid);
-      const dCols = grid.xs.length - 1;
-      const dRows = grid.ys.length - 1;
-      if (detected.length && dCols === cols && dRows === rows) {
-        cells = detected;
-      } else if (detected.length && detected.length >= numCards) {
-        cells = detected;
-      }
-    }
+    cells =
+      cellsFromMatchingGrid(
+        readSheetGridFromImage(img, sheetW, sheetH, undefined, cols, rows),
+        cols,
+        rows,
+        numCards,
+        content,
+      ) ||
+      cellsFromMatchingGrid(
+        readSheetGridFromImage(img, sheetW, sheetH, content, cols, rows),
+        cols,
+        rows,
+        numCards,
+        null,
+      );
   }
 
   if (!cells) {
-    const cellW = Math.floor(sheetW / cols);
-    const cellH = Math.floor(sheetH / rows);
+    const cellW = Math.floor(content.w / cols);
+    const cellH = Math.floor(content.h / rows);
     if (cellW < 1 || cellH < 1) {
       throw new CardSheetSliceError('empty_cell', `Cell size too small (${cellW}×${cellH})`);
     }
     cells = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        cells.push({ x: c * cellW, y: r * cellH, w: cellW, h: cellH });
+        cells.push({
+          x: content.x + c * cellW,
+          y: content.y + r * cellH,
+          w: cellW,
+          h: cellH,
+        });
       }
     }
   }
@@ -123,11 +147,34 @@ export async function sliceCardSheet(
   return out;
 }
 
-/** Probe crop marks on a decoded sheet image (for UI preview). */
-export function detectSheetCropMarks(img: HTMLImageElement | HTMLCanvasElement): CropMarkGrid | null {
+/** Probe crop marks / gutters on a decoded sheet image (for UI preview). */
+export function detectSheetCropMarks(
+  img: HTMLImageElement | HTMLCanvasElement,
+  content?: { x: number; y: number; w: number; h: number },
+  expectCols?: number,
+  expectRows?: number,
+): CropMarkGrid | null {
   const w = 'naturalWidth' in img ? (img.naturalWidth || img.width) : img.width;
   const h = 'naturalHeight' in img ? (img.naturalHeight || img.height) : img.height;
-  return readCropMarksFromImage(img, w, h);
+  return readSheetGridFromImage(img, w, h, content, expectCols, expectRows);
+}
+
+/** Soft outer paper margins as % insets (seed for map-style sliders). */
+export function detectSheetSoftMargins(img: HTMLImageElement | HTMLCanvasElement): FloorCropInsets {
+  const w = 'naturalWidth' in img ? (img.naturalWidth || img.width) : img.width;
+  const h = 'naturalHeight' in img ? (img.naturalHeight || img.height) : img.height;
+  const probe = document.createElement('canvas');
+  probe.width = w;
+  probe.height = h;
+  const ctx = probe.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return emptyFloorCropInsets();
+  try {
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, w, h);
+    return detectSoftMargins(data, w, h, { channels: 4 });
+  } catch {
+    return emptyFloorCropInsets();
+  }
 }
 
 export function cardSheetSliceErrorI18nKey(err: unknown): string {
@@ -137,10 +184,13 @@ export function cardSheetSliceErrorI18nKey(err: unknown): string {
   return 'cardSheet.error.generic';
 }
 
-function readCropMarksFromImage(
+function readSheetGridFromImage(
   img: CanvasImageSource,
   sheetW: number,
   sheetH: number,
+  content?: { x: number; y: number; w: number; h: number },
+  expectCols?: number,
+  expectRows?: number,
 ): CropMarkGrid | null {
   const probe = document.createElement('canvas');
   probe.width = sheetW;
@@ -150,10 +200,46 @@ function readCropMarksFromImage(
   try {
     ctx.drawImage(img, 0, 0);
     const { data } = ctx.getImageData(0, 0, sheetW, sheetH);
-    return detectCropMarkGrid(data, sheetW, sheetH, { channels: 4 });
+    return detectSheetGrid(data, sheetW, sheetH, {
+      channels: 4,
+      content,
+      expectCols,
+      expectRows,
+    });
   } catch {
     return null;
   }
+}
+
+type SheetCell = { x: number; y: number; w: number; h: number };
+
+/** Use mark/gutter cells only when they match cols×rows; optionally clip to insets. */
+function cellsFromMatchingGrid(
+  grid: CropMarkGrid | null,
+  cols: number,
+  rows: number,
+  numCards: number,
+  clipTo: SheetCell | null,
+): SheetCell[] | null {
+  if (!grid || grid.xs.length - 1 !== cols || grid.ys.length - 1 !== rows) return null;
+  let detected = cropMarkCells(grid);
+  if (clipTo) {
+    detected = detected
+      .map(cell => clipCellToRect(cell, clipTo))
+      .filter((cell): cell is SheetCell => !!cell);
+  }
+  return detected.length >= numCards ? detected : null;
+}
+
+function clipCellToRect(cell: SheetCell, rect: SheetCell): SheetCell | null {
+  const x = Math.max(cell.x, rect.x);
+  const y = Math.max(cell.y, rect.y);
+  const x2 = Math.min(cell.x + cell.w, rect.x + rect.w);
+  const y2 = Math.min(cell.y + cell.h, rect.y + rect.h);
+  const w = Math.floor(x2 - x);
+  const h = Math.floor(y2 - y);
+  if (w < 1 || h < 1) return null;
+  return { x, y, w, h };
 }
 
 function sanitizeBaseName(name: string | undefined): string {

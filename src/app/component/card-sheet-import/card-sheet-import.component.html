@@ -3,48 +3,127 @@
     <header class="card-head">
       <h3>
         <i class="material-icons head-icon" aria-hidden="true">grid_on</i>
-        {{ (isPdf ? 'cardSheet.titlePdf' : 'cardSheet.title') | i18n }}
+        {{ 'cardSheet.title' | i18n }}
       </h3>
     </header>
-    <p class="hint">{{ (isPdf ? 'cardSheet.helpPdf' : 'cardSheet.help') | i18n }}</p>
+    <p class="hint">{{ 'cardSheet.help' | i18n }}</p>
 
-    <div *ngIf="previewLoading" class="sheet-preview-loading">…</div>
-
-    <div *ngIf="previewSafeUrl && !previewLoading" class="sheet-preview" aria-hidden="true">
-      <div class="sheet-preview-frame">
-        <img
-          class="sheet-preview-img"
-          [src]="previewSafeUrl"
-          draggable="false"
-          alt=""
-          (load)="onPreviewImgLoad($event)"
-        />
+    <div *ngIf="showPreviewShell" class="sheet-preview" aria-hidden="true">
+      <div
+        class="sheet-preview-frame"
+        [class.is-busy]="previewLoading"
+        [class.is-panning]="isPanning"
+        [class.is-trim-drag]="isTrimDragging"
+        [class.is-zoomed]="previewZoom > 1"
+        [attr.title]="'cardSheet.wheelZoom' | i18n"
+        (wheel)="onPreviewWheel($event)"
+        (pointerdown)="onPreviewPanDown($event)"
+      >
         <div
-          *ngIf="!useMarkOverlay"
-          class="sheet-grid"
-          [style.gridTemplateColumns]="'repeat(' + safeCols + ', 1fr)'"
-          [style.gridTemplateRows]="'repeat(' + safeRows + ', 1fr)'"
+          class="sheet-preview-stage"
+          [class.no-transition]="isPanning || isTrimDragging"
+          [style.transform]="previewTransform"
         >
+          <img
+            *ngIf="previewSafeUrl"
+            class="sheet-preview-img"
+            [src]="previewSafeUrl"
+            draggable="false"
+            alt=""
+            (load)="onPreviewImgLoad($event)"
+          />
           <div
-            *ngFor="let i of slotIndexes"
-            class="sheet-cell"
-            [class.is-used]="i < safeNumCards"
-            [class.is-skipped]="i >= safeNumCards"
+            *ngIf="previewSafeUrl"
+            class="trim-window"
+            [style.top]="trimWindowStyle.top"
+            [style.right]="trimWindowStyle.right"
+            [style.bottom]="trimWindowStyle.bottom"
+            [style.left]="trimWindowStyle.left"
           ></div>
+          <div
+            *ngIf="previewSafeUrl && !useMarkOverlay"
+            class="sheet-grid"
+            [style.top]="gridInsetStyle.top"
+            [style.right]="gridInsetStyle.right"
+            [style.bottom]="gridInsetStyle.bottom"
+            [style.left]="gridInsetStyle.left"
+            [style.gridTemplateColumns]="'repeat(' + safeCols + ', 1fr)'"
+            [style.gridTemplateRows]="'repeat(' + safeRows + ', 1fr)'"
+          >
+            <div
+              *ngFor="let i of slotIndexes"
+              class="sheet-cell"
+              [class.is-used]="i < safeNumCards"
+              [class.is-skipped]="i >= safeNumCards"
+            ></div>
+          </div>
+          <div *ngIf="previewSafeUrl && useMarkOverlay" class="sheet-mark-overlay">
+            <div
+              *ngFor="let x of markXs"
+              class="sheet-mark-vline"
+              [style.left.%]="x"
+            ></div>
+            <div
+              *ngFor="let y of markYs"
+              class="sheet-mark-hline"
+              [style.top.%]="y"
+            ></div>
+          </div>
+          <ng-container *ngIf="previewSafeUrl">
+            <button
+              type="button"
+              class="trim-handle trim-handle-v"
+              [style.left.%]="trimLinePos('left')"
+              [attr.title]="'cardSheet.trimLeft' | i18n"
+              (pointerdown)="onTrimHandleDown($event, 'left')"
+            ></button>
+            <button
+              type="button"
+              class="trim-handle trim-handle-v"
+              [style.left.%]="trimLinePos('right')"
+              [attr.title]="'cardSheet.trimRight' | i18n"
+              (pointerdown)="onTrimHandleDown($event, 'right')"
+            ></button>
+            <button
+              type="button"
+              class="trim-handle trim-handle-h"
+              [style.top.%]="trimLinePos('top')"
+              [attr.title]="'cardSheet.trimTop' | i18n"
+              (pointerdown)="onTrimHandleDown($event, 'top')"
+            ></button>
+            <button
+              type="button"
+              class="trim-handle trim-handle-h"
+              [style.top.%]="trimLinePos('bottom')"
+              [attr.title]="'cardSheet.trimBottom' | i18n"
+              (pointerdown)="onTrimHandleDown($event, 'bottom')"
+            ></button>
+          </ng-container>
         </div>
-        <div *ngIf="useMarkOverlay" class="sheet-mark-overlay">
-          <div
-            *ngFor="let x of markXs"
-            class="sheet-mark-vline"
-            [style.left.%]="x"
-          ></div>
-          <div
-            *ngFor="let y of markYs"
-            class="sheet-mark-hline"
-            [style.top.%]="y"
-          ></div>
-        </div>
+        <div *ngIf="previewLoading" class="sheet-preview-busy" aria-hidden="true">…</div>
+        <span class="zoom-badge">{{ previewZoom | number:'1.1-1' }}×</span>
+        <button
+          *ngIf="viewAltered"
+          type="button"
+          class="view-reset"
+          [attr.title]="'cardSheet.resetView' | i18n"
+          (pointerdown)="$event.stopPropagation()"
+          (click)="resetPreviewView()"
+        >
+          <i class="material-icons" aria-hidden="true">restart_alt</i>
+        </button>
       </div>
+
+      <div *ngIf="showPageControls" class="sheet-page-nav">
+        <button type="button" class="btn btn-icon" (click)="prevPage()" [disabled]="!canPrevPage" [attr.title]="'cardSheet.prevPage' | i18n">
+          <i class="material-icons" aria-hidden="true">chevron_left</i>
+        </button>
+        <span class="sheet-page-label">{{ 'cardSheet.previewPage' | i18n:{ page: previewPage, count: pageCount } }}</span>
+        <button type="button" class="btn btn-icon" (click)="nextPage()" [disabled]="!canNextPage" [attr.title]="'cardSheet.nextPage' | i18n">
+          <i class="material-icons" aria-hidden="true">chevron_right</i>
+        </button>
+      </div>
+
       <p class="sheet-preview-caption">
         {{ 'cardSheet.previewHint' | i18n }}
         <span *ngIf="autoTrim && detectStatus === 'ok'"> · {{ 'cardSheet.detectOk' | i18n }}</span>
@@ -52,7 +131,7 @@
       </p>
     </div>
 
-    <label *ngIf="isPdf" class="field">
+    <label *ngIf="showPageRange" class="field">
       <span>{{ 'cardSheet.pages' | i18n }}</span>
       <input
         type="text"
@@ -61,10 +140,38 @@
         (keydown.enter)="confirm()"
       />
     </label>
-    <p *ngIf="isPdf" class="hint">
+    <p *ngIf="showPageRange" class="hint">
       {{ 'cardSheet.pagesHint' | i18n:{ count: pageCount || '—' } }}
       <span *ngIf="pageRangeError" class="field-error"> {{ pageRangeError }}</span>
     </p>
+
+    <div class="trim-head">
+      <span class="trim-title">{{ 'cardSheet.manualTrim' | i18n }}</span>
+      <button type="button" class="btn btn-link" (click)="resetInsets()">{{ 'cardSheet.resetTrim' | i18n }}</button>
+    </div>
+    <p class="hint">{{ 'cardSheet.manualTrimHint' | i18n }}</p>
+    <div class="slider-grid">
+      <label class="field">
+        <span>{{ 'cardSheet.trimTop' | i18n }} {{ pct('top') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('top')" (ngModelChange)="setPct('top', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'cardSheet.trimBottom' | i18n }} {{ pct('bottom') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('bottom')" (ngModelChange)="setPct('bottom', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'cardSheet.trimLeft' | i18n }} {{ pct('left') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('left')" (ngModelChange)="setPct('left', $event)" />
+      </label>
+      <label class="field">
+        <span>{{ 'cardSheet.trimRight' | i18n }} {{ pct('right') }}%</span>
+        <input type="range" min="0" [max]="sliderMax" step="0.5"
+          [ngModel]="pct('right')" (ngModelChange)="setPct('right', $event)" />
+      </label>
+    </div>
 
     <label class="field field-check">
       <input type="checkbox" [(ngModel)]="autoTrim" (ngModelChange)="onAutoTrimChange()" />

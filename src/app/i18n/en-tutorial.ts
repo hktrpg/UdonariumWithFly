@@ -181,7 +181,7 @@ Upgraded to 1.13.2`,
   'changelog.2026json': `2026/08/08 Character JSON
 ・JSON for easy import; character sheet “Download as JSON” (CCFOLIA; Ctrl+V on the table to paste)`,
   'changelog.2026note': `2026/08/08 Shared notes・map-mask actions
-・Shared notes: text / image / video (≤50MB mp4・webm) / PDF (≤20MB); drag-import and switch content type
+・Shared notes: text / image / video (≤50MB mp4・webm) / PDF (≤50MB); drag-import and switch content type
 ・Note inventory opens a dedicated settings panel (front/back, scope: this map / all maps, lock, flip, etc.)
 ・“Self only” matches token stealth (owner-bound); hidden from others’ table/inventory; ghosted for owner, visible to GM
 ・GM “Show to players” full-screen handout (optional targets); self-only notes are never room-broadcast
