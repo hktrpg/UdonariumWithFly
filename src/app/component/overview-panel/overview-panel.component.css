@@ -304,8 +304,7 @@
 
 .grid-container-root {
   padding: 0.5em 1.2em;
-  max-height: 250px;
-  overflow: hidden auto;
+  overflow: visible;
   box-sizing: border-box;
   border-left: solid 1px #999;
   border-right: solid 1px #999;

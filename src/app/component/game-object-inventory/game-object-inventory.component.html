@@ -41,6 +41,11 @@
   </form>
 </ng-template>
 <ng-template #inventoryViewSetting>
+  <div class="inv-overview-config-row" *ngIf="!GuestMode()">
+    <button type="button" class="btn btn-sm" [class.is-active]="isOverviewConfigOpen" (click)="toggleOverviewDisplayConfig()">
+      <i class="material-icons">tune</i>{{ 'overviewConfig.title' | i18n }}
+    </button>
+  </div>
   <ng-container *ngIf="isEdit">
     <header class="card-head"><h3>{{ 'inv.settings' | i18n }}</h3></header>
     <div class="field-row wrap">
@@ -59,7 +64,7 @@
     <div class="field-row">
       <label class="field grow">
         <span>{{ 'inv.displayItems' | i18n }}</span>
-        <input [(ngModel)]="dataTag" [placeholder]="'inv.displayItemsPlaceholder' | i18n" />
+        <span class="summary-value">{{ dataTag || '-' }}</span>
       </label>
     </div>
     <div class="actions">
@@ -148,19 +153,19 @@
       <div class="table-cell">
         <div *ngIf="gameObject.rootDataElement">
           <ng-container *ngFor="let dataElm of getInventoryTags(gameObject); trackBy: trackByGameObject">
-            <ng-container *ngTemplateOutlet="dataElmTag; context:{ dataElm: dataElm, name: gameObject.name }"></ng-container>
+            <ng-container *ngTemplateOutlet="dataElmTag; context:{ dataElm: dataElm, name: gameObject.name, character: inventorySendCharacter(gameObject) }"></ng-container>
           </ng-container>
         </div>
       </div>
     </div>
   </div>
 </ng-template>
-<ng-template #dataElmTag let-dataElm="dataElm" let-name="name">
+<ng-template #dataElmTag let-dataElm="dataElm" let-name="name" let-character="character">
   <ng-container *ngIf="dataElm === newLineDataElement"><br></ng-container>
   <div *ngIf="dataElm && dataElm !== newLineDataElement" class="object-tag">
     <ng-container [ngSwitch]="dataElm.attributes['type']">
       <ng-container *ngSwitchCase="'simpleNumber'">
-        <div class="tag-name"><span>{{dataElm.name}}</span></div>
+        <div class="tag-name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span>{{dataElm.name}}</span></div>
         <div style="text-align: center;">
           <div style="display: inline-block;">
             <div class="tag-value-box">
@@ -172,7 +177,7 @@
       </ng-container>
       <ng-container *ngSwitchCase="'numberResource'">
         <div class="resource-tag">
-          <div style="font-size: 0.8em; display: inline-block; margin-right: 0.5em;"><span>{{dataElm.name}}</span></div>
+          <div style="font-size: 0.8em; display: inline-block; margin-right: 0.5em;"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span>{{dataElm.name}}</span></div>
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" class="input resource-value" type="number" size="1" [(ngModel)]="dataElm.currentValue" [placeholder]="'inv.resourcePlaceholder' | i18n" attr.data-init-value="{{ dataElm.currentValue }}" />
         </div>
         <div class="resource-tag">
@@ -181,7 +186,7 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'checkProperty'">
-        <div class="tag-name" [style.textDecoration]="dataElm.value ? 'none' : 'line-through'"><span>{{dataElm.name}}</span> {{ dataElm.checkDisplayValue() }}</div>
+        <div class="tag-name" [style.textDecoration]="dataElm.value ? 'none' : 'line-through'"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span>{{dataElm.name}}</span> {{ dataElm.checkDisplayValue() }}</div>
         <div style="text-align: center;">
           <div style="display: inline-block;">
             <div class="tag-value-box">
@@ -191,7 +196,7 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'abilityScore'">
-        <div class="tag-name"><span>{{dataElm.name}}</span></div>
+        <div class="tag-name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span>{{dataElm.name}}</span></div>
         <div style="text-align: center;">
           <div style="display: inline-block;">
             <div class="tag-value-box">
@@ -203,7 +208,7 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'url'">
-        <div class="tag-name"><span *ngIf="!stringUtil.validUrl(dataElm.value)" [title]="'char.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
+        <div class="tag-name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span *ngIf="!stringUtil.validUrl(dataElm.value)" [title]="'char.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
           (click)="stringUtil.validUrl(dataElm.value) ? openUrl(dataElm.value, name, dataElm.name) : false"><span class="url-link">{{dataElm.name}}</span></a></div>
       </ng-container>
       <ng-container *ngSwitchCase="'colors'"></ng-container>
@@ -211,7 +216,7 @@
       <ng-container *ngSwitchCase="'note'"></ng-container>
       <ng-container *ngSwitchDefault>
         <ng-container *ngIf="0 == dataElm.children.length">
-          <div class="tag-name"><span>{{dataElm.name}}</span></div>
+          <div class="tag-name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span>{{dataElm.name}}</span></div>
           <div style="text-align: center;">
             <div style="display: inline-block;">
               <div class="tag-value-box">

@@ -9,6 +9,7 @@ import { StandList } from './stand-list';
 import { Network } from './core/system';
 import { PeerCursor } from './peer-cursor';
 import { ObjectStore } from './core/synchronize-object/object-store';
+import { parseDataTags } from './overview-data-tag.util';
 import { translate } from 'i18n';
 import type { CharacterToken } from './character-token';
 
@@ -48,6 +49,20 @@ export class GameCharacter extends TabletopObject {
    * Chat-window auto links use {@link claimAutoVision} instead and do not write here.
    */
   @SyncVar() visionOwner: string = '';
+  /** When true, overview/inventory tags come from {@link overviewDataTag} instead of the room default. */
+  @SyncVar() useCustomOverviewDataTag: boolean = false;
+  /** Space-separated tag names for per-character overview/inventory display (same format as room dataTag). */
+  @SyncVar() overviewDataTag: string = '';
+
+  private _overviewDataTags: string[];
+  private _overviewDataTagCache: string;
+  get overviewDataTags(): string[] {
+    if (this._overviewDataTagCache !== this.overviewDataTag) {
+      this._overviewDataTagCache = this.overviewDataTag;
+      this._overviewDataTags = parseDataTags(this.overviewDataTag);
+    }
+    return this._overviewDataTags;
+  }
 
   /** Session-only: Advanced copy applies auto-number to Token/Character clones. */
   static menuCloneAutoNumber = false;

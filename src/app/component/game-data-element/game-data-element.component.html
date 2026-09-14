@@ -16,16 +16,12 @@
     </div>
     <div class="table-cell table-cell_solid table-cell_name">
       <ng-container *ngIf="isTagLocked">
-        <button *ngIf="!isCommonValue" type="button" [attr.title]="'sheet.sendToChat' | i18n" style="vertical-align: middle; padding: 0 2px;" (click)="sendLogMessage()">
-          <i class="material-icons" style="font-size: 1rem;">send</i>
-        </button>
+        <data-element-send-button *ngIf="!isCommonValue" [dataElm]="gameDataElement" [character]="sendCharacter" [snapshot]="sendSnapshot"></data-element-send-button>
         <span style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</span>
         <ng-container *ngIf="descriptionType === 'character' && name === 'height'"><br><span style="font-size: 0.4rem">{{ 'sheet.data.heightImage' | i18n }}</span></ng-container>
       </ng-container>
       <ng-container *ngIf="!isTagLocked">
-        <button type="button" [attr.title]="'sheet.sendToChat' | i18n" (click)="sendLogMessage()">
-          <i class="material-icons icon-size">send</i>
-        </button>
+        <data-element-send-button [dataElm]="gameDataElement" [character]="sendCharacter" [snapshot]="sendSnapshot"></data-element-send-button>
         <div class="hidden-spacer" style="font-family: Cambria, Georgia; font-size: 0.9rem;">{{name}}</div>
         <input style="width:100%; min-width:10px; font-family: Cambria, Georgia; font-size: 0.9rem;" size="1"
           [(ngModel)]="name" [placeholder]="'sheet.placeholder.value' | i18n" />

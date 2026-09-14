@@ -1,0 +1,79 @@
+<div class="settings-ui dense overview-display-config" appFitPanel [fitMinHeight]="280" [class.is-disabled]="GuestMode()">
+  <section class="card card-dense" *ngIf="canEditCharacterScope">
+    <div class="btn-group scope-group">
+      <button type="button" class="btn btn-sm" [class.is-active]="scopeMode === 'global'" (click)="setScopeMode('global')">
+        {{ 'overviewConfig.scopeGlobal' | i18n }}
+      </button>
+      <button type="button" class="btn btn-sm" [class.is-active]="scopeMode === 'character'" (click)="setScopeMode('character')">
+        {{ 'overviewConfig.scopeCharacter' | i18n }}
+      </button>
+    </div>
+  </section>
+
+  <section class="card card-dense" *ngIf="mode === 'inventory' && previewCharacters.length">
+    <label class="field">
+      <span>{{ 'overviewConfig.previewCharacter' | i18n }}</span>
+      <select [ngModel]="previewCharacter?.identifier" (ngModelChange)="onPreviewCharacterChange($event)">
+        <option *ngFor="let ch of previewCharacters" [value]="ch.identifier">{{ ch.name }}</option>
+      </select>
+    </label>
+  </section>
+
+  <section class="card card-dense">
+    <header class="card-head"><h3>{{ 'overviewConfig.selectedFields' | i18n }}</h3></header>
+    <div class="selected-list"
+      (dragover)="onSelectedListDragOver($event)"
+      (drop)="onSelectedListDrop($event)"
+      (dragleave)="onSelectedListDragLeave($event)">
+      <ng-container *ngFor="let tag of selectedTags; let i = index">
+        <div class="drop-slot" [class.is-active]="dropIndex === i"></div>
+        <div class="selected-row"
+          [class.is-missing]="tagIsMissing(tag)"
+          [class.is-break]="isNewlineTag(tag)"
+          draggable="true"
+          (dragstart)="onSelectedDragStart($event, i)"
+          (dragend)="onDragEnd()">
+          <button type="button" class="row-drag" tabindex="-1" [attr.title]="'overviewConfig.dragToReorder' | i18n">
+            <i class="material-icons">drag_handle</i>
+          </button>
+          <div class="row-body">
+            <div class="line-break-row" *ngIf="isNewlineTag(tag)">{{ tagChipLabel(tag) }}</div>
+              <overview-summary-field *ngIf="!isNewlineTag(tag) && resolveTagElement(tag) as dataElm"
+                [dataElm]="dataElm"
+                [character]="previewCharacter ?? character"
+                [showSendButton]="true"></overview-summary-field>
+            <div class="preview-missing" *ngIf="tagIsMissing(tag)">
+              {{ tag }} — {{ 'overviewConfig.notInList' | i18n }}
+            </div>
+          </div>
+          <button type="button" class="row-remove" (click)="removeTag(i); $event.stopPropagation()" [attr.title]="'overviewConfig.removeFromList' | i18n">
+            <i class="material-icons">close</i>
+          </button>
+        </div>
+      </ng-container>
+      <div class="drop-slot" [class.is-active]="dropIndex === selectedTags.length"></div>
+      <p class="empty-hint" *ngIf="!selectedTags.length">{{ 'overviewConfig.selectedEmpty' | i18n }}</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-sm" (click)="addSeparator()">{{ 'overviewConfig.addSeparator' | i18n }}</button>
+      <button type="button" class="btn btn-sm" (click)="resetDefault()">{{ 'overviewConfig.resetDefault' | i18n }}</button>
+    </div>
+  </section>
+
+  <section class="card card-dense">
+    <header class="card-head"><h3>{{ 'overviewConfig.availableFields' | i18n }}</h3></header>
+    <div class="pool-list">
+      <button type="button" class="pool-chip"
+        *ngFor="let field of availableFields"
+        draggable="true"
+        (click)="addField(field)"
+        (dragstart)="onPoolDragStart($event, field.name)"
+        (dragend)="onDragEnd()">
+        <span class="pool-name">{{ field.name }}</span>
+        <span class="pool-type">{{ fieldTypeLabel(field) }}</span>
+      </button>
+      <p class="empty-hint" *ngIf="allFieldsSelected">{{ 'overviewConfig.allFieldsAdded' | i18n }}</p>
+      <p class="empty-hint" *ngIf="!availableFields.length && !allFieldsSelected">{{ 'overviewConfig.noFields' | i18n }}</p>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,139 @@
+.overview-display-config.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.overview-display-config .scope-group {
+  display: flex;
+  width: 100%;
+}
+
+.overview-display-config .scope-group .btn {
+  flex: 1 1 0;
+}
+
+.overview-display-config .btn.btn-sm.is-active {
+  background: #6d543a;
+  border-color: #5c4630;
+  color: #fffaf2;
+}
+
+.selected-list,
+.pool-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #c4b29a;
+  background: #fffdf8;
+}
+
+.selected-list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.drop-slot {
+  flex: 0 0 4px;
+  margin: 1px 0;
+  border-radius: 2px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.drop-slot.is-active {
+  background: rgba(109, 84, 58, 0.45);
+}
+
+.selected-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #d2c2ab;
+  cursor: grab;
+}
+
+.selected-row:active {
+  cursor: grabbing;
+}
+
+.selected-row.is-missing {
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.selected-row.is-break .row-body {
+  text-align: center;
+}
+
+.row-drag,
+.row-remove {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #7a6a58;
+  padding: 0;
+  cursor: inherit;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.row-drag .material-icons,
+.row-remove .material-icons {
+  font-size: 18px;
+}
+
+.row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.row-body overview-summary-field {
+  display: block;
+  width: 100%;
+}
+
+.line-break-row {
+  font-size: 11px;
+  font-style: italic;
+  color: #7a6a58;
+  padding: 2px 0;
+  border-top: 1px dashed #c4b29a;
+  border-bottom: 1px dashed #c4b29a;
+}
+
+.pool-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 1px solid #d2c2ab;
+  background: #fff;
+  color: #3a2f24;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: grab;
+  min-width: 72px;
+}
+
+.pool-name {
+  font-weight: 700;
+}
+
+.pool-type {
+  font-size: 10px;
+  color: #7a6a58;
+}
+
+.preview-missing {
+  color: #a33;
+  font-style: italic;
+  font-size: 11px;
+}

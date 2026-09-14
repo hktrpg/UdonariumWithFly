@@ -6,6 +6,7 @@ import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { DataElement } from '@udonarium/data-element';
 import { DataSummarySetting, SortOrder } from '@udonarium/data-summary-setting';
 import { GameCharacter } from '@udonarium/game-character';
+import { isOverviewTagNewline } from '@udonarium/overview-data-tag.util';
 import { TabletopObject } from '@udonarium/tabletop-object';
 
 type ObjectIdentifier = string;
@@ -26,35 +27,56 @@ export class GameObjectInventoryService {
   set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
   get dataTags(): string[] { return this.summarySetting.dataTags; }
 
+  resolveDataTags(character?: GameCharacter | null): string[] {
+    if (character instanceof GameCharacter
+      && character.useCustomOverviewDataTag
+      && 0 < (character.overviewDataTag || '').trim().length) {
+      return character.overviewDataTags;
+    }
+    return this.dataTags;
+  }
+
   /**
    * Build inventory-summary DataElements for any character body.
    * Used by overview for temporary copies that are excluded from inventory lists.
    */
   summaryElementsFor(object: TabletopObject): DataElement[] {
     if (!object?.detailDataElement) return [];
-    const newLine = '/';
-    return this.dataTags.map(tag =>
-      (newLine === StringUtil.toHalfWidth(tag))
+    const tags = object instanceof GameCharacter ? this.resolveDataTags(object) : this.dataTags;
+    return tags.map(tag =>
+      isOverviewTagNewline(tag)
         ? this.newLineDataElement
         : object.detailDataElement.getFirstElementByNameUnsensitive(tag)
     );
   }
 
+  collectDisplayableFields(character: GameCharacter): DataElement[] {
+    if (!character?.detailDataElement) return [];
+    const result: DataElement[] = [];
+    const walk = (element: DataElement) => {
+      if (element.children.length < 1) {
+        result.push(element);
+        return;
+      }
+      for (const child of element.children) {
+        if (child instanceof DataElement) walk(child);
+      }
+    };
+    for (const child of character.detailDataElement.children) {
+      if (child instanceof DataElement) walk(child);
+    }
+    return result;
+  }
+
   /** Every character (all maps + inventories + graveyard). Temporary copies stay off the list. */
-  allInventory: ObjectInventory = new ObjectInventory(object => !object.isTemporaryCopy);
+  allInventory: ObjectInventory;
   /** Bodies that have a Token on the currently viewed map. */
-  tableInventory: ObjectInventory = new ObjectInventory(object => {
-    if (!(object instanceof GameCharacter) || object.isTemporaryCopy) return false;
-    return CharacterToken.tokensOnTable(object.identifier).length > 0;
-  });
+  tableInventory: ObjectInventory;
   /** Common inventory for the currently viewed map only. */
-  commonInventory: ObjectInventory = new ObjectInventory(object =>
-    !object.isTemporaryCopy && !this.isAnyLocation(object.location.name) && object.isInventoryForCurrentView());
-  privateInventory: ObjectInventory = new ObjectInventory(object =>
-    !object.isTemporaryCopy && object.location.name === Network.peerId && object.isInventoryForCurrentView());
+  commonInventory: ObjectInventory;
+  privateInventory: ObjectInventory;
   /** Room-wide graveyard (shared across all maps). */
-  graveyardInventory: ObjectInventory = new ObjectInventory(object =>
-    !object.isTemporaryCopy && object.location.name === 'graveyard');
+  graveyardInventory: ObjectInventory;
 
   indicateAll: boolean = false;
   
@@ -71,11 +93,24 @@ export class GameObjectInventoryService {
   private placementsMap: Map<ObjectIdentifier, string> = new Map();
   private tagNameMap: Map<ObjectIdentifier, ElementName> = new Map();
   private tokenPresenceMap: Map<ObjectIdentifier, string> = new Map();
+  private overviewTagMap: Map<ObjectIdentifier, string> = new Map();
 
   static _newLineDataElement = createMockElement('/');
   get newLineDataElement(): DataElement { return GameObjectInventoryService._newLineDataElement; }
 
   constructor() {
+    const summaryResolver = (object: TabletopObject) => this.summaryElementsFor(object);
+    this.allInventory = new ObjectInventory(object => !object.isTemporaryCopy, summaryResolver);
+    this.tableInventory = new ObjectInventory(object => {
+      if (!(object instanceof GameCharacter) || object.isTemporaryCopy) return false;
+      return CharacterToken.tokensOnTable(object.identifier).length > 0;
+    }, summaryResolver);
+    this.commonInventory = new ObjectInventory(object =>
+      !object.isTemporaryCopy && !this.isAnyLocation(object.location.name) && object.isInventoryForCurrentView(), summaryResolver);
+    this.privateInventory = new ObjectInventory(object =>
+      !object.isTemporaryCopy && object.location.name === Network.peerId && object.isInventoryForCurrentView(), summaryResolver);
+    this.graveyardInventory = new ObjectInventory(object =>
+      !object.isTemporaryCopy && object.location.name === 'graveyard', summaryResolver);
     this.initialize();
   }
 
@@ -107,11 +142,18 @@ export class GameObjectInventoryService {
             this.placementsMap.set(object.identifier, placementsKey);
             this.refresh();
           }
+          const overviewKey = `${object.useCustomOverviewDataTag ? 1 : 0}|${object.overviewDataTag || ''}`;
+          const prevOverview = this.overviewTagMap.get(object.identifier);
+          if (overviewKey !== prevOverview) {
+            this.overviewTagMap.set(object.identifier, overviewKey);
+            this.refreshDataElements();
+            this.callInventoryUpdate();
+          }
         } else if (object instanceof DataElement) {
           if (!this.containsInGameCharacter(object)) return;
 
           let prevName = this.tagNameMap.get(object.identifier);
-          if ((this.dataTags.includes(prevName) || this.dataTags.includes(object.name)) && object.name !== prevName) {
+          if (object.name !== prevName) {
             this.tagNameMap.set(object.identifier, object.name);
             this.refreshDataElements();
           }
@@ -135,6 +177,7 @@ export class GameObjectInventoryService {
         this.tableIdMap.delete(event.data.identifier);
         this.tagNameMap.delete(event.data.identifier);
         this.tokenPresenceMap.delete(event.data.identifier);
+        this.overviewTagMap.delete(event.data.identifier);
         this.refresh();
       })
       .on('SYNCHRONIZE_FILE_LIST', event => {
@@ -201,9 +244,6 @@ export class GameObjectInventoryService {
 }
 
 class ObjectInventory {
-  newLineString: string = '/';
-  private newLineDataElement: DataElement = GameObjectInventoryService._newLineDataElement;
-
   private get summarySetting(): DataSummarySetting { return DataSummarySetting.instance; }
 
   get sortTag(): string { return this.summarySetting.sortTag; }
@@ -246,8 +286,7 @@ class ObjectInventory {
       let caches = this.tabletopObjects;
       for (let object of caches) {
         if (!object.detailDataElement) continue;
-        let elements = this.dataTags.map(tag => (this.newLineString === StringUtil.toHalfWidth(tag)) ? this.newLineDataElement : object.detailDataElement.getFirstElementByNameUnsensitive(tag));
-        this._dataElementMap.set(object.identifier, elements);
+        this._dataElementMap.set(object.identifier, this.summaryResolver(object));
       }
       this.needsRefreshElements = false;
     }
@@ -259,7 +298,8 @@ class ObjectInventory {
   private needsSort: boolean = true;
 
   constructor(
-    readonly classifier: (object: TabletopObject) => boolean
+    readonly classifier: (object: TabletopObject) => boolean,
+    private readonly summaryResolver: (object: TabletopObject) => DataElement[]
   ) { }
 
   refreshObjects() {

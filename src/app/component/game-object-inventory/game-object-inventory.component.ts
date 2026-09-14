@@ -28,6 +28,7 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 import { SelectionState, TabletopSelectionService } from 'service/tabletop-selection.service';
 import { CharacterFxMenuService } from 'service/character-fx-menu.service';
 import { I18nService } from 'service/i18n.service';
+import { OverviewDisplayConfigService } from 'service/overview-display-config.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
 import { hasStatus } from '@udonarium/table-fx/character-status';
 import { buildMatrixRainColumns, imageEffectFilter, imageEffectOpacity, imageEffectTransform, MatrixRainColumn } from '@udonarium/table-fx/image-effect';
@@ -84,6 +85,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   panelId;
 
   isEdit: boolean = false;
+  private unsubscribeOverviewConfig: (() => void) | null = null;
 
   stringUtil = StringUtil;
   private sortStopTimerId = null;
@@ -121,6 +123,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     private characterFxMenu: CharacterFxMenuService,
     private tabletopActionService: TabletopActionService,
     private i18n: I18nService,
+    private overviewDisplayConfigService: OverviewDisplayConfigService,
   ) { }
 
   GuestMode() {
@@ -129,6 +132,7 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
+    this.unsubscribeOverviewConfig = this.overviewDisplayConfigService.subscribe(() => this.changeDetector.markForCheck());
     Promise.resolve().then(() => this.refreshPanelTitle());
     EventSystem.register(this)
       .on('SELECT_TABLETOP_OBJECT', event => {
@@ -165,9 +169,16 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
     this.panelId = UUID.generateUuid();
   }
 
+  get isOverviewConfigOpen(): boolean {
+    return this.overviewDisplayConfigService.isOpen
+      && this.overviewDisplayConfigService.mode === 'inventory';
+  }
+
   ngOnDestroy() {
+    this.unsubscribeOverviewConfig?.();
     EventSystem.unregister(this);
     if (this.sortStopTimerId) clearTimeout(this.sortStopTimerId);
+    if (this.isOverviewConfigOpen) this.overviewDisplayConfigService.close();
   }
 
   getTabTitle(inventoryType: string) {
@@ -228,9 +239,11 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
   }
 
   getInventoryTags(gameObject: GameCharacter): DataElement[] {
-    // Always resolve from allInventory: tableInventory only has the current map,
-    // so other-map tokens in the All tab would otherwise get empty tags.
-    return this.inventoryService.allInventory.dataElementMap.get(gameObject.identifier) || [];
+    return this.inventoryService.summaryElementsFor(gameObject);
+  }
+
+  inventorySendCharacter(gameObject: TabletopObject): GameCharacter | null {
+    return gameObject instanceof GameCharacter ? gameObject : null;
   }
 
   /** Blank area: block browser menu (item menus call stopPropagation). */
@@ -709,6 +722,16 @@ export class GameObjectInventoryComponent implements OnInit, OnDestroy {
 
   toggleEdit() {
     this.isEdit = !this.isEdit;
+  }
+
+  toggleOverviewDisplayConfig() {
+    if (this.GuestMode()) return;
+    if (this.isOverviewConfigOpen) {
+      this.overviewDisplayConfigService.close();
+    } else {
+      this.overviewDisplayConfigService.open({ mode: 'inventory' });
+    }
+    this.changeDetector.markForCheck();
   }
 
   cleanInventory() {

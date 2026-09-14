@@ -1,0 +1,18 @@
+:host {
+  display: inline-flex;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+.send-btn {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+  color: inherit;
+}
+
+.send-btn .material-icons {
+  font-size: 1rem;
+}

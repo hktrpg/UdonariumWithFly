@@ -1,0 +1,33 @@
+<data-element-send-button *ngIf="showSendButton && character && dataElm" [dataElm]="dataElm" [character]="character"></data-element-send-button>
+<ng-container *ngIf="dataElm" [ngSwitch]="dataElm.type">
+  <ng-container *ngSwitchCase="'numberResource'">
+    <span class="field-name">{{ dataElm.name }}</span>
+    <span class="field-value resource-value">{{ dataElm.currentValue }} / {{ dataElm.value || '?' }}</span>
+    <div class="resource-bar" *ngIf="dataElm.value">
+      <div class="resource-bar-fill" [style.width.%]="resourcePercent(dataElm)"></div>
+    </div>
+  </ng-container>
+  <ng-container *ngSwitchCase="'abilityScore'">
+    <span class="field-name">{{ dataElm.name }}</span>
+    <span class="field-value">
+      {{ dataElm.value }}
+      <ng-container *ngIf="dataElm.currentValue">({{ (dataElm.calcAbilityScore() >= 0 ? '+' : '') + dataElm.calcAbilityScore() }})</ng-container>
+    </span>
+  </ng-container>
+  <ng-container *ngSwitchCase="'checkProperty'">
+    <span class="field-name" [class.is-off]="!dataElm.value">{{ dataElm.name }}</span>
+    <span class="field-value">{{ checkValue(dataElm) }}</span>
+  </ng-container>
+  <ng-container *ngSwitchCase="'simpleNumber'">
+    <span class="field-name">{{ dataElm.name }}</span>
+    <span class="field-value">{{ dataElm.value }}</span>
+  </ng-container>
+  <ng-container *ngSwitchCase="'note'">
+    <span class="field-name">{{ dataElm.name }}</span>
+    <span class="field-value field-note">{{ dataElm.value }}</span>
+  </ng-container>
+  <ng-container *ngSwitchDefault>
+    <span class="field-name">{{ dataElm.name }}</span>
+    <span class="field-value">{{ dataElm.value }}</span>
+  </ng-container>
+</ng-container>

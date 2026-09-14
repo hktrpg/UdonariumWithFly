@@ -103,6 +103,9 @@ import { DiceSettingsComponent } from './component/dice-settings/dice-settings.c
 import { RangeSettingsComponent } from './component/range-settings/range-settings.component';
 import { CharacterSettingsComponent } from './component/character-settings/character-settings.component';
 import { CharacterResourceHudComponent } from './component/character-resource-hud/character-resource-hud.component';
+import { OverviewDisplayConfigComponent } from './component/overview-display-config/overview-display-config.component';
+import { OverviewSummaryFieldComponent } from './component/overview-summary-field/overview-summary-field.component';
+import { DataElementSendButtonComponent } from './component/data-element-send-button/data-element-send-button.component';
 import { HandRailComponent } from './component/hand-rail/hand-rail.component';
 import { MusicHudComponent } from './component/music-hud/music-hud.component';
 import { CombatAnnounceComponent } from './component/combat-announce/combat-announce.component';
@@ -208,6 +211,9 @@ import '@udonarium/table-fx/table-timer';
     RangeSettingsComponent,
     CharacterSettingsComponent,
     CharacterResourceHudComponent,
+    OverviewDisplayConfigComponent,
+    OverviewSummaryFieldComponent,
+    DataElementSendButtonComponent,
     HandRailComponent,
     MusicHudComponent,
     CombatTrackerComponent,

@@ -1,15 +1,12 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
-import { ChatTab } from '@udonarium/chat-tab';
 import { EventSystem } from '@udonarium/core/system';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { DataElement } from '@udonarium/data-element';
 import { checkPropertySheetValue } from '@udonarium/check-property-display';
 import { parseNoteFieldHeightPx } from '@udonarium/note-field-height';
 import { GameCharacter } from '@udonarium/game-character';
-import { PeerCursor } from '@udonarium/peer-cursor';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
-import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
 import { I18nService } from 'service/i18n.service';
 
@@ -39,6 +36,14 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
   }
 
   stringUtil = StringUtil;
+
+  get sendCharacter(): GameCharacter | null {
+    return this.tabletopObject instanceof GameCharacter ? this.tabletopObject : null;
+  }
+
+  get sendSnapshot() {
+    return { name: this.name, value: this.value, currentValue: this.currentValue };
+  }
 
   private _name: string = '';
   get name(): string { return this._name; }
@@ -114,7 +119,6 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
 
   constructor(
     private changeDetector: ChangeDetectorRef,
-    private chatMessageService: ChatMessageService,
     private modalService: ModalService,
     private i18n: I18nService
   ) { }
@@ -219,34 +223,6 @@ export class GameDataElementComponent implements OnInit, OnDestroy {
     } else {
       this.modalService.open(OpenUrlComponent, { url: url, title: this.tabletopObjectName, subTitle: this.name });
     } 
-  }
-
-  /** Send field value (or current/max) + name to the first chat tab for quick dice/commands. */
-  sendLogMessage() {
-    const chatTabs = this.chatMessageService.chatTabs;
-    if (!chatTabs || chatTabs.length < 1) return;
-
-    const chatTab: ChatTab = chatTabs[0];
-    let payload = `${this.value ?? ''}`;
-    if (this.currentValue !== '' && this.currentValue != null) {
-      payload = `${this.currentValue}/${this.value}`;
-    }
-    let text = `${payload} ${this.name}`.trim();
-    if (!text) return;
-
-    const sendFrom = (this.tabletopObject instanceof GameCharacter)
-      ? this.tabletopObject.identifier
-      : PeerCursor.myCursor.identifier;
-    let gameType = this.chatMessageService.gameType || 'DiceBot';
-
-    // Same {} / ｛｝ ability TAG expansion as chat palette (e.g. 2d6+{敏捷} in 戰鬥特技).
-    if (this.tabletopObject instanceof GameCharacter && this.tabletopObject.chatPalette) {
-      const palette = this.tabletopObject.chatPalette;
-      text = palette.evaluate(text, this.tabletopObject.rootDataElement);
-      if (palette.dicebot) gameType = palette.dicebot;
-    }
-
-    this.chatMessageService.sendMessage(chatTab, text, gameType, sendFrom);
   }
 
   private setValues(object: DataElement) {
