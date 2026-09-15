@@ -37,11 +37,13 @@
   color: #bbb;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .pin-button .material-icons {
   font-size: 18px;
   transform: rotate(45deg);
+  transition: transform 140ms ease;
 }
 
 .pin-button.is-pinned {
@@ -54,8 +56,18 @@
   transform: none;
 }
 
-.pin-button:hover {
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  .pin-button:hover {
+    color: #fff;
+    border-color: #aaa;
+    background: rgba(72, 72, 72, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+    transform: scale(1.06);
+  }
+
+  .pin-button:active {
+    transform: scale(0.96);
+  }
 }
 
 .component-content {
@@ -100,11 +112,25 @@
   padding: 0 1em;
 }
 
+.title-background,
+.title-bg-area,
+.title-area.component-title {
+  transition: filter 150ms ease, background-color 150ms ease;
+}
+
 .title-background {
   background-color: #555;
   border-top: solid 1px #999;
   border-left: solid 1px #999;
   border-right: solid 1px #999;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .title-background:hover,
+  .title-bg-area:hover,
+  .title-area.component-title:hover {
+    filter: brightness(1.14);
+  }
 }
 
 .component-owner {
@@ -150,15 +176,35 @@
   left : 8px;
   bottom: -21px;
   width: 42px;
-  height: 42px; 
-  border-radius: 100px; 
+  height: 42px;
+  border-radius: 100px;
   padding: 4px;
   cursor: zoom-in;
+  border: 1px solid #777;
+  background: rgba(60, 60, 60, 0.88);
+  color: #bbb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .zoom-button > .material-icons {
   font-size: 24px;
   vertical-align: bottom;
+  transition: transform 140ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .zoom-button:hover {
+    color: #fff;
+    border-color: #aaa;
+    background: rgba(72, 72, 72, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+    transform: scale(1.06);
+  }
+
+  .zoom-button:active {
+    transform: scale(0.96);
+  }
 }
 
 .position-right-bottom {
@@ -472,6 +518,40 @@ input[type=number]:hover, input[type=number]:focus {
   pointer-events: auto;
 }
 
+.component ::ng-deep .send-btn {
+  border-radius: 3px;
+  transition: transform 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .component ::ng-deep .send-btn:hover {
+    transform: scale(1.12);
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-button,
+  .pin-button .material-icons,
+  .zoom-button,
+  .zoom-button > .material-icons,
+  .title-background,
+  .title-bg-area,
+  .title-area.component-title,
+  .component ::ng-deep .send-btn {
+    transition: none;
+  }
+
+  .pin-button:hover,
+  .pin-button:active,
+  .zoom-button:hover,
+  .zoom-button:active,
+  .component ::ng-deep .send-btn:hover {
+    transform: none;
+  }
+}
+
 /**************** input-range ****************/
 
 input[type='range'] {
@@ -701,14 +781,6 @@ button.link:disabled:hover {
   #fff 0px 0px 2px,
   #fff 0px 0px 2px,
   #fff 0px 0px 2px;
-}
-
-.is-pointer-events-none {
-  pointer-events: none;
-}
-
-.is-pointer-events-auto {
-  pointer-events: auto;
 }
 
 .hide-area {

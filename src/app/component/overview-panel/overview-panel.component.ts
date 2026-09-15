@@ -269,7 +269,13 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   get newLineDataElement(): DataElement { return this.inventoryService.newLineDataElement; }
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
-  get pointerEventsStyle(): any { return { 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }; }
+  pointerEventsNgClass(extra: Record<string, boolean> = {}): Record<string, boolean> {
+    return {
+      ...extra,
+      'is-pointer-events-auto': !this.isPointerDragging,
+      'pointer-events-none': this.isPointerDragging,
+    };
+  }
 
   isOpenImageView: boolean = false;
 
