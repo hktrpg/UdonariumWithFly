@@ -56,11 +56,6 @@
   transition: border-color var(--udon-motion-fast) var(--udon-ease-standard), background var(--udon-motion-fast) var(--udon-ease-standard), box-shadow var(--udon-motion-fast) var(--udon-ease-standard);
 }
 
-.choice-tile:hover {
-  background: #fff7eb;
-  border-color: #b89b78;
-}
-
 .choice-tile.is-selected {
   border-color: #5c4630;
   background: linear-gradient(180deg, #fff4e4 0%, #f3e4cc 100%);

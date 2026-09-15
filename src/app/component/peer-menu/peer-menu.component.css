@@ -419,10 +419,6 @@
   margin: 0;
 }
 
-.mesh-diag-icon:hover:not(:disabled) {
-  color: #334155;
-}
-
 .mesh-diag-icon:disabled {
   color: #94a3b8;
   cursor: default;

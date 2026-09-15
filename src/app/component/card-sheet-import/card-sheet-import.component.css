@@ -143,10 +143,6 @@
   font-size: 16px;
 }
 
-.view-reset:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
 /* Dim outside the content window; keep cards readable inside. */
 .trim-window {
   position: absolute;

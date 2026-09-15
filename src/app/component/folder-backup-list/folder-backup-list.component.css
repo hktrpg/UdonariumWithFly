@@ -398,10 +398,6 @@
   cursor: pointer;
 }
 
-.delete-btn:hover:not(:disabled) {
-  background: #ffe8e8;
-}
-
 .delete-btn:disabled {
   opacity: 0.5;
   cursor: default;

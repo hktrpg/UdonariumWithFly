@@ -74,11 +74,13 @@
     </div>
     <div class="component-background">
       <div class="grid-container-root" *ngIf="hasDataElms && (card.isVisible || gmCardPeek)">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: card.name }"></ng-container>
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
+              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: card.name }"></ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -136,7 +138,7 @@
         <!--<ng-container *ngFor="let dataElm of dataElms">-->
         <ng-container *ngFor="let dataElm of inventoryDataElms">
           <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
-            <div class="grid-container">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: character.name, character: character }"></ng-container>
             </div>
           </ng-container>
@@ -170,13 +172,13 @@
     <div class="dataElm-area component-background"
       [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root" *ngIf="hasDataElms && dice.isVisible">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: dice.name }"></ng-container>
-            </ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -192,38 +194,42 @@
     <div class="dataElm-area component-background"
       [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root" *ngIf="rangeElms.length > 0">
-        <div class="grid-container">
           <ng-container *ngFor="let dataElm of rangeElms">
             <ng-container *ngIf="dataElm.name == 'length' || dataElm.name == 'width'">
-              <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
-              <div class="value">
-                <div style="display: inline-block; width: min-content;">
-                  <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
-                  <input class="input" style="width:4em" type="number" step="0.1" size="1" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)"  [disabled]="GuestMode()" />
+              <div class="grid-container overview-data-row">
+                <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
+                <div class="value">
+                  <div style="display: inline-block; width: min-content;">
+                    <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
+                    <input class="input" style="width:4em" type="number" step="0.1" size="1" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)"  [disabled]="GuestMode()" />
+                  </div>
                 </div>
-              </div>
-              <div class="section" style="line-height: 1em;">
-                <input type="range" title="{{dataElm.value}}"
-                  [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
-                  [min]="dataElm.name == 'length' ? 1 : 0" max="12" step="0.5" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)" [disabled]="GuestMode()" />
+                <div class="section" style="line-height: 1em;">
+                  <input type="range" title="{{dataElm.value}}"
+                    [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
+                    [min]="dataElm.name == 'length' ? 1 : 0" max="12" step="0.5" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)" [disabled]="GuestMode()" />
+                </div>
               </div>
             </ng-container>
             <ng-container *ngIf="dataElm.name == 'opacity'">
-              <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
-              <div class="value">
-                <div style="display: inline-block; width: min-content;">
-                  <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
-                  <input class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue" [disabled]="GuestMode()" /><b class="move" style="font-size: small">%</b>
+              <div class="grid-container overview-data-row">
+                <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
+                <div class="value">
+                  <div style="display: inline-block; width: min-content;">
+                    <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
+                    <input class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue" [disabled]="GuestMode()" /><b class="move" style="font-size: small">%</b>
+                  </div>
                 </div>
-              </div>
-              <div class="section" style="line-height: 1em;">
-                <input type="range" title="{{dataElm.currentValue}}%"
-                  [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
-                  min="0" max="100" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
+                <div class="section" style="line-height: 1em;">
+                  <input type="range" title="{{dataElm.currentValue}}%"
+                    [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
+                    min="0" max="100" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
+                </div>
               </div>
             </ng-container>
           </ng-container>
           <ng-container *ngIf="range.followingCharactor">
+            <div class="grid-container overview-data-row">
             <div class="tag">➡ {{ range.followingCharactor.name }}</div>
             <div class="value" style="margin-top: 3px; pointer-events: none">
               <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px"
@@ -235,14 +241,18 @@
                 </span>
               </div>
             </div>
+            </div>
           </ng-container>
-          <div *ngIf="dataElms.length > 0" class="section border" style="padding-top: 2px"></div>
+          <div *ngIf="dataElms.length > 0" class="grid-container">
+            <div class="section border" style="padding-top: 2px"></div>
+          </div>
           <ng-container *ngFor="let dataElm of dataElms">
             <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
-              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: range.name }"></ng-container>
+              <div class="grid-container overview-data-row">
+                <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: range.name }"></ng-container>
+              </div>
             </ng-container>
           </ng-container>
-        </div>
       </div>
     </div>
   </div>
@@ -258,13 +268,13 @@
     <div class="dataElm-area component-background"
       [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: object.name }"></ng-container>
-            </ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -275,11 +285,11 @@
   <ng-template #thenBlock>
     <div class="section" style="padding-top: 0.5em;">
       <div *ngIf="0 < (dataElm.name || '').trim().length" class="section-text" [attr.title]="dataElm.name">{{dataElm.name}}</div>
-      <div class="grid-container indetnt">
-        <ng-container *ngFor="let childElm of dataElm.children">
+      <ng-container *ngFor="let childElm of dataElm.children">
+        <div class="grid-container indetnt overview-data-row">
           <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: childElm, name: name, character: character }"></ng-container>
-        </ng-container>
-      </div>
+        </div>
+      </ng-container>
     </div>
   </ng-template>
   <ng-template #elseBlock>

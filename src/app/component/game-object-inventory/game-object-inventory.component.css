@@ -185,12 +185,11 @@ input[type='range']::-webkit-slider-runnable-track {
   border-bottom: solid 1px var(--slider-border-color);
   border-radius: var(--slider-height);
   height: var(--slider-height);
-  background: var(--slider-track-color);
-}
-
-input[type='range']::-webkit-slider-runnable-track {
   background: linear-gradient(var(--slider-fill-color), var(--slider-fill-color)) 0/var(--sx) 100% no-repeat var(--slider-track-color);
   cursor: pointer;
+  transition:
+    background var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-fast, 120ms) var(--udon-ease-standard, ease);
 }
 
 input[type='range']::-moz-range-track {
@@ -199,6 +198,9 @@ input[type='range']::-moz-range-track {
   border-radius: var(--slider-height);
   height: var(--slider-height);
   background: var(--slider-track-color);
+  transition:
+    background-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-fast, 120ms) var(--udon-ease-standard, ease);
 }
 
 input[type='range']::-ms-track {

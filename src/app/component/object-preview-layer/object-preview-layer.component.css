@@ -208,11 +208,6 @@
   cursor: default;
 }
 
-.nav-btn:hover:not(:disabled),
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
 .pin-btn .material-icons {
   transform: rotate(45deg);
   font-size: 18px;

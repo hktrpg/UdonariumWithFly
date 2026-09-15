@@ -323,10 +323,6 @@
   text-align: left;
 }
 
-.action-panel-head:hover {
-  background: #f0e0c8;
-}
-
 .action-panel-head .material-icons {
   font-size: 14px;
   opacity: 0.9;

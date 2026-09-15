@@ -12,24 +12,12 @@
 .image:not(.current-images) {
   cursor: pointer;
 }
-.image:not(.current-images):hover {
-  border: 2px dotted red;
-  transform: scale(1.08);
-  z-index: 200;
-  transition-duration: 60ms;
-}
-
 .current-images {
   border: 2px solid red;
 }
 
 .image img {
   vertical-align: bottom;
-}
-
-.image:hover img {
-  backdrop-filter: blur(1px);
-  filter: none !important;
 }
 
 .empty {
@@ -66,10 +54,6 @@
   color: black;
   font-weight: bolder;
 }
-.word-tag:hover {
-  color: red;
-}
-
 .word-selecter {
   padding : 5px;
   user-select: none;
@@ -96,14 +80,12 @@
   margin: 2px;
   border-radius: 100px;
   cursor: pointer;
-
   height: 1.6em;
-}
-
-.word-selecter input[type="checkbox"] + div:hover {
-  background-color: #888;
-  color: #eee;
-  border: solid 1px #555;
+  transition:
+    background-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    box-shadow var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease);
 }
 
 .word-selecter input[type="checkbox"]:checked + div {
@@ -114,6 +96,27 @@
 .word-selecter input[type="checkbox"]:checked + div.all-tags {
   background-color: #eee;
   color: darkcyan;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .word-selecter label:hover input[type='checkbox']:not(:checked) + div {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #888;
+    color: #ddd;
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div:not(.all-tags) {
+    background: #666;
+    border-color: #999;
+    color: #eee;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div.all-tags {
+    background: #e4e4e4;
+    border-color: #aaa;
+    color: #0e7490;
+  }
 }
 
 .grow {

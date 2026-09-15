@@ -147,11 +147,6 @@
   font-size: 13px;
 }
 
-.icon-btn:hover:not(:disabled) {
-  background: #f0e0c8;
-  border-color: #8a6a45;
-}
-
 .icon-btn:disabled {
   opacity: 0.45;
   cursor: default;

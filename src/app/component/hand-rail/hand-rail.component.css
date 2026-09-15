@@ -240,12 +240,6 @@
   line-height: 1;
 }
 
-.hand-orphan-import.is-open .hand-orphan-import-btn,
-.hand-orphan-import-btn:hover {
-  border-color: rgba(251, 191, 36, 0.9);
-  background: rgba(160, 100, 12, 0.6);
-}
-
 .hand-orphan-import-badge {
   position: absolute;
   top: -5px;
@@ -367,11 +361,6 @@
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-}
-
-.hand-orphan-import-confirm:hover {
-  border-color: rgba(125, 211, 252, 0.95);
-  background: rgba(40, 110, 160, 0.7);
 }
 
 .hand-empty {

@@ -630,3 +630,33 @@ label.disabled {
     grid-column: 3;
   }
 }
+
+/* Tag filter chips (image library, …) — label:hover beats :checked base in component CSS. */
+.word-selecter input[type='checkbox'] + div {
+  transition:
+    background-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    box-shadow var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .word-selecter label:hover input[type='checkbox']:not(:checked) + div {
+    background: var(--udon-btn-compact-hover-bg, #e8dcc8);
+    border-color: var(--udon-btn-compact-hover-border, #b89b78);
+    color: #3a2f24;
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div:not(.all-tags) {
+    background: #684f38;
+    border-color: #7a5f45;
+    color: #fffaf2;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.12);
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div.all-tags {
+    background: #e8dcc8;
+    border-color: var(--udon-btn-compact-hover-border, #b89b78);
+    color: #5c4630;
+  }
+}

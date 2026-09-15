@@ -37,10 +37,6 @@
   cursor: pointer;
 }
 
-.timer-row:hover {
-  background: #f4e8d6;
-}
-
 .timer-row.is-selected {
   background: #efe0c8;
 }

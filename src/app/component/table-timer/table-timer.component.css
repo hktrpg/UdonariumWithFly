@@ -76,20 +76,10 @@
   font-family: Consolas, "Segoe UI Symbol", monospace;
 }
 
-.win-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
 .win-btn.is-active {
   background: rgba(125, 211, 252, 0.25);
   border-color: rgba(125, 211, 252, 0.45);
   color: #e0f2fe;
-}
-
-.win-btn.is-close:hover {
-  background: rgba(248, 113, 113, 0.85);
-  color: #fff;
 }
 
 .table-timer-time {

@@ -173,10 +173,6 @@
   line-height: 1.2;
 }
 
-.slot-name:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .slot-name:disabled {
   cursor: default;
   opacity: 0.85;

@@ -62,11 +62,6 @@
   font-family: Consolas, "Segoe UI Symbol", monospace;
 }
 
-.win-btn.is-close:hover {
-  background: rgba(248, 113, 113, 0.85);
-  color: #fff;
-}
-
 .timer-compact-hud-list {
   display: flex;
   flex-direction: column;
@@ -84,10 +79,6 @@
 
 .timer-compact-row:first-child {
   border-top: none;
-}
-
-.timer-compact-row:hover {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .timer-compact-label {

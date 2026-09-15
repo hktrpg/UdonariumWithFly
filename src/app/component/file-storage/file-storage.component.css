@@ -78,13 +78,6 @@
   overflow: hidden;
 }
 
-.image:hover {
-  border: 2px dotted #a33;
-  transform: scale(1.08);
-  z-index: 150;
-  transition-duration: 60ms;
-}
-
 .image img {
   vertical-align: bottom;
 }
@@ -95,11 +88,6 @@
 
 .selecter .image:not(.selected) img {
   filter: saturate(40%) opacity(90%) blur(2px);
-}
-
-.image:hover img {
-  backdrop-filter: blur(1px);
-  filter: none !important;
 }
 
 .image-meta {
@@ -251,11 +239,6 @@
   border-radius: 4px;
   cursor: pointer;
   height: 1.6em;
-}
-
-.word-selecter input[type='checkbox'] + div:hover {
-  background-color: #efe0c8;
-  color: #3a2f24;
 }
 
 .word-selecter input[type='checkbox']:checked + div {

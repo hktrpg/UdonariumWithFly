@@ -125,11 +125,6 @@
   user-select: none;
 }
 
-.jb-fold:hover,
-.jb-row-head:hover {
-  background: rgba(255, 248, 235, 0.55);
-}
-
 .jb-fold .material-icons,
 .jb-row-ico {
   font-size: 16px;
@@ -188,11 +183,6 @@
   color: var(--jb-ink);
   cursor: pointer;
   line-height: 1;
-}
-
-.jb-icon-act:hover:not(:disabled) {
-  background: var(--jb-soft);
-  color: var(--jb-accent);
 }
 
 .jb-icon-act:disabled {
@@ -778,14 +768,6 @@
   border-bottom: 1px solid #e2d3bf;
   position: relative;
   z-index: 1;
-}
-
-.jb-folder-head:hover {
-  background: #ebe1d2;
-}
-
-.jb-folder-block.is-drop-target > .jb-folder-head:hover {
-  background: #fff4e0;
 }
 
 .jb-folder-toggle {

@@ -173,10 +173,6 @@
   transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
-.choice-item:hover {
-  background: #fff7eb;
-}
-
 .choice-item[data-choice="include"].is-selected {
   border-color: #059669;
   background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
