@@ -1,6 +1,7 @@
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
 import { InnerXml } from './core/synchronize-object/object-serializer';
+import { parseDataTags } from './overview-data-tag.util';
 import { translate } from 'i18n';
 
 export enum SortOrder {
@@ -29,7 +30,7 @@ export class DataSummarySetting extends GameObject implements InnerXml {
   get dataTags(): string[] {
     if (this._dataTag !== this.dataTag) {
       this._dataTag = this.dataTag;
-      this._dataTags = this.dataTag != null && 0 < this.dataTag.trim().length ? this.dataTag.trim().split(/[　\s]+/) : [];
+      this._dataTags = parseDataTags(this.dataTag);
     }
     return this._dataTags;
   }

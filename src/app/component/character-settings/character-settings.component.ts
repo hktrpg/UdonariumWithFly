@@ -17,6 +17,7 @@ import { I18nService } from 'service/i18n.service';
 import { ModalService } from 'service/modal.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
+import { OverviewDisplayConfigService } from 'service/overview-display-config.service';
 import { SaveDataService } from 'service/save-data.service';
 
 @Component({
@@ -36,6 +37,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
   isEdit = false;
   isSaveing = false;
   progresPercent = 0;
+  private unsubscribeOverviewConfig: (() => void) | null = null;
 
   constructor(
     private changeDetector: ChangeDetectorRef,
@@ -44,7 +46,8 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     private modalService: ModalService,
     private pointerDeviceService: PointerDeviceService,
     private chatMessageService: ChatMessageService,
-    private i18n: I18nService
+    private i18n: I18nService,
+    private overviewDisplayConfigService: OverviewDisplayConfigService
   ) { }
 
   GuestMode() { return Network.GuestMode(); }
@@ -205,6 +208,7 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
   }
 
   ngOnInit() {
+    this.unsubscribeOverviewConfig = this.overviewDisplayConfigService.subscribe(() => this.changeDetector.markForCheck());
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', event => {
         if (this.character && event.data?.identifier === this.character.identifier) this.panelService.close();
@@ -241,11 +245,32 @@ export class CharacterSettingsComponent implements OnInit, OnChanges, OnDestroy 
     }
   }
 
-  ngOnDestroy() {
-    EventSystem.unregister(this);
+  get isOverviewConfigOpen(): boolean {
+    return this.overviewDisplayConfigService.isOpen
+      && this.overviewDisplayConfigService.mode === 'character'
+      && this.overviewDisplayConfigService.character === this.character;
   }
 
-  toggleEditMode() { this.isEdit = !this.isEdit; }
+  ngOnDestroy() {
+    this.unsubscribeOverviewConfig?.();
+    EventSystem.unregister(this);
+    if (this.isOverviewConfigOpen) this.overviewDisplayConfigService.close();
+  }
+
+  toggleEditMode() {
+    this.isEdit = !this.isEdit;
+    this.changeDetector.markForCheck();
+  }
+
+  toggleOverviewDisplayConfig() {
+    if (!this.character || this.GuestMode()) return;
+    if (this.isOverviewConfigOpen) {
+      this.overviewDisplayConfigService.close();
+    } else {
+      this.overviewDisplayConfigService.open({ mode: 'character', character: this.character });
+    }
+    this.changeDetector.markForCheck();
+  }
 
   addDataElement() {
     if (!this.character?.detailDataElement || this.GuestMode()) return;

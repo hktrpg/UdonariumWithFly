@@ -64,6 +64,14 @@
   outline-offset: 1px;
 }
 
+.inv-overview-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .view-summary {
   display: flex;
   flex-wrap: wrap;

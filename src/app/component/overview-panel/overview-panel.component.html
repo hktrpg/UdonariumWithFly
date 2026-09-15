@@ -136,7 +136,7 @@
         <ng-container *ngFor="let dataElm of inventoryDataElms">
           <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
             <div class="grid-container">
-              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: character.name }"></ng-container>
+              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: character.name, character: character }"></ng-container>
             </div>
           </ng-container>
         </ng-container>
@@ -271,14 +271,14 @@
   </div>
 </ng-template>
 
-<ng-template #dataElement let-dataElm="dataElm" let-name="name">
+<ng-template #dataElement let-dataElm="dataElm" let-name="name" let-character="character">
   <ng-container *ngIf="0 < dataElm.children.length; then thenBlock; else elseBlock"></ng-container>
   <ng-template #thenBlock>
     <div class="section" style="padding-top: 0.5em;">
       <div *ngIf="0 < (dataElm.name || '').trim().length" class="section-text" [attr.title]="dataElm.name">{{dataElm.name}}</div>
       <div class="grid-container indetnt">
         <ng-container *ngFor="let childElm of dataElm.children">
-          <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: childElm, name: name }"></ng-container>
+          <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: childElm, name: name, character: character }"></ng-container>
         </ng-container>
       </div>
     </div>
@@ -297,14 +297,14 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'simpleNumber'">
-        <div class="tag" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+        <div class="tag" [attr.title]="dataElm.name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button>{{dataElm.name}}</div>
         <div class="value">
           <div class="hidden-spacer">{{dataElm.value}}</div>
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" class="input" style="width:4em" type="{{(dataElm.value && dataElm.value == +dataElm.value) ? 'number' : 'text'}}" size="1" [(ngModel)]="dataElm.value"  [disabled]="GuestMode()" />
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'numberResource'">
-        <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+        <div class="tag" style="min-width: 100px" [attr.title]="dataElm.name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button>{{dataElm.name}}</div>
         <div class="value">
           <div style="display: inline-block; width: min-content;">
             <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
@@ -319,13 +319,13 @@
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'checkProperty'">
-        <div class="tag" [attr.title]="dataElm.name"><span [style.textDecoration]="dataElm.value ? 'none' : 'line-through'">{{dataElm.name}}</span> {{ checkValue(dataElm) }}</div>
+        <div class="tag" [attr.title]="dataElm.name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button><span [style.textDecoration]="dataElm.value ? 'none' : 'line-through'">{{dataElm.name}}</span> {{ checkValue(dataElm) }}</div>
         <div class="value">
           <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" type="checkbox" style="width: 2em; margin-right:1em" [(ngModel)]="dataElm.value" checked="{{dataElm.value ? 'checked' : ''}}" (change)="dataElm.value = (dataElm.value ? dataElm.name : '')" [disabled]="GuestMode()">
         </div>
       </ng-container>
       <ng-container *ngSwitchCase="'abilityScore'">
-        <div class="tag" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+        <div class="tag" [attr.title]="dataElm.name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button>{{dataElm.name}}</div>
         <div class="value">
           <div class="hidden-spacer">{{dataElm.value}}</div>
             <input appLogging [logging.name]="name" [logging.dataElement]="dataElm" [logging.disable]="isNoLogging" class="input" style="width:4em" type="{{(dataElm.value && dataElm.value == +dataElm.value) ? 'number' : 'text'}}" size="1" [(ngModel)]="dataElm.value"  [disabled]="GuestMode()" />
@@ -334,12 +334,13 @@
       </ng-container>
       <ng-container *ngSwitchCase="'url'">
         <div class="tag">
+          <data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button>
           <span *ngIf="!stringUtil.validUrl(dataElm.value)" [attr.title]="'common.invalidUrl' | i18n">⚠️</span><a draggable="false" [attr.title]="dataElm.value" [ngClass]="{'outer-link': !stringUtil.sameOrigin(dataElm.value) && stringUtil.validUrl(dataElm.value), 'invalid': !stringUtil.validUrl(dataElm.value)}" target="_blank" [attr.href]="(stringUtil.validUrl(dataElm.value) ? dataElm.value : '') | safe: 'url'" [attr.disabled]="!stringUtil.validUrl(dataElm.value) ? '' : null"
           (click)="stringUtil.validUrl(dataElm.value) ? openUrl(dataElm.value, name, dataElm.name) : false"><span class="url-link">{{dataElm.name}}</span></a>
         </div>
       </ng-container>
       <ng-container *ngSwitchDefault>
-        <div *ngIf="dataElm.name" class="tag" [attr.title]="dataElm.name">{{dataElm.name}}</div>
+        <div *ngIf="dataElm.name" class="tag" [attr.title]="dataElm.name"><data-element-send-button [dataElm]="dataElm" [character]="character"></data-element-send-button>{{dataElm.name}}</div>
         <div class="value">
           <div *ngIf="dataElm.name" class="hidden-spacer">{{dataElm.value}}</div>
           <input class="input" [ngStyle]="{'min-width': dataElm.name ? '8em' : '100%'}" type="{{dataElm.name === 'size' || dataElm.name === 'altitude' ? 'number' : 'text'}}" min="{{dataElm.name === 'size' ? '0' : ''}}" size="1" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)"  [disabled]="GuestMode()" />

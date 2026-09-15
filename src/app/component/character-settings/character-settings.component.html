@@ -5,6 +5,9 @@
       {{ isSaveing ? (progresPercent + '%') : ('sheet.download' | i18n) }}
     </button>
     <button type="button" class="btn btn-sm" (click)="exportCcfoliaJson()" [disabled]="GuestMode()">{{ 'sheet.exportCcfoliaJson' | i18n }}</button>
+    <button type="button" class="btn btn-sm" [class.is-active]="isOverviewConfigOpen" (click)="toggleOverviewDisplayConfig()" [disabled]="GuestMode()">
+      <i class="material-icons">tune</i>{{ 'overviewConfig.title' | i18n }}
+    </button>
   </section>
 
   <!-- Identity -->

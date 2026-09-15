@@ -411,9 +411,6 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
     return false; 
   }
   private getInventoryTags(gameObject: TabletopObject): DataElement[] {
-    const cached = this.inventoryService.tableInventory.dataElementMap.get(gameObject.identifier);
-    if (cached) return cached;
-    // Temporary bodies are excluded from inventory maps — build the same summary tags locally.
     return this.inventoryService.summaryElementsFor(gameObject);
   }
 
