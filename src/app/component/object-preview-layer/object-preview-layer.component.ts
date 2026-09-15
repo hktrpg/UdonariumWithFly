@@ -12,6 +12,7 @@ import {
   ViewChildren
 } from '@angular/core';
 import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
+import { getResourcePolicy } from '@udonarium/core/file-storage/resource-policy';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
@@ -636,7 +637,8 @@ export class ObjectPreviewLayerComponent implements OnInit, OnDestroy, AfterView
     const pdfId = p.pdfIdentifier;
     const attemptKey = pdfPageRenderKey(pdfId, wantPage);
     try {
-      const result = await renderPdfPage(canvas, pdf.url, wantPage, pdfId, 1600);
+      const policy = getResourcePolicy();
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, pdfId, policy.pdfMaxWidthPx, policy.pdfMaxScale);
       if (!result || seq !== this.pdfRenderSeq.get(id)) return;
       const live = this.findById(id);
       if (!live || live.pdfIdentifier !== pdfId) return;

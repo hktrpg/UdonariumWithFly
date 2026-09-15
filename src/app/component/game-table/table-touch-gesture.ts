@@ -1,4 +1,5 @@
 import { NgZone } from '@angular/core';
+import { needsSyntheticContextMenu } from '@udonarium/core/platform-detect';
 import { MathUtil } from '@udonarium/core/system/util/math-util';
 
 type Callback = (srcEvent: TouchEvent | MouseEvent | PointerEvent) => void;
@@ -86,12 +87,7 @@ export class TableTouchGesture {
     // Long-press → contextmenu (iOS / some Android lack native).
     // Mobile (simplePan): empty-table long-press is ping (pointer hold), not add-menu.
     // Object long-press still opens the object menu.
-    let ua = window.navigator.userAgent.toLowerCase();
-    let needsSyntheticContextMenu =
-      ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1
-      || (ua.indexOf('macintosh') > -1 && 'ontouchend' in document)
-      || ua.indexOf('android') > -1;
-    if (!needsSyntheticContextMenu) return;
+    if (!needsSyntheticContextMenu()) return;
     this.hammer.add(new Hammer.Press({ time: 550 }));
     this.hammer.on('press', ev => {
       if (this.simplePan) {

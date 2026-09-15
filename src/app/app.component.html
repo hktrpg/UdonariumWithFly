@@ -78,6 +78,14 @@
   <div class="ephemeral-notice-title">{{ 'jukebox.reject.title' | i18n }}</div>
   <div class="ephemeral-notice-line" *ngFor="let line of audioRejectToastLines">{{ line }}</div>
 </div>
+<div class="ephemeral-notice" *ngIf="showMemoryResourceWarning"
+  role="status" aria-live="polite" aria-atomic="true">
+  <div class="ephemeral-notice-title">{{ 'deviceResource.memoryWarning.title' | i18n }}</div>
+  <div class="ephemeral-notice-line">{{ 'deviceResource.memoryWarning.body' | i18n }}</div>
+  <button type="button" class="ephemeral-notice-dismiss" (click)="dismissMemoryResourceWarning()">
+    {{ 'deviceResource.memoryWarning.dismiss' | i18n }}
+  </button>
+</div>
 <character-resource-hud></character-resource-hud>
 <music-hud></music-hud>
 <network-indicator class="networkIndicator"></network-indicator>

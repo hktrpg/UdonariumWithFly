@@ -1,4 +1,5 @@
 import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
+import { getResourcePolicy } from '@udonarium/core/file-storage/resource-policy';
 
 /** Seamless ambient loop with head/tail crossfade (no hard loop click). */
 export class WeatherLoopPlayer {
@@ -86,7 +87,7 @@ export class WeatherLoopPlayer {
   private createElement(url: string, volume: number): HTMLAudioElement {
     const el = new Audio(url);
     el.loop = false;
-    el.preload = 'auto';
+    el.preload = getResourcePolicy().weatherAudioPreload;
     el.volume = volume;
     this.wireAmbient(el);
     return el;

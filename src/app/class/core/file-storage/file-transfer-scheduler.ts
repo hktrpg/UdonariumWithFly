@@ -8,6 +8,7 @@ import {
   fileSyncPriorityTier,
   primePlayingMusicCache,
 } from './file-sync-priority';
+import { getResourcePolicy } from './resource-policy';
 import { ImageState } from './image-file';
 import { PdfState } from './pdf-file';
 import { VideoState } from './video-file';
@@ -40,7 +41,9 @@ const RECEIVE_RETRY_BACKOFF_MS = 5_000;
 const OUTBOUND_PENDING_TIMEOUT_MS = 30_000;
 
 export class FileReceiveScheduler {
-  private static readonly MAX_CONCURRENT_RECEIVES = 4;
+  private static maxConcurrentReceives(): number {
+    return getResourcePolicy().maxConcurrentReceives;
+  }
   private static activeReceives = new Set<string>();
   /** Slots reserved when a REQUEST is sent, before START_*_TRANSMISSION arrives. */
   private static outboundPending = new Set<string>();
@@ -57,6 +60,7 @@ export class FileReceiveScheduler {
    * Catalogs may still enqueue; dispatch resumes when the hold clears.
    */
   private static joinProbeHold = false;
+  private static resourceScanTimer: number | null = null;
 
   static ensureNetworkHooks(): void {
     if (FileReceiveScheduler.networkHooksRegistered) return;
@@ -212,7 +216,7 @@ export class FileReceiveScheduler {
   }
 
   static isReceiveBudgetFull(): boolean {
-    return FileReceiveScheduler.reservedReceiveCount() >= FileReceiveScheduler.MAX_CONCURRENT_RECEIVES;
+    return FileReceiveScheduler.reservedReceiveCount() >= FileReceiveScheduler.maxConcurrentReceives();
   }
 
   static markReceiveStart(kind: FileResourceKind, identifier: string): void {
@@ -231,7 +235,19 @@ export class FileReceiveScheduler {
     FileReceiveScheduler.outboundPending.delete(key);
     FileReceiveScheduler.outboundRequests.delete(key);
     FileReceiveScheduler.activeReceives.delete(key);
+    FileReceiveScheduler.scheduleResourceScanDebounced();
     FileReceiveScheduler.schedule();
+  }
+
+  /** Debounced tier rescan after P2P file receives (mobile blob growth). */
+  private static scheduleResourceScanDebounced(): void {
+    if (FileReceiveScheduler.resourceScanTimer != null) {
+      clearZeroTimeout(FileReceiveScheduler.resourceScanTimer);
+    }
+    FileReceiveScheduler.resourceScanTimer = setZeroTimeout(() => {
+      FileReceiveScheduler.resourceScanTimer = null;
+      EventSystem.trigger('DEVICE_RESOURCE_SCAN', null);
+    });
   }
 
   /** Drop queued / in-flight receive for a library delete. */

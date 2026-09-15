@@ -81,7 +81,7 @@
         <i class="material-icons red-eye">visibility</i>
       </div>
       <span class="image-click" (click)="onSelectedFile(file)">
-        <img *ngIf="0 < file.url.length" [src]="file.url | safe: 'resourceUrl'" [alt]="file.name" height="120" draggable="false" />
+        <img *ngIf="0 < file.url.length" [appLazyImg]="file.url" [alt]="file.name" height="120" draggable="false" loading="lazy" />
         <img *ngIf="file.url.length <= 0" src="assets/images/loading.gif" [alt]="file.name" draggable="false" />
       </span>
     </div>

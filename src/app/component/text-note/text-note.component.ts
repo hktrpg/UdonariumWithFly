@@ -13,6 +13,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { getResourcePolicy } from '@udonarium/core/file-storage/resource-policy';
 import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -806,8 +807,9 @@ export class TextNoteComponent implements OnChanges, OnDestroy, AfterViewInit, A
       // readable in 3D view — CSS then scales the bitmap down into the paper box.
       const displayW = Math.max(120, this.width * this.gridSize);
       const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
-      const maxW = Math.min(1600, Math.round(displayW * Math.max(3, dpr * 2.5)));
-      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW);
+      const policy = getResourcePolicy();
+      const maxW = Math.min(policy.pdfMaxWidthPx, Math.round(displayW * Math.max(3, dpr * 2.5)));
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW, policy.pdfMaxScale);
       // Ignore stale / superseded renders (rapid page flips).
       if (!result || seq !== this.pdfRenderSeq || this.textNote.pdfIdentifier !== id) return;
       this.lastPdfKey = pdfPageRenderKey(this.textNote.pdfIdentifier, result.page);

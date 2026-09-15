@@ -5,6 +5,7 @@
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { loadPdfDocument, evictPdfDocument } from '@udonarium/core/file-storage/pdf-render';
+import { getResourcePolicy } from '@udonarium/core/file-storage/resource-policy';
 import { CardSheetSliceError } from '@udonarium/card-sheet-slice';
 
 export type PdfSheetPageBlob = {
@@ -28,7 +29,7 @@ function blobCacheTag(source: Blob): string {
 export async function renderPdfPagesToPng(
   source: Blob,
   pages: number[],
-  maxWidthPx = 2400,
+  maxWidthPx = getResourcePolicy().pdfMaxWidthPx,
 ): Promise<{ pageCount: number; pages: PdfSheetPageBlob[] }> {
   if (!source || !pages?.length) {
     throw new CardSheetSliceError('invalid_params', 'No PDF pages to render');
@@ -54,7 +55,8 @@ export async function renderPdfPagesToPng(
       }
       const page = await doc.getPage(pageNum);
       const unscaled = page.getViewport({ scale: 1 });
-      const scale = Math.min(3, maxWidthPx / Math.max(1, unscaled.width));
+      const maxScale = getResourcePolicy().pdfMaxScale;
+      const scale = Math.min(maxScale, maxWidthPx / Math.max(1, unscaled.width));
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.floor(viewport.width));

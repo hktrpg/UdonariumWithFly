@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [hktrpg-main, fix, main, master, Weather-sfx]
+    branches: [hktrpg-main, fix, main, master, mobile, Weather-sfx]
   pull_request:
     branches: [hktrpg-main, fix, main, master]
 
@@ -21,6 +21,8 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Karma (headless + coverage)
         run: npm run test:ci
 
