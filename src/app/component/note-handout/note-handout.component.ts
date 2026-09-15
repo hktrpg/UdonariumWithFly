@@ -11,6 +11,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { pdfPageRenderKey, renderPdfPage } from '@udonarium/core/file-storage/pdf-render';
+import { getResourcePolicy } from '@udonarium/core/file-storage/resource-policy';
 import { PdfStorage } from '@udonarium/core/file-storage/pdf-storage';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { EventSystem } from '@udonarium/core/system';
@@ -342,7 +343,9 @@ export class NoteHandoutComponent implements OnInit, OnDestroy, AfterViewChecked
     const id = this.pdfIdentifier;
     const attemptKey = pdfPageRenderKey(id, wantPage);
     try {
-      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, 1100);
+      const policy = getResourcePolicy();
+      const maxW = Math.min(policy.pdfMaxWidthPx, 1100);
+      const result = await renderPdfPage(canvas, pdf.url, wantPage, id, maxW, policy.pdfMaxScale);
       // Ignore stale renders so an older page cannot overwrite the current one.
       if (!result || seq !== this.pdfRenderSeq || this.pdfIdentifier !== id) return;
       this.pdfPageCount = result.pageCount;

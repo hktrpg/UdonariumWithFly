@@ -1,4 +1,4 @@
-import { CanvasUtil } from './canvas-util';
+import { createThumbnailBlob } from './image-canvas';
 import { FileReaderUtil } from './file-reader-util';
 import { normalizeImageBlob } from './image-normalize';
 
@@ -177,47 +177,17 @@ export class ImageFile {
     window.URL.revokeObjectURL(this.context.thumbnail.url);
   }
 
-  private static createThumbnailAsync(context: ImageContext): Promise<ThumbnailContext> {
-    return new Promise((resolve, reject) => {
-      let image: HTMLImageElement = new Image();
-      image.onload = (event) => {
-        const srcW = Math.max(0, image.naturalWidth || image.width || 0);
-        const srcH = Math.max(0, image.naturalHeight || image.height || 0);
-        if (srcW < 1 || srcH < 1) {
-          reject(new Error('Invalid image dimensions'));
-          return;
-        }
-        // Long thin bake faces (Open3Dhk walls) can round the short edge to 0.
-        const scale = Math.min(128 / Math.max(srcW, srcH), 1.0);
-        const dstWidth = Math.max(1, Math.round(srcW * scale));
-        const dstHeight = Math.max(1, Math.round(srcH * scale));
-
-        let canvas: HTMLCanvasElement = document.createElement('canvas');
-        let render: CanvasRenderingContext2D = canvas.getContext('2d');
-        canvas.width = srcW;
-        canvas.height = srcH;
-
-        render.drawImage(image, 0, 0);
-        CanvasUtil.resize(canvas, dstWidth, dstHeight, true);
-
-        canvas.toBlob(blob => {
-          if (!blob) {
-            reject(new Error('Thumbnail toBlob failed'));
-            return;
-          }
-          let thumbnail: ThumbnailContext = {
-            type: blob.type,
-            blob: blob,
-            url: window.URL.createObjectURL(blob),
-          };
-          resolve(thumbnail);
-        }, context.blob.type);
-      };
-      image.onabort = image.onerror = () => {
-        reject();
-      }
-      image.src = context.url;
-    });
+  private static async createThumbnailAsync(context: ImageContext): Promise<ThumbnailContext> {
+    const source = context.blob;
+    if (!source || source.size < 1) {
+      throw new Error('Empty image blob');
+    }
+    const blob = await createThumbnailBlob(source, context.blob.type || 'image/png');
+    return {
+      type: blob.type,
+      blob,
+      url: window.URL.createObjectURL(blob),
+    };
   }
 
   static Empty: ImageFile = ImageFile.createEmpty('null');

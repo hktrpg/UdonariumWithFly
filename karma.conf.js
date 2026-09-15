@@ -1,6 +1,21 @@
 // Karma configuration for Angular tests + coverage gates on critical paths.
+// Prefer Playwright's bundled Chromium when installed (reliable headless on Windows + CI).
+const fs = require('fs');
+try {
+  const { chromium } = require('playwright');
+  const chromeBin = chromium.executablePath();
+  if (fs.existsSync(chromeBin)) {
+    process.env.CHROME_BIN = chromeBin;
+  }
+} catch {
+  // Fall back to system Chrome via karma-chrome-launcher.
+}
+
 module.exports = function (config) {
   config.set({
+    // Avoid Windows localhost → IPv6 mismatch where Chrome never captures.
+    hostname: '127.0.0.1',
+    listenAddress: '127.0.0.1',
     basePath: '',
     frameworks: ['jasmine', '@angular-devkit/build-angular'],
     plugins: [
@@ -60,6 +75,24 @@ module.exports = function (config) {
               functions: 30,
               branches: 20,
             },
+            '**/compress.ts': {
+              statements: 40,
+              lines: 40,
+              functions: 30,
+              branches: 20,
+            },
+            '**/resource-policy.ts': {
+              statements: 40,
+              lines: 40,
+              functions: 30,
+              branches: 20,
+            },
+            '**/image-canvas.ts': {
+              statements: 30,
+              lines: 30,
+              functions: 30,
+              branches: 20,
+            },
           },
           // Exclude Angular components / huge services from per-file gates.
           excludes: [
@@ -75,10 +108,22 @@ module.exports = function (config) {
     },
     reporters: ['progress', 'kjhtml'],
     browsers: ['Chrome'],
+    // Windows CI/dev: ChromeHeadless can exceed the default 60s capture window.
+    captureTimeout: 180000,
+    browserDisconnectTimeout: 120000,
+    browserNoActivityTimeout: 180000,
     customLaunchers: {
       ChromeHeadlessCI: {
-        base: 'ChromeHeadless',
-        flags: ['--no-sandbox', '--disable-gpu'],
+        base: 'Chrome',
+        flags: [
+          '--headless=new',
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-extensions',
+          '--use-gl=angle',
+          '--enable-webgl',
+          '--ignore-gpu-blocklist',
+        ],
       },
     },
     restartOnFileChange: true,

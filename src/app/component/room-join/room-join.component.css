@@ -98,3 +98,8 @@
   background: #fff0e0;
   border: 1px solid #d4a56a;
 }
+
+.room-join .actions {
+  margin-top: 10px;
+  gap: 6px;
+}

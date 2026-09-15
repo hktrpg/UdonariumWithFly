@@ -133,7 +133,7 @@
       <div class="table-cell image-box" [ngClass]="{'is-hide-in': invIsHideIn(gameObject)}">
         <span *ngIf="!gameObject.isAllowsChat" style="margin-top:-2px; margin-left: -2px; position: absolute; pointer-events: none; font-size: 16px; filter: grayscale(100%); opacity: 0.8">🤐</span>
         <span class="aura matrix-rain-host" [ngClass]="{black: host.aura == 0, blue: host.aura == 1, green: host.aura == 2, cyan: host.aura == 3, red: host.aura == 4, magenta: host.aura == 5, yellow: host.aura == 6, white: host.aura == 7}">
-          <img *ngIf="gameObject.imageFile.url" class="inverser" [src]="gameObject.imageFile.url | safe: 'resourceUrl'"
+          <img *ngIf="gameObject.imageFile.url" class="inverser" [appLazyImg]="gameObject.imageFile.url"
             [style.filter]="invImageFilter(gameObject)"
             [style.opacity]="invImageOpacity(gameObject)"
             [style.transform]="invImageTransform(gameObject)"

@@ -36,6 +36,7 @@ import {
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { ModalService } from 'service/modal.service';
+import { isIOS } from '@udonarium/core/platform-detect';
 
 type ScrollPosition = { top: number, bottom: number, clientHeight: number, scrollHeight: number, };
 type TutorialCardId = 'ops' | 'scene' | 'changelog';
@@ -58,9 +59,6 @@ const TUTORIAL_CARD_META: Record<TutorialCardId, { icon: string; hintKey: string
   scene: { icon: 'map', hintKey: 'tutorial.card.scene.hint' },
   changelog: { icon: 'history', hintKey: 'tutorial.card.changelog.hint' },
 };
-
-const ua = window.navigator.userAgent.toLowerCase();
-const isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf('macintosh') > -1 && 'ontouchend' in document;
 
 @Component({
     selector: 'chat-tab',
@@ -475,11 +473,11 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
       if (scrollWideTop < messageBoxTop) {
         this.topIndex -= Math.floor((messageBoxTop - scrollWideTop) / maxHeight) + 1;
       } else if (scrollWideTop > messageBoxTop) {
-        if (!isiOS) this.topIndex += Math.floor((scrollWideTop - messageBoxTop) / maxHeight);
+        if (!isIOS) this.topIndex += Math.floor((scrollWideTop - messageBoxTop) / maxHeight);
       }
 
       if (messageBoxBottom > scrollWideBottom) {
-        if (!isiOS) this.bottomIndex -= Math.floor((messageBoxBottom - scrollWideBottom) / maxHeight);
+        if (!isIOS) this.bottomIndex -= Math.floor((messageBoxBottom - scrollWideBottom) / maxHeight);
       } else if (messageBoxBottom < scrollWideBottom) {
         this.bottomIndex += Math.floor((scrollWideBottom - messageBoxBottom) / maxHeight) + 1;
       }

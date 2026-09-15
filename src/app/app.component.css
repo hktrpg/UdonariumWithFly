@@ -443,6 +443,21 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   margin-top: 2px;
 }
 
+.ephemeral-notice:has(.ephemeral-notice-dismiss) {
+  pointer-events: auto;
+}
+
+.ephemeral-notice-dismiss {
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px solid #c9a882;
+  border-radius: 3px;
+  background: rgba(255, 248, 238, 0.12);
+  color: #fff8ee;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .desktop-icon-rail {
   position: fixed;
   /* Above object-preview-layer (100050) so menu icons stay clickable during Ctrl preview. */
@@ -458,10 +473,37 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   left: 0;
   width: 52px;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  /* Do not reserve scrollbar gutter — it shrinks the 52px rail and clips badges. */
+}
+
+.desktop-icon-rail.vertical ul {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.desktop-icon-rail.vertical ul > li {
+  flex: 0 1 52px;
+  min-height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-icon-rail.vertical ul > li > a {
+  flex: 1 1 auto;
+  width: 52px;
+  height: auto;
+  min-height: 28px;
+  max-height: 48px;
 }
 
 .desktop-icon-rail.horizontal {

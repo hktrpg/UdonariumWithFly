@@ -1,4 +1,8 @@
-import { CanvasUtil } from './core/file-storage/canvas-util';
+import {
+  canvasToBlob,
+  drawImageToMaxEdge,
+  loadImageFromUrl,
+} from './core/file-storage/image-canvas';
 
 /** Longest edge of stored preview JPEG (finer than list thumb for hover zoom). */
 const PREVIEW_MAX_EDGE = 480;
@@ -34,7 +38,7 @@ export async function captureMapPreviewDataUrl(): Promise<string> {
     let paintedBg = false;
     for (const bgUrl of parseCssUrls(getComputedStyle(el).backgroundImage)) {
       try {
-        const bg = await loadImage(bgUrl);
+        const bg = await loadImageFromUrl(bgUrl);
         drawCover(ctx, bg, cw, ch);
         paintedBg = true;
         break;
@@ -105,7 +109,7 @@ async function paintTextNotes(
 
     for (const bgUrl of parseCssUrls(cs.backgroundImage)) {
       try {
-        const bg = await loadImage(bgUrl);
+        const bg = await loadImageFromUrl(bgUrl);
         ctx.save();
         roundRect(ctx, x, y, rw, rh, 2 * scale);
         ctx.clip();
@@ -265,34 +269,25 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cw: num
 
 async function shrinkDataUrl(dataUrl: string, maxEdge: number, quality: number): Promise<string> {
   if (!dataUrl) return '';
-  const img = await loadImage(dataUrl);
+  const img = await loadImageFromUrl(dataUrl);
   const w = img.naturalWidth || img.width;
   const h = img.naturalHeight || img.height;
   if (w < 1 || h < 1) return '';
 
-  const scale = Math.min(1, maxEdge / Math.max(w, h));
-  const tw = Math.max(1, Math.round(w * scale));
-  const th = Math.max(1, Math.round(h * scale));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0);
-
-  if (tw !== w || th !== h) {
-    CanvasUtil.resize(canvas, tw, th, true);
+  const { canvas } = drawImageToMaxEdge(img, w, h, maxEdge);
+  try {
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    return await blobToDataUrl(blob);
+  } catch {
+    return dataUrl;
   }
-
-  return canvas.toDataURL('image/jpeg', quality);
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('preview image load failed'));
-    img.src = src;
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('preview data URL failed'));
+    reader.readAsDataURL(blob);
   });
 }

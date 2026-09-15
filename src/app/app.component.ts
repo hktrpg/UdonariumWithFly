@@ -14,6 +14,7 @@ import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { RoomFileSyncWatchdog } from '@udonarium/core/file-storage/room-file-sync-watchdog';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { isIOS } from '@udonarium/core/platform-detect';
 import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory';
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
@@ -109,6 +110,7 @@ import { TeachingTipService } from 'service/teaching-tip.service';
 import { MobileLayoutService } from 'service/mobile-layout.service';
 import { WeatherSeService } from 'service/weather-se.service';
 import { ConnectionBusyService } from 'service/connection-busy.service';
+import { DeviceResourceProfileService } from 'service/device-resource-profile.service';
 import { MaskTokenFxService } from 'service/mask-token-fx.service';
 import { Subscription } from 'rxjs';
 import { MAIN_MENU_ITEMS, MainMenuItemDef, tourIdForMenuComponent } from './config/main-menu.def';
@@ -363,10 +365,19 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Non-focusing toast for body-level audio import rejects (5s). */
   audioRejectToastLines: string[] = [];
   private audioRejectToastTimer: ReturnType<typeof setTimeout> | null = null;
+  memoryWarningDismissed = false;
 
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
   get isRoom(): boolean { return Network.peer?.isRoom; }
   get isGMMode(): boolean { return !!PeerCursor.myCursor?.isGMMode; }
+
+  get showMemoryResourceWarning(): boolean {
+    return this.deviceResourceProfile.getPolicy().showMemoryWarning && !this.memoryWarningDismissed;
+  }
+
+  dismissMemoryResourceWarning(): void {
+    this.memoryWarningDismissed = true;
+  }
 
   private static _noticePlayer: AudioPlayer;
   static get noticePlayer(): AudioPlayer {
@@ -414,6 +425,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private weatherSe: WeatherSeService,
     _audioImportName: AudioImportNameService,
     private connectionBusy: ConnectionBusyService,
+    private deviceResourceProfile: DeviceResourceProfileService,
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -691,6 +703,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         Network.open();
       })
       .on<File>('FILE_LOADED', event => {
+        this.deviceResourceProfile.scanAndApply();
+        this.lazyNgZoneUpdate(false);
+      })
+      .on('DEVICE_RESOURCE_SCAN', () => {
+        this.deviceResourceProfile.scanAndApply();
         this.lazyNgZoneUpdate(false);
       })
       .on('OPEN_NETWORK', event => {
@@ -968,6 +985,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       });
 
     workaroundForMobileSafari();
+    this.deviceResourceProfile.scanAndApply();
   }
   
   private static readonly beforeUnloadProc = (event) => {
@@ -1156,6 +1174,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       this.isMobileLayout = v;
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
       this.isMobileEdit = v && this.mobileLayout.isEdit;
+      this.deviceResourceProfile.scanAndApply();
     });
     this.mobileSub.add(this.mobileLayout.chromeMode$.subscribe(() => {
       this.isTabletLandscape = this.mobileLayout.isTabletLandscape;
@@ -2407,9 +2426,7 @@ ModalService.ModalComponentClass = ModalComponent;
 function workaroundForMobileSafari() {
   // Workaround for issue confirmed on Mobile Safari (iOS 16.4).
   // chrome-smooth-image-trick interferes with CSS animation (keyframes), so override with fix CSS.
-  let ua = window.navigator.userAgent.toLowerCase();
-  let isiOS = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1 || ua.indexOf('macintosh') > -1 && 'ontouchend' in document;
-  if (isiOS) {
+  if (isIOS) {
     let style = document.createElement('style');
     style.innerHTML = `
       .chrome-smooth-image-trick {

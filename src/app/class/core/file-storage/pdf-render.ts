@@ -127,7 +127,8 @@ export async function renderPdfPage(
   url: string,
   pageNumber: number,
   cacheKey?: string,
-  maxWidthPx = 800
+  maxWidthPx = 800,
+  maxScale = 4,
 ): Promise<{ pageCount: number; page: number } | null> {
   if (fatalWorkerError) throw fatalWorkerError;
 
@@ -157,7 +158,7 @@ export async function renderPdfPage(
 
   const unscaled = pdfPage.getViewport({ scale: 1 });
   // Allow sharp tabletop / retina renders (old cap of 2 made small notes unreadable).
-  const scale = Math.min(4, maxWidthPx / Math.max(1, unscaled.width));
+  const scale = Math.min(Math.max(1, maxScale), maxWidthPx / Math.max(1, unscaled.width));
   const viewport = pdfPage.getViewport({ scale });
   const context = canvas.getContext('2d');
   if (!context) return { pageCount, page };

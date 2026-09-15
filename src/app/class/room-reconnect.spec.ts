@@ -186,20 +186,25 @@ describe('room-reconnect.util', () => {
   });
 
   it('shouldBootstrapSurvivalMesh caps first connect on slow link', () => {
-    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 4 })).toBeFalse();
-    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5 })).toBeFalse();
     const prev = Object.getOwnPropertyDescriptor(navigator, 'connection');
     Object.defineProperty(navigator, 'connection', {
       configurable: true,
-      get: () => ({ effectiveType: '3g' }),
+      get: () => ({ effectiveType: '4g' }),
     });
     try {
+      expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 4 })).toBeFalse();
+      expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5 })).toBeFalse();
+
+      Object.defineProperty(navigator, 'connection', {
+        configurable: true,
+        get: () => ({ effectiveType: '3g' }),
+      });
       expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5 })).toBeTrue();
       expect(shouldBootstrapSurvivalMesh({ openCount: 1, roomMemberCount: 5 })).toBeFalse();
+      expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5, bestOpenPing: 2500 })).toBeTrue();
     } finally {
       if (prev) Object.defineProperty(navigator, 'connection', prev);
     }
-    expect(shouldBootstrapSurvivalMesh({ openCount: 0, roomMemberCount: 5, bestOpenPing: 2500 })).toBeTrue();
   });
 });
 

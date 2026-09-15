@@ -48,6 +48,7 @@ import { MovableDirective } from 'directive/movable.directive';
 import { ResizableDirective } from 'directive/resizable.directive';
 import { RotableDirective } from 'directive/rotable.directive';
 import { TooltipDirective } from 'directive/tooltip.directive';
+import { LazyImgDirective } from 'directive/lazy-img.directive';
 import { SafePipe } from 'pipe/safe.pipe';
 import { I18nPipe } from 'pipe/i18n.pipe';
 
@@ -175,6 +176,7 @@ import '@udonarium/table-fx/table-timer';
     NetworkIndicatorComponent,
     DiceSymbolComponent,
     TooltipDirective,
+    LazyImgDirective,
     DraggableDirective,
     FitPanelDirective,
     ResizableDirective,
