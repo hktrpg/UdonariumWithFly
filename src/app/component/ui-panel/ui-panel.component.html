@@ -10,12 +10,12 @@
     'is-snap-half': isMobileSheet && !isSheetCustomHeight && mobileSheetSnap === 'half',
     'is-sheet-custom': isMobileSheet && isSheetCustomHeight
   }"
-  class="draggable-panel"
+  class="draggable-panel magnet-snap-panel"
   [attr.data-tour-panel]="panelService.tourPanelId || null"
   [attr.data-geometry-key]="panelService.geometryKey || null"
   [style.left.px]="left" [style.top.px]="top" [style.width.px]="width" [style.height.px]="height"
   [resizable.disable]="isMinimized || isFullScreen || isMobileSheet" [resizable.align]="isMobileSheet ? 'vertical' : (!isAbleRotateButton ? 'normal' : isHorizontal ? 'horizontal' : 'vertical')" [draggable.disable]="isFullScreen || isMobileSheet"
-  [draggable.handle]="'.title'" [draggable.stack]="'.draggable-panel'" [resizable.stack]="'.draggable-panel'"
+  [draggable.handle]="'.title'" [draggable.stack]="'.magnet-snap-panel'" [resizable.stack]="'.draggable-panel'"
   (resizable.start)="onPanelResizeStart()" (resizable.end)="onPanelGeometryEnd()" (draggable.end)="onPanelGeometryEnd()"
   appDraggable appResizable #draggablePanel>
   <div class="title" #titleBar (dblclick)="onTitleDblClick($event)" (click)="onMobileTitleTap($event)">

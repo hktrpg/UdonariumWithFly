@@ -150,7 +150,3 @@
   background: #5a7d4a;
   border-color: #7a9d6a;
 }
-
-.gt-btn:not(:disabled):hover {
-  filter: brightness(1.1);
-}

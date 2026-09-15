@@ -117,11 +117,6 @@
   cursor: default;
 }
 
-.nav-btn:hover:not(:disabled),
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
 .handout-image,
 .handout-pdf,
 .handout-video {

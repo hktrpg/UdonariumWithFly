@@ -43,7 +43,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   box-shadow: inset 0 0 40px rgba(80, 170, 255, 0.12);
-  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition: border-color var(--udon-motion-fast) var(--udon-ease-standard), background var(--udon-motion-fast) var(--udon-ease-standard), box-shadow var(--udon-motion-fast) var(--udon-ease-standard);
 }
 
 .hand-rail-drop-band.is-hover {
@@ -95,7 +95,7 @@
   cursor: pointer;
   user-select: none;
   flex: 0 0 auto;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition: background var(--udon-motion-base) var(--udon-ease-standard), border-color var(--udon-motion-base) var(--udon-ease-standard);
 }
 
 .hand-play-face:hover {
@@ -119,7 +119,7 @@
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.12);
   flex: 0 0 auto;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--udon-motion-medium) var(--udon-ease-standard), border-color var(--udon-motion-medium) var(--udon-ease-standard);
 }
 
 .hand-play-face-thumb {
@@ -131,7 +131,7 @@
   border-radius: 50%;
   background: #f4f7fb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transition: transform 160ms ease, background 160ms ease;
+  transition: transform var(--udon-motion-medium) var(--udon-ease-standard), background var(--udon-motion-medium) var(--udon-ease-standard);
 }
 
 .hand-play-face-input:checked + .hand-play-face-track {
@@ -172,7 +172,7 @@
   border-bottom: none;
   width: 100%;
   box-sizing: border-box;
-  transition: opacity 160ms ease, border-color 160ms ease;
+  transition: opacity var(--udon-motion-medium) var(--udon-ease-standard), border-color var(--udon-motion-medium) var(--udon-ease-standard);
   max-height: 56px;
   overflow: visible;
 }
@@ -238,12 +238,6 @@
 .hand-orphan-import-btn .material-icons {
   font-size: 18px;
   line-height: 1;
-}
-
-.hand-orphan-import.is-open .hand-orphan-import-btn,
-.hand-orphan-import-btn:hover {
-  border-color: rgba(251, 191, 36, 0.9);
-  background: rgba(160, 100, 12, 0.6);
 }
 
 .hand-orphan-import-badge {
@@ -369,11 +363,6 @@
   cursor: pointer;
 }
 
-.hand-orphan-import-confirm:hover {
-  border-color: rgba(125, 211, 252, 0.95);
-  background: rgba(40, 110, 160, 0.7);
-}
-
 .hand-empty {
   margin: 0;
   padding: 10px 12px 14px;
@@ -474,7 +463,7 @@
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   cursor: grab;
-  transition: max-height 140ms ease;
+  transition: max-height var(--udon-motion-base) var(--udon-ease-standard);
 }
 
 .hand-rail:hover .hand-rail-scroll,
@@ -512,7 +501,7 @@
   gap: 0;
   font-size: 0; /* kill inline whitespace gaps */
   overflow: visible;
-  transition: height 140ms ease, min-height 140ms ease;
+  transition: height var(--udon-motion-base) var(--udon-ease-standard), min-height var(--udon-motion-base) var(--udon-ease-standard);
 }
 
 .hand-rail:hover .hand-row,
@@ -531,7 +520,7 @@
   transform-origin: bottom center;
   /* Tuck: only top ~20% peeks — vertical only. */
   transform: translate3d(0, 80%, 0);
-  transition: transform 140ms ease;
+  transition: transform var(--udon-motion-base) var(--udon-ease-standard);
   cursor: grab;
   overflow: hidden;
   border-radius: 0;

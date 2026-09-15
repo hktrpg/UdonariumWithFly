@@ -143,10 +143,6 @@
   font-size: 16px;
 }
 
-.view-reset:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
 /* Dim outside the content window; keep cards readable inside. */
 .trim-window {
   position: absolute;
@@ -264,16 +260,6 @@
 .btn-icon .material-icons {
   font-size: 20px;
   vertical-align: middle;
-}
-
-.btn-link {
-  background: transparent;
-  border: none;
-  color: #6b5640;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0;
 }
 
 .trim-head {

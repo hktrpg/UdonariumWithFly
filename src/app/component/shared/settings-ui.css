@@ -188,7 +188,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: filter 120ms ease;
+  transition: filter var(--udon-motion-fast) var(--udon-ease-standard);
 }
 
 .image-frame-empty {
@@ -390,28 +390,16 @@ label.disabled {
   cursor: default;
 }
 
-.btn:not(:disabled):hover {
-  background: #efe0c8;
-}
-
 .btn-primary {
   background: #5c4630;
   border-color: #4a3826;
   color: #fffaf2;
 }
 
-.btn-primary:not(:disabled):hover {
-  background: #6d543a;
-}
-
 .btn-danger {
   background: #fff5f5;
   border-color: #d4a0a0;
   color: #a33;
-}
-
-.btn-danger:not(:disabled):hover {
-  background: #ffe8e8;
 }
 
 .btn-sm {
@@ -495,11 +483,6 @@ label.disabled {
   cursor: pointer;
 }
 
-.drop-zone:hover {
-  border-color: #b89b78;
-  background: linear-gradient(180deg, #fffaf2 0%, #f3ebe0 100%);
-}
-
 .drop-zone .material-icons {
   font-size: 28px;
   opacity: 0.75;
@@ -545,11 +528,6 @@ label.disabled {
 
 .btn-mute .material-icons {
   font-size: 20px;
-}
-
-.btn-mute:hover {
-  background: #efe0c8;
-  border-color: #b89b78;
 }
 
 .radio-row {
@@ -650,5 +628,35 @@ label.disabled {
   .volume-row .num,
   .volume-row .val {
     grid-column: 3;
+  }
+}
+
+/* Tag filter chips (image library, …) — label:hover beats :checked base in component CSS. */
+.word-selecter input[type='checkbox'] + div {
+  transition:
+    background-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    box-shadow var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .word-selecter label:hover input[type='checkbox']:not(:checked) + div {
+    background: var(--udon-btn-compact-hover-bg, #e8dcc8);
+    border-color: var(--udon-btn-compact-hover-border, #b89b78);
+    color: #3a2f24;
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div:not(.all-tags) {
+    background: #684f38;
+    border-color: #7a5f45;
+    color: #fffaf2;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.12);
+  }
+
+  .word-selecter label:hover input[type='checkbox']:checked + div.all-tags {
+    background: #e8dcc8;
+    border-color: var(--udon-btn-compact-hover-border, #b89b78);
+    color: #5c4630;
   }
 }

@@ -5,6 +5,9 @@
   gap: 0.35em 0.5em;
   font-size: 12px;
   line-height: 1.4;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 3px;
 }
 
 .field-name {

@@ -4,6 +4,7 @@ import { CSSNumber } from '@udonarium/transform/css-number';
 import { PointerCoordinate } from 'service/pointer-device.service';
 
 import { InputHandler } from './input-handler';
+import { panelMagnetSnapOffset, toPanelMagnetRect } from './panel-magnet-snap.util';
 
 @Directive({
     selector: '[appDraggable]',
@@ -16,6 +17,9 @@ export class DraggableDirective implements AfterViewInit, OnDestroy {
   /** Elements (and descendants) that must not start panel drag — includes HTML5 DnD sources. */
   @Input('draggable.unhandle') unhandleSelector: string = 'input,textarea,button,select,option,span,label,li,.is-draggable,[draggable="true"]';
   @Input('draggable.stack') stackSelector: string = '';
+  /** Snap panel edges to other stack peers while dragging (desktop panels). */
+  @Input('draggable.magnetSnap') magnetSnap: boolean = true;
+  @Input('draggable.magnetThreshold') magnetThreshold: number = 12;
   @Input('draggable.opacity') opacity: number = 0.7;
   @Input('draggable.allowOverHalf') allowOverHalf: boolean = false;
 
@@ -29,6 +33,7 @@ export class DraggableDirective implements AfterViewInit, OnDestroy {
   private startPosition: PointerCoordinate = { x: 0, y: 0, z: 0 };
   private startPointer: PointerCoordinate = { x: 0, y: 0, z: 0 };
   private prevTrans: PointerCoordinate = { x: 0, y: 0, z: 0 };
+  private startViewportBox = { left: 0, top: 0, width: 0, height: 0 };
 
   constructor(
     private ngZone: NgZone,
@@ -71,6 +76,13 @@ export class DraggableDirective implements AfterViewInit, OnDestroy {
     if ((e as MouseEvent).button === 1 || (e as MouseEvent).button === 2) return this.cancel();
     this.setForeground();
     this.startPosition = this.calcElementPosition(this.elementRef.nativeElement);
+    const viewportBox = this.elementRef.nativeElement.getBoundingClientRect();
+    this.startViewportBox = {
+      left: viewportBox.left,
+      top: viewportBox.top,
+      width: viewportBox.width,
+      height: viewportBox.height,
+    };
 
     this.startPointer = this.input.pointer;
     this.prevTrans = { x: 0, y: 0, z: 0 };
@@ -107,6 +119,10 @@ export class DraggableDirective implements AfterViewInit, OnDestroy {
     trans.x += correction.x;
     trans.y += correction.y;
     trans.z += correction.z;
+
+    const magnet = this.calcMagnetSnapOffset(trans);
+    trans.x += magnet.x;
+    trans.y += magnet.y;
 
     if (0 < MathUtil.sqrMagnitude(trans)) {
       this.elementRef.nativeElement.style.opacity = this.opacity + '';
@@ -196,6 +212,28 @@ export class DraggableDirective implements AfterViewInit, OnDestroy {
       node = node.parentElement;
     }
     return false;
+  }
+
+  private calcMagnetSnapOffset(trans: PointerCoordinate): PointerCoordinate {
+    if (!this.magnetSnap || this.stackSelector.length < 1) return { x: 0, y: 0, z: 0 };
+
+    const doc = this.elementRef.nativeElement.ownerDocument;
+    const stacks = doc.querySelectorAll<HTMLElement>(this.stackSelector);
+    const others = [];
+    stacks.forEach(elm => {
+      if (elm === this.elementRef.nativeElement) return;
+      others.push(toPanelMagnetRect(elm.getBoundingClientRect()));
+    });
+    if (!others.length) return { x: 0, y: 0, z: 0 };
+
+    const moving = toPanelMagnetRect({
+      left: this.startViewportBox.left + trans.x,
+      top: this.startViewportBox.top + trans.y,
+      width: this.startViewportBox.width,
+      height: this.startViewportBox.height,
+    });
+    const snap = panelMagnetSnapOffset(moving, others, this.magnetThreshold);
+    return { x: snap.x, y: snap.y, z: 0 };
   }
 
   private calcCorrectionPosition(diff: PointerCoordinate = { x: 0, y: 0, z: 0 }): PointerCoordinate {

@@ -37,10 +37,6 @@
   cursor: pointer;
 }
 
-.timer-row:hover {
-  background: #f4e8d6;
-}
-
 .timer-row.is-selected {
   background: #efe0c8;
 }
@@ -186,18 +182,10 @@
   color: #fffaf2;
 }
 
-.btn-canvas-room:hover:not(:disabled) {
-  background: #6b5340;
-}
-
 .btn-canvas-personal {
   background: #ebe2d4;
   border-color: #c4b29a;
   color: #3a2f24;
-}
-
-.btn-canvas-personal:hover:not(:disabled) {
-  background: #e0d4c2;
 }
 
 .checkbox-inline {

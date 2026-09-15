@@ -220,10 +220,6 @@
   white-space: nowrap;
 }
 
-.scene-chip-menu button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .scene-chip-menu button:disabled {
   opacity: 0.4;
   cursor: not-allowed;

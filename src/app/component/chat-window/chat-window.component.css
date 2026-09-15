@@ -117,12 +117,6 @@
   vertical-align: middle;
 }
 
-.toolbar-more:hover,
-.chat-toolbar.actions-open .toolbar-more {
-  background-color: #555;
-  color: #eee;
-}
-
 .chat-toolbar-actions {
   display: flex;
   align-items: center;
@@ -227,12 +221,6 @@
   padding: 2px 4px;
   border-radius: 5px;
   cursor: pointer;
-}
-
-.tab-setting:hover {
-  background-color: #888;
-  color: #eee;
-  border: solid 1px #555;
 }
 
 .small-font {

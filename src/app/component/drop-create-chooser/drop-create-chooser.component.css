@@ -53,12 +53,7 @@
   color: #3a2f24;
   text-align: left;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
-}
-
-.choice-tile:hover {
-  background: #fff7eb;
-  border-color: #b89b78;
+  transition: border-color var(--udon-motion-fast) var(--udon-ease-standard), background var(--udon-motion-fast) var(--udon-ease-standard), box-shadow var(--udon-motion-fast) var(--udon-ease-standard);
 }
 
 .choice-tile.is-selected {

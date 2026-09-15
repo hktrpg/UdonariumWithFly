@@ -398,10 +398,6 @@
   cursor: pointer;
 }
 
-.delete-btn:hover:not(:disabled) {
-  background: #ffe8e8;
-}
-
 .delete-btn:disabled {
   opacity: 0.5;
   cursor: default;
@@ -491,11 +487,6 @@
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
-}
-
-.btn-cancel:hover {
-  background-color: #888;
-  color: #eee;
 }
 
 .thumb-preview {

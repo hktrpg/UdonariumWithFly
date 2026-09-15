@@ -11,6 +11,7 @@
   cursor: pointer;
   line-height: 1;
   color: inherit;
+  border-radius: 3px;
 }
 
 .send-btn .material-icons {

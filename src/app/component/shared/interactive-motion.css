@@ -1,0 +1,1395 @@
+/**
+ * Unified motion tokens + interactive affordance (hover / focus / active).
+ * Import once from styles.css — do not duplicate per-component motion blocks.
+ */
+:root {
+  /* Duration */
+  --udon-motion-fast: 120ms;
+  --udon-motion-base: 140ms;
+  --udon-motion-medium: 160ms;
+  --udon-motion-slow: 200ms;
+  --udon-motion-drag: 132ms;
+
+  /* Easing */
+  --udon-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --udon-ease-emphasized: cubic-bezier(0.2, 0, 0, 1.15);
+  --udon-ease-spring: cubic-bezier(0.21, 0.97, 0.75, 1.25);
+  --udon-ease-linear: linear;
+
+  /* Legacy aliases */
+  --udon-hover-dur: var(--udon-motion-base);
+  --udon-hover-ease: var(--udon-ease-standard);
+
+  /* Interactive scale */
+  --udon-hover-scale: 1.06;
+  --udon-hover-scale-sm: 1.04;
+  --udon-hover-scale-xs: 1.12;
+  --udon-hover-scale-menu: 1.03;
+  --udon-active-scale: 0.96;
+  --udon-active-scale-sm: 0.94;
+  --udon-active-scale-menu: 0.97;
+
+  /* Chrome brightness */
+  --udon-bar-bright: 1.14;
+  --udon-chrome-bright: 1.12;
+  --udon-chrome-active-bright: 0.92;
+
+  /* Form controls */
+  --udon-input-hover-bg: #faf6ef;
+  --udon-input-focus-bg: #fff;
+  --udon-input-hover-border: #a88868;
+  --udon-input-focus-border: #6d543a;
+  --udon-input-sheet-hover-bg: #eee;
+  --udon-input-sheet-focus-bg: #fff;
+  --udon-inline-input-hover-bg: #eee;
+  --udon-inline-input-focus-bg: #fff;
+  --udon-focus-ring-color: rgba(37, 99, 235, 0.42);
+  --udon-focus-ring-width: 2px;
+  --udon-focus-ring-offset: 1px;
+
+  /* Compact list / toolbar buttons (.btn-sm in settings panels) */
+  --udon-btn-compact-hover-bg: #e8dcc8;
+  --udon-btn-compact-hover-border: #b89b78;
+  --udon-btn-compact-primary-hover-bg: #684f38;
+  --udon-btn-compact-danger-hover-bg: #fff0f0;
+  --udon-btn-compact-danger-hover-border: #d4a0a0;
+  --udon-row-hover-bg: #faf5ec;
+  --udon-row-hover-bg-muted: rgba(92, 70, 48, 0.06);
+  --udon-img-tile-hover-border: #b89b78;
+  --udon-choice-hover-bg: #f5ebe0;
+  --udon-hud-input-hover-bg: rgba(255, 255, 255, 0.1);
+  --udon-hud-input-hover-border: rgba(255, 255, 255, 0.32);
+  --udon-hud-focus-ring: rgba(96, 165, 250, 0.4);
+
+  /* Panel bar strips — neutral darken (map settings style), not brown tint */
+  --udon-warm-bar-hover-bg: rgba(0, 0, 0, 0.045);
+  --udon-warm-bar-hover-border: #d2c2ab;
+  --udon-warm-toolbar-hover-bg: #ebe1d2;
+  --udon-dark-bar-hover-bg: rgba(255, 255, 255, 0.06);
+
+  /* Custom range sliders (HP/MP etc.) — darken on hover, like map settings */
+  --udon-slider-hover-fill: #444;
+  --udon-slider-hover-track: #d0c8bc;
+  --udon-slider-hover-border: #666;
+  --udon-slider-hover-thumb: #e8e8e8;
+}
+
+/* —— Form controls (global + settings panels + character sheet fields) —— */
+select,
+textarea,
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+input[type='url'],
+input[type='email'],
+.settings-ui .field input[type='text'],
+.settings-ui .field input[type='password'],
+.settings-ui .field input[type='number'],
+.settings-ui .field input[type='url'],
+.settings-ui .field select,
+.settings-ui .field textarea,
+.settings-ui .slider-row .num,
+game-data-element input:not([type='range']):not([type='checkbox']):not([type='radio']),
+game-data-element input[type='range'],
+game-data-element textarea,
+game-data-element select,
+input.input,
+textarea.textarea,
+input.id-input {
+  transition:
+    background-color var(--udon-motion-fast) var(--udon-ease-standard),
+    border-color var(--udon-motion-fast) var(--udon-ease-standard),
+    box-shadow var(--udon-motion-fast) var(--udon-ease-standard),
+    color var(--udon-motion-fast) var(--udon-ease-standard);
+}
+
+/* Borderless inline editors (overview / inventory panels). */
+input.input,
+textarea.textarea {
+  background: none;
+  border: none;
+  border-radius: 2px;
+  outline: none;
+}
+
+/* Ghost icon/text buttons on sheets and panels. */
+button.link {
+  background: none;
+  border: none;
+  border-radius: 2px;
+  outline: none;
+  color: #444;
+  font-family: Cambria, Georgia;
+  font-size: 1em;
+  padding: 2px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+button.link i {
+  font-size: 1rem;
+}
+
+button.link:disabled {
+  color: gray;
+  cursor: default;
+}
+
+.settings-ui .btn-link {
+  background: transparent;
+  border: none;
+  color: #6b5640;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+
+.btn-cancel {
+  transition:
+    background-color var(--udon-motion-fast) var(--udon-ease-standard),
+    border-color var(--udon-motion-fast) var(--udon-ease-standard),
+    color var(--udon-motion-fast) var(--udon-ease-standard);
+}
+
+.remove-button {
+  transition:
+    background-color var(--udon-motion-fast) var(--udon-ease-standard),
+    color var(--udon-motion-fast) var(--udon-ease-standard);
+}
+
+/* Legacy buttons with no semantic class (modal close, inline chat helpers, …). */
+button:not([class]) {
+  transition:
+    background-color var(--udon-motion-fast) var(--udon-ease-standard),
+    border-color var(--udon-motion-fast) var(--udon-ease-standard),
+    color var(--udon-motion-fast) var(--udon-ease-standard),
+    transform var(--udon-motion-fast) var(--udon-ease-standard),
+    box-shadow var(--udon-motion-fast) var(--udon-ease-standard);
+}
+
+/* —— Warm settings panels (character sheet, inventory, combat, …) —— */
+.btn,
+.btn-mute,
+.settings-ui .image-frame:not(:disabled),
+.settings-ui .icon-toggle,
+.settings-ui .drop-zone,
+.settings-ui .pool-chip,
+.settings-ui .row-drag,
+.settings-ui .row-remove,
+.settings-ui .inv-tab span,
+.settings-ui .role,
+.settings-ui .check-row label,
+.settings-ui .image-frame img,
+.btn-canvas,
+.btn-icon,
+.delete-btn,
+.list-pick,
+.jb-icon-act,
+.settings-ui .file-list .image,
+file-selecter .image,
+.settings-ui .choice-tile,
+.settings-ui .choice-item,
+.settings-ui .icon-btn,
+.settings-ui .timer-row,
+.settings-ui .word-selecter input[type='checkbox'] + div,
+.settings-ui .portrait,
+.settings-ui .role-switch,
+.icon-image-box img,
+.settings-ui input[type='range'],
+game-data-element input[type='range'],
+game-object-inventory input[type='range'],
+overview-panel input[type='range'],
+overview-panel .input,
+overview-panel .grid-container,
+overview-panel .grid-container > .tag,
+overview-panel .grid-container > .value,
+overview-panel .overview-data-row,
+.overview-display-config .selected-row,
+.overview-display-config overview-summary-field,
+.resource-hud .res-num,
+button.link,
+.btn-link,
+button.indicate,
+.tab-setting,
+.toolbar-more,
+game-data-element button:not(:disabled) {
+  transition:
+    transform var(--udon-motion-base) var(--udon-ease-standard),
+    background-color var(--udon-motion-base) var(--udon-ease-standard),
+    border-color var(--udon-motion-base) var(--udon-ease-standard),
+    color var(--udon-motion-base) var(--udon-ease-standard),
+    box-shadow var(--udon-motion-base) var(--udon-ease-standard),
+    filter var(--udon-motion-base) var(--udon-ease-standard),
+    opacity var(--udon-motion-base) var(--udon-ease-standard);
+}
+
+/* —— Dark chrome icon buttons —— */
+.pin-button,
+.zoom-button,
+.scene-nav-toggle,
+.scene-chip,
+.hud-action,
+.streetscape-job-hud .hud-main,
+.resource-hud .hud-drag,
+.resource-hud .hud-collapse,
+.resource-hud .btn-nudge,
+.music-hud .hud-drag,
+.music-hud .hud-collapse,
+.music-hud .hud-open,
+.music-hud .slot-play,
+.streetscape-job-hud .hud-drag,
+.streetscape-job-hud .hud-action,
+.table-timer-compact-hud .win-btn,
+.table-timer .win-btn,
+.table-timer .timer-btn,
+.timer-compact-hud .timer-btn,
+.preview-bar .nav-btn,
+.preview-bar .close-btn,
+.handout-bar .nav-btn,
+.handout-bar .close-btn,
+.hand-orphan-import-btn,
+.hand-orphan-import-close,
+.hand-orphan-import-confirm,
+.music-hud .slot-name,
+.gt-btn,
+.view-reset,
+.pdf-btn,
+.mesh-diag-icon,
+.draggable-panel .title button,
+.modal-panel .title button,
+.desktop-icon-rail ul > li,
+context-menu .sheet-back,
+context-menu .sheet-minimize,
+context-menu .sheet-close {
+  transition:
+    transform var(--udon-motion-base) var(--udon-ease-standard),
+    background-color var(--udon-motion-base) var(--udon-ease-standard),
+    border-color var(--udon-motion-base) var(--udon-ease-standard),
+    color var(--udon-motion-base) var(--udon-ease-standard),
+    box-shadow var(--udon-motion-base) var(--udon-ease-standard),
+    filter var(--udon-motion-base) var(--udon-ease-standard);
+}
+
+.pin-button .material-icons,
+.zoom-button > .material-icons,
+context-menu .sub-menu-arrow .material-icons {
+  transition:
+    transform var(--udon-motion-base) var(--udon-ease-standard),
+    color var(--udon-motion-base) var(--udon-ease-standard);
+}
+
+/* —— Dark chrome bars / draggable headers —— */
+.title-background,
+.title-bg-area,
+.title-area.component-title,
+.resource-hud .hud-head,
+.scene-chip,
+.draggable-panel .title,
+.modal-panel .title,
+.hand-rail-chrome,
+.hand-rail-drop-band,
+.hud-chrome,
+.timer-compact-hud-chrome,
+.table-timer-chrome,
+.scene-nav-track,
+.preview-bar,
+.settings-ui .card-head,
+.settings-ui .toolbar,
+.settings-ui .sticky-toolbar,
+.settings-ui .selection-bar,
+.settings-ui .drop-bar,
+.settings-ui .table-toolbar,
+.settings-ui .block-head,
+.settings-ui .action-head,
+.settings-ui .note-head,
+.settings-ui .sheet-head,
+.settings-ui .trim-head,
+.settings-ui .action-panel-head,
+.settings-ui .jb-row-head,
+.settings-ui .jb-fold,
+.settings-ui .jb-folder-head,
+.settings-ui .hand-orphan-import-head,
+.timer-compact-row {
+  transition:
+    filter var(--udon-motion-base) var(--udon-ease-standard),
+    background-color var(--udon-motion-base) var(--udon-ease-standard),
+    border-color var(--udon-motion-base) var(--udon-ease-standard),
+    box-shadow var(--udon-motion-base) var(--udon-ease-standard),
+    opacity var(--udon-motion-medium) var(--udon-ease-standard);
+}
+
+.resource-hud .gm-toggle,
+.streetscape-job-hud .hud-main,
+.scene-chip-menu button,
+context-menu ul > li,
+context-menu .icon-menu img,
+.hand-play-face,
+.hand-play-face-track,
+.hand-play-face-thumb {
+  transition:
+    transform var(--udon-motion-base) var(--udon-ease-standard),
+    filter var(--udon-motion-medium) var(--udon-ease-standard),
+    background-color var(--udon-motion-base) var(--udon-ease-standard),
+    border-color var(--udon-motion-base) var(--udon-ease-standard),
+    color var(--udon-motion-base) var(--udon-ease-standard),
+    opacity var(--udon-motion-medium) var(--udon-ease-standard);
+}
+
+.send-btn {
+  border-radius: 3px;
+  transition:
+    transform var(--udon-motion-fast) var(--udon-ease-standard),
+    color var(--udon-motion-fast) var(--udon-ease-standard),
+    background-color var(--udon-motion-fast) var(--udon-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Form controls */
+  select:hover:not(:disabled),
+  textarea:hover:not(:disabled),
+  input[type='text']:hover:not(:disabled),
+  input[type='password']:hover:not(:disabled),
+  input[type='number']:hover:not(:disabled),
+  input[type='search']:hover:not(:disabled),
+  input[type='url']:hover:not(:disabled),
+  input[type='email']:hover:not(:disabled),
+  .settings-ui .field input:hover:not(:disabled),
+  .settings-ui .field select:hover:not(:disabled),
+  .settings-ui .field textarea:hover:not(:disabled),
+  .settings-ui .slider-row .num:hover:not(:disabled) {
+    background-color: var(--udon-input-hover-bg);
+    border-color: var(--udon-input-hover-border);
+  }
+
+  game-data-element input:not([type='range']):not([type='checkbox']):not([type='radio']):hover:not(:disabled),
+  game-data-element textarea:hover:not(:disabled),
+  game-data-element select:hover:not(:disabled) {
+    background: var(--udon-input-sheet-hover-bg);
+  }
+
+  input.input:hover:not(:disabled),
+  textarea.textarea:hover:not(:disabled) {
+    background-color: var(--udon-inline-input-hover-bg);
+  }
+
+  input.input:focus:not(:disabled),
+  textarea.textarea:focus:not(:disabled),
+  input.input:focus-visible:not(:disabled),
+  textarea.textarea:focus-visible:not(:disabled) {
+    background-color: var(--udon-inline-input-focus-bg);
+  }
+
+  input.id-input:hover:not(:disabled),
+  input.id-input:active:not(:disabled) {
+    border-color: #444;
+  }
+
+  /* Only unclassed legacy buttons — never override dark HUD / settings chrome. */
+  button:not([class]):hover:not(:disabled) {
+    background-color: #cfd8dc;
+  }
+
+  button.indicate:hover:not(:disabled):not(.is-active) {
+    background-color: #555;
+    color: #eee;
+    border-color: #555;
+  }
+
+  .tab-setting:hover {
+    background-color: #666;
+    color: #eee;
+    border-color: #555;
+    filter: brightness(1.06);
+  }
+
+  .toolbar-more:hover,
+  .chat-toolbar.actions-open .toolbar-more {
+    background-color: #555;
+    color: #eee;
+    border-color: #555;
+    filter: brightness(1.06);
+  }
+
+  button.danger:not(:disabled):hover {
+    background-color: rgb(160, 32, 32);
+    color: #f5f5f5;
+  }
+
+  /* Warm settings buttons — unified across forms, lists, footers (room create, etc.). */
+  .btn:not(:disabled):not(.btn-canvas):hover {
+    transform: none;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.12);
+  }
+
+  .btn:not(:disabled):not(.btn-canvas):not(.btn-primary):not(.btn-danger):hover {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+  }
+
+  .btn.btn-primary:not(:disabled):not(.btn-canvas):hover {
+    background: var(--udon-btn-compact-primary-hover-bg);
+    border-color: #4a3826;
+    filter: none;
+  }
+
+  .btn.btn-danger:not(:disabled):not(.btn-canvas):hover {
+    background: var(--udon-btn-compact-danger-hover-bg);
+    border-color: var(--udon-btn-compact-danger-hover-border);
+    box-shadow: 0 1px 2px rgba(120, 40, 40, 0.1);
+  }
+
+  .btn:not(:disabled):not(.btn-canvas):active {
+    transform: translateY(1px);
+    box-shadow: none;
+    filter: brightness(0.97);
+  }
+
+  .btn.zoom-button:hover:not(:disabled) {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    color: #3a2f24;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.12);
+    transform: none;
+    filter: none;
+  }
+
+  .btn-icon:hover:not(:disabled),
+  .delete-btn:hover:not(:disabled) {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    transform: none;
+  }
+
+  .delete-btn:hover:not(:disabled) {
+    background: #ffe8e8;
+    border-color: #e0b2a4;
+    color: #8b3a3a;
+  }
+
+  .list-pick:hover {
+    background: var(--udon-row-hover-bg-muted);
+    border-color: var(--udon-warm-bar-hover-border);
+    box-shadow: inset 0 -2px 0 #5c4630;
+  }
+
+  .jb-icon-act:hover:not(:disabled) {
+    background: var(--udon-btn-compact-hover-bg);
+    color: #684f38;
+    transform: none;
+  }
+
+  /* List / table row affordance (lobby, combat, presets, notes, timers, …). */
+  .settings-ui table tr:not(:first-child):hover > * {
+    background-color: var(--udon-row-hover-bg);
+  }
+
+  .settings-ui .list-item:hover {
+    background: var(--udon-row-hover-bg-muted);
+  }
+
+  .settings-ui .combatant-list li:not(.current):hover {
+    background: var(--udon-row-hover-bg);
+  }
+
+  .settings-ui .note-card:not(.is-selected):hover {
+    border-color: var(--udon-btn-compact-hover-border);
+    box-shadow: 0 1px 3px rgba(58, 47, 36, 0.08);
+  }
+
+  .settings-ui .timer-row:hover {
+    background: var(--udon-row-hover-bg);
+  }
+
+  .settings-ui .choice-tile:hover:not(:disabled),
+  .settings-ui .choice-item:hover {
+    background: var(--udon-choice-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.08);
+  }
+
+  .settings-ui .role-switch:hover {
+    filter: brightness(1.04);
+  }
+
+  .settings-ui .portrait:not(:disabled):hover {
+    border-color: var(--udon-btn-compact-hover-border);
+    box-shadow: 0 1px 3px rgba(58, 47, 36, 0.1);
+    filter: brightness(1.03);
+  }
+
+  .settings-ui .icon-btn:hover:not(:disabled) {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+  }
+
+  /* Image library tiles */
+  .settings-ui .file-list .image:hover {
+    border: 2px solid var(--udon-img-tile-hover-border);
+    transform: translateY(-1px);
+    z-index: 150;
+    box-shadow: 0 2px 8px rgba(58, 47, 36, 0.12);
+  }
+
+  .settings-ui .file-list .image:hover img,
+  file-selecter .image:not(.current-images):hover img {
+    filter: none !important;
+    backdrop-filter: none;
+  }
+
+  file-selecter .image:not(.current-images):hover {
+    border: 2px solid var(--udon-img-tile-hover-border);
+    transform: translateY(-1px);
+    z-index: 200;
+    box-shadow: 0 2px 8px rgba(58, 47, 36, 0.12);
+  }
+
+  /* Tag chips: see settings-ui.css + file-selecter.component.css (label:hover; beats :checked in encapsulated CSS). */
+
+  .word-tag.removable:hover {
+    color: #8b3a3a;
+  }
+
+  .icon-image-box:not(.current-icon):hover {
+    z-index: 600;
+  }
+
+  .icon-image-box:not(.current-icon):hover img {
+    border: 2px solid var(--udon-img-tile-hover-border);
+  }
+
+  .btn-canvas-room:hover:not(:disabled) {
+    background: #6b5340;
+    transform: scale(var(--udon-hover-scale-sm));
+    box-shadow: 0 1px 4px rgba(58, 47, 36, 0.14);
+  }
+
+  .btn-canvas-personal:hover:not(:disabled) {
+    background: #e0d4c2;
+    transform: scale(var(--udon-hover-scale-sm));
+    box-shadow: 0 1px 4px rgba(58, 47, 36, 0.14);
+  }
+
+  .btn-link:hover:not(:disabled) {
+    color: #4a3828;
+    filter: brightness(0.92);
+  }
+
+  .btn-cancel:hover:not(:disabled) {
+    background-color: #888;
+    color: #eee;
+  }
+
+  .remove-button:hover:not(:disabled) {
+    background-color: #eee;
+  }
+
+  button.link:hover:not(:disabled) {
+    background: #444;
+    color: #ccc;
+    transform: scale(1.04);
+  }
+
+  button.link:active:not(:disabled) {
+    transform: scale(var(--udon-active-scale-sm));
+  }
+
+  button.link:disabled:hover,
+  game-data-element button:disabled:hover {
+    background-color: transparent;
+    transform: none;
+  }
+
+  .btn-mute:hover {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    transform: none;
+  }
+
+  .settings-ui .image-frame:not(:disabled):hover {
+    filter: brightness(1.06);
+    border-color: #a88868;
+  }
+
+  .settings-ui .icon-toggle:hover {
+    filter: brightness(1.1);
+  }
+
+  .settings-ui .icon-toggle:hover .material-icons {
+    opacity: 1;
+  }
+
+  .settings-ui .drop-zone:hover {
+    border-color: #b89b78;
+    background: linear-gradient(180deg, #fffaf2 0%, #f3ebe0 100%);
+    filter: brightness(1.02);
+  }
+
+  .settings-ui .pool-chip:hover {
+    border-color: #a88868;
+    background: #fffaf2;
+    transform: none;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.1);
+  }
+
+  .settings-ui .row-drag:hover,
+  .settings-ui .row-remove:hover {
+    opacity: 1;
+    color: #5c4630;
+    transform: none;
+    filter: brightness(1.08);
+  }
+
+  .settings-ui .inv-tab:not(.is-active):hover span {
+    background: var(--udon-btn-compact-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    transform: none;
+  }
+
+  .settings-ui .role:hover:not(.disabled) {
+    border-color: #b89a72;
+    box-shadow: 0 1px 2px rgba(58, 47, 36, 0.08);
+    transform: none;
+  }
+
+  .settings-ui .check-row label:hover {
+    filter: brightness(1.06);
+  }
+
+  game-data-element button:not(:disabled):hover {
+    background: #555;
+    color: #eee;
+    transform: none;
+    filter: brightness(1.06);
+  }
+
+  game-data-element button:not(:disabled):active {
+    transform: translateY(1px);
+    filter: brightness(0.95);
+  }
+
+  /* Resource HUD (dark chrome) */
+  .resource-hud .res-num:hover:not(:disabled) {
+    border-color: var(--udon-hud-input-hover-border);
+    background: var(--udon-hud-input-hover-bg);
+  }
+
+  .resource-hud .res-row input[type='range']:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  .resource-hud .char-block:hover {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Context menu */
+  context-menu ul > li.hasHighlight:hover {
+    color: #ccc;
+    background-color: rgba(30, 30, 30, 0.8);
+  }
+
+  context-menu ul > li.hasHighlight:active:not(.disabled) {
+    filter: brightness(var(--udon-chrome-active-bright));
+  }
+
+  context-menu ul > li.hasHighlight:hover .sub-menu-arrow .material-icons {
+    transform: translateX(2px);
+  }
+
+  context-menu .icon-menu:hover img {
+    border: 2px dotted rgba(255, 0, 0, 40);
+    z-index: 600;
+    transform: scale(1.05);
+  }
+
+  context-menu .sheet-back:hover,
+  context-menu .sheet-minimize:hover,
+  context-menu .sheet-close:hover {
+    background: var(--udon-chrome-active, rgba(255, 255, 255, 0.08));
+    color: #fff;
+  }
+
+  context-menu .sheet-actions.is-icon-grid > ul > li.is-grid-icon:hover {
+    background: var(--udon-chrome-active, rgba(255, 255, 255, 0.08));
+    border-color: #888;
+    transform: scale(var(--udon-hover-scale-menu));
+  }
+
+  /* Left icon rail */
+  .desktop-icon-rail ul > li:hover {
+    color: #ddd;
+    background-color: rgba(255, 255, 255, 0.12);
+    filter: brightness(var(--udon-chrome-bright));
+  }
+
+  /* Dark chrome icon buttons */
+  .pin-button:hover {
+    color: #fff;
+    border-color: #aaa;
+    background: rgba(72, 72, 72, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+    transform: scale(var(--udon-hover-scale));
+  }
+
+  .pin-button:active {
+    transform: scale(var(--udon-active-scale));
+  }
+
+  .zoom-button:hover:not(.btn) {
+    color: #fff;
+    border-color: #aaa;
+    background: rgba(72, 72, 72, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+    transform: scale(var(--udon-hover-scale));
+  }
+
+  .zoom-button:active {
+    transform: scale(var(--udon-active-scale));
+  }
+
+  .scene-nav-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.24);
+    filter: none;
+  }
+
+  .scene-nav-toggle:active {
+    transform: scale(var(--udon-active-scale));
+  }
+
+  .resource-hud .hud-drag:hover,
+  .resource-hud .hud-collapse:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transform: scale(var(--udon-hover-scale));
+  }
+
+  .resource-hud .hud-drag:active,
+  .resource-hud .hud-collapse:active {
+    transform: scale(var(--udon-active-scale));
+  }
+
+  .resource-hud .btn-nudge:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(var(--udon-hover-scale-xs));
+  }
+
+  .resource-hud .btn-nudge:active:not(:disabled) {
+    transform: scale(var(--udon-active-scale-sm));
+  }
+
+  .streetscape-job-hud .hud-drag:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(var(--udon-hover-scale-sm));
+    filter: none;
+  }
+
+  .music-hud .hud-drag:hover,
+  .music-hud .hud-collapse:hover,
+  .music-hud .hud-open:hover,
+  .music-hud .slot-play:hover:not(:disabled) {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transform: scale(var(--udon-hover-scale));
+  }
+
+  .music-hud .hud-drag:active,
+  .music-hud .hud-collapse:active,
+  .music-hud .hud-open:active,
+  .music-hud .slot-play:active:not(:disabled) {
+    transform: scale(var(--udon-active-scale));
+  }
+
+  .table-timer-compact-hud .win-btn:hover:not(.is-close),
+  .table-timer .win-btn:hover:not(.is-close) {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.08);
+  }
+
+  .table-timer-compact-hud .win-btn.is-close:hover,
+  .table-timer .win-btn.is-close:hover {
+    background: rgba(248, 113, 113, 0.85);
+    color: #fff;
+  }
+
+  .timer-btn:hover:not(:disabled) {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transform: scale(var(--udon-hover-scale-sm));
+  }
+
+  .timer-btn:active:not(:disabled) {
+    transform: scale(var(--udon-active-scale-sm));
+  }
+
+  .music-hud .slot-name:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    filter: brightness(1.06);
+  }
+
+  .hand-orphan-import-btn:hover,
+  .hand-orphan-import.is-open .hand-orphan-import-btn {
+    border-color: rgba(251, 191, 36, 0.9);
+    background: rgba(160, 100, 12, 0.6);
+    filter: brightness(1.06);
+  }
+
+  .hand-orphan-import-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    filter: brightness(1.1);
+  }
+
+  .hand-orphan-import-confirm:hover {
+    border-color: rgba(125, 211, 252, 0.95);
+    background: rgba(40, 110, 160, 0.7);
+    filter: brightness(1.06);
+  }
+
+  .gt-btn:not(:disabled):hover {
+    filter: brightness(1.12);
+    border-color: #999;
+  }
+
+  .gt-btn.primary:not(:disabled):hover {
+    filter: brightness(1.1);
+    border-color: #8aad7a;
+  }
+
+  .view-reset:hover {
+    background: rgba(0, 0, 0, 0.7);
+    filter: brightness(1.12);
+  }
+
+  .pdf-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.28);
+    transform: scale(var(--udon-hover-scale-sm));
+  }
+
+  .pdf-btn:active:not(:disabled) {
+    transform: scale(var(--udon-active-scale-sm));
+  }
+
+  .mesh-diag-icon:hover:not(:disabled) {
+    color: #334155;
+    background: rgba(92, 70, 48, 0.08);
+    border-radius: 4px;
+  }
+
+  .preview-bar .nav-btn:hover:not(:disabled),
+  .preview-bar .close-btn:hover,
+  .handout-bar .nav-btn:hover:not(:disabled),
+  .handout-bar .close-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: scale(var(--udon-hover-scale-sm));
+  }
+
+  .preview-bar .nav-btn:active:not(:disabled),
+  .preview-bar .close-btn:active,
+  .handout-bar .nav-btn:active:not(:disabled),
+  .handout-bar .close-btn:active {
+    transform: scale(var(--udon-active-scale-sm));
+  }
+
+  /* Warm panel bar strips */
+  .settings-ui .card-head:hover,
+  .settings-ui .block-head:hover,
+  .settings-ui .action-head:hover,
+  .settings-ui .note-head:hover,
+  .settings-ui .sheet-head:hover,
+  .settings-ui .trim-head:hover,
+  .settings-ui .hand-orphan-import-head:hover {
+    background: var(--udon-warm-bar-hover-bg);
+    border-bottom-color: var(--udon-warm-bar-hover-border);
+  }
+
+  .settings-ui .card-head:hover {
+    border-radius: 3px 3px 0 0;
+  }
+
+  .settings-ui .toolbar:hover,
+  .settings-ui .sticky-toolbar:hover,
+  .settings-ui .selection-bar:hover,
+  .settings-ui .drop-bar:hover {
+    background: var(--udon-warm-bar-hover-bg);
+    border-radius: 4px;
+  }
+
+  .settings-ui .table-toolbar:hover {
+    background: var(--udon-warm-toolbar-hover-bg);
+    border-bottom-color: var(--udon-warm-bar-hover-border);
+  }
+
+  .settings-ui .action-panel-head:hover {
+    background: var(--udon-warm-bar-hover-bg);
+    border-color: var(--udon-warm-bar-hover-border);
+  }
+
+  .settings-ui .jb-row-head:hover,
+  .settings-ui .jb-fold:hover,
+  .settings-ui .jb-folder-head:hover {
+    background: var(--udon-warm-bar-hover-bg);
+  }
+
+  .settings-ui .jb-folder-block.is-drop-target > .jb-folder-head:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Range sliders — darken on hover (map settings), not brown */
+  .settings-ui input[type='range']:hover:not(:disabled),
+  game-data-element input[type='range']:hover:not(:disabled),
+  game-object-inventory input[type='range']:hover:not(:disabled),
+  overview-panel input[type='range']:hover:not(:disabled) {
+    --slider-fill-color: var(--udon-slider-hover-fill);
+    --slider-track-color: var(--udon-slider-hover-track);
+    --slider-border-color: var(--udon-slider-hover-border);
+    --slider-thumb-bg: var(--udon-slider-hover-thumb);
+  }
+
+  .settings-ui input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  game-data-element input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  game-object-inventory input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  overview-panel input[type='range']:hover:not(:disabled)::-webkit-slider-thumb {
+    transform: scale(1.12);
+  }
+
+  .settings-ui input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  game-data-element input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  game-object-inventory input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  overview-panel input[type='range']:hover:not(:disabled)::-moz-range-thumb {
+    transform: scale(1.12);
+  }
+
+  .draggable-panel .title button:hover,
+  .modal-panel .title button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    transform: scale(1.1);
+  }
+
+  .draggable-panel .title button:active,
+  .modal-panel .title button:active {
+    transform: scale(0.92);
+  }
+
+  context-menu .sheet-back:active,
+  context-menu .sheet-minimize:active,
+  context-menu .sheet-close:active {
+    background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+    transform: scale(var(--udon-active-scale));
+  }
+
+  context-menu .sheet-actions.is-icon-grid > ul > li.is-grid-icon:active {
+    background: var(--udon-chrome-active, rgba(255, 255, 255, 0.1));
+    transform: scale(var(--udon-active-scale-menu));
+  }
+
+  /* Dark chrome bars */
+  .title-background:hover,
+  .title-bg-area:hover,
+  .title-area.component-title:hover {
+    filter: brightness(var(--udon-bar-bright));
+  }
+
+  .hud-chrome:hover,
+  .timer-compact-hud-chrome:hover,
+  .table-timer-chrome:hover {
+    background: var(--udon-dark-bar-hover-bg);
+    filter: none;
+  }
+
+  .hand-rail-chrome:hover,
+  .hand-rail-drop-band:hover {
+    background: rgba(255, 255, 255, 0.04);
+    filter: none;
+  }
+
+  .preview-bar.is-float-bar:hover {
+    background: rgba(32, 28, 24, 0.92);
+    border-color: rgba(255, 255, 255, 0.18);
+    filter: none;
+  }
+
+  .timer-compact-row:hover {
+    background: var(--udon-dark-bar-hover-bg);
+  }
+
+  .resource-hud .hud-head:hover {
+    background: var(--udon-dark-bar-hover-bg);
+    filter: none;
+  }
+
+  .resource-hud .gm-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+    filter: none;
+  }
+
+  .scene-chip:hover:not(:disabled):not(.is-locked) {
+    background: rgba(48, 52, 60, 0.95);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    filter: none;
+  }
+
+  .scene-chip.is-active:not(.is-viewed):hover:not(:disabled):not(.is-locked) {
+    background: rgba(60, 78, 48, 0.98);
+    border-color: rgba(180, 220, 120, 0.65);
+  }
+
+  .scene-chip.is-viewed:hover:not(:disabled):not(.is-locked) {
+    background: rgba(45, 60, 88, 0.98);
+    border-color: rgba(120, 180, 255, 0.9);
+  }
+
+  .scene-chip-menu button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    filter: none;
+  }
+
+  .streetscape-job-hud .hud-main:hover {
+    background: var(--udon-dark-bar-hover-bg);
+    filter: none;
+  }
+
+  .streetscape-job-hud .hud-action:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(var(--udon-hover-scale-sm));
+    filter: none;
+  }
+
+  .draggable-panel .title:hover,
+  .modal-panel .title:hover {
+    filter: brightness(1.08);
+  }
+
+  /* Chat send only — sheet/overview send uses data-element-send-button warm hover. */
+  chat-input .send-btn:hover:not(:disabled) {
+    transform: scale(var(--udon-hover-scale-xs));
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.14);
+  }
+
+  data-element-send-button .send-btn:hover:not(:disabled) {
+    background: rgba(92, 70, 48, 0.1);
+    color: #684f38;
+    transform: scale(1.08);
+  }
+
+  data-element-send-button .send-btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  /* Quick display (token hover / pinned overview panel) */
+  overview-panel .overview-data-row {
+    padding: 0 4px;
+    margin: 0 -4px;
+  }
+
+  overview-panel .overview-data-row:hover {
+    background: var(--udon-warm-bar-hover-bg);
+    border-radius: 3px;
+  }
+
+  overview-panel .grid-container .input:hover:not(:disabled) {
+    background: var(--udon-input-hover-bg);
+    box-shadow: inset 0 0 0 1px var(--udon-input-hover-border);
+  }
+
+  /* Overview display configurator preview rows */
+  .overview-display-config .selected-row:hover {
+    background: var(--udon-row-hover-bg);
+    border-color: var(--udon-btn-compact-hover-border);
+    box-shadow: 0 1px 3px rgba(58, 47, 36, 0.08);
+  }
+
+  .overview-display-config overview-summary-field:hover {
+    background: var(--udon-row-hover-bg-muted);
+    border-radius: 3px;
+  }
+}
+
+/* Focus (keyboard / modern input) */
+select:focus-visible,
+textarea:focus-visible,
+input[type='text']:focus-visible,
+input[type='password']:focus-visible,
+input[type='number']:focus-visible,
+input[type='search']:focus-visible,
+input[type='url']:focus-visible,
+input[type='email']:focus-visible,
+.settings-ui .field input:focus-visible,
+.settings-ui .field select:focus-visible,
+.settings-ui .field textarea:focus-visible,
+.settings-ui .slider-row .num:focus-visible,
+game-data-element input:not([type='range']):not([type='checkbox']):not([type='radio']):focus-visible,
+game-data-element textarea:focus-visible,
+game-data-element select:focus-visible {
+  background-color: var(--udon-input-focus-bg);
+  border-color: var(--udon-input-focus-border);
+  outline: none;
+  box-shadow:
+    0 0 0 var(--udon-focus-ring-offset) var(--udon-control-bg, #fff),
+    0 0 0 calc(var(--udon-focus-ring-offset) + var(--udon-focus-ring-width)) var(--udon-focus-ring-color);
+}
+
+game-data-element input:not([type='range']):not([type='checkbox']):not([type='radio']):focus-visible,
+game-data-element textarea:focus-visible,
+game-data-element select:focus-visible {
+  background: var(--udon-input-sheet-focus-bg);
+}
+
+input.input:focus-visible:not(:disabled),
+textarea.textarea:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--udon-input-focus-border);
+}
+
+.settings-ui .role:focus-visible {
+  outline: none;
+  border-color: var(--udon-input-focus-border);
+  box-shadow:
+    0 0 0 var(--udon-focus-ring-offset) #fffdf8,
+    0 0 0 calc(var(--udon-focus-ring-offset) + var(--udon-focus-ring-width)) var(--udon-focus-ring-color);
+}
+
+.resource-hud .res-num:focus-visible {
+  outline: none;
+  border-color: var(--udon-hud-input-hover-border);
+  box-shadow: 0 0 0 2px var(--udon-hud-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --udon-motion-fast: 0ms;
+    --udon-motion-base: 0ms;
+    --udon-motion-medium: 0ms;
+    --udon-motion-slow: 0ms;
+    --udon-motion-drag: 0ms;
+  }
+
+  select,
+  textarea,
+  input,
+  input.input,
+  textarea.textarea,
+  input.id-input,
+  button,
+  button.link,
+  .btn-cancel,
+  .remove-button,
+  .btn,
+  .btn-canvas,
+  .btn-link,
+  .btn-mute,
+  .btn-icon,
+  .delete-btn,
+  .list-pick,
+  .jb-icon-act,
+  button.indicate,
+  .tab-setting,
+  .toolbar-more,
+  .gt-btn,
+  .view-reset,
+  .pdf-btn,
+  .timer-btn,
+  .hand-orphan-import-btn,
+  .hand-orphan-import-close,
+  .hand-orphan-import-confirm,
+  .music-hud .slot-name,
+  .mesh-diag-icon,
+  .settings-ui .image-frame,
+  .settings-ui .icon-toggle,
+  .settings-ui .drop-zone,
+  .settings-ui .pool-chip,
+  .settings-ui .row-drag,
+  .settings-ui .row-remove,
+  .settings-ui .inv-tab span,
+  .settings-ui .role,
+  .settings-ui .check-row label,
+  game-data-element button,
+  .pin-button,
+  .pin-button .material-icons,
+  .zoom-button,
+  .zoom-button > .material-icons,
+  .scene-nav-toggle,
+  .scene-chip,
+  .resource-hud .hud-head,
+  .resource-hud .hud-drag,
+  .resource-hud .hud-collapse,
+  .resource-hud .gm-toggle,
+  .resource-hud .btn-nudge,
+  .streetscape-job-hud .hud-drag,
+  .streetscape-job-hud .hud-action,
+  .streetscape-job-hud .hud-main,
+  .table-timer-compact-hud .win-btn,
+  .draggable-panel .title,
+  .draggable-panel .title button,
+  .modal-panel .title,
+  .modal-panel .title button,
+  .title-background,
+  .title-bg-area,
+  .title-area.component-title,
+  .send-btn,
+  .desktop-icon-rail ul > li,
+  context-menu ul > li,
+  context-menu .sub-menu-arrow .material-icons,
+  context-menu .icon-menu img,
+  context-menu .sheet-back,
+  context-menu .sheet-minimize,
+  context-menu .sheet-close,
+  .hand-rail-chrome,
+  .hand-rail-drop-band,
+  .hud-chrome,
+  .timer-compact-hud-chrome,
+  .table-timer-chrome,
+  .scene-nav-track,
+  .preview-bar,
+  .settings-ui .card-head,
+  .settings-ui .toolbar,
+  .settings-ui .sticky-toolbar,
+  .settings-ui .selection-bar,
+  .settings-ui .drop-bar,
+  .settings-ui .table-toolbar,
+  .settings-ui .block-head,
+  .settings-ui .action-head,
+  .settings-ui .note-head,
+  .settings-ui .sheet-head,
+  .settings-ui .trim-head,
+  .settings-ui .action-panel-head,
+  .settings-ui .jb-row-head,
+  .settings-ui .jb-fold,
+  .settings-ui .jb-folder-head,
+  .settings-ui .hand-orphan-import-head,
+  .timer-compact-row,
+  .music-hud .hud-drag,
+  .music-hud .hud-collapse,
+  .music-hud .hud-open,
+  .music-hud .slot-play,
+  .table-timer .win-btn,
+  .preview-bar .nav-btn,
+  .preview-bar .close-btn,
+  .handout-bar .nav-btn,
+  .handout-bar .close-btn,
+  .hand-play-face,
+  .hand-play-face-track,
+  .hand-play-face-thumb,
+  .settings-ui input[type='range'],
+  game-data-element input[type='range'],
+  game-object-inventory input[type='range'],
+  overview-panel input[type='range'],
+  overview-panel .input,
+  overview-panel .grid-container,
+  overview-panel .overview-data-row,
+  .overview-display-config .selected-row,
+  .overview-display-config overview-summary-field {
+    transition: none !important;
+  }
+
+  .btn:not(:disabled):not(.btn-canvas):hover,
+  .btn:not(:disabled):not(.btn-canvas):active,
+  .btn.zoom-button:hover:not(:disabled),
+  .btn-canvas-room:hover:not(:disabled),
+  .btn-canvas-personal:hover:not(:disabled),
+  .btn-link:hover:not(:disabled),
+  .btn-icon:hover:not(:disabled),
+  .delete-btn:hover:not(:disabled),
+  .list-pick:hover,
+  .jb-icon-act:hover:not(:disabled),
+  button.indicate:hover:not(:disabled):not(.is-active),
+  .tab-setting:hover,
+  .toolbar-more:hover,
+  .gt-btn:not(:disabled):hover,
+  .view-reset:hover,
+  .pdf-btn:hover:not(:disabled),
+  .pdf-btn:active:not(:disabled),
+  .timer-btn:hover:not(:disabled),
+  .timer-btn:active:not(:disabled),
+  .music-hud .slot-name:hover:not(:disabled),
+  .hand-orphan-import-btn:hover,
+  .hand-orphan-import-close:hover,
+  .hand-orphan-import-confirm:hover,
+  .mesh-diag-icon:hover:not(:disabled),
+  .btn-cancel:hover:not(:disabled),
+  .remove-button:hover:not(:disabled),
+  button.link:hover:not(:disabled),
+  button.link:active:not(:disabled),
+  .btn-mute:hover,
+  .settings-ui .pool-chip:hover,
+  .settings-ui .row-drag:hover,
+  .settings-ui .row-remove:hover,
+  .settings-ui .inv-tab:hover span,
+  .settings-ui .role:hover,
+  game-data-element button:not(:disabled):hover,
+  game-data-element button:not(:disabled):active,
+  .pin-button:hover,
+  .pin-button:active,
+  .zoom-button:hover:not(.btn),
+  .zoom-button:active,
+  .scene-nav-toggle:hover,
+  .scene-nav-toggle:active,
+  .scene-chip:hover:not(:disabled):not(.is-locked),
+  .resource-hud .hud-drag:hover,
+  .resource-hud .hud-collapse:hover,
+  .resource-hud .hud-drag:active,
+  .resource-hud .hud-collapse:active,
+  .resource-hud .btn-nudge:hover:not(:disabled),
+  .resource-hud .btn-nudge:active:not(:disabled),
+  .streetscape-job-hud .hud-drag:hover,
+  .streetscape-job-hud .hud-action:hover,
+  .music-hud .hud-drag:hover,
+  .music-hud .hud-collapse:hover,
+  .music-hud .hud-open:hover,
+  .music-hud .slot-play:hover:not(:disabled),
+  .music-hud .hud-drag:active,
+  .music-hud .hud-collapse:active,
+  .music-hud .hud-open:active,
+  .music-hud .slot-play:active:not(:disabled),
+  .table-timer-compact-hud .win-btn:hover,
+  .table-timer .win-btn:hover,
+  .preview-bar .nav-btn:hover:not(:disabled),
+  .preview-bar .close-btn:hover,
+  .preview-bar .nav-btn:active:not(:disabled),
+  .preview-bar .close-btn:active,
+  .handout-bar .nav-btn:hover:not(:disabled),
+  .handout-bar .close-btn:hover,
+  .handout-bar .nav-btn:active:not(:disabled),
+  .handout-bar .close-btn:active,
+  .draggable-panel .title button:hover,
+  .draggable-panel .title button:active,
+  .modal-panel .title button:hover,
+  .modal-panel .title button:active,
+  chat-input .send-btn:hover:not(:disabled),
+  data-element-send-button .send-btn:hover:not(:disabled),
+  data-element-send-button .send-btn:active:not(:disabled),
+  .settings-ui input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  .settings-ui input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  game-data-element input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  game-data-element input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  game-object-inventory input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  game-object-inventory input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  overview-panel input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+  overview-panel input[type='range']:hover:not(:disabled)::-moz-range-thumb,
+  context-menu ul > li.hasHighlight:hover .sub-menu-arrow .material-icons,
+  context-menu .icon-menu:hover img,
+  context-menu .sheet-back:active,
+  context-menu .sheet-minimize:active,
+  context-menu .sheet-close:active,
+  context-menu .sheet-actions.is-icon-grid > ul > li.is-grid-icon:hover,
+  context-menu .sheet-actions.is-icon-grid > ul > li.is-grid-icon:active,
+  .desktop-icon-rail ul > li:hover {
+    transform: none !important;
+  }
+}

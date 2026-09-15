@@ -32,6 +32,7 @@ import { DiceSymbol } from '@udonarium/dice-symbol';
 import { RangeArea } from '@udonarium/range';
 import { GmCardPeek } from '@udonarium/gm-card-peek';
 import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@udonarium/table-fx/image-effect';
+import { MAGNET_SNAP_STACK_SELECTOR } from 'directive/panel-magnet-snap.util';
 
 @Component({
     selector: 'overview-panel',
@@ -54,6 +55,8 @@ import { imageEffectFilter, imageEffectOpacity, imageEffectTransform } from '@ud
     standalone: false
 })
 export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestroy {
+  readonly magnetSnapStack = MAGNET_SNAP_STACK_SELECTOR;
+
   @ViewChild('draggablePanel', { static: true }) draggablePanel: ElementRef<HTMLElement>;
   @ViewChild('cardImage', { static: false }) cardImageElement: ElementRef;
   @ViewChild('fullCardImage', { static: false }) fullCardImageElement: ElementRef<HTMLElement>;
@@ -266,7 +269,13 @@ export class OverviewPanelComponent implements OnChanges, AfterViewInit, OnDestr
   get newLineDataElement(): DataElement { return this.inventoryService.newLineDataElement; }
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging || this.pointerDeviceService.isTablePickGesture; }
 
-  get pointerEventsStyle(): any { return { 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }; }
+  pointerEventsNgClass(extra: Record<string, boolean> = {}): Record<string, boolean> {
+    return {
+      ...extra,
+      'is-pointer-events-auto': !this.isPointerDragging,
+      'pointer-events-none': this.isPointerDragging,
+    };
+  }
 
   isOpenImageView: boolean = false;
 

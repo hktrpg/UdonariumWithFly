@@ -46,10 +46,6 @@
   color: #5c4630;
 }
 
-.inv-tab:hover span {
-  background: #efe0c8;
-}
-
 .inv-tab.is-active span {
   background: #5c4630;
   border-color: #4a3826;
@@ -154,14 +150,6 @@
   box-sizing: border-box;
 }
 
-.input:hover {
-  background: #EEE;
-}
-
-.input:focus {
-  background: #FFF;
-}
-
 input[type=number] {
   -moz-appearance: textfield;
 }
@@ -197,12 +185,11 @@ input[type='range']::-webkit-slider-runnable-track {
   border-bottom: solid 1px var(--slider-border-color);
   border-radius: var(--slider-height);
   height: var(--slider-height);
-  background: var(--slider-track-color);
-}
-
-input[type='range']::-webkit-slider-runnable-track {
   background: linear-gradient(var(--slider-fill-color), var(--slider-fill-color)) 0/var(--sx) 100% no-repeat var(--slider-track-color);
   cursor: pointer;
+  transition:
+    background var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-fast, 120ms) var(--udon-ease-standard, ease);
 }
 
 input[type='range']::-moz-range-track {
@@ -211,6 +198,9 @@ input[type='range']::-moz-range-track {
   border-radius: var(--slider-height);
   height: var(--slider-height);
   background: var(--slider-track-color);
+  transition:
+    background-color var(--udon-motion-base, 140ms) var(--udon-ease-standard, ease),
+    border-color var(--udon-motion-fast, 120ms) var(--udon-ease-standard, ease);
 }
 
 input[type='range']::-ms-track {
@@ -442,36 +432,6 @@ button.is-active {
 button.is-active .material-icons {
   opacity: 1.0;
 }
-
-button.link {
-  /*.input {*/
-    background: none;
-    border: none;
-    border-radius: 2px;
-    outline: none;
-  
-    color: #444;
-    font-family: Cambria, Georgia;
-    font-size: 1.0em;
-    padding: 2px;
-    box-sizing: border-box;
-  }
-    
-  button.link i {
-    font-size: 1.0rem;
-  }
-  
-  button.link:hover  {
-    background: #444;
-    color: #CCC;
-  }
-  
-  button.link:disabled {
-    color: gray;
-  }
-  button.link:disabled:hover {
-    background-color: transparent;
-  }
 
 .face-icon {
   display: inline-block;

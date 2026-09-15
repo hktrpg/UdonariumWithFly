@@ -1,4 +1,6 @@
-<div class="component is-pointer-events-none" [@fadeInOut]="fadeState" appDraggable #draggablePanel
+<div class="component magnet-snap-panel overview-panel-surface" [@fadeInOut]="fadeState" appDraggable #draggablePanel
+  [draggable.stack]="magnetSnapStack" [draggable.allowOverHalf]="true"
+  [ngClass]="pointerEventsNgClass()" data-no-dblclick
   [class.is-pinned]="isPinned">
   <button type="button" class="pin-button is-pointer-events-auto"
     [class.is-pinned]="isPinned"
@@ -48,7 +50,7 @@
 
 <ng-template #overviewCard let-card="card">
   <div class="component-content is-small-size"
-    [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+    [ngClass]="pointerEventsNgClass()">
     <div *ngIf="hasImage" style="position: relative;">
       <div *ngIf="(card.aliasName == 'card' && !(cardState === CardStateBack) && (cardState == CardStateFront || card.isFront || card.isHand || gmCardPeek)) || (card.aliasName == 'card-stack' && card.topCard.isFront)"
         class="text" style="z-index: 5; top: 8px"
@@ -72,11 +74,13 @@
     </div>
     <div class="component-background">
       <div class="grid-container-root" *ngIf="hasDataElms && (card.isVisible || gmCardPeek)">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: card.name }"></ng-container>
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
+              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: card.name }"></ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -84,7 +88,7 @@
 
 <ng-template #overviewNote let-note="note">
   <div class="component-content is-large-size"
-    [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+    [ngClass]="pointerEventsNgClass()">
     <div class="component-title title-background">{{note.title}}</div>
     <div class="component-background text-note-container">
       <div style="position: relative" (mousedown)="textAreaActivate()">
@@ -102,10 +106,10 @@
 <ng-template #overviewCharacter let-character="character">
   <div class="component-content character-grid-container is-middle-size">
     <div class="title-bg-area title-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
     </div>
     <div *ngIf="hasImage" class="image-area character-image-box"
-      [ngClass]="{ 'has-icon': isUseIcon,'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass({ 'has-icon': isUseIcon })">
       <ng-container *ngIf="!isUseIcon">
         <div [ngStyle]="{'transform': ('rotate(' + roll + 'deg)') }">
           <div class="inverser"
@@ -126,16 +130,15 @@
       </ng-container>
       <!--<img class="character-image" [src]="imageUrl | safe: 'resourceUrl'" />-->
     </div>
-    <div class="title-area component-title" [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging,
-    'pointer-events-none': this.isPointerDragging }">{{character.name}}</div>
+    <div class="title-area component-title" [ngClass]="pointerEventsNgClass()">{{character.name}}</div>
     <div class="void-area is-pointer-events-none"></div>
     <div class="dataElm-area component-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root" *ngIf="hasDataElms">
         <!--<ng-container *ngFor="let dataElm of dataElms">-->
         <ng-container *ngFor="let dataElm of inventoryDataElms">
           <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
-            <div class="grid-container">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: character.name, character: character }"></ng-container>
             </div>
           </ng-container>
@@ -148,34 +151,34 @@
 <ng-template #overviewDiceSymbol let-dice="dice">
   <div class="component-content character-grid-container is-middle-size">
     <div class="title-bg-area title-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
     </div>
     <div class="title-area component-title"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <ng-container *ngIf="0 < dice?.name?.length">{{dice.name}}:</ng-container><ng-container *ngIf="dice.isVisible">{{dice.face}}</ng-container><ng-container *ngIf="!dice.isVisible">{{ 'dice.hidden' | i18n }}</ng-container>
     </div>
     <div *ngIf="dice.hasOwner && 0 < dice.ownerName?.length" class="owner-name-area component-owner"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <div class="owner-tag" [style.background-color]="dice.ownerColor">{{dice.ownerName}}
       </div>
     </div>
     <div class="image-area character-image-box"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }"
+      [ngClass]="pointerEventsNgClass()"
       *ngIf="hasImage">
       <img class="character-image" [ngClass]="{'is-black-mask': !dice.isVisible, 'is-harf-black-mask': dice.isMine  || (dice.isGMMode && dice.hasOwner)}"
         [src]="imageUrl | safe: 'resourceUrl'" draggable="false" />
     </div>
     <div class="void-area is-pointer-events-none"></div>
     <div class="dataElm-area component-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root" *ngIf="hasDataElms && dice.isVisible">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: dice.name }"></ng-container>
-            </ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -184,46 +187,49 @@
 <ng-template #overviewRange let-range="range">
   <div class="component-content character-grid-container is-middle-size" >
     <div class="title-bg-area title-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
     </div>
-    <div class="title-area component-title" [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging,
-      'pointer-events-none': this.isPointerDragging }">{{range.name}}</div>
+    <div class="title-area component-title" [ngClass]="pointerEventsNgClass()">{{range.name}}</div>
     <div class="void-area is-pointer-events-none"></div>
     <div class="dataElm-area component-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root" *ngIf="rangeElms.length > 0">
-        <div class="grid-container">
           <ng-container *ngFor="let dataElm of rangeElms">
             <ng-container *ngIf="dataElm.name == 'length' || dataElm.name == 'width'">
-              <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
-              <div class="value">
-                <div style="display: inline-block; width: min-content;">
-                  <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
-                  <input class="input" style="width:4em" type="number" step="0.1" size="1" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)"  [disabled]="GuestMode()" />
+              <div class="grid-container overview-data-row">
+                <div class="tag" style="min-width: 100px" [attr.title]="('range.' + dataElm.name) | i18n">{{ ('range.' + dataElm.name) | i18n }}</div>
+                <div class="value">
+                  <div style="display: inline-block; width: min-content;">
+                    <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.value}}</div>
+                    <input class="input" style="width:4em" type="number" step="0.1" size="1" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)"  [disabled]="GuestMode()" />
+                  </div>
                 </div>
-              </div>
-              <div class="section" style="line-height: 1em;">
-                <input type="range" title="{{dataElm.value}}"
-                  [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
-                  [min]="dataElm.name == 'length' ? 1 : 0" max="12" step="0.5" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)" [disabled]="GuestMode()" />
+                <div class="section" style="line-height: 1em;">
+                  <input type="range" title="{{dataElm.value}}"
+                    [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
+                    [min]="dataElm.name == 'length' ? 1 : 0" max="12" step="0.5" [ngModel]="dataElm.value" (ngModelChange)="writeOverviewDataElm(dataElm, $event)" [disabled]="GuestMode()" />
+                </div>
               </div>
             </ng-container>
             <ng-container *ngIf="dataElm.name == 'opacity'">
-              <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
-              <div class="value">
-                <div style="display: inline-block; width: min-content;">
-                  <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
-                  <input class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue" [disabled]="GuestMode()" /><b class="move" style="font-size: small">%</b>
+              <div class="grid-container overview-data-row">
+                <div class="tag" style="min-width: 100px" [attr.title]="'range.opacity' | i18n">{{ 'range.opacity' | i18n }}</div>
+                <div class="value">
+                  <div style="display: inline-block; width: min-content;">
+                    <div class="hidden-spacer" style="margin-right: 2em;">{{dataElm.currentValue}}</div>
+                    <input class="input" style="width:4em" type="number" size="1" [(ngModel)]="dataElm.currentValue" [disabled]="GuestMode()" /><b class="move" style="font-size: small">%</b>
+                  </div>
                 </div>
-              </div>
-              <div class="section" style="line-height: 1em;">
-                <input type="range" title="{{dataElm.currentValue}}%"
-                  [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
-                  min="0" max="100" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
+                <div class="section" style="line-height: 1em;">
+                  <input type="range" title="{{dataElm.currentValue}}%"
+                    [style]="'font-size: 0.8em; width: 100%; --min: 0; --max:' + dataElm.value + '; --val:' + dataElm.currentValue +';' | safe: 'style'"
+                    min="0" max="100" [(ngModel)]="dataElm.currentValue"  [disabled]="GuestMode()" />
+                </div>
               </div>
             </ng-container>
           </ng-container>
           <ng-container *ngIf="range.followingCharactor">
+            <div class="grid-container overview-data-row">
             <div class="tag">➡ {{ range.followingCharactor.name }}</div>
             <div class="value" style="margin-top: 3px; pointer-events: none">
               <div class="inverser" style="min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; margin-left: auto; margin-right: 0px"
@@ -235,14 +241,18 @@
                 </span>
               </div>
             </div>
+            </div>
           </ng-container>
-          <div *ngIf="dataElms.length > 0" class="section border" style="padding-top: 2px"></div>
+          <div *ngIf="dataElms.length > 0" class="grid-container">
+            <div class="section border" style="padding-top: 2px"></div>
+          </div>
           <ng-container *ngFor="let dataElm of dataElms">
             <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
-              <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: range.name }"></ng-container>
+              <div class="grid-container overview-data-row">
+                <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: range.name }"></ng-container>
+              </div>
             </ng-container>
           </ng-container>
-        </div>
       </div>
     </div>
   </div>
@@ -251,21 +261,20 @@
 <ng-template #overviewTabletop let-object="object">
   <div class="component-content character-grid-container is-middle-size" >
     <div class="title-bg-area title-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
     </div>
-    <div class="title-area component-title" [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging,
-      'pointer-events-none': this.isPointerDragging }">{{object.name}}</div>
+    <div class="title-area component-title" [ngClass]="pointerEventsNgClass()">{{object.name}}</div>
     <div class="void-area is-pointer-events-none"></div>
     <div class="dataElm-area component-background"
-      [ngClass]="{ 'is-pointer-events-auto': !this.isPointerDragging, 'pointer-events-none': this.isPointerDragging }">
+      [ngClass]="pointerEventsNgClass()">
       <div class="grid-container-root">
-        <div class="grid-container">
-          <ng-container *ngFor="let dataElm of dataElms">
-            <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+        <ng-container *ngFor="let dataElm of dataElms">
+          <ng-container *ngIf="dataElm && dataElm !== newLineDataElement">
+            <div class="grid-container overview-data-row">
               <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: dataElm, name: object.name }"></ng-container>
-            </ng-container>
+            </div>
           </ng-container>
-        </div>
+        </ng-container>
       </div>
     </div>
   </div>
@@ -276,11 +285,11 @@
   <ng-template #thenBlock>
     <div class="section" style="padding-top: 0.5em;">
       <div *ngIf="0 < (dataElm.name || '').trim().length" class="section-text" [attr.title]="dataElm.name">{{dataElm.name}}</div>
-      <div class="grid-container indetnt">
-        <ng-container *ngFor="let childElm of dataElm.children">
+      <ng-container *ngFor="let childElm of dataElm.children">
+        <div class="grid-container indetnt overview-data-row">
           <ng-container *ngTemplateOutlet="dataElement; context: { dataElm: childElm, name: name, character: character }"></ng-container>
-        </ng-container>
-      </div>
+        </div>
+      </ng-container>
     </div>
   </ng-template>
   <ng-template #elseBlock>
