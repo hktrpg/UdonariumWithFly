@@ -27,7 +27,7 @@ export class OverviewDisplayConfigComponent implements OnInit, OnChanges, OnDest
   @Input() mode: OverviewDisplayConfigMode = 'inventory';
   @Input() character: GameCharacter | null = null;
 
-  scopeMode: ScopeMode = 'global';
+  scopeMode: ScopeMode = 'character';
   selectedTags: string[] = [];
   previewCharacter: GameCharacter | null = null;
   dropIndex: number | null = null;
@@ -238,7 +238,7 @@ export class OverviewDisplayConfigComponent implements OnInit, OnChanges, OnDest
 
   private initializeState() {
     this.previewCharacter = this.character ?? this.previewCharacters[0] ?? null;
-    this.scopeMode = this.character?.useCustomOverviewDataTag ? 'character' : 'global';
+    this.scopeMode = this.canEditCharacterScope ? 'character' : 'global';
     this.loadSelectedTags();
     this.changeDetector.markForCheck();
   }

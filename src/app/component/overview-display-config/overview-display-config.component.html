@@ -1,11 +1,11 @@
 <div class="settings-ui dense overview-display-config" appFitPanel [fitMinHeight]="280" [class.is-disabled]="GuestMode()">
   <section class="card card-dense" *ngIf="canEditCharacterScope">
     <div class="btn-group scope-group">
-      <button type="button" class="btn btn-sm" [class.is-active]="scopeMode === 'global'" (click)="setScopeMode('global')">
-        {{ 'overviewConfig.scopeGlobal' | i18n }}
-      </button>
       <button type="button" class="btn btn-sm" [class.is-active]="scopeMode === 'character'" (click)="setScopeMode('character')">
         {{ 'overviewConfig.scopeCharacter' | i18n }}
+      </button>
+      <button type="button" class="btn btn-sm" [class.is-active]="scopeMode === 'global'" (click)="setScopeMode('global')">
+        {{ 'overviewConfig.scopeGlobal' | i18n }}
       </button>
     </div>
   </section>
