@@ -493,11 +493,6 @@
   cursor: pointer;
 }
 
-.btn-cancel:hover {
-  background-color: #888;
-  color: #eee;
-}
-
 .thumb-preview {
   position: fixed;
   z-index: 10000;

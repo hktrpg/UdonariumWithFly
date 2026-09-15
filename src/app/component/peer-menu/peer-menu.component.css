@@ -145,10 +145,6 @@
   display: inline-block;
 }
 
-.id-input:active, .id-input:hover {
-  border-color: #444;
-}
-
 .copied {
   font-size: smaller;
   opacity: 0;

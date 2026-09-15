@@ -475,19 +475,8 @@ input, button, textarea, select{
   box-sizing: border-box;
 }
 
-input:hover, textarea:hover, select:hover  {
-  background: #EEE;
-}
-input:focus, textarea:focus, select:focus  {
-  background: #FFF;
-}
 button i {
   font-size: 1.0rem;
-}
-
-button:hover  {
-  background: #444;
-  color: #CCC;
 }
 
 .table-cell button{
@@ -496,9 +485,6 @@ button:hover  {
 
 button:disabled {
   color: gray;
-}
-button:disabled:hover {
-  background-color: transparent;
 }
 
 input[type='range'] {

@@ -498,7 +498,6 @@ nav ul a, nav ul a:hover, nav ul a:active, nav ul a:visited {
   position: relative;
 }
 
-.desktop-icon-rail ul > li:hover,
 .desktop-icon-rail ul > li.is-active {
   color: #ddd;
   background-color: rgba(255, 255, 255, 0.08);

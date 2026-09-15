@@ -266,16 +266,6 @@
   vertical-align: middle;
 }
 
-.btn-link {
-  background: transparent;
-  border: none;
-  color: #6b5640;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0;
-}
-
 .trim-head {
   display: flex;
   align-items: baseline;

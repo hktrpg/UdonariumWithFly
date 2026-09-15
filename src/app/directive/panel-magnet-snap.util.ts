@@ -1,4 +1,4 @@
-/** Shared draggable.stack selector for magnet snap between desktop panels and token overviews. */
+/** Shared draggable.stack selector for magnet snap between panels, token overviews, and fixed menu rails. */
 export const MAGNET_SNAP_STACK_SELECTOR = '.magnet-snap-panel';
 
 export interface PanelMagnetRect {

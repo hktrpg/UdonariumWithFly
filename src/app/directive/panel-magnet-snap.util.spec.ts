@@ -24,4 +24,12 @@ describe('panelMagnetSnapOffset', () => {
     expect(snap.x).toBe(0);
     expect(snap.y).toBe(0);
   });
+
+  it('snaps panel left edge to desktop menu rail right edge', () => {
+    const menuRail = toPanelMagnetRect({ left: 0, top: 0, width: 52, height: 800 });
+    const moving = toPanelMagnetRect({ left: 60, top: 120, width: 300, height: 400 });
+    const snap = panelMagnetSnapOffset(moving, [menuRail], 12);
+    expect(snap.x).toBe(-8);
+    expect(snap.y).toBe(0);
+  });
 });
