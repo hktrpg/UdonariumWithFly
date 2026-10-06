@@ -42,6 +42,8 @@ export const en_tip: I18nDictionary = {
   'tip.chat.compact.body': 'List-style messages instead of bubbles for easier reading.',
   'tip.chat.clarify.title': 'Compact toolbar',
   'tip.chat.clarify.body': 'Hide tabs/toolbar and keep the input. Use the small button to restore.',
+  'tip.chat.faceIcon.title': 'Face icon (character chat)',
+  'tip.chat.faceIcon.body': 'On: chat messages and the composer preview use the character face icon. Floating dialogue can show it, and stand-image “specified image” conditions match it.\nOff: messages and preview use the regular character image. Floating dialogue has no face icon; stand conditions match the regular image.\nWithout a face icon, messages use the regular image.\nThis does not change the tabletop token or character overview; overview has a separate face-icon toggle.',
 
   'tour.welcome.title': 'Welcome — guided tour',
   'tour.welcome.body': 'Read each intro, then open / try the main features once.\nYou can skip anytime. Hover tips stay available afterward.\nDesktop Chrome recommended. Save (ZIP or folder backup) before leaving.',

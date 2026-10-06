@@ -17,6 +17,8 @@ import { CutInService } from 'service/cut-in.service';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { AudioFile } from '@udonarium/core/file-storage/audio-file';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
+import { AudioLibrary } from '@udonarium/audio-library';
+import { isContentHashIdentifier, isMediaFileName } from 'service/folder-backup-layout';
 import { UUID } from '@udonarium/core/system/util/uuid';
 import { OpenUrlComponent } from 'component/open-url/open-url.component';
 import { CutInComponent } from 'component/cut-in/cut-in.component';
@@ -81,7 +83,12 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   set cutInIsFrontOfStand(isFrontOfStand: boolean) { if (this.isEditable) this.selectedCutIn.isFrontOfStand = isFrontOfStand; }
 
   get cutInAudioIdentifier(): string { return this.selectedCutIn.audioIdentifier; }
-  set cutInAudioIdentifier(audioIdentifier: string) { if (this.isEditable) this.selectedCutIn.audioIdentifier = audioIdentifier; }
+  set cutInAudioIdentifier(audioIdentifier: string) {
+    if (!this.isEditable || this.selectedCutIn.audioIdentifier === audioIdentifier) return;
+    this.selectedCutIn.audioIdentifier = audioIdentifier;
+    // The previous file name must not become the fallback label for a new audio ID.
+    this.selectedCutIn.audioFileName = '';
+  }
   
   get cutInAudioFileName(): string { return this.selectedCutIn?.audioFileName || ''; }
   set cutInAudioFileName(audioFileName: string) { if (this.isEditable) this.selectedCutIn.audioFileName = audioFileName; }
@@ -141,6 +148,19 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.selectedCutIn) return true;
     return this.selectedCutIn.isValidAudio;
   }
+
+  get missingLinkedAudio(): boolean {
+    return !!this.selectedCutIn?.audioIdentifier && !this.isValidAudio;
+  }
+
+  get selectedAudioNeedsName(): boolean {
+    const audio = this.selectedCutIn?.audioIdentifier
+      ? AudioStorage.instance.get(this.selectedCutIn.audioIdentifier)
+      : null;
+    if (!audio) return false;
+    const name = this.storedAudioName(audio);
+    return isContentHashIdentifier(name) || isMediaFileName(name);
+  }
   
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
   get otherPeers(): PeerCursor[] { return [PeerCursor.myCursor, ...Network.peers.filter(peer => peer.isOpen).map(peer => PeerCursor.findByPeerId(peer.peerId))].filter(peerCursor => peerCursor); /* ObjectStore.instance.getObjects(PeerCursor); */ }
@@ -163,6 +183,23 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   get audios(): AudioFile[] { return AudioStorage.instance.audios.filter(audio => !audio.isHidden); }
+  private storedAudioName(audio: AudioFile): string {
+    const libraryName = AudioLibrary.instance.displayName(audio);
+    if (!isContentHashIdentifier(libraryName) && !isMediaFileName(libraryName)) return libraryName;
+    // Older CutIns may retain the original filename even when the audio blob was
+    // restored under a content hash without AudioLibrary name metadata.
+    const namedCutIn = this.cutIns.find(cutIn => cutIn.audioIdentifier === audio.identifier
+      && !!cutIn.audioFileName
+      && !isContentHashIdentifier(cutIn.audioFileName)
+      && !isMediaFileName(cutIn.audioFileName));
+    return namedCutIn ? namedCutIn.audioFileName : libraryName;
+  }
+  audioDisplayName(audio: AudioFile): string {
+    const name = this.storedAudioName(audio);
+    return isContentHashIdentifier(name) || isMediaFileName(name)
+      ? this.i18n.t('cutin.unnamedAudio', { hash: audio.identifier.slice(0, 10) })
+      : name;
+  }
 
   sendTo: string = '';
   isSaveing: boolean = false;
@@ -379,7 +416,9 @@ export class CutInSettingComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     const audio = AudioStorage.instance.get(identifier);
-    this.cutInAudioFileName = audio ? audio.name : '';
+    // Keep the saved filename while the linked blob is still loading or missing:
+    // clearing it would also suppress CutIn.isValidAudio's missing-link warning.
+    if (audio) this.cutInAudioFileName = this.storedAudioName(audio);
   }
 
   openYouTubeTerms() {

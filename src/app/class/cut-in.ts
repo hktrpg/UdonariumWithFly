@@ -98,7 +98,7 @@ export class CutIn extends ObjectNode {
   }
 
   get isValidAudio(): boolean {
-    return this.audioFileName.length == 0 || this.audioIdentifier.length == 0 || !!AudioStorage.instance.get(this.audioIdentifier);
+    return this.audioIdentifier.length == 0 || !!AudioStorage.instance.get(this.audioIdentifier);
   }
 
   get postfixes(): string[] {

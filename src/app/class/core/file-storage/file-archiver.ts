@@ -14,7 +14,8 @@ import { MimeType } from './mime-type';
 import { PdfStorage } from './pdf-storage';
 import { VideoStorage } from './video-storage';
 import { AudioImportNameService } from 'service/audio-import-name.service';
-import { isMediaFileName } from 'service/folder-backup-layout';
+import { isContentHashIdentifier, isMediaFileName } from 'service/folder-backup-layout';
+import { readAudioTagTitle } from './audio-tag-title';
 import { poseDebug } from '@udonarium/table-fx/pose-debug';
 import { TabletopLoadSettle } from '@udonarium/tabletop-load-settle';
 import { folderBackupDebug } from 'service/folder-backup-debug';
@@ -223,6 +224,15 @@ export class FileArchiver {
     if (isMediaFileName(importFile.name)) {
       const audio = await this.addPackedOrFresh(importFile, AudioStorage.instance, opts);
       if (audio && AudioStorage.instance.get(audio.identifier)) {
+        const currentName = AudioLibrary.instance.displayName(audio);
+        if (isContentHashIdentifier(currentName) || isMediaFileName(currentName)) {
+          // Packed filenames carry only the content hash. An embedded MP3 title
+          // can restore a useful label without overriding existing room names.
+          const title = (await readAudioTagTitle(importFile)).trim();
+          if (title && !isContentHashIdentifier(title) && !isMediaFileName(title)) {
+            AudioLibrary.instance.renameAudio(audio.identifier, title);
+          }
+        }
         AudioLibrary.instance.ensureListed(audio.identifier);
       }
       return;
@@ -236,11 +246,13 @@ export class FileArchiver {
     const existed = !!AudioStorage.instance.get(created.identifier);
     const audio = AudioStorage.instance.addImported(created);
     if (!audio) return;
-    if (existed) {
-      AudioLibrary.instance.ensureListed(audio.identifier);
-      return;
+    const currentName = AudioLibrary.instance.displayName(audio);
+    const newName = displayName || created.name;
+    if (newName && (!existed || isContentHashIdentifier(currentName) || isMediaFileName(currentName))) {
+      // Re-importing the original file can recover a label for an older
+      // hash-named blob; preserve any existing user-chosen name.
+      AudioLibrary.instance.renameAudio(audio.identifier, newName);
     }
-    if (displayName) AudioLibrary.instance.renameAudio(audio.identifier, displayName);
     AudioLibrary.instance.ensureListed(audio.identifier);
   }
 

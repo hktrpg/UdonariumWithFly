@@ -42,6 +42,8 @@ export const zhCN_tip: I18nDictionary = {
   'tip.chat.compact.body': '以列表显示消息，便于阅读（相对气泡）。',
   'tip.chat.clarify.title': '精简工具栏',
   'tip.chat.clarify.body': '收起标签与工具栏，只留输入区；可用小按钮还原。',
+  'tip.chat.faceIcon.title': '头像（角色发言）',
+  'tip.chat.faceIcon.body': '开启：聊天消息和输入框预览使用角色卡头像；浮动对话可显示头像，立绘“指定图片”条件也用头像匹配。\n关闭：聊天消息和预览改用角色普通图片；浮动对话不附头像，立绘条件改用普通图片。\n未设置头像时，聊天消息会使用普通图片。\n此开关不影响桌面 Token 或角色总览；总览另有“总览显示头像”开关。',
 
   'tour.welcome.title': '欢迎 — 引导教学',
   'tour.welcome.body': '请先阅读说明，再打开／尝试各主要功能。\n可随时跳过。之后滑过按钮仍会立刻显示教学 BOX。\n建议桌面版 Chrome。离开前请存档（ZIP 或文件夹备份）。',

@@ -253,6 +253,7 @@ export const zhCN_ui: I18nDictionary = {
   'menu.settings.leftOnly': '消息一律靠左',
   'menu.settings.autoPopupChat': '发言时自动开聊天',
   'menu.settings.skipEmptyQuotes': '略过空白「」',
+  'menu.settings.autoDialogQuotes': '角色发言自动插入「」',
   'menu.settings.gmCardPeek': 'GM 卡牌透视',
   'menu.settings.resourceHud': '显示资源 HUD',
   'menu.settings.musicHud': '显示音乐 HUD',

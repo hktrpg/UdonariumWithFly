@@ -378,6 +378,8 @@ export const zhCN_obj: I18nDictionary = {
   'cutin.crop': '裁切',
   'cutin.media': '音效／影片',
   'cutin.noAudio': '无音效',
+  'cutin.unnamedAudio': '未命名音效（{{hash}}）',
+  'cutin.unnamedAudioHelp': '没有保存名称。可在音乐播放器中重命名，或重新导入原始音效文件。',
   'cutin.endedAction': '音效／影片结束时',
   'cutin.nothing': '什么都不做',
   'cutin.stopWhenEnded': '停止 CutIn',

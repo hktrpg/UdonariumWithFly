@@ -25,6 +25,7 @@
     "src/app/service/hand.service.spec.ts",
     "src/app/service/room-invite.service.spec.ts",
     "src/app/component/card-stack/card-stack-gesture.spec.ts",
+    "src/app/component/cut-in-setting/cut-in-audio-name.spec.ts",
     "src/app/service/timer.service.spec.ts",
     "src/app/service/table-lighting.service.spec.ts",
     "src/app/service/streetscape-job.service.spec.ts",

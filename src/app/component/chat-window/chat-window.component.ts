@@ -35,6 +35,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   static readonly CHAT_IS_LEFT_ONLY_LOCAL_STORAGE_KEY = 'udonanaumu-chat-left-only-local-storage';
   static readonly CHAT_AUTO_POPUP_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-popup-local-storage';
   static readonly CHAT_SKIP_EMPTY_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-skip-empty-quotes-local-storage';
+  static readonly CHAT_AUTO_DIALOG_QUOTES_LOCAL_STORAGE_KEY = 'udonanaumu-chat-auto-dialog-quotes-local-storage';
   /** Designed defaults: 700×530, bottom-left beside the main menu (not fixed 100,450). */
   static readonly DEFAULT_WIDTH = 700;
   static readonly DEFAULT_HEIGHT = 530;
@@ -171,6 +172,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   set skipEmptyDialogQuotes(skip: boolean) {
     ChatWindowComponent.setSkipEmptyDialogQuotes(skip);
+  }
+
+  /** Default ON: prefill 「」 when speaking as a character. Local preference only. */
+  static autoDialogQuotes = true;
+  static setAutoDialogQuotes(enabled: boolean) {
+    ChatWindowComponent.autoDialogQuotes = !!enabled;
+    localForage.setItem(ChatWindowComponent.CHAT_AUTO_DIALOG_QUOTES_LOCAL_STORAGE_KEY, !!enabled).catch(e => console.log(e));
+    EventSystem.trigger('CHANGE_CHAT_AUTO_DIALOG_QUOTES', null);
   }
 
   /** Mobile: toolbar action icons collapsed behind tune toggle (session only). */

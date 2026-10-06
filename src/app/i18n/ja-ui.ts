@@ -253,6 +253,7 @@ export const ja_ui: I18nDictionary = {
   'menu.settings.leftOnly': 'メッセージを左寄せ',
   'menu.settings.autoPopupChat': '発言でチャット自動表示',
   'menu.settings.skipEmptyQuotes': '空の「」を略す',
+  'menu.settings.autoDialogQuotes': 'キャラクター発言に「」を自動挿入',
   'menu.settings.gmCardPeek': 'GMのカード透視',
   'menu.settings.resourceHud': 'リソースHUDを表示',
   'menu.settings.musicHud': '音楽HUDを表示',

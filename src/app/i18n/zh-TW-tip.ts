@@ -42,6 +42,8 @@ export const zhTW_tip: I18nDictionary = {
   'tip.chat.compact.body': '改以列表顯示訊息，方便閱讀（相對氣泡）。',
   'tip.chat.clarify.title': '精簡工具列',
   'tip.chat.clarify.body': '收起標籤與工具列，只留輸入區；可用小鈕還原。',
+  'tip.chat.faceIcon.title': '大頭貼（角色發言）',
+  'tip.chat.faceIcon.body': '開啟：聊天訊息及輸入框預覽使用角色卡的大頭貼；浮動對話可顯示大頭貼，立繪「指定圖片」條件亦以它比對。\n關閉：聊天訊息及預覽改用角色一般圖片；浮動對話不附大頭貼，立繪條件改用一般圖片。\n未設定大頭貼時，聊天訊息會使用一般圖片。\n此開關不影響桌面 Token 或角色總覽；總覽另有「總覽顯示大頭貼」。',
 
   'tour.welcome.title': '歡迎 — 引導教學',
   'tour.welcome.body': '請依序閱讀說明並打開／嘗試各主要功能。\n可隨時略過。之後滑過按鈕仍會立刻顯示教學 BOX。\n建議桌面版 Chrome。離開前請存檔（ZIP 或資料夾備份）。',

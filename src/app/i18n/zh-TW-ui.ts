@@ -254,6 +254,7 @@ export const zhTW_ui: I18nDictionary = {
   'menu.settings.leftOnly': '訊息一律靠左',
   'menu.settings.autoPopupChat': '發言時自動開聊天',
   'menu.settings.skipEmptyQuotes': '略過空白「」',
+  'menu.settings.autoDialogQuotes': '角色發言自動插入「」',
   'menu.settings.gmCardPeek': 'GM 卡牌透視',
   'menu.settings.resourceHud': '顯示資源 HUD',
   'menu.settings.musicHud': '顯示音樂 HUD',
