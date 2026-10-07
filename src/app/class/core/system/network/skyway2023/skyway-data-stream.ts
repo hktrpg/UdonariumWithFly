@@ -7,7 +7,7 @@ import { IPeerContext, PeerContext } from '../peer-context';
 import { PeerSessionGrade } from '../peer-session-state';
 import { CandidateType, WebRTCStats } from '../webrtc/webrtc-stats';
 import { WebRTCConnection, WebRTCStatsMonitor } from '../webrtc/webrtc-stats-monitor';
-import { meshWarnThrottled, netDebug } from '../net-debug';
+import { meshWarnThrottled, netDebug } from '../net-mesh-log';
 import { navigatorEffectiveType, poorNetworkCloseDebounceMs } from '@udonarium/room-reconnect.util';
 import { isRetriableSubscribeError } from './skyway-log';
 import { computeStreamHealthMetrics, isInboundStale, shouldRecycleStaleDataChannel } from './skyway-stream-health';

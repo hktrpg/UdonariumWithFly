@@ -173,11 +173,8 @@ td.altitude {
 
 input.altitude {
   /* Native vertical slider (colored). appearance:none previously blanked it white. */
-  writing-mode: bt-lr;
   writing-mode: vertical-lr;
   direction: rtl;
-  appearance: slider-vertical;
-  -webkit-appearance: slider-vertical;
   accent-color: #4b5563;
   width: 8px;
   height: 100%;

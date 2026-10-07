@@ -149,7 +149,7 @@ export class ChatMessageComponent implements OnInit, OnDestroy {
   get msgImageTransform(): string | null { return imageEffectTransform(this.msgImageEffectSource()); }
 
   get htmlEscapedFrom():string  {
-    return this._htmlEscapeLinking(this.chatMessage.from, true);
+    return this._htmlEscapeLinking(this.chatMessage.from ?? '', true);
   } 
 
   get htmlEscapedText():string  {
@@ -163,7 +163,7 @@ export class ChatMessageComponent implements OnInit, OnDestroy {
   }
 
   private _htmlEscapeLinking(str, shorten=false, ruby=false): string {
-    str = StringUtil.escapeHtml(str);
+    str = StringUtil.escapeHtml(str ?? '');
     if (ruby) str = StringUtil.rubyToHtml(str);
     return this.lastNewLineAdjust(str).split("\n").map(line => {
       const headerMatch = line.match(/^(#+ )([\s\S]*)$/);

@@ -1,4 +1,5 @@
 import { GuestSession } from '@udonarium/guest-session';
+import { withNativeDateForLoad } from './native-date';
 import { setZeroTimeout } from '../util/zero-timeout';
 import { Connection, ConnectionCallback } from './connection';
 import { IPeerContext, PeerContext } from './peer-context';
@@ -281,9 +282,11 @@ export class Network {
     if (mode && mode !== 'skyway2023') {
       console.warn(`Unknown backend mode "${mode}"; using skyway2023`);
     }
-    return (await import(
-      /* webpackChunkName: "lib/backend/skyway2023/skyway-connection" */
-      './skyway2023/skyway-connection')
-    ).SkyWayConnection;
+    return withNativeDateForLoad(async () => {
+      const mod = await import(
+        /* webpackChunkName: "lib/backend/skyway2023/skyway-connection" */
+        './skyway2023/skyway-connection');
+      return mod.SkyWayConnection;
+    });
   }
 }

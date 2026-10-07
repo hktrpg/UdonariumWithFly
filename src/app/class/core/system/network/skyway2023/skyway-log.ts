@@ -1,5 +1,5 @@
 import { Logger } from '@skyway-sdk/core';
-import { netDebug } from '../net-debug';
+import { netDebug } from '../net-mesh-log';
 
 let installed = false;
 

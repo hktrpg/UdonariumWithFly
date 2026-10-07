@@ -31,6 +31,7 @@
     "src/app/service/streetscape-job.service.spec.ts",
     "src/app/class/card-stack.surface.spec.ts",
     "src/app/directive/movable-selection-synchronizer.spec.ts",
-    "src/app/directive/panel-magnet-snap.util.spec.ts"
+    "src/app/directive/panel-magnet-snap.util.spec.ts",
+    "src/app/util/**/*.spec.ts"
   ]
 }

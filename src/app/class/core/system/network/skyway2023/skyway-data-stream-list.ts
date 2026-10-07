@@ -1,5 +1,5 @@
 import { PeerContext } from '../peer-context';
-import { netDebug } from '../net-debug';
+import { netDebug } from '../net-mesh-log';
 import { SkyWayDataStream } from './skyway-data-stream';
 
 export class SkyWayDataStreamList implements Iterable<SkyWayDataStream> {

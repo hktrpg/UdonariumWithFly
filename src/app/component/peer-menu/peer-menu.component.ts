@@ -34,7 +34,7 @@ import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { RoomInfo } from '@udonarium/core/system/network/room-info';
 import { RoomJoinResult, RoomRole } from '@udonarium/room-auth';
 import { SceneToolPermission } from '@udonarium/table-fx/scene-tool-permission';
-import { appVersion } from '../../../environments/version';
+import { APP_VERSION_DISPLAY } from '../../util/app-version-display';
 
 import * as localForage from 'localforage';
 
@@ -152,15 +152,8 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   get maskedPassword(): string { return '●●●●●●●●' }
   get config(): AppConfig { return AppConfigService.appConfig; }
   get canUsePrivateSession(): boolean { return this.config.backend.mode == 'skyway'; }
-  /** Build stamp: commit time in local TZ, short SHA, branch. */
-  get appVersionDisplay(): string {
-    const d = new Date(appVersion.committedAt);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const date = Number.isNaN(d.getTime())
-      ? appVersion.committedAt
-      : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return `${date} ${appVersion.sha} ${appVersion.branch}`;
-  }
+  /** Build stamp: commit time in local TZ, short SHA, branch (cached — see app-version-display). */
+  readonly appVersionDisplay = APP_VERSION_DISPLAY;
   get canLoadZip(): boolean { return SceneToolPermission.instance.canLoadZip(); }
   get canLoadRoom(): boolean { return SceneToolPermission.instance.canLoadRoom(); }
 

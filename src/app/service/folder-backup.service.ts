@@ -766,6 +766,33 @@ export class FolderBackupService implements OnDestroy {
   }
 
   /**
+   * Connection busy overlay is above modals — release it while the user re-enters passwords.
+   * Restores the loading overlay only when they continue.
+   */
+  private async promptBackupRoomPassword(room: RoomBackupInfo): Promise<boolean> {
+    folderBackupDebug('auth undecryptable → RoomSetting');
+    const busy = ConnectionBusyService.instance;
+    busy?.hide();
+    let ok = false;
+    try {
+      ok = await this.modalService.open(RoomSettingComponent, {
+        width: 690,
+        height: 600,
+        left: 0,
+        top: 80,
+        preferredRoomId: room.roomId,
+        preferredRoomName: room.displayName,
+        preferredAuth: room.auth,
+        preferredAuthStatus: room.authStatus,
+        suppressConnectionBusy: true,
+      }) === true;
+    } finally {
+      if (ok) busy?.show('folderBackup.loadingRoom');
+    }
+    return ok;
+  }
+
+  /**
    * One continuous busy overlay: flush (if switching) → open room as GM → load backup → settle.
    * Skips RoomSetting when auth can be applied from backup meta.
    */
@@ -806,21 +833,8 @@ export class FolderBackupService implements OnDestroy {
         }
       }
 
-      const needsPasswordUi = room.authStatus === 'undecryptable';
-      if (needsPasswordUi) {
-        folderBackupDebug('auth undecryptable → RoomSetting');
-        const created = await this.modalService.open(RoomSettingComponent, {
-          width: 690,
-          height: 600,
-          left: 0,
-          top: 80,
-          preferredRoomId: room.roomId,
-          preferredRoomName: room.displayName,
-          preferredAuth: room.auth,
-          preferredAuthStatus: room.authStatus,
-          suppressConnectionBusy: true,
-        });
-        if (created !== true) return;
+      if (room.authStatus === 'undecryptable') {
+        if (!await this.promptBackupRoomPassword(room)) return;
         openedNewRoom = true;
       } else {
         await this.openRoomAsGmFromBackup(room);

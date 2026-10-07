@@ -13,8 +13,6 @@ import { VideoState } from '@udonarium/core/file-storage/video-file';
 import { VideoStorage } from '@udonarium/core/file-storage/video-storage';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 
-import { Network } from './network';
-
 export type MediaKindStats = {
   complete: number;
   incomplete: number;
@@ -125,13 +123,27 @@ export function collectRoomMediaStats(): RoomMediaStats {
   };
 }
 
+function readNetworkBandwidth(): { usage: number; peak: number } {
+  try {
+    // Lazy require — avoids skyway chunk → net-debug → network cycle at module init.
+    const { Network } = require('./network') as typeof import('./network');
+    return {
+      usage: Network.instance.bandwidthUsage || 0,
+      peak: Network.instance.bandwidthPeak || 0,
+    };
+  } catch {
+    return { usage: 0, peak: 0 };
+  }
+}
+
 /** Current transfer / memory-ish load signals for bug reports. */
 export function collectMeshLoadStats(): MeshLoadStats {
   const pendingBytes = FileReceiveScheduler.pendingReceiveBytes();
   const sync = FileSyncProgress.snapshot(20);
+  const bw = readNetworkBandwidth();
   const stats: MeshLoadStats = {
-    bandwidthUsageBytes: Network.instance.bandwidthUsage || 0,
-    bandwidthPeakBytes: Network.instance.bandwidthPeak || 0,
+    bandwidthUsageBytes: bw.usage,
+    bandwidthPeakBytes: bw.peak,
     fileSyncPending: FileReceiveScheduler.pendingReceiveCount(),
     fileSyncActive: FileReceiveScheduler.activeReceiveCount(),
     fileSyncOutbound: FileReceiveScheduler.outboundPendingCount(),
