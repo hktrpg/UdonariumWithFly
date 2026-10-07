@@ -1,11 +1,18 @@
 import { attachPackagePath } from '@udonarium/terrain-model/model-package-files';
 import { photoGltfFaces } from '@udonarium/terrain-model/photo-gltf-faces';
+import { isWebGLAvailable } from '../../../testing/webgl-available';
 
 /**
  * Open3Dhk Individualised building: top face (Terrain「地板」) must be a
  * top-down roof, not a side facade. Regression for streetscape textured import.
  */
 describe('Open3Dhk photo bake roof face', () => {
+  beforeAll(() => {
+    if (!isWebGLAvailable()) {
+      pending('WebGL unavailable (enable SwiftShader / GPU in Karma Chrome flags)');
+    }
+  });
+
   it('floor (top) bake is not a tall facade strip', async () => {
     const base = 'building/B352541799701063A0';
     const files = await Promise.all([

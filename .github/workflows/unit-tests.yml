@@ -22,8 +22,15 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
-      # Karma uses karma-chrome-launcher — avoid `playwright install --with-deps` here
-      # (apt on ubuntu runners can hang 15+ min when archive mirrors are slow).
+      # Prefer Playwright Chromium in karma.conf (WebGL2 for Open3Dhk photo-bake spec).
+      - uses: actions/cache@v4
+        id: playwright-browsers-karma
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium (browser only)
+        run: npx playwright install chromium
+      # Fallback when CHROME_BIN is unset (e.g. cache miss path).
       - uses: browser-actions/setup-chrome@v1
       - name: Karma (headless + coverage)
         env:
