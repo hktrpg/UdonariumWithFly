@@ -11,13 +11,15 @@ try {
   // Fall back to system Chrome via karma-chrome-launcher.
 }
 
-const ciWebGlFlags = process.env.CI
-  ? [
-      '--use-gl=angle',
-      '--use-angle=swiftshader-webgl',
-      '--enable-unsafe-swiftshader',
-    ]
-  : ['--use-gl=angle'];
+const usingPlaywrightChromium = (process.env.CHROME_BIN || '').includes('ms-playwright');
+const ciWebGlFlags =
+  process.env.CI && !usingPlaywrightChromium
+    ? [
+        '--use-gl=angle',
+        '--use-angle=swiftshader-webgl',
+        '--enable-unsafe-swiftshader',
+      ]
+    : ['--use-gl=angle'];
 
 module.exports = function (config) {
   config.set({
