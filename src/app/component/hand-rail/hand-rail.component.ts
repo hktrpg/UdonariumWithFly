@@ -132,7 +132,7 @@ export class HandRailComponent implements OnInit, OnDestroy {
 
   get isDraggingCard(): boolean { return !!this.dragCard; }
 
-  /** Fan / chrome HUD — shown whenever the viewed hand has cards (collapse never hides cards). */
+  /** Hand rail HUD — visible only when the viewed hand has at least one card. */
   get showHud(): boolean { return this.hudVisible; }
 
   /** Card row / drop zone — always on when there are cards; also when expanded (empty drop zone). */
@@ -146,10 +146,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
   private computeHudVisible(cardCount: number): boolean {
     if (this.isGuest) return false;
     if (this.isMobileLayout && this.mobileLayout.isEdit) return false;
-    // Empty + drag-to-hand: show only the dashed drop band (rail + band stacks poorly).
-    if (cardCount < 1 && this.isDropOffer) return false;
-    // Otherwise always show so empty hands still raise on bottom hover.
-    return true;
+    // Empty hand: no toolbar / rail (use dashed drop band while dragging a card in).
+    return cardCount >= 1;
   }
 
   private computeDropBandVisible(cardCount: number): boolean {
