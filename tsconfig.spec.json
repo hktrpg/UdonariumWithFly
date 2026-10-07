@@ -9,7 +9,8 @@
     ]
   },
   "files": [
-    "src/app/class/core/file-storage/fs-access.d.ts"
+    "src/app/class/core/file-storage/fs-access.d.ts",
+    "src/native-date-polyfill.ts"
   ],
   "include": [
     "src/testing/**/*.ts",
