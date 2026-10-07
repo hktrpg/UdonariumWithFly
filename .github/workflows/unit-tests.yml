@@ -13,6 +13,7 @@ concurrency:
 jobs:
   karma:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,13 +22,15 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      # Karma uses karma-chrome-launcher — avoid `playwright install --with-deps` here
+      # (apt on ubuntu runners can hang 15+ min when archive mirrors are slow).
+      - uses: browser-actions/setup-chrome@v1
       - name: Karma (headless + coverage)
         run: npm run test:ci
 
   playwright-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: karma
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +40,16 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
-      - name: Install Playwright Chromium
+      - uses: actions/cache@v4
+        id: playwright-browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium (with OS deps)
+        if: steps.playwright-browsers.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium (browser only)
+        if: steps.playwright-browsers.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
       - name: Smoke E2E
         run: npm run e2e:smoke
