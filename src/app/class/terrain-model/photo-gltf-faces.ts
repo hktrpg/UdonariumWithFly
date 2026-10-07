@@ -60,6 +60,10 @@ export async function photoGltfFaces(
     } catch {
       throw new Error('MODEL_NO_WEBGL');
     }
+    if (!renderer.getContext()) {
+      renderer.dispose();
+      throw new Error('MODEL_NO_WEBGL');
+    }
     renderer.setPixelRatio(1);
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;

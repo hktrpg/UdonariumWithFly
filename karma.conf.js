@@ -11,6 +11,16 @@ try {
   // Fall back to system Chrome via karma-chrome-launcher.
 }
 
+const usingPlaywrightChromium = (process.env.CHROME_BIN || '').includes('ms-playwright');
+const ciWebGlFlags =
+  process.env.CI && !usingPlaywrightChromium
+    ? [
+        '--use-gl=angle',
+        '--use-angle=swiftshader-webgl',
+        '--enable-unsafe-swiftshader',
+      ]
+    : ['--use-gl=angle'];
+
 module.exports = function (config) {
   config.set({
     // Avoid Windows localhost → IPv6 mismatch where Chrome never captures.
@@ -120,9 +130,9 @@ module.exports = function (config) {
           '--no-sandbox',
           '--disable-dev-shm-usage',
           '--disable-extensions',
-          '--use-gl=angle',
-          '--enable-webgl',
           '--ignore-gpu-blocklist',
+          '--enable-webgl',
+          ...ciWebGlFlags,
         ],
       },
     },

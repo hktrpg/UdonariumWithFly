@@ -193,8 +193,9 @@ export namespace StringUtil {
   }
 
   export function escapeHtml(str) {
-    if(typeof str !== 'string') {
-      str = str.toString();
+    if (str == null) return '';
+    if (typeof str !== 'string') {
+      str = String(str);
     }
     return str.replace(/[&'`"<>]/g, function(match){
       return {

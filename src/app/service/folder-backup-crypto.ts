@@ -1,5 +1,7 @@
 import * as localForage from 'localforage';
 
+import { folderBackupDebug } from './folder-backup-debug';
+
 /** AES-GCM blob written to folder backup meta (no plaintext passwords). */
 export interface FolderBackupSecretsBlob {
   v: 1;
@@ -61,7 +63,11 @@ export class FolderBackupCrypto {
         guestPassword: String(parsed?.guestPassword || ''),
       };
     } catch (e) {
-      console.warn('FolderBackupCrypto decrypt failed (other browser/device or corrupted meta)', e);
+      // Expected when meta was encrypted on another browser/profile or site data was cleared.
+      folderBackupDebug('crypto decrypt failed (undecryptable)', {
+        name: e instanceof Error ? e.name : 'unknown',
+        message: e instanceof Error ? e.message : String(e),
+      });
       return null;
     }
   }

@@ -66,11 +66,11 @@ export class TeachingTipService implements OnDestroy {
     if (!this.enabled) this.hide();
   }
 
-  show(tipKey: string, anchorEl: HTMLElement) {
+  show(tipKey: string, anchorEl: HTMLElement, estimatedHeight = 120) {
     if (!this.enabled || this.paused || !this.isAvailable || !tipKey || !anchorEl) return;
     const rect = anchorEl.getBoundingClientRect();
     const boxW = 280;
-    const boxH = 120;
+    const boxH = estimatedHeight;
     let left = rect.right + 8;
     let top = rect.top;
     if (left + boxW > window.innerWidth - 8) left = Math.max(8, rect.left - boxW - 8);

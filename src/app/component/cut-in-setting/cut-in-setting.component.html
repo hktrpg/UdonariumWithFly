@@ -255,18 +255,20 @@
             (change)="onAudioFileChange(audioSelect.value)"
           >
             <option value="" class="not-specified">{{ 'cutin.noAudio' | i18n }}</option>
-            <option *ngFor="let audio of audios" [value]="audio.identifier">{{ audio.name }}</option>
+            <option *ngIf="missingLinkedAudio" [value]="cutInAudioIdentifier">⚠️ {{ cutInAudioFileName || cutInAudioIdentifier.slice(0, 10) }}</option>
+            <option *ngFor="let audio of audios" [value]="audio.identifier" [title]="audio.identifier">{{ audioDisplayName(audio) }}</option>
           </select>
         </label>
       </div>
-      <ng-container *ngIf="isEditable && cutInAudioFileName.length > 0">
+      <ng-container *ngIf="isEditable && cutInAudioIdentifier">
         <p class="hint link-ok" *ngIf="isValidAudio">
           <i class="material-icons">check</i> {{ 'cutin.linkOk' | i18n }}
         </p>
         <p class="hint link-ng" *ngIf="!isValidAudio">
-          ⚠️{{ 'cutin.linkNg' | i18n }} {{ cutInAudioFileName }}
+          ⚠️{{ 'cutin.linkNg' | i18n }} {{ cutInAudioFileName || cutInAudioIdentifier.slice(0, 10) }}
         </p>
       </ng-container>
+      <p class="hint" *ngIf="selectedAudioNeedsName">{{ 'cutin.unnamedAudioHelp' | i18n }}</p>
       <div class="media-row">
         <input
           type="radio"

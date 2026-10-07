@@ -5,16 +5,18 @@ import { setZeroTimeout } from '../../util/zero-timeout';
 import { Connection, ConnectionCallback } from '../connection';
 import { IPeerContext, PeerContext } from '../peer-context';
 import { IRoomInfo, RoomInfo } from '../room-info';
-import { netDebug, meshWarn, meshWarnThrottled } from '../net-debug';
+import { netDebug, meshWarn, meshWarnThrottled } from '../net-mesh-log';
 import { SkyWayDataStream } from './skyway-data-stream';
 import { SkyWayDataStreamList } from './skyway-data-stream-list';
 import { SkyWayFacade } from './skyway-facade';
-import { RoomConnectHelper } from '@udonarium/room-connect-helper';
 import { relayTargetPeerIds, shouldBootstrapSurvivalMesh, shouldLimitDirectMesh, buildSurvivalMeshContext, applyRelayFanOut, isRekeyFullMeshBoost } from '@udonarium/room-reconnect.util';
 import { isHighPriorityOutbound } from '../outbound-priority';
-import { translate } from 'i18n';
+import { skywayI18n } from './skyway-i18n';
 
 type PeerId = string;
+
+const SKYWAY_PRIVATE_UNSUPPORTED_FALLBACK =
+  'Private connections are not available with SkyWay (2023) in this Udonarium build. Please use room connections instead.';
 
 interface DataContainer {
   data: Uint8Array;
@@ -97,7 +99,7 @@ export class SkyWayConnection implements Connection {
     if (!this.peer.isRoom) {
       console.warn('connect() is Fail. Room connection only');
       let errorType = 'udonarium-unsupported';
-      let errorMessage = translate('skyway.privateUnsupported');
+      let errorMessage = skywayI18n('skyway.privateUnsupported', undefined, SKYWAY_PRIVATE_UNSUPPORTED_FALLBACK);
       if (this.callback.onError) this.callback.onError(this.peer, errorType, errorMessage, {});
       return false;
     }
@@ -168,6 +170,9 @@ export class SkyWayConnection implements Connection {
 
   send(data: any, sendTo?: string): boolean {
     if (sendTo) {
+      if (!sendTo.length || sendTo === '???') {
+        return true;
+      }
       const stream = this.streams.find(sendTo);
       if (!stream) {
         const inRoom = this.listRoomMemberPeerIds().includes(sendTo);
@@ -178,8 +183,7 @@ export class SkyWayConnection implements Connection {
           });
           return true;
         }
-        meshWarnThrottled(`drop-unicast-${sendTo.slice(0, 12)}`,
-          'send dropped (unicast peer not in mesh)', sendTo.slice(0, 16));
+        netDebug('send dropped (unicast peer not in mesh)', sendTo.slice(0, 16));
         return false;
       }
       if (!stream.open) {
@@ -391,7 +395,10 @@ export class SkyWayConnection implements Connection {
     };
 
     this.skyWay.onTokenRefreshed = () => {
-      RoomConnectHelper.scheduleMeshHeal();
+      // Lazy import — static import pulls Network into this chunk and causes TDZ on SkyWayConnection.
+      void import('@udonarium/room-connect-helper').then(({ RoomConnectHelper }) => {
+        RoomConnectHelper.scheduleMeshHeal();
+      });
     };
 
     this.skyWay.onMemberLeft = (peerId) => {

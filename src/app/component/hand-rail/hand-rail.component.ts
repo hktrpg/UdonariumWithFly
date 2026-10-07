@@ -65,7 +65,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
   offlineHandPiles: HandPileInfo[] = [];
   /** Import-offline-hand popover open. */
   orphanImportOpen = false;
-  hudVisible = false;
   dropBandVisible = false;
   private handListSignature = '';
   private lazyUpdateTimer: ReturnType<typeof setTimeout> = null;
@@ -132,8 +131,12 @@ export class HandRailComponent implements OnInit, OnDestroy {
 
   get isDraggingCard(): boolean { return !!this.dragCard; }
 
-  /** Fan / chrome HUD — shown whenever the viewed hand has cards (collapse never hides cards). */
-  get showHud(): boolean { return this.hudVisible; }
+  /** Hand rail — visible when the viewed hand has cards (live count, not cached). */
+  get showHandRail(): boolean {
+    if (this.isGuest) return false;
+    if (this.isMobileLayout && this.mobileLayout.isEdit) return false;
+    return this.handService.cardsInHand().length >= 1;
+  }
 
   /** Card row / drop zone — always on when there are cards; also when expanded (empty drop zone). */
   get showCardRow(): boolean {
@@ -142,15 +145,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
 
   /** Dashed drop band while dragging — empty hand only, pinned to viewport bottom. */
   get showDropBand(): boolean { return this.dropBandVisible; }
-
-  private computeHudVisible(cardCount: number): boolean {
-    if (this.isGuest) return false;
-    if (this.isMobileLayout && this.mobileLayout.isEdit) return false;
-    // Empty + drag-to-hand: show only the dashed drop band (rail + band stacks poorly).
-    if (cardCount < 1 && this.isDropOffer) return false;
-    // Otherwise always show so empty hands still raise on bottom hover.
-    return true;
-  }
 
   private computeDropBandVisible(cardCount: number): boolean {
     if (this.isGuest) return false;
@@ -184,11 +178,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
     if (signature !== this.handListSignature) {
       this.handListSignature = signature;
       this.displayCards = cards;
-      changed = true;
-    }
-    const nextHud = this.computeHudVisible(cards.length);
-    if (nextHud !== this.hudVisible) {
-      this.hudVisible = nextHud;
       changed = true;
     }
     const nextDropBand = this.computeDropBandVisible(cards.length);
@@ -281,13 +270,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  private refreshHudVisible(): boolean {
-    const next = this.computeHudVisible(this.displayCards.length);
-    if (next === this.hudVisible) return false;
-    this.hudVisible = next;
-    return true;
-  }
-
   private requestViewUpdate(force = false) {
     const changed = this.syncFromModel() || force;
     if (changed) {
@@ -301,9 +283,8 @@ export class HandRailComponent implements OnInit, OnDestroy {
     if (!offerChanged && !hoverChanged) return false;
     this.isDropOffer = nextOffer;
     this.isDropHover = nextHover;
-    const hudChanged = this.refreshHudVisible();
     const bandChanged = this.refreshDropBandVisible();
-    return hudChanged || bandChanged || offerChanged || hoverChanged;
+    return bandChanged || offerChanged || hoverChanged;
   }
 
   constructor(
@@ -682,7 +663,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.isDropOffer = true;
     this.isDropHover = nextHover;
     this.reorderHoverIndex = nextReorder;
-    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.changeDetector.markForCheck();
   };
@@ -718,7 +698,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.dragCard = card;
     this.dragPointerId = event.pointerId;
     this.isDropOffer = true;
-    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.createDragGhost(card, event.clientX, event.clientY);
     (event.currentTarget as HTMLElement)?.setPointerCapture?.(event.pointerId);
@@ -731,7 +710,6 @@ export class HandRailComponent implements OnInit, OnDestroy {
     this.isDropOffer = false;
     this.isDropHover = false;
     this.reorderHoverIndex = -1;
-    this.refreshHudVisible();
     this.refreshDropBandVisible();
     this.removeDragGhost();
     setCardMergePreview(null);
@@ -913,7 +891,9 @@ export class HandRailComponent implements OnInit, OnDestroy {
     if (this.handListSignature.includes(data.identifier)) return true;
     const card = ObjectStore.instance.get<Card>(data.identifier);
     // Any hand pile (incl. other owners) drives orphan chips + nickname auto-claim.
-    return !!card?.isInHand;
+    if (card?.isInHand) return true;
+    // Card left the hand (played to table) — refresh to hide the rail when empty.
+    return this.displayCards.length > 0;
   }
 
   private isHandRelevantCardDelete(data: {

@@ -542,6 +542,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         ChatWindowComponent.skipEmptyDialogQuotes = on;
         setSkipEmptyDialogQuotes(on);
       });
+      localForage.getItem(ChatWindowComponent.CHAT_AUTO_DIALOG_QUOTES_LOCAL_STORAGE_KEY).then(enabled => {
+        ChatWindowComponent.autoDialogQuotes = enabled == null ? true : !!enabled;
+        EventSystem.trigger('CHANGE_CHAT_AUTO_DIALOG_QUOTES', null);
+      });
       GmCardPeek.loadFromStorage();
       PanelService.loadGeometryFromStorage();
       PanelService.loadSingleNonChatFromStorage();
@@ -2197,6 +2201,12 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         set: (v) => { ChatWindowComponent.setSkipEmptyDialogQuotes(v); },
         on: `☑${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
         off: `☐${this.i18n.t('menu.settings.skipEmptyQuotes')}`,
+      }),
+      contextMenuToggleCheck({
+        get: () => ChatWindowComponent.autoDialogQuotes,
+        set: (v) => { ChatWindowComponent.setAutoDialogQuotes(v); },
+        on: `☑${this.i18n.t('menu.settings.autoDialogQuotes')}`,
+        off: `☐${this.i18n.t('menu.settings.autoDialogQuotes')}`,
       }),
       contextMenuToggleCheck({
         get: () => GmCardPeek.enabled,

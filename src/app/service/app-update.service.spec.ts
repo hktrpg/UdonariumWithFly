@@ -8,6 +8,12 @@ describe('AppUpdateService', () => {
   let service: AppUpdateService;
   let versionUpdates$: Subject<VersionEvent>;
   let activateUpdate: jasmine.Spy;
+  let ngZone: NgZone;
+
+  /** markReady() applies state inside NgZone.run — flush before expects. */
+  function flushNgZone(): Promise<void> {
+    return new Promise(resolve => ngZone.run(() => resolve()));
+  }
 
   beforeEach(() => {
     versionUpdates$ = new Subject<VersionEvent>();
@@ -27,6 +33,7 @@ describe('AppUpdateService', () => {
         { provide: NgZone, useValue: new NgZone({ enableLongStackTrace: false }) },
       ],
     });
+    ngZone = TestBed.inject(NgZone);
     service = TestBed.inject(AppUpdateService);
   });
 
@@ -37,6 +44,7 @@ describe('AppUpdateService', () => {
       version: { hash: 'bad' },
       error: 'Hash mismatch',
     } as VersionEvent);
+    await flushNgZone();
     expect(service.installFailed).toBe(true);
     expect(service.isUpdateReady).toBe(true);
 
@@ -46,6 +54,7 @@ describe('AppUpdateService', () => {
       latestVersion: { hash: 'new' },
     } as VersionEvent);
     await activateUpdate.calls.mostRecent().returnValue;
+    await flushNgZone();
 
     expect(service.installFailed).toBe(false);
     expect(service.isUpdateReady).toBe(true);
@@ -62,8 +71,7 @@ describe('AppUpdateService', () => {
     try {
       await activateUpdate.calls.mostRecent().returnValue;
     } catch { /* expected */ }
-    // allow markReady microtask
-    await Promise.resolve();
+    await flushNgZone();
     expect(service.installFailed).toBe(true);
   });
 });

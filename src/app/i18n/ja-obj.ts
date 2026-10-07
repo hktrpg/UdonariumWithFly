@@ -376,6 +376,8 @@ export const ja_obj: I18nDictionary = {
   'cutin.crop': '切り抜き',
   'cutin.media': '音声／動画',
   'cutin.noAudio': '音声なし',
+  'cutin.unnamedAudio': '名前のない音声（{{hash}}）',
+  'cutin.unnamedAudioHelp': '名前が保存されていません。ジュークボックスで名前を変更するか、元の音声ファイルを再読み込みしてください。',
   'cutin.endedAction': '音声／動画終了時',
   'cutin.nothing': '何もしない',
   'cutin.stopWhenEnded': 'カットインを停止',

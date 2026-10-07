@@ -1,7 +1,7 @@
 import { ImageFile } from './core/file-storage/image-file';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { SyncObject, SyncVar } from './core/synchronize-object/decorator';
-import { Network } from './core/system';
+import { EventSystem, Network } from './core/system';
 import { DataElement } from './data-element';
 import { PeerCursor } from './peer-cursor';
 import { TabletopObject } from './tabletop-object';
@@ -94,6 +94,7 @@ export class Card extends TabletopObject {
       ? 0
       : Math.max(...peersHand.map(c => c.handOrder)) + 1;
     this.setLocation('hand');
+    EventSystem.trigger('HAND_RAIL_SYNC', {});
   }
 
   complement(): void {

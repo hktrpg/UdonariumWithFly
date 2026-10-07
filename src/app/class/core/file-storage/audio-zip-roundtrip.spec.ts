@@ -1,6 +1,7 @@
 import { AudioLibrary } from '@udonarium/audio-library';
 import { FileArchiver } from './file-archiver';
 import { AudioStorage } from './audio-storage';
+import { FileReaderUtil } from './file-reader-util';
 import { MimeType } from './mime-type';
 import { VideoStorage } from './video-storage';
 import { isMediaFileName, packedMediaFileName, toPackedAudioFile } from 'service/folder-backup-layout';
@@ -146,6 +147,45 @@ describe('audio ZIP / folder-backup round-trip', () => {
       expect(AudioLibrary.instance.displayName(AudioStorage.instance.get(id))).toBe('戰鬥主題');
     } finally {
       if (prev && originalResolve) prev.resolveDisplayName = originalResolve;
+    }
+  });
+
+  it('recovers a hash-only WAV name on original-file re-import without replacing a chosen name', async () => {
+    const bytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x10, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x51]);
+    const original = new File([bytes], 'door-open.wav', { type: 'audio/wav' });
+    const id = await FileReaderUtil.calcSHA256Async(await original.arrayBuffer());
+    const packed = new File([bytes], `${id}.wav`, { type: 'audio/wav' });
+
+    try {
+      await FileArchiver.instance.load([packed]);
+      expect(AudioLibrary.instance.displayName(AudioStorage.instance.get(id))).toBe(id);
+
+      await FileArchiver.instance.load([original]);
+      expect(AudioLibrary.instance.displayName(AudioStorage.instance.get(id))).toBe('door-open');
+
+      AudioLibrary.instance.renameAudio(id, '手動命名');
+      await FileArchiver.instance.load([new File([bytes], 'another-name.wav', { type: 'audio/wav' })]);
+      expect(AudioLibrary.instance.displayName(AudioStorage.instance.get(id))).toBe('手動命名');
+    } finally {
+      AudioLibrary.instance.removeAudioMeta(id);
+    }
+  });
+
+  it('uses an embedded MP3 title when a packed file has no saved display name', async () => {
+    const title = new TextEncoder().encode('Battle Theme');
+    const frameSize = title.length + 1;
+    const tagSize = frameSize + 10;
+    const bytes = new Uint8Array(10 + tagSize);
+    bytes.set([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, tagSize], 0); // ID3v2.3
+    bytes.set([0x54, 0x49, 0x54, 0x32, 0, 0, 0, frameSize, 0, 0, 3], 10); // TIT2, UTF-8
+    bytes.set(title, 21);
+    const id = await FileReaderUtil.calcSHA256Async(bytes.buffer);
+
+    try {
+      await FileArchiver.instance.load([new File([bytes], `${id}.mp3`, { type: 'audio/mpeg' })]);
+      expect(AudioLibrary.instance.displayName(AudioStorage.instance.get(id))).toBe('Battle Theme');
+    } finally {
+      AudioLibrary.instance.removeAudioMeta(id);
     }
   });
 

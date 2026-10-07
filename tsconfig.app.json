@@ -6,7 +6,8 @@
     "types": []
   },
   "files": [
-    "src/main.ts"
+    "src/main.ts",
+    "src/native-date-polyfill.ts"
   ],
   "include": [
     "src/**/*.d.ts"

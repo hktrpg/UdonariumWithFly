@@ -57,6 +57,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
 
   /** Character whose vision was auto-linked from the chat send-from selector. */
   private visionLinkedCharacterId = '';
+  private didAutoInsertDialogQuotes = false;
 
   @Input() onlyCharacters: boolean = false;
   @Input() chatTabidentifier: string = '';
@@ -396,6 +397,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
           this.sendTo = '';
         }
       })
+      .on('CHANGE_CHAT_AUTO_DIALOG_QUOTES', () => this.ensureCharacterDialogQuotes())
       .on<string>('WRITING_A_MESSAGE', event => {
         if (event.isSendFromSelf || event.data !== this.chatTabidentifier) return;
         if (!this.writingPeers.has(event.sendFrom)) {
@@ -478,6 +480,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   //}
 
   onInput() {
+    if (this.text !== '「」') this.didAutoInsertDialogQuotes = false;
     if (this.writingEventInterval === null && this.previousWritingLength <= this.text.length) {
       let sendTo: string = null;
       if (this.isDirect) {
@@ -548,11 +551,24 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
   /** When speaking as a character token, keep empty dialog quotes 「」 ready for chat balloons. */
   private ensureCharacterDialogQuotes() {
     const textArea = this.textAreaElementRef?.nativeElement;
+    if (!ChatWindowComponent.autoDialogQuotes) {
+      if (this.didAutoInsertDialogQuotes && this.text === '「」') {
+        this.text = '';
+        this.previousWritingLength = 0;
+        if (textArea) {
+          textArea.value = '';
+          this.calcFitHeight();
+        }
+      }
+      this.didAutoInsertDialogQuotes = false;
+      return;
+    }
     const blankOrEmptyQuotes = !this.text.trim() || this.text === '「」';
 
     if (this.character) {
       if (!blankOrEmptyQuotes) return;
       this.text = '「」';
+      this.didAutoInsertDialogQuotes = true;
       this.previousWritingLength = this.text.length;
       if (textArea) {
         textArea.value = this.text;
@@ -564,6 +580,7 @@ export class ChatInputComponent implements OnInit, OnChanges, OnDestroy {
 
     if (this.text === '「」') {
       this.text = '';
+      this.didAutoInsertDialogQuotes = false;
       this.previousWritingLength = 0;
       if (textArea) {
         textArea.value = '';

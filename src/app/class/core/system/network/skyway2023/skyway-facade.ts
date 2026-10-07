@@ -20,7 +20,7 @@ import {
   nextRefreshDelayMs,
   skyWayRecoveryGate,
 } from './skyway-recovery-policy';
-import { translate } from 'i18n';
+import { skywayI18n } from './skyway-i18n';
 
 export class SkyWayFacade {
   /** Lobby/room membership keepalive — shorter interval helps on high-latency mobile links. */
@@ -147,7 +147,7 @@ export class SkyWayFacade {
     let authToken = await backend.createSkyWayAuthToken(channelName, this.peer.peerId);
     if (authToken.length < 1) {
       skyWayRecoveryGate.noteFailure('token-api');
-      let message = translate('skyway.backendUnavailable', { url: backend.url });
+      let message = skywayI18n('skyway.backendUnavailable', { url: backend.url });
       const err = new Error(message);
       err.name = 'server-error';
       throw err;
@@ -208,7 +208,7 @@ export class SkyWayFacade {
     if (gen !== this.tokenRefreshGeneration || this.isDestroyed) return false;
     if (authToken.length < 1) {
       skyWayRecoveryGate.noteFailure('token-api');
-      const message = translate('skyway.backendUnavailableShort', { url: backend.url });
+      const message = skywayI18n('skyway.backendUnavailableShort', { url: backend.url });
       console.warn(`token-refresh: attempt ${this.tokenRefreshAttempt} failed: ${message}`);
       if (scheduleRetry && !this.isDestroyed) {
         this.clearTokenRefreshTimersOnly();
@@ -270,7 +270,7 @@ export class SkyWayFacade {
       this.close();
       if (this.onClose) this.onClose(this.peer);
     }
-    const message = translate('skyway.tokenExpired');
+    const message = skywayI18n('skyway.tokenExpired');
     skyWayRecoveryGate.noteFailure('token-expired');
     if (this.onFatalError) this.onFatalError(this.peer, 'token-expired', message, new Error(message));
   }
@@ -621,9 +621,9 @@ export class SkyWayFacade {
       .toLowerCase();
     const candidates = [`skyway.${rawType}`, `skyway.${kebab}`, `skyway.${rawType.toLowerCase()}`];
     for (const key of candidates) {
-      const text = translate(key);
+      const text = skywayI18n(key);
       if (text !== key) return { type: kebab || rawType, message: text };
     }
-    return { type: kebab || 'default', message: translate('skyway.default') };
+    return { type: kebab || 'default', message: skywayI18n('skyway.default') };
   }
 }

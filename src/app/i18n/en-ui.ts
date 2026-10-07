@@ -253,6 +253,7 @@ export const en_ui: I18nDictionary = {
   'menu.settings.leftOnly': 'Align messages left',
   'menu.settings.autoPopupChat': 'Auto-open chat on speak',
   'menu.settings.skipEmptyQuotes': 'Hide empty 「」',
+  'menu.settings.autoDialogQuotes': 'Auto-insert 「」 for character chat',
   'menu.settings.gmCardPeek': 'GM card peek (face-through)',
   'menu.settings.resourceHud': 'Show resource HUD',
   'menu.settings.musicHud': 'Show music HUD',

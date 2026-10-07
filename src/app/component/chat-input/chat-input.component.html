@@ -21,7 +21,10 @@
   </div>
   <div class="table-cell">
     <div class="ff-flex">
-      <label class="face-icon-label" style="margin-right: 2px" *ngIf="!ClarifyMode()">
+      <label class="face-icon-label" style="margin-right: 2px" *ngIf="!ClarifyMode()"
+        [appTeachingTip]="character ? 'tip.chat.faceIcon' : ''"
+        [appTeachingTipDelayMs]="700"
+        [appTeachingTipEstimatedHeight]="270">
         <input *ngIf="character" type="checkbox" [(ngModel)]="isUseFaceIcon" checked="{{isUseFaceIcon ? 'checked' : ''}}" (change)="isUseFaceIcon = (isUseFaceIcon ? true : false)" />
         <b *ngIf="character" style="font-size: smaller">{{ 'chat.faceIcon' | i18n }}</b>
       </label>

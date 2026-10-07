@@ -20,6 +20,7 @@
             "index": "src/index.html",
             "main": "src/main.ts",
             "polyfills": [
+              "src/native-date-polyfill.ts",
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
@@ -40,6 +41,9 @@
             ],
             "scripts": [],
             "allowedCommonJsDependencies": [
+              "@udonarium/character-token",
+              "@udonarium/game-character",
+              "@udonarium/tabletop-object",
               "base-x",
               "bcdice",
               "crypto-js/lib-typedarrays",
@@ -114,6 +118,7 @@
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
             "polyfills": [
+              "src/native-date-polyfill.ts",
               "zone.js",
               "zone.js/testing"
             ],
@@ -127,7 +132,8 @@
               "src/app/service/app-update.service.spec.ts",
               "src/app/service/folder-backup-layout.spec.ts",
               "src/app/service/save-snapshot.flush.spec.ts",
-              "src/app/service/save-xml-remap.spec.ts"
+              "src/app/service/save-xml-remap.spec.ts",
+              "src/app/component/cut-in-setting/cut-in-audio-name.spec.ts"
             ],
             "assets": [
               "src/favicon.ico",
