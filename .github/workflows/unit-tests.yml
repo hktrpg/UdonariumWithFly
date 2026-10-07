@@ -26,6 +26,8 @@ jobs:
       # (apt on ubuntu runners can hang 15+ min when archive mirrors are slow).
       - uses: browser-actions/setup-chrome@v1
       - name: Karma (headless + coverage)
+        env:
+          TZ: UTC
         run: npm run test:ci
 
   playwright-smoke:

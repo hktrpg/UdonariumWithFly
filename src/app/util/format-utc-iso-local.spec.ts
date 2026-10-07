@@ -1,20 +1,27 @@
 import { formatUtcIsoToLocal, utcMsFromIsoInstant } from './format-utc-iso-local';
 
+function localWallFromUtcMs(utcMs: number): string {
+  const d = new Date(utcMs);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 describe('formatUtcIsoToLocal', () => {
+  const realDate = Date;
+
+  afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).Date = realDate;
+  });
+
   it('parses Zulu ISO without new Date(string)', () => {
     expect(utcMsFromIsoInstant('2026-09-22T19:45:22.000Z')).toBe(Date.UTC(2026, 8, 22, 19, 45, 22, 0));
   });
 
   it('formats a known instant in local wall time', () => {
-    const utcMs = Date.UTC(2026, 0, 1, 0, 30, 0);
-    const iso = new Date(utcMs).toISOString();
-    const formatted = formatUtcIsoToLocal(iso);
-    const expected = (() => {
-      const d = new Date(utcMs);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    })();
-    expect(formatted).toBe(expected);
+    const iso = '2026-01-01T00:30:00.000Z';
+    const utcMs = utcMsFromIsoInstant(iso)!;
+    expect(formatUtcIsoToLocal(iso)).toBe(localWallFromUtcMs(utcMs));
   });
 
   it('returns raw string when ISO is invalid', () => {
@@ -22,25 +29,20 @@ describe('formatUtcIsoToLocal', () => {
   });
 
   it('formats via utcMs when Date constructor rejects ISO strings', () => {
-    const utcMs = Date.UTC(2026, 8, 22, 19, 45, 22, 0);
-    const RealDate = Date;
+    const iso = '2026-09-22T19:45:22.000Z';
+    const utcMs = utcMsFromIsoInstant(iso)!;
     const BrokenDate = Object.assign(
       function (value?: unknown) {
         if (typeof value === 'string') {
           throw new TypeError('patched Date rejects strings');
         }
-        return new RealDate(value as number);
+        return new realDate(value as number);
       },
-      { UTC: RealDate.UTC, parse: RealDate.parse, now: RealDate.now },
+      { UTC: realDate.UTC, parse: realDate.parse, now: realDate.now },
     ) as unknown as DateConstructor;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).Date = BrokenDate;
 
-    try {
-      expect(formatUtcIsoToLocal('2026-09-22T19:45:22.000Z')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-    } finally {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).Date = RealDate;
-    }
+    expect(formatUtcIsoToLocal(iso)).toBe(localWallFromUtcMs(utcMs));
   });
 });

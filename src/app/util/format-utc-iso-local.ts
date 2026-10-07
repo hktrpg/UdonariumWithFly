@@ -30,15 +30,17 @@ function formatLocalWallViaIntl(utcMs: number): string | null {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+      hourCycle: 'h23',
     }).formatToParts(utcMs);
     const pick = (type: Intl.DateTimeFormatPartTypes) =>
       parts.find(p => p.type === type)?.value;
     const y = pick('year');
     const mo = pick('month');
     const d = pick('day');
-    const h = pick('hour');
+    let h = pick('hour');
     const mi = pick('minute');
     if (!y || !mo || !d || h == null || mi == null) return null;
+    if (h === '24') h = '00';
     return `${y}-${mo}-${d} ${h}:${mi}`;
   } catch {
     return null;
